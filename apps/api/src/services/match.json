@@ -1,0 +1,63 @@
+{
+  "ligaData": {
+    "seasonId": 2025,
+    "seasonName": "2025/2026",
+    "actualMatchDay": {
+      "spieltag": 13,
+      "bezeichnung": "13. Spieltag"
+    },
+    "ligaId": 49009,
+    "liganame": "Regionsklasse U12 männlich / Mitte",
+    "liganr": 45012,
+    "skName": "Regionsklasse",
+    "skNameSmall": "RKl",
+    "skEbeneId": 1,
+    "skEbeneName": "Bezirk",
+    "akName": "U12",
+    "geschlechtId": 1,
+    "geschlecht": "männlich",
+    "verbandId": 7,
+    "verbandName": "Niedersachsen",
+    "bezirknr": 40,
+    "bezirkName": "Region Hannover",
+    "kreisnr": null,
+    "kreisname": null,
+    "statisticType": 1,
+    "vorabliga": false,
+    "tableExists": true,
+    "crossTableExists": true
+  },
+  "matchId": 2676378,
+  "matchDay": 2,
+  "matchNo": 2406,
+  "kickoffDate": "2025-09-20",
+  "kickoffTime": "10:00",
+  "homeTeam": {
+    "seasonTeamId": 412210,
+    "teamCompetitionId": 412210,
+    "teamPermanentId": 320703,
+    "teamname": "Steller Sportverein Kirchhorst",
+    "teamnameSmall": null,
+    "clubId": 5258,
+    "verzicht": false
+  },
+  "guestTeam": {
+    "seasonTeamId": 412211,
+    "teamCompetitionId": 412211,
+    "teamPermanentId": 290564,
+    "teamname": "Hanover Dragons",
+    "teamnameSmall": "DRAG1",
+    "clubId": 4121,
+    "verzicht": false
+  },
+  "result": "65:28",
+  "ergebnisbestaetigt": true,
+  "statisticType": 1,
+  "verzicht": false,
+  "abgesagt": false,
+  "matchResult": null,
+  "matchInfo": null,
+  "matchBoxscore": null,
+  "playByPlay": null,
+  "hasPlayByPlay": false
+}

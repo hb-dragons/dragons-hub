@@ -1,0 +1,1953 @@
+{
+  "type": "object",
+  "fields": {
+    "game1": {
+      "type": "object",
+      "fields": {
+        "spielplanId": {
+          "type": "number"
+        },
+        "spielnr": {
+          "type": "number"
+        },
+        "spieltag": {
+          "type": "number"
+        },
+        "spieldatum": {
+          "type": "number"
+        },
+        "heimEndstand": {
+          "type": "number"
+        },
+        "gastEndstand": {
+          "type": "number"
+        },
+        "heimHalbzeitstand": {
+          "type": "number"
+        },
+        "gastHalbzeitstand": {
+          "type": "number"
+        },
+        "heimV1stand": {
+          "type": "number"
+        },
+        "gastV1stand": {
+          "type": "number"
+        },
+        "heimV3stand": {
+          "type": "number"
+        },
+        "gastV3stand": {
+          "type": "number"
+        },
+        "heimV4stand": {
+          "type": "number"
+        },
+        "gastV4stand": {
+          "type": "number"
+        },
+        "heimOt1stand": {
+          "type": "number"
+        },
+        "gastOt1stand": {
+          "type": "number"
+        },
+        "heimOt2stand": {
+          "type": "number"
+        },
+        "gastOt2stand": {
+          "type": "number"
+        },
+        "spielfeldId": {
+          "type": "number"
+        },
+        "liga": {
+          "type": "object",
+          "fields": {
+            "ligaId": {
+              "type": "number"
+            },
+            "liganr": {
+              "type": "number"
+            },
+            "liganame": {
+              "type": "string"
+            },
+            "ligaKurzname": {
+              "type": "string"
+            },
+            "srKurzname": {
+              "type": "string"
+            },
+            "fibaLiveScores": {
+              "type": "boolean"
+            },
+            "fibaDss": {
+              "type": "boolean"
+            },
+            "srKosten": {
+              "type": "boolean"
+            },
+            "srKostenKmPauschal": {
+              "type": "number"
+            },
+            "scouting": {
+              "type": "boolean"
+            },
+            "parentLigaId": {
+              "type": "number"
+            },
+            "altersklasse": {
+              "type": "object",
+              "fields": {
+                "altersklasseId": {
+                  "type": "number"
+                },
+                "verband": {
+                  "type": "null"
+                },
+                "altersklasse": {
+                  "type": "string"
+                },
+                "altersklassegruppeId": {
+                  "type": "number"
+                },
+                "sortorder": {
+                  "type": "number"
+                },
+                "altersklasseJahrgang": {
+                  "type": "object",
+                  "fields": {
+                    "akjId": {
+                      "type": "number"
+                    },
+                    "jahrgangLimit": {
+                      "type": "number"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "akjGruppeId": {
+                      "type": "number"
+                    },
+                    "akjGruppeName": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            },
+            "geschlechtId": {
+              "type": "number"
+            },
+            "geschlecht": {
+              "type": "string"
+            },
+            "spielklasse": {
+              "type": "null"
+            },
+            "bezirk": {
+              "type": "null"
+            },
+            "kreis": {
+              "type": "null"
+            },
+            "notPublic": {
+              "type": "boolean"
+            },
+            "srNotPublic": {
+              "type": "boolean"
+            },
+            "srNotVisible": {
+              "type": "boolean"
+            },
+            "ergViertel": {
+              "type": "boolean"
+            },
+            "verband": {
+              "type": "null"
+            },
+            "mannschaftdataEditable": {
+              "type": "boolean"
+            },
+            "spielplanEditable": {
+              "type": "boolean"
+            },
+            "mannschaftschluesselnrEditable": {
+              "type": "boolean"
+            },
+            "spielerOhneTna": {
+              "type": "boolean"
+            },
+            "nationalitaetSpielerstats": {
+              "type": "boolean"
+            },
+            "ausschreibung": {
+              "type": "string"
+            },
+            "spieltyp": {
+              "type": "string"
+            },
+            "tabelleNotVisible": {
+              "type": "boolean"
+            },
+            "statistikNotVisible": {
+              "type": "boolean"
+            },
+            "srKoppelbar": {
+              "type": "boolean"
+            },
+            "srMindestabstandTage": {
+              "type": "number"
+            },
+            "srKmBegrenzungWochenende": {
+              "type": "number"
+            },
+            "srKmBegrenzung": {
+              "type": "number"
+            },
+            "sr1modus": {
+              "type": "null"
+            },
+            "sr2modus": {
+              "type": "null"
+            },
+            "sr3modus": {
+              "type": "null"
+            },
+            "srModusKom": {
+              "type": "boolean"
+            },
+            "srRueckgabefrist": {
+              "type": "number"
+            },
+            "srSpieleboerseAktiv": {
+              "type": "boolean"
+            },
+            "srSpieleDirektOnline": {
+              "type": "boolean"
+            },
+            "srOffeneSpieleSichtbarTage": {
+              "type": "number"
+            },
+            "srSofortUebernahmeErlaubt": {
+              "type": "boolean"
+            },
+            "srOeffentlAnbietenErlaubt": {
+              "type": "boolean"
+            },
+            "srZgSpieleAutoAnbieten": {
+              "type": "boolean"
+            },
+            "srEigeneAnsetzungAnbieten": {
+              "type": "boolean"
+            },
+            "srAnzahlSrHm": {
+              "type": "number"
+            },
+            "srAnzahlSrNichtHm": {
+              "type": "number"
+            },
+            "srGebiet": {
+              "type": "object",
+              "fields": {
+                "srgebietId": {
+                  "type": "number"
+                },
+                "kreisId": {
+                  "type": "null"
+                },
+                "verband": {
+                  "type": "object",
+                  "fields": {
+                    "verbandId": {
+                      "type": "number"
+                    },
+                    "verbandsname": {
+                      "type": "string"
+                    },
+                    "kurzname": {
+                      "type": "string"
+                    },
+                    "presentName": {
+                      "type": "string"
+                    },
+                    "logoimage": {
+                      "type": "string"
+                    },
+                    "sortorder": {
+                      "type": "number"
+                    },
+                    "personfunktionList": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "bezirkId": {
+                  "type": "null"
+                },
+                "srgebietname": {
+                  "type": "string"
+                },
+                "srgebietebeneId": {
+                  "type": "number"
+                },
+                "sortorder": {
+                  "type": "number"
+                }
+              }
+            },
+            "srQualifikation": {
+              "type": "object",
+              "fields": {
+                "srQualifikationId": {
+                  "type": "number"
+                },
+                "bezeichnung": {
+                  "type": "string"
+                },
+                "kurzBezeichnung": {
+                  "type": "string"
+                },
+                "srGebietEbeneId": {
+                  "type": "number"
+                }
+              }
+            },
+            "srKurznameOrLiganame": {
+              "type": "string"
+            },
+            "fibaCompetitionName": {
+              "type": "null"
+            },
+            "vorabLiga": {
+              "type": "boolean"
+            },
+            "localPlayerShowInfoEnabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "heimMannschaftLiga": {
+          "type": "object",
+          "fields": {
+            "mannschaftLigaId": {
+              "type": "number"
+            },
+            "liga": {
+              "type": "object",
+              "fields": {
+                "ligaId": {
+                  "type": "number"
+                },
+                "liganr": {
+                  "type": "number"
+                },
+                "liganame": {
+                  "type": "string"
+                },
+                "ligaKurzname": {
+                  "type": "string"
+                },
+                "srKurzname": {
+                  "type": "string"
+                },
+                "fibaLiveScores": {
+                  "type": "boolean"
+                },
+                "fibaDss": {
+                  "type": "boolean"
+                },
+                "srKosten": {
+                  "type": "boolean"
+                },
+                "srKostenKmPauschal": {
+                  "type": "number"
+                },
+                "scouting": {
+                  "type": "boolean"
+                },
+                "parentLigaId": {
+                  "type": "number"
+                },
+                "altersklasse": {
+                  "type": "null"
+                },
+                "geschlechtId": {
+                  "type": "number"
+                },
+                "geschlecht": {
+                  "type": "string"
+                },
+                "spielklasse": {
+                  "type": "null"
+                },
+                "bezirk": {
+                  "type": "null"
+                },
+                "kreis": {
+                  "type": "null"
+                },
+                "notPublic": {
+                  "type": "boolean"
+                },
+                "srNotPublic": {
+                  "type": "boolean"
+                },
+                "srNotVisible": {
+                  "type": "boolean"
+                },
+                "ergViertel": {
+                  "type": "boolean"
+                },
+                "verband": {
+                  "type": "null"
+                },
+                "mannschaftdataEditable": {
+                  "type": "boolean"
+                },
+                "spielplanEditable": {
+                  "type": "boolean"
+                },
+                "mannschaftschluesselnrEditable": {
+                  "type": "boolean"
+                },
+                "spielerOhneTna": {
+                  "type": "boolean"
+                },
+                "nationalitaetSpielerstats": {
+                  "type": "boolean"
+                },
+                "ausschreibung": {
+                  "type": "string"
+                },
+                "spieltyp": {
+                  "type": "string"
+                },
+                "tabelleNotVisible": {
+                  "type": "boolean"
+                },
+                "statistikNotVisible": {
+                  "type": "boolean"
+                },
+                "srKoppelbar": {
+                  "type": "boolean"
+                },
+                "srMindestabstandTage": {
+                  "type": "number"
+                },
+                "srKmBegrenzungWochenende": {
+                  "type": "number"
+                },
+                "srKmBegrenzung": {
+                  "type": "number"
+                },
+                "sr1modus": {
+                  "type": "null"
+                },
+                "sr2modus": {
+                  "type": "null"
+                },
+                "sr3modus": {
+                  "type": "null"
+                },
+                "srModusKom": {
+                  "type": "boolean"
+                },
+                "srRueckgabefrist": {
+                  "type": "number"
+                },
+                "srSpieleboerseAktiv": {
+                  "type": "boolean"
+                },
+                "srSpieleDirektOnline": {
+                  "type": "boolean"
+                },
+                "srOffeneSpieleSichtbarTage": {
+                  "type": "number"
+                },
+                "srSofortUebernahmeErlaubt": {
+                  "type": "boolean"
+                },
+                "srOeffentlAnbietenErlaubt": {
+                  "type": "boolean"
+                },
+                "srZgSpieleAutoAnbieten": {
+                  "type": "boolean"
+                },
+                "srEigeneAnsetzungAnbieten": {
+                  "type": "boolean"
+                },
+                "srAnzahlSrHm": {
+                  "type": "number"
+                },
+                "srAnzahlSrNichtHm": {
+                  "type": "number"
+                },
+                "srGebiet": {
+                  "type": "object",
+                  "fields": {
+                    "srgebietId": {
+                      "type": "number"
+                    },
+                    "kreisId": {
+                      "type": "null"
+                    },
+                    "verband": {
+                      "type": "object",
+                      "fields": {
+                        "verbandId": {
+                          "type": "number"
+                        },
+                        "verbandsname": {
+                          "type": "string"
+                        },
+                        "kurzname": {
+                          "type": "string"
+                        },
+                        "presentName": {
+                          "type": "string"
+                        },
+                        "logoimage": {
+                          "type": "string"
+                        },
+                        "sortorder": {
+                          "type": "number"
+                        },
+                        "personfunktionList": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    "bezirkId": {
+                      "type": "null"
+                    },
+                    "srgebietname": {
+                      "type": "string"
+                    },
+                    "srgebietebeneId": {
+                      "type": "number"
+                    },
+                    "sortorder": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "srQualifikation": {
+                  "type": "object",
+                  "fields": {
+                    "srQualifikationId": {
+                      "type": "number"
+                    },
+                    "bezeichnung": {
+                      "type": "string"
+                    },
+                    "kurzBezeichnung": {
+                      "type": "string"
+                    },
+                    "srGebietEbeneId": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "srKurznameOrLiganame": {
+                  "type": "string"
+                },
+                "fibaCompetitionName": {
+                  "type": "null"
+                },
+                "vorabLiga": {
+                  "type": "boolean"
+                },
+                "localPlayerShowInfoEnabled": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "mannschaft": {
+              "type": "object",
+              "fields": {
+                "mannschaftId": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kurzname": {
+                  "type": "string"
+                },
+                "mannschaftsnr": {
+                  "type": "number"
+                },
+                "verein": {
+                  "type": "object",
+                  "fields": {
+                    "vereinId": {
+                      "type": "number"
+                    },
+                    "vereinsnummer": {
+                      "type": "number"
+                    },
+                    "vereinsname": {
+                      "type": "string"
+                    },
+                    "inaktiv": {
+                      "type": "boolean"
+                    },
+                    "verbandId": {
+                      "type": "number"
+                    },
+                    "kreisId": {
+                      "type": "null"
+                    },
+                    "bezirkId": {
+                      "type": "number"
+                    },
+                    "datumAufnahme": {
+                      "type": "null"
+                    },
+                    "datumAustritt": {
+                      "type": "null"
+                    },
+                    "sgMembers": {
+                      "type": "null"
+                    },
+                    "sgMemberOf": {
+                      "type": "null"
+                    },
+                    "personfunktionList": {
+                      "type": "null"
+                    },
+                    "kontaktdata": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "altersklasseJahrgang": {
+                  "type": "object",
+                  "fields": {
+                    "akjId": {
+                      "type": "number"
+                    },
+                    "jahrgangLimit": {
+                      "type": "number"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "akjGruppeId": {
+                      "type": "number"
+                    },
+                    "akjGruppeName": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "geschecht": {
+                  "type": "string"
+                },
+                "inaktiv": {
+                  "type": "boolean"
+                },
+                "spielfeld": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "fields": {
+                    "id": {
+                      "type": "number"
+                    },
+                    "bezeichnung": {
+                      "type": "string"
+                    },
+                    "strasse": {
+                      "type": "string"
+                    },
+                    "plz": {
+                      "type": "string"
+                    },
+                    "ort": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "number"
+                    },
+                    "kurzname": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "exportname": {
+                  "type": "null"
+                },
+                "vtname": {
+                  "type": "null"
+                },
+                "trikotHeim": {
+                  "type": "null"
+                },
+                "trikotAuswaerts": {
+                  "type": "null"
+                },
+                "spielhemdHeim": {
+                  "type": "string"
+                },
+                "spielhoseHeim": {
+                  "type": "string"
+                },
+                "spielhemdAuswaerts": {
+                  "type": "string"
+                },
+                "spielhoseAuswaerts": {
+                  "type": "string"
+                },
+                "mannschaftsLogoId": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                }
+              }
+            },
+            "spielfeld": {
+              "type": "null"
+            },
+            "verzicht": {
+              "type": "boolean"
+            },
+            "ausserKonkurrenz": {
+              "type": "boolean"
+            },
+            "schluesselnr": {
+              "type": "number"
+            },
+            "punktstrafe": {
+              "type": "number"
+            },
+            "wunschuhrzeit": {
+              "type": "null"
+            },
+            "wunschwochentag": {
+              "type": "number"
+            },
+            "bemerkung": {
+              "type": "null"
+            },
+            "trikotHeim": {
+              "type": "null"
+            },
+            "trikotAuswaerts": {
+              "type": "null"
+            },
+            "spielhemdHeim": {
+              "type": "string"
+            },
+            "spielhoseHeim": {
+              "type": "string"
+            },
+            "spielhemdAuswaerts": {
+              "type": "string"
+            },
+            "spielhoseAuswaerts": {
+              "type": "string"
+            },
+            "mannschaftName": {
+              "type": "string"
+            },
+            "mannschaftKurzname": {
+              "type": "string"
+            },
+            "mannschaftExportname": {
+              "type": "string"
+            },
+            "mannschaftVtname": {
+              "type": "null"
+            }
+          }
+        },
+        "gastMannschaftLiga": {
+          "type": "object",
+          "fields": {
+            "mannschaftLigaId": {
+              "type": "number"
+            },
+            "liga": {
+              "type": "object",
+              "fields": {
+                "ligaId": {
+                  "type": "number"
+                },
+                "liganr": {
+                  "type": "number"
+                },
+                "liganame": {
+                  "type": "string"
+                },
+                "ligaKurzname": {
+                  "type": "string"
+                },
+                "srKurzname": {
+                  "type": "string"
+                },
+                "fibaLiveScores": {
+                  "type": "boolean"
+                },
+                "fibaDss": {
+                  "type": "boolean"
+                },
+                "srKosten": {
+                  "type": "boolean"
+                },
+                "srKostenKmPauschal": {
+                  "type": "number"
+                },
+                "scouting": {
+                  "type": "boolean"
+                },
+                "parentLigaId": {
+                  "type": "number"
+                },
+                "altersklasse": {
+                  "type": "null"
+                },
+                "geschlechtId": {
+                  "type": "number"
+                },
+                "geschlecht": {
+                  "type": "string"
+                },
+                "spielklasse": {
+                  "type": "null"
+                },
+                "bezirk": {
+                  "type": "null"
+                },
+                "kreis": {
+                  "type": "null"
+                },
+                "notPublic": {
+                  "type": "boolean"
+                },
+                "srNotPublic": {
+                  "type": "boolean"
+                },
+                "srNotVisible": {
+                  "type": "boolean"
+                },
+                "ergViertel": {
+                  "type": "boolean"
+                },
+                "verband": {
+                  "type": "null"
+                },
+                "mannschaftdataEditable": {
+                  "type": "boolean"
+                },
+                "spielplanEditable": {
+                  "type": "boolean"
+                },
+                "mannschaftschluesselnrEditable": {
+                  "type": "boolean"
+                },
+                "spielerOhneTna": {
+                  "type": "boolean"
+                },
+                "nationalitaetSpielerstats": {
+                  "type": "boolean"
+                },
+                "ausschreibung": {
+                  "type": "string"
+                },
+                "spieltyp": {
+                  "type": "string"
+                },
+                "tabelleNotVisible": {
+                  "type": "boolean"
+                },
+                "statistikNotVisible": {
+                  "type": "boolean"
+                },
+                "srKoppelbar": {
+                  "type": "boolean"
+                },
+                "srMindestabstandTage": {
+                  "type": "number"
+                },
+                "srKmBegrenzungWochenende": {
+                  "type": "number"
+                },
+                "srKmBegrenzung": {
+                  "type": "number"
+                },
+                "sr1modus": {
+                  "type": "null"
+                },
+                "sr2modus": {
+                  "type": "null"
+                },
+                "sr3modus": {
+                  "type": "null"
+                },
+                "srModusKom": {
+                  "type": "boolean"
+                },
+                "srRueckgabefrist": {
+                  "type": "number"
+                },
+                "srSpieleboerseAktiv": {
+                  "type": "boolean"
+                },
+                "srSpieleDirektOnline": {
+                  "type": "boolean"
+                },
+                "srOffeneSpieleSichtbarTage": {
+                  "type": "number"
+                },
+                "srSofortUebernahmeErlaubt": {
+                  "type": "boolean"
+                },
+                "srOeffentlAnbietenErlaubt": {
+                  "type": "boolean"
+                },
+                "srZgSpieleAutoAnbieten": {
+                  "type": "boolean"
+                },
+                "srEigeneAnsetzungAnbieten": {
+                  "type": "boolean"
+                },
+                "srAnzahlSrHm": {
+                  "type": "number"
+                },
+                "srAnzahlSrNichtHm": {
+                  "type": "number"
+                },
+                "srGebiet": {
+                  "type": "object",
+                  "fields": {
+                    "srgebietId": {
+                      "type": "number"
+                    },
+                    "kreisId": {
+                      "type": "null"
+                    },
+                    "verband": {
+                      "type": "object",
+                      "fields": {
+                        "verbandId": {
+                          "type": "number"
+                        },
+                        "verbandsname": {
+                          "type": "string"
+                        },
+                        "kurzname": {
+                          "type": "string"
+                        },
+                        "presentName": {
+                          "type": "string"
+                        },
+                        "logoimage": {
+                          "type": "string"
+                        },
+                        "sortorder": {
+                          "type": "number"
+                        },
+                        "personfunktionList": {
+                          "type": "null"
+                        }
+                      }
+                    },
+                    "bezirkId": {
+                      "type": "null"
+                    },
+                    "srgebietname": {
+                      "type": "string"
+                    },
+                    "srgebietebeneId": {
+                      "type": "number"
+                    },
+                    "sortorder": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "srQualifikation": {
+                  "type": "object",
+                  "fields": {
+                    "srQualifikationId": {
+                      "type": "number"
+                    },
+                    "bezeichnung": {
+                      "type": "string"
+                    },
+                    "kurzBezeichnung": {
+                      "type": "string"
+                    },
+                    "srGebietEbeneId": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "srKurznameOrLiganame": {
+                  "type": "string"
+                },
+                "fibaCompetitionName": {
+                  "type": "null"
+                },
+                "vorabLiga": {
+                  "type": "boolean"
+                },
+                "localPlayerShowInfoEnabled": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "mannschaft": {
+              "type": "object",
+              "fields": {
+                "mannschaftId": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kurzname": {
+                  "type": "string"
+                },
+                "mannschaftsnr": {
+                  "type": "number"
+                },
+                "verein": {
+                  "type": "object",
+                  "fields": {
+                    "vereinId": {
+                      "type": "number"
+                    },
+                    "vereinsnummer": {
+                      "type": "number"
+                    },
+                    "vereinsname": {
+                      "type": "string"
+                    },
+                    "inaktiv": {
+                      "type": "boolean"
+                    },
+                    "verbandId": {
+                      "type": "number"
+                    },
+                    "kreisId": {
+                      "type": "null"
+                    },
+                    "bezirkId": {
+                      "type": "number"
+                    },
+                    "datumAufnahme": {
+                      "type": "null"
+                    },
+                    "datumAustritt": {
+                      "type": "null"
+                    },
+                    "sgMembers": {
+                      "type": "null"
+                    },
+                    "sgMemberOf": {
+                      "type": "null"
+                    },
+                    "personfunktionList": {
+                      "type": "null"
+                    },
+                    "kontaktdata": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "altersklasseJahrgang": {
+                  "type": "object",
+                  "fields": {
+                    "akjId": {
+                      "type": "number"
+                    },
+                    "jahrgangLimit": {
+                      "type": "number"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "akjGruppeId": {
+                      "type": "number"
+                    },
+                    "akjGruppeName": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "geschecht": {
+                  "type": "string"
+                },
+                "inaktiv": {
+                  "type": "boolean"
+                },
+                "spielfeld": {
+                  "type": "object",
+                  "fields": {
+                    "id": {
+                      "type": "number"
+                    },
+                    "bezeichnung": {
+                      "type": "string"
+                    },
+                    "strasse": {
+                      "type": "string"
+                    },
+                    "plz": {
+                      "type": "string"
+                    },
+                    "ort": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "number"
+                    },
+                    "kurzname": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "exportname": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "vtname": {
+                  "type": "null"
+                },
+                "trikotHeim": {
+                  "type": "null"
+                },
+                "trikotAuswaerts": {
+                  "type": "null"
+                },
+                "spielhemdHeim": {
+                  "type": "string"
+                },
+                "spielhoseHeim": {
+                  "type": "string"
+                },
+                "spielhemdAuswaerts": {
+                  "type": "string"
+                },
+                "spielhoseAuswaerts": {
+                  "type": "string"
+                },
+                "mannschaftsLogoId": {
+                  "type": "number"
+                }
+              }
+            },
+            "spielfeld": {
+              "type": "null"
+            },
+            "verzicht": {
+              "type": "boolean"
+            },
+            "ausserKonkurrenz": {
+              "type": "boolean"
+            },
+            "schluesselnr": {
+              "type": "number"
+            },
+            "punktstrafe": {
+              "type": "number"
+            },
+            "wunschuhrzeit": {
+              "type": "null"
+            },
+            "wunschwochentag": {
+              "type": "number"
+            },
+            "bemerkung": {
+              "type": "null"
+            },
+            "trikotHeim": {
+              "type": "null"
+            },
+            "trikotAuswaerts": {
+              "type": "null"
+            },
+            "spielhemdHeim": {
+              "type": "string"
+            },
+            "spielhoseHeim": {
+              "type": "string"
+            },
+            "spielhemdAuswaerts": {
+              "type": "string"
+            },
+            "spielhoseAuswaerts": {
+              "type": "string"
+            },
+            "mannschaftName": {
+              "type": "string"
+            },
+            "mannschaftKurzname": {
+              "type": "string"
+            },
+            "mannschaftExportname": {
+              "type": "string"
+            },
+            "mannschaftVtname": {
+              "type": "null"
+            }
+          }
+        },
+        "spielfeld": {
+          "type": "object",
+          "fields": {
+            "id": {
+              "type": "number"
+            },
+            "bezeichnung": {
+              "type": "string"
+            },
+            "strasse": {
+              "type": "string"
+            },
+            "plz": {
+              "type": "string"
+            },
+            "ort": {
+              "type": "string"
+            },
+            "score": {
+              "type": "number"
+            },
+            "kurzname": {
+              "type": "string"
+            }
+          }
+        },
+        "spielleitungList": {
+          "type": "null"
+        },
+        "ergebnisbestaetigt": {
+          "type": "boolean"
+        },
+        "verzicht": {
+          "type": "boolean"
+        },
+        "abgesagt": {
+          "type": "boolean"
+        },
+        "ergebnisVon": {
+          "type": "string"
+        },
+        "dssUseraccountId": {
+          "type": "null"
+        },
+        "ats": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "fields": {
+            "srgebietId": {
+              "type": "number"
+            },
+            "kreisId": {
+              "type": "null"
+            },
+            "verband": {
+              "type": "object",
+              "fields": {
+                "verbandId": {
+                  "type": "number"
+                },
+                "verbandsname": {
+                  "type": "string"
+                },
+                "kurzname": {
+                  "type": "string"
+                },
+                "presentName": {
+                  "type": "string"
+                },
+                "logoimage": {
+                  "type": "string"
+                },
+                "sortorder": {
+                  "type": "number"
+                },
+                "personfunktionList": {
+                  "type": "null"
+                }
+              }
+            },
+            "bezirkId": {
+              "type": "number"
+            },
+            "srgebietname": {
+              "type": "string"
+            },
+            "srgebietebeneId": {
+              "type": "number"
+            },
+            "sortorder": {
+              "type": "number"
+            }
+          }
+        },
+        "sr1Verein": {
+          "type": "null"
+        },
+        "sr2Verein": {
+          "type": "null"
+        },
+        "sr1VereinInformiert": {
+          "type": "null"
+        },
+        "sr2VereinInformiert": {
+          "type": "null"
+        },
+        "spielortGeandert": {
+          "type": "boolean"
+        },
+        "spielzeitGeandert": {
+          "type": "boolean"
+        }
+      }
+    },
+    "gekoppelt": {
+      "type": "boolean"
+    },
+    "game2": {
+      "type": "null"
+    },
+    "sr1": {
+      "type": "object",
+      "fields": {
+        "spielleitung": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "fields": {
+            "spielleitungId": {
+              "type": "number"
+            },
+            "schirirolle": {
+              "type": "object",
+              "fields": {
+                "schirirolleId": {
+                  "type": "number"
+                },
+                "schirirollename": {
+                  "type": "string"
+                },
+                "schirirollekurzname": {
+                  "type": "string"
+                }
+              }
+            },
+            "schiedsrichter": {
+              "type": "object",
+              "fields": {
+                "schiedsrichterId": {
+                  "type": "number"
+                },
+                "vereinVO": {
+                  "type": "null"
+                },
+                "personVO": {
+                  "type": "object",
+                  "fields": {
+                    "personId": {
+                      "type": "number"
+                    },
+                    "nachname": {
+                      "type": "string"
+                    },
+                    "vorname": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "geburtsdatum": {
+                      "type": "number"
+                    },
+                    "geschlecht": {
+                      "type": "string"
+                    },
+                    "personDetailsVO": {
+                      "type": "null"
+                    },
+                    "personSettingsVO": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "srgebietId": {
+                  "type": "number"
+                },
+                "schiristatusId": {
+                  "type": "number"
+                },
+                "kaderwertList": {
+                  "type": "null"
+                },
+                "gruppeList": {
+                  "type": "null"
+                },
+                "lizenzStufe": {
+                  "type": "null"
+                },
+                "lizenznummer": {
+                  "type": "number"
+                }
+              }
+            },
+            "spielleitungstatusId": {
+              "type": "number"
+            },
+            "spielleitungstatus": {
+              "type": "string"
+            },
+            "tempeinteilung": {
+              "type": "boolean"
+            },
+            "zeitpunktansetzung": {
+              "type": "number"
+            },
+            "zeitpunktaufhebung": {
+              "type": "null"
+            },
+            "einteilerUacc": {
+              "type": "object",
+              "fields": {
+                "useraccountId": {
+                  "type": "number"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "lastlogin": {
+                  "type": "number"
+                },
+                "failedlogincount": {
+                  "type": "number"
+                },
+                "firstname": {
+                  "type": "string"
+                },
+                "lastname": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "forcepasswordchange": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "bemerkung": {
+              "type": "null"
+            },
+            "einteilungsart": {
+              "type": "number"
+            },
+            "einteilungsArtObj": {
+              "type": "object",
+              "fields": {
+                "title": {
+                  "type": "string"
+                },
+                "letter": {
+                  "type": "string"
+                },
+                "subLetter": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                }
+              }
+            },
+            "emailbenachrichtigt": {
+              "type": "boolean"
+            },
+            "terminkonflikt": {
+              "type": "number"
+            },
+            "bestaetigtart": {
+              "type": "number"
+            },
+            "bestaetigtzeitpunkt": {
+              "type": "number"
+            },
+            "nichtAngetreten": {
+              "type": "boolean"
+            },
+            "sr1Verein": {
+              "type": "null"
+            },
+            "sr2Verein": {
+              "type": "null"
+            }
+          }
+        },
+        "lizenzNr": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "srVerein": {
+          "type": "null"
+        },
+        "ansetzenFuerSpiel": {
+          "type": "null"
+        },
+        "permission": {
+          "type": "object",
+          "fields": {
+            "addSr": {
+              "type": "boolean"
+            },
+            "removeSr": {
+              "type": "boolean"
+            },
+            "addVerein": {
+              "type": "boolean"
+            },
+            "removeVerein": {
+              "type": "boolean"
+            },
+            "canOverride": {
+              "type": "boolean"
+            },
+            "srPermission": {
+              "type": "boolean"
+            },
+            "vereinPermission": {
+              "type": "boolean"
+            }
+          }
+        },
+        "offenAngeboten": {
+          "type": "boolean"
+        },
+        "spielleitungGame2": {
+          "type": "null"
+        },
+        "spielplanId2": {
+          "type": "null"
+        }
+      }
+    },
+    "sr2": {
+      "type": "object",
+      "fields": {
+        "spielleitung": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "fields": {
+            "spielleitungId": {
+              "type": "number"
+            },
+            "schirirolle": {
+              "type": "object",
+              "fields": {
+                "schirirolleId": {
+                  "type": "number"
+                },
+                "schirirollename": {
+                  "type": "string"
+                },
+                "schirirollekurzname": {
+                  "type": "string"
+                }
+              }
+            },
+            "schiedsrichter": {
+              "type": "object",
+              "fields": {
+                "schiedsrichterId": {
+                  "type": "number"
+                },
+                "vereinVO": {
+                  "type": "null"
+                },
+                "personVO": {
+                  "type": "object",
+                  "fields": {
+                    "personId": {
+                      "type": "number"
+                    },
+                    "nachname": {
+                      "type": "string"
+                    },
+                    "vorname": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "geburtsdatum": {
+                      "type": "number"
+                    },
+                    "geschlecht": {
+                      "type": "string"
+                    },
+                    "personDetailsVO": {
+                      "type": "null"
+                    },
+                    "personSettingsVO": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "srgebietId": {
+                  "type": "number"
+                },
+                "schiristatusId": {
+                  "type": "number"
+                },
+                "kaderwertList": {
+                  "type": "null"
+                },
+                "gruppeList": {
+                  "type": "null"
+                },
+                "lizenzStufe": {
+                  "type": "null"
+                },
+                "lizenznummer": {
+                  "type": "number"
+                }
+              }
+            },
+            "spielleitungstatusId": {
+              "type": "number"
+            },
+            "spielleitungstatus": {
+              "type": "string"
+            },
+            "tempeinteilung": {
+              "type": "boolean"
+            },
+            "zeitpunktansetzung": {
+              "type": "number"
+            },
+            "zeitpunktaufhebung": {
+              "type": "null"
+            },
+            "einteilerUacc": {
+              "type": "object",
+              "fields": {
+                "useraccountId": {
+                  "type": "number"
+                },
+                "username": {
+                  "type": "string"
+                },
+                "lastlogin": {
+                  "type": "number"
+                },
+                "failedlogincount": {
+                  "type": "number"
+                },
+                "firstname": {
+                  "type": "string"
+                },
+                "lastname": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "forcepasswordchange": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "bemerkung": {
+              "type": "null"
+            },
+            "einteilungsart": {
+              "type": "number"
+            },
+            "einteilungsArtObj": {
+              "type": "object",
+              "fields": {
+                "title": {
+                  "type": "string"
+                },
+                "letter": {
+                  "type": "string"
+                },
+                "subLetter": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                }
+              }
+            },
+            "emailbenachrichtigt": {
+              "type": "boolean"
+            },
+            "terminkonflikt": {
+              "type": "number"
+            },
+            "bestaetigtart": {
+              "type": "number"
+            },
+            "bestaetigtzeitpunkt": {
+              "type": "number"
+            },
+            "nichtAngetreten": {
+              "type": "boolean"
+            },
+            "sr1Verein": {
+              "type": "null"
+            },
+            "sr2Verein": {
+              "type": "null"
+            }
+          }
+        },
+        "lizenzNr": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "srVerein": {
+          "type": "null"
+        },
+        "ansetzenFuerSpiel": {
+          "type": "null"
+        },
+        "permission": {
+          "type": "object",
+          "fields": {
+            "addSr": {
+              "type": "boolean"
+            },
+            "removeSr": {
+              "type": "boolean"
+            },
+            "addVerein": {
+              "type": "boolean"
+            },
+            "removeVerein": {
+              "type": "boolean"
+            },
+            "canOverride": {
+              "type": "boolean"
+            },
+            "srPermission": {
+              "type": "boolean"
+            },
+            "vereinPermission": {
+              "type": "boolean"
+            }
+          }
+        },
+        "offenAngeboten": {
+          "type": "boolean"
+        },
+        "spielleitungGame2": {
+          "type": "null"
+        },
+        "spielplanId2": {
+          "type": "null"
+        }
+      }
+    },
+    "sr3": {
+      "type": "object",
+      "fields": {
+        "spielleitung": {
+          "type": "null"
+        },
+        "lizenzNr": {
+          "type": "null"
+        },
+        "srVerein": {
+          "type": "null"
+        },
+        "ansetzenFuerSpiel": {
+          "type": "null"
+        },
+        "permission": {
+          "type": "object",
+          "fields": {
+            "addSr": {
+              "type": "boolean"
+            },
+            "removeSr": {
+              "type": "boolean"
+            },
+            "addVerein": {
+              "type": "boolean"
+            },
+            "removeVerein": {
+              "type": "boolean"
+            },
+            "canOverride": {
+              "type": "boolean"
+            },
+            "srPermission": {
+              "type": "boolean"
+            },
+            "vereinPermission": {
+              "type": "boolean"
+            }
+          }
+        },
+        "offenAngeboten": {
+          "type": "boolean"
+        },
+        "spielleitungGame2": {
+          "type": "null"
+        },
+        "spielplanId2": {
+          "type": "null"
+        }
+      }
+    },
+    "coa": {
+      "type": "object",
+      "fields": {
+        "spielleitung": {
+          "type": "null"
+        },
+        "lizenzNr": {
+          "type": "null"
+        },
+        "srVerein": {
+          "type": "null"
+        },
+        "ansetzenFuerSpiel": {
+          "type": "null"
+        },
+        "permission": {
+          "type": "object",
+          "fields": {
+            "addSr": {
+              "type": "boolean"
+            },
+            "removeSr": {
+              "type": "boolean"
+            },
+            "addVerein": {
+              "type": "boolean"
+            },
+            "removeVerein": {
+              "type": "boolean"
+            },
+            "canOverride": {
+              "type": "boolean"
+            },
+            "srPermission": {
+              "type": "boolean"
+            },
+            "vereinPermission": {
+              "type": "boolean"
+            }
+          }
+        },
+        "offenAngeboten": {
+          "type": "boolean"
+        },
+        "spielleitungGame2": {
+          "type": "null"
+        },
+        "spielplanId2": {
+          "type": "null"
+        }
+      }
+    },
+    "kom": {
+      "type": "object",
+      "fields": {
+        "spielleitung": {
+          "type": "null"
+        },
+        "lizenzNr": {
+          "type": "null"
+        },
+        "srVerein": {
+          "type": "null"
+        },
+        "ansetzenFuerSpiel": {
+          "type": "null"
+        },
+        "permission": {
+          "type": "object",
+          "fields": {
+            "addSr": {
+              "type": "boolean"
+            },
+            "removeSr": {
+              "type": "boolean"
+            },
+            "addVerein": {
+              "type": "boolean"
+            },
+            "removeVerein": {
+              "type": "boolean"
+            },
+            "canOverride": {
+              "type": "boolean"
+            },
+            "srPermission": {
+              "type": "boolean"
+            },
+            "vereinPermission": {
+              "type": "boolean"
+            }
+          }
+        },
+        "offenAngeboten": {
+          "type": "boolean"
+        },
+        "spielleitungGame2": {
+          "type": "null"
+        },
+        "spielplanId2": {
+          "type": "null"
+        }
+      }
+    },
+    "atsAllowed": {
+      "type": "boolean"
+    },
+    "editAnythingPossible": {
+      "type": "boolean"
+    },
+    "gameInfoMessages": {
+      "type": "array"
+    },
+    "editAnySrPossible": {
+      "type": "boolean"
+    },
+    "editAnyVereinPossible": {
+      "type": "boolean"
+    },
+    "undoAtsAllowed": {
+      "type": "boolean"
+    },
+    "rollenAndSrVereinEmpty": {
+      "type": "boolean"
+    },
+    "rolleOnlyEmpty": {
+      "type": "boolean"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "@dragons/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --platform node --target node20 --dts --clean",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@bull-board/api": "^6.18.1",
+    "@bull-board/hono": "^6.18.1",
+    "@dragons/db": "workspace:*",
+    "@dragons/sdk": "workspace:*",
+    "@hono/node-server": "^1.19.9",
+    "basketball-bund-sdk": "github:dirkdrutschmann/basketball-bund-sdk",
+    "better-auth": "^1.4.18",
+    "bullmq": "^5.69.2",
+    "dotenv": "^17.3.1",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.11.9",
+    "ioredis": "^5.9.3",
+    "p-limit": "^7.3.0",
+    "pg": "^8.18.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.15",
+    "@types/node": "^25.2.3",
+    "@types/pg": "^8.16.0",
+    "@vitest/coverage-v8": "^4.0.7",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.7"
+  }
+}

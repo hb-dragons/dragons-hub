@@ -1,0 +1,244 @@
+{
+  "kreuztabelle": null,
+  "ligaData": {
+    "actualMatchDay": {
+      "bezeichnung": "11. Spieltag",
+      "spieltag": 11
+    },
+    "akName": "Senioren",
+    "bezirkName": null,
+    "bezirknr": null,
+    "crossTableExists": true,
+    "geschlecht": "männlich",
+    "geschlechtId": 1,
+    "kreisname": null,
+    "kreisnr": null,
+    "ligaId": 48666,
+    "liganame": "Oberliga Herren Ost",
+    "liganr": 4001,
+    "seasonId": 2025,
+    "seasonName": "2025/2026",
+    "skEbeneId": 0,
+    "skEbeneName": "Verband",
+    "skName": "Oberliga",
+    "skNameSmall": "OL",
+    "statisticType": 1,
+    "tableExists": true,
+    "verbandId": 7,
+    "verbandName": "Niedersachsen",
+    "vorabliga": false
+  },
+  "matches": [],
+  "nextSpieltag": null,
+  "prevSpieltag": null,
+  "selSpielDatum": null,
+  "selSpieltag": null,
+  "spieltage": null,
+  "tabelle": {
+    "bbl": false,
+    "entries": [
+      {
+        "anzGewinnpunkte": 22,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 11,
+        "gegenKoerbe": 739,
+        "koerbe": 911,
+        "korbdiff": 172,
+        "n": 0,
+        "rang": 1,
+        "s": 11,
+        "team": {
+          "clubId": 325,
+          "seasonTeamId": 406186,
+          "teamCompetitionId": 406186,
+          "teamPermanentId": 157732,
+          "teamname": "TuS Bothfeld",
+          "teamnameSmall": "BOTH1",
+          "verzicht": false
+        }
+      },
+      {
+        "anzGewinnpunkte": 16,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 11,
+        "gegenKoerbe": 756,
+        "koerbe": 833,
+        "korbdiff": 77,
+        "n": 3,
+        "rang": 2,
+        "s": 8,
+        "team": {
+          "clubId": 1017,
+          "seasonTeamId": 406184,
+          "teamCompetitionId": 406184,
+          "teamPermanentId": 157816,
+          "teamname": "SG Braunschweig II",
+          "teamnameSmall": "SG 2",
+          "verzicht": false
+        }
+      },
+      {
+        "anzGewinnpunkte": 14,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 11,
+        "gegenKoerbe": 791,
+        "koerbe": 838,
+        "korbdiff": 47,
+        "n": 4,
+        "rang": 3,
+        "s": 7,
+        "team": {
+          "clubId": 992,
+          "seasonTeamId": 406183,
+          "teamCompetitionId": 406183,
+          "teamPermanentId": 160361,
+          "teamname": "Schapen Sharks",
+          "teamnameSmall": "Shark",
+          "verzicht": false
+        }
+      },
+      {
+        "anzGewinnpunkte": 12,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 11,
+        "gegenKoerbe": 758,
+        "koerbe": 769,
+        "korbdiff": 11,
+        "n": 5,
+        "rang": 4,
+        "s": 6,
+        "team": {
+          "clubId": 1465,
+          "seasonTeamId": 406182,
+          "teamCompetitionId": 406182,
+          "teamPermanentId": 157815,
+          "teamname": "SC Weende",
+          "teamnameSmall": "SCW",
+          "verzicht": false
+        }
+      },
+      {
+        "anzGewinnpunkte": 10,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 11,
+        "gegenKoerbe": 806,
+        "koerbe": 853,
+        "korbdiff": 47,
+        "n": 6,
+        "rang": 5,
+        "s": 5,
+        "team": {
+          "clubId": 1819,
+          "seasonTeamId": 406187,
+          "teamCompetitionId": 406187,
+          "teamPermanentId": 152164,
+          "teamname": "Völkenrode Dolphins",
+          "teamnameSmall": "Völ D",
+          "verzicht": false
+        }
+      },
+      {
+        "anzGewinnpunkte": 8,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 10,
+        "gegenKoerbe": 728,
+        "koerbe": 727,
+        "korbdiff": -1,
+        "n": 6,
+        "rang": 6,
+        "s": 4,
+        "team": {
+          "clubId": 1789,
+          "seasonTeamId": 406181,
+          "teamCompetitionId": 406181,
+          "teamPermanentId": 152158,
+          "teamname": "MTV/BG Wolfenbüttel II",
+          "teamnameSmall": "MTV/B",
+          "verzicht": false
+        }
+      },
+      {
+        "anzGewinnpunkte": 7,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 11,
+        "gegenKoerbe": 873,
+        "koerbe": 835,
+        "korbdiff": -38,
+        "n": 7,
+        "rang": 7,
+        "s": 4,
+        "team": {
+          "clubId": 754,
+          "seasonTeamId": 411672,
+          "teamCompetitionId": 411672,
+          "teamPermanentId": 160072,
+          "teamname": "TSV Neustadt 2",
+          "teamnameSmall": "NEU2",
+          "verzicht": false
+        }
+      },
+      {
+        "anzGewinnpunkte": 6,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 10,
+        "gegenKoerbe": 868,
+        "koerbe": 699,
+        "korbdiff": -169,
+        "n": 7,
+        "rang": 8,
+        "s": 3,
+        "team": {
+          "clubId": 1028,
+          "seasonTeamId": 412271,
+          "teamCompetitionId": 412271,
+          "teamPermanentId": 160048,
+          "teamname": "TK Hannover",
+          "teamnameSmall": "TKH",
+          "verzicht": false
+        }
+      },
+      {
+        "anzGewinnpunkte": 6,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 11,
+        "gegenKoerbe": 854,
+        "koerbe": 775,
+        "korbdiff": -79,
+        "n": 8,
+        "rang": 9,
+        "s": 3,
+        "team": {
+          "clubId": 634,
+          "seasonTeamId": 406178,
+          "teamCompetitionId": 406178,
+          "teamPermanentId": 157725,
+          "teamname": "CVJM Hannover II",
+          "teamnameSmall": "CVJM2",
+          "verzicht": false
+        }
+      },
+      {
+        "anzGewinnpunkte": 5,
+        "anzVerlustpunkte": 0,
+        "anzspiele": 11,
+        "gegenKoerbe": 793,
+        "koerbe": 726,
+        "korbdiff": -67,
+        "n": 8,
+        "rang": 10,
+        "s": 3,
+        "team": {
+          "clubId": 1477,
+          "seasonTeamId": 414380,
+          "teamCompetitionId": 414380,
+          "teamPermanentId": 157829,
+          "teamname": "BTS Neustadt II",
+          "teamnameSmall": "BTS 2",
+          "verzicht": false
+        }
+      }
+    ],
+    "ligaData": null
+  },
+  "teamStatistik": null
+}

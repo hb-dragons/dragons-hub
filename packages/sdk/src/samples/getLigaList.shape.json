@@ -1,0 +1,91 @@
+{
+  "type": "object",
+  "fields": {
+    "startAtIndex": {
+      "type": "number"
+    },
+    "ligen": {
+      "type": "array",
+      "elementShape": {
+        "type": "object",
+        "fields": {
+          "seasonId": {
+            "type": "null"
+          },
+          "seasonName": {
+            "type": "null"
+          },
+          "actualMatchDay": {
+            "type": "null"
+          },
+          "ligaId": {
+            "type": "number"
+          },
+          "liganame": {
+            "type": "string"
+          },
+          "liganr": {
+            "type": "number"
+          },
+          "skName": {
+            "type": "string"
+          },
+          "skNameSmall": {
+            "type": "string"
+          },
+          "skEbeneId": {
+            "type": "number"
+          },
+          "skEbeneName": {
+            "type": "string"
+          },
+          "akName": {
+            "type": "string"
+          },
+          "geschlechtId": {
+            "type": "number"
+          },
+          "geschlecht": {
+            "type": "string"
+          },
+          "verbandId": {
+            "type": "number"
+          },
+          "verbandName": {
+            "type": "string"
+          },
+          "bezirknr": {
+            "type": "null"
+          },
+          "bezirkName": {
+            "type": "null"
+          },
+          "kreisnr": {
+            "type": "null"
+          },
+          "kreisname": {
+            "type": "null"
+          },
+          "statisticType": {
+            "type": "null"
+          },
+          "vorabliga": {
+            "type": "boolean"
+          },
+          "tableExists": {
+            "type": "null"
+          },
+          "crossTableExists": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    "hasMoreData": {
+      "type": "boolean"
+    },
+    "size": {
+      "type": "number"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@dragons/ui/lib/utils";
+import { UserButton } from "@daveyplate/better-auth-ui";
+
+const navLinks = [
+  { href: "/admin/matches", label: "Matches" },
+  { href: "/admin/teams", label: "Teams" },
+  { href: "/admin/sync", label: "Sync" },
+  { href: "/admin/settings", label: "Settings" },
+];
+
+export function Header() {
+  const pathname = usePathname();
+
+  return (
+    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-6">
+        <Link href="/admin" className="text-lg font-semibold tracking-tight">
+          Dragons Admin
+        </Link>
+        <nav className="flex flex-1 items-center gap-1">
+          {navLinks.map((link) => {
+            const isActive = pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <UserButton />
+      </div>
+    </header>
+  );
+}

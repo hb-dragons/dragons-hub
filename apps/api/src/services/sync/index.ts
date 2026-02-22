@@ -1,0 +1,269 @@
+import { db } from "../../config/database";
+import { syncRuns } from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
+import { syncLeagues } from "./leagues.sync";
+import { syncTeamsFromData } from "./teams.sync";
+import { syncMatchesFromData } from "./matches.sync";
+import { syncStandingsFromData } from "./standings.sync";
+import { syncVenuesFromData, buildVenueIdLookup } from "./venues.sync";
+import {
+  syncRefereesFromData,
+  syncRefereeRolesFromData,
+  syncRefereeAssignmentsFromData,
+  buildMatchIdLookup,
+} from "./referees.sync";
+import { createSyncLogger } from "./sync-logger";
+import { fetchAllSyncData, extractRefereeAssignments } from "./data-fetcher";
+
+export interface SyncResult {
+  syncRunId: number;
+  triggeredBy: "cron" | "manual";
+  startedAt: Date;
+  completedAt: Date;
+  durationMs: number;
+  leagues: { created: number; updated: number; skipped: number; errors: number };
+  teams: { created: number; updated: number; skipped: number; errors: number };
+  matches: { created: number; updated: number; skipped: number; errors: number };
+  standings: { created: number; updated: number; skipped: number; errors: number };
+  venues: { created: number; updated: number; skipped: number; errors: number };
+  referees: {
+    created: number;
+    updated: number;
+    skipped: number;
+    rolesUpdated: number;
+    assignmentsCreated: number;
+    errors: number;
+  };
+  totalErrors: string[];
+  status: "completed" | "failed";
+}
+
+export class SyncOrchestrator {
+  async fullSync(
+    triggeredBy: "cron" | "manual",
+    jobLogger?: (msg: string) => Promise<void> | void,
+    syncRunId?: number,
+  ): Promise<SyncResult> {
+    const log = async (msg: string) => {
+      console.log(msg);
+      if (jobLogger) await jobLogger(msg);
+    };
+
+    const startedAt = new Date();
+    const allErrors: string[] = [];
+
+    // Reuse existing sync run (from eager creation) or create a new one
+    let syncRun: { id: number };
+    if (syncRunId) {
+      const [updated] = await db
+        .update(syncRuns)
+        .set({ status: "running", startedAt })
+        .where(eq(syncRuns.id, syncRunId))
+        .returning();
+      if (!updated) {
+        throw new Error("Failed to update sync run");
+      }
+      syncRun = updated;
+    } else {
+      const [created] = await db
+        .insert(syncRuns)
+        .values({
+          syncType: "full",
+          triggeredBy,
+          status: "running",
+          startedAt,
+        })
+        .returning();
+      if (!created) {
+        throw new Error("Failed to create sync run");
+      }
+      syncRun = created;
+    }
+
+    // Create sync logger for per-item logging
+    const syncLogger = createSyncLogger(syncRun.id);
+
+    try {
+      await log(`[Sync] Starting full sync (triggered by: ${triggeredBy})`);
+
+      // Step 1: Sync leagues (sequential — FK dependency)
+      await log("[Sync] Step 1/6: Syncing leagues...");
+      const leaguesResult = await syncLeagues(syncLogger);
+      allErrors.push(...leaguesResult.errors);
+
+      // Step 2: Parallel data fetch from SDK
+      await log("[Sync] Step 2/6: Fetching all data in parallel...");
+      const syncData = await fetchAllSyncData();
+      await log(
+        `[Sync] Fetched: ${syncData.leagueData.length} leagues, ${syncData.teams.size} teams, ${syncData.venues.size} venues, ${syncData.referees.size} referees`,
+      );
+
+      // Step 3: Parallel entity upserts (independent tables)
+      await log("[Sync] Step 3/6: Syncing entities in parallel...");
+      const [teamsRes, venuesRes, refereesRes, rolesRes, standingsRes] = await Promise.all([
+        syncTeamsFromData(syncData.teams, syncLogger),
+        syncVenuesFromData(syncData.venues, syncLogger),
+        syncRefereesFromData(syncData.referees, syncLogger),
+        syncRefereeRolesFromData(syncData.refereeRoles, syncLogger),
+        syncStandingsFromData(syncData.leagueData, syncLogger),
+      ]);
+
+      allErrors.push(...teamsRes.errors);
+      allErrors.push(...venuesRes.errors);
+      allErrors.push(...refereesRes.errors);
+      allErrors.push(...standingsRes.errors);
+
+      // Step 4: Matches sync (needs venue FK lookup)
+      await log("[Sync] Step 4/6: Syncing matches...");
+      const venueIdLookup = await buildVenueIdLookup();
+      const matchesRes = await syncMatchesFromData(
+        syncData.leagueData,
+        venueIdLookup,
+        syncRun.id,
+        syncLogger,
+      );
+      allErrors.push(...matchesRes.errors);
+
+      // Step 5: Referee assignments (needs match + referee FK lookups)
+      await log("[Sync] Step 5/6: Syncing referee assignments...");
+      const refereeAssignments = extractRefereeAssignments(syncData.leagueData);
+      const matchIdLookup = await buildMatchIdLookup();
+      const assignmentsRes = await syncRefereeAssignmentsFromData(
+        refereeAssignments,
+        refereesRes.refereeIdLookup,
+        rolesRes.roleIdLookup,
+        matchIdLookup,
+        syncLogger,
+      );
+      allErrors.push(...assignmentsRes.errors);
+
+      // Step 6: Finalize
+      await log("[Sync] Step 6/6: Finalizing...");
+
+      // Close sync logger (flushes remaining entries)
+      await syncLogger.close();
+
+      const completedAt = new Date();
+      const durationMs = completedAt.getTime() - startedAt.getTime();
+
+      const summary = {
+        leagues: {
+          total: leaguesResult.total,
+          created: leaguesResult.created,
+          updated: leaguesResult.updated,
+          skipped: leaguesResult.skipped,
+        },
+        teams: { total: teamsRes.total, created: teamsRes.created, updated: teamsRes.updated, skipped: teamsRes.skipped },
+        matches: {
+          total: matchesRes.total,
+          created: matchesRes.created,
+          updated: matchesRes.updated,
+          skipped: matchesRes.skipped,
+        },
+        standings: { total: standingsRes.total, created: standingsRes.created, updated: standingsRes.updated, skipped: standingsRes.skipped },
+        venues: { total: venuesRes.total, created: venuesRes.created, updated: venuesRes.updated, skipped: venuesRes.skipped },
+        referees: {
+          created: refereesRes.created,
+          updated: refereesRes.updated,
+          skipped: refereesRes.skipped,
+          rolesUpdated: rolesRes.updated,
+          assignmentsCreated: assignmentsRes.created,
+        },
+      };
+
+      await db
+        .update(syncRuns)
+        .set({
+          status: "completed",
+          completedAt,
+          durationMs,
+          recordsProcessed:
+            leaguesResult.total + teamsRes.total + matchesRes.total + standingsRes.total + venuesRes.total,
+          recordsCreated:
+            leaguesResult.created + teamsRes.created + matchesRes.created + standingsRes.created + venuesRes.created + refereesRes.created,
+          recordsUpdated:
+            leaguesResult.updated + teamsRes.updated + matchesRes.updated + standingsRes.updated + venuesRes.updated + refereesRes.updated,
+          recordsSkipped:
+            leaguesResult.skipped + teamsRes.skipped + matchesRes.skipped + standingsRes.skipped + venuesRes.skipped + refereesRes.skipped,
+          recordsFailed: allErrors.length,
+          errorMessage: allErrors.length > 0 ? allErrors.slice(0, 10).join("\n") : null,
+          summary,
+        })
+        .where(eq(syncRuns.id, syncRun.id));
+
+      const syncResult: SyncResult = {
+        syncRunId: syncRun.id,
+        triggeredBy,
+        startedAt,
+        completedAt,
+        durationMs,
+        leagues: {
+          created: leaguesResult.created,
+          updated: leaguesResult.updated,
+          skipped: leaguesResult.skipped,
+          errors: leaguesResult.errors.length,
+        },
+        teams: { created: teamsRes.created, updated: teamsRes.updated, skipped: teamsRes.skipped, errors: teamsRes.errors.length },
+        matches: {
+          created: matchesRes.created,
+          updated: matchesRes.updated,
+          skipped: matchesRes.skipped,
+          errors: matchesRes.errors.length,
+        },
+        standings: { created: standingsRes.created, updated: standingsRes.updated, skipped: standingsRes.skipped, errors: standingsRes.errors.length },
+        venues: { created: venuesRes.created, updated: venuesRes.updated, skipped: venuesRes.skipped, errors: venuesRes.errors.length },
+        referees: {
+          created: refereesRes.created,
+          updated: refereesRes.updated,
+          skipped: refereesRes.skipped,
+          rolesUpdated: rolesRes.updated,
+          assignmentsCreated: assignmentsRes.created,
+          errors: refereesRes.errors.length + assignmentsRes.errors.length,
+        },
+        totalErrors: allErrors,
+        status: "completed",
+      };
+
+      await log(`[Sync] Full sync completed in ${durationMs}ms with ${allErrors.length} errors`);
+      return syncResult;
+    } catch (error) {
+      const completedAt = new Date();
+      const message = error instanceof Error ? error.message : "Unknown error";
+      allErrors.push(`Fatal sync error: ${message}`);
+
+      await syncLogger.close();
+
+      await db
+        .update(syncRuns)
+        .set({
+          status: "failed",
+          completedAt,
+          durationMs: completedAt.getTime() - startedAt.getTime(),
+          recordsFailed: allErrors.length,
+          errorMessage: message,
+          errorStack: error instanceof Error ? error.stack : undefined,
+        })
+        .where(eq(syncRuns.id, syncRun.id));
+
+      console.error(`[Sync] Full sync failed: ${message}`);
+
+      return {
+        syncRunId: syncRun.id,
+        triggeredBy,
+        startedAt,
+        completedAt,
+        durationMs: completedAt.getTime() - startedAt.getTime(),
+        leagues: { created: 0, updated: 0, skipped: 0, errors: 0 },
+        teams: { created: 0, updated: 0, skipped: 0, errors: 0 },
+        matches: { created: 0, updated: 0, skipped: 0, errors: 0 },
+        standings: { created: 0, updated: 0, skipped: 0, errors: 0 },
+        venues: { created: 0, updated: 0, skipped: 0, errors: 0 },
+        referees: { created: 0, updated: 0, skipped: 0, rolesUpdated: 0, assignmentsCreated: 0, errors: 0 },
+        totalErrors: allErrors,
+        status: "failed",
+      };
+    }
+  }
+}
+
+export const syncOrchestrator = new SyncOrchestrator();

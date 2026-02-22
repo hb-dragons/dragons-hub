@@ -1,0 +1,192 @@
+{
+  "type": "object",
+  "fields": {
+    "prevSpieltag": {
+      "type": "null"
+    },
+    "selSpieltag": {
+      "type": "null"
+    },
+    "selSpielDatum": {
+      "type": "null"
+    },
+    "nextSpieltag": {
+      "type": "null"
+    },
+    "ligaData": {
+      "type": "object",
+      "fields": {
+        "seasonId": {
+          "type": "number"
+        },
+        "seasonName": {
+          "type": "string"
+        },
+        "actualMatchDay": {
+          "type": "object",
+          "fields": {
+            "spieltag": {
+              "type": "number"
+            },
+            "bezeichnung": {
+              "type": "string"
+            }
+          }
+        },
+        "ligaId": {
+          "type": "number"
+        },
+        "liganame": {
+          "type": "string"
+        },
+        "liganr": {
+          "type": "number"
+        },
+        "skName": {
+          "type": "string"
+        },
+        "skNameSmall": {
+          "type": "string"
+        },
+        "skEbeneId": {
+          "type": "number"
+        },
+        "skEbeneName": {
+          "type": "string"
+        },
+        "akName": {
+          "type": "string"
+        },
+        "geschlechtId": {
+          "type": "number"
+        },
+        "geschlecht": {
+          "type": "string"
+        },
+        "verbandId": {
+          "type": "number"
+        },
+        "verbandName": {
+          "type": "string"
+        },
+        "bezirknr": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "bezirkName": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "kreisnr": {
+          "type": "null"
+        },
+        "kreisname": {
+          "type": "null"
+        },
+        "statisticType": {
+          "type": "number"
+        },
+        "vorabliga": {
+          "type": "boolean"
+        },
+        "tableExists": {
+          "type": "boolean"
+        },
+        "crossTableExists": {
+          "type": "boolean"
+        }
+      }
+    },
+    "spieltage": {
+      "type": "null"
+    },
+    "matches": {
+      "type": "array"
+    },
+    "tabelle": {
+      "type": "object",
+      "fields": {
+        "ligaData": {
+          "type": "null"
+        },
+        "entries": {
+          "type": "array",
+          "elementShape": {
+            "type": "object",
+            "fields": {
+              "rang": {
+                "type": "number"
+              },
+              "team": {
+                "type": "object",
+                "fields": {
+                  "seasonTeamId": {
+                    "type": "number"
+                  },
+                  "teamCompetitionId": {
+                    "type": "number"
+                  },
+                  "teamPermanentId": {
+                    "type": "number"
+                  },
+                  "teamname": {
+                    "type": "string"
+                  },
+                  "teamnameSmall": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "clubId": {
+                    "type": "number"
+                  },
+                  "verzicht": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "anzspiele": {
+                "type": "number"
+              },
+              "anzGewinnpunkte": {
+                "type": "number"
+              },
+              "anzVerlustpunkte": {
+                "type": "number"
+              },
+              "s": {
+                "type": "number"
+              },
+              "n": {
+                "type": "number"
+              },
+              "koerbe": {
+                "type": "number"
+              },
+              "gegenKoerbe": {
+                "type": "number"
+              },
+              "korbdiff": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "bbl": {
+          "type": "boolean"
+        }
+      }
+    },
+    "kreuztabelle": {
+      "type": "null"
+    },
+    "teamStatistik": {
+      "type": "null"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+node_modules/
+.pnpm-store/
+.turbo/
+dist/
+coverage/
+apps/*/coverage/
+
+.DS_Store
+
+.env
+.env.*
+!.env.example
+
+apps/*/.next/
+apps/*/dist/
+apps/*/tsconfig.tsbuildinfo

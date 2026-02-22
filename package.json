@@ -1,0 +1,21 @@
+{
+  "name": "dragons-all",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "dev": "turbo dev --parallel",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "coverage": "turbo coverage",
+    "check:ai-slop": "node scripts/check-ai-slop.mjs",
+    "security:audit": "pnpm audit --audit-level=high",
+    "clean": "turbo clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.8.7",
+    "typescript": "^5.9.3"
+  }
+}

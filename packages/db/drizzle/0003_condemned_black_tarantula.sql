@@ -1,0 +1,4 @@
+ALTER TABLE "matches" ADD CONSTRAINT "matches_home_team_api_id_teams_api_team_permanent_id_fk" FOREIGN KEY ("home_team_api_id") REFERENCES "public"."teams"("api_team_permanent_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "matches" ADD CONSTRAINT "matches_guest_team_api_id_teams_api_team_permanent_id_fk" FOREIGN KEY ("guest_team_api_id") REFERENCES "public"."teams"("api_team_permanent_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "standings" ADD CONSTRAINT "standings_team_api_id_teams_api_team_permanent_id_fk" FOREIGN KEY ("team_api_id") REFERENCES "public"."teams"("api_team_permanent_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "sync_runs_started_at_idx" ON "sync_runs" USING btree ("started_at");
