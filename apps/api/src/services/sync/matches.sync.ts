@@ -11,7 +11,6 @@ import type { SdkSpielplanMatch, SdkGetGameResponse } from "@dragons/sdk";
 import type { LeagueFetchedData } from "./data-fetcher";
 import { computeEntityHash } from "./hash";
 import type { SyncLogger } from "./sync-logger";
-import { writeFileSync } from "fs";
 
 export interface MatchesSyncResult {
   total: number;
@@ -24,7 +23,7 @@ export interface MatchesSyncResult {
 }
 
 interface PeriodScores {
-  periodFormat: "quarters" | "achtel" | null;
+  periodFormat: "quarters" | null;
   homeQ1: number | null;
   guestQ1: number | null;
   homeQ2: number | null;
@@ -33,14 +32,6 @@ interface PeriodScores {
   guestQ3: number | null;
   homeQ4: number | null;
   guestQ4: number | null;
-  homeQ5: number | null;
-  guestQ5: number | null;
-  homeQ6: number | null;
-  guestQ6: number | null;
-  homeQ7: number | null;
-  guestQ7: number | null;
-  homeQ8: number | null;
-  guestQ8: number | null;
 }
 
 interface OvertimeDeltas {
@@ -66,7 +57,7 @@ interface RemoteSnapshot {
   guestScore: number | null;
   homeHalftimeScore: number | null;
   guestHalftimeScore: number | null;
-  periodFormat: "quarters" | "achtel" | null;
+  periodFormat: "quarters" | null;
   homeQ1: number | null;
   guestQ1: number | null;
   homeQ2: number | null;
@@ -75,14 +66,6 @@ interface RemoteSnapshot {
   guestQ3: number | null;
   homeQ4: number | null;
   guestQ4: number | null;
-  homeQ5: number | null;
-  guestQ5: number | null;
-  homeQ6: number | null;
-  guestQ6: number | null;
-  homeQ7: number | null;
-  guestQ7: number | null;
-  homeQ8: number | null;
-  guestQ8: number | null;
   homeOt1: number | null;
   guestOt1: number | null;
   homeOt2: number | null;
@@ -115,14 +98,6 @@ export function extractPeriodScores(
     guestQ3: null,
     homeQ4: null,
     guestQ4: null,
-    homeQ5: null,
-    guestQ5: null,
-    homeQ6: null,
-    guestQ6: null,
-    homeQ7: null,
-    guestQ7: null,
-    homeQ8: null,
-    guestQ8: null,
   };
 
   if (!game) return nullScores;
@@ -130,90 +105,18 @@ export function extractPeriodScores(
   const validScore = (score: number | undefined) =>
     score !== undefined && score >= 0 ? score : null;
 
+  // When V5-V8 fields are present the game uses achtel (8-period) format.
+  // We don't extract per-period data for achtel — just return nulls so the
+  // caller falls back to end-result only.
   const hasV5to8 =
     game.heimV5stand !== undefined ||
     game.heimV6stand !== undefined ||
     game.heimV7stand !== undefined ||
     game.heimV8stand !== undefined;
 
+  if (hasV5to8) return nullScores;
+
   const hasOvertime = game.heimOt1stand >= 0 || game.gastOt1stand >= 0;
-
-  // Detect achtel even without V5-V8: if V4stand is valid but differs from
-  // Endstand, V4 is not the last period → achtel format.
-  // We must exclude genuine overtime where V4≠Endstand is expected. In real OT,
-  // OT1stand > V4stand (cumulative). In achtel misdetection, OT values are small
-  // bogus numbers (representing achtel periods, not overtime scores).
-  const v4Home = validScore(game.heimV4stand);
-  const v4Guest = validScore(game.gastV4stand);
-  const endHome = validScore(game.heimEndstand);
-  const endGuest = validScore(game.gastEndstand);
-  const ot1Home = validScore(game.heimOt1stand);
-  const ot1Guest = validScore(game.gastOt1stand);
-  const hasConsistentOvertime =
-    hasOvertime &&
-    ((ot1Home != null && v4Home != null && ot1Home > v4Home) ||
-      (ot1Guest != null && v4Guest != null && ot1Guest > v4Guest));
-  const v4DiffersFromEnd =
-    !hasConsistentOvertime &&
-    ((v4Home != null && endHome != null && v4Home !== endHome) ||
-      (v4Guest != null && endGuest != null && v4Guest !== endGuest));
-
-  const isAchtel = hasV5to8 || v4DiffersFromEnd;
-
-  if (isAchtel) {
-    // Achtel format: 8 periods, cumulative values → delta
-    // Halbzeitstand meaning depends on how the SDK reports the game:
-    // - Full achtel (V5-V8 present): SDK knows it's achtel, Halbzeitstand = after V4 (true halftime)
-    // - Partial achtel (no V5-V8): SDK treats as quarters, Halbzeitstand = after V2
-    const cumH1 = validScore(game.heimV1stand);
-    const cumG1 = validScore(game.gastV1stand);
-    const cumH2 = hasV5to8
-      ? validScore(game.heimV2stand)
-      : (validScore(game.heimV2stand) ?? validScore(game.heimHalbzeitstand));
-    const cumG2 = hasV5to8
-      ? validScore(game.gastV2stand)
-      : (validScore(game.gastV2stand) ?? validScore(game.gastHalbzeitstand));
-    const cumH3 = validScore(game.heimV3stand);
-    const cumG3 = validScore(game.gastV3stand);
-    const cumH4 = hasV5to8
-      ? (validScore(game.heimV4stand) ?? validScore(game.heimHalbzeitstand))
-      : validScore(game.heimV4stand);
-    const cumG4 = hasV5to8
-      ? (validScore(game.gastV4stand) ?? validScore(game.gastHalbzeitstand))
-      : validScore(game.gastV4stand);
-    const cumH5 = validScore(game.heimV5stand);
-    const cumG5 = validScore(game.gastV5stand);
-    const cumH6 = validScore(game.heimV6stand);
-    const cumG6 = validScore(game.gastV6stand);
-    const cumH7 = validScore(game.heimV7stand);
-    const cumG7 = validScore(game.gastV7stand);
-    const cumH8 =
-      validScore(game.heimV8stand) ??
-      (hasOvertime ? null : validScore(game.heimEndstand));
-    const cumG8 =
-      validScore(game.gastV8stand) ??
-      (hasOvertime ? null : validScore(game.gastEndstand));
-
-    return {
-      periodFormat: "achtel",
-      homeQ1: cumH1,
-      guestQ1: cumG1,
-      homeQ2: delta(cumH2, cumH1),
-      guestQ2: delta(cumG2, cumG1),
-      homeQ3: delta(cumH3, cumH2),
-      guestQ3: delta(cumG3, cumG2),
-      homeQ4: delta(cumH4, cumH3),
-      guestQ4: delta(cumG4, cumG3),
-      homeQ5: delta(cumH5, cumH4),
-      guestQ5: delta(cumG5, cumG4),
-      homeQ6: delta(cumH6, cumH5),
-      guestQ6: delta(cumG6, cumG5),
-      homeQ7: delta(cumH7, cumH6),
-      guestQ7: delta(cumG7, cumG6),
-      homeQ8: delta(cumH8, cumH7),
-      guestQ8: delta(cumG8, cumG7),
-    };
-  }
 
   // Standard 4-quarter format: cumulative → delta
   const cumH1 = validScore(game.heimV1stand);
@@ -252,14 +155,6 @@ export function extractPeriodScores(
     guestQ3: delta(cumG3, cumG2),
     homeQ4: delta(cumH4, cumH3),
     guestQ4: delta(cumG4, cumG3),
-    homeQ5: null,
-    guestQ5: null,
-    homeQ6: null,
-    guestQ6: null,
-    homeQ7: null,
-    guestQ7: null,
-    homeQ8: null,
-    guestQ8: null,
   };
 }
 
@@ -283,55 +178,27 @@ export function extractOvertimeDeltas(
 
   if (cumOt1Home == null && cumOt1Guest == null) return nullOt;
 
-  // Compute regulation end by summing deltas from period scores
-  const isAchtel = periodScores.periodFormat === "achtel";
-  const lastPeriods = isAchtel
-    ? [
-        periodScores.homeQ1,
-        periodScores.homeQ2,
-        periodScores.homeQ3,
-        periodScores.homeQ4,
-        periodScores.homeQ5,
-        periodScores.homeQ6,
-        periodScores.homeQ7,
-        periodScores.homeQ8,
-      ]
-    : [
-        periodScores.homeQ1,
-        periodScores.homeQ2,
-        periodScores.homeQ3,
-        periodScores.homeQ4,
-      ];
-  const lastPeriodsGuest = isAchtel
-    ? [
-        periodScores.guestQ1,
-        periodScores.guestQ2,
-        periodScores.guestQ3,
-        periodScores.guestQ4,
-        periodScores.guestQ5,
-        periodScores.guestQ6,
-        periodScores.guestQ7,
-        periodScores.guestQ8,
-      ]
-    : [
-        periodScores.guestQ1,
-        periodScores.guestQ2,
-        periodScores.guestQ3,
-        periodScores.guestQ4,
-      ];
+  // Compute regulation end by summing Q1-Q4 deltas
+  const homePeriods = [
+    periodScores.homeQ1,
+    periodScores.homeQ2,
+    periodScores.homeQ3,
+    periodScores.homeQ4,
+  ];
+  const guestPeriods = [
+    periodScores.guestQ1,
+    periodScores.guestQ2,
+    periodScores.guestQ3,
+    periodScores.guestQ4,
+  ];
 
   const sumOrNull = (values: (number | null)[]): number | null => {
     if (values.some((v) => v == null)) return null;
     return values.reduce<number>((s, v) => s + v!, 0);
   };
 
-  const regEndHome = sumOrNull(lastPeriods);
-  const regEndGuest = sumOrNull(lastPeriodsGuest);
-
-  // For achtel games where regulation end can't be computed (incomplete period
-  // data), the SDK's OT fields contain bogus achtel data, not real overtime.
-  // Skip all OT computation to avoid storing garbage values.
-  if (isAchtel && regEndHome == null && regEndGuest == null) return nullOt;
+  const regEndHome = sumOrNull(homePeriods);
+  const regEndGuest = sumOrNull(guestPeriods);
 
   return {
     homeOt1: delta(cumOt1Home, regEndHome),
@@ -401,14 +268,6 @@ function snapshotToHashData(snapshot: RemoteSnapshot): Record<string, unknown> {
     guestQ3: snapshot.guestQ3,
     homeQ4: snapshot.homeQ4,
     guestQ4: snapshot.guestQ4,
-    homeQ5: snapshot.homeQ5,
-    guestQ5: snapshot.guestQ5,
-    homeQ6: snapshot.homeQ6,
-    guestQ6: snapshot.guestQ6,
-    homeQ7: snapshot.homeQ7,
-    guestQ7: snapshot.guestQ7,
-    homeQ8: snapshot.homeQ8,
-    guestQ8: snapshot.guestQ8,
     homeOt1: snapshot.homeOt1,
     guestOt1: snapshot.guestOt1,
     homeOt2: snapshot.homeOt2,
@@ -440,14 +299,6 @@ const TRACKED_FIELDS = [
   "guestQ3",
   "homeQ4",
   "guestQ4",
-  "homeQ5",
-  "guestQ5",
-  "homeQ6",
-  "guestQ6",
-  "homeQ7",
-  "guestQ7",
-  "homeQ8",
-  "guestQ8",
   "homeOt1",
   "guestOt1",
   "homeOt2",
@@ -508,14 +359,6 @@ const SNAPSHOT_DB_FIELDS = [
   "guestQ3",
   "homeQ4",
   "guestQ4",
-  "homeQ5",
-  "guestQ5",
-  "homeQ6",
-  "guestQ6",
-  "homeQ7",
-  "guestQ7",
-  "homeQ8",
-  "guestQ8",
   "homeOt1",
   "guestOt1",
   "homeOt2",
@@ -693,14 +536,6 @@ export async function syncMatchesFromData(
                 "guestQ3",
                 "homeQ4",
                 "guestQ4",
-                "homeQ5",
-                "guestQ5",
-                "homeQ6",
-                "guestQ6",
-                "homeQ7",
-                "guestQ7",
-                "homeQ8",
-                "guestQ8",
                 "homeOt1",
                 "guestOt1",
                 "homeOt2",
@@ -783,14 +618,6 @@ export async function syncMatchesFromData(
               guestQ3: remoteSnapshot.guestQ3,
               homeQ4: remoteSnapshot.homeQ4,
               guestQ4: remoteSnapshot.guestQ4,
-              homeQ5: remoteSnapshot.homeQ5,
-              guestQ5: remoteSnapshot.guestQ5,
-              homeQ6: remoteSnapshot.homeQ6,
-              guestQ6: remoteSnapshot.guestQ6,
-              homeQ7: remoteSnapshot.homeQ7,
-              guestQ7: remoteSnapshot.guestQ7,
-              homeQ8: remoteSnapshot.homeQ8,
-              guestQ8: remoteSnapshot.guestQ8,
               homeOt1: remoteSnapshot.homeOt1,
               guestOt1: remoteSnapshot.guestOt1,
               homeOt2: remoteSnapshot.homeOt2,
