@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { fetchAPI } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
@@ -21,6 +22,7 @@ interface OwnClubTeam {
 }
 
 export function TeamsTable({ initialTeams }: { initialTeams: OwnClubTeam[] }) {
+  const t = useTranslations();
   const [teams, setTeams] = useState(initialTeams);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
@@ -58,16 +60,16 @@ export function TeamsTable({ initialTeams }: { initialTeams: OwnClubTeam[] }) {
   }
 
   if (teams.length === 0) {
-    return <p className="text-muted-foreground">No own-club teams found.</p>;
+    return <p className="text-muted-foreground">{t("teams.empty")}</p>;
   }
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>API Name</TableHead>
-          <TableHead>League</TableHead>
-          <TableHead>Custom Name</TableHead>
+          <TableHead>{t("teams.columns.apiName")}</TableHead>
+          <TableHead>{t("teams.columns.league")}</TableHead>
+          <TableHead>{t("teams.columns.customName")}</TableHead>
           <TableHead className="w-24" />
         </TableRow>
       </TableHeader>
@@ -76,7 +78,7 @@ export function TeamsTable({ initialTeams }: { initialTeams: OwnClubTeam[] }) {
           <TableRow key={team.id}>
             <TableCell className="font-medium">{team.name}</TableCell>
             <TableCell className="text-muted-foreground">
-              {team.leagueName ?? "—"}
+              {team.leagueName ?? "\u2014"}
             </TableCell>
             <TableCell>
               <Input
@@ -84,7 +86,7 @@ export function TeamsTable({ initialTeams }: { initialTeams: OwnClubTeam[] }) {
                 onChange={(e) =>
                   setDrafts((prev) => ({ ...prev, [team.id]: e.target.value }))
                 }
-                placeholder="Enter custom name…"
+                placeholder={t("teams.placeholder")}
                 maxLength={50}
                 className="max-w-xs"
               />
@@ -95,7 +97,7 @@ export function TeamsTable({ initialTeams }: { initialTeams: OwnClubTeam[] }) {
                 disabled={!isDirty(team) || saving[team.id]}
                 onClick={() => save(team)}
               >
-                {saving[team.id] ? "Saving…" : "Save"}
+                {saving[team.id] ? t("common.saving") : t("common.save")}
               </Button>
             </TableCell>
           </TableRow>

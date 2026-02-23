@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Card,
   CardContent,
@@ -17,6 +18,7 @@ import { fetchAPI } from "@/lib/api";
 import { useSettings } from "./settings-provider";
 
 export function ClubConfig() {
+  const t = useTranslations();
   const { clubConfig, setClubConfig } = useSettings();
   const [clubId, setClubId] = useState(clubConfig?.clubId?.toString() ?? "");
   const [clubName, setClubName] = useState(clubConfig?.clubName ?? "");
@@ -29,11 +31,11 @@ export function ClubConfig() {
   async function handleSave() {
     const id = parseInt(clubId, 10);
     if (!id || id <= 0) {
-      toast.error("Club ID must be a positive number");
+      toast.error(t("settings.club.toast.invalidId"));
       return;
     }
     if (!clubName.trim()) {
-      toast.error("Club name is required");
+      toast.error(t("settings.club.toast.nameRequired"));
       return;
     }
 
@@ -47,9 +49,9 @@ export function ClubConfig() {
         },
       );
       setClubConfig(result);
-      toast.success(`Club set to ${result.clubName}`);
+      toast.success(t("settings.club.toast.saved", { name: result.clubName }));
     } catch {
-      toast.error("Failed to save club config");
+      toast.error(t("settings.club.toast.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -58,9 +60,9 @@ export function ClubConfig() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Club Configuration</CardTitle>
+        <CardTitle>{t("settings.club.title")}</CardTitle>
         <CardDescription>
-          Set the club ID from basketball-bund.net. This determines which leagues can be discovered.
+          {t("settings.club.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -68,27 +70,27 @@ export function ClubConfig() {
           <div className="flex items-center gap-2 text-sm">
             <Check className="h-4 w-4 text-green-600" />
             <span className="font-medium">{clubConfig.clubName}</span>
-            <span className="text-muted-foreground">(ID: {clubConfig.clubId})</span>
+            <span className="text-muted-foreground">({t("settings.club.idCurrent", { id: clubConfig.clubId })})</span>
           </div>
         )}
 
         <div className="grid max-w-sm gap-4">
           <div className="space-y-2">
-            <Label htmlFor="club-id">Club ID</Label>
+            <Label htmlFor="club-id">{t("settings.club.idLabel")}</Label>
             <Input
               id="club-id"
               type="number"
               min={1}
-              placeholder="e.g. 4121"
+              placeholder={t("settings.club.idPlaceholder")}
               value={clubId}
               onChange={(e) => setClubId(e.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="club-name">Club Name</Label>
+            <Label htmlFor="club-name">{t("settings.club.nameLabel")}</Label>
             <Input
               id="club-name"
-              placeholder="e.g. Dragons Rhöndorf"
+              placeholder={t("settings.club.namePlaceholder")}
               value={clubName}
               onChange={(e) => setClubName(e.target.value)}
             />
@@ -103,7 +105,7 @@ export function ClubConfig() {
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       </CardContent>

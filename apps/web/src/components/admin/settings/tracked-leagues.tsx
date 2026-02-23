@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Card,
   CardContent,
@@ -36,6 +37,7 @@ interface TrackedLeaguesResponse {
 }
 
 export function TrackedLeagues() {
+  const t = useTranslations();
   const { clubConfig, trackedLeagues, setTrackedLeagues } = useSettings();
   const initialValue = trackedLeagues.map((l) => l.ligaNr).join(", ");
   const [input, setInput] = useState(initialValue);
@@ -77,13 +79,17 @@ export function TrackedLeagues() {
 
       if (result.notFound.length > 0) {
         toast.warning(
-          `Saved ${result.tracked} league(s). ${result.notFound.length} not found: ${result.notFound.join(", ")}`,
+          t("settings.leagues.toast.partial", {
+            tracked: result.tracked,
+            notFoundCount: result.notFound.length,
+            notFoundList: result.notFound.join(", "),
+          }),
         );
       } else {
-        toast.success(`Tracking ${result.tracked} league(s)`);
+        toast.success(t("settings.leagues.toast.saved", { count: result.tracked }));
       }
     } catch {
-      toast.error("Failed to save league settings");
+      toast.error(t("settings.leagues.toast.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -92,18 +98,18 @@ export function TrackedLeagues() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tracked Leagues</CardTitle>
+        <CardTitle>{t("settings.leagues.title")}</CardTitle>
         <CardDescription>
-          Enter the league numbers (liganr) you want to sync, separated by commas.
+          {t("settings.leagues.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid max-w-md gap-4">
           <div className="space-y-2">
-            <Label htmlFor="league-numbers">League Numbers</Label>
+            <Label htmlFor="league-numbers">{t("settings.leagues.numbersLabel")}</Label>
             <Input
               id="league-numbers"
-              placeholder="e.g. 4102, 4105, 4003"
+              placeholder={t("settings.leagues.numbersPlaceholder")}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={!clubConfig}
@@ -119,19 +125,19 @@ export function TrackedLeagues() {
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
 
         {!clubConfig && (
           <p className="text-sm text-muted-foreground">
-            Configure a club above before setting leagues.
+            {t("settings.leagues.configureClubFirst")}
           </p>
         )}
 
         {lastNotFound.length > 0 && (
           <p className="text-sm text-destructive">
-            Not found: {lastNotFound.join(", ")}
+            {t("settings.leagues.notFound", { numbers: lastNotFound.join(", ") })}
           </p>
         )}
 
@@ -140,9 +146,9 @@ export function TrackedLeagues() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="px-4 py-2 text-left font-medium">Liga Nr</th>
-                  <th className="px-4 py-2 text-left font-medium">Name</th>
-                  <th className="px-4 py-2 text-left font-medium">Season</th>
+                  <th className="px-4 py-2 text-left font-medium">{t("settings.leagues.columns.ligaNr")}</th>
+                  <th className="px-4 py-2 text-left font-medium">{t("settings.leagues.columns.name")}</th>
+                  <th className="px-4 py-2 text-left font-medium">{t("settings.leagues.columns.season")}</th>
                 </tr>
               </thead>
               <tbody>
