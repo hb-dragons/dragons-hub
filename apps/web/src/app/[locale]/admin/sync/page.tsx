@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { fetchAPIServer } from "@/lib/api.server";
 import {
   Tabs,
@@ -19,6 +20,7 @@ import type {
 } from "@/components/admin/sync/types";
 
 export default async function SyncPage() {
+  const t = await getTranslations();
   let status: SyncStatusResponse | null = null;
   let logs: LogsResponse | null = null;
   let schedule: SyncScheduleData | null = null;
@@ -46,10 +48,10 @@ export default async function SyncPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Sync Management
+              {t("sync.title")}
             </h1>
             <p className="text-muted-foreground">
-              Monitor and control data synchronization
+              {t("sync.description")}
             </p>
           </div>
           <SyncTriggerButton />
@@ -67,8 +69,8 @@ export default async function SyncPage() {
         {/* Tabs */}
         <Tabs defaultValue="history">
           <TabsList>
-            <TabsTrigger value="history">Sync History</TabsTrigger>
-            <TabsTrigger value="schedule">Schedule Settings</TabsTrigger>
+            <TabsTrigger value="history">{t("sync.tabs.history")}</TabsTrigger>
+            <TabsTrigger value="schedule">{t("sync.tabs.schedule")}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="history" className="mt-4">

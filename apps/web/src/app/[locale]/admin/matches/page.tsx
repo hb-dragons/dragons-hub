@@ -1,9 +1,11 @@
+import { getTranslations } from "next-intl/server";
 import { fetchAPIServer } from "@/lib/api.server"
 import { MatchListTable } from "@/components/admin/matches/match-list-table"
 import type { MatchListResponse } from "@/components/admin/matches/types"
 import { getOwnTeamLabel } from "@/components/admin/matches/utils"
 
 export default async function MatchesPage() {
+  const t = await getTranslations();
   let data: MatchListResponse | null = null
   let error: string | null = null
 
@@ -23,9 +25,9 @@ export default async function MatchesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Spiele</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t("matches.title")}</h1>
         <p className="text-muted-foreground">
-          Spiele des eigenen Vereins anzeigen und verwalten
+          {t("matches.description")}
         </p>
       </div>
 
