@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
 import {
@@ -8,6 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@dragons/ui/components/tooltip"
+import { Sheet } from "@dragons/ui/components/sheet"
 import { cn } from "@dragons/ui/lib/utils"
 import { Calendar } from "lucide-react"
 import { Input } from "@dragons/ui/components/input"
@@ -29,6 +31,7 @@ import {
 } from "./utils"
 import type { MatchListItem } from "./types"
 import { matchStrings } from "./match-strings"
+import { MatchEditSheet } from "./match-edit-sheet"
 
 function OverrideDot({ match, field }: { match: MatchListItem; field: string }) {
   if (!match.overriddenFields.includes(field)) return null
@@ -255,6 +258,7 @@ export function MatchListTable({
   teamOptions,
 }: MatchListTableProps) {
   const router = useRouter()
+  const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
 
   const teamFilterOptions = teamOptions.map((name) => ({
     label: name,
@@ -266,7 +270,7 @@ export function MatchListTable({
     if (e.metaKey || e.ctrlKey) {
       window.open(href, "_blank")
     } else {
-      router.push(href)
+      setSelectedMatchId(row.original.id)
     }
   }
 
@@ -278,6 +282,12 @@ export function MatchListTable({
 
   return (
     <TooltipProvider>
+    <Sheet
+      open={selectedMatchId !== null}
+      onOpenChange={(open) => {
+        if (!open) setSelectedMatchId(null)
+      }}
+    >
     <DataTable
       columns={columns}
       data={data}
@@ -312,6 +322,15 @@ export function MatchListTable({
         </DataTableToolbar>
       )}
     </DataTable>
+    <MatchEditSheet
+      matchId={selectedMatchId}
+      open={selectedMatchId !== null}
+      onOpenChange={(open) => {
+        if (!open) setSelectedMatchId(null)
+      }}
+      onSaved={() => router.refresh()}
+    />
+    </Sheet>
     </TooltipProvider>
   )
 }

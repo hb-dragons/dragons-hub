@@ -65,4 +65,11 @@ export const matchStrings = {
   // Badges / status
   overrideCount: (n: number) => `${n} Override${n !== 1 ? "s" : ""}`,
   noStatusFlags: "Keine Statusflags gesetzt",
+
+  // Toast messages
+  loadError: "Spiel konnte nicht geladen werden",
+  saveSuccess: "Spiel aktualisiert",
+  saveError: "Spiel konnte nicht gespeichert werden",
+  releaseSuccess: "Override aufgehoben",
+  releaseError: "Override konnte nicht aufgehoben werden",
 } as const;
