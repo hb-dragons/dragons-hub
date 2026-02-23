@@ -113,6 +113,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 
 ## Git & CI
 
+- **Never add `Co-Authored-By`, `Signed-off-by`, or any other trailer that credits Claude/AI as a contributor.** Commits are authored solely by the human developer.
 - CI runs on all PRs and pushes to main: lint, typecheck, test, coverage, build, AI slop check, dependency audit, secret scan
 - CD builds artifacts on pushes to main and creates releases on version tags
 - Do not commit `.env` files, secrets, or credentials

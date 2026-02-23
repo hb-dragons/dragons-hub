@@ -11,6 +11,24 @@ export {
   PopoverContent,
   PopoverAnchor,
 } from "./components/popover";
+export {
+  Sheet,
+  SheetPortal,
+  SheetOverlay,
+  SheetTrigger,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+} from "./components/sheet";
 export { TimePicker } from "./components/time-picker";
 export type { TimePickerProps } from "./components/time-picker";
+export {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "./components/tooltip";
 export { cn } from "./lib/utils";

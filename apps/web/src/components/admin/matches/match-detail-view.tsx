@@ -39,6 +39,7 @@ import {
   type FieldDiff,
   type MatchFormValues,
 } from "./types";
+import { matchStrings } from "./match-strings";
 
 interface MatchDetailViewProps {
   initialData: MatchDetailResponse;
@@ -118,10 +119,10 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
         setMatch(result.match);
         setDiffs(result.diffs);
         form.reset(getDefaultValues(result.match));
-        toast.success("Match updated");
+        toast.success(matchStrings.saveSuccess);
         router.refresh();
       } catch {
-        toast.error("Failed to update match");
+        toast.error(matchStrings.saveError);
       } finally {
         setSaving(false);
       }
@@ -140,10 +141,10 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
         setMatch(result.match);
         setDiffs(result.diffs);
         form.reset(getDefaultValues(result.match));
-        toast.success("Override released");
+        toast.success(matchStrings.releaseSuccess);
         router.refresh();
       } catch {
-        toast.error("Failed to release override");
+        toast.error(matchStrings.releaseError);
       } finally {
         setSaving(false);
       }
@@ -161,14 +162,14 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
         <Link href="/admin/matches">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-1 h-4 w-4" />
-            Back
+            Zurück
           </Button>
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">
             {match.homeTeamName} vs {match.guestTeamName}
           </h1>
-          <p className="text-muted-foreground">Matchday {match.matchDay}</p>
+          <p className="text-muted-foreground">{matchStrings.matchDay} {match.matchDay}</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline">MD {match.matchDay}</Badge>
@@ -177,7 +178,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
               variant="outline"
               className="border-amber-500 text-amber-600"
             >
-              {overrideCount} Override{overrideCount !== 1 ? "s" : ""}
+              {matchStrings.overrideCount(overrideCount)}
             </Badge>
           )}
         </div>
@@ -190,38 +191,38 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Match Info</CardTitle>
+                <CardTitle className="text-base">{matchStrings.sectionMatchInfo}</CardTitle>
               </CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <div>
-                    <dt className="text-muted-foreground">Match No</dt>
+                    <dt className="text-muted-foreground">{matchStrings.matchNo}</dt>
                     <dd className="font-medium">{match.matchNo}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Matchday</dt>
+                    <dt className="text-muted-foreground">{matchStrings.matchDay}</dt>
                     <dd className="font-medium">{match.matchDay}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">League</dt>
+                    <dt className="text-muted-foreground">{matchStrings.league}</dt>
                     <dd className="font-medium">
                       {match.leagueName ?? "—"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Date</dt>
+                    <dt className="text-muted-foreground">{matchStrings.columnDate}</dt>
                     <dd className="font-medium">
                       {formatMatchDate(match.kickoffDate)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Time</dt>
+                    <dt className="text-muted-foreground">{matchStrings.columnTime}</dt>
                     <dd className="font-medium">
                       {formatMatchTime(match.kickoffTime)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Venue</dt>
+                    <dt className="text-muted-foreground">{matchStrings.venue}</dt>
                     <dd className="font-medium">
                       {match.venueNameOverride ?? match.venueName ?? "—"}
                     </dd>
@@ -232,18 +233,18 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Score</CardTitle>
+                <CardTitle className="text-base">{matchStrings.score}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <div>
-                    <dt className="text-muted-foreground">Final</dt>
+                    <dt className="text-muted-foreground">{matchStrings.score}</dt>
                     <dd className="text-lg font-bold tabular-nums">
                       {formatScore(match.homeScore, match.guestScore)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Halftime</dt>
+                    <dt className="text-muted-foreground">{matchStrings.halftimeScore}</dt>
                     <dd className="text-lg font-bold tabular-nums">
                       {formatScore(
                         match.homeHalftimeScore,
@@ -305,36 +306,36 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Status</CardTitle>
+                <CardTitle className="text-base">{matchStrings.status}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
                   {match.isConfirmed && (
-                    <Badge variant="success">Confirmed</Badge>
+                    <Badge variant="success">{matchStrings.confirmed}</Badge>
                   )}
                   {match.isForfeited && (
-                    <Badge variant="destructive">Forfeited</Badge>
+                    <Badge variant="destructive">{matchStrings.forfeited}</Badge>
                   )}
                   {match.isCancelled && (
-                    <Badge variant="destructive">Cancelled</Badge>
+                    <Badge variant="destructive">{matchStrings.cancelled}</Badge>
                   )}
                   {!match.isConfirmed &&
                     !match.isForfeited &&
                     !match.isCancelled && (
                       <span className="text-sm text-muted-foreground">
-                        No status flags set
+                        {matchStrings.noStatusFlags}
                       </span>
                     )}
                 </div>
                 <Separator className="my-3" />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <div>
-                    Last sync:{" "}
+                    {matchStrings.lastSync}:{" "}
                     {match.lastRemoteSync
                       ? new Date(match.lastRemoteSync).toLocaleString("de-DE")
                       : "—"}
                   </div>
-                  <div>Remote version: v{match.currentRemoteVersion}</div>
+                  <div>{matchStrings.remoteVersion}: v{match.currentRemoteVersion}</div>
                 </div>
               </CardContent>
             </Card>
@@ -345,13 +346,13 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
             {/* Overridable fields */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Overrides</CardTitle>
+                <CardTitle className="text-base">{matchStrings.sectionOverrides}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <MatchOverrideField
                   control={form.control}
                   name="kickoffDate"
-                  label="Date"
+                  label={matchStrings.columnDate}
                   remoteValue={match.kickoffDate}
                   diffStatus={getDiffStatus("kickoffDate")}
                   inputType="date"
@@ -361,7 +362,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 <MatchOverrideField
                   control={form.control}
                   name="kickoffTime"
-                  label="Time"
+                  label={matchStrings.columnTime}
                   remoteValue={formatMatchTime(match.kickoffTime)}
                   diffStatus={getDiffStatus("kickoffTime")}
                   inputType="time"
@@ -371,7 +372,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 <MatchOverrideField
                   control={form.control}
                   name="venueNameOverride"
-                  label="Venue"
+                  label={matchStrings.venueOverride}
                   remoteValue={match.venueName}
                   diffStatus={getDiffStatus("venue")}
                   inputType="text"
@@ -379,7 +380,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 <MatchOverrideField
                   control={form.control}
                   name="isForfeited"
-                  label="Forfeited"
+                  label={matchStrings.forfeited}
                   remoteValue={String(match.isForfeited ?? false)}
                   diffStatus={getDiffStatus("isForfeited")}
                   inputType="boolean"
@@ -389,7 +390,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 <MatchOverrideField
                   control={form.control}
                   name="isCancelled"
-                  label="Cancelled"
+                  label={matchStrings.cancelled}
                   remoteValue={String(match.isCancelled ?? false)}
                   diffStatus={getDiffStatus("isCancelled")}
                   inputType="boolean"
@@ -402,7 +403,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
             {/* Staff (local-only) */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Kampfgericht</CardTitle>
+                <CardTitle className="text-base">{matchStrings.sectionStaff}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Controller
@@ -411,7 +412,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="anschreiber">
-                        Anschreiber
+                        {matchStrings.columnAnschreiber}
                       </FieldLabel>
                       <Input
                         id="anschreiber"
@@ -420,7 +421,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Team name"
+                        placeholder="Teamname"
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -432,7 +433,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="zeitnehmer">
-                        Zeitnehmer
+                        {matchStrings.columnZeitnehmer}
                       </FieldLabel>
                       <Input
                         id="zeitnehmer"
@@ -441,7 +442,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Team name"
+                        placeholder="Teamname"
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -453,7 +454,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="shotclock">
-                        Shotclock
+                        {matchStrings.columnShotclock}
                       </FieldLabel>
                       <Input
                         id="shotclock"
@@ -462,7 +463,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Team name"
+                        placeholder="Teamname"
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -474,7 +475,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
             {/* Notes (local-only) */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Notes</CardTitle>
+                <CardTitle className="text-base">{matchStrings.sectionNotes}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Controller
@@ -483,10 +484,10 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="internal-notes">
-                        Internal Notes
+                        {matchStrings.internalNotes}
                       </FieldLabel>
                       <FieldDescription>
-                        Only visible to admins
+                        {matchStrings.internalNotesHint}
                       </FieldDescription>
                       <Textarea
                         id="internal-notes"
@@ -496,7 +497,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Internal notes"
+                        placeholder={matchStrings.internalNotes}
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -508,10 +509,10 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="public-comment">
-                        Public Comment
+                        {matchStrings.publicComment}
                       </FieldLabel>
                       <FieldDescription>
-                        Visible on public pages
+                        {matchStrings.publicCommentHint}
                       </FieldDescription>
                       <Textarea
                         id="public-comment"
@@ -521,7 +522,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Public comment"
+                        placeholder={matchStrings.publicComment}
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -540,14 +541,11 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                     render={({ field, fieldState }) => (
                       <Field>
                         <FieldLabel htmlFor="change-reason">
-                          Change Reason
+                          {matchStrings.changeReason}
                         </FieldLabel>
-                        <FieldDescription>
-                          Optional note explaining this change
-                        </FieldDescription>
                         <Input
                           id="change-reason"
-                          placeholder="e.g. Rescheduled by email"
+                          placeholder={matchStrings.changeReasonPlaceholder}
                           value={field.value ?? ""}
                           onChange={field.onChange}
                           onBlur={field.onBlur}
@@ -566,7 +564,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                     ) : (
                       <Save className="mr-2 h-4 w-4" />
                     )}
-                    Save Changes
+                    {matchStrings.save}
                   </Button>
                 </div>
               </CardContent>

@@ -14,6 +14,7 @@ import {
   FieldError,
 } from "@dragons/ui/components/field";
 import type { DiffStatus, MatchFormValues } from "./types";
+import { matchStrings } from "./match-strings";
 
 interface MatchOverrideFieldProps {
   control: Control<MatchFormValues>;
@@ -59,7 +60,7 @@ export function MatchOverrideField({
                     title="Release override (restore remote value)"
                   >
                     <RotateCcw className="mr-1 h-3 w-3" />
-                    Release
+                    {matchStrings.resetOverride}
                   </Button>
                 )}
               </div>
@@ -105,7 +106,7 @@ export function MatchOverrideField({
               )}
 
               <p className="mt-1 text-xs text-muted-foreground">
-                Remote: {remoteValue ?? "—"}
+                {matchStrings.officialLabel}: {remoteValue ?? "—"}
               </p>
             </div>
 
