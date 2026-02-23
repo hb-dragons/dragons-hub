@@ -1,25 +1,27 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, usePathname } from "@/lib/navigation";
 import { cn } from "@dragons/ui/lib/utils";
 import { UserButton } from "@daveyplate/better-auth-ui";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 const navLinks = [
-  { href: "/admin/matches", label: "Matches" },
-  { href: "/admin/teams", label: "Teams" },
-  { href: "/admin/sync", label: "Sync" },
-  { href: "/admin/settings", label: "Settings" },
+  { href: "/admin/matches" as const, labelKey: "nav.matches" as const },
+  { href: "/admin/teams" as const, labelKey: "nav.teams" as const },
+  { href: "/admin/sync" as const, labelKey: "nav.sync" as const },
+  { href: "/admin/settings" as const, labelKey: "nav.settings" as const },
 ];
 
 export function Header() {
   const pathname = usePathname();
+  const t = useTranslations();
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-6">
         <Link href="/admin" className="text-lg font-semibold tracking-tight">
-          Dragons Admin
+          {t("nav.brand")}
         </Link>
         <nav className="flex flex-1 items-center gap-1">
           {navLinks.map((link) => {
@@ -35,11 +37,12 @@ export function Header() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {link.label}
+                {t(link.labelKey)}
               </Link>
             );
           })}
         </nav>
+        <LocaleSwitcher />
         <UserButton />
       </div>
     </header>
