@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { useTranslations } from "next-intl"
+import { useTranslations, useFormatter } from "next-intl"
 import { useRouter } from "@/lib/navigation"
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
 import {
@@ -23,7 +23,6 @@ import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filte
 import { DataTableDateFilter } from "@/components/ui/data-table-date-filter"
 
 import {
-  formatMatchDate,
   formatMatchTime,
   formatScore,
   getTeamColor,
@@ -63,7 +62,7 @@ const dateRangeFilterFn: FilterFn<MatchListItem> = (row, columnId, value) => {
   return true
 }
 
-function getColumns(t: ReturnType<typeof useTranslations>): ColumnDef<MatchListItem, unknown>[] {
+function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<typeof useFormatter>): ColumnDef<MatchListItem, unknown>[] {
   return [
     {
       accessorKey: "kickoffDate",
@@ -72,7 +71,7 @@ function getColumns(t: ReturnType<typeof useTranslations>): ColumnDef<MatchListI
       ),
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-sm">
-          {formatMatchDate(row.original.kickoffDate)}
+          {format.dateTime(new Date(row.original.kickoffDate + "T00:00:00"), "matchDate")}
         </span>
       ),
       filterFn: dateRangeFilterFn,
@@ -232,8 +231,9 @@ export function MatchListTable({
   teamOptions,
 }: MatchListTableProps) {
   const t = useTranslations()
+  const format = useFormatter()
   const router = useRouter()
-  const columns = useMemo(() => getColumns(t), [t])
+  const columns = useMemo(() => getColumns(t, format), [t, format])
 
   const teamFilterOptions = teamOptions.map((name) => ({
     label: name,

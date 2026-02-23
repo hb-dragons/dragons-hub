@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import { useRouter } from "@/lib/navigation";
 import { Link } from "@/lib/navigation";
 import { useForm, Controller } from "react-hook-form";
@@ -28,7 +28,6 @@ import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
 import { MatchOverrideField } from "./match-override-field";
 import {
-  formatMatchDate,
   formatMatchTime,
   formatScore,
   formatPeriodScores,
@@ -71,6 +70,7 @@ function getDefaultValues(match: MatchDetail): MatchFormValues {
 
 export function MatchDetailView({ initialData }: MatchDetailViewProps) {
   const t = useTranslations();
+  const format = useFormatter();
   const router = useRouter();
   const [match, setMatch] = useState<MatchDetail>(initialData.match);
   const [diffs, setDiffs] = useState<FieldDiff[]>(initialData.diffs);
@@ -213,7 +213,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   <div>
                     <dt className="text-muted-foreground">{t("matchDetail.info.date")}</dt>
                     <dd className="font-medium">
-                      {formatMatchDate(match.kickoffDate)}
+                      {format.dateTime(new Date(match.kickoffDate + "T00:00:00"), "matchDate")}
                     </dd>
                   </div>
                   <div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import {
   Card,
   CardContent,
@@ -30,7 +30,7 @@ import { cn } from "@dragons/ui/lib/utils";
 import type { SyncRun } from "./types";
 import { SyncLogDetail } from "./sync-log-detail";
 import { useSyncContext } from "./sync-provider";
-import { formatDuration, formatDate } from "./utils";
+import { formatDuration } from "./utils";
 
 const STATUS_CONFIG: Record<
   string,
@@ -88,6 +88,7 @@ function formatRecords(run: SyncRun): React.ReactNode {
 
 export function SyncHistoryTable() {
   const t = useTranslations();
+  const format = useFormatter();
   const { logs: rawLogs, logsHasMore: hasMore, loadMoreLogs: onLoadMore, loadingMore } = useSyncContext();
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -162,7 +163,7 @@ export function SyncHistoryTable() {
                         <TableCell className="font-medium">
                           {run.syncType}
                         </TableCell>
-                        <TableCell>{formatDate(run.startedAt)}</TableCell>
+                        <TableCell>{format.dateTime(new Date(run.startedAt), "syncTimestamp")}</TableCell>
                         <TableCell>{formatDuration(run.durationMs)}</TableCell>
                         <TableCell className="text-right text-sm">
                           {formatRecords(run)}

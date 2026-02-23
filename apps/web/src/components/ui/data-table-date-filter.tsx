@@ -1,6 +1,6 @@
 "use client"
 
-import { useTranslations } from "next-intl"
+import { useTranslations, useFormatter } from "next-intl"
 import type { Column } from "@tanstack/react-table"
 import { CalendarIcon } from "lucide-react"
 import { Button } from "@dragons/ui/components/button"
@@ -13,8 +13,6 @@ import {
 import { cn } from "@dragons/ui/lib/utils"
 import type { DateRange } from "react-day-picker"
 
-import { formatDate } from "@/lib/format"
-
 interface DataTableDateFilterProps<TData, TValue> {
   column: Column<TData, TValue>
   title: string
@@ -25,6 +23,7 @@ export function DataTableDateFilter<TData, TValue>({
   title,
 }: DataTableDateFilterProps<TData, TValue>) {
   const t = useTranslations()
+  const format = useFormatter()
   const dateRange = column.getFilterValue() as DateRange | undefined
   const hasValue = dateRange?.from || dateRange?.to
 
@@ -39,8 +38,8 @@ export function DataTableDateFilter<TData, TValue>({
           <CalendarIcon />
           {hasValue ? (
             <span>
-              {dateRange?.from ? formatDate(dateRange.from) : ""}{" "}
-              {dateRange?.to ? `– ${formatDate(dateRange.to)}` : ""}
+              {dateRange?.from ? format.dateTime(dateRange.from, "short") : ""}{" "}
+              {dateRange?.to ? `– ${format.dateTime(dateRange.to, "short")}` : ""}
             </span>
           ) : (
             <span>{title}</span>
