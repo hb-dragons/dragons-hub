@@ -943,6 +943,33 @@ describe("updateMatchLocal", () => {
     expect((changes.rows[0] as Record<string, unknown>).field_name).toBe("zeitnehmer");
   });
 
+  it("returns correct remote diff values after updating override fields", async () => {
+    await seedBasicData();
+    const matchId = await insertMatch({
+      kickoff_date: "2025-03-15",
+      kickoff_time: "18:00:00",
+      current_remote_version: 1,
+    });
+    await insertRemoteVersion(matchId, 1, {
+      kickoffDate: "2025-03-15",
+      kickoffTime: "18:00",
+      isForfeited: false,
+      isCancelled: false,
+    });
+
+    const result = await updateMatchLocal(
+      matchId,
+      { kickoffDate: "2025-04-01" },
+      "admin@test.com",
+    );
+
+    const dateDiff = result!.diffs.find((d) => d.field === "kickoffDate");
+    expect(dateDiff).toBeDefined();
+    expect(dateDiff!.remoteValue).toBe("2025-03-15");
+    expect(dateDiff!.localValue).toBe("2025-04-01");
+    expect(dateDiff!.status).toBe("diverged");
+  });
+
   it("creates override row when setting score", async () => {
     await seedBasicData();
     const matchId = await insertMatch({ home_score: 80, guest_score: 70 });
@@ -1050,6 +1077,30 @@ describe("releaseOverride", () => {
       [matchId],
     );
     expect(overrides.rows).toHaveLength(0);
+  });
+
+  it("returns correct remote diff values after releasing override", async () => {
+    await seedBasicData();
+    const matchId = await insertMatch({
+      kickoff_date: "2025-04-01",
+      kickoff_time: "19:00:00",
+      current_remote_version: 1,
+    });
+    await insertRemoteVersion(matchId, 1, {
+      kickoffDate: "2025-03-15",
+      kickoffTime: "18:00",
+      isForfeited: false,
+      isCancelled: false,
+    });
+    await insertOverride(matchId, "kickoffDate");
+
+    const result = await releaseOverride(matchId, "kickoffDate", "admin@test.com");
+
+    expect(result!.match.kickoffDate).toBe("2025-03-15");
+
+    // After release, no kickoffDate diff should exist (override removed, value matches remote)
+    const dateDiff = result!.diffs.find((d) => d.field === "kickoffDate");
+    expect(dateDiff).toBeUndefined();
   });
 
   it("increments local version on release", async () => {
