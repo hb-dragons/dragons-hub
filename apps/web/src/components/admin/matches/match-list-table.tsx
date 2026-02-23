@@ -1,6 +1,8 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useMemo } from "react"
+import { useTranslations } from "next-intl"
+import { useRouter } from "@/lib/navigation"
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
 import {
   Card,
@@ -61,133 +63,135 @@ const dateRangeFilterFn: FilterFn<MatchListItem> = (row, columnId, value) => {
   return true
 }
 
-const columns: ColumnDef<MatchListItem, unknown>[] = [
-  {
-    accessorKey: "kickoffDate",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Datum" />
-    ),
-    cell: ({ row }) => (
-      <span className="whitespace-nowrap text-sm">
-        {formatMatchDate(row.original.kickoffDate)}
-      </span>
-    ),
-    filterFn: dateRangeFilterFn,
-    meta: { label: "Datum" },
-  },
-  {
-    accessorKey: "kickoffTime",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Uhrzeit" />
-    ),
-    cell: ({ row }) => (
-      <span className="tabular-nums text-sm">
-        {formatMatchTime(row.original.kickoffTime)}
-      </span>
-    ),
-    meta: { label: "Uhrzeit" },
-  },
-  {
-    id: "team",
-    accessorFn: (row) => getOwnTeamLabel(row),
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Team" />
-    ),
-    cell: ({ row }) => <TeamBadge name={getOwnTeamLabel(row.original)} />,
-    filterFn: (row, id, value) => {
-      const filterValues = value as string[] | undefined
-      if (!filterValues || filterValues.length === 0) return true
-      return filterValues.includes(row.getValue(id) as string)
+function getColumns(t: ReturnType<typeof useTranslations>): ColumnDef<MatchListItem, unknown>[] {
+  return [
+    {
+      accessorKey: "kickoffDate",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("matches.columns.date")} />
+      ),
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-sm">
+          {formatMatchDate(row.original.kickoffDate)}
+        </span>
+      ),
+      filterFn: dateRangeFilterFn,
+      meta: { label: t("matches.columns.date") },
     },
-    meta: { label: "Team" },
-  },
-  {
-    id: "home",
-    accessorFn: (row) =>
-      row.homeIsOwnClub ? "Dragons" : getOpponentName(row),
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Heim" />
-    ),
-    cell: ({ getValue }) => (
-      <span className="text-sm">{getValue() as string}</span>
-    ),
-    meta: { label: "Heim" },
-  },
-  {
-    id: "guest",
-    accessorFn: (row) =>
-      row.homeIsOwnClub ? getOpponentName(row) : "Dragons",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Gast" />
-    ),
-    cell: ({ getValue }) => (
-      <span className="text-sm">{getValue() as string}</span>
-    ),
-    meta: { label: "Gast" },
-  },
-  {
-    id: "score",
-    accessorFn: (row) => formatScore(row.homeScore, row.guestScore),
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Ergebnis" />
-    ),
-    cell: ({ getValue }) => (
-      <span className="tabular-nums text-sm">{getValue() as string}</span>
-    ),
-    sortingFn: (rowA, rowB) => {
-      const diffA =
-        (rowA.original.homeScore ?? 0) - (rowA.original.guestScore ?? 0)
-      const diffB =
-        (rowB.original.homeScore ?? 0) - (rowB.original.guestScore ?? 0)
-      if (diffA === diffB) {
-        return (rowA.original.homeScore ?? 0) - (rowB.original.homeScore ?? 0)
-      }
-      return diffA - diffB
+    {
+      accessorKey: "kickoffTime",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("matches.columns.time")} />
+      ),
+      cell: ({ row }) => (
+        <span className="tabular-nums text-sm">
+          {formatMatchTime(row.original.kickoffTime)}
+        </span>
+      ),
+      meta: { label: t("matches.columns.time") },
     },
-    meta: { label: "Ergebnis" },
-  },
-  {
-    accessorKey: "anschreiber",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Anschreiber" />
-    ),
-    cell: ({ row }) => (
-      <span className="text-sm">{row.original.anschreiber ?? ""}</span>
-    ),
-    meta: { label: "Anschreiber" },
-  },
-  {
-    accessorKey: "zeitnehmer",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Zeitnehmer" />
-    ),
-    cell: ({ row }) => (
-      <span className="text-sm">{row.original.zeitnehmer ?? ""}</span>
-    ),
-    meta: { label: "Zeitnehmer" },
-  },
-  {
-    accessorKey: "shotclock",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Shotclock" />
-    ),
-    cell: ({ row }) => (
-      <span className="text-sm">{row.original.shotclock ?? ""}</span>
-    ),
-    meta: { label: "Shotclock" },
-  },
-  {
-    accessorKey: "publicComment",
-    header: "Kommentar",
-    cell: ({ row }) => (
-      <span className="text-xs text-muted-foreground">
-        {row.original.publicComment ?? ""}
-      </span>
-    ),
-    enableSorting: false,
-    meta: { label: "Kommentar" },
-  },
-]
+    {
+      id: "team",
+      accessorFn: (row) => getOwnTeamLabel(row),
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("matches.columns.team")} />
+      ),
+      cell: ({ row }) => <TeamBadge name={getOwnTeamLabel(row.original)} />,
+      filterFn: (row, id, value) => {
+        const filterValues = value as string[] | undefined
+        if (!filterValues || filterValues.length === 0) return true
+        return filterValues.includes(row.getValue(id) as string)
+      },
+      meta: { label: t("matches.columns.team") },
+    },
+    {
+      id: "home",
+      accessorFn: (row) =>
+        row.homeIsOwnClub ? "Dragons" : getOpponentName(row),
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("matches.columns.home")} />
+      ),
+      cell: ({ getValue }) => (
+        <span className="text-sm">{getValue() as string}</span>
+      ),
+      meta: { label: t("matches.columns.home") },
+    },
+    {
+      id: "guest",
+      accessorFn: (row) =>
+        row.homeIsOwnClub ? getOpponentName(row) : "Dragons",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("matches.columns.guest")} />
+      ),
+      cell: ({ getValue }) => (
+        <span className="text-sm">{getValue() as string}</span>
+      ),
+      meta: { label: t("matches.columns.guest") },
+    },
+    {
+      id: "score",
+      accessorFn: (row) => formatScore(row.homeScore, row.guestScore),
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("matches.columns.score")} />
+      ),
+      cell: ({ getValue }) => (
+        <span className="tabular-nums text-sm">{getValue() as string}</span>
+      ),
+      sortingFn: (rowA, rowB) => {
+        const diffA =
+          (rowA.original.homeScore ?? 0) - (rowA.original.guestScore ?? 0)
+        const diffB =
+          (rowB.original.homeScore ?? 0) - (rowB.original.guestScore ?? 0)
+        if (diffA === diffB) {
+          return (rowA.original.homeScore ?? 0) - (rowB.original.homeScore ?? 0)
+        }
+        return diffA - diffB
+      },
+      meta: { label: t("matches.columns.score") },
+    },
+    {
+      accessorKey: "anschreiber",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("matches.columns.anschreiber")} />
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm">{row.original.anschreiber ?? ""}</span>
+      ),
+      meta: { label: t("matches.columns.anschreiber") },
+    },
+    {
+      accessorKey: "zeitnehmer",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("matches.columns.zeitnehmer")} />
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm">{row.original.zeitnehmer ?? ""}</span>
+      ),
+      meta: { label: t("matches.columns.zeitnehmer") },
+    },
+    {
+      accessorKey: "shotclock",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("matches.columns.shotclock")} />
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm">{row.original.shotclock ?? ""}</span>
+      ),
+      meta: { label: t("matches.columns.shotclock") },
+    },
+    {
+      accessorKey: "publicComment",
+      header: t("matches.columns.comment"),
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {row.original.publicComment ?? ""}
+        </span>
+      ),
+      enableSorting: false,
+      meta: { label: t("matches.columns.comment") },
+    },
+  ]
+}
 
 const matchGlobalFilterFn: FilterFn<MatchListItem> = (
   row,
@@ -227,7 +231,9 @@ export function MatchListTable({
   data,
   teamOptions,
 }: MatchListTableProps) {
+  const t = useTranslations()
   const router = useRouter()
+  const columns = useMemo(() => getColumns(t), [t])
 
   const teamFilterOptions = teamOptions.map((name) => ({
     label: name,
@@ -252,8 +258,8 @@ export function MatchListTable({
   return (
     <Card className="pb-0">
       <CardHeader>
-        <CardTitle>Spiele</CardTitle>
-        <CardDescription>Alle Spiele des eigenen Vereins</CardDescription>
+        <CardTitle>{t("matches.cardTitle")}</CardTitle>
+        <CardDescription>{t("matches.cardDescription")}</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <DataTable
@@ -266,14 +272,14 @@ export function MatchListTable({
           emptyState={
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Calendar className="mb-2 h-8 w-8" />
-              <p>Keine Spiele gefunden</p>
+              <p>{t("matches.empty")}</p>
             </div>
           }
         >
           {(table) => (
             <DataTableToolbar table={table}>
               <Input
-                placeholder="Spiele suchen..."
+                placeholder={t("matches.searchPlaceholder")}
                 value={(table.getState().globalFilter as string) ?? ""}
                 onChange={(event) => table.setGlobalFilter(event.target.value)}
                 className="h-8 w-[150px] lg:w-[250px]"
@@ -285,7 +291,7 @@ export function MatchListTable({
               />
               <DataTableDateFilter
                 column={table.getColumn("kickoffDate")!}
-                title="Datum"
+                title={t("matches.columns.date")}
               />
             </DataTableToolbar>
           )}

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/lib/navigation";
+import { Link } from "@/lib/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -23,7 +25,6 @@ import {
   FieldError,
 } from "@dragons/ui/components/field";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
-import Link from "next/link";
 import { fetchAPI } from "@/lib/api";
 import { MatchOverrideField } from "./match-override-field";
 import {
@@ -69,6 +70,7 @@ function getDefaultValues(match: MatchDetail): MatchFormValues {
 }
 
 export function MatchDetailView({ initialData }: MatchDetailViewProps) {
+  const t = useTranslations();
   const router = useRouter();
   const [match, setMatch] = useState<MatchDetail>(initialData.match);
   const [diffs, setDiffs] = useState<FieldDiff[]>(initialData.diffs);
@@ -118,15 +120,15 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
         setMatch(result.match);
         setDiffs(result.diffs);
         form.reset(getDefaultValues(result.match));
-        toast.success("Match updated");
+        toast.success(t("matchDetail.toast.updated"));
         router.refresh();
       } catch {
-        toast.error("Failed to update match");
+        toast.error(t("matchDetail.toast.updateFailed"));
       } finally {
         setSaving(false);
       }
     },
-    [match.id, form, router],
+    [match.id, form, router, t],
   );
 
   const handleReleaseOverride = useCallback(
@@ -140,15 +142,15 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
         setMatch(result.match);
         setDiffs(result.diffs);
         form.reset(getDefaultValues(result.match));
-        toast.success("Override released");
+        toast.success(t("matchDetail.toast.overrideReleased"));
         router.refresh();
       } catch {
-        toast.error("Failed to release override");
+        toast.error(t("matchDetail.toast.overrideReleaseFailed"));
       } finally {
         setSaving(false);
       }
     },
-    [match.id, form, router],
+    [match.id, form, router, t],
   );
 
   const periodScores = formatPeriodScores(match);
@@ -161,23 +163,23 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
         <Link href="/admin/matches">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-1 h-4 w-4" />
-            Back
+            {t("common.back")}
           </Button>
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">
             {match.homeTeamName} vs {match.guestTeamName}
           </h1>
-          <p className="text-muted-foreground">Matchday {match.matchDay}</p>
+          <p className="text-muted-foreground">{t("matchDetail.matchday", { day: match.matchDay })}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">MD {match.matchDay}</Badge>
+          <Badge variant="outline">{t("matchDetail.matchdayBadge", { day: match.matchDay })}</Badge>
           {overrideCount > 0 && (
             <Badge
               variant="outline"
               className="border-amber-500 text-amber-600"
             >
-              {overrideCount} Override{overrideCount !== 1 ? "s" : ""}
+              {t("matchDetail.overrideCount", { count: overrideCount })}
             </Badge>
           )}
         </div>
@@ -190,40 +192,40 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Match Info</CardTitle>
+                <CardTitle className="text-base">{t("matchDetail.info.title")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <div>
-                    <dt className="text-muted-foreground">Match No</dt>
+                    <dt className="text-muted-foreground">{t("matchDetail.info.matchNo")}</dt>
                     <dd className="font-medium">{match.matchNo}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Matchday</dt>
+                    <dt className="text-muted-foreground">{t("matchDetail.info.matchday")}</dt>
                     <dd className="font-medium">{match.matchDay}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">League</dt>
+                    <dt className="text-muted-foreground">{t("matchDetail.info.league")}</dt>
                     <dd className="font-medium">
-                      {match.leagueName ?? "—"}
+                      {match.leagueName ?? "\u2014"}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Date</dt>
+                    <dt className="text-muted-foreground">{t("matchDetail.info.date")}</dt>
                     <dd className="font-medium">
                       {formatMatchDate(match.kickoffDate)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Time</dt>
+                    <dt className="text-muted-foreground">{t("matchDetail.info.time")}</dt>
                     <dd className="font-medium">
                       {formatMatchTime(match.kickoffTime)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Venue</dt>
+                    <dt className="text-muted-foreground">{t("matchDetail.info.venue")}</dt>
                     <dd className="font-medium">
-                      {match.venueNameOverride ?? match.venueName ?? "—"}
+                      {match.venueNameOverride ?? match.venueName ?? "\u2014"}
                     </dd>
                   </div>
                 </dl>
@@ -232,18 +234,18 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Score</CardTitle>
+                <CardTitle className="text-base">{t("matchDetail.score.title")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                   <div>
-                    <dt className="text-muted-foreground">Final</dt>
+                    <dt className="text-muted-foreground">{t("matchDetail.score.final")}</dt>
                     <dd className="text-lg font-bold tabular-nums">
                       {formatScore(match.homeScore, match.guestScore)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Halftime</dt>
+                    <dt className="text-muted-foreground">{t("matchDetail.score.halftime")}</dt>
                     <dd className="text-lg font-bold tabular-nums">
                       {formatScore(
                         match.homeHalftimeScore,
@@ -279,7 +281,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                               key={p.label}
                               className="px-2 py-1 text-center tabular-nums"
                             >
-                              {p.home ?? "—"}
+                              {p.home ?? "\u2014"}
                             </td>
                           ))}
                         </tr>
@@ -292,7 +294,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                               key={p.label}
                               className="px-2 py-1 text-center tabular-nums"
                             >
-                              {p.guest ?? "—"}
+                              {p.guest ?? "\u2014"}
                             </td>
                           ))}
                         </tr>
@@ -305,36 +307,37 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Status</CardTitle>
+                <CardTitle className="text-base">{t("matchDetail.status.title")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
                   {match.isConfirmed && (
-                    <Badge variant="success">Confirmed</Badge>
+                    <Badge variant="success">{t("matchDetail.status.confirmed")}</Badge>
                   )}
                   {match.isForfeited && (
-                    <Badge variant="destructive">Forfeited</Badge>
+                    <Badge variant="destructive">{t("matchDetail.status.forfeited")}</Badge>
                   )}
                   {match.isCancelled && (
-                    <Badge variant="destructive">Cancelled</Badge>
+                    <Badge variant="destructive">{t("matchDetail.status.cancelled")}</Badge>
                   )}
                   {!match.isConfirmed &&
                     !match.isForfeited &&
                     !match.isCancelled && (
                       <span className="text-sm text-muted-foreground">
-                        No status flags set
+                        {t("matchDetail.status.noFlags")}
                       </span>
                     )}
                 </div>
                 <Separator className="my-3" />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <div>
-                    Last sync:{" "}
-                    {match.lastRemoteSync
-                      ? new Date(match.lastRemoteSync).toLocaleString("de-DE")
-                      : "—"}
+                    {t("matchDetail.status.lastSync", {
+                      value: match.lastRemoteSync
+                        ? new Date(match.lastRemoteSync).toLocaleString("de-DE")
+                        : "\u2014",
+                    })}
                   </div>
-                  <div>Remote version: v{match.currentRemoteVersion}</div>
+                  <div>{t("matchDetail.status.remoteVersion", { version: match.currentRemoteVersion })}</div>
                 </div>
               </CardContent>
             </Card>
@@ -345,13 +348,13 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
             {/* Overridable fields */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Overrides</CardTitle>
+                <CardTitle className="text-base">{t("matchDetail.overrides.title")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <MatchOverrideField
                   control={form.control}
                   name="kickoffDate"
-                  label="Date"
+                  label={t("matchDetail.overrides.date")}
                   remoteValue={match.kickoffDate}
                   diffStatus={getDiffStatus("kickoffDate")}
                   inputType="date"
@@ -361,7 +364,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 <MatchOverrideField
                   control={form.control}
                   name="kickoffTime"
-                  label="Time"
+                  label={t("matchDetail.overrides.time")}
                   remoteValue={formatMatchTime(match.kickoffTime)}
                   diffStatus={getDiffStatus("kickoffTime")}
                   inputType="time"
@@ -371,7 +374,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 <MatchOverrideField
                   control={form.control}
                   name="venueNameOverride"
-                  label="Venue"
+                  label={t("matchDetail.overrides.venue")}
                   remoteValue={match.venueName}
                   diffStatus={getDiffStatus("venue")}
                   inputType="text"
@@ -379,7 +382,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 <MatchOverrideField
                   control={form.control}
                   name="isForfeited"
-                  label="Forfeited"
+                  label={t("matchDetail.overrides.forfeited")}
                   remoteValue={String(match.isForfeited ?? false)}
                   diffStatus={getDiffStatus("isForfeited")}
                   inputType="boolean"
@@ -389,7 +392,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 <MatchOverrideField
                   control={form.control}
                   name="isCancelled"
-                  label="Cancelled"
+                  label={t("matchDetail.overrides.cancelled")}
                   remoteValue={String(match.isCancelled ?? false)}
                   diffStatus={getDiffStatus("isCancelled")}
                   inputType="boolean"
@@ -402,7 +405,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
             {/* Staff (local-only) */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Kampfgericht</CardTitle>
+                <CardTitle className="text-base">{t("matchDetail.staff.title")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Controller
@@ -411,7 +414,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="anschreiber">
-                        Anschreiber
+                        {t("matchDetail.staff.anschreiber")}
                       </FieldLabel>
                       <Input
                         id="anschreiber"
@@ -420,7 +423,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Team name"
+                        placeholder={t("matchDetail.staff.placeholder")}
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -432,7 +435,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="zeitnehmer">
-                        Zeitnehmer
+                        {t("matchDetail.staff.zeitnehmer")}
                       </FieldLabel>
                       <Input
                         id="zeitnehmer"
@@ -441,7 +444,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Team name"
+                        placeholder={t("matchDetail.staff.placeholder")}
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -453,7 +456,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="shotclock">
-                        Shotclock
+                        {t("matchDetail.staff.shotclock")}
                       </FieldLabel>
                       <Input
                         id="shotclock"
@@ -462,7 +465,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Team name"
+                        placeholder={t("matchDetail.staff.placeholder")}
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -474,7 +477,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
             {/* Notes (local-only) */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Notes</CardTitle>
+                <CardTitle className="text-base">{t("matchDetail.notes.title")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Controller
@@ -483,10 +486,10 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="internal-notes">
-                        Internal Notes
+                        {t("matchDetail.notes.internal")}
                       </FieldLabel>
                       <FieldDescription>
-                        Only visible to admins
+                        {t("matchDetail.notes.internalDescription")}
                       </FieldDescription>
                       <Textarea
                         id="internal-notes"
@@ -496,7 +499,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Internal notes"
+                        placeholder={t("matchDetail.notes.internalPlaceholder")}
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -508,10 +511,10 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   render={({ field, fieldState }) => (
                     <Field>
                       <FieldLabel htmlFor="public-comment">
-                        Public Comment
+                        {t("matchDetail.notes.public")}
                       </FieldLabel>
                       <FieldDescription>
-                        Visible on public pages
+                        {t("matchDetail.notes.publicDescription")}
                       </FieldDescription>
                       <Textarea
                         id="public-comment"
@@ -521,7 +524,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
-                        placeholder="Public comment"
+                        placeholder={t("matchDetail.notes.publicPlaceholder")}
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
                     </Field>
@@ -540,14 +543,14 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                     render={({ field, fieldState }) => (
                       <Field>
                         <FieldLabel htmlFor="change-reason">
-                          Change Reason
+                          {t("matchDetail.changeReason.label")}
                         </FieldLabel>
                         <FieldDescription>
-                          Optional note explaining this change
+                          {t("matchDetail.changeReason.description")}
                         </FieldDescription>
                         <Input
                           id="change-reason"
-                          placeholder="e.g. Rescheduled by email"
+                          placeholder={t("matchDetail.changeReason.placeholder")}
                           value={field.value ?? ""}
                           onChange={field.onChange}
                           onBlur={field.onBlur}
@@ -566,7 +569,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                     ) : (
                       <Save className="mr-2 h-4 w-4" />
                     )}
-                    Save Changes
+                    {t("common.saveChanges")}
                   </Button>
                 </div>
               </CardContent>

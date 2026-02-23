@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Controller, type Control, type FieldPath } from "react-hook-form";
 import { Input } from "@dragons/ui/components/input";
 import { Switch } from "@dragons/ui/components/switch";
@@ -36,6 +37,8 @@ export function MatchOverrideField({
   isOverridden,
   onRelease,
 }: MatchOverrideFieldProps) {
+  const t = useTranslations();
+
   return (
     <Controller
       control={control}
@@ -59,7 +62,7 @@ export function MatchOverrideField({
                     title="Release override (restore remote value)"
                   >
                     <RotateCcw className="mr-1 h-3 w-3" />
-                    Release
+                    {t("common.release")}
                   </Button>
                 )}
               </div>
@@ -105,7 +108,7 @@ export function MatchOverrideField({
               )}
 
               <p className="mt-1 text-xs text-muted-foreground">
-                Remote: {remoteValue ?? "—"}
+                {t("common.remote", { value: remoteValue ?? "\u2014" })}
               </p>
             </div>
 
