@@ -1,20 +1,8 @@
 "use client"
 
 import type { Column } from "@tanstack/react-table"
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronsUpDownIcon,
-  EyeOffIcon,
-} from "lucide-react"
+import { ArrowDownIcon, ArrowUpIcon, ChevronsUpDownIcon } from "lucide-react"
 import { Button } from "@dragons/ui/components/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@dragons/ui/components/dropdown-menu"
 import { cn } from "@dragons/ui/lib/utils"
 
 interface DataTableColumnHeaderProps<TData, TValue>
@@ -28,55 +16,39 @@ export function DataTableColumnHeader<TData, TValue>({
   title,
   className,
 }: DataTableColumnHeaderProps<TData, TValue>) {
+  "use no memo"
   if (!column.getCanSort()) {
     return <div className={cn(className)}>{title}</div>
   }
 
+  // Extract to a primitive so React Compiler doesn't skip re-renders
+  const sorted = column.getIsSorted()
+
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-3 h-8 data-[state=open]:bg-accent"
-          >
-            <span>{title}</span>
-            {column.getIsSorted() === "desc" ? (
-              <ArrowDownIcon className="ml-2 size-4" />
-            ) : column.getIsSorted() === "asc" ? (
-              <ArrowUpIcon className="ml-2 size-4" />
-            ) : (
-              <ChevronsUpDownIcon className="ml-2 size-4" />
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          <DropdownMenuItem onClick={() => column.toggleSorting(false)}>
-            <ArrowUpIcon className="mr-2 size-3.5 text-muted-foreground/70" />
-            Aufsteigend
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => column.toggleSorting(true)}>
-            <ArrowDownIcon className="mr-2 size-3.5 text-muted-foreground/70" />
-            Absteigend
-          </DropdownMenuItem>
-          {column.getIsSorted() && (
-            <DropdownMenuItem onClick={() => column.clearSorting()}>
-              <ChevronsUpDownIcon className="mr-2 size-3.5 text-muted-foreground/70" />
-              Zurücksetzen
-            </DropdownMenuItem>
-          )}
-          {column.getCanHide() && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => column.toggleVisibility(false)}>
-                <EyeOffIcon className="mr-2 size-3.5 text-muted-foreground/70" />
-                Ausblenden
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="-ml-3 h-8"
+        onClick={() => {
+          if (sorted === "asc") {
+            column.toggleSorting(true)
+          } else if (sorted === "desc") {
+            column.clearSorting()
+          } else {
+            column.toggleSorting(false)
+          }
+        }}
+      >
+        <span>{title}</span>
+        {sorted === "desc" ? (
+          <ArrowDownIcon />
+        ) : sorted === "asc" ? (
+          <ArrowUpIcon />
+        ) : (
+          <ChevronsUpDownIcon className="text-muted-foreground/70" />
+        )}
+      </Button>
     </div>
   )
 }

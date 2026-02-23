@@ -21,27 +21,32 @@ import {
 } from "@dragons/ui/components/command"
 import { cn } from "@dragons/ui/lib/utils"
 
-import type { FilterOption } from "@/types/data-table"
+interface FacetedFilterOption {
+  label: string
+  value: string
+  icon?: React.ComponentType<{ className?: string }>
+}
 
 interface DataTableFacetedFilterProps<TData, TValue> {
-  column?: Column<TData, TValue>
-  title?: string
-  options: FilterOption[]
-  selectedValues: Set<string>
-  onSelectionChange: (values: string[]) => void
+  column: Column<TData, TValue>
+  title: string
+  options: FacetedFilterOption[]
 }
 
 export function DataTableFacetedFilter<TData, TValue>({
+  column,
   title,
   options,
-  selectedValues,
-  onSelectionChange,
 }: DataTableFacetedFilterProps<TData, TValue>) {
+  const facets = column.getFacetedUniqueValues()
+  const filterValue = column.getFilterValue() as string[] | undefined
+  const selectedValues = new Set(filterValue ?? [])
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="h-8 border-dashed">
-          <PlusCircleIcon className="mr-2 size-4" />
+          <PlusCircleIcon />
           {title}
           {selectedValues.size > 0 && (
             <>
@@ -96,12 +101,15 @@ export function DataTableFacetedFilter<TData, TValue>({
                       } else {
                         next.add(option.value)
                       }
-                      onSelectionChange(Array.from(next))
+                      const values = Array.from(next)
+                      column.setFilterValue(
+                        values.length > 0 ? values : undefined,
+                      )
                     }}
                   >
                     <div
                       className={cn(
-                        "mr-2 flex size-4 items-center justify-center rounded-sm border border-primary",
+                        "flex size-4 items-center justify-center rounded-sm border border-primary",
                         isSelected
                           ? "bg-primary text-primary-foreground"
                           : "opacity-50 [&_svg]:invisible",
@@ -110,12 +118,12 @@ export function DataTableFacetedFilter<TData, TValue>({
                       <CheckIcon className="size-4" />
                     </div>
                     {option.icon && (
-                      <option.icon className="mr-2 size-4 text-muted-foreground" />
+                      <option.icon className="text-muted-foreground" />
                     )}
                     <span>{option.label}</span>
-                    {option.count != null && (
+                    {facets?.get(option.value) != null && (
                       <span className="ml-auto flex size-4 items-center justify-center font-mono text-xs">
-                        {option.count}
+                        {facets.get(option.value)}
                       </span>
                     )}
                   </CommandItem>
@@ -127,7 +135,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                 <CommandSeparator />
                 <CommandGroup>
                   <CommandItem
-                    onSelect={() => onSelectionChange([])}
+                    onSelect={() => column.setFilterValue(undefined)}
                     className="justify-center text-center"
                   >
                     Filter zurücksetzen

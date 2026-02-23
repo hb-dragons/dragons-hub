@@ -1,7 +1,24 @@
 "use client"
 
-import type { Table as TanstackTable, Row } from "@tanstack/react-table"
-import { flexRender } from "@tanstack/react-table"
+import { useState } from "react"
+import type {
+  ColumnDef,
+  ColumnFiltersState,
+  FilterFn,
+  Row,
+  SortingState,
+  Table as TanstackTable,
+  VisibilityState,
+} from "@tanstack/react-table"
+import {
+  flexRender,
+  getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
 import {
   Table,
   TableBody,
@@ -11,28 +28,65 @@ import {
   TableRow,
 } from "@dragons/ui/components/table"
 import { cn } from "@dragons/ui/lib/utils"
-import { DataTablePagination } from "./data-table-pagination"
 
-interface DataTableProps<TData> {
-  table: TanstackTable<TData>
+interface DataTableProps<TData, TValue> {
+  columns: ColumnDef<TData, TValue>[]
+  data: TData[]
+  children?: (table: TanstackTable<TData>) => React.ReactNode
   onRowClick?: (row: Row<TData>, event: React.MouseEvent) => void
   rowClassName?: (row: Row<TData>) => string | undefined
   emptyState?: React.ReactNode
-  children?: React.ReactNode
+  initialColumnVisibility?: VisibilityState
+  globalFilterFn?: FilterFn<TData>
 }
 
-export function DataTable<TData>({
-  table,
+export function DataTable<TData, TValue>({
+  columns,
+  data,
+  children,
   onRowClick,
   rowClassName,
   emptyState,
-  children,
-}: DataTableProps<TData>) {
+  initialColumnVisibility,
+  globalFilterFn,
+}: DataTableProps<TData, TValue>) {
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
+    initialColumnVisibility ?? {},
+  )
+  const [globalFilter, setGlobalFilter] = useState("")
+
+  const table = useReactTable({
+    data,
+    columns,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      globalFilter,
+    },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+  })
+
   return (
     <div className="space-y-2">
-      {children && <div className="px-6">{children}</div>}
+      {children && <div className="px-6">{children(table)}</div>}
       {table.getRowModel().rows.length === 0 ? (
-        emptyState
+        emptyState ?? (
+          <p className="py-12 text-center text-muted-foreground">
+            Keine Ergebnisse.
+          </p>
+        )
       ) : (
         <Table>
           <TableHeader>
@@ -55,7 +109,6 @@ export function DataTable<TData>({
             {table.getRowModel().rows.map((row) => (
               <TableRow
                 key={row.id}
-                data-state={row.getIsSelected() && "selected"}
                 className={cn(
                   onRowClick && "cursor-pointer",
                   rowClassName?.(row),
@@ -77,7 +130,6 @@ export function DataTable<TData>({
           </TableBody>
         </Table>
       )}
-      <DataTablePagination table={table} />
     </div>
   )
 }

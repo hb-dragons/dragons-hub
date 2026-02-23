@@ -1,8 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useQueryStates, parseAsArrayOf, parseAsString, parseAsTimestamp } from "nuqs"
-import type { ColumnDef, Row } from "@tanstack/react-table"
+import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
 import {
   Card,
   CardContent,
@@ -12,9 +11,9 @@ import {
 } from "@dragons/ui/components/card"
 import { cn } from "@dragons/ui/lib/utils"
 import { Calendar } from "lucide-react"
+import { Input } from "@dragons/ui/components/input"
 import type { DateRange } from "react-day-picker"
 
-import { useDataTable } from "@/hooks/use-data-table"
 import { DataTable } from "@/components/ui/data-table"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
@@ -47,7 +46,22 @@ function TeamBadge({ name }: { name: string }) {
   )
 }
 
-const columns: ColumnDef<MatchListItem>[] = [
+const dateRangeFilterFn: FilterFn<MatchListItem> = (row, columnId, value) => {
+  const dateRange = value as DateRange | undefined
+  if (!dateRange) return true
+  const cellValue = row.getValue(columnId) as string
+  if (dateRange.from) {
+    const fromStr = dateRange.from.toISOString().slice(0, 10)
+    if (cellValue < fromStr) return false
+  }
+  if (dateRange.to) {
+    const toStr = dateRange.to.toISOString().slice(0, 10)
+    if (cellValue > toStr) return false
+  }
+  return true
+}
+
+const columns: ColumnDef<MatchListItem, unknown>[] = [
   {
     accessorKey: "kickoffDate",
     header: ({ column }) => (
@@ -58,6 +72,7 @@ const columns: ColumnDef<MatchListItem>[] = [
         {formatMatchDate(row.original.kickoffDate)}
       </span>
     ),
+    filterFn: dateRangeFilterFn,
     meta: { label: "Datum" },
   },
   {
@@ -79,6 +94,11 @@ const columns: ColumnDef<MatchListItem>[] = [
       <DataTableColumnHeader column={column} title="Team" />
     ),
     cell: ({ row }) => <TeamBadge name={getOwnTeamLabel(row.original)} />,
+    filterFn: (row, id, value) => {
+      const filterValues = value as string[] | undefined
+      if (!filterValues || filterValues.length === 0) return true
+      return filterValues.includes(row.getValue(id) as string)
+    },
     meta: { label: "Team" },
   },
   {
@@ -114,6 +134,16 @@ const columns: ColumnDef<MatchListItem>[] = [
     cell: ({ getValue }) => (
       <span className="tabular-nums text-sm">{getValue() as string}</span>
     ),
+    sortingFn: (rowA, rowB) => {
+      const diffA =
+        (rowA.original.homeScore ?? 0) - (rowA.original.guestScore ?? 0)
+      const diffB =
+        (rowB.original.homeScore ?? 0) - (rowB.original.guestScore ?? 0)
+      if (diffA === diffB) {
+        return (rowA.original.homeScore ?? 0) - (rowB.original.homeScore ?? 0)
+      }
+      return diffA - diffB
+    },
     meta: { label: "Ergebnis" },
   },
   {
@@ -121,10 +151,9 @@ const columns: ColumnDef<MatchListItem>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Anschreiber" />
     ),
-    cell: ({ row }) =>
-      row.original.anschreiber ? (
-        <TeamBadge name={row.original.anschreiber} />
-      ) : null,
+    cell: ({ row }) => (
+      <span className="text-sm">{row.original.anschreiber ?? ""}</span>
+    ),
     meta: { label: "Anschreiber" },
   },
   {
@@ -132,10 +161,9 @@ const columns: ColumnDef<MatchListItem>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Zeitnehmer" />
     ),
-    cell: ({ row }) =>
-      row.original.zeitnehmer ? (
-        <TeamBadge name={row.original.zeitnehmer} />
-      ) : null,
+    cell: ({ row }) => (
+      <span className="text-sm">{row.original.zeitnehmer ?? ""}</span>
+    ),
     meta: { label: "Zeitnehmer" },
   },
   {
@@ -143,10 +171,9 @@ const columns: ColumnDef<MatchListItem>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Shotclock" />
     ),
-    cell: ({ row }) =>
-      row.original.shotclock ? (
-        <TeamBadge name={row.original.shotclock} />
-      ) : null,
+    cell: ({ row }) => (
+      <span className="text-sm">{row.original.shotclock ?? ""}</span>
+    ),
     meta: { label: "Shotclock" },
   },
   {
@@ -162,55 +189,50 @@ const columns: ColumnDef<MatchListItem>[] = [
   },
 ]
 
+const matchGlobalFilterFn: FilterFn<MatchListItem> = (
+  row,
+  _columnId,
+  filterValue,
+) => {
+  const search = (filterValue as string).toLowerCase()
+  if (!search) return true
+
+  const home = (
+    row.original.homeIsOwnClub
+      ? "Dragons"
+      : getOpponentName(row.original)
+  ).toLowerCase()
+  const guest = (
+    row.original.homeIsOwnClub
+      ? getOpponentName(row.original)
+      : "Dragons"
+  ).toLowerCase()
+  const comment = (row.original.publicComment || "").toLowerCase()
+  const team = getOwnTeamLabel(row.original).toLowerCase()
+
+  return (
+    home.includes(search) ||
+    guest.includes(search) ||
+    comment.includes(search) ||
+    team.includes(search)
+  )
+}
+
 interface MatchListTableProps {
   data: MatchListItem[]
-  pageCount: number
   teamOptions: string[]
 }
 
 export function MatchListTable({
   data,
-  pageCount,
   teamOptions,
 }: MatchListTableProps) {
   const router = useRouter()
-  const { table } = useDataTable({
-    data,
-    columns,
-    pageCount,
-  })
-
-  // URL-synced filter state for team (multiSelect)
-  const [teamFilter, setTeamFilter] = useQueryStates(
-    {
-      team: parseAsArrayOf(parseAsString).withDefault([]),
-    },
-    { history: "push", shallow: true, clearOnDefault: true },
-  )
-
-  // URL-synced filter state for date range
-  const [dateFilter, setDateFilter] = useQueryStates(
-    {
-      dateFrom: parseAsTimestamp.withOptions({ clearOnDefault: true }),
-      dateTo: parseAsTimestamp.withOptions({ clearOnDefault: true }),
-    },
-    { history: "push", shallow: true, clearOnDefault: true },
-  )
 
   const teamFilterOptions = teamOptions.map((name) => ({
     label: name,
     value: name,
   }))
-
-  const selectedTeams = new Set(teamFilter.team)
-
-  const dateRange: DateRange | undefined =
-    dateFilter.dateFrom || dateFilter.dateTo
-      ? {
-          from: dateFilter.dateFrom ?? undefined,
-          to: dateFilter.dateTo ?? undefined,
-        }
-      : undefined
 
   function handleRowClick(row: Row<MatchListItem>, e: React.MouseEvent) {
     const href = `/admin/matches/${row.original.id}`
@@ -222,18 +244,9 @@ export function MatchListTable({
   }
 
   function getRowClassName(row: Row<MatchListItem>) {
-    return row.original.homeIsOwnClub ? "bg-muted/30" : undefined
-  }
-
-  function handleTeamChange(values: string[]) {
-    void setTeamFilter({ team: values.length > 0 ? values : [] })
-  }
-
-  function handleDateRangeChange(range: DateRange | undefined) {
-    void setDateFilter({
-      dateFrom: range?.from ?? null,
-      dateTo: range?.to ?? null,
-    })
+    return row.original.homeIsOwnClub
+      ? "bg-green-100 dark:bg-green-950/30"
+      : undefined
   }
 
   return (
@@ -244,9 +257,12 @@ export function MatchListTable({
       </CardHeader>
       <CardContent className="p-0">
         <DataTable
-          table={table}
+          columns={columns}
+          data={data}
           onRowClick={handleRowClick}
           rowClassName={getRowClassName}
+          globalFilterFn={matchGlobalFilterFn}
+          initialColumnVisibility={{ score: false, publicComment: false }}
           emptyState={
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Calendar className="mb-2 h-8 w-8" />
@@ -254,19 +270,25 @@ export function MatchListTable({
             </div>
           }
         >
-          <DataTableToolbar table={table}>
-            <DataTableFacetedFilter
-              title="Team"
-              options={teamFilterOptions}
-              selectedValues={selectedTeams}
-              onSelectionChange={handleTeamChange}
-            />
-            <DataTableDateFilter
-              title="Datum"
-              dateRange={dateRange}
-              onDateRangeChange={handleDateRangeChange}
-            />
-          </DataTableToolbar>
+          {(table) => (
+            <DataTableToolbar table={table}>
+              <Input
+                placeholder="Spiele suchen..."
+                value={(table.getState().globalFilter as string) ?? ""}
+                onChange={(event) => table.setGlobalFilter(event.target.value)}
+                className="h-8 w-[150px] lg:w-[250px]"
+              />
+              <DataTableFacetedFilter
+                column={table.getColumn("team")!}
+                title="Team"
+                options={teamFilterOptions}
+              />
+              <DataTableDateFilter
+                column={table.getColumn("kickoffDate")!}
+                title="Datum"
+              />
+            </DataTableToolbar>
+          )}
         </DataTable>
       </CardContent>
     </Card>

@@ -1,5 +1,6 @@
 "use client"
 
+import type { Column } from "@tanstack/react-table"
 import { CalendarIcon } from "lucide-react"
 import { Button } from "@dragons/ui/components/button"
 import { Calendar } from "@dragons/ui/components/calendar"
@@ -13,17 +14,16 @@ import type { DateRange } from "react-day-picker"
 
 import { formatDate } from "@/lib/format"
 
-interface DataTableDateFilterProps {
-  title?: string
-  dateRange: DateRange | undefined
-  onDateRangeChange: (range: DateRange | undefined) => void
+interface DataTableDateFilterProps<TData, TValue> {
+  column: Column<TData, TValue>
+  title: string
 }
 
-export function DataTableDateFilter({
+export function DataTableDateFilter<TData, TValue>({
+  column,
   title,
-  dateRange,
-  onDateRangeChange,
-}: DataTableDateFilterProps) {
+}: DataTableDateFilterProps<TData, TValue>) {
+  const dateRange = column.getFilterValue() as DateRange | undefined
   const hasValue = dateRange?.from || dateRange?.to
 
   return (
@@ -34,7 +34,7 @@ export function DataTableDateFilter({
           size="sm"
           className={cn("h-8 border-dashed", hasValue && "border-solid")}
         >
-          <CalendarIcon className="mr-2 size-4" />
+          <CalendarIcon />
           {hasValue ? (
             <span>
               {dateRange?.from ? formatDate(dateRange.from) : ""}{" "}
@@ -50,7 +50,7 @@ export function DataTableDateFilter({
           mode="range"
           defaultMonth={dateRange?.from}
           selected={dateRange}
-          onSelect={onDateRangeChange}
+          onSelect={(range) => column.setFilterValue(range ?? undefined)}
           numberOfMonths={2}
         />
         {hasValue && (
@@ -59,7 +59,7 @@ export function DataTableDateFilter({
               variant="ghost"
               size="sm"
               className="w-full"
-              onClick={() => onDateRangeChange(undefined)}
+              onClick={() => column.setFilterValue(undefined)}
             >
               Zurücksetzen
             </Button>

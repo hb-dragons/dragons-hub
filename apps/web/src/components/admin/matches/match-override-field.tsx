@@ -2,13 +2,17 @@
 
 import { Controller, type Control, type FieldPath } from "react-hook-form";
 import { Input } from "@dragons/ui/components/input";
-import { Label } from "@dragons/ui/components/label";
 import { Switch } from "@dragons/ui/components/switch";
 import { Button } from "@dragons/ui/components/button";
 import { DatePicker } from "@dragons/ui/components/date-picker";
 import { TimePicker } from "@dragons/ui/components/time-picker";
-import { X, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { DiffIndicator } from "./diff-indicator";
+import {
+  Field,
+  FieldLabel,
+  FieldError,
+} from "@dragons/ui/components/field";
 import type { DiffStatus, MatchFormValues } from "./types";
 
 interface MatchOverrideFieldProps {
@@ -36,18 +40,38 @@ export function MatchOverrideField({
     <Controller
       control={control}
       name={name}
-      render={({ field }) => {
-        const hasValue = field.value != null && field.value !== "";
+      render={({ field, fieldState }) => {
+        const isDiverged = diffStatus === "diverged";
 
         return (
-          <div className="grid grid-cols-[150px_1fr_1fr_auto_auto] items-center gap-4">
-            <Label className="text-sm font-medium">{label}</Label>
-
-            <div className="text-sm text-muted-foreground">
-              {remoteValue ?? <span className="italic">—</span>}
+          <Field>
+            <div className="flex items-center justify-between">
+              <FieldLabel>{label}</FieldLabel>
+              <div className="flex items-center gap-2">
+                {diffStatus && <DiffIndicator status={diffStatus} />}
+                {isOverridden && onRelease && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground"
+                    onClick={onRelease}
+                    title="Release override (restore remote value)"
+                  >
+                    <RotateCcw className="mr-1 h-3 w-3" />
+                    Release
+                  </Button>
+                )}
+              </div>
             </div>
 
-            <div>
+            <div
+              className={
+                isDiverged
+                  ? "rounded-md border-l-4 border-l-amber-500 pl-3"
+                  : undefined
+              }
+            >
               {inputType === "boolean" ? (
                 <Switch
                   checked={field.value === true}
@@ -57,17 +81,16 @@ export function MatchOverrideField({
                 <DatePicker
                   value={typeof field.value === "string" ? field.value : null}
                   onChange={(v) => field.onChange(v)}
-                  className="h-8"
+                  className="h-9"
                 />
               ) : inputType === "time" ? (
                 <TimePicker
                   value={typeof field.value === "string" ? field.value : null}
                   onChange={(v) => field.onChange(v)}
-                  className="h-8"
+                  className="h-9"
                 />
               ) : (
                 <Input
-                  type={inputType}
                   value={
                     field.value == null
                       ? ""
@@ -77,42 +100,17 @@ export function MatchOverrideField({
                   }
                   onChange={(e) => field.onChange(e.target.value || null)}
                   onBlur={field.onBlur}
-                  className="h-8"
+                  className="h-9"
                 />
               )}
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Remote: {remoteValue ?? "—"}
+              </p>
             </div>
 
-            <div className="w-20">
-              {diffStatus && <DiffIndicator status={diffStatus} />}
-            </div>
-
-            <div className="flex w-16 gap-1">
-              {hasValue && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 text-muted-foreground"
-                  onClick={() => field.onChange(null)}
-                  title="Clear override"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-              {isOverridden && onRelease && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 text-muted-foreground"
-                  onClick={onRelease}
-                  title="Release override (restore remote value)"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          </div>
+            <FieldError>{fieldState.error?.message}</FieldError>
+          </Field>
         );
       }}
     />

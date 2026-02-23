@@ -1,3 +1,284 @@
+# Matches Table & Detail Page Redesign — Implementation Plan
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** Redesign the matches list table (simplified columns, green home-game rows) and detail page (two-column layout with inline override editing, form validation on blur, dirty tracking).
+
+**Architecture:** The matches table gets column changes and visual updates (no structural changes). The detail page is rewritten from a tabbed layout to a two-column split: read-only reference on the left, editable form on the right. React Hook Form (already installed) handles validation, dirty tracking, and unsaved-changes warnings.
+
+**Tech Stack:** Next.js 16, React Hook Form 7, Zod 4, TanStack Table v8, shadcn/Radix UI components, Tailwind CSS.
+
+---
+
+## Task 1: Update Matches Table Columns and Styling
+
+**Files:**
+- Modify: `apps/web/src/components/admin/matches/match-list-table.tsx`
+
+**Step 1: Update staff column cell renderers from TeamBadge to plain text**
+
+In `match-list-table.tsx`, change the three staff column cell renderers. Replace `<TeamBadge>` with plain text:
+
+```tsx
+// anschreiber column (around line 154)
+cell: ({ row }) => (
+  <span className="text-sm">{row.original.anschreiber ?? ""}</span>
+),
+
+// zeitnehmer column (around line 165)
+cell: ({ row }) => (
+  <span className="text-sm">{row.original.zeitnehmer ?? ""}</span>
+),
+
+// shotclock column (around line 176)
+cell: ({ row }) => (
+  <span className="text-sm">{row.original.shotclock ?? ""}</span>
+),
+```
+
+**Step 2: Hide Score and Comment columns by default**
+
+Pass `initialColumnVisibility` to `DataTable` to hide score and publicComment:
+
+```tsx
+<DataTable
+  columns={columns}
+  data={data}
+  onRowClick={handleRowClick}
+  rowClassName={getRowClassName}
+  globalFilterFn={matchGlobalFilterFn}
+  initialColumnVisibility={{ score: false, publicComment: false }}
+  emptyState={...}
+>
+```
+
+**Step 3: Change home game row background to green**
+
+Update the `getRowClassName` function:
+
+```tsx
+function getRowClassName(row: Row<MatchListItem>) {
+  return row.original.homeIsOwnClub
+    ? "bg-green-100 dark:bg-green-950/30"
+    : undefined
+}
+```
+
+**Step 4: Verify visually**
+
+Run: `pnpm --filter @dragons/web dev`
+Open `http://localhost:3000/admin/matches` and verify:
+- Staff columns show plain text, not badges
+- Score and Comment columns are hidden by default
+- Score and Comment can be toggled on via column visibility menu
+- Home game rows have a green background
+- All filters and sorting still work
+
+**Step 5: Commit**
+
+```bash
+git add apps/web/src/components/admin/matches/match-list-table.tsx
+git commit -m "feat(matches): simplify table columns and green home-game rows"
+```
+
+---
+
+## Task 2: Redesign Match Override Field Component
+
+**Files:**
+- Modify: `apps/web/src/components/admin/matches/match-override-field.tsx`
+
+This component changes from a grid-row layout (used in the old overrides tab) to a stacked layout showing the input with a remote reference label underneath and inline diff indicator.
+
+**Step 1: Rewrite the component**
+
+Replace the contents of `match-override-field.tsx` with the new stacked layout:
+
+```tsx
+"use client";
+
+import { Controller, type Control, type FieldPath } from "react-hook-form";
+import { Input } from "@dragons/ui/components/input";
+import { Switch } from "@dragons/ui/components/switch";
+import { Button } from "@dragons/ui/components/button";
+import { DatePicker } from "@dragons/ui/components/date-picker";
+import { TimePicker } from "@dragons/ui/components/time-picker";
+import { RotateCcw } from "lucide-react";
+import { DiffIndicator } from "./diff-indicator";
+import {
+  Field,
+  FieldLabel,
+  FieldError,
+} from "@dragons/ui/components/field";
+import type { DiffStatus, MatchFormValues } from "./types";
+
+interface MatchOverrideFieldProps {
+  control: Control<MatchFormValues>;
+  name: FieldPath<MatchFormValues>;
+  label: string;
+  remoteValue: string | null;
+  diffStatus?: DiffStatus;
+  inputType: "date" | "time" | "text" | "boolean";
+  isOverridden?: boolean;
+  onRelease?: () => void;
+}
+
+export function MatchOverrideField({
+  control,
+  name,
+  label,
+  remoteValue,
+  diffStatus,
+  inputType,
+  isOverridden,
+  onRelease,
+}: MatchOverrideFieldProps) {
+  return (
+    <Controller
+      control={control}
+      name={name}
+      render={({ field, fieldState }) => {
+        const isDiverged = diffStatus === "diverged";
+
+        return (
+          <Field>
+            <div className="flex items-center justify-between">
+              <FieldLabel>{label}</FieldLabel>
+              <div className="flex items-center gap-2">
+                {diffStatus && <DiffIndicator status={diffStatus} />}
+                {isOverridden && onRelease && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-muted-foreground"
+                    onClick={onRelease}
+                    title="Release override (restore remote value)"
+                  >
+                    <RotateCcw className="mr-1 h-3 w-3" />
+                    Release
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div
+              className={
+                isDiverged
+                  ? "rounded-md border-l-4 border-l-amber-500 pl-3"
+                  : undefined
+              }
+            >
+              {inputType === "boolean" ? (
+                <Switch
+                  checked={field.value === true}
+                  onCheckedChange={(checked) => field.onChange(checked)}
+                />
+              ) : inputType === "date" ? (
+                <DatePicker
+                  value={typeof field.value === "string" ? field.value : null}
+                  onChange={(v) => field.onChange(v)}
+                  className="h-9"
+                />
+              ) : inputType === "time" ? (
+                <TimePicker
+                  value={typeof field.value === "string" ? field.value : null}
+                  onChange={(v) => field.onChange(v)}
+                  className="h-9"
+                />
+              ) : (
+                <Input
+                  value={
+                    field.value == null
+                      ? ""
+                      : typeof field.value === "boolean"
+                        ? ""
+                        : field.value
+                  }
+                  onChange={(e) => field.onChange(e.target.value || null)}
+                  onBlur={field.onBlur}
+                  className="h-9"
+                />
+              )}
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Remote: {remoteValue ?? "—"}
+              </p>
+            </div>
+
+            <FieldError>{fieldState.error?.message}</FieldError>
+          </Field>
+        );
+      }}
+    />
+  );
+}
+```
+
+Key changes:
+- Stacked layout instead of 5-column grid
+- Label + diff indicator on same line at top
+- Input wrapped in optional amber left border when diverged
+- "Remote: ..." label always shown below input
+- Release button moved next to diff indicator (top right)
+- Removed clear (X) button (setting field to null is handled by clearing the input)
+- Uses `Field`/`FieldLabel`/`FieldError` wrappers for consistent spacing
+
+**Step 2: Verify the component compiles**
+
+Run: `pnpm --filter @dragons/web build`
+Expected: no TypeScript errors in `match-override-field.tsx`
+
+**Step 3: Commit**
+
+```bash
+git add apps/web/src/components/admin/matches/match-override-field.tsx
+git commit -m "feat(matches): redesign override field with inline remote reference"
+```
+
+---
+
+## Task 3: Rewrite Match Detail View — Two-Column Layout
+
+**Files:**
+- Modify: `apps/web/src/components/admin/matches/match-detail-view.tsx`
+
+This is the largest change. The entire tabbed layout is replaced with a two-column split page.
+
+**Step 1: Rewrite `match-detail-view.tsx`**
+
+Replace the full component with the two-column layout. The left column is read-only reference data. The right column is the editable form with React Hook Form.
+
+Key structure:
+
+```
+Header (back button, title, badges)
+├── Left Column (Card)
+│   ├── Match identifiers (No, Matchday, League)
+│   ├── Score + Halftime
+│   ├── Period Scores table
+│   ├── Status flags (badges)
+│   └── Sync info (last sync, version)
+└── Right Column (form)
+    ├── Overridable fields section
+    │   ├── Date (MatchOverrideField)
+    │   ├── Time (MatchOverrideField)
+    │   ├── Venue (MatchOverrideField)
+    │   ├── Forfeited (MatchOverrideField)
+    │   └── Cancelled (MatchOverrideField)
+    ├── Staff section
+    │   ├── Anschreiber (Controller + Input)
+    │   ├── Zeitnehmer (Controller + Input)
+    │   └── Shotclock (Controller + Input)
+    ├── Notes section
+    │   ├── Internal Notes (Controller + Textarea)
+    │   └── Public Comment (Controller + Textarea)
+    └── Footer (Change Reason + Save button)
+```
+
+Full replacement code for `match-detail-view.tsx`:
+
+```tsx
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
@@ -140,7 +421,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
         setMatch(result.match);
         setDiffs(result.diffs);
         form.reset(getDefaultValues(result.match));
-        toast.success("Override released");
+        toast.success(`Override released`);
         router.refresh();
       } catch {
         toast.error("Failed to release override");
@@ -168,7 +449,9 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
           <h1 className="text-2xl font-bold tracking-tight">
             {match.homeTeamName} vs {match.guestTeamName}
           </h1>
-          <p className="text-muted-foreground">Matchday {match.matchDay}</p>
+          <p className="text-muted-foreground">
+            Matchday {match.matchDay}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline">MD {match.matchDay}</Badge>
@@ -204,9 +487,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   </div>
                   <div>
                     <dt className="text-muted-foreground">League</dt>
-                    <dd className="font-medium">
-                      {match.leagueName ?? "—"}
-                    </dd>
+                    <dd className="font-medium">{match.leagueName ?? "—"}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Date</dt>
@@ -345,7 +626,9 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
             {/* Overridable fields */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Overrides</CardTitle>
+                <CardTitle className="text-base">
+                  Overrides
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <MatchOverrideField
@@ -577,3 +860,126 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
     </div>
   );
 }
+```
+
+Key changes from current implementation:
+- Removed `Tabs`/`TabsContent`/`TabsList`/`TabsTrigger` imports and usage
+- Added `mode: "onBlur"` to `useForm` for on-blur validation
+- Added `isDirty` from `form.formState` for save button state
+- Added `beforeunload` event listener for unsaved changes warning
+- Two-column grid with `lg:grid-cols-2` (stacks on mobile)
+- Left column: three Cards (Match Info, Score, Status)
+- Right column: four Cards (Overrides, Kampfgericht, Notes, Footer)
+- Save button disabled when not dirty or saving
+- Fixed duplicate toast in `handleReleaseOverride` (was called twice in original)
+- Removed `FieldDescription` from staff fields (was "Scorekeeper/Timekeeper/24-second clock operator" — unnecessary)
+
+**Step 2: Verify the build**
+
+Run: `pnpm --filter @dragons/web build`
+Expected: clean build with no TypeScript errors
+
+**Step 3: Verify visually**
+
+Run: `pnpm --filter @dragons/web dev`
+Open a match detail page and verify:
+- Two-column layout on desktop, stacked on mobile
+- Left column shows read-only match data
+- Right column shows all editable fields
+- Override fields show "Remote: ..." label below input
+- Diverged overrides have amber left border + badge
+- Save button is disabled until a field is changed
+- On-blur validation works (e.g., change date to invalid format, tab away)
+- Browser warns when navigating away with unsaved changes
+
+**Step 4: Commit**
+
+```bash
+git add apps/web/src/components/admin/matches/match-detail-view.tsx
+git commit -m "feat(matches): two-column detail layout with inline overrides"
+```
+
+---
+
+## Task 4: Clean Up Unused Imports
+
+**Files:**
+- Modify: `apps/web/src/components/admin/matches/match-detail-view.tsx` (if any unused imports remain)
+- Modify: `apps/web/src/components/admin/matches/match-list-table.tsx` (remove `TeamBadge` if unused)
+
+**Step 1: Check if `TeamBadge` is still used**
+
+`TeamBadge` in `match-list-table.tsx` is used by the "team" column cell renderer. Staff columns no longer use it. But the team column still does, so `TeamBadge` stays.
+
+The `formatScore` import in `match-list-table.tsx` is still used by the score column (which is hidden by default but still defined). Keep it.
+
+**Step 2: Run typecheck**
+
+Run: `pnpm --filter @dragons/web typecheck`
+Expected: no errors
+
+**Step 3: Run lint**
+
+Run: `pnpm --filter @dragons/web lint`
+Expected: no errors (or only pre-existing ones)
+
+**Step 4: Commit (if any changes)**
+
+```bash
+git add -A apps/web/src/components/admin/matches/
+git commit -m "chore(matches): clean up unused imports"
+```
+
+---
+
+## Task 5: Final Visual QA and Commit
+
+**Step 1: Start dev server**
+
+Run: `pnpm dev`
+
+**Step 2: Test matches table**
+
+Navigate to `http://localhost:3000/admin/matches`:
+- [ ] 8 default columns visible (Date, Time, Team, Home, Guest, Anschreiber, Zeitnehmer, Shotclock)
+- [ ] Score and Comment hidden but available in column visibility menu
+- [ ] Staff columns show plain text (not colored badges)
+- [ ] Home game rows have green background
+- [ ] Clicking a row navigates to detail page
+- [ ] Cmd+click opens in new tab
+- [ ] Global search works
+- [ ] Team filter works
+- [ ] Date range filter works
+- [ ] Column visibility toggle shows/hides Score and Comment
+
+**Step 3: Test match detail page**
+
+Click into any match:
+- [ ] Two-column layout on desktop
+- [ ] Left column: Match Info, Score (with period scores if available), Status cards
+- [ ] Right column: Overrides, Kampfgericht, Notes, Save footer
+- [ ] Override fields show "Remote: ..." below input
+- [ ] Diverged fields have amber left border + "Diverged" badge
+- [ ] Release button appears on overridden fields
+- [ ] Save button is disabled initially (no changes)
+- [ ] Making a change enables the Save button
+- [ ] Invalid input shows error on blur (e.g., bad date format)
+- [ ] Navigating away with unsaved changes shows browser warning
+- [ ] Save works and shows toast
+- [ ] Release override works and shows toast
+
+**Step 4: Final commit with all changes**
+
+```bash
+git add -A
+git commit -m "feat(matches): redesign table and detail page
+
+- Simplified table: 8 default columns, Score/Comment toggleable
+- Staff columns show plain text instead of colored badges
+- Home game rows highlighted in green
+- Detail page: two-column layout replacing tabs
+- Inline override editing with remote value reference
+- On-blur validation with React Hook Form
+- Dirty tracking: Save disabled until changes made
+- Unsaved changes warning on navigation"
+```
