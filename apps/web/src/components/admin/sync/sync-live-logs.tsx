@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import {
   Card,
   CardContent,
@@ -73,6 +74,7 @@ const MAX_ENTRIES = 500;
 let entryCounter = 0;
 
 export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
+  const t = useTranslations();
   const [entries, setEntries] = useState<(LiveLogEntry & { _key: number })[]>([]);
   const [connected, setConnected] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -148,11 +150,11 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Radio className="h-4 w-4 animate-pulse text-blue-500" />
-            <CardTitle>Live Sync Progress</CardTitle>
+            <CardTitle>{t("sync.live.title")}</CardTitle>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant={connected ? "success" : "secondary"}>
-              {connected ? "Connected" : "Disconnected"}
+              {connected ? t("sync.live.connected") : t("sync.live.disconnected")}
             </Badge>
             <Button
               variant="ghost"
@@ -168,25 +170,25 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
           </div>
         </div>
         <CardDescription>
-          Streaming sync entries in real-time
+          {t("sync.live.streaming")}
         </CardDescription>
         {/* Live Counters */}
         <div className="flex gap-4 pt-2 text-sm">
           <span className="text-green-600">
             <Plus className="mr-1 inline h-3 w-3" />
-            {counters.created} created
+            {t("sync.live.created", { count: counters.created })}
           </span>
           <span className="text-blue-600">
             <RefreshCw className="mr-1 inline h-3 w-3" />
-            {counters.updated} updated
+            {t("sync.live.updated", { count: counters.updated })}
           </span>
           <span className="text-muted-foreground">
             <SkipForward className="mr-1 inline h-3 w-3" />
-            {counters.skipped} skipped
+            {t("sync.live.skipped", { count: counters.skipped })}
           </span>
           <span className="text-red-600">
             <XCircle className="mr-1 inline h-3 w-3" />
-            {counters.failed} failed
+            {t("sync.live.failed", { count: counters.failed })}
           </span>
         </div>
       </CardHeader>
@@ -197,7 +199,7 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
         >
           {entries.length === 0 ? (
             <div className="flex h-[200px] items-center justify-center text-muted-foreground">
-              Waiting for entries...
+              {t("sync.live.waiting")}
             </div>
           ) : (
             <div className="space-y-0.5 p-2">

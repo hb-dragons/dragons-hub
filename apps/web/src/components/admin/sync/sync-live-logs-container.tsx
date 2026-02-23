@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   Card,
   CardContent,
@@ -12,6 +13,7 @@ import { SyncLiveLogs } from "./sync-live-logs";
 import { useSyncContext } from "./sync-provider";
 
 export function SyncLiveLogsContainer() {
+  const t = useTranslations();
   const { runningSyncRunId, triggering, onSyncComplete } = useSyncContext();
 
   if (!runningSyncRunId && !triggering) return null;
@@ -22,13 +24,13 @@ export function SyncLiveLogsContainer() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-            <CardTitle>Live Sync Progress</CardTitle>
+            <CardTitle>{t("sync.live.title")}</CardTitle>
           </div>
-          <CardDescription>Starting sync...</CardDescription>
+          <CardDescription>{t("sync.live.starting")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex h-[200px] items-center justify-center rounded-md bg-muted/30 text-sm text-muted-foreground">
-            Preparing sync job...
+            {t("sync.live.preparing")}
           </div>
         </CardContent>
       </Card>

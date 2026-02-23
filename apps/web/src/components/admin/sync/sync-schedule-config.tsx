@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Card,
   CardContent,
@@ -47,6 +48,7 @@ function hourToCron(hour: string): string {
 }
 
 export function SyncScheduleConfig() {
+  const t = useTranslations();
   const { schedule, updateSchedule: onUpdated } = useSyncContext();
   const [enabled, setEnabled] = useState(schedule?.enabled ?? true);
   const [hour, setHour] = useState(
@@ -84,10 +86,10 @@ export function SyncScheduleConfig() {
 
       onUpdated(updated);
       setSaveState("success");
-      toast.success("Schedule updated");
+      toast.success(t("sync.schedule.toast.updated"));
     } catch {
       setSaveState("error");
-      toast.error("Failed to save schedule");
+      toast.error(t("sync.schedule.toast.updateFailed"));
     } finally {
       setSaving(false);
       setTimeout(() => setSaveState("idle"), 2000);
@@ -97,18 +99,18 @@ export function SyncScheduleConfig() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Schedule Settings</CardTitle>
+        <CardTitle>{t("sync.schedule.title")}</CardTitle>
         <CardDescription>
-          Configure the automatic sync schedule
+          {t("sync.schedule.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Enable/Disable */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
-            <Label htmlFor="schedule-enabled">Automatic Sync</Label>
+            <Label htmlFor="schedule-enabled">{t("sync.schedule.enabledLabel")}</Label>
             <p className="text-sm text-muted-foreground">
-              Run sync automatically on a daily schedule
+              {t("sync.schedule.enabledDescription")}
             </p>
           </div>
           <Switch
@@ -120,7 +122,7 @@ export function SyncScheduleConfig() {
 
         {/* Sync Time */}
         <div className="space-y-2">
-          <Label>Sync Time</Label>
+          <Label>{t("sync.schedule.timeLabel")}</Label>
           <Select value={hour} onValueChange={setHour} disabled={!enabled}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
@@ -137,7 +139,7 @@ export function SyncScheduleConfig() {
 
         {/* Timezone */}
         <div className="space-y-2">
-          <Label>Timezone</Label>
+          <Label>{t("sync.schedule.timezoneLabel")}</Label>
           <Select
             value={timezone}
             onValueChange={setTimezone}
@@ -167,15 +169,15 @@ export function SyncScheduleConfig() {
               <AlertCircle className="mr-2 h-4 w-4" />
             ) : null}
             {saving
-              ? "Saving..."
+              ? t("common.saving")
               : saveState === "success"
-                ? "Saved"
+                ? t("common.saved")
                 : saveState === "error"
-                  ? "Failed"
-                  : "Save Changes"}
+                  ? t("common.failed")
+                  : t("common.saveChanges")}
           </Button>
           {hasChanges && (
-            <span className="text-sm text-yellow-600">Unsaved changes</span>
+            <span className="text-sm text-yellow-600">{t("common.unsavedChanges")}</span>
           )}
         </div>
       </CardContent>

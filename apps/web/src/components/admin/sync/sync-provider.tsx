@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
 import type {
@@ -73,6 +74,7 @@ export function SyncProvider({
   initialError,
   children,
 }: SyncProviderProps) {
+  const t = useTranslations();
   const [status, setStatus] = useState(initialStatus);
   const [logs, setLogs] = useState<SyncRun[]>(initialLogs?.items ?? []);
   const [logsHasMore, setLogsHasMore] = useState(
@@ -110,13 +112,13 @@ export function SyncProvider({
     } catch {
       consecutiveFailsRef.current += 1;
       if (consecutiveFailsRef.current === 3) {
-        toast.error("Lost connection to API", {
-          description: "Data may be stale. Retrying in the background.",
+        toast.error(t("sync.toast.connectionLost"), {
+          description: t("sync.toast.connectionLostDescription"),
         });
       }
       setError("Failed to connect to API");
     }
-  }, []);
+  }, [t]);
 
   // Consider sync "running" if either the server says so OR we just triggered one
   const isRunning = (status?.isRunning ?? false) || runningSyncRunId !== null;
@@ -208,12 +210,12 @@ export function SyncProvider({
         ...prev.filter((r) => r.id !== optimisticRun.id),
       ]);
     } catch {
-      toast.error("Failed to trigger sync");
+      toast.error(t("sync.toast.triggerFailed"));
       setError("Failed to trigger sync");
     } finally {
       setTriggering(false);
     }
-  }, []);
+  }, [t]);
 
   const onSyncComplete = useCallback(() => {
     // Don't clear runningSyncRunId here — the SSE endpoint may fire
@@ -238,11 +240,11 @@ export function SyncProvider({
       });
       setLogsHasMore(data.hasMore);
     } catch {
-      toast.error("Failed to load more logs");
+      toast.error(t("sync.toast.loadMoreFailed"));
     } finally {
       setLoadingMore(false);
     }
-  }, [logs.length]);
+  }, [logs.length, t]);
 
   const value: SyncContextValue = {
     status,

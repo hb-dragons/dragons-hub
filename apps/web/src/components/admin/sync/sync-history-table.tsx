@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Card,
   CardContent,
@@ -35,30 +36,30 @@ const STATUS_CONFIG: Record<
   string,
   {
     icon: React.ElementType;
-    label: string;
+    labelKey: string;
     variant: "success" | "destructive" | "default" | "secondary";
     iconClass?: string;
   }
 > = {
   completed: {
     icon: CheckCircle2,
-    label: "Completed",
+    labelKey: "sync.history.status.completed",
     variant: "success",
   },
   failed: {
     icon: XCircle,
-    label: "Failed",
+    labelKey: "sync.history.status.failed",
     variant: "destructive",
   },
   running: {
     icon: Loader2,
-    label: "Running",
+    labelKey: "sync.history.status.running",
     variant: "default",
     iconClass: "animate-spin",
   },
   pending: {
     icon: Clock,
-    label: "Pending",
+    labelKey: "sync.history.status.pending",
     variant: "secondary",
   },
 };
@@ -86,6 +87,7 @@ function formatRecords(run: SyncRun): React.ReactNode {
 }
 
 export function SyncHistoryTable() {
+  const t = useTranslations();
   const { logs: rawLogs, logsHasMore: hasMore, loadMoreLogs: onLoadMore, loadingMore } = useSyncContext();
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -98,33 +100,33 @@ export function SyncHistoryTable() {
   return (
     <Card className="pb-0">
       <CardHeader>
-        <CardTitle>Sync History</CardTitle>
+        <CardTitle>{t("sync.history.title")}</CardTitle>
         <CardDescription>
-          Previous sync runs and their results
+          {t("sync.history.description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Clock className="mb-2 h-8 w-8" />
-            <p>No sync runs yet</p>
+            <p>{t("sync.history.empty")}</p>
           </div>
         ) : (
           <>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Duration</TableHead>
+                  <TableHead className="w-[120px]">{t("sync.history.columns.status")}</TableHead>
+                  <TableHead>{t("sync.history.columns.type")}</TableHead>
+                  <TableHead>{t("sync.history.columns.started")}</TableHead>
+                  <TableHead>{t("sync.history.columns.duration")}</TableHead>
                   <TableHead
                     className="text-right"
-                    title="Created / Updated / Skipped / Failed"
+                    title={t("sync.history.recordsTooltip")}
                   >
-                    Records
+                    {t("sync.history.columns.records")}
                   </TableHead>
-                  <TableHead>Trigger</TableHead>
+                  <TableHead>{t("sync.history.columns.trigger")}</TableHead>
                   <TableHead className="w-[40px]" />
                 </TableRow>
               </TableHeader>
@@ -154,7 +156,7 @@ export function SyncHistoryTable() {
                                 statusCfg.iconClass,
                               )}
                             />
-                            {statusCfg.label}
+                            {t(statusCfg.labelKey)}
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium">
@@ -199,7 +201,7 @@ export function SyncHistoryTable() {
                   {loadingMore && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  Load More
+                  {t("common.loadMore")}
                 </Button>
               </div>
             )}
