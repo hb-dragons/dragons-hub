@@ -1001,7 +1001,7 @@ describe("syncMatchesFromData", () => {
     });
     // homeHalftimeScore and homeQ1 are overridden
     const { txUpdateSet } = makeTxMock(
-      makeLockedRow({ homeHalftimeScore: 45, homeQ1: 25, periodFormat: "achtel" }),
+      makeLockedRow({ homeHalftimeScore: 45, homeQ1: 25, periodFormat: "quarters" }),
       [{ fieldName: "homeHalftimeScore" }, { fieldName: "homeQ1" }, { fieldName: "periodFormat" }],
     );
 
