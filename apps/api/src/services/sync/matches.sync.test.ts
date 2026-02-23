@@ -169,10 +169,6 @@ function makeLockedRow(overrides: Record<string, unknown> = {}) {
     homeQ2: 20, guestQ2: 17,
     homeQ3: 20, guestQ3: 20,
     homeQ4: 20, guestQ4: 15,
-    homeQ5: null, guestQ5: null,
-    homeQ6: null, guestQ6: null,
-    homeQ7: null, guestQ7: null,
-    homeQ8: null, guestQ8: null,
     homeOt1: null, guestOt1: null,
     homeOt2: null, guestOt2: null,
     ...overrides,
@@ -308,8 +304,6 @@ describe("syncMatchesFromData", () => {
     expect(inserted.homeQ3).toBe(20);
     // Q4 = V4stand(80) - V3stand(60) = 20
     expect(inserted.homeQ4).toBe(20);
-    // No Q5-Q8 for standard quarters
-    expect(inserted.homeQ5).toBeNull();
   });
 
   it("creates initial remote version for new match", async () => {
@@ -561,60 +555,6 @@ describe("syncMatchesFromData", () => {
     expect(inserted.homeOt2).toBe(10);
     // OT2 guest delta = 85 - 78 = 7
     expect(inserted.guestOt2).toBe(7);
-  });
-
-  it("handles achtel period scores with delta conversion", async () => {
-    const details = makeGameDetails({
-      heimV1stand: 20,
-      gastV1stand: 18,
-      heimV2stand: 40,
-      gastV2stand: 35,
-      heimHalbzeitstand: 80,
-      gastHalbzeitstand: 70,
-      heimV3stand: 60,
-      gastV3stand: 55,
-      heimV4stand: 80,
-      gastV4stand: 70,
-      heimV5stand: 90,
-      gastV5stand: 78,
-      heimV6stand: 100,
-      gastV6stand: 88,
-      heimV7stand: 110,
-      gastV7stand: 98,
-      heimV8stand: 120,
-      gastV8stand: 108,
-    });
-    const data = makeLeagueData({
-      gameDetails: new Map([[1000, details]]),
-    });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
-    const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1 }]),
-    });
-    mockInsert.mockReturnValue({ values: mockValues });
-
-    await syncMatchesFromData([data], new Map(), null);
-
-    const inserted = mockValues.mock.calls[0][0];
-    expect(inserted.periodFormat).toBe("achtel");
-    // Q1 delta = cumulative Q1 (first period)
-    expect(inserted.homeQ1).toBe(20);
-    expect(inserted.guestQ1).toBe(18);
-    // Q2 delta = V2(40) - V1(20) = 20
-    expect(inserted.homeQ2).toBe(20);
-    expect(inserted.guestQ2).toBe(17);
-    // Q5 delta = V5(90) - V4(80) = 10
-    expect(inserted.homeQ5).toBe(10);
-    expect(inserted.guestQ5).toBe(8);
-    // Q8 delta = V8(120) - V7(110) = 10
-    expect(inserted.homeQ8).toBe(10);
-    expect(inserted.guestQ8).toBe(10);
   });
 
   it("handles transaction with null locked row", async () => {
@@ -1132,128 +1072,6 @@ describe("extractPeriodScores", () => {
     expect(scores.guestQ4).toBeNull();
   });
 
-  it("handles achtel format with invalid V4 falling back to Halbzeitstand", () => {
-    const game = makeGameDetails({
-      heimV1stand: 10,
-      gastV1stand: 8,
-      heimHalbzeitstand: 40,
-      gastHalbzeitstand: 38,
-      heimV3stand: 30,
-      gastV3stand: 28,
-      heimV4stand: -1,
-      gastV4stand: -1,
-      heimV5stand: 50,
-      gastV5stand: 48,
-      heimV6stand: 60,
-      gastV6stand: 58,
-      heimV7stand: 70,
-      gastV7stand: 68,
-      heimV8stand: 80,
-      gastV8stand: 78,
-      heimOt1stand: -1,
-      gastOt1stand: -1,
-    }).game1;
-
-    const scores = extractPeriodScores(game);
-    expect(scores.periodFormat).toBe("achtel");
-    // V4 is -1, so falls back to Halbzeitstand (V4 = halftime in achtel)
-    // cumH4 = validScore(-1) ?? validScore(40) = 40
-    // cumG4 = validScore(-1) ?? validScore(38) = 38
-    expect(scores.homeQ4).toBe(10); // 40 - 30
-    expect(scores.guestQ4).toBe(10); // 38 - 28
-  });
-
-  it("handles achtel format with invalid V8 falling back to Endstand", () => {
-    const game = makeGameDetails({
-      heimV1stand: 10,
-      gastV1stand: 8,
-      heimV3stand: 30,
-      gastV3stand: 28,
-      heimV4stand: 40,
-      gastV4stand: 38,
-      heimV5stand: 50,
-      gastV5stand: 48,
-      heimV6stand: 60,
-      gastV6stand: 58,
-      heimV7stand: 70,
-      gastV7stand: 68,
-      heimV8stand: undefined,
-      gastV8stand: undefined,
-      heimEndstand: 80,
-      gastEndstand: 78,
-      heimOt1stand: -1,
-      gastOt1stand: -1,
-    }).game1;
-
-    const scores = extractPeriodScores(game);
-    expect(scores.periodFormat).toBe("achtel");
-    // V8 is undefined and no overtime, so falls back to Endstand
-    expect(scores.homeQ8).toBe(10); // 80 - 70
-    expect(scores.guestQ8).toBe(10); // 78 - 68
-  });
-
-  it("does not derive achtel V8 from Endstand when overtime was played", () => {
-    const game = makeGameDetails({
-      heimV1stand: 10,
-      gastV1stand: 8,
-      heimV3stand: 30,
-      gastV3stand: 28,
-      heimV4stand: 40,
-      gastV4stand: 38,
-      heimV5stand: 50,
-      gastV5stand: 48,
-      heimV6stand: 60,
-      gastV6stand: 58,
-      heimV7stand: 70,
-      gastV7stand: 68,
-      heimV8stand: undefined,
-      gastV8stand: undefined,
-      heimEndstand: 90,
-      gastEndstand: 85,
-      heimOt1stand: 10,
-      gastOt1stand: 5,
-      heimOt2stand: -1,
-      gastOt2stand: -1,
-    }).game1;
-
-    const scores = extractPeriodScores(game);
-    expect(scores.periodFormat).toBe("achtel");
-    // V8 is undefined but overtime was played, so should NOT fall back to Endstand
-    expect(scores.homeQ8).toBeNull();
-    expect(scores.guestQ8).toBeNull();
-  });
-
-  it("does not use Halbzeitstand as fallback for V2 in achtel format", () => {
-    const game = makeGameDetails({
-      heimV1stand: 10,
-      gastV1stand: 8,
-      heimV2stand: undefined,
-      gastV2stand: undefined,
-      heimHalbzeitstand: 40,
-      gastHalbzeitstand: 38,
-      heimV3stand: 30,
-      gastV3stand: 28,
-      heimV4stand: 40,
-      gastV4stand: 38,
-      heimV5stand: 50,
-      gastV5stand: 48,
-      heimV6stand: 60,
-      gastV6stand: 58,
-      heimV7stand: 70,
-      gastV7stand: 68,
-      heimV8stand: 80,
-      gastV8stand: 78,
-    }).game1;
-
-    const scores = extractPeriodScores(game);
-    expect(scores.periodFormat).toBe("achtel");
-    // V2 is undefined — should be null, NOT fall back to Halbzeitstand
-    expect(scores.homeQ2).toBeNull();
-    expect(scores.guestQ2).toBeNull();
-    // Q3 should also be null since cumH2 is null
-    expect(scores.homeQ3).toBeNull();
-  });
-
   it("extracts standard quarter deltas", () => {
     const game = makeGameDetails({
       heimV1stand: 20,
@@ -1273,46 +1091,6 @@ describe("extractPeriodScores", () => {
     expect(scores.homeQ2).toBe(20); // 40 - 20
     expect(scores.homeQ3).toBe(20); // 60 - 40
     expect(scores.homeQ4).toBe(20); // 80 - 60
-    expect(scores.homeQ5).toBeNull();
-  });
-
-  it("detects achtel when V4stand differs from Endstand (no V5-V8)", () => {
-    // Simulates a U12 achtel game where SDK provides V1-V4 as achtels 1-4
-    // but does NOT include V5-V8. V4stand (64) ≠ Endstand (110).
-    const game = makeGameDetails({
-      heimV1stand: 15,
-      gastV1stand: 0,
-      heimHalbzeitstand: 29,
-      gastHalbzeitstand: 0,
-      heimV3stand: 51,
-      gastV3stand: 0,
-      heimV4stand: 64,
-      gastV4stand: 4,
-      heimEndstand: 110,
-      gastEndstand: 15,
-      heimOt1stand: 8,
-      gastOt1stand: 2,
-      heimOt2stand: 15,
-      gastOt2stand: 4,
-    }).game1;
-
-    const scores = extractPeriodScores(game);
-    expect(scores.periodFormat).toBe("achtel");
-    // V1-V4 represent achtels 1-4
-    expect(scores.homeQ1).toBe(15);
-    expect(scores.homeQ2).toBe(14); // Halbzeitstand(29) - V1stand(15)
-    expect(scores.homeQ3).toBe(22); // V3stand(51) - Halbzeitstand(29)
-    expect(scores.homeQ4).toBe(13); // V4stand(64) - V3stand(51)
-    // V5-V8 not present
-    expect(scores.homeQ5).toBeNull();
-    expect(scores.homeQ8).toBeNull();
-
-    // OT values are bogus (SDK achtel data, not real overtime) — should all be null
-    const deltas = extractOvertimeDeltas(game, scores);
-    expect(deltas.homeOt1).toBeNull();
-    expect(deltas.guestOt1).toBeNull();
-    expect(deltas.homeOt2).toBeNull();
-    expect(deltas.guestOt2).toBeNull();
   });
 
   it("does not detect achtel when V4stand equals Endstand", () => {
@@ -1333,8 +1111,35 @@ describe("extractPeriodScores", () => {
     expect(scores.periodFormat).toBe("quarters");
   });
 
-  it("does not false-detect achtel when V4 differs due to overtime", () => {
-    // V4stand(80) ≠ Endstand(90), but overtime explains the difference
+  it("returns null period scores when V5-V8 are present (achtel game)", () => {
+    const game = makeGameDetails({
+      heimV1stand: 10,
+      gastV1stand: 8,
+      heimV2stand: 20,
+      gastV2stand: 18,
+      heimV3stand: 30,
+      gastV3stand: 28,
+      heimV4stand: 40,
+      gastV4stand: 38,
+      heimV5stand: 50,
+      gastV5stand: 48,
+      heimV6stand: 60,
+      gastV6stand: 58,
+      heimV7stand: 70,
+      gastV7stand: 68,
+      heimV8stand: 80,
+      gastV8stand: 78,
+    }).game1;
+
+    const scores = extractPeriodScores(game);
+    expect(scores.periodFormat).toBeNull();
+    expect(scores.homeQ1).toBeNull();
+    expect(scores.guestQ1).toBeNull();
+    expect(scores.homeQ4).toBeNull();
+    expect(scores.guestQ4).toBeNull();
+  });
+
+  it("treats V4 != Endstand as quarters when overtime is present", () => {
     const game = makeGameDetails({
       heimV1stand: 20,
       gastV1stand: 18,
@@ -1351,37 +1156,10 @@ describe("extractPeriodScores", () => {
     }).game1;
 
     const scores = extractPeriodScores(game);
-    // OT1stand(90) > V4stand(80) → consistent overtime, not achtel
     expect(scores.periodFormat).toBe("quarters");
-  });
-
-  it("extracts achtel deltas", () => {
-    const game = makeGameDetails({
-      heimV1stand: 10,
-      gastV1stand: 8,
-      heimV2stand: 20,
-      gastV2stand: 18,
-      heimV3stand: 30,
-      gastV3stand: 28,
-      heimV4stand: 40,
-      gastV4stand: 38,
-      heimV5stand: 50,
-      gastV5stand: 48,
-      heimV6stand: 60,
-      gastV6stand: 58,
-      heimV7stand: 70,
-      gastV7stand: 68,
-      heimV8stand: 80,
-      gastV8stand: 78,
-    }).game1;
-
-    const scores = extractPeriodScores(game);
-
-    expect(scores.periodFormat).toBe("achtel");
-    expect(scores.homeQ1).toBe(10);
-    expect(scores.homeQ2).toBe(10); // 20 - 10
-    expect(scores.homeQ5).toBe(10); // 50 - 40
-    expect(scores.homeQ8).toBe(10); // 80 - 70
+    expect(scores.homeQ1).toBe(20);
+    expect(scores.homeQ4).toBe(20); // 80 - 60
+    expect(scores.guestQ4).toBe(25); // 80 - 55
   });
 });
 
@@ -1391,40 +1169,6 @@ describe("extractOvertimeDeltas", () => {
     const deltas = extractOvertimeDeltas(undefined, periodScores);
     expect(deltas.homeOt1).toBeNull();
     expect(deltas.guestOt1).toBeNull();
-  });
-
-  it("computes achtel OT deltas from regulation end (8 periods)", () => {
-    const game = makeGameDetails({
-      heimV1stand: 10,
-      gastV1stand: 8,
-      heimV2stand: 20,
-      gastV2stand: 18,
-      heimV3stand: 30,
-      gastV3stand: 28,
-      heimV4stand: 40,
-      gastV4stand: 38,
-      heimV5stand: 50,
-      gastV5stand: 48,
-      heimV6stand: 60,
-      gastV6stand: 58,
-      heimV7stand: 70,
-      gastV7stand: 68,
-      heimV8stand: 80,
-      gastV8stand: 78,
-      heimOt1stand: 90,
-      gastOt1stand: 86,
-      heimOt2stand: -1,
-      gastOt2stand: -1,
-    }).game1;
-
-    const periodScores = extractPeriodScores(game);
-    expect(periodScores.periodFormat).toBe("achtel");
-
-    const deltas = extractOvertimeDeltas(game, periodScores);
-    // OT1 delta = 90 - 80 = 10 (home), 86 - 78 = 8 (guest)
-    expect(deltas.homeOt1).toBe(10);
-    expect(deltas.guestOt1).toBe(8);
-    expect(deltas.homeOt2).toBeNull();
   });
 
   it("computes OT deltas from regulation end", () => {
@@ -1452,6 +1196,22 @@ describe("extractOvertimeDeltas", () => {
     const periodScores = extractPeriodScores(game);
     const deltas = extractOvertimeDeltas(game, periodScores);
 
+    expect(deltas.homeOt1).toBeNull();
+    expect(deltas.guestOt1).toBeNull();
+  });
+
+  it("returns null OT when period scores are null (achtel game skipped)", () => {
+    const game = makeGameDetails({
+      heimV5stand: 50,
+      gastV5stand: 48,
+      heimOt1stand: 90,
+      gastOt1stand: 86,
+    }).game1;
+
+    const periodScores = extractPeriodScores(game);
+    expect(periodScores.periodFormat).toBeNull();
+
+    const deltas = extractOvertimeDeltas(game, periodScores);
     expect(deltas.homeOt1).toBeNull();
     expect(deltas.guestOt1).toBeNull();
   });
