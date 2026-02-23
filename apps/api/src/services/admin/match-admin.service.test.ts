@@ -625,6 +625,72 @@ describe("computeDiffs", () => {
     expect(venueDiff!.localValue).toBe("New Gym");
     expect(venueDiff!.remoteValue).toBe("Test Venue");
   });
+
+  it("uses remote snapshot values instead of row values for overridden fields", () => {
+    const row = {
+      kickoffDate: "2025-04-01", // overridden value in the row
+      kickoffTime: "19:00:00",   // overridden value in the row
+      venueName: "Test Venue",
+      venueNameOverride: null,
+      isForfeited: false,
+      isCancelled: false,
+      anschreiber: null,
+      zeitnehmer: null,
+      shotclock: null,
+      internalNotes: null,
+      publicComment: null,
+    } as Parameters<typeof computeDiffs>[0];
+
+    const remoteSnapshot = {
+      kickoffDate: "2025-03-15", // original remote value
+      kickoffTime: "18:00",      // original remote value
+      isForfeited: false,
+      isCancelled: false,
+    };
+
+    const diffs = computeDiffs(row, ["kickoffDate", "kickoffTime"], remoteSnapshot);
+
+    const dateDiff = diffs.find((d) => d.field === "kickoffDate");
+    expect(dateDiff).toBeDefined();
+    expect(dateDiff!.remoteValue).toBe("2025-03-15");
+    expect(dateDiff!.localValue).toBe("2025-04-01");
+    expect(dateDiff!.status).toBe("diverged");
+
+    const timeDiff = diffs.find((d) => d.field === "kickoffTime");
+    expect(timeDiff).toBeDefined();
+    expect(timeDiff!.remoteValue).toBe("18:00");
+    expect(timeDiff!.localValue).toBe("19:00:00");
+    expect(timeDiff!.status).toBe("diverged");
+  });
+
+  it("requires remoteSnapshot for correct diff when override matches row value", () => {
+    const row = {
+      kickoffDate: "2025-04-01",
+      kickoffTime: "18:00:00",
+      venueName: "Test Venue",
+      venueNameOverride: null,
+      isForfeited: false,
+      isCancelled: false,
+      anschreiber: null,
+      zeitnehmer: null,
+      shotclock: null,
+      internalNotes: null,
+      publicComment: null,
+    } as Parameters<typeof computeDiffs>[0];
+
+    const remoteSnapshot = {
+      kickoffDate: "2025-03-20",
+      kickoffTime: "18:00:00",
+      isForfeited: false,
+      isCancelled: false,
+    };
+
+    const diffs = computeDiffs(row, ["kickoffDate"], remoteSnapshot);
+    const dateDiff = diffs.find((d) => d.field === "kickoffDate");
+    expect(dateDiff!.remoteValue).toBe("2025-03-20");
+    expect(dateDiff!.localValue).toBe("2025-04-01");
+    expect(dateDiff!.status).toBe("diverged");
+  });
 });
 
 describe("updateMatchLocal", () => {
