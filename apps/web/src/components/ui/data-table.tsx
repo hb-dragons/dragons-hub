@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import type {
   ColumnDef,
   ColumnFiltersState,
@@ -50,6 +51,7 @@ export function DataTable<TData, TValue>({
   initialColumnVisibility,
   globalFilterFn,
 }: DataTableProps<TData, TValue>) {
+  const t = useTranslations()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
@@ -84,7 +86,7 @@ export function DataTable<TData, TValue>({
       {table.getRowModel().rows.length === 0 ? (
         emptyState ?? (
           <p className="py-12 text-center text-muted-foreground">
-            Keine Ergebnisse.
+            {t("common.noResults")}
           </p>
         )
       ) : (

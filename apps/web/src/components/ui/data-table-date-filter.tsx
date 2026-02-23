@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import type { Column } from "@tanstack/react-table"
 import { CalendarIcon } from "lucide-react"
 import { Button } from "@dragons/ui/components/button"
@@ -23,6 +24,7 @@ export function DataTableDateFilter<TData, TValue>({
   column,
   title,
 }: DataTableDateFilterProps<TData, TValue>) {
+  const t = useTranslations()
   const dateRange = column.getFilterValue() as DateRange | undefined
   const hasValue = dateRange?.from || dateRange?.to
 
@@ -61,7 +63,7 @@ export function DataTableDateFilter<TData, TValue>({
               className="w-full"
               onClick={() => column.setFilterValue(undefined)}
             >
-              Zurücksetzen
+              {t("common.reset")}
             </Button>
           </div>
         )}

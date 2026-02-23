@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import type { Table } from "@tanstack/react-table"
 import { XIcon } from "lucide-react"
 import { Button } from "@dragons/ui/components/button"
@@ -14,6 +15,7 @@ export function DataTableToolbar<TData>({
   table,
   children,
 }: DataTableToolbarProps<TData>) {
+  const t = useTranslations()
   const isFiltered = table.getState().columnFilters.length > 0
 
   return (
@@ -26,7 +28,7 @@ export function DataTableToolbar<TData>({
             onClick={() => table.resetColumnFilters()}
             className="h-8 px-2 lg:px-3"
           >
-            Zurücksetzen
+            {t("common.reset")}
             <XIcon />
           </Button>
         )}

@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslations } from "next-intl"
 import type { Table } from "@tanstack/react-table"
 import { SlidersHorizontalIcon } from "lucide-react"
 import { Button } from "@dragons/ui/components/button"
@@ -19,6 +20,7 @@ interface DataTableViewOptionsProps<TData> {
 export function DataTableViewOptions<TData>({
   table,
 }: DataTableViewOptionsProps<TData>) {
+  const t = useTranslations()
   const columns = table
     .getAllColumns()
     .filter(
@@ -31,11 +33,11 @@ export function DataTableViewOptions<TData>({
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="ml-auto hidden lg:flex">
           <SlidersHorizontalIcon />
-          Spalten
+          {t("common.columns")}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[180px]">
-        <DropdownMenuLabel>Spalten ein/ausblenden</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("common.columnsToggle")}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {columns.map((column) => {
           const label =
