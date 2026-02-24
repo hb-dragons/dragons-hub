@@ -186,6 +186,31 @@ describe("getOwnClubTeams", () => {
     expect(result[0]!.customName).toBe("Herren 1");
   });
 
+  it("includes nameShort when set", async () => {
+    await insertTeam({
+      api_team_permanent_id: 1000,
+      name: "Dragons Herren 1",
+      name_short: "Dragons H1",
+      is_own_club: true,
+    });
+
+    const result = await getOwnClubTeams();
+
+    expect(result[0]!.nameShort).toBe("Dragons H1");
+  });
+
+  it("returns null nameShort when not set", async () => {
+    await insertTeam({
+      api_team_permanent_id: 1000,
+      name: "Dragons Herren 1",
+      is_own_club: true,
+    });
+
+    const result = await getOwnClubTeams();
+
+    expect(result[0]!.nameShort).toBeNull();
+  });
+
   it("includes league name from standings", async () => {
     const leagueId = await insertLeague({ name: "Kreisliga A" });
     await insertTeam({ api_team_permanent_id: 1000, name: "Dragons Herren 1", is_own_club: true });
@@ -228,7 +253,7 @@ describe("getOwnClubTeams", () => {
 
     const result = await getOwnClubTeams();
 
-    expect(Object.keys(result[0]!).sort()).toEqual(["customName", "id", "leagueName", "name"]);
+    expect(Object.keys(result[0]!).sort()).toEqual(["customName", "id", "leagueName", "name", "nameShort"]);
   });
 
   it("does not duplicate teams with multiple standings entries", async () => {

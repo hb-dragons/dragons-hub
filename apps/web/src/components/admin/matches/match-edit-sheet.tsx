@@ -14,7 +14,15 @@ import {
 } from "@dragons/ui/components/sheet";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
-import { Input } from "@dragons/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@dragons/ui/components/select";
+import { Combobox } from "@dragons/ui/components/combobox";
+import type { ComboboxOption } from "@dragons/ui/components/combobox";
 import { Textarea } from "@dragons/ui/components/textarea";
 import { Switch } from "@dragons/ui/components/switch";
 import { DatePicker } from "@dragons/ui/components/date-picker";
@@ -26,7 +34,7 @@ import {
   FieldDescription,
   FieldError,
 } from "@dragons/ui/components/field";
-import { Loader2, RotateCcw, Save } from "lucide-react";
+import { Loader2, RotateCcw, Save, X } from "lucide-react";
 
 import { fetchAPI } from "@/lib/api";
 import {
@@ -85,7 +93,7 @@ function OverrideField({
           <span className="text-xs text-muted-foreground">
             {t("matchDetail.overrides.official")}
           </span>
-          <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
+          <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm whitespace-pre-line">
             {remoteDisplay ?? remoteValue ?? "\u2014"}
           </div>
         </div>
@@ -112,20 +120,34 @@ function getDefaultValues(match: MatchDetail): MatchFormValues {
     kickoffTime: match.overriddenFields.includes("kickoffTime")
       ? match.kickoffTime
       : null,
-    venueNameOverride: match.venueNameOverride,
-    isForfeited: match.overriddenFields.includes("isForfeited")
-      ? match.isForfeited
-      : null,
-    isCancelled: match.overriddenFields.includes("isCancelled")
-      ? match.isCancelled
-      : null,
+    venueNameOverride: match.venueNameOverride ?? match.venueName,
+    // Boolean fields always use the actual match value so the Switch displays
+    // the real state.  The dirty-fields-only submit ensures that unchanged
+    // booleans are never sent (which would previously send null → clear override).
+    isForfeited: match.isForfeited ?? false,
+    isCancelled: match.isCancelled ?? false,
     anschreiber: match.anschreiber,
     zeitnehmer: match.zeitnehmer,
     shotclock: match.shotclock,
     internalNotes: match.internalNotes,
     publicComment: match.publicComment,
-    changeReason: "",
   };
+}
+
+// ---------------------------------------------------------------------------
+// Team types & helpers for Kampfgericht dropdowns
+// ---------------------------------------------------------------------------
+
+interface OwnClubTeam {
+  id: number;
+  name: string;
+  nameShort: string | null;
+  customName: string | null;
+  leagueName: string | null;
+}
+
+function getTeamDisplayName(team: OwnClubTeam): string {
+  return team.customName ?? team.nameShort ?? team.name;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +174,7 @@ export function MatchEditSheet({
   const [match, setMatch] = useState<MatchDetail | null>(null);
   const [diffs, setDiffs] = useState<FieldDiff[]>([]);
   const [saving, setSaving] = useState(false);
+  const [ownClubTeams, setOwnClubTeams] = useState<OwnClubTeam[]>([]);
 
   const form = useForm<MatchFormValues>({
     resolver: zodResolver(matchFormSchema),
@@ -166,7 +189,6 @@ export function MatchEditSheet({
       shotclock: null,
       internalNotes: null,
       publicComment: null,
-      changeReason: "",
     },
     mode: "onBlur",
   });
@@ -178,6 +200,7 @@ export function MatchEditSheet({
     if (!open || matchId == null) {
       setMatch(null);
       setDiffs([]);
+      setOwnClubTeams([]);
       return;
     }
 
@@ -198,6 +221,14 @@ export function MatchEditSheet({
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+
+    fetchAPI<OwnClubTeam[]>("/admin/teams")
+      .then((result) => {
+        if (!cancelled) setOwnClubTeams(result);
+      })
+      .catch(() => {
+        // Teams fetch failure is non-critical
       });
 
     return () => {
@@ -226,11 +257,20 @@ export function MatchEditSheet({
   const onSubmit = useCallback(
     async (data: MatchFormValues) => {
       if (!match) return;
-      const { changeReason, ...fields } = data;
-      const updateData: Record<string, unknown> = { ...fields };
-      if (changeReason) {
-        updateData.changeReason = changeReason;
+      const { dirtyFields } = form.formState;
+
+      // Only send fields the user actually changed — prevents unchanged
+      // booleans (or any other field) from being sent as null/default and
+      // accidentally clearing overrides on the backend.
+      const updateData: Record<string, unknown> = {};
+      for (const key of Object.keys(data) as (keyof typeof data)[]) {
+        if (dirtyFields[key]) {
+          updateData[key] = data[key];
+        }
       }
+
+      // Nothing actually changed
+      if (Object.keys(updateData).length === 0) return;
 
       try {
         setSaving(true);
@@ -601,23 +641,61 @@ export function MatchEditSheet({
                 )}
               />
 
-              {/* Venue name (local-only, no diff) */}
+              {/* Venue */}
               <Controller
                 control={form.control}
                 name="venueNameOverride"
                 render={({ field, fieldState }) => (
-                  <Field>
-                    <FieldLabel>{t("matchDetail.overrides.venue")}</FieldLabel>
-                    <Input
+                  <OverrideField
+                    label={t("matchDetail.overrides.venue")}
+                    remoteValue={match.venueName}
+                    remoteDisplay={
+                      match.venueName
+                        ? [
+                            match.venueName,
+                            [match.venueStreet, match.venueCity]
+                              .filter(Boolean)
+                              .join(", "),
+                          ]
+                            .filter(Boolean)
+                            .join("\n")
+                        : undefined
+                    }
+                    isOverridden={match.overriddenFields.includes(
+                      "venueNameOverride",
+                    )}
+                    onRelease={() =>
+                      handleReleaseOverride("venueNameOverride")
+                    }
+                  >
+                    <Combobox
                       value={field.value ?? ""}
-                      onChange={(e) =>
-                        field.onChange(e.target.value || null)
-                      }
-                      onBlur={field.onBlur}
+                      onChange={(v) => field.onChange(v || null)}
+                      onSearch={async (q) => {
+                        const result = await fetchAPI<{
+                          venues: {
+                            id: number;
+                            name: string;
+                            street: string | null;
+                            city: string | null;
+                          }[];
+                        }>(`/admin/venues/search?q=${encodeURIComponent(q)}`);
+                        return result.venues.map(
+                          (v): ComboboxOption => ({
+                            value: String(v.id),
+                            label: v.name,
+                            description: [v.street, v.city]
+                              .filter(Boolean)
+                              .join(", ") || undefined,
+                          }),
+                        );
+                      }}
+                      onSelect={(option) => field.onChange(option.label)}
+                      placeholder={t("matchDetail.overrides.venuePlaceholder")}
                       className="h-9"
                     />
                     <FieldError>{fieldState.error?.message}</FieldError>
-                  </Field>
+                  </OverrideField>
                 )}
               />
             </section>
@@ -630,62 +708,78 @@ export function MatchEditSheet({
                 {t("matchDetail.staff.title")}
               </h3>
 
-              <Controller
-                control={form.control}
-                name="anschreiber"
-                render={({ field, fieldState }) => (
-                  <Field>
-                    <FieldLabel>{t("matchDetail.staff.anschreiber")}</FieldLabel>
-                    <Input
-                      value={field.value ?? ""}
-                      onChange={(e) =>
-                        field.onChange(e.target.value || null)
-                      }
-                      onBlur={field.onBlur}
-                      className="h-9"
-                    />
-                    <FieldError>{fieldState.error?.message}</FieldError>
-                  </Field>
-                )}
-              />
+              {/* Set All dropdown — not a form field, just a convenience setter */}
+              <Field>
+                <FieldLabel>{t("matchDetail.staff.setAll")}</FieldLabel>
+                <Select
+                  value=""
+                  onValueChange={(teamName) => {
+                    form.setValue("anschreiber", teamName, { shouldDirty: true });
+                    form.setValue("zeitnehmer", teamName, { shouldDirty: true });
+                    form.setValue("shotclock", teamName, { shouldDirty: true });
+                  }}
+                >
+                  <SelectTrigger className="h-9 w-full">
+                    <SelectValue placeholder={t("matchDetail.staff.teamPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ownClubTeams.map((team) => {
+                      const displayName = getTeamDisplayName(team);
+                      return (
+                        <SelectItem key={team.id} value={displayName}>
+                          {displayName}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-              <Controller
-                control={form.control}
-                name="zeitnehmer"
-                render={({ field, fieldState }) => (
-                  <Field>
-                    <FieldLabel>{t("matchDetail.staff.zeitnehmer")}</FieldLabel>
-                    <Input
-                      value={field.value ?? ""}
-                      onChange={(e) =>
-                        field.onChange(e.target.value || null)
-                      }
-                      onBlur={field.onBlur}
-                      className="h-9"
-                    />
-                    <FieldError>{fieldState.error?.message}</FieldError>
-                  </Field>
-                )}
-              />
-
-              <Controller
-                control={form.control}
-                name="shotclock"
-                render={({ field, fieldState }) => (
-                  <Field>
-                    <FieldLabel>{t("matchDetail.staff.shotclock")}</FieldLabel>
-                    <Input
-                      value={field.value ?? ""}
-                      onChange={(e) =>
-                        field.onChange(e.target.value || null)
-                      }
-                      onBlur={field.onBlur}
-                      className="h-9"
-                    />
-                    <FieldError>{fieldState.error?.message}</FieldError>
-                  </Field>
-                )}
-              />
+              {/* Per-role dropdowns */}
+              {(["anschreiber", "zeitnehmer", "shotclock"] as const).map((fieldName) => (
+                <Controller
+                  key={fieldName}
+                  control={form.control}
+                  name={fieldName}
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel>{t(`matchDetail.staff.${fieldName}`)}</FieldLabel>
+                      <div className="flex gap-2">
+                        <Select
+                          value={field.value ?? ""}
+                          onValueChange={(v) => field.onChange(v)}
+                        >
+                          <SelectTrigger className="h-9 w-full">
+                            <SelectValue placeholder={t("matchDetail.staff.placeholder")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ownClubTeams.map((team) => {
+                              const displayName = getTeamDisplayName(team);
+                              return (
+                                <SelectItem key={team.id} value={displayName}>
+                                  {displayName}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        {field.value && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 shrink-0"
+                            onClick={() => field.onChange(null)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                      <FieldError>{fieldState.error?.message}</FieldError>
+                    </Field>
+                  )}
+                />
+              ))}
             </section>
 
             <Separator />
@@ -743,28 +837,8 @@ export function MatchEditSheet({
 
            </div>
 
-            {/* Footer: change reason + save — sticky at bottom */}
-            <div className="border-t bg-background px-4 py-4 space-y-4">
-              <Controller
-                control={form.control}
-                name="changeReason"
-                render={({ field, fieldState }) => (
-                  <Field>
-                    <FieldLabel>{t("matchDetail.changeReason.label")}</FieldLabel>
-                    <FieldDescription>
-                      {t("matchDetail.changeReason.description")}
-                    </FieldDescription>
-                    <Input
-                      placeholder={t("matchDetail.changeReason.placeholder")}
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      className="h-9"
-                    />
-                    <FieldError>{fieldState.error?.message}</FieldError>
-                  </Field>
-                )}
-              />
+            {/* Footer: save — sticky at bottom */}
+            <div className="border-t bg-background px-4 py-4">
               <Button
                 type="submit"
                 disabled={saving || !isDirty}

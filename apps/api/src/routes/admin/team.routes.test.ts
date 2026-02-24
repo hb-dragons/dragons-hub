@@ -36,8 +36,8 @@ beforeEach(() => {
 describe("GET /teams", () => {
   it("returns list of own club teams", async () => {
     const teams = [
-      { id: 1, name: "Dragons Herren 1", customName: "Herren 1", leagueName: "Kreisliga A" },
-      { id: 2, name: "Dragons Herren 2", customName: null, leagueName: null },
+      { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A" },
+      { id: 2, name: "Dragons Herren 2", nameShort: null, customName: null, leagueName: null },
     ];
     mocks.getOwnClubTeams.mockResolvedValue(teams);
 
@@ -60,7 +60,7 @@ describe("GET /teams", () => {
 
 describe("PATCH /teams/:id", () => {
   it("updates custom name and returns team", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", customName: "Herren 1", leagueName: "Kreisliga A" };
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A" };
     mocks.updateTeamCustomName.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
@@ -75,7 +75,7 @@ describe("PATCH /teams/:id", () => {
   });
 
   it("clears custom name with null", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", customName: null, leagueName: null };
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null };
     mocks.updateTeamCustomName.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {

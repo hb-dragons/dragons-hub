@@ -5,6 +5,7 @@ import { eq, and, sql } from "drizzle-orm";
 export interface OwnClubTeam {
   id: number;
   name: string;
+  nameShort: string | null;
   customName: string | null;
   leagueName: string | null;
 }
@@ -14,6 +15,7 @@ export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
     .selectDistinctOn([teams.id], {
       id: teams.id,
       name: teams.name,
+      nameShort: teams.nameShort,
       customName: teams.customName,
       leagueName: leagues.name,
     })
@@ -37,6 +39,7 @@ export async function updateTeamCustomName(
     .returning({
       id: teams.id,
       name: teams.name,
+      nameShort: teams.nameShort,
       customName: teams.customName,
     });
 
