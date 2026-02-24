@@ -286,23 +286,25 @@ export function MatchEditSheet({
 
   return (
     <SheetContent className="sm:max-w-2xl">
+      <SheetHeader>
+        <SheetTitle>
+          {match
+            ? `${match.homeTeamName} vs ${match.guestTeamName}`
+            : t("matches.title")}
+        </SheetTitle>
+        {match && (
+          <SheetDescription>
+            {t("matchDetail.info.matchday")} {match.matchDay} &middot;{" "}
+            {match.leagueName ?? "\u2014"}
+          </SheetDescription>
+        )}
+      </SheetHeader>
       {loading || !match ? (
         <div className="flex h-full items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
         <>
-          {/* Header */}
-          <SheetHeader>
-            <SheetTitle>
-              {match.homeTeamName} vs {match.guestTeamName}
-            </SheetTitle>
-            <SheetDescription>
-              {t("matchDetail.info.matchday")} {match.matchDay} &middot;{" "}
-              {match.leagueName ?? "\u2014"}
-            </SheetDescription>
-          </SheetHeader>
-
           <form
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex flex-col gap-6 px-4 pb-4"

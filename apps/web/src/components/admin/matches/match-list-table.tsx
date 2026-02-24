@@ -287,55 +287,57 @@ export function MatchListTable({
 
   return (
     <TooltipProvider>
-    <Sheet
-      open={selectedMatchId !== null}
-      onOpenChange={(open) => {
-        if (!open) setSelectedMatchId(null)
-      }}
-    >
-    <DataTable
-      columns={columns}
-      data={data}
-      onRowClick={handleRowClick}
-      rowClassName={getRowClassName}
-      globalFilterFn={matchGlobalFilterFn}
-      initialColumnVisibility={{ score: false, publicComment: false }}
-      emptyState={
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-          <Calendar className="mb-2 h-8 w-8" />
-          <p>{t("matches.empty")}</p>
-        </div>
-      }
-    >
-      {(table) => (
-        <DataTableToolbar table={table}>
-          <Input
-            placeholder={t("matches.searchPlaceholder")}
-            value={(table.getState().globalFilter as string) ?? ""}
-            onChange={(event) => table.setGlobalFilter(event.target.value)}
-            className="h-8 w-[150px] lg:w-[250px]"
+      <DataTable
+        columns={columns}
+        data={data}
+        onRowClick={handleRowClick}
+        rowClassName={getRowClassName}
+        globalFilterFn={matchGlobalFilterFn}
+        initialColumnVisibility={{ score: false, publicComment: false }}
+        emptyState={
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Calendar className="mb-2 h-8 w-8" />
+            <p>{t("matches.empty")}</p>
+          </div>
+        }
+      >
+        {(table) => (
+          <DataTableToolbar table={table}>
+            <Input
+              placeholder={t("matches.searchPlaceholder")}
+              value={(table.getState().globalFilter as string) ?? ""}
+              onChange={(event) => table.setGlobalFilter(event.target.value)}
+              className="h-8 w-[150px] lg:w-[250px]"
+            />
+            <DataTableFacetedFilter
+              column={table.getColumn("team")!}
+              title="Team"
+              options={teamFilterOptions}
+            />
+            <DataTableDateFilter
+              column={table.getColumn("kickoffDate")!}
+              title={t("matches.columns.date")}
+            />
+          </DataTableToolbar>
+        )}
+      </DataTable>
+      {selectedMatchId !== null && (
+        <Sheet
+          open
+          onOpenChange={(open) => {
+            if (!open) setSelectedMatchId(null)
+          }}
+        >
+          <MatchEditSheet
+            matchId={selectedMatchId}
+            open
+            onOpenChange={(open) => {
+              if (!open) setSelectedMatchId(null)
+            }}
+            onSaved={() => router.refresh()}
           />
-          <DataTableFacetedFilter
-            column={table.getColumn("team")!}
-            title="Team"
-            options={teamFilterOptions}
-          />
-          <DataTableDateFilter
-            column={table.getColumn("kickoffDate")!}
-            title={t("matches.columns.date")}
-          />
-        </DataTableToolbar>
+        </Sheet>
       )}
-    </DataTable>
-    <MatchEditSheet
-      matchId={selectedMatchId}
-      open={selectedMatchId !== null}
-      onOpenChange={(open) => {
-        if (!open) setSelectedMatchId(null)
-      }}
-      onSaved={() => router.refresh()}
-    />
-    </Sheet>
     </TooltipProvider>
   )
 }

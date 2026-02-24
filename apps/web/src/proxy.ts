@@ -1,19 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
+import createMiddleware from "next-intl/middleware";
+import { routing } from "./i18n/routing";
 
-const PUBLIC_PATHS = ["/", "/auth"];
+const intlMiddleware = createMiddleware(routing);
+
+/** Strip non-default locale prefix to get the logical pathname for auth checks. */
+function getLogicalPathname(pathname: string): string {
+  for (const locale of routing.locales) {
+    if (locale === routing.defaultLocale) continue;
+    if (pathname === `/${locale}`) return "/";
+    if (pathname.startsWith(`/${locale}/`)) {
+      return pathname.slice(`/${locale}`.length);
+    }
+  }
+  return pathname;
+}
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const logicalPathname = getLogicalPathname(pathname);
 
+  // Public paths — skip auth, just handle locale
   if (
-    PUBLIC_PATHS.includes(pathname) ||
-    pathname.startsWith("/auth/") ||
-    pathname.startsWith("/api/auth")
+    logicalPathname === "/" ||
+    logicalPathname.startsWith("/auth") ||
+    logicalPathname.startsWith("/api/auth")
   ) {
-    return NextResponse.next();
+    return intlMiddleware(request);
   }
 
-  // Check for Better Auth session cookie (prefixed with "dragons")
+  // Protected paths — check for Better Auth session cookie
   const sessionCookie =
     request.cookies.get("dragons.session_token") ??
     request.cookies.get("__Secure-dragons.session_token");
@@ -24,9 +40,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  return NextResponse.next();
+  return intlMiddleware(request);
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/((?!_next|api|.*\\..*).*)"],
 };
