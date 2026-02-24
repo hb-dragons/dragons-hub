@@ -284,8 +284,23 @@ export function MatchEditSheet({
 
   const periodScores = match ? formatPeriodScores(match) : [];
 
+  // For non-overridden fields, diffs may be empty — fall back to match values
+  // (which ARE the remote values when no override exists)
+  const remoteKickoffDate = match
+    ? (getRemoteValue("kickoffDate") ?? match.kickoffDate)
+    : null;
+  const remoteKickoffTime = match
+    ? (getRemoteValue("kickoffTime") ?? match.kickoffTime)
+    : null;
+  const remoteIsForfeited = match
+    ? (getRemoteValue("isForfeited") ?? String(match.isForfeited ?? false))
+    : null;
+  const remoteIsCancelled = match
+    ? (getRemoteValue("isCancelled") ?? String(match.isCancelled ?? false))
+    : null;
+
   return (
-    <SheetContent className="sm:max-w-2xl">
+    <SheetContent className="data-[side=right]:sm:max-w-3xl">
       <SheetHeader>
         <SheetTitle>
           {match
@@ -307,8 +322,9 @@ export function MatchEditSheet({
         <>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col gap-6 px-4 pb-4"
+            className="flex min-h-0 flex-1 flex-col"
           >
+           <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4">
             {/* Match info */}
             <section>
               <h3 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
@@ -472,10 +488,10 @@ export function MatchEditSheet({
                 render={({ field }) => (
                   <OverrideField
                     label={t("matchDetail.overrides.date")}
-                    remoteValue={getRemoteValue("kickoffDate")}
+                    remoteValue={remoteKickoffDate}
                     remoteDisplay={
-                      getRemoteValue("kickoffDate")
-                        ? format.dateTime(new Date(getRemoteValue("kickoffDate")! + "T00:00:00"), "matchDate")
+                      remoteKickoffDate
+                        ? format.dateTime(new Date(remoteKickoffDate + "T00:00:00"), "matchDate")
                         : undefined
                     }
                     isOverridden={match.overriddenFields.includes(
@@ -501,10 +517,10 @@ export function MatchEditSheet({
                 render={({ field }) => (
                   <OverrideField
                     label={t("matchDetail.overrides.time")}
-                    remoteValue={getRemoteValue("kickoffTime")}
+                    remoteValue={remoteKickoffTime}
                     remoteDisplay={
-                      getRemoteValue("kickoffTime")
-                        ? formatMatchTime(getRemoteValue("kickoffTime")!)
+                      remoteKickoffTime
+                        ? formatMatchTime(remoteKickoffTime)
                         : undefined
                     }
                     isOverridden={match.overriddenFields.includes(
@@ -517,7 +533,7 @@ export function MatchEditSheet({
                         typeof field.value === "string" ? field.value : null
                       }
                       onChange={(v) => field.onChange(v)}
-                      className="h-9"
+                      className="h-9 w-full"
                     />
                   </OverrideField>
                 )}
@@ -530,9 +546,9 @@ export function MatchEditSheet({
                 render={({ field }) => (
                   <OverrideField
                     label={t("matchDetail.overrides.forfeited")}
-                    remoteValue={getRemoteValue("isForfeited")}
+                    remoteValue={remoteIsForfeited}
                     remoteDisplay={
-                      getRemoteValue("isForfeited") === "true"
+                      remoteIsForfeited === "true"
                         ? t("common.yes")
                         : t("common.no")
                     }
@@ -561,9 +577,9 @@ export function MatchEditSheet({
                 render={({ field }) => (
                   <OverrideField
                     label={t("matchDetail.overrides.cancelled")}
-                    remoteValue={getRemoteValue("isCancelled")}
+                    remoteValue={remoteIsCancelled}
                     remoteDisplay={
-                      getRemoteValue("isCancelled") === "true"
+                      remoteIsCancelled === "true"
                         ? t("common.yes")
                         : t("common.no")
                     }
@@ -725,10 +741,10 @@ export function MatchEditSheet({
               />
             </section>
 
-            <Separator />
+           </div>
 
-            {/* Footer: change reason + save */}
-            <section className="space-y-4">
+            {/* Footer: change reason + save — sticky at bottom */}
+            <div className="border-t bg-background px-4 py-4 space-y-4">
               <Controller
                 control={form.control}
                 name="changeReason"
@@ -761,7 +777,7 @@ export function MatchEditSheet({
                 )}
                 {t("common.saveChanges")}
               </Button>
-            </section>
+            </div>
           </form>
         </>
       )}
