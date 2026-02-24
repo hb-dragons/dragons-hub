@@ -1,16 +1,16 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useTranslations, useFormatter } from "next-intl"
 import { useRouter } from "@/lib/navigation"
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@dragons/ui/components/card"
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@dragons/ui/components/tooltip"
+import { Sheet } from "@dragons/ui/components/sheet"
 import { cn } from "@dragons/ui/lib/utils"
 import { Calendar } from "lucide-react"
 import { Input } from "@dragons/ui/components/input"
@@ -30,6 +30,23 @@ import {
   getOpponentName,
 } from "./utils"
 import type { MatchListItem } from "./types"
+import { MatchEditSheet } from "./match-edit-sheet"
+
+function OverrideDot({ match, field }: { match: MatchListItem; field: string }) {
+  const t = useTranslations()
+  if (!match.overriddenFields.includes(field)) return null
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="ml-1 inline-block h-2 w-2 rounded-full bg-amber-500" />
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-xs">{t("matchDetail.overrideActive")}</p>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
 
 function TeamBadge({ name }: { name: string }) {
   const color = getTeamColor(name)
@@ -72,6 +89,7 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-sm">
           {format.dateTime(new Date(row.original.kickoffDate + "T00:00:00"), "matchDate")}
+          <OverrideDot match={row.original} field="kickoffDate" />
         </span>
       ),
       filterFn: dateRangeFilterFn,
@@ -85,6 +103,7 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
       cell: ({ row }) => (
         <span className="tabular-nums text-sm">
           {formatMatchTime(row.original.kickoffTime)}
+          <OverrideDot match={row.original} field="kickoffTime" />
         </span>
       ),
       meta: { label: t("matches.columns.time") },
@@ -154,7 +173,10 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
         <DataTableColumnHeader column={column} title={t("matches.columns.anschreiber")} />
       ),
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.anschreiber ?? ""}</span>
+        <span className="text-sm">
+          {row.original.anschreiber ?? ""}
+          <OverrideDot match={row.original} field="anschreiber" />
+        </span>
       ),
       meta: { label: t("matches.columns.anschreiber") },
     },
@@ -164,7 +186,10 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
         <DataTableColumnHeader column={column} title={t("matches.columns.zeitnehmer")} />
       ),
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.zeitnehmer ?? ""}</span>
+        <span className="text-sm">
+          {row.original.zeitnehmer ?? ""}
+          <OverrideDot match={row.original} field="zeitnehmer" />
+        </span>
       ),
       meta: { label: t("matches.columns.zeitnehmer") },
     },
@@ -174,7 +199,10 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
         <DataTableColumnHeader column={column} title={t("matches.columns.shotclock")} />
       ),
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.shotclock ?? ""}</span>
+        <span className="text-sm">
+          {row.original.shotclock ?? ""}
+          <OverrideDot match={row.original} field="shotclock" />
+        </span>
       ),
       meta: { label: t("matches.columns.shotclock") },
     },
@@ -184,6 +212,7 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">
           {row.original.publicComment ?? ""}
+          <OverrideDot match={row.original} field="publicComment" />
         </span>
       ),
       enableSorting: false,
@@ -234,6 +263,7 @@ export function MatchListTable({
   const format = useFormatter()
   const router = useRouter()
   const columns = useMemo(() => getColumns(t, format), [t, format])
+  const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
 
   const teamFilterOptions = teamOptions.map((name) => ({
     label: name,
@@ -245,58 +275,67 @@ export function MatchListTable({
     if (e.metaKey || e.ctrlKey) {
       window.open(href, "_blank")
     } else {
-      router.push(href)
+      setSelectedMatchId(row.original.id)
     }
   }
 
   function getRowClassName(row: Row<MatchListItem>) {
     return row.original.homeIsOwnClub
-      ? "bg-green-100 dark:bg-green-950/30"
+      ? "border-l-2 border-l-green-500"
       : undefined
   }
 
   return (
-    <Card className="pb-0">
-      <CardHeader>
-        <CardTitle>{t("matches.cardTitle")}</CardTitle>
-        <CardDescription>{t("matches.cardDescription")}</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <DataTable
-          columns={columns}
-          data={data}
-          onRowClick={handleRowClick}
-          rowClassName={getRowClassName}
-          globalFilterFn={matchGlobalFilterFn}
-          initialColumnVisibility={{ score: false, publicComment: false }}
-          emptyState={
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Calendar className="mb-2 h-8 w-8" />
-              <p>{t("matches.empty")}</p>
-            </div>
-          }
-        >
-          {(table) => (
-            <DataTableToolbar table={table}>
-              <Input
-                placeholder={t("matches.searchPlaceholder")}
-                value={(table.getState().globalFilter as string) ?? ""}
-                onChange={(event) => table.setGlobalFilter(event.target.value)}
-                className="h-8 w-[150px] lg:w-[250px]"
-              />
-              <DataTableFacetedFilter
-                column={table.getColumn("team")!}
-                title="Team"
-                options={teamFilterOptions}
-              />
-              <DataTableDateFilter
-                column={table.getColumn("kickoffDate")!}
-                title={t("matches.columns.date")}
-              />
-            </DataTableToolbar>
-          )}
-        </DataTable>
-      </CardContent>
-    </Card>
+    <TooltipProvider>
+    <Sheet
+      open={selectedMatchId !== null}
+      onOpenChange={(open) => {
+        if (!open) setSelectedMatchId(null)
+      }}
+    >
+    <DataTable
+      columns={columns}
+      data={data}
+      onRowClick={handleRowClick}
+      rowClassName={getRowClassName}
+      globalFilterFn={matchGlobalFilterFn}
+      initialColumnVisibility={{ score: false, publicComment: false }}
+      emptyState={
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Calendar className="mb-2 h-8 w-8" />
+          <p>{t("matches.empty")}</p>
+        </div>
+      }
+    >
+      {(table) => (
+        <DataTableToolbar table={table}>
+          <Input
+            placeholder={t("matches.searchPlaceholder")}
+            value={(table.getState().globalFilter as string) ?? ""}
+            onChange={(event) => table.setGlobalFilter(event.target.value)}
+            className="h-8 w-[150px] lg:w-[250px]"
+          />
+          <DataTableFacetedFilter
+            column={table.getColumn("team")!}
+            title="Team"
+            options={teamFilterOptions}
+          />
+          <DataTableDateFilter
+            column={table.getColumn("kickoffDate")!}
+            title={t("matches.columns.date")}
+          />
+        </DataTableToolbar>
+      )}
+    </DataTable>
+    <MatchEditSheet
+      matchId={selectedMatchId}
+      open={selectedMatchId !== null}
+      onOpenChange={(open) => {
+        if (!open) setSelectedMatchId(null)
+      }}
+      onSaved={() => router.refresh()}
+    />
+    </Sheet>
+    </TooltipProvider>
   )
 }

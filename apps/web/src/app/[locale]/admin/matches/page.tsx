@@ -16,20 +16,13 @@ export default async function MatchesPage() {
   }
 
   const allItems = data?.items ?? []
-
-  // Compute team options from all matches
   const teamOptions = [
     ...new Set(allItems.map((m) => getOwnTeamLabel(m))),
   ].sort()
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t("matches.title")}</h1>
-        <p className="text-muted-foreground">
-          {t("matches.description")}
-        </p>
-      </div>
+      <h1 className="text-3xl font-bold tracking-tight">{t("matches.title")}</h1>
 
       {error ? (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">

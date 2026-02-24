@@ -15,51 +15,25 @@ export function formatScore(
 
 /** Format period scores as an array of [home, guest] pairs for display */
 export function formatPeriodScores(match: MatchDetail): { label: string; home: number | null; guest: number | null }[] {
-  // Detect achtel from actual data even if periodFormat says "quarters":
-  // 1. Q5-Q8 have values → definitely achtel
-  // 2. OT deltas are negative → bogus OT from achtel misdetection (scores can't be negative)
-  const hasQ5to8 = match.homeQ5 != null || match.guestQ5 != null
-    || match.homeQ6 != null || match.guestQ6 != null
-    || match.homeQ7 != null || match.guestQ7 != null
-    || match.homeQ8 != null || match.guestQ8 != null;
-  const hasNegativeOt =
-    (match.homeOt1 != null && match.homeOt1 < 0)
-    || (match.guestOt1 != null && match.guestOt1 < 0)
-    || (match.homeOt2 != null && match.homeOt2 < 0)
-    || (match.guestOt2 != null && match.guestOt2 < 0);
-  const isAchtel = match.periodFormat === "achtel" || hasQ5to8 || hasNegativeOt;
-  const effectiveFormat = isAchtel ? "achtel" : match.periodFormat;
-
-  if (!effectiveFormat) return [];
+  if (!match.periodFormat) return [];
 
   const periods: { label: string; home: number | null; guest: number | null }[] = [];
 
-  const periodCount = isAchtel ? 8 : 4;
-  const periodKeys = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8"] as const;
-
-  for (let i = 0; i < periodCount; i++) {
-    const key = periodKeys[i]!;
+  const periodKeys = ["Q1", "Q2", "Q3", "Q4"] as const;
+  for (const key of periodKeys) {
     const homeKey = `home${key}` as keyof MatchDetail;
     const guestKey = `guest${key}` as keyof MatchDetail;
     periods.push({
-      label: isAchtel ? `A${i + 1}` : `Q${i + 1}`,
+      label: key,
       home: match[homeKey] as number | null,
       guest: match[guestKey] as number | null,
     });
   }
 
-  // Only add overtime if values are non-negative (negative deltas indicate
-  // achtel misdetection where OT fields contain garbage data)
-  const ot1Valid = (match.homeOt1 != null || match.guestOt1 != null)
-    && (match.homeOt1 == null || match.homeOt1 >= 0)
-    && (match.guestOt1 == null || match.guestOt1 >= 0);
-  const ot2Valid = (match.homeOt2 != null || match.guestOt2 != null)
-    && (match.homeOt2 == null || match.homeOt2 >= 0)
-    && (match.guestOt2 == null || match.guestOt2 >= 0);
-  if (ot1Valid) {
+  if (match.homeOt1 != null || match.guestOt1 != null) {
     periods.push({ label: "OT1", home: match.homeOt1, guest: match.guestOt1 });
   }
-  if (ot2Valid) {
+  if (match.homeOt2 != null || match.guestOt2 != null) {
     periods.push({ label: "OT2", home: match.homeOt2, guest: match.guestOt2 });
   }
 

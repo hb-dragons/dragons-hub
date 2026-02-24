@@ -475,25 +475,31 @@ export async function getMatchDetail(id: number): Promise<MatchDetailResponse | 
   const overriddenFields = overrides.map((o) => o.fieldName);
 
   // Load latest remote snapshot for diff comparison
-  let remoteSnapshot: Record<string, unknown> | null = null;
-  if (row.currentRemoteVersion > 0) {
-    const [latestRemote] = await db
-      .select({ snapshot: matchRemoteVersions.snapshot })
-      .from(matchRemoteVersions)
-      .where(
-        and(
-          eq(matchRemoteVersions.matchId, id),
-          eq(matchRemoteVersions.versionNumber, row.currentRemoteVersion),
-        ),
-      )
-      .limit(1);
-    remoteSnapshot = (latestRemote?.snapshot as Record<string, unknown>) ?? null;
-  }
+  const remoteSnapshot = await loadRemoteSnapshot(db, id, row.currentRemoteVersion);
 
   return {
     match: rowToDetail(row, overriddenFields, overrides),
     diffs: computeDiffs(row, overriddenFields, remoteSnapshot),
   };
+}
+
+async function loadRemoteSnapshot(
+  client: Database | TransactionClient,
+  matchId: number,
+  remoteVersion: number,
+): Promise<Record<string, unknown> | null> {
+  if (remoteVersion <= 0) return null;
+  const [latestRemote] = await client
+    .select({ snapshot: matchRemoteVersions.snapshot })
+    .from(matchRemoteVersions)
+    .where(
+      and(
+        eq(matchRemoteVersions.matchId, matchId),
+        eq(matchRemoteVersions.versionNumber, remoteVersion),
+      ),
+    )
+    .limit(1);
+  return (latestRemote?.snapshot as Record<string, unknown>) ?? null;
 }
 
 function queryMatchWithJoins(client: Database | TransactionClient) {
@@ -650,7 +656,8 @@ export async function updateMatchLocal(
       const overrides = await tx.select({ fieldName: matchOverrides.fieldName, reason: matchOverrides.reason, changedBy: matchOverrides.changedBy, createdAt: matchOverrides.createdAt })
         .from(matchOverrides).where(eq(matchOverrides.matchId, id));
       const overriddenFields = overrides.map((o) => o.fieldName);
-      return { match: rowToDetail(row, overriddenFields, overrides), diffs: computeDiffs(row, overriddenFields) };
+      const remoteSnapshot = await loadRemoteSnapshot(tx, id, row.currentRemoteVersion);
+      return { match: rowToDetail(row, overriddenFields, overrides), diffs: computeDiffs(row, overriddenFields, remoteSnapshot) };
     }
 
     const newVersion = locked.currentLocalVersion + 1;
@@ -731,7 +738,7 @@ export async function updateMatchLocal(
 
     return {
       match: rowToDetail(row, overriddenFields, overrides),
-      diffs: computeDiffs(row, overriddenFields),
+      diffs: computeDiffs(row, overriddenFields, await loadRemoteSnapshot(tx, id, row.currentRemoteVersion)),
     };
   });
 }
@@ -848,7 +855,7 @@ export async function releaseOverride(
 
     return {
       match: rowToDetail(row, overriddenFields, overrides),
-      diffs: computeDiffs(row, overriddenFields),
+      diffs: computeDiffs(row, overriddenFields, await loadRemoteSnapshot(tx, matchId, row.currentRemoteVersion)),
     };
   });
 }

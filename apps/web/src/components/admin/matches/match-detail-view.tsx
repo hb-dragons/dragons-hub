@@ -333,7 +333,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                   <div>
                     {t("matchDetail.status.lastSync", {
                       value: match.lastRemoteSync
-                        ? new Date(match.lastRemoteSync).toLocaleString("de-DE")
+                        ? format.dateTime(new Date(match.lastRemoteSync), "syncTimestamp")
                         : "\u2014",
                     })}
                   </div>
