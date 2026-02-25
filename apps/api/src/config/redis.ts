@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { env } from "./env";
+import { logger } from "./logger";
 
 let _redis: Redis | undefined;
 
@@ -11,11 +12,11 @@ export const redis: Redis = new Proxy({} as Redis, {
       });
 
       _redis.on("connect", () => {
-        console.log("[Redis] Connected");
+        logger.info("Redis connected");
       });
 
       _redis.on("error", (err) => {
-        console.error("[Redis] Connection error:", err.message);
+        logger.error({ err }, "Redis connection error");
       });
     }
     return (_redis as unknown as Record<string | symbol, unknown>)[prop];

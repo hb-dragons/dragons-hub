@@ -6,6 +6,7 @@ config({ path: resolve(import.meta.dirname, "../../../.env") });
 // when modules that access env at top level (e.g. queues.ts) are loaded.
 const { serve } = await import("@hono/node-server");
 const { app } = await import("./app");
+const { logger } = await import("./config/logger");
 const { initializeWorkers, shutdownWorkers } = await import("./workers/index");
 
 const port = Number(process.env.PORT ?? 3001);
@@ -16,11 +17,11 @@ const server = serve({
   fetch: app.fetch,
   port,
 }, (info) => {
-  console.log(`API running at http://localhost:${info.port}`);
+  logger.info(`API running at http://localhost:${info.port}`);
 });
 
 async function shutdown() {
-  console.log("[Server] Shutting down...");
+  logger.info("Shutting down...");
   await shutdownWorkers();
   server.close();
   process.exit(0);

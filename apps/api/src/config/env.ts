@@ -27,6 +27,8 @@ export const env: Env = new Proxy({} as Env, {
     if (!_env) {
       const result = envSchema.safeParse(process.env);
       if (!result.success) {
+        // Logger depends on env config — cannot import here (circular dependency).
+        // console.error is acceptable for env validation failures at startup.
         console.error("Invalid environment variables:");
         for (const issue of result.error.issues) {
           console.error(`  ${issue.path.join(".")}: ${issue.message}`);

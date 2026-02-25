@@ -4,6 +4,10 @@ vi.mock("./env", () => ({
   env: { REDIS_URL: "redis://localhost:6379" },
 }));
 
+vi.mock("./logger", () => ({
+  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}));
+
 const handlers: Record<string, (...args: unknown[]) => void> = {};
 const mockOn = vi.fn().mockImplementation(function (this: unknown, event: string, handler: (...args: unknown[]) => void) {
   handlers[event] = handler;
@@ -42,20 +46,25 @@ describe("redis config", () => {
   });
 
   it("connect handler logs message", async () => {
+    const { logger } = await import("./logger");
     const { redis } = await import("./redis");
     void redis.ping;
 
     const connectHandler = handlers["connect"];
     expect(connectHandler).toBeDefined();
-    connectHandler!(); // Should not throw
+    connectHandler!();
+    expect(logger.info).toHaveBeenCalledWith("Redis connected");
   });
 
   it("error handler logs error message", async () => {
+    const { logger } = await import("./logger");
     const { redis } = await import("./redis");
     void redis.ping;
 
+    const err = new Error("connection failed");
     const errorHandler = handlers["error"];
     expect(errorHandler).toBeDefined();
-    errorHandler!(new Error("connection failed")); // Should not throw
+    errorHandler!(err);
+    expect(logger.error).toHaveBeenCalledWith({ err }, "Redis connection error");
   });
 });
