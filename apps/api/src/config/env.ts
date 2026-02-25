@@ -13,6 +13,9 @@ const envSchema = z.object({
     .string()
     .default("http://localhost:3000")
     .transform((val) => val.split(",").map((s) => s.trim())),
+  LOG_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace"])
+    .default("info"),
 });
 
 export type Env = z.infer<typeof envSchema>;
