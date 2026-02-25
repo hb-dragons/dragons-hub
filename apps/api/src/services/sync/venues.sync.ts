@@ -4,6 +4,9 @@ import { sql } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import type { SdkSpielfeld } from "@dragons/sdk";
 import type { SyncLogger } from "./sync-logger";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "venues-sync" });
 
 export interface VenuesSyncResult {
   total: number;
@@ -44,7 +47,7 @@ export async function syncVenuesFromData(
     return result;
   }
 
-  console.log(`[Venues Sync] Batch syncing ${venuesMap.size} unique venues...`);
+  log.info({ count: venuesMap.size }, "Batch syncing unique venues");
 
   const now = new Date();
 
@@ -86,7 +89,7 @@ export async function syncVenuesFromData(
     }
     result.skipped = result.total - upsertResult.length - result.failed;
 
-    console.log(`[Venues Sync] Batch synced ${upsertResult.length} venues (${result.created} created, ${result.updated} updated, ${result.skipped} skipped)`);
+    log.info({ total: upsertResult.length, created: result.created, updated: result.updated, skipped: result.skipped }, "Batch synced venues");
     await logger?.log({
       entityType: "venue",
       entityId: "batch",
@@ -98,7 +101,7 @@ export async function syncVenuesFromData(
     const message = error instanceof Error ? error.message : "Unknown error";
     result.errors.push(`Batch venue sync failed: ${message}`);
     result.failed = venuesMap.size;
-    console.error("[Venues Sync] Batch sync error:", error);
+    log.error({ err: error }, "Batch sync error");
     await logger?.log({
       entityType: "venue",
       entityId: "batch",
@@ -108,7 +111,7 @@ export async function syncVenuesFromData(
   }
 
   result.durationMs = Date.now() - startedAt;
-  console.log(`[Venues Sync] Completed in ${result.durationMs}ms: ${result.total} total, ${result.errors.length} errors`);
+  log.info({ durationMs: result.durationMs, total: result.total, errors: result.errors.length }, "Venues sync completed");
 
   return result;
 }

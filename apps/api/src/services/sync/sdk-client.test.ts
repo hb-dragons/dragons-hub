@@ -2,6 +2,17 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // --- Mock setup ---
 
+vi.mock("../../config/logger", () => ({
+  logger: {
+    child: () => ({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
+}));
+
 vi.mock("../../config/env", () => ({
   env: {
     SDK_USERNAME: "testuser",

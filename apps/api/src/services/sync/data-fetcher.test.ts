@@ -3,6 +3,18 @@ import type { SdkGetGameResponse, SdkSpielplanMatch, SdkTabelleEntry } from "@dr
 
 // --- Mock setup ---
 
+const mockLogWarn = vi.fn();
+vi.mock("../../config/logger", () => ({
+  logger: {
+    child: () => ({
+      info: vi.fn(),
+      warn: (...args: unknown[]) => mockLogWarn(...args),
+      error: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
+}));
+
 const mockSelect = vi.fn();
 vi.mock("../../config/database", () => ({
   db: {
@@ -279,17 +291,18 @@ describe("fetchAllSyncData", () => {
     mockGetTabelle.mockResolvedValue([]);
     mockGetGameDetailsBatch.mockResolvedValue(new Map());
 
-    const warnSpy = vi.spyOn(console, "warn");
+    mockLogWarn.mockClear();
     const result = await fetchAllSyncData();
 
     expect(result.teams.size).toBe(0);
-    expect(warnSpy).toHaveBeenCalledWith(
+    expect(mockLogWarn).toHaveBeenCalledWith(
+      expect.objectContaining({ matchId: 1000 }),
       expect.stringContaining("null/zero homeTeam"),
     );
-    expect(warnSpy).toHaveBeenCalledWith(
+    expect(mockLogWarn).toHaveBeenCalledWith(
+      expect.objectContaining({ matchId: 1000 }),
       expect.stringContaining("null/zero guestTeam"),
     );
-    warnSpy.mockRestore();
   });
 
   it("warns for zero teamPermanentId in spielplan", async () => {
@@ -308,15 +321,15 @@ describe("fetchAllSyncData", () => {
     mockGetTabelle.mockResolvedValue([]);
     mockGetGameDetailsBatch.mockResolvedValue(new Map());
 
-    const warnSpy = vi.spyOn(console, "warn");
+    mockLogWarn.mockClear();
     const result = await fetchAllSyncData();
 
     expect(result.teams.size).toBe(1);
     expect(result.teams.has(30)).toBe(true);
-    expect(warnSpy).toHaveBeenCalledWith(
+    expect(mockLogWarn).toHaveBeenCalledWith(
+      expect.objectContaining({ matchId: 1000 }),
       expect.stringContaining("null/zero homeTeam"),
     );
-    warnSpy.mockRestore();
   });
 
   it("collects teams from tabelle entries", async () => {

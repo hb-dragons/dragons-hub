@@ -8,6 +8,9 @@ import type {
   ExtractedRefereeAssignment,
 } from "./data-fetcher";
 import type { SyncLogger } from "./sync-logger";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "referees-sync" });
 
 export interface RefereesSyncResult {
   total: number;
@@ -27,7 +30,7 @@ export async function syncRefereeRolesFromData(
     return { updated: 0, roleIdLookup: new Map() };
   }
 
-  console.log(`[Referees Sync] Batch syncing ${rolesMap.size} referee roles...`);
+  log.info({ count: rolesMap.size }, "Batch syncing referee roles");
 
   const now = new Date();
   const roleRecords = Array.from(rolesMap.entries()).map(([apiId, role]) => ({
@@ -50,7 +53,7 @@ export async function syncRefereeRolesFromData(
       })
       .returning({ id: refereeRoles.id, apiId: refereeRoles.apiId });
 
-    console.log(`[Referees Sync] Batch upserted ${upsertResult.length} referee roles`);
+    log.info({ count: upsertResult.length }, "Batch upserted referee roles");
     await logger?.log({
       entityType: "refereeRole",
       entityId: "batch",
@@ -61,7 +64,7 @@ export async function syncRefereeRolesFromData(
     const roleIdLookup = new Map(upsertResult.map((r) => [r.apiId, r.id]));
     return { updated: upsertResult.length, roleIdLookup };
   } catch (error) {
-    console.error("[Referees Sync] Batch role sync failed:", error);
+    log.error({ err: error }, "Batch role sync failed");
     await logger?.log({
       entityType: "refereeRole",
       entityId: "batch",
@@ -88,7 +91,7 @@ export async function syncRefereesFromData(
     return { created: 0, updated: 0, skipped: 0, refereeIdLookup: new Map(), errors };
   }
 
-  console.log(`[Referees Sync] Batch syncing ${refereesMap.size} referees...`);
+  log.info({ count: refereesMap.size }, "Batch syncing referees");
 
   const now = new Date();
   const refereeRecords = Array.from(refereesMap.entries()).map(([apiId, referee]) => ({
@@ -134,7 +137,7 @@ export async function syncRefereesFromData(
     }
     const skipped = refereesMap.size - upsertResult.length;
 
-    console.log(`[Referees Sync] Batch synced ${upsertResult.length} referees (${created} created, ${updated} updated, ${skipped} skipped)`);
+    log.info({ total: upsertResult.length, created, updated, skipped }, "Batch synced referees");
     await logger?.log({
       entityType: "referee",
       entityId: "batch",
@@ -147,7 +150,7 @@ export async function syncRefereesFromData(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     errors.push(`Batch referee sync failed: ${message}`);
-    console.error("[Referees Sync] Batch referee sync failed:", error);
+    log.error({ err: error }, "Batch referee sync failed");
     await logger?.log({
       entityType: "referee",
       entityId: "batch",
@@ -179,7 +182,7 @@ export async function syncRefereeAssignmentsFromData(
     return { created: 0, errors };
   }
 
-  console.log(`[Referees Sync] Processing ${assignments.length} referee assignments...`);
+  log.info({ count: assignments.length }, "Processing referee assignments");
 
   const validAssignments = assignments.filter((a) => {
     const matchId = matchIdLookup.get(a.matchApiId);
@@ -189,7 +192,7 @@ export async function syncRefereeAssignmentsFromData(
   });
 
   if (validAssignments.length === 0) {
-    console.log("[Referees Sync] No valid assignments to sync");
+    log.info("No valid assignments to sync");
     return { created: 0, errors };
   }
 
@@ -240,6 +243,6 @@ export async function syncRefereeAssignmentsFromData(
     }
   }
 
-  console.log(`[Referees Sync] Created ${created} referee assignments`);
+  log.info({ created }, "Created referee assignments");
   return { created, errors };
 }

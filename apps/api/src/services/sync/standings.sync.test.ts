@@ -3,6 +3,17 @@ import type { LeagueFetchedData } from "./data-fetcher";
 
 // --- Mock setup ---
 
+vi.mock("../../config/logger", () => ({
+  logger: {
+    child: () => ({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
+}));
+
 const mockInsert = vi.fn();
 vi.mock("../../config/database", () => ({
   db: {

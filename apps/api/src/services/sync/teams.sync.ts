@@ -5,6 +5,9 @@ import { computeEntityHash } from "./hash";
 import { getClubConfig } from "../admin/settings.service";
 import type { SdkTeamRef } from "@dragons/sdk";
 import type { SyncLogger } from "./sync-logger";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "teams-sync" });
 
 export interface TeamsSyncResult {
   total: number;
@@ -47,7 +50,7 @@ export async function syncTeamsFromData(
     return result;
   }
 
-  console.log(`[Teams Sync] Batch syncing ${teamsMap.size} unique teams...`);
+  log.info({ count: teamsMap.size }, "Batch syncing unique teams");
 
   const clubConfig = await getClubConfig();
   const ownClubId = clubConfig?.clubId ?? 0;
@@ -97,7 +100,7 @@ export async function syncTeamsFromData(
     }
     result.skipped = result.total - upsertResult.length - result.failed;
 
-    console.log(`[Teams Sync] Batch synced ${upsertResult.length} teams (${result.created} created, ${result.updated} updated, ${result.skipped} skipped)`);
+    log.info({ total: upsertResult.length, created: result.created, updated: result.updated, skipped: result.skipped }, "Batch synced teams");
     await logger?.log({
       entityType: "team",
       entityId: "batch",
@@ -109,7 +112,7 @@ export async function syncTeamsFromData(
     const message = error instanceof Error ? error.message : "Unknown error";
     result.errors.push(`Batch team sync failed: ${message}`);
     result.failed = teamsMap.size;
-    console.error("[Teams Sync] Batch sync error:", error);
+    log.error({ err: error }, "Batch sync error");
     await logger?.log({
       entityType: "team",
       entityId: "batch",
@@ -133,12 +136,12 @@ export async function syncTeamsFromData(
       .returning({ id: teams.id });
 
     if (markOwn.length > 0 || unmarkOwn.length > 0) {
-      console.log(`[Teams Sync] Corrected isOwnClub: ${markOwn.length} marked, ${unmarkOwn.length} unmarked`);
+      log.info({ marked: markOwn.length, unmarked: unmarkOwn.length }, "Corrected isOwnClub");
     }
   }
 
   result.durationMs = Date.now() - startedAt;
-  console.log(`[Teams Sync] Completed in ${result.durationMs}ms: ${result.total} total, ${result.errors.length} errors`);
+  log.info({ durationMs: result.durationMs, total: result.total, errors: result.errors.length }, "Teams sync completed");
 
   return result;
 }

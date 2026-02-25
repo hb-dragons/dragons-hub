@@ -5,6 +5,9 @@ import { sdkClient } from "./sdk-client";
 import { computeEntityHash } from "./hash";
 import type { SdkLigaData } from "@dragons/sdk";
 import type { SyncLogger } from "./sync-logger";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "leagues-sync" });
 
 export interface LeagueSyncResult {
   total: number;
@@ -49,7 +52,7 @@ export async function syncLeagues(logger?: SyncLogger): Promise<LeagueSyncResult
       .from(leagues)
       .where(eq(leagues.isTracked, true));
 
-    console.log(`[Leagues Sync] Refreshing metadata for ${trackedLeagues.length} tracked leagues`);
+    log.info({ count: trackedLeagues.length }, "Refreshing metadata for tracked leagues");
 
     for (const league of trackedLeagues) {
       result.total++;
@@ -125,12 +128,13 @@ export async function syncLeagues(logger?: SyncLogger): Promise<LeagueSyncResult
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     result.errors.push(`Failed to fetch tracked leagues: ${message}`);
-    console.error("[Leagues Sync] Error:", message);
+    log.error({ err: error }, "Error fetching tracked leagues");
   }
 
   result.durationMs = Date.now() - startedAt;
-  console.log(
-    `[Leagues Sync] Completed in ${result.durationMs}ms: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.errors.length} errors`,
+  log.info(
+    { durationMs: result.durationMs, created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length },
+    "Leagues sync completed",
   );
 
   return result;

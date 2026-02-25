@@ -4,6 +4,9 @@ import { sql } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import type { LeagueFetchedData } from "./data-fetcher";
 import type { SyncLogger } from "./sync-logger";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "standings-sync" });
 
 export interface StandingsSyncResult {
   total: number;
@@ -96,7 +99,7 @@ export async function syncStandingsFromData(
     return result;
   }
 
-  console.log(`[Standings Sync] Batch syncing ${allStandingRecords.length} standings...`);
+  log.info({ count: allStandingRecords.length }, "Batch syncing standings");
 
   try {
     const upsertResult = await db
@@ -130,7 +133,7 @@ export async function syncStandingsFromData(
     }
     result.skipped = result.total - upsertResult.length - result.failed;
 
-    console.log(`[Standings Sync] Batch synced ${upsertResult.length} standings (${result.created} created, ${result.updated} updated, ${result.skipped} skipped)`);
+    log.info({ total: upsertResult.length, created: result.created, updated: result.updated, skipped: result.skipped }, "Batch synced standings");
     await logger?.log({
       entityType: "standing",
       entityId: "batch",
@@ -142,7 +145,7 @@ export async function syncStandingsFromData(
     const message = error instanceof Error ? error.message : "Unknown error";
     result.errors.push(`Batch standings sync failed: ${message}`);
     result.failed = allStandingRecords.length;
-    console.error("[Standings Sync] Batch sync error:", error);
+    log.error({ err: error }, "Batch sync error");
     await logger?.log({
       entityType: "standing",
       entityId: "batch",
@@ -152,7 +155,7 @@ export async function syncStandingsFromData(
   }
 
   result.durationMs = Date.now() - startedAt;
-  console.log(`[Standings Sync] Completed in ${result.durationMs}ms: ${result.total} total, ${result.errors.length} errors`);
+  log.info({ durationMs: result.durationMs, total: result.total, errors: result.errors.length }, "Standings sync completed");
 
   return result;
 }

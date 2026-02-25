@@ -2,6 +2,17 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // --- Mock setup ---
 
+vi.mock("../../config/logger", () => ({
+  logger: {
+    child: () => ({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
+}));
+
 vi.mock("../../config/env", () => ({
   env: { REDIS_URL: "redis://localhost:6379" },
 }));
@@ -192,6 +203,16 @@ describe("SyncLogger with Redis failure", () => {
         constructor() {
           throw new Error("Redis unavailable");
         }
+      },
+    }));
+    vi.doMock("../../config/logger", () => ({
+      logger: {
+        child: () => ({
+          info: vi.fn(),
+          warn: vi.fn(),
+          error: vi.fn(),
+          debug: vi.fn(),
+        }),
       },
     }));
     vi.doMock("../../config/env", () => ({

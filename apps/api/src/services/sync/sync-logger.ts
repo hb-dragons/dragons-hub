@@ -4,6 +4,9 @@ import type { NewSyncRunEntry } from "@dragons/db/schema";
 import { EventEmitter } from "events";
 import Redis from "ioredis";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "sync-logger" });
 
 export type EntityType = "league" | "match" | "standing" | "team" | "venue" | "referee" | "refereeRole";
 export type ActionType = "created" | "updated" | "skipped" | "failed";
@@ -34,7 +37,7 @@ export class SyncLogger {
     try {
       this.redis = new Redis(env.REDIS_URL);
     } catch {
-      console.warn("[SyncLogger] Redis not available, streaming disabled");
+      log.warn("Redis not available, streaming disabled");
     }
   }
 
@@ -61,7 +64,7 @@ export class SyncLogger {
         );
       } catch {
         this.redisPublishFailed = true;
-        console.warn("[SyncLogger] Redis publish failed, streaming disabled for this run");
+        log.warn("Redis publish failed, streaming disabled for this run");
       }
     }
 
@@ -85,7 +88,7 @@ export class SyncLogger {
     try {
       await db.insert(syncRunEntries).values(toInsert);
     } catch (error) {
-      console.error("[SyncLogger] Failed to flush entries:", error);
+      log.error({ err: error }, "Failed to flush entries");
       this.entries.push(...toInsert);
     }
   }

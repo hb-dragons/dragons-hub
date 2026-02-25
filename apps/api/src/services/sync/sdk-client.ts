@@ -1,6 +1,9 @@
 import BasketballBundSDK from "basketball-bund-sdk";
 import pLimit from "p-limit";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "sdk-client" });
 import type {
   SdkLiga,
   SdkLigaListResponse,
@@ -65,8 +68,9 @@ async function withRetry<T>(
       const baseDelay = Math.pow(2, attempt - 1) * 1000;
       const jitter = baseDelay * Math.random() * 0.5;
       const delay = baseDelay + jitter;
-      console.warn(
-        `[SDK Client] ${label} attempt ${attempt} failed, retrying in ${Math.round(delay)}ms...`,
+      log.warn(
+        { label, attempt, delayMs: Math.round(delay) },
+        `${label} attempt ${attempt} failed, retrying in ${Math.round(delay)}ms`,
       );
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
@@ -111,9 +115,7 @@ class AuthenticatedClient {
 
     await this.verifyLogin();
     this.isAuthenticated = true;
-    console.log(
-      "[SDK Client] Successfully authenticated with basketball-bund.net",
-    );
+    log.info("Successfully authenticated with basketball-bund.net");
     return true;
   }
 
@@ -206,7 +208,7 @@ export class SdkClient {
       }
     }
 
-    console.log(`[SDK Client] Fetched ${allLigen.length} leagues`);
+    log.info({ count: allLigen.length }, "Fetched leagues");
     return allLigen;
   }
 
@@ -271,10 +273,6 @@ export class SdkClient {
   async getGameDetails(matchId: number): Promise<SdkGetGameResponse> {
     await this.ensureAuthenticated();
     await this.rateLimiter.acquire();
-    const matchInfo = await this.sdk.match.getMatchInfo({
-      matchId: 2406,
-    });
-    console.log("MATCH INFO", matchInfo);
     const response = await withRetry(
       async () => {
         const res = await this.authClient.authenticatedFetch(
@@ -317,9 +315,7 @@ export class SdkClient {
   ): Promise<Map<number, SdkGetGameResponse>> {
     await this.ensureAuthenticated();
 
-    console.log(
-      `[SDK Client] Fetching game details for ${matchIds.length} matches...`,
-    );
+    log.info({ count: matchIds.length }, "Fetching game details for matches");
 
     const detailsMap = new Map<number, SdkGetGameResponse>();
     const limit = pLimit(10);
@@ -352,13 +348,15 @@ export class SdkClient {
       }
     }
 
-    console.log(
-      `[SDK Client] Fetched details for ${detailsMap.size}/${matchIds.length} matches (${failedCount} failed)`,
+    log.info(
+      { fetched: detailsMap.size, total: matchIds.length, failed: failedCount },
+      "Fetched game details",
     );
 
     if (failedCount > 0) {
-      console.warn(
-        `[SDK Client] Game detail failures (first ${failedErrors.length}): ${failedErrors.join("; ")}`,
+      log.warn(
+        { failedCount, errors: failedErrors },
+        "Game detail failures",
       );
     }
 

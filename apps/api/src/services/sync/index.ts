@@ -14,6 +14,9 @@ import {
 } from "./referees.sync";
 import { createSyncLogger } from "./sync-logger";
 import { fetchAllSyncData, extractRefereeAssignments } from "./data-fetcher";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "sync" });
 
 export interface SyncResult {
   syncRunId: number;
@@ -44,8 +47,8 @@ export class SyncOrchestrator {
     jobLogger?: (msg: string) => Promise<void> | void,
     syncRunId?: number,
   ): Promise<SyncResult> {
-    const log = async (msg: string) => {
-      console.log(msg);
+    const logStep = async (msg: string) => {
+      log.info(msg);
       if (jobLogger) await jobLogger(msg);
     };
 
@@ -84,22 +87,22 @@ export class SyncOrchestrator {
     const syncLogger = createSyncLogger(syncRun.id);
 
     try {
-      await log(`[Sync] Starting full sync (triggered by: ${triggeredBy})`);
+      await logStep(`Starting full sync (triggered by: ${triggeredBy})`);
 
       // Step 1: Sync leagues (sequential — FK dependency)
-      await log("[Sync] Step 1/6: Syncing leagues...");
+      await logStep("Step 1/6: Syncing leagues...");
       const leaguesResult = await syncLeagues(syncLogger);
       allErrors.push(...leaguesResult.errors);
 
       // Step 2: Parallel data fetch from SDK
-      await log("[Sync] Step 2/6: Fetching all data in parallel...");
+      await logStep("Step 2/6: Fetching all data in parallel...");
       const syncData = await fetchAllSyncData();
-      await log(
-        `[Sync] Fetched: ${syncData.leagueData.length} leagues, ${syncData.teams.size} teams, ${syncData.venues.size} venues, ${syncData.referees.size} referees`,
+      await logStep(
+        `Fetched: ${syncData.leagueData.length} leagues, ${syncData.teams.size} teams, ${syncData.venues.size} venues, ${syncData.referees.size} referees`,
       );
 
       // Step 3: Parallel entity upserts (independent tables)
-      await log("[Sync] Step 3/6: Syncing entities in parallel...");
+      await logStep("Step 3/6: Syncing entities in parallel...");
       const [teamsRes, venuesRes, refereesRes, rolesRes, standingsRes] = await Promise.all([
         syncTeamsFromData(syncData.teams, syncLogger),
         syncVenuesFromData(syncData.venues, syncLogger),
@@ -114,7 +117,7 @@ export class SyncOrchestrator {
       allErrors.push(...standingsRes.errors);
 
       // Step 4: Matches sync (needs venue FK lookup)
-      await log("[Sync] Step 4/6: Syncing matches...");
+      await logStep("Step 4/6: Syncing matches...");
       const venueIdLookup = await buildVenueIdLookup();
       const matchesRes = await syncMatchesFromData(
         syncData.leagueData,
@@ -125,7 +128,7 @@ export class SyncOrchestrator {
       allErrors.push(...matchesRes.errors);
 
       // Step 5: Referee assignments (needs match + referee FK lookups)
-      await log("[Sync] Step 5/6: Syncing referee assignments...");
+      await logStep("Step 5/6: Syncing referee assignments...");
       const refereeAssignments = extractRefereeAssignments(syncData.leagueData);
       const matchIdLookup = await buildMatchIdLookup();
       const assignmentsRes = await syncRefereeAssignmentsFromData(
@@ -138,7 +141,7 @@ export class SyncOrchestrator {
       allErrors.push(...assignmentsRes.errors);
 
       // Step 6: Finalize
-      await log("[Sync] Step 6/6: Finalizing...");
+      await logStep("Step 6/6: Finalizing...");
 
       // Close sync logger (flushes remaining entries)
       await syncLogger.close();
@@ -224,7 +227,7 @@ export class SyncOrchestrator {
         status: "completed",
       };
 
-      await log(`[Sync] Full sync completed in ${durationMs}ms with ${allErrors.length} errors`);
+      await logStep(`Full sync completed in ${durationMs}ms with ${allErrors.length} errors`);
       return syncResult;
     } catch (error) {
       const completedAt = new Date();
@@ -245,7 +248,7 @@ export class SyncOrchestrator {
         })
         .where(eq(syncRuns.id, syncRun.id));
 
-      console.error(`[Sync] Full sync failed: ${message}`);
+      log.error({ err: error }, `Full sync failed: ${message}`);
 
       return {
         syncRunId: syncRun.id,

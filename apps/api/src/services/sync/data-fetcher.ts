@@ -2,6 +2,9 @@ import { db } from "../../config/database";
 import { leagues } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import { sdkClient } from "./sdk-client";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "data-fetcher" });
 import type {
   SdkSpielplanMatch,
   SdkTabelleEntry,
@@ -50,7 +53,7 @@ async function fetchLeagueData(
   leagueApiId: number,
   leagueDbId: number | null,
 ): Promise<LeagueFetchedData> {
-  console.log(`[Data Fetcher] Fetching data for league ${leagueApiId}...`);
+  log.info({ leagueApiId }, "Fetching data for league");
 
   const spielplan = await sdkClient.getSpielplan(leagueApiId);
   const matchIds = spielplan.map((m) => m.matchId).filter((id): id is number => !!id);
@@ -62,8 +65,9 @@ async function fetchLeagueData(
       : Promise.resolve(new Map<number, SdkGetGameResponse>()),
   ]);
 
-  console.log(
-    `[Data Fetcher] League ${leagueApiId}: ${spielplan.length} matches, ${tabelle.length} standings, ${gameDetails.size} details`,
+  log.info(
+    { leagueApiId, matches: spielplan.length, standings: tabelle.length, details: gameDetails.size },
+    "Fetched league data",
   );
 
   return { leagueApiId, leagueDbId, spielplan, tabelle, gameDetails };
@@ -76,7 +80,7 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
     .where(eq(leagues.isTracked, true));
 
   if (trackedLeagues.length === 0) {
-    console.warn("[Data Fetcher] No tracked leagues found in database. Configure leagues first.");
+    log.warn("No tracked leagues found in database. Configure leagues first.");
     return {
       leagueData: [],
       teams: new Map(),
@@ -86,7 +90,7 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
     };
   }
 
-  console.log(`[Data Fetcher] Fetching data for ${trackedLeagues.length} leagues in parallel...`);
+  log.info({ count: trackedLeagues.length }, "Fetching data for leagues in parallel");
 
   await sdkClient.ensureAuthenticated();
 
@@ -98,8 +102,9 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
   const venues = collectUniqueVenues(leagueData);
   const { referees, refereeRoles } = collectUniqueReferees(leagueData);
 
-  console.log(
-    `[Data Fetcher] Collected: ${teams.size} teams, ${venues.size} venues, ${referees.size} referees, ${refereeRoles.size} roles`,
+  log.info(
+    { teams: teams.size, venues: venues.size, referees: referees.size, roles: refereeRoles.size },
+    "Collected unique entities",
   );
 
   return { leagueData, teams, venues, referees, refereeRoles };
@@ -112,12 +117,12 @@ function collectUniqueTeams(allData: LeagueFetchedData[]): Map<number, SdkTeamRe
       if (match.homeTeam?.teamPermanentId) {
         teams.set(match.homeTeam.teamPermanentId, match.homeTeam);
       } else {
-        console.warn(`[Data Fetcher] League ${data.leagueApiId}: match ${match.matchId} has null/zero homeTeam (TBD slot)`);
+        log.warn({ leagueApiId: data.leagueApiId, matchId: match.matchId }, "Match has null/zero homeTeam (TBD slot)");
       }
       if (match.guestTeam?.teamPermanentId) {
         teams.set(match.guestTeam.teamPermanentId, match.guestTeam);
       } else {
-        console.warn(`[Data Fetcher] League ${data.leagueApiId}: match ${match.matchId} has null/zero guestTeam (TBD slot)`);
+        log.warn({ leagueApiId: data.leagueApiId, matchId: match.matchId }, "Match has null/zero guestTeam (TBD slot)");
       }
     }
 

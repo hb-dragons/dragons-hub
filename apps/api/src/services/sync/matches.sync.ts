@@ -11,6 +11,9 @@ import type { SdkSpielplanMatch, SdkGetGameResponse } from "@dragons/sdk";
 import type { LeagueFetchedData } from "./data-fetcher";
 import { computeEntityHash } from "./hash";
 import type { SyncLogger } from "./sync-logger";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "matches-sync" });
 
 export interface MatchesSyncResult {
   total: number;
@@ -388,8 +391,9 @@ export async function syncMatchesFromData(
       continue;
     }
 
-    console.log(
-      `[Matches Sync] Processing ${data.spielplan.length} matches for league ${data.leagueApiId}`,
+    log.info(
+      { leagueApiId: data.leagueApiId, count: data.spielplan.length },
+      "Processing matches for league",
     );
 
     for (const basicMatch of data.spielplan) {
@@ -663,8 +667,9 @@ export async function syncMatchesFromData(
   }
 
   result.durationMs = Date.now() - startedAt;
-  console.log(
-    `[Matches Sync] Completed in ${result.durationMs}ms: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.errors.length} errors`,
+  log.info(
+    { durationMs: result.durationMs, created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length },
+    "Matches sync completed",
   );
 
   return result;

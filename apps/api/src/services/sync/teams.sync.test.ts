@@ -3,6 +3,18 @@ import type { SdkTeamRef } from "@dragons/sdk";
 
 // --- Mock setup ---
 
+const mockLogInfo = vi.fn();
+vi.mock("../../config/logger", () => ({
+  logger: {
+    child: () => ({
+      info: (...args: unknown[]) => mockLogInfo(...args),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
+}));
+
 const mockGetClubConfig = vi.fn();
 vi.mock("../admin/settings.service", () => ({
   getClubConfig: (...args: unknown[]) => mockGetClubConfig(...args),
@@ -263,14 +275,14 @@ describe("syncTeamsFromData", () => {
       .mockReturnValueOnce(mockUpdateReturningChain([{ id: 5 }])) // markOwn
       .mockReturnValueOnce(mockUpdateReturningChain([])); // unmarkOwn
 
-    const consoleSpy = vi.spyOn(console, "log");
+    mockLogInfo.mockClear();
     await syncTeamsFromData(teamsMap);
 
     expect(mockUpdate).toHaveBeenCalledTimes(2);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Corrected isOwnClub: 1 marked, 0 unmarked"),
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ marked: 1, unmarked: 0 }),
+      "Corrected isOwnClub",
     );
-    consoleSpy.mockRestore();
   });
 
   it("corrective pass unmarks non-own-club teams", async () => {
@@ -280,13 +292,13 @@ describe("syncTeamsFromData", () => {
       .mockReturnValueOnce(mockUpdateReturningChain([])) // markOwn
       .mockReturnValueOnce(mockUpdateReturningChain([{ id: 3 }, { id: 7 }])); // unmarkOwn
 
-    const consoleSpy = vi.spyOn(console, "log");
+    mockLogInfo.mockClear();
     await syncTeamsFromData(teamsMap);
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Corrected isOwnClub: 0 marked, 2 unmarked"),
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ marked: 0, unmarked: 2 }),
+      "Corrected isOwnClub",
     );
-    consoleSpy.mockRestore();
   });
 
   it("corrective pass skips logging when no corrections needed", async () => {
@@ -294,14 +306,13 @@ describe("syncTeamsFromData", () => {
     mockInsert.mockReturnValue(mockInsertChain([]));
     mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
 
-    const consoleSpy = vi.spyOn(console, "log");
+    mockLogInfo.mockClear();
     await syncTeamsFromData(teamsMap);
 
-    const correctionLogs = consoleSpy.mock.calls.filter(
-      (call) => typeof call[0] === "string" && call[0].includes("Corrected isOwnClub"),
+    const correctionLogs = mockLogInfo.mock.calls.filter(
+      (call: unknown[]) => call[1] === "Corrected isOwnClub",
     );
     expect(correctionLogs).toHaveLength(0);
-    consoleSpy.mockRestore();
   });
 
   it("skips corrective pass when no club config", async () => {

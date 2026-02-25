@@ -2,6 +2,17 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // --- Mock setup ---
 
+vi.mock("../../config/logger", () => ({
+  logger: {
+    child: () => ({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    }),
+  },
+}));
+
 const mockInsert = vi.fn();
 const mockUpdate = vi.fn();
 vi.mock("../../config/database", () => ({
