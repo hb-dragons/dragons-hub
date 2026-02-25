@@ -9,8 +9,9 @@ import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { HonoAdapter } from "@bull-board/hono";
 import { syncQueue } from "./workers/queues";
+import type { AppEnv } from "./types";
 
-export const app = new Hono();
+export const app = new Hono<AppEnv>();
 
 // Bull Board Admin UI
 const serverAdapter = new HonoAdapter(serveStatic);
