@@ -13,6 +13,10 @@ vi.mock("../../services/admin/settings.service", () => ({
   setClubConfig: mocks.setClubConfig,
 }));
 
+vi.mock("../../config/logger", () => ({
+  logger: { error: vi.fn() },
+}));
+
 // --- Imports (after mocks) ---
 
 import { settingsRoutes } from "./settings.routes";

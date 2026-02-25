@@ -13,6 +13,10 @@ vi.mock("../../services/admin/league-discovery.service", () => ({
   resolveAndSaveLeagues: mocks.resolveAndSaveLeagues,
 }));
 
+vi.mock("../../config/logger", () => ({
+  logger: { error: vi.fn() },
+}));
+
 // --- Imports (after mocks) ---
 
 import { leagueRoutes } from "./league.routes";

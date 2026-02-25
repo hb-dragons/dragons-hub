@@ -40,6 +40,18 @@ vi.mock("./config/auth", () => ({
   },
 }));
 
+vi.mock("./config/logger", () => ({
+  logger: {
+    child: vi.fn(() => ({
+      level: "info",
+      info: vi.fn(),
+      debug: vi.fn(),
+      error: vi.fn(),
+    })),
+    error: vi.fn(),
+  },
+}));
+
 vi.mock("@bull-board/api", () => ({
   createBullBoard: vi.fn(),
 }));

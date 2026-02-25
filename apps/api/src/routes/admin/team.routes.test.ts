@@ -13,6 +13,10 @@ vi.mock("../../services/admin/team-admin.service", () => ({
   updateTeamCustomName: mocks.updateTeamCustomName,
 }));
 
+vi.mock("../../config/logger", () => ({
+  logger: { error: vi.fn() },
+}));
+
 // --- Imports (after mocks) ---
 
 import { teamRoutes } from "./team.routes";

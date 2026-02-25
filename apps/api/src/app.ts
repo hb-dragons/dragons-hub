@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { errorHandler } from "./middleware/error";
 import { corsMiddleware } from "./middleware/cors";
+import { requestLogger } from "./middleware/request-logger";
 import { requireAdmin } from "./middleware/auth";
 import { auth } from "./config/auth";
 import { routes } from "./routes/index";
@@ -22,6 +23,7 @@ createBullBoard({
 });
 
 app.use("*", corsMiddleware);
+app.use("*", requestLogger);
 app.onError(errorHandler);
 
 // Better Auth handler

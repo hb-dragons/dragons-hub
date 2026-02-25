@@ -1,7 +1,9 @@
 import type { ErrorHandler } from "hono";
 import { ZodError } from "zod";
+import { logger as rootLogger } from "../config/logger";
+import type { AppEnv } from "../types";
 
-export const errorHandler: ErrorHandler = (error, c) => {
+export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
   if (error instanceof ZodError) {
     return c.json(
       {
@@ -20,7 +22,9 @@ export const errorHandler: ErrorHandler = (error, c) => {
   const message = error instanceof Error ? error.message : "Unknown error";
   const stack = error instanceof Error ? error.stack : undefined;
 
-  console.error("[Error]", message, stack);
+  // Use request-scoped logger if available, otherwise root logger
+  const log = c.get("logger") ?? rootLogger;
+  log.error({ err: error, stack }, message);
 
   return c.json(
     {

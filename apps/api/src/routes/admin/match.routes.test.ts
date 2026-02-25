@@ -17,6 +17,10 @@ vi.mock("../../services/admin/match-admin.service", () => ({
   releaseOverride: mocks.releaseOverride,
 }));
 
+vi.mock("../../config/logger", () => ({
+  logger: { error: vi.fn() },
+}));
+
 // --- Imports (after mocks) ---
 
 import { matchRoutes } from "./match.routes";
