@@ -6,11 +6,11 @@ import type { DiffStatus } from "./types";
 
 const DIFF_CONFIG: Record<
   DiffStatus,
-  { labelKey: string; variant: "default" | "success" | "secondary" }
+  { labelKey: "diverged" | "synced" | "local"; variant: "default" | "success" | "secondary" }
 > = {
-  diverged: { labelKey: "matchDetail.diff.diverged", variant: "default" },
-  synced: { labelKey: "matchDetail.diff.synced", variant: "success" },
-  "local-only": { labelKey: "matchDetail.diff.local", variant: "secondary" },
+  diverged: { labelKey: "diverged", variant: "default" },
+  synced: { labelKey: "synced", variant: "success" },
+  "local-only": { labelKey: "local", variant: "secondary" },
 };
 
 interface DiffIndicatorProps {
@@ -18,7 +18,7 @@ interface DiffIndicatorProps {
 }
 
 export function DiffIndicator({ status }: DiffIndicatorProps) {
-  const t = useTranslations();
+  const t = useTranslations("matchDetail.diff");
   const config = DIFF_CONFIG[status];
   return (
     <Badge

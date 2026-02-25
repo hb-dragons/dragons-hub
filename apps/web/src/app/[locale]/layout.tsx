@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale } from "next-intl";
-import { setRequestLocale, getTranslations } from "next-intl/server";
+import { NextIntlClientProvider } from "next-intl";
+import { setRequestLocale, getMessages, getTranslations } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { Providers } from "./providers";
 
@@ -29,10 +30,13 @@ export default async function LocaleLayout({
     notFound();
   }
   setRequestLocale(locale);
+  const messages = await getMessages();
 
   return (
-    <Providers>
-      {children}
-    </Providers>
+    <NextIntlClientProvider messages={messages}>
+      <Providers>
+        {children}
+      </Providers>
+    </NextIntlClientProvider>
   );
 }

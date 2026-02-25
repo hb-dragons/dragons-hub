@@ -1,4 +1,12 @@
-export { SyncProvider, useSyncContext } from "./sync-provider";
+export { SyncRunProvider } from "./sync-run-provider";
+export {
+  useSyncRunContext,
+  useSyncStatus,
+  useSyncLogs,
+  useSyncSchedule,
+  useTriggerSync,
+  SyncCompletionWatcher,
+} from "./use-sync";
 export { SyncTriggerButton } from "./sync-trigger-button";
 export { SyncErrorBanner } from "./sync-error-banner";
 export { SyncStatusCards } from "./sync-status-cards";

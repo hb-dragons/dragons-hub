@@ -22,6 +22,7 @@ export function DataTableDateFilter<TData, TValue>({
   column,
   title,
 }: DataTableDateFilterProps<TData, TValue>) {
+  "use no memo"
   const t = useTranslations()
   const format = useFormatter()
   const dateRange = column.getFilterValue() as DateRange | undefined

@@ -19,7 +19,6 @@ export const matchFormSchema = z.object({
   shotclock: z.string().max(100).nullable().optional(),
   internalNotes: z.string().max(2000).nullable().optional(),
   publicComment: z.string().max(500).nullable().optional(),
-  changeReason: z.string().max(200).optional(),
 });
 
 export type MatchFormValues = z.infer<typeof matchFormSchema>;
@@ -64,6 +63,8 @@ export interface MatchListItem {
   leagueName: string | null;
   venueId: number | null;
   venueName: string | null;
+  venueStreet: string | null;
+  venueCity: string | null;
   venueNameOverride: string | null;
   isConfirmed: boolean | null;
   isForfeited: boolean | null;
@@ -139,5 +140,4 @@ export interface MatchUpdateData {
   shotclock?: string | null;
   internalNotes?: string | null;
   publicComment?: string | null;
-  changeReason?: string;
 }

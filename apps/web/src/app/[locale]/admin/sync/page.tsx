@@ -6,7 +6,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@dragons/ui/components/tabs";
-import { SyncProvider } from "@/components/admin/sync/sync-provider";
+import { SyncRunProvider } from "@/components/admin/sync/sync-run-provider";
+import { SyncCompletionWatcher } from "@/components/admin/sync/use-sync";
 import { SyncTriggerButton } from "@/components/admin/sync/sync-trigger-button";
 import { SyncErrorBanner } from "@/components/admin/sync/sync-error-banner";
 import { SyncStatusCards } from "@/components/admin/sync/sync-status-cards";
@@ -36,23 +37,39 @@ export default async function SyncPage() {
     error = e instanceof Error ? e.message : "Failed to connect to API";
   }
 
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {t("sync.title")}
+            </h1>
+            <p className="text-muted-foreground">{t("sync.description")}</p>
+          </div>
+        </div>
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <SyncProvider
-        initialStatus={status}
-        initialLogs={logs}
-        initialSchedule={schedule}
-        initialError={error}
-      >
+    <SyncRunProvider
+      initialStatus={status}
+      initialLogs={logs}
+      initialSchedule={schedule}
+    >
+      <SyncCompletionWatcher />
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               {t("sync.title")}
             </h1>
-            <p className="text-muted-foreground">
-              {t("sync.description")}
-            </p>
+            <p className="text-muted-foreground">{t("sync.description")}</p>
           </div>
           <SyncTriggerButton />
         </div>
@@ -69,8 +86,12 @@ export default async function SyncPage() {
         {/* Tabs */}
         <Tabs defaultValue="history">
           <TabsList>
-            <TabsTrigger value="history">{t("sync.tabs.history")}</TabsTrigger>
-            <TabsTrigger value="schedule">{t("sync.tabs.schedule")}</TabsTrigger>
+            <TabsTrigger value="history">
+              {t("sync.tabs.history")}
+            </TabsTrigger>
+            <TabsTrigger value="schedule">
+              {t("sync.tabs.schedule")}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="history" className="mt-4">
@@ -81,7 +102,7 @@ export default async function SyncPage() {
             <SyncScheduleConfig />
           </TabsContent>
         </Tabs>
-      </SyncProvider>
-    </div>
+      </div>
+    </SyncRunProvider>
   );
 }

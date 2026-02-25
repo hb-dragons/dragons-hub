@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import useSWR, { useSWRConfig } from "swr";
+import { apiFetcher } from "@/lib/swr";
+import { SWR_KEYS } from "@/lib/swr-keys";
 import {
   Card,
   CardContent,
@@ -15,11 +18,12 @@ import { Label } from "@dragons/ui/components/label";
 import { Loader2, Check, Save } from "lucide-react";
 import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
-import { useSettings } from "./settings-provider";
+import type { ClubConfig as ClubConfigType } from "./settings-provider";
 
 export function ClubConfig() {
   const t = useTranslations();
-  const { clubConfig, setClubConfig } = useSettings();
+  const { data: clubConfig } = useSWR<ClubConfigType | null>(SWR_KEYS.settingsClub, apiFetcher);
+  const { mutate } = useSWRConfig();
   const [clubId, setClubId] = useState(clubConfig?.clubId?.toString() ?? "");
   const [clubName, setClubName] = useState(clubConfig?.clubName ?? "");
   const [saving, setSaving] = useState(false);
@@ -48,7 +52,7 @@ export function ClubConfig() {
           body: JSON.stringify({ clubId: id, clubName: clubName.trim() }),
         },
       );
-      setClubConfig(result);
+      await mutate(SWR_KEYS.settingsClub, result, { revalidate: false });
       toast.success(t("settings.club.toast.saved", { name: result.clubName }));
     } catch {
       toast.error(t("settings.club.toast.saveFailed"));
@@ -70,7 +74,7 @@ export function ClubConfig() {
           <div className="flex items-center gap-2 text-sm">
             <Check className="h-4 w-4 text-green-600" />
             <span className="font-medium">{clubConfig.clubName}</span>
-            <span className="text-muted-foreground">({t("settings.club.idCurrent", { id: clubConfig.clubId })})</span>
+            <span className="text-muted-foreground">({t("settings.club.idCurrent", { id: String(clubConfig.clubId) })})</span>
           </div>
         )}
 

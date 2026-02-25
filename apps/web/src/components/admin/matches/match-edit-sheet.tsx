@@ -508,7 +508,7 @@ export function MatchEditSheet({
                   })}
                 </div>
                 <div>
-                  {t("matchDetail.status.remoteVersion", { version: match.currentRemoteVersion })}
+                  {t("matchDetail.status.remoteVersion", { version: String(match.currentRemoteVersion) })}
                 </div>
               </div>
             </section>

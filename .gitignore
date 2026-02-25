@@ -17,3 +17,6 @@ apps/*/tsconfig.tsbuildinfo
 
 # Worktrees
 .worktrees/
+
+# next-intl generated type declarations
+apps/web/src/messages/*.d.json.ts

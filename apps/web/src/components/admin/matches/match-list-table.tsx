@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react"
 import { useTranslations, useFormatter } from "next-intl"
-import { useRouter } from "@/lib/navigation"
+import useSWR, { useSWRConfig } from "swr"
+import { apiFetcher } from "@/lib/swr"
+import { SWR_KEYS } from "@/lib/swr-keys"
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
 import {
   Tooltip,
@@ -12,7 +14,7 @@ import {
 } from "@dragons/ui/components/tooltip"
 import { Sheet } from "@dragons/ui/components/sheet"
 import { cn } from "@dragons/ui/lib/utils"
-import { Calendar } from "lucide-react"
+import { Ban, Calendar, CircleOff, SearchIcon, SquareActivity } from "lucide-react"
 import { Input } from "@dragons/ui/components/input"
 import type { DateRange } from "react-day-picker"
 
@@ -29,11 +31,11 @@ import {
   getOwnTeamLabel,
   getOpponentName,
 } from "./utils"
-import type { MatchListItem } from "./types"
+import type { MatchListItem, MatchListResponse } from "./types"
 import { MatchEditSheet } from "./match-edit-sheet"
 
 function OverrideDot({ match, field }: { match: MatchListItem; field: string }) {
-  const t = useTranslations()
+  const t = useTranslations("matchDetail")
   if (!match.overriddenFields.includes(field)) return null
 
   return (
@@ -42,7 +44,7 @@ function OverrideDot({ match, field }: { match: MatchListItem; field: string }) 
         <span className="ml-1 inline-block h-2 w-2 rounded-full bg-amber-500" />
       </TooltipTrigger>
       <TooltipContent>
-        <p className="text-xs">{t("matchDetail.overrideActive")}</p>
+        <p className="text-xs">{t("overrideActive")}</p>
       </TooltipContent>
     </Tooltip>
   )
@@ -79,12 +81,12 @@ const dateRangeFilterFn: FilterFn<MatchListItem> = (row, columnId, value) => {
   return true
 }
 
-function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<typeof useFormatter>): ColumnDef<MatchListItem, unknown>[] {
+function getColumns(t: ReturnType<typeof useTranslations<"matches">>, format: ReturnType<typeof useFormatter>): ColumnDef<MatchListItem, unknown>[] {
   return [
     {
       accessorKey: "kickoffDate",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("matches.columns.date")} />
+        <DataTableColumnHeader column={column} title={t("columns.date")} />
       ),
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-sm">
@@ -93,12 +95,12 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
         </span>
       ),
       filterFn: dateRangeFilterFn,
-      meta: { label: t("matches.columns.date") },
+      meta: { label: t("columns.date") },
     },
     {
       accessorKey: "kickoffTime",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("matches.columns.time")} />
+        <DataTableColumnHeader column={column} title={t("columns.time")} />
       ),
       cell: ({ row }) => (
         <span className="tabular-nums text-sm">
@@ -106,13 +108,13 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
           <OverrideDot match={row.original} field="kickoffTime" />
         </span>
       ),
-      meta: { label: t("matches.columns.time") },
+      meta: { label: t("columns.time") },
     },
     {
       id: "team",
       accessorFn: (row) => getOwnTeamLabel(row),
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("matches.columns.team")} />
+        <DataTableColumnHeader column={column} title={t("columns.team")} />
       ),
       cell: ({ row }) => <TeamBadge name={getOwnTeamLabel(row.original)} />,
       filterFn: (row, id, value) => {
@@ -120,37 +122,37 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
         if (!filterValues || filterValues.length === 0) return true
         return filterValues.includes(row.getValue(id) as string)
       },
-      meta: { label: t("matches.columns.team") },
+      meta: { label: t("columns.team") },
     },
     {
       id: "home",
       accessorFn: (row) =>
         row.homeIsOwnClub ? "Dragons" : getOpponentName(row),
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("matches.columns.home")} />
+        <DataTableColumnHeader column={column} title={t("columns.home")} />
       ),
       cell: ({ getValue }) => (
         <span className="text-sm">{getValue() as string}</span>
       ),
-      meta: { label: t("matches.columns.home") },
+      meta: { label: t("columns.home") },
     },
     {
       id: "guest",
       accessorFn: (row) =>
         row.homeIsOwnClub ? getOpponentName(row) : "Dragons",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("matches.columns.guest")} />
+        <DataTableColumnHeader column={column} title={t("columns.guest")} />
       ),
       cell: ({ getValue }) => (
         <span className="text-sm">{getValue() as string}</span>
       ),
-      meta: { label: t("matches.columns.guest") },
+      meta: { label: t("columns.guest") },
     },
     {
       id: "score",
       accessorFn: (row) => formatScore(row.homeScore, row.guestScore),
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("matches.columns.score")} />
+        <DataTableColumnHeader column={column} title={t("columns.score")} />
       ),
       cell: ({ getValue }) => (
         <span className="tabular-nums text-sm">{getValue() as string}</span>
@@ -165,12 +167,12 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
         }
         return diffA - diffB
       },
-      meta: { label: t("matches.columns.score") },
+      meta: { label: t("columns.score") },
     },
     {
       accessorKey: "anschreiber",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("matches.columns.anschreiber")} />
+        <DataTableColumnHeader column={column} title={t("columns.anschreiber")} />
       ),
       cell: ({ row }) => (
         <span className="text-sm">
@@ -178,12 +180,12 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
           <OverrideDot match={row.original} field="anschreiber" />
         </span>
       ),
-      meta: { label: t("matches.columns.anschreiber") },
+      meta: { label: t("columns.anschreiber") },
     },
     {
       accessorKey: "zeitnehmer",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("matches.columns.zeitnehmer")} />
+        <DataTableColumnHeader column={column} title={t("columns.zeitnehmer")} />
       ),
       cell: ({ row }) => (
         <span className="text-sm">
@@ -191,12 +193,12 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
           <OverrideDot match={row.original} field="zeitnehmer" />
         </span>
       ),
-      meta: { label: t("matches.columns.zeitnehmer") },
+      meta: { label: t("columns.zeitnehmer") },
     },
     {
       accessorKey: "shotclock",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title={t("matches.columns.shotclock")} />
+        <DataTableColumnHeader column={column} title={t("columns.shotclock")} />
       ),
       cell: ({ row }) => (
         <span className="text-sm">
@@ -204,11 +206,11 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
           <OverrideDot match={row.original} field="shotclock" />
         </span>
       ),
-      meta: { label: t("matches.columns.shotclock") },
+      meta: { label: t("columns.shotclock") },
     },
     {
       accessorKey: "publicComment",
-      header: t("matches.columns.comment"),
+      header: t("columns.comment"),
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">
           {row.original.publicComment ?? ""}
@@ -216,7 +218,25 @@ function getColumns(t: ReturnType<typeof useTranslations>, format: ReturnType<ty
         </span>
       ),
       enableSorting: false,
-      meta: { label: t("matches.columns.comment") },
+      meta: { label: t("columns.comment") },
+    },
+    {
+      id: "status",
+      accessorFn: (row) => {
+        if (row.isForfeited) return "forfeited"
+        if (row.isCancelled) return "cancelled"
+        return "active"
+      },
+      header: () => null,
+      cell: () => null,
+      filterFn: (row, id, value) => {
+        const filterValues = value as string[] | undefined
+        if (!filterValues || filterValues.length === 0) return true
+        return filterValues.includes(row.getValue(id) as string)
+      },
+      enableSorting: false,
+      enableHiding: false,
+      meta: { label: t("status.label") },
     },
   ]
 }
@@ -250,25 +270,30 @@ const matchGlobalFilterFn: FilterFn<MatchListItem> = (
   )
 }
 
-interface MatchListTableProps {
-  data: MatchListItem[]
-  teamOptions: string[]
-}
-
-export function MatchListTable({
-  data,
-  teamOptions,
-}: MatchListTableProps) {
-  const t = useTranslations()
+export function MatchListTable() {
+  const t = useTranslations("matches")
   const format = useFormatter()
-  const router = useRouter()
+  const { mutate } = useSWRConfig()
+  const { data: response } = useSWR<MatchListResponse>(SWR_KEYS.matches, apiFetcher)
   const columns = useMemo(() => getColumns(t, format), [t, format])
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
+
+  const allItems = response?.items ?? []
+  const teamOptions = useMemo(
+    () => [...new Set(allItems.map((m) => getOwnTeamLabel(m)))].sort(),
+    [allItems],
+  )
 
   const teamFilterOptions = teamOptions.map((name) => ({
     label: name,
     value: name,
   }))
+
+  const statusFilterOptions = [
+    { label: t("status.active"), value: "active", icon: SquareActivity },
+    { label: t("status.cancelled"), value: "cancelled", icon: Ban },
+    { label: t("status.forfeited"), value: "forfeited", icon: CircleOff },
+  ]
 
   function handleRowClick(row: Row<MatchListItem>, e: React.MouseEvent) {
     const href = `/admin/matches/${row.original.id}`
@@ -280,43 +305,54 @@ export function MatchListTable({
   }
 
   function getRowClassName(row: Row<MatchListItem>) {
-    return row.original.homeIsOwnClub
-      ? "border-l-2 border-l-green-500"
-      : undefined
+    return cn(
+      row.original.homeIsOwnClub && "border-l-2 border-l-green-500",
+      row.original.isCancelled && "line-through text-muted-foreground opacity-60",
+      row.original.isForfeited && "line-through text-muted-foreground opacity-40",
+    )
   }
 
   return (
     <TooltipProvider>
       <DataTable
         columns={columns}
-        data={data}
+        data={allItems}
         onRowClick={handleRowClick}
         rowClassName={getRowClassName}
         globalFilterFn={matchGlobalFilterFn}
-        initialColumnVisibility={{ score: false, publicComment: false }}
+        initialColumnVisibility={{ score: false, publicComment: false, status: false }}
+        initialColumnFilters={[{ id: "status", value: ["active", "cancelled"] }]}
         emptyState={
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Calendar className="mb-2 h-8 w-8" />
-            <p>{t("matches.empty")}</p>
+            <p>{t("empty")}</p>
           </div>
         }
       >
         {(table) => (
           <DataTableToolbar table={table}>
-            <Input
-              placeholder={t("matches.searchPlaceholder")}
-              value={(table.getState().globalFilter as string) ?? ""}
-              onChange={(event) => table.setGlobalFilter(event.target.value)}
-              className="h-8 w-[150px] lg:w-[250px]"
-            />
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={t("searchPlaceholder")}
+                value={(table.getState().globalFilter as string) ?? ""}
+                onChange={(event) => table.setGlobalFilter(event.target.value)}
+                className="h-8 w-[150px] pl-8 lg:w-[250px]"
+              />
+            </div>
             <DataTableFacetedFilter
               column={table.getColumn("team")!}
               title="Team"
               options={teamFilterOptions}
             />
+            <DataTableFacetedFilter
+              column={table.getColumn("status")!}
+              title={t("status.label")}
+              options={statusFilterOptions}
+            />
             <DataTableDateFilter
               column={table.getColumn("kickoffDate")!}
-              title={t("matches.columns.date")}
+              title={t("columns.date")}
             />
           </DataTableToolbar>
         )}
@@ -334,7 +370,7 @@ export function MatchListTable({
             onOpenChange={(open) => {
               if (!open) setSelectedMatchId(null)
             }}
-            onSaved={() => router.refresh()}
+            onSaved={() => mutate(SWR_KEYS.matches)}
           />
         </Sheet>
       )}

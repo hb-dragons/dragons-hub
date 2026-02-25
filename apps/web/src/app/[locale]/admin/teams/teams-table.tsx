@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import useSWR, { useSWRConfig } from "swr";
+import { apiFetcher } from "@/lib/swr";
+import { SWR_KEYS } from "@/lib/swr-keys";
 import { fetchAPI } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
@@ -21,9 +24,11 @@ interface OwnClubTeam {
   leagueName: string | null;
 }
 
-export function TeamsTable({ initialTeams }: { initialTeams: OwnClubTeam[] }) {
+export function TeamsTable() {
   const t = useTranslations();
-  const [teams, setTeams] = useState(initialTeams);
+  const { data: teams } = useSWR<OwnClubTeam[]>(SWR_KEYS.teams, apiFetcher);
+  const { mutate } = useSWRConfig();
+  const teamsList = teams ?? [];
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
 
@@ -46,7 +51,13 @@ export function TeamsTable({ initialTeams }: { initialTeams: OwnClubTeam[] }) {
         method: "PATCH",
         body: JSON.stringify({ customName }),
       });
-      setTeams((prev) => prev.map((t) => (t.id === team.id ? updated : t)));
+      // Update SWR cache with the changed team
+      await mutate(
+        SWR_KEYS.teams,
+        (current: OwnClubTeam[] | undefined) =>
+          (current ?? []).map((t) => (t.id === team.id ? updated : t)),
+        { revalidate: false },
+      );
       setDrafts((prev) => {
         const next = { ...prev };
         delete next[team.id];
@@ -59,7 +70,7 @@ export function TeamsTable({ initialTeams }: { initialTeams: OwnClubTeam[] }) {
     }
   }
 
-  if (teams.length === 0) {
+  if (teamsList.length === 0) {
     return <p className="text-muted-foreground">{t("teams.empty")}</p>;
   }
 
@@ -74,7 +85,7 @@ export function TeamsTable({ initialTeams }: { initialTeams: OwnClubTeam[] }) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {teams.map((team) => (
+        {teamsList.map((team) => (
           <TableRow key={team.id}>
             <TableCell className="font-medium">{team.name}</TableCell>
             <TableCell className="text-muted-foreground">

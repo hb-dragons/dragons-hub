@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import useSWR, { useSWRConfig } from "swr";
+import { apiFetcher } from "@/lib/swr";
+import { SWR_KEYS } from "@/lib/swr-keys";
 import {
   Card,
   CardContent,
@@ -15,7 +18,10 @@ import { Label } from "@dragons/ui/components/label";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
-import { useSettings, type TrackedLeague } from "./settings-provider";
+import type {
+  ClubConfig as ClubConfigType,
+  TrackedLeaguesResponse,
+} from "./settings-provider";
 
 interface ResolvedLeague {
   ligaNr: number;
@@ -31,14 +37,19 @@ interface ResolveResponse {
   untracked: number;
 }
 
-interface TrackedLeaguesResponse {
-  leagueNumbers: number[];
-  leagues: Array<TrackedLeague & { apiLigaId: number }>;
-}
-
 export function TrackedLeagues() {
   const t = useTranslations();
-  const { clubConfig, trackedLeagues, setTrackedLeagues } = useSettings();
+  const { data: clubConfig } = useSWR<ClubConfigType | null>(SWR_KEYS.settingsClub, apiFetcher);
+  const { data: leaguesData } = useSWR<TrackedLeaguesResponse>(SWR_KEYS.settingsLeagues, apiFetcher);
+  const { mutate } = useSWRConfig();
+
+  const trackedLeagues = leaguesData?.leagues.map((l) => ({
+    id: l.id,
+    ligaNr: l.ligaNr,
+    name: l.name,
+    seasonName: l.seasonName,
+  })) ?? [];
+
   const initialValue = trackedLeagues.map((l) => l.ligaNr).join(", ");
   const [input, setInput] = useState(initialValue);
   const [saving, setSaving] = useState(false);
@@ -65,28 +76,20 @@ export function TrackedLeagues() {
         body: JSON.stringify({ leagueNumbers }),
       });
 
-      // Re-fetch tracked leagues to get full data including id
-      const fresh = await fetchAPI<TrackedLeaguesResponse>("/admin/settings/leagues");
-      setTrackedLeagues(
-        fresh.leagues.map((l) => ({
-          id: l.id,
-          ligaNr: l.ligaNr,
-          name: l.name,
-          seasonName: l.seasonName,
-        })),
-      );
+      // Revalidate from server to get full league data
+      await mutate(SWR_KEYS.settingsLeagues);
       setLastNotFound(result.notFound);
 
       if (result.notFound.length > 0) {
         toast.warning(
           t("settings.leagues.toast.partial", {
-            tracked: result.tracked,
-            notFoundCount: result.notFound.length,
+            tracked: String(result.tracked),
+            notFoundCount: String(result.notFound.length),
             notFoundList: result.notFound.join(", "),
           }),
         );
       } else {
-        toast.success(t("settings.leagues.toast.saved", { count: result.tracked }));
+        toast.success(t("settings.leagues.toast.saved", { count: String(result.tracked) }));
       }
     } catch {
       toast.error(t("settings.leagues.toast.saveFailed"));

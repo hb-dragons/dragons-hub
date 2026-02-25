@@ -38,6 +38,7 @@ interface DataTableProps<TData, TValue> {
   rowClassName?: (row: Row<TData>) => string | undefined
   emptyState?: React.ReactNode
   initialColumnVisibility?: VisibilityState
+  initialColumnFilters?: ColumnFiltersState
   globalFilterFn?: FilterFn<TData>
 }
 
@@ -49,11 +50,15 @@ export function DataTable<TData, TValue>({
   rowClassName,
   emptyState,
   initialColumnVisibility,
+  initialColumnFilters,
   globalFilterFn,
 }: DataTableProps<TData, TValue>) {
+  "use no memo" // table instance is a stable ref with mutable state — opt out of React Compiler
   const t = useTranslations()
   const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
+    initialColumnFilters ?? [],
+  )
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
     initialColumnVisibility ?? {},
   )

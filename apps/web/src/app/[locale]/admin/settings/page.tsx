@@ -1,52 +1,48 @@
 import { getTranslations } from "next-intl/server";
 import { fetchAPIServer } from "@/lib/api.server";
-import { SettingsProvider } from "@/components/admin/settings/settings-provider";
+import { SWRConfig } from "swr";
+import { SWR_KEYS } from "@/lib/swr-keys";
 import { ClubConfig } from "@/components/admin/settings/club-config";
 import { TrackedLeagues } from "@/components/admin/settings/tracked-leagues";
 import type {
   ClubConfig as ClubConfigType,
-  TrackedLeague,
+  TrackedLeaguesResponse,
 } from "@/components/admin/settings/settings-provider";
-
-interface TrackedLeaguesResponse {
-  leagueNumbers: number[];
-  leagues: Array<TrackedLeague & { apiLigaId: number }>;
-}
 
 export default async function SettingsPage() {
   const t = await getTranslations();
   let clubConfig: ClubConfigType | null = null;
-  let trackedLeagues: TrackedLeague[] = [];
+  let leaguesResponse: TrackedLeaguesResponse | null = null;
 
   try {
-    const [clubResult, leaguesResult] = await Promise.all([
+    [clubConfig, leaguesResponse] = await Promise.all([
       fetchAPIServer<ClubConfigType | null>("/admin/settings/club"),
       fetchAPIServer<TrackedLeaguesResponse>("/admin/settings/leagues"),
     ]);
-    clubConfig = clubResult;
-    trackedLeagues = leaguesResult.leagues.map((l) => ({
-      id: l.id,
-      ligaNr: l.ligaNr,
-      name: l.name,
-      seasonName: l.seasonName,
-    }));
   } catch {
     // Will show empty state
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t("settings.title")}</h1>
-        <p className="text-muted-foreground">
-          {t("settings.description")}
-        </p>
-      </div>
+    <SWRConfig
+      value={{
+        fallback: {
+          [SWR_KEYS.settingsClub]: clubConfig,
+          [SWR_KEYS.settingsLeagues]: leaguesResponse,
+        },
+      }}
+    >
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{t("settings.title")}</h1>
+          <p className="text-muted-foreground">
+            {t("settings.description")}
+          </p>
+        </div>
 
-      <SettingsProvider initialClubConfig={clubConfig} initialTrackedLeagues={trackedLeagues}>
         <ClubConfig />
         <TrackedLeagues />
-      </SettingsProvider>
-    </div>
+      </div>
+    </SWRConfig>
   );
 }

@@ -11,12 +11,13 @@ import {
 import { Activity, Clock, Timer, Calendar } from "lucide-react";
 import { cn } from "@dragons/ui/lib/utils";
 import type { SyncScheduleData } from "./types";
-import { useSyncContext } from "./sync-provider";
+import { useSyncStatus, useSyncSchedule } from "./use-sync";
 import { formatDuration } from "./utils";
 
 export function SyncStatusCards() {
   const t = useTranslations();
-  const { status, schedule } = useSyncContext();
+  const { status } = useSyncStatus();
+  const { schedule } = useSyncSchedule();
   const isRunning = status?.isRunning ?? false;
   const lastSync = status?.lastSync;
 
@@ -50,8 +51,8 @@ export function SyncStatusCards() {
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
 
-      if (diffHours === 0) return t("sync.status.inMinutes", { minutes: diffMinutes });
-      if (diffHours < 24) return t("sync.status.inHours", { hours: diffHours, minutes: diffMinutes });
+      if (diffHours === 0) return t("sync.status.inMinutes", { minutes: String(diffMinutes) });
+      if (diffHours < 24) return t("sync.status.inHours", { hours: String(diffHours), minutes: String(diffMinutes) });
       return t("sync.status.tomorrow");
     } catch {
       return t("sync.schedule.cronFormat", { hour: cronHour(sched.cronExpression) });

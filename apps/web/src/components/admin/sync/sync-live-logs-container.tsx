@@ -1,6 +1,8 @@
 "use client";
 
+import { useCallback } from "react";
 import { useTranslations } from "next-intl";
+import { useSWRConfig } from "swr";
 import {
   Card,
   CardContent,
@@ -10,11 +12,21 @@ import {
 } from "@dragons/ui/components/card";
 import { Loader2 } from "lucide-react";
 import { SyncLiveLogs } from "./sync-live-logs";
-import { useSyncContext } from "./sync-provider";
+import { useSyncRunContext } from "./use-sync";
+import { SWR_KEYS } from "@/lib/swr-keys";
 
 export function SyncLiveLogsContainer() {
   const t = useTranslations();
-  const { runningSyncRunId, triggering, onSyncComplete } = useSyncContext();
+  const { runningSyncRunId, triggering } = useSyncRunContext();
+  const { mutate } = useSWRConfig();
+
+  const onSyncComplete = useCallback(() => {
+    // Don't clear runningSyncRunId here — the SSE endpoint may fire
+    // "complete" before the job has started processing. The SyncCompletionWatcher
+    // clears it once polled data confirms the run is actually done.
+    void mutate(SWR_KEYS.syncStatus);
+    void mutate(SWR_KEYS.syncLogs(20, 0));
+  }, [mutate]);
 
   if (!runningSyncRunId && !triggering) return null;
 

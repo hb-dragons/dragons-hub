@@ -15,16 +15,18 @@ export function DataTableToolbar<TData>({
   table,
   children,
 }: DataTableToolbarProps<TData>) {
+  "use no memo"
   const t = useTranslations()
   const isFiltered = table.getState().columnFilters.length > 0
 
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2">
       <div className="flex flex-1 flex-wrap items-center gap-2">
         {children}
         {isFiltered && (
           <Button
             variant="ghost"
+            size="sm"
             onClick={() => table.resetColumnFilters()}
             className="h-8 px-2 lg:px-3"
           >

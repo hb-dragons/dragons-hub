@@ -176,19 +176,19 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
         <div className="flex gap-4 pt-2 text-sm">
           <span className="text-green-600">
             <Plus className="mr-1 inline h-3 w-3" />
-            {t("sync.live.created", { count: counters.created })}
+            {t("sync.live.created", { count: String(counters.created) })}
           </span>
           <span className="text-blue-600">
             <RefreshCw className="mr-1 inline h-3 w-3" />
-            {t("sync.live.updated", { count: counters.updated })}
+            {t("sync.live.updated", { count: String(counters.updated) })}
           </span>
           <span className="text-muted-foreground">
             <SkipForward className="mr-1 inline h-3 w-3" />
-            {t("sync.live.skipped", { count: counters.skipped })}
+            {t("sync.live.skipped", { count: String(counters.skipped) })}
           </span>
           <span className="text-red-600">
             <XCircle className="mr-1 inline h-3 w-3" />
-            {t("sync.live.failed", { count: counters.failed })}
+            {t("sync.live.failed", { count: String(counters.failed) })}
           </span>
         </div>
       </CardHeader>

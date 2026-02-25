@@ -53,6 +53,12 @@
       "zeitnehmer": "Timekeeper",
       "shotclock": "Shot Clock",
       "comment": "Comment"
+    },
+    "status": {
+      "label": "Status",
+      "active": "Active",
+      "cancelled": "Cancelled",
+      "forfeited": "Forfeited"
     }
   },
   "matchDetail": {
@@ -295,5 +301,17 @@
     "switch": "Language",
     "de": "Deutsch",
     "en": "English"
+  },
+  "errors": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Please try again.",
+    "tryAgain": "Try again",
+    "goHome": "Go to dashboard",
+    "notFound": {
+      "title": "Page not found",
+      "description": "The page you are looking for does not exist.",
+      "matchTitle": "Match not found",
+      "matchDescription": "This match does not exist or has been removed."
+    }
   }
 }

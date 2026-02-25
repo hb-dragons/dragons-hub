@@ -1,5 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { fetchAPIServer } from "@/lib/api.server";
+import { SWRConfig } from "swr";
+import { SWR_KEYS } from "@/lib/swr-keys";
 import { TeamsTable } from "./teams-table";
 
 interface OwnClubTeam {
@@ -32,7 +34,9 @@ export default async function TeamsPage() {
       {error ? (
         <p className="text-destructive">{error}</p>
       ) : (
-        <TeamsTable initialTeams={teams ?? []} />
+        <SWRConfig value={{ fallback: { [SWR_KEYS.teams]: teams } }}>
+          <TeamsTable />
+        </SWRConfig>
       )}
     </div>
   );

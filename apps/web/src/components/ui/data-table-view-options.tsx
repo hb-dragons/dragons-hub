@@ -20,6 +20,7 @@ interface DataTableViewOptionsProps<TData> {
 export function DataTableViewOptions<TData>({
   table,
 }: DataTableViewOptionsProps<TData>) {
+  "use no memo"
   const t = useTranslations()
   const columns = table
     .getAllColumns()
@@ -31,9 +32,9 @@ export function DataTableViewOptions<TData>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="ml-auto hidden lg:flex">
+        <Button variant="outline" size="sm" className="h-8 shrink-0">
           <SlidersHorizontalIcon />
-          {t("common.columns")}
+          <span className="hidden sm:inline">{t("common.columns")}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[180px]">
@@ -48,6 +49,7 @@ export function DataTableViewOptions<TData>({
               key={column.id}
               checked={column.getIsVisible()}
               onCheckedChange={(value) => column.toggleVisibility(!!value)}
+              onSelect={(e) => e.preventDefault()}
             >
               {label}
             </DropdownMenuCheckboxItem>

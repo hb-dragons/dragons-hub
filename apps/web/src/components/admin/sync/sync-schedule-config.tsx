@@ -23,7 +23,7 @@ import { Loader2, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
 import type { SyncScheduleData } from "./types";
-import { useSyncContext } from "./sync-provider";
+import { useSyncSchedule } from "./use-sync";
 
 const HOURS = Array.from({ length: 24 }, (_, i) =>
   String(i).padStart(2, "0"),
@@ -49,7 +49,7 @@ function hourToCron(hour: string): string {
 
 export function SyncScheduleConfig() {
   const t = useTranslations();
-  const { schedule, updateSchedule: onUpdated } = useSyncContext();
+  const { schedule, mutate: scheduleMutate } = useSyncSchedule();
   const [enabled, setEnabled] = useState(schedule?.enabled ?? true);
   const [hour, setHour] = useState(
     cronToHour(schedule?.cronExpression ?? "0 4 * * *"),
@@ -84,7 +84,7 @@ export function SyncScheduleConfig() {
         },
       );
 
-      onUpdated(updated);
+      await scheduleMutate(updated, { revalidate: false });
       setSaveState("success");
       toast.success(t("sync.schedule.toast.updated"));
     } catch {

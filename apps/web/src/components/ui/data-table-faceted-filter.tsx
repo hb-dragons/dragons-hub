@@ -1,10 +1,11 @@
 "use client"
 
 import { useTranslations } from "next-intl"
-import { CheckIcon, PlusCircleIcon } from "lucide-react"
+import { PlusCircleIcon } from "lucide-react"
 import type { Column } from "@tanstack/react-table"
 import { Badge } from "@dragons/ui/components/badge"
 import { Button } from "@dragons/ui/components/button"
+import { Checkbox } from "@dragons/ui/components/checkbox"
 import {
   Popover,
   PopoverContent,
@@ -20,7 +21,6 @@ import {
   CommandList,
   CommandSeparator,
 } from "@dragons/ui/components/command"
-import { cn } from "@dragons/ui/lib/utils"
 
 interface FacetedFilterOption {
   label: string
@@ -39,6 +39,7 @@ export function DataTableFacetedFilter<TData, TValue>({
   title,
   options,
 }: DataTableFacetedFilterProps<TData, TValue>) {
+  "use no memo"
   const t = useTranslations()
   const facets = column.getFacetedUniqueValues()
   const filterValue = column.getFilterValue() as string[] | undefined
@@ -65,7 +66,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                     variant="secondary"
                     className="rounded-sm px-1 font-normal"
                   >
-                    {t("common.selected", { count: selectedValues.size })}
+                    {t("common.selected", { count: String(selectedValues.size) })}
                   </Badge>
                 ) : (
                   options
@@ -96,6 +97,7 @@ export function DataTableFacetedFilter<TData, TValue>({
                 return (
                   <CommandItem
                     key={option.value}
+                    value={option.value}
                     onSelect={() => {
                       const next = new Set(selectedValues)
                       if (isSelected) {
@@ -109,16 +111,11 @@ export function DataTableFacetedFilter<TData, TValue>({
                       )
                     }}
                   >
-                    <div
-                      className={cn(
-                        "flex size-4 items-center justify-center rounded-sm border border-primary",
-                        isSelected
-                          ? "bg-primary text-primary-foreground"
-                          : "opacity-50 [&_svg]:invisible",
-                      )}
-                    >
-                      <CheckIcon className="size-4" />
-                    </div>
+                    <Checkbox
+                      checked={isSelected}
+                      tabIndex={-1}
+                      className="pointer-events-none"
+                    />
                     {option.icon && (
                       <option.icon className="text-muted-foreground" />
                     )}

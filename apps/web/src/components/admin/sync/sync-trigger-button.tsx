@@ -3,14 +3,16 @@
 import { useTranslations } from "next-intl";
 import { Button } from "@dragons/ui/components/button";
 import { Loader2, Play } from "lucide-react";
-import { useSyncContext } from "./sync-provider";
+import { useSyncStatus, useTriggerSync, useSyncRunContext } from "./use-sync";
 
 export function SyncTriggerButton() {
   const t = useTranslations();
-  const { isRunning, triggering, triggerSync } = useSyncContext();
+  const { isRunning } = useSyncStatus();
+  const { triggering } = useSyncRunContext();
+  const { trigger } = useTriggerSync();
 
   return (
-    <Button onClick={triggerSync} disabled={isRunning || triggering}>
+    <Button onClick={trigger} disabled={isRunning || triggering}>
       {triggering ? (
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
       ) : (

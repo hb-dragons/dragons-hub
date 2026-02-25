@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, useCallback, useRef, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import {
   Card,
@@ -27,39 +27,41 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@dragons/ui/lib/utils";
-import type { SyncRun } from "./types";
+import { toast } from "sonner";
+import { fetchAPI } from "@/lib/api";
+import type { SyncRun, LogsResponse } from "./types";
 import { SyncLogDetail } from "./sync-log-detail";
-import { useSyncContext } from "./sync-provider";
+import { useSyncLogs } from "./use-sync";
 import { formatDuration } from "./utils";
 
 const STATUS_CONFIG: Record<
   string,
   {
     icon: React.ElementType;
-    labelKey: string;
+    labelKey: "completed" | "failed" | "running" | "pending";
     variant: "success" | "destructive" | "default" | "secondary";
     iconClass?: string;
   }
 > = {
   completed: {
     icon: CheckCircle2,
-    labelKey: "sync.history.status.completed",
+    labelKey: "completed",
     variant: "success",
   },
   failed: {
     icon: XCircle,
-    labelKey: "sync.history.status.failed",
+    labelKey: "failed",
     variant: "destructive",
   },
   running: {
     icon: Loader2,
-    labelKey: "sync.history.status.running",
+    labelKey: "running",
     variant: "default",
     iconClass: "animate-spin",
   },
   pending: {
     icon: Clock,
-    labelKey: "sync.history.status.pending",
+    labelKey: "pending",
     variant: "secondary",
   },
 };
@@ -87,47 +89,92 @@ function formatRecords(run: SyncRun): React.ReactNode {
 }
 
 export function SyncHistoryTable() {
-  const t = useTranslations();
+  const t = useTranslations("sync.history");
+  const tStatus = useTranslations("sync.history.status");
+  const tToast = useTranslations("sync.toast");
+  const tCommon = useTranslations("common");
   const format = useFormatter();
-  const { logs: rawLogs, logsHasMore: hasMore, loadMoreLogs: onLoadMore, loadingMore } = useSyncContext();
+  const { logs: firstPageLogs, hasMore: firstPageHasMore } = useSyncLogs();
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [extraLogs, setExtraLogs] = useState<SyncRun[]>([]);
+  const [extraHasMore, setExtraHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Track first page identity so we can clear extra logs when SWR refreshes
+  const prevFirstIdRef = useRef<number | undefined>(firstPageLogs[0]?.id);
+  useEffect(() => {
+    const currentFirstId = firstPageLogs[0]?.id;
+    if (currentFirstId !== prevFirstIdRef.current) {
+      prevFirstIdRef.current = currentFirstId;
+      setExtraLogs([]);
+      setExtraHasMore(false);
+    }
+  }, [firstPageLogs]);
+
+  const hasMore = extraLogs.length > 0 ? extraHasMore : firstPageHasMore;
+
+  const onLoadMore = useCallback(async () => {
+    try {
+      setLoadingMore(true);
+      const currentTotal = firstPageLogs.length + extraLogs.length;
+      const data = await fetchAPI<LogsResponse>(
+        `/admin/sync/logs?limit=20&offset=${currentTotal}`,
+      );
+      setExtraLogs((prev) => {
+        const existingIds = new Set([
+          ...firstPageLogs.map((r) => r.id),
+          ...prev.map((r) => r.id),
+        ]);
+        return [
+          ...prev,
+          ...data.items.filter((r) => !existingIds.has(r.id)),
+        ];
+      });
+      setExtraHasMore(data.hasMore);
+    } catch {
+      toast.error(tToast("loadMoreFailed"));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [firstPageLogs, extraLogs.length, tToast]);
 
   // Deduplicate by id to prevent React key warnings from race conditions
   // between optimistic updates and polling refreshes
-  const logs = rawLogs.filter(
+  const allLogs = [...firstPageLogs, ...extraLogs];
+  const logs = allLogs.filter(
     (run, i, arr) => arr.findIndex((r) => r.id === run.id) === i,
   );
 
   return (
     <Card className="pb-0">
       <CardHeader>
-        <CardTitle>{t("sync.history.title")}</CardTitle>
+        <CardTitle>{t("title")}</CardTitle>
         <CardDescription>
-          {t("sync.history.description")}
+          {t("description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Clock className="mb-2 h-8 w-8" />
-            <p>{t("sync.history.empty")}</p>
+            <p>{t("empty")}</p>
           </div>
         ) : (
           <>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">{t("sync.history.columns.status")}</TableHead>
-                  <TableHead>{t("sync.history.columns.type")}</TableHead>
-                  <TableHead>{t("sync.history.columns.started")}</TableHead>
-                  <TableHead>{t("sync.history.columns.duration")}</TableHead>
+                  <TableHead className="w-[120px]">{t("columns.status")}</TableHead>
+                  <TableHead>{t("columns.type")}</TableHead>
+                  <TableHead>{t("columns.started")}</TableHead>
+                  <TableHead>{t("columns.duration")}</TableHead>
                   <TableHead
                     className="text-right"
-                    title={t("sync.history.recordsTooltip")}
+                    title={t("recordsTooltip")}
                   >
-                    {t("sync.history.columns.records")}
+                    {t("columns.records")}
                   </TableHead>
-                  <TableHead>{t("sync.history.columns.trigger")}</TableHead>
+                  <TableHead>{t("columns.trigger")}</TableHead>
                   <TableHead className="w-[40px]" />
                 </TableRow>
               </TableHeader>
@@ -157,7 +204,7 @@ export function SyncHistoryTable() {
                                 statusCfg.iconClass,
                               )}
                             />
-                            {t(statusCfg.labelKey)}
+                            {tStatus(statusCfg.labelKey)}
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium">
@@ -202,7 +249,7 @@ export function SyncHistoryTable() {
                   {loadingMore && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {t("common.loadMore")}
+                  {tCommon("loadMore")}
                 </Button>
               </div>
             )}

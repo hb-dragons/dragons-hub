@@ -43,33 +43,36 @@ interface SyncLogDetailProps {
 
 const ENTITY_CONFIG: Record<
   EntityType,
-  { icon: React.ElementType; labelKey: string; color: string }
+  { icon: React.ElementType; labelKey: "league" | "match" | "team" | "standing" | "venue" | "referee" | "refereeRole"; color: string }
 > = {
-  league: { icon: Trophy, labelKey: "sync.logDetail.entity.league", color: "text-yellow-600" },
-  match: { icon: Gamepad2, labelKey: "sync.logDetail.entity.match", color: "text-purple-600" },
-  team: { icon: Users, labelKey: "sync.logDetail.entity.team", color: "text-blue-600" },
-  standing: { icon: BarChart, labelKey: "sync.logDetail.entity.standing", color: "text-green-600" },
-  venue: { icon: MapPin, labelKey: "sync.logDetail.entity.venue", color: "text-orange-600" },
-  referee: { icon: Shield, labelKey: "sync.logDetail.entity.referee", color: "text-teal-600" },
+  league: { icon: Trophy, labelKey: "league", color: "text-yellow-600" },
+  match: { icon: Gamepad2, labelKey: "match", color: "text-purple-600" },
+  team: { icon: Users, labelKey: "team", color: "text-blue-600" },
+  standing: { icon: BarChart, labelKey: "standing", color: "text-green-600" },
+  venue: { icon: MapPin, labelKey: "venue", color: "text-orange-600" },
+  referee: { icon: Shield, labelKey: "referee", color: "text-teal-600" },
   refereeRole: {
     icon: ClipboardList,
-    labelKey: "sync.logDetail.entity.refereeRole",
+    labelKey: "refereeRole",
     color: "text-indigo-600",
   },
 };
 
 const ACTION_CONFIG: Record<
   EntryAction,
-  { icon: React.ElementType; labelKey: string; variant: "success" | "default" | "secondary" | "destructive" }
+  { icon: React.ElementType; labelKey: "created" | "updated" | "skipped" | "failed"; variant: "success" | "default" | "secondary" | "destructive" }
 > = {
-  created: { icon: Plus, labelKey: "sync.logDetail.action.created", variant: "success" },
-  updated: { icon: RefreshCw, labelKey: "sync.logDetail.action.updated", variant: "default" },
-  skipped: { icon: SkipForward, labelKey: "sync.logDetail.action.skipped", variant: "secondary" },
-  failed: { icon: XCircle, labelKey: "sync.logDetail.action.failed", variant: "destructive" },
+  created: { icon: Plus, labelKey: "created", variant: "success" },
+  updated: { icon: RefreshCw, labelKey: "updated", variant: "default" },
+  skipped: { icon: SkipForward, labelKey: "skipped", variant: "secondary" },
+  failed: { icon: XCircle, labelKey: "failed", variant: "destructive" },
 };
 
 export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
-  const t = useTranslations();
+  const t = useTranslations("sync.logDetail");
+  const tEntity = useTranslations("sync.logDetail.entity");
+  const tAction = useTranslations("sync.logDetail.action");
+  const tCommon = useTranslations("common");
   const [entries, setEntries] = useState<SyncRunEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -110,7 +113,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
         setHasMore(data.hasMore);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
-        toast.error(t("sync.logDetail.loadFailed"));
+        toast.error(t("loadFailed"));
       } finally {
         setLoading(false);
       }
@@ -145,7 +148,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
                   <ChevronDown
                     className={`mr-1 h-3 w-3 transition-transform ${showStack ? "rotate-180" : ""}`}
                   />
-                  {showStack ? t("sync.logDetail.hideStack") : t("sync.logDetail.showStack")}
+                  {showStack ? t("hideStack") : t("showStack")}
                 </Button>
               )}
               {showStack && syncRun.errorStack && (
@@ -165,10 +168,10 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
             <SelectValue placeholder="Entity type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("sync.logDetail.allEntities")}</SelectItem>
+            <SelectItem value="all">{t("allEntities")}</SelectItem>
             {(Object.keys(ENTITY_CONFIG) as EntityType[]).map((key) => (
               <SelectItem key={key} value={key}>
-                {t(ENTITY_CONFIG[key].labelKey)}
+                {tEntity(ENTITY_CONFIG[key].labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -179,10 +182,10 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
             <SelectValue placeholder="Action" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("sync.logDetail.allActions")}</SelectItem>
+            <SelectItem value="all">{t("allActions")}</SelectItem>
             {(Object.keys(ACTION_CONFIG) as EntryAction[]).map((key) => (
               <SelectItem key={key} value={key}>
-                {t(ACTION_CONFIG[key].labelKey)}
+                {tAction(ACTION_CONFIG[key].labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -191,12 +194,12 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             <FilterX className="mr-1 h-3 w-3" />
-            {t("common.clear")}
+            {tCommon("clear")}
           </Button>
         )}
 
         <span className="text-sm text-muted-foreground">
-          {t("sync.logDetail.entries", { count: total })}
+          {t("entries", { count: total })}
         </span>
       </div>
 
@@ -204,18 +207,18 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
       <div className="max-h-[400px] overflow-y-auto rounded-md border">
         {loading && entries.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            {t("sync.logDetail.loadingEntries")}
+            {t("loadingEntries")}
           </div>
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
             <p>
               {hasActiveFilters
-                ? t("sync.logDetail.noMatchingEntries")
-                : t("sync.logDetail.noEntries")}
+                ? t("noMatchingEntries")
+                : t("noEntries")}
             </p>
             {hasActiveFilters && (
               <Button variant="link" size="sm" onClick={clearFilters}>
-                {t("common.clearFilters")}
+                {tCommon("clearFilters")}
               </Button>
             )}
           </div>
@@ -238,14 +241,14 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
                 >
                   <EntityIcon className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
                   <span className="w-24 shrink-0 text-muted-foreground">
-                    {t(entityCfg.labelKey)}
+                    {tEntity(entityCfg.labelKey)}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-medium">
                     {entry.entityName || entry.entityId}
                   </span>
                   <Badge variant={actionCfg.variant} className="shrink-0">
                     <ActionIcon className="h-3 w-3" />
-                    {t(actionCfg.labelKey)}
+                    {tAction(actionCfg.labelKey)}
                   </Badge>
                   <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">
                     {new Date(entry.createdAt).toLocaleTimeString()}
@@ -266,7 +269,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
             onClick={() => loadEntries(entries.length, true)}
             disabled={loading}
           >
-            {t("sync.logDetail.loadMore", { remaining: total - entries.length })}
+            {t("loadMore", { remaining: String(total - entries.length) })}
           </Button>
         </div>
       )}

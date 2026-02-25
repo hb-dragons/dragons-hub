@@ -53,6 +53,12 @@
       "zeitnehmer": "Zeitnehmer",
       "shotclock": "Shotclock",
       "comment": "Kommentar"
+    },
+    "status": {
+      "label": "Status",
+      "active": "Aktiv",
+      "cancelled": "Abgesagt",
+      "forfeited": "Kampflos"
     }
   },
   "matchDetail": {
@@ -295,5 +301,17 @@
     "switch": "Sprache",
     "de": "Deutsch",
     "en": "English"
+  },
+  "errors": {
+    "title": "Etwas ist schiefgelaufen",
+    "description": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.",
+    "tryAgain": "Erneut versuchen",
+    "goHome": "Zum Dashboard",
+    "notFound": {
+      "title": "Seite nicht gefunden",
+      "description": "Die gesuchte Seite existiert nicht.",
+      "matchTitle": "Spiel nicht gefunden",
+      "matchDescription": "Dieses Spiel existiert nicht oder wurde entfernt."
+    }
   }
 }

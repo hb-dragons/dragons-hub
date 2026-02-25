@@ -53,18 +53,16 @@ function getDefaultValues(match: MatchDetail): MatchFormValues {
       ? match.kickoffTime
       : null,
     venueNameOverride: match.venueNameOverride,
-    isForfeited: match.overriddenFields.includes("isForfeited")
-      ? match.isForfeited
-      : null,
-    isCancelled: match.overriddenFields.includes("isCancelled")
-      ? match.isCancelled
-      : null,
+    // Boolean fields always use the actual match value so the Switch displays
+    // the real state.  The dirty-fields-only submit ensures that unchanged
+    // booleans are never sent (which would previously send null → clear override).
+    isForfeited: match.isForfeited ?? false,
+    isCancelled: match.isCancelled ?? false,
     anschreiber: match.anschreiber,
     zeitnehmer: match.zeitnehmer,
     shotclock: match.shotclock,
     internalNotes: match.internalNotes,
     publicComment: match.publicComment,
-    changeReason: "",
   };
 }
 
@@ -102,11 +100,20 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
 
   const onSubmit = useCallback(
     async (data: MatchFormValues) => {
-      const { changeReason, ...fields } = data;
-      const updateData: Record<string, unknown> = { ...fields };
-      if (changeReason) {
-        updateData.changeReason = changeReason;
+      const { dirtyFields } = form.formState;
+
+      // Only send fields the user actually changed — prevents unchanged
+      // booleans (or any other field) from being sent as null/default and
+      // accidentally clearing overrides on the backend.
+      const updateData: Record<string, unknown> = {};
+      for (const key of Object.keys(data) as (keyof typeof data)[]) {
+        if (dirtyFields[key]) {
+          updateData[key] = data[key];
+        }
       }
+
+      // Nothing actually changed
+      if (Object.keys(updateData).length === 0) return;
 
       try {
         setSaving(true);
@@ -170,10 +177,10 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
           <h1 className="text-2xl font-bold tracking-tight">
             {match.homeTeamName} vs {match.guestTeamName}
           </h1>
-          <p className="text-muted-foreground">{t("matchDetail.matchday", { day: match.matchDay })}</p>
+          <p className="text-muted-foreground">{t("matchDetail.matchday", { day: String(match.matchDay) })}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline">{t("matchDetail.matchdayBadge", { day: match.matchDay })}</Badge>
+          <Badge variant="outline">{t("matchDetail.matchdayBadge", { day: String(match.matchDay) })}</Badge>
           {overrideCount > 0 && (
             <Badge
               variant="outline"
@@ -337,7 +344,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                         : "\u2014",
                     })}
                   </div>
-                  <div>{t("matchDetail.status.remoteVersion", { version: match.currentRemoteVersion })}</div>
+                  <div>{t("matchDetail.status.remoteVersion", { version: String(match.currentRemoteVersion) })}</div>
                 </div>
               </CardContent>
             </Card>
@@ -536,29 +543,7 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
             {/* Form footer */}
             <Card>
               <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <Controller
-                    control={form.control}
-                    name="changeReason"
-                    render={({ field, fieldState }) => (
-                      <Field>
-                        <FieldLabel htmlFor="change-reason">
-                          {t("matchDetail.changeReason.label")}
-                        </FieldLabel>
-                        <FieldDescription>
-                          {t("matchDetail.changeReason.description")}
-                        </FieldDescription>
-                        <Input
-                          id="change-reason"
-                          placeholder={t("matchDetail.changeReason.placeholder")}
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                          onBlur={field.onBlur}
-                        />
-                        <FieldError>{fieldState.error?.message}</FieldError>
-                      </Field>
-                    )}
-                  />
+                <div>
                   <Button
                     type="submit"
                     disabled={saving || !isDirty}
