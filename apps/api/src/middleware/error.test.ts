@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { z } from "zod";
+import type { Logger } from "pino";
+import type { AppEnv } from "../types";
 
 // --- Mock setup (hoisted before imports) ---
 
@@ -27,7 +29,7 @@ import { errorHandler } from "./error";
 
 // App WITHOUT request logger middleware — error handler falls back to root logger
 function createBareApp() {
-  const app = new Hono();
+  const app = new Hono<AppEnv>();
   app.onError(errorHandler);
 
   app.get("/throw-error", () => {
@@ -50,12 +52,12 @@ function createBareApp() {
 
 // App WITH a manually-set context logger — simulates the request logger middleware
 function createAppWithContextLogger() {
-  const app = new Hono();
+  const app = new Hono<AppEnv>();
   app.onError(errorHandler);
 
   // Simulate what requestLogger does: set a child logger on context
   app.use("*", async (c, next) => {
-    c.set("logger", mocks.childLogger);
+    c.set("logger", mocks.childLogger as unknown as Logger);
     await next();
   });
 

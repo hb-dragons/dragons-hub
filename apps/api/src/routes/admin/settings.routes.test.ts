@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
+import type { AppEnv } from "../../types";
 
 // --- Mocks (hoisted before imports) ---
 
@@ -22,7 +23,7 @@ vi.mock("../../config/logger", () => ({
 import { settingsRoutes } from "./settings.routes";
 import { errorHandler } from "../../middleware/error";
 
-const app = new Hono();
+const app = new Hono<AppEnv>();
 app.onError(errorHandler);
 app.route("/", settingsRoutes);
 

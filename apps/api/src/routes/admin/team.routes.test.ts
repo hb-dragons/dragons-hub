@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
+import type { AppEnv } from "../../types";
 
 // --- Mocks (hoisted before imports) ---
 
@@ -23,7 +24,7 @@ import { teamRoutes } from "./team.routes";
 import { errorHandler } from "../../middleware/error";
 
 // Test app without auth middleware
-const app = new Hono();
+const app = new Hono<AppEnv>();
 app.onError(errorHandler);
 app.route("/", teamRoutes);
 

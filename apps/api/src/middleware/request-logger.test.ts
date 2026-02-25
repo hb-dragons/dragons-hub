@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
+import type { AppEnv } from "../types";
 
 // --- Mock setup ---
 
@@ -15,14 +16,14 @@ const mockLogger = {
 
 vi.mock("../config/logger", () => ({
   logger: {
-    child: (...args: unknown[]) => mockLogger.child(...args),
+    child: (...args: Parameters<typeof mockLogger.child>) => mockLogger.child(...args),
   },
 }));
 
 import { requestLogger } from "./request-logger";
 
 function createApp() {
-  const app = new Hono();
+  const app = new Hono<AppEnv>();
   app.use("*", requestLogger);
   app.get("/test", (c) => c.json({ ok: true }));
   app.post("/items", (c) => c.json({ created: true }, 201));
