@@ -8,6 +8,14 @@ vi.mock("../config/env", () => ({
   },
 }));
 
+vi.mock("../config/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
 const mockInsert = vi.fn();
 vi.mock("../config/database", () => ({
   db: {

@@ -1,5 +1,6 @@
 import { Worker, Job } from "bullmq";
 import { env } from "../config/env";
+import { logger } from "../config/logger";
 import { syncOrchestrator } from "../services/sync/index";
 
 interface SyncJobData {
@@ -11,25 +12,26 @@ interface SyncJobData {
 export const syncWorker = new Worker<SyncJobData>(
   "sync",
   async (job: Job<SyncJobData>) => {
-    console.log(`[Sync Worker] Starting job ${job.id}: ${job.name}`);
+    const log = logger.child({ jobId: job.id });
+    log.info({ jobName: job.name }, "Starting sync job");
 
     const triggeredBy = job.name === "daily-sync" ? "cron" : ("manual" as const);
 
     try {
-      const logger = async (msg: string) => {
+      const jobLogger = async (msg: string) => {
         await job.log(msg);
       };
 
       switch (job.data.type) {
         case "full": {
-          const fullResult = await syncOrchestrator.fullSync(triggeredBy, logger, job.data.syncRunId);
+          const fullResult = await syncOrchestrator.fullSync(triggeredBy, jobLogger, job.data.syncRunId);
           return { completed: true, type: job.data.type, result: fullResult };
         }
         default:
           throw new Error(`Unsupported sync type: ${job.data.type}`);
       }
     } catch (error) {
-      console.error(`[Sync Worker] Job ${job.id} failed:`, error);
+      log.error({ err: error }, "Sync job failed");
       throw error;
     }
   },
@@ -40,13 +42,13 @@ export const syncWorker = new Worker<SyncJobData>(
 );
 
 syncWorker.on("completed", (job) => {
-  console.log(`[Sync Worker] Job ${job.id} completed`);
+  logger.info({ jobId: job.id }, "Sync job completed");
 });
 
 syncWorker.on("failed", (job, err) => {
-  console.error(`[Sync Worker] Job ${job?.id} failed:`, err.message);
+  logger.error({ jobId: job?.id, err }, "Sync job failed");
 });
 
 syncWorker.on("error", (err) => {
-  console.error("[Sync Worker] Worker error:", err);
+  logger.error({ err }, "Worker error");
 });

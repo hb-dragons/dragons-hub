@@ -1,21 +1,22 @@
 import { syncWorker } from "./sync.worker";
 import { initializeScheduledJobs, syncQueue } from "./queues";
 import { db } from "../config/database";
+import { logger } from "../config/logger";
 import { syncRuns } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function initializeWorkers() {
-  console.log("[Workers] Initializing workers...");
+  logger.info("Initializing workers...");
 
   await initializeScheduledJobs();
 
   // Workers are automatically started when imported
-  console.log("[Workers] Sync worker started");
-  console.log("[Workers] Workers initialized");
+  logger.info("Sync worker started");
+  logger.info("Workers initialized");
 }
 
 export async function shutdownWorkers() {
-  console.log("[Workers] Shutting down...");
+  logger.info("Shutting down workers...");
 
   try {
     // Mark any running sync runs as failed
@@ -28,13 +29,13 @@ export async function shutdownWorkers() {
       })
       .where(eq(syncRuns.status, "running"));
   } catch (error) {
-    console.error("[Workers] Failed to mark running syncs as failed:", error);
+    logger.error({ err: error }, "Failed to mark running syncs as failed");
   }
 
   await syncWorker.close();
   await syncQueue.close();
 
-  console.log("[Workers] Shutdown complete");
+  logger.info("Worker shutdown complete");
 }
 
 export { syncWorker };

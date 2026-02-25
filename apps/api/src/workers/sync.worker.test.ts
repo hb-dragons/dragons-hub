@@ -6,6 +6,21 @@ vi.mock("../config/env", () => ({
   env: { REDIS_URL: "redis://localhost:6379" },
 }));
 
+const mockChildLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+}));
+
+vi.mock("../config/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    child: vi.fn().mockReturnValue(mockChildLogger),
+  },
+}));
+
 const mockFullSync = vi.fn();
 vi.mock("../services/sync/index", () => ({
   syncOrchestrator: {

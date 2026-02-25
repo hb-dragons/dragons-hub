@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { env } from "../config/env";
+import { logger } from "../config/logger";
 import { db } from "../config/database";
 import { syncSchedule, syncRuns } from "@dragons/db/schema";
 
@@ -39,7 +40,7 @@ export async function initializeScheduledJobs() {
       enabled = schedule.enabled;
     }
   } catch {
-    console.warn("[Queues] Could not read schedule from DB, using defaults");
+    logger.warn("Could not read schedule from DB, using defaults");
   }
 
   if (enabled) {
@@ -53,9 +54,9 @@ export async function initializeScheduledJobs() {
         },
       },
     );
-    console.log(`[Queues] Scheduled jobs initialized: ${cronExpression} (${timezone})`);
+    logger.info({ cronExpression, timezone }, "Scheduled jobs initialized");
   } else {
-    console.log("[Queues] Sync schedule is disabled");
+    logger.info("Sync schedule is disabled");
   }
 }
 
@@ -132,8 +133,8 @@ export async function updateSyncSchedule(
         },
       },
     );
-    console.log(`[Queues] Sync schedule updated: ${cronExpression} (${timezone})`);
+    logger.info({ cronExpression, timezone }, "Sync schedule updated");
   } else {
-    console.log("[Queues] Sync schedule disabled");
+    logger.info("Sync schedule disabled");
   }
 }

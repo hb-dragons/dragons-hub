@@ -6,6 +6,14 @@ vi.mock("../config/env", () => ({
   env: { REDIS_URL: "redis://localhost:6379" },
 }));
 
+vi.mock("../config/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
 const mockInitScheduledJobs = vi.fn().mockResolvedValue(undefined);
 const mockSyncQueueClose = vi.fn().mockResolvedValue(undefined);
 vi.mock("./queues", () => ({
