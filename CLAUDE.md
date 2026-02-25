@@ -137,6 +137,7 @@ NODE_ENV=development
 TRUSTED_ORIGINS=http://localhost:3000
 NEXT_PUBLIC_API_URL=http://localhost:3001
 BETTER_AUTH_URL=http://localhost:3001
+LOG_LEVEL=info                    # Pino log level (fatal/error/warn/info/debug/trace)
 ```
 
 Note: Club and league tracking configuration is managed via the admin UI (`/admin/settings`) and stored in the `app_settings` database table.
