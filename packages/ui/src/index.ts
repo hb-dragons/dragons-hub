@@ -12,6 +12,18 @@ export {
   PopoverAnchor,
 } from "./components/popover";
 export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
+} from "./components/dialog";
+export {
   Sheet,
   SheetPortal,
   SheetOverlay,
