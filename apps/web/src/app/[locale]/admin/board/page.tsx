@@ -3,6 +3,7 @@ import { fetchAPIServer } from "@/lib/api.server";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { KanbanBoard } from "@/components/admin/board/kanban-board";
+import { CreateBoardButton } from "@/components/admin/board/create-board-button";
 import type { BoardData, TaskCardData } from "@/components/admin/board/types";
 
 export default async function BoardPage() {
@@ -33,8 +34,9 @@ export default async function BoardPage() {
           {error}
         </div>
       ) : !board ? (
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-          <p>{t("board.emptyBoard")}</p>
+        <div className="flex flex-col items-center justify-center py-12">
+          <p className="mb-4 text-muted-foreground">{t("board.emptyBoard")}</p>
+          <CreateBoardButton />
         </div>
       ) : (
         <SWRConfig

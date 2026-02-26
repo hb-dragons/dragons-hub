@@ -20,16 +20,16 @@ import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 interface BookingSettings {
-  bufferBeforeMinutes: number;
-  bufferAfterMinutes: number;
-  defaultGameDurationMinutes: number;
+  bufferBefore: number;
+  bufferAfter: number;
+  gameDuration: number;
   dueDaysBefore: number;
 }
 
 const DEFAULTS: BookingSettings = {
-  bufferBeforeMinutes: 60,
-  bufferAfterMinutes: 60,
-  defaultGameDurationMinutes: 90,
+  bufferBefore: 60,
+  bufferAfter: 60,
+  gameDuration: 90,
   dueDaysBefore: 7,
 };
 
@@ -41,26 +41,26 @@ export function BookingConfig() {
   );
   const { mutate } = useSWRConfig();
 
-  const [bufferBefore, setBufferBefore] = useState(DEFAULTS.bufferBeforeMinutes.toString());
-  const [bufferAfter, setBufferAfter] = useState(DEFAULTS.bufferAfterMinutes.toString());
-  const [gameDuration, setGameDuration] = useState(DEFAULTS.defaultGameDurationMinutes.toString());
+  const [bufferBefore, setBufferBefore] = useState(DEFAULTS.bufferBefore.toString());
+  const [bufferAfter, setBufferAfter] = useState(DEFAULTS.bufferAfter.toString());
+  const [gameDuration, setGameDuration] = useState(DEFAULTS.gameDuration.toString());
   const [dueDays, setDueDays] = useState(DEFAULTS.dueDaysBefore.toString());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (settings) {
-      setBufferBefore(settings.bufferBeforeMinutes.toString());
-      setBufferAfter(settings.bufferAfterMinutes.toString());
-      setGameDuration(settings.defaultGameDurationMinutes.toString());
+      setBufferBefore(settings.bufferBefore.toString());
+      setBufferAfter(settings.bufferAfter.toString());
+      setGameDuration(settings.gameDuration.toString());
       setDueDays(settings.dueDaysBefore.toString());
     }
   }, [settings]);
 
   const hasChanges =
     settings &&
-    (bufferBefore !== settings.bufferBeforeMinutes.toString() ||
-      bufferAfter !== settings.bufferAfterMinutes.toString() ||
-      gameDuration !== settings.defaultGameDurationMinutes.toString() ||
+    (bufferBefore !== settings.bufferBefore.toString() ||
+      bufferAfter !== settings.bufferAfter.toString() ||
+      gameDuration !== settings.gameDuration.toString() ||
       dueDays !== settings.dueDaysBefore.toString());
 
   async function handleSave() {
@@ -71,9 +71,9 @@ export function BookingConfig() {
         {
           method: "PUT",
           body: JSON.stringify({
-            bufferBeforeMinutes: parseInt(bufferBefore, 10),
-            bufferAfterMinutes: parseInt(bufferAfter, 10),
-            defaultGameDurationMinutes: parseInt(gameDuration, 10),
+            bufferBefore: parseInt(bufferBefore, 10),
+            bufferAfter: parseInt(bufferAfter, 10),
+            gameDuration: parseInt(gameDuration, 10),
             dueDaysBefore: parseInt(dueDays, 10),
           }),
         },

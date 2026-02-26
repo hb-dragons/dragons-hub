@@ -14,16 +14,21 @@ export default async function SettingsPage() {
   const t = await getTranslations();
   let clubConfig: ClubConfigType | null = null;
   let leaguesResponse: TrackedLeaguesResponse | null = null;
-  let bookingConfig: { bufferBeforeMinutes: number; bufferAfterMinutes: number; defaultGameDurationMinutes: number; dueDaysBefore: number } | null = null;
+  let bookingConfig: { bufferBefore: number; bufferAfter: number; gameDuration: number; dueDaysBefore: number } | null = null;
 
   try {
-    [clubConfig, leaguesResponse, bookingConfig] = await Promise.all([
+    [clubConfig, leaguesResponse] = await Promise.all([
       fetchAPIServer<ClubConfigType | null>("/admin/settings/club"),
       fetchAPIServer<TrackedLeaguesResponse>("/admin/settings/leagues"),
-      fetchAPIServer<{ bufferBeforeMinutes: number; bufferAfterMinutes: number; defaultGameDurationMinutes: number; dueDaysBefore: number }>("/admin/settings/booking"),
     ]);
   } catch {
-    // Will show empty state
+    // Will show empty state for club and leagues
+  }
+
+  try {
+    bookingConfig = await fetchAPIServer<{ bufferBefore: number; bufferAfter: number; gameDuration: number; dueDaysBefore: number }>("/admin/settings/booking");
+  } catch {
+    // Will show defaults for booking config
   }
 
   return (
