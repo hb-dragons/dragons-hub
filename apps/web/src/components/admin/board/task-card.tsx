@@ -5,11 +5,11 @@ import { Badge } from "@dragons/ui/components/badge";
 import { Calendar, CheckSquare, Link as LinkIcon } from "lucide-react";
 import type { TaskCardData } from "./types";
 
-const priorityConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  low: { label: "priority.low", variant: "secondary" },
-  normal: { label: "priority.normal", variant: "outline" },
-  high: { label: "priority.high", variant: "default" },
-  urgent: { label: "priority.urgent", variant: "destructive" },
+const priorityVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  low: "secondary",
+  normal: "outline",
+  high: "default",
+  urgent: "destructive",
 };
 
 interface TaskCardProps {
@@ -20,7 +20,12 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onDragStart, onClick }: TaskCardProps) {
   const t = useTranslations("board");
-  const config = priorityConfig[task.priority] ?? priorityConfig.normal;
+  const variant = priorityVariant[task.priority] ?? priorityVariant.normal;
+  const priorityKey = (["low", "normal", "high", "urgent"] as const).includes(
+    task.priority as "low" | "normal" | "high" | "urgent",
+  )
+    ? (task.priority as "low" | "normal" | "high" | "urgent")
+    : "normal";
   const hasChecklist = task.checklistTotal > 0;
   const hasLink = task.matchId !== null || task.venueBookingId !== null;
 
@@ -33,8 +38,8 @@ export function TaskCard({ task, onDragStart, onClick }: TaskCardProps) {
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium leading-tight">{task.title}</p>
-        <Badge variant={config.variant} className="shrink-0">
-          {t(config.label)}
+        <Badge variant={variant} className="shrink-0">
+          {t(`priority.${priorityKey}`)}
         </Badge>
       </div>
 
