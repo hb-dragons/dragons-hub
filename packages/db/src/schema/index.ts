@@ -9,3 +9,8 @@ export * from "./referees";
 export * from "./versions";
 export * from "./sync-runs";
 export * from "./auth";
+export * from "./venue-bookings";
+export * from "./venue-booking-matches";
+export * from "./boards";
+export * from "./tasks";
+export * from "./notifications";

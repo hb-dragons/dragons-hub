@@ -50,6 +50,13 @@
       "when": 1771507286287,
       "tag": "0006_flowery_yellowjacket",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772115723781,
+      "tag": "0007_charming_karen_page",
+      "breakpoints": true
     }
   ]
 }

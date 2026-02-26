@@ -21,6 +21,7 @@ export const teams = pgTable(
     clubId: integer("club_id").notNull(),
     isOwnClub: boolean("is_own_club").default(false),
     verzicht: boolean("verzicht").default(false),
+    estimatedGameDuration: integer("estimated_game_duration"),
     dataHash: varchar("data_hash", { length: 64 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
