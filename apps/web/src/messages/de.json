@@ -11,7 +11,8 @@
     "sync": "Synchronisation",
     "settings": "Einstellungen",
     "standings": "Tabellen",
-    "venues": "Hallen"
+    "venues": "Hallen",
+    "users": "Benutzer"
   },
   "common": {
     "save": "Speichern",
@@ -310,6 +311,106 @@
       "customName": "Eigener Name"
     },
     "placeholder": "Eigenen Namen eingeben..."
+  },
+  "users": {
+    "title": "Benutzer",
+    "description": "Benutzerkonten und Berechtigungen verwalten",
+    "empty": "Keine Benutzer gefunden",
+    "searchPlaceholder": "Benutzer suchen...",
+    "addUser": "Benutzer hinzufügen",
+    "columns": {
+      "name": "Name",
+      "email": "E-Mail",
+      "role": "Rolle",
+      "status": "Status",
+      "created": "Erstellt"
+    },
+    "roles": {
+      "admin": "Admin",
+      "user": "Benutzer"
+    },
+    "status": {
+      "active": "Aktiv",
+      "banned": "Gesperrt"
+    },
+    "actions": {
+      "edit": "Bearbeiten",
+      "changeRole": "Rolle ändern",
+      "setPassword": "Passwort setzen",
+      "ban": "Benutzer sperren",
+      "unban": "Benutzer entsperren",
+      "delete": "Benutzer löschen"
+    },
+    "createDialog": {
+      "title": "Benutzer erstellen",
+      "description": "Neues Benutzerkonto mit temporärem Passwort erstellen.",
+      "nameLabel": "Name",
+      "namePlaceholder": "Vollständiger Name",
+      "emailLabel": "E-Mail",
+      "emailPlaceholder": "benutzer@beispiel.de",
+      "passwordLabel": "Temporäres Passwort",
+      "passwordPlaceholder": "Temporäres Passwort eingeben",
+      "roleLabel": "Rolle",
+      "create": "Benutzer erstellen",
+      "creating": "Wird erstellt..."
+    },
+    "editDialog": {
+      "title": "Benutzer bearbeiten",
+      "description": "Benutzerdaten aktualisieren.",
+      "nameLabel": "Name",
+      "emailLabel": "E-Mail",
+      "update": "Änderungen speichern",
+      "updating": "Wird gespeichert..."
+    },
+    "setPasswordDialog": {
+      "title": "Passwort setzen",
+      "description": "Neues Passwort für {name} setzen.",
+      "passwordLabel": "Neues Passwort",
+      "passwordPlaceholder": "Neues Passwort eingeben",
+      "confirm": "Passwort setzen",
+      "confirming": "Wird gesetzt..."
+    },
+    "banDialog": {
+      "title": "Benutzer sperren",
+      "description": "{name} vom Zugriff auf das System sperren.",
+      "reasonLabel": "Grund",
+      "reasonPlaceholder": "Optionaler Sperrgrund",
+      "expiresLabel": "Läuft ab nach (Tage)",
+      "expiresPlaceholder": "Leer lassen für dauerhaft",
+      "confirm": "Benutzer sperren",
+      "confirming": "Wird gesperrt..."
+    },
+    "unbanConfirm": {
+      "title": "Benutzer entsperren",
+      "description": "Möchten Sie {name} wirklich entsperren?",
+      "confirm": "Entsperren"
+    },
+    "deleteConfirm": {
+      "title": "Benutzer löschen",
+      "description": "{name} und alle zugehörigen Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirm": "Löschen"
+    },
+    "changeRoleConfirm": {
+      "title": "Rolle ändern",
+      "description": "Rolle von {name} von {currentRole} zu {newRole} ändern?",
+      "confirm": "Rolle ändern"
+    },
+    "toast": {
+      "created": "Benutzer erfolgreich erstellt",
+      "updated": "Benutzer erfolgreich aktualisiert",
+      "deleted": "Benutzer erfolgreich gelöscht",
+      "banned": "Benutzer erfolgreich gesperrt",
+      "unbanned": "Benutzer erfolgreich entsperrt",
+      "roleChanged": "Rolle erfolgreich geändert",
+      "passwordSet": "Passwort erfolgreich gesetzt",
+      "createFailed": "Benutzer konnte nicht erstellt werden",
+      "updateFailed": "Benutzer konnte nicht aktualisiert werden",
+      "deleteFailed": "Benutzer konnte nicht gelöscht werden",
+      "banFailed": "Benutzer konnte nicht gesperrt werden",
+      "unbanFailed": "Benutzer konnte nicht entsperrt werden",
+      "roleChangeFailed": "Rolle konnte nicht geändert werden",
+      "passwordSetFailed": "Passwort konnte nicht gesetzt werden"
+    }
   },
   "settings": {
     "title": "Einstellungen",

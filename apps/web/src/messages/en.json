@@ -11,7 +11,8 @@
     "sync": "Sync",
     "settings": "Settings",
     "standings": "Standings",
-    "venues": "Venues"
+    "venues": "Venues",
+    "users": "Users"
   },
   "common": {
     "save": "Save",
@@ -310,6 +311,106 @@
       "customName": "Custom Name"
     },
     "placeholder": "Enter custom name..."
+  },
+  "users": {
+    "title": "Users",
+    "description": "Manage user accounts and permissions",
+    "empty": "No users found",
+    "searchPlaceholder": "Search users...",
+    "addUser": "Add User",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "created": "Created"
+    },
+    "roles": {
+      "admin": "Admin",
+      "user": "User"
+    },
+    "status": {
+      "active": "Active",
+      "banned": "Banned"
+    },
+    "actions": {
+      "edit": "Edit",
+      "changeRole": "Change Role",
+      "setPassword": "Set Password",
+      "ban": "Ban User",
+      "unban": "Unban User",
+      "delete": "Delete User"
+    },
+    "createDialog": {
+      "title": "Create User",
+      "description": "Create a new user account with a temporary password.",
+      "nameLabel": "Name",
+      "namePlaceholder": "Full name",
+      "emailLabel": "Email",
+      "emailPlaceholder": "user@example.com",
+      "passwordLabel": "Temporary Password",
+      "passwordPlaceholder": "Enter a temporary password",
+      "roleLabel": "Role",
+      "create": "Create User",
+      "creating": "Creating..."
+    },
+    "editDialog": {
+      "title": "Edit User",
+      "description": "Update user details.",
+      "nameLabel": "Name",
+      "emailLabel": "Email",
+      "update": "Save Changes",
+      "updating": "Saving..."
+    },
+    "setPasswordDialog": {
+      "title": "Set Password",
+      "description": "Set a new password for {name}.",
+      "passwordLabel": "New Password",
+      "passwordPlaceholder": "Enter new password",
+      "confirm": "Set Password",
+      "confirming": "Setting..."
+    },
+    "banDialog": {
+      "title": "Ban User",
+      "description": "Ban {name} from accessing the system.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Optional ban reason",
+      "expiresLabel": "Expires after (days)",
+      "expiresPlaceholder": "Leave empty for permanent",
+      "confirm": "Ban User",
+      "confirming": "Banning..."
+    },
+    "unbanConfirm": {
+      "title": "Unban User",
+      "description": "Are you sure you want to unban {name}?",
+      "confirm": "Unban"
+    },
+    "deleteConfirm": {
+      "title": "Delete User",
+      "description": "This will permanently delete {name} and all their data. This action cannot be undone.",
+      "confirm": "Delete"
+    },
+    "changeRoleConfirm": {
+      "title": "Change Role",
+      "description": "Change {name}'s role from {currentRole} to {newRole}?",
+      "confirm": "Change Role"
+    },
+    "toast": {
+      "created": "User created successfully",
+      "updated": "User updated successfully",
+      "deleted": "User deleted successfully",
+      "banned": "User banned successfully",
+      "unbanned": "User unbanned successfully",
+      "roleChanged": "Role changed successfully",
+      "passwordSet": "Password set successfully",
+      "createFailed": "Failed to create user",
+      "updateFailed": "Failed to update user",
+      "deleteFailed": "Failed to delete user",
+      "banFailed": "Failed to ban user",
+      "unbanFailed": "Failed to unban user",
+      "roleChangeFailed": "Failed to change role",
+      "passwordSetFailed": "Failed to set password"
+    }
   },
   "settings": {
     "title": "Settings",

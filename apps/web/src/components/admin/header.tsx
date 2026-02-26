@@ -12,6 +12,7 @@ const navLinks = [
   { href: "/admin/standings" as const, labelKey: "nav.standings" as const },
   { href: "/admin/venues" as const, labelKey: "nav.venues" as const },
   { href: "/admin/teams" as const, labelKey: "nav.teams" as const },
+  { href: "/admin/users" as const, labelKey: "nav.users" as const },
   { href: "/admin/sync" as const, labelKey: "nav.sync" as const },
   { href: "/admin/settings" as const, labelKey: "nav.settings" as const },
 ];

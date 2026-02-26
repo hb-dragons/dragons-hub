@@ -11,4 +11,5 @@ export const SWR_KEYS = {
   venues: "/admin/venues",
   settingsClub: "/admin/settings/club",
   settingsLeagues: "/admin/settings/leagues",
+  users: "admin-users",
 } as const;
