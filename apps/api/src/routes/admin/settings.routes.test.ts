@@ -7,11 +7,15 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   getClubConfig: vi.fn(),
   setClubConfig: vi.fn(),
+  getBookingSettings: vi.fn(),
+  setBookingSettings: vi.fn(),
 }));
 
 vi.mock("../../services/admin/settings.service", () => ({
   getClubConfig: mocks.getClubConfig,
   setClubConfig: mocks.setClubConfig,
+  getBookingSettings: mocks.getBookingSettings,
+  setBookingSettings: mocks.setBookingSettings,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -101,5 +105,93 @@ describe("PUT /settings/club", () => {
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("GET /settings/booking", () => {
+  it("returns booking config", async () => {
+    const config = { bufferBefore: 60, bufferAfter: 60, gameDuration: 90, dueDaysBefore: 7 };
+    mocks.getBookingSettings.mockResolvedValue(config);
+
+    const res = await app.request("/settings/booking");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(config);
+    expect(mocks.getBookingSettings).toHaveBeenCalledOnce();
+  });
+});
+
+describe("PUT /settings/booking", () => {
+  it("sets booking config", async () => {
+    mocks.setBookingSettings.mockResolvedValue(undefined);
+
+    const body = { bufferBefore: 45, bufferAfter: 30, gameDuration: 120, dueDaysBefore: 14 };
+    const res = await app.request("/settings/booking", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(body);
+    expect(mocks.setBookingSettings).toHaveBeenCalledWith(body);
+  });
+
+  it("returns 400 for missing fields", async () => {
+    const res = await app.request("/settings/booking", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bufferBefore: 60 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for negative bufferBefore", async () => {
+    const res = await app.request("/settings/booking", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bufferBefore: -1, bufferAfter: 60, gameDuration: 90, dueDaysBefore: 7 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for zero gameDuration", async () => {
+    const res = await app.request("/settings/booking", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bufferBefore: 60, bufferAfter: 60, gameDuration: 0, dueDaysBefore: 7 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for non-integer values", async () => {
+    const res = await app.request("/settings/booking", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bufferBefore: 60.5, bufferAfter: 60, gameDuration: 90, dueDaysBefore: 7 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("accepts zero for buffer values and dueDaysBefore", async () => {
+    mocks.setBookingSettings.mockResolvedValue(undefined);
+
+    const body = { bufferBefore: 0, bufferAfter: 0, gameDuration: 90, dueDaysBefore: 0 };
+    const res = await app.request("/settings/booking", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(body);
   });
 });

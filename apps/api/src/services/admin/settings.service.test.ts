@@ -23,7 +23,7 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
 }));
 
-import { getSetting, upsertSetting, getClubConfig, setClubConfig } from "./settings.service";
+import { getSetting, upsertSetting, getClubConfig, setClubConfig, getBookingSettings, setBookingSettings } from "./settings.service";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -139,5 +139,99 @@ describe("setClubConfig", () => {
     await setClubConfig(4121, "Dragons");
 
     expect(mockInsert).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("getBookingSettings", () => {
+  it("returns stored settings when all exist", async () => {
+    let callIndex = 0;
+    mockSelect.mockImplementation(() => {
+      const values = [
+        { value: "45" },
+        { value: "30" },
+        { value: "120" },
+        { value: "14" },
+      ];
+      const row = values[callIndex++];
+      return {
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(row ? [row] : []),
+          }),
+        }),
+      };
+    });
+
+    const result = await getBookingSettings();
+
+    expect(result).toEqual({
+      bufferBefore: 45,
+      bufferAfter: 30,
+      gameDuration: 120,
+      dueDaysBefore: 14,
+    });
+  });
+
+  it("returns defaults when no settings exist", async () => {
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    const result = await getBookingSettings();
+
+    expect(result).toEqual({
+      bufferBefore: 60,
+      bufferAfter: 60,
+      gameDuration: 90,
+      dueDaysBefore: 7,
+    });
+  });
+
+  it("returns partial defaults when some settings exist", async () => {
+    let callIndex = 0;
+    mockSelect.mockImplementation(() => {
+      const values = [
+        { value: "45" },
+        undefined,
+        { value: "120" },
+        undefined,
+      ];
+      const row = values[callIndex++];
+      return {
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(row ? [row] : []),
+          }),
+        }),
+      };
+    });
+
+    const result = await getBookingSettings();
+
+    expect(result).toEqual({
+      bufferBefore: 45,
+      bufferAfter: 60,
+      gameDuration: 120,
+      dueDaysBefore: 7,
+    });
+  });
+});
+
+describe("setBookingSettings", () => {
+  it("upserts all four booking settings", async () => {
+    mockInsertSuccess();
+
+    await setBookingSettings({
+      bufferBefore: 45,
+      bufferAfter: 30,
+      gameDuration: 120,
+      dueDaysBefore: 14,
+    });
+
+    expect(mockInsert).toHaveBeenCalledTimes(4);
   });
 });
