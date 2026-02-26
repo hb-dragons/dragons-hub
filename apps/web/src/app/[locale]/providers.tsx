@@ -17,6 +17,8 @@ export function Providers({ children }: { children: ReactNode }) {
       onSessionChange={() => {
         router.refresh();
       }}
+      redirectTo="/admin"
+      signUp={false}
       Link={Link}
     >
       {children}

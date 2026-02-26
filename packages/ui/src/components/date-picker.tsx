@@ -62,6 +62,7 @@ function DatePicker({
         <Calendar
           mode="single"
           selected={date}
+          defaultMonth={date}
           onSelect={handleSelect}
           locale={de}
           initialFocus

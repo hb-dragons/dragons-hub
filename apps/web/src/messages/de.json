@@ -6,9 +6,12 @@
   "nav": {
     "brand": "Dragons Admin",
     "matches": "Spiele",
+    "referees": "Schiedsrichter",
     "teams": "Teams",
     "sync": "Synchronisation",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "standings": "Tabellen",
+    "venues": "Hallen"
   },
   "common": {
     "save": "Speichern",
@@ -100,6 +103,10 @@
       "official": "Offiziell",
       "local": "Lokal"
     },
+    "discardTitle": "Änderungen verwerfen?",
+    "discardDescription": "Ungespeicherte Änderungen gehen verloren.",
+    "discard": "Verwerfen",
+    "periodScores": "Viertelergebnisse",
     "staff": {
       "title": "Kampfgericht",
       "team": "Team",
@@ -233,13 +240,64 @@
         "updated": "Aktualisiert",
         "skipped": "Übersprungen",
         "failed": "Fehlgeschlagen"
-      }
+      },
+      "changes": "Änderungen",
+      "noChanges": "Keine Feldänderungen aufgezeichnet",
+      "loadingChanges": "Lade Änderungen...",
+      "changesFailed": "Änderungen konnten nicht geladen werden",
+      "fieldOld": "Alt",
+      "fieldNew": "Neu",
+      "field": "Feld"
     },
     "toast": {
       "triggerFailed": "Sync konnte nicht gestartet werden",
       "connectionLost": "Verbindung zur API verloren",
       "connectionLostDescription": "Daten können veraltet sein. Wiederverbindung im Hintergrund.",
       "loadMoreFailed": "Weitere Logs konnten nicht geladen werden"
+    }
+  },
+  "referees": {
+    "title": "Schiedsrichter",
+    "empty": "Keine Schiedsrichter gefunden",
+    "searchPlaceholder": "Schiedsrichter suchen...",
+    "columns": {
+      "lastName": "Nachname",
+      "firstName": "Vorname",
+      "licenseNumber": "Lizenz-Nr.",
+      "matchCount": "Spiele",
+      "roles": "Rollen",
+      "apiId": "API-ID"
+    }
+  },
+  "standings": {
+    "title": "Tabellen",
+    "description": "Tabellenstände der verfolgten Ligen",
+    "empty": "Keine Tabellendaten vorhanden",
+    "season": "Saison: {season}",
+    "columns": {
+      "position": "#",
+      "team": "Team",
+      "played": "Sp",
+      "won": "S",
+      "lost": "N",
+      "pointsFor": "PF",
+      "pointsAgainst": "PA",
+      "pointsDiff": "+/-",
+      "leaguePoints": "Pkt"
+    }
+  },
+  "venues": {
+    "title": "Hallen",
+    "description": "Alle Hallen aus den synchronisierten Spieldaten",
+    "empty": "Keine Hallen gefunden",
+    "searchPlaceholder": "Hallen suchen...",
+    "openMap": "In Karten öffnen",
+    "columns": {
+      "name": "Name",
+      "street": "Straße",
+      "postalCode": "PLZ",
+      "city": "Stadt",
+      "map": "Karte"
     }
   },
   "teams": {

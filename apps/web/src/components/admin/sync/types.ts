@@ -113,6 +113,16 @@ export interface LogsResponse {
   hasMore: boolean;
 }
 
+export interface MatchFieldChange {
+  fieldName: string;
+  oldValue: string | null;
+  newValue: string | null;
+}
+
+export interface MatchChangesResponse {
+  changes: MatchFieldChange[];
+}
+
 export interface SyncScheduleData {
   id: number | null;
   enabled: boolean;

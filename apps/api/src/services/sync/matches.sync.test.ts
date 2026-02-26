@@ -704,6 +704,32 @@ describe("syncMatchesFromData", () => {
     expect(txInsert).toHaveBeenCalledTimes(2);
   });
 
+  it("does not report kickoffTime change when only seconds suffix differs", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    // SDK sends "18:00", DB stores "18:00:00" — these are the same time
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ kickoffTime: "18:00" })],
+    });
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([{
+            id: 1,
+            remoteDataHash: "old-hash",
+          }]),
+        }),
+      }),
+    });
+    const { txInsert } = makeTxMock(makeLockedRow({
+      kickoffTime: "18:00:00", // DB returns with seconds
+    }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    // Only matchRemoteVersions insert, NO matchChanges insert
+    expect(txInsert).toHaveBeenCalledTimes(1);
+  });
+
   it("preserves existing fields when game details are unavailable", async () => {
     vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
     const data = makeLeagueData({

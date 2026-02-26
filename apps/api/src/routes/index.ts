@@ -6,6 +6,8 @@ import { teamRoutes } from "./admin/team.routes";
 import { settingsRoutes } from "./admin/settings.routes";
 import { leagueRoutes } from "./admin/league.routes";
 import { venueRoutes } from "./admin/venue.routes";
+import { refereeRoutes } from "./admin/referee.routes";
+import { standingsRoutes } from "./admin/standings.routes";
 
 const routes = new Hono();
 
@@ -16,5 +18,7 @@ routes.route("/admin", teamRoutes);
 routes.route("/admin", settingsRoutes);
 routes.route("/admin", leagueRoutes);
 routes.route("/admin", venueRoutes);
+routes.route("/admin", refereeRoutes);
+routes.route("/admin", standingsRoutes);
 
 export { routes };

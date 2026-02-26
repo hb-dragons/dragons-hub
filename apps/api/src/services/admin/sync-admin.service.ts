@@ -1,5 +1,5 @@
 import { db } from "../../config/database";
-import { syncRuns, syncRunEntries, syncSchedule } from "@dragons/db/schema";
+import { syncRuns, syncRunEntries, syncSchedule, matches, matchRemoteVersions, matchChanges } from "@dragons/db/schema";
 import { desc, eq, sql, and } from "drizzle-orm";
 import { updateSyncSchedule } from "../../workers/queues";
 import type { SyncLogsQuery, SyncEntriesQuery, UpdateScheduleBody } from "../../routes/admin/sync.schemas";
@@ -171,4 +171,44 @@ export async function upsertSchedule(data: UpdateScheduleBody) {
   }
 
   return schedule;
+}
+
+export async function getMatchChangesForEntry(syncRunId: number, apiMatchId: number) {
+  const [match] = await db
+    .select({ id: matches.id })
+    .from(matches)
+    .where(eq(matches.apiMatchId, apiMatchId))
+    .limit(1);
+
+  if (!match) return null;
+
+  const [version] = await db
+    .select({ versionNumber: matchRemoteVersions.versionNumber })
+    .from(matchRemoteVersions)
+    .where(
+      and(
+        eq(matchRemoteVersions.matchId, match.id),
+        eq(matchRemoteVersions.syncRunId, syncRunId),
+      ),
+    )
+    .limit(1);
+
+  if (!version) return null;
+
+  const changes = await db
+    .select({
+      fieldName: matchChanges.fieldName,
+      oldValue: matchChanges.oldValue,
+      newValue: matchChanges.newValue,
+    })
+    .from(matchChanges)
+    .where(
+      and(
+        eq(matchChanges.matchId, match.id),
+        eq(matchChanges.versionNumber, version.versionNumber),
+        eq(matchChanges.track, "remote"),
+      ),
+    );
+
+  return { changes };
 }

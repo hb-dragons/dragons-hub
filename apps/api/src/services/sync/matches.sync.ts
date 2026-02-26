@@ -325,14 +325,24 @@ function detectFieldChanges(
   const stringify = (v: FieldValue) =>
     v === null || v === undefined ? null : String(v);
 
+  /** Normalize time strings so "10:30:00" and "10:30" compare equal */
+  const normalizeTime = (v: string | null) =>
+    v !== null ? v.replace(/^(\d{2}:\d{2}):00$/, "$1") : v;
+
   for (const name of TRACKED_FIELDS) {
     const old = existing[name as keyof typeof existing] as FieldValue;
     const nw = snapshot[name as keyof RemoteSnapshot] as FieldValue;
-    if (stringify(old) !== stringify(nw)) {
+    let oldStr = stringify(old);
+    let newStr = stringify(nw);
+    if (name === "kickoffTime") {
+      oldStr = normalizeTime(oldStr);
+      newStr = normalizeTime(newStr);
+    }
+    if (oldStr !== newStr) {
       changes.push({
         fieldName: name,
-        oldValue: stringify(old),
-        newValue: stringify(nw),
+        oldValue: oldStr,
+        newValue: newStr,
       });
     }
   }

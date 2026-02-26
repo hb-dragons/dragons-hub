@@ -25,7 +25,9 @@ import {
   XCircle,
   AlertCircle,
   ChevronDown,
+  ChevronRight,
   FilterX,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
@@ -33,6 +35,8 @@ import type {
   SyncRun,
   SyncRunEntry,
   SyncRunEntriesResponse,
+  MatchFieldChange,
+  MatchChangesResponse,
   EntityType,
   EntryAction,
 } from "./types";
@@ -80,12 +84,40 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [showStack, setShowStack] = useState(false);
+  const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set());
+  const [matchChangesCache, setMatchChangesCache] = useState<Record<number, MatchFieldChange[] | "loading" | "error">>({});
 
   const hasActiveFilters = entityFilter !== "all" || actionFilter !== "all";
 
   function clearFilters() {
     setEntityFilter("all");
     setActionFilter("all");
+  }
+
+  async function toggleMatchChanges(entry: SyncRunEntry) {
+    const entryId = entry.id;
+    if (expandedEntries.has(entryId)) {
+      setExpandedEntries((prev) => {
+        const next = new Set(prev);
+        next.delete(entryId);
+        return next;
+      });
+      return;
+    }
+
+    setExpandedEntries((prev) => new Set(prev).add(entryId));
+
+    if (matchChangesCache[entryId] && matchChangesCache[entryId] !== "error") return;
+
+    setMatchChangesCache((prev) => ({ ...prev, [entryId]: "loading" }));
+    try {
+      const data = await fetchAPI<MatchChangesResponse>(
+        `/admin/sync/logs/${syncRun.id}/match-changes/${entry.entityId}`,
+      );
+      setMatchChangesCache((prev) => ({ ...prev, [entryId]: data.changes }));
+    } catch {
+      setMatchChangesCache((prev) => ({ ...prev, [entryId]: "error" }));
+    }
   }
 
   const loadEntries = useCallback(
@@ -233,26 +265,84 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
               const actionCfg = ACTION_CONFIG[entry.action] ?? ACTION_CONFIG.skipped;
               const EntityIcon = entityCfg.icon;
               const ActionIcon = actionCfg.icon;
+              const isExpandable = entry.entityType === "match" && entry.action === "updated";
+              const isExpanded = expandedEntries.has(entry.id);
+              const cachedChanges = matchChangesCache[entry.id];
 
               return (
-                <div
-                  key={entry.id}
-                  className="flex items-center gap-3 px-3 py-2 text-sm bg-background"
-                >
-                  <EntityIcon className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
-                  <span className="w-24 shrink-0 text-muted-foreground">
-                    {tEntity(entityCfg.labelKey)}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-medium">
-                    {entry.entityName || entry.entityId}
-                  </span>
-                  <Badge variant={actionCfg.variant} className="shrink-0">
-                    <ActionIcon className="h-3 w-3" />
-                    {tAction(actionCfg.labelKey)}
-                  </Badge>
-                  <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">
-                    {new Date(entry.createdAt).toLocaleTimeString()}
-                  </span>
+                <div key={entry.id}>
+                  <div
+                    className={`flex items-center gap-3 px-3 py-2 text-sm bg-background ${isExpandable ? "cursor-pointer hover:bg-muted/50" : ""}`}
+                    onClick={isExpandable ? () => toggleMatchChanges(entry) : undefined}
+                  >
+                    {isExpandable ? (
+                      isExpanded ? (
+                        <ChevronDown className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
+                      ) : (
+                        <ChevronRight className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
+                      )
+                    ) : (
+                      <EntityIcon className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
+                    )}
+                    <span className="w-24 shrink-0 text-muted-foreground">
+                      {tEntity(entityCfg.labelKey)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">
+                        {entry.entityName || entry.entityId}
+                      </span>
+                      {entry.message && (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {entry.message}
+                        </span>
+                      )}
+                    </div>
+                    <Badge variant={actionCfg.variant} className="shrink-0">
+                      <ActionIcon className="h-3 w-3" />
+                      {tAction(actionCfg.labelKey)}
+                    </Badge>
+                    <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">
+                      {new Date(entry.createdAt).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  {isExpanded && (
+                    <div className="border-t bg-muted/30 px-6 py-2">
+                      {cachedChanges === "loading" && (
+                        <p className="text-xs text-muted-foreground">{t("loadingChanges")}</p>
+                      )}
+                      {cachedChanges === "error" && (
+                        <p className="text-xs text-destructive">{t("changesFailed")}</p>
+                      )}
+                      {Array.isArray(cachedChanges) && cachedChanges.length === 0 && (
+                        <p className="text-xs text-muted-foreground">{t("noChanges")}</p>
+                      )}
+                      {Array.isArray(cachedChanges) && cachedChanges.length > 0 && (
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-left text-muted-foreground">
+                              <th className="pb-1 pr-4 font-medium">{t("field")}</th>
+                              <th className="pb-1 pr-4 font-medium">{t("fieldOld")}</th>
+                              <th className="pb-1 font-medium">{t("fieldNew")}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cachedChanges.map((change) => (
+                              <tr key={change.fieldName}>
+                                <td className="py-0.5 pr-4 font-mono">{change.fieldName}</td>
+                                <td className="py-0.5 pr-4 text-muted-foreground">{change.oldValue ?? "–"}</td>
+                                <td className="py-0.5 font-medium">
+                                  <span className="inline-flex items-center gap-1">
+                                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                    {change.newValue ?? "–"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

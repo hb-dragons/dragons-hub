@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   getSyncRunEntries: vi.fn(),
   getSchedule: vi.fn(),
   upsertSchedule: vi.fn(),
+  getMatchChangesForEntry: vi.fn(),
   redisInstances: [] as MockRedis[],
 }));
 
@@ -41,6 +42,7 @@ vi.mock("../../services/admin/sync-admin.service", () => ({
   getSyncRunEntries: mocks.getSyncRunEntries,
   getSchedule: mocks.getSchedule,
   upsertSchedule: mocks.upsertSchedule,
+  getMatchChangesForEntry: mocks.getMatchChangesForEntry,
 }));
 
 vi.mock("../../config/env", () => ({
@@ -379,6 +381,59 @@ describe("GET /sync/logs/:id/entries", () => {
 
   it("returns 400 for invalid id param", async () => {
     const res = await app.request("/sync/logs/0/entries");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("GET /sync/logs/:id/match-changes/:apiMatchId", () => {
+  it("returns changes for a valid match and sync run", async () => {
+    mocks.getSyncRun.mockResolvedValue({ id: 1, status: "completed" });
+    mocks.getMatchChangesForEntry.mockResolvedValue({
+      changes: [
+        { fieldName: "homeScore", oldValue: "0", newValue: "85" },
+        { fieldName: "guestScore", oldValue: "0", newValue: "72" },
+      ],
+    });
+
+    const res = await app.request("/sync/logs/1/match-changes/5001");
+
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.changes).toHaveLength(2);
+    expect(mocks.getMatchChangesForEntry).toHaveBeenCalledWith(1, 5001);
+  });
+
+  it("returns 404 when sync run not found", async () => {
+    mocks.getSyncRun.mockResolvedValue(null);
+
+    const res = await app.request("/sync/logs/999/match-changes/5001");
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+    expect(mocks.getMatchChangesForEntry).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when match or version not found", async () => {
+    mocks.getSyncRun.mockResolvedValue({ id: 1, status: "completed" });
+    mocks.getMatchChangesForEntry.mockResolvedValue(null);
+
+    const res = await app.request("/sync/logs/1/match-changes/9999");
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("returns 400 for invalid sync run id", async () => {
+    const res = await app.request("/sync/logs/0/match-changes/5001");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for invalid apiMatchId", async () => {
+    const res = await app.request("/sync/logs/1/match-changes/0");
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });

@@ -6,10 +6,12 @@ import type { AppEnv } from "../../types";
 
 const mocks = vi.hoisted(() => ({
   searchVenues: vi.fn(),
+  getVenues: vi.fn(),
 }));
 
 vi.mock("../../services/admin/venue-admin.service", () => ({
   searchVenues: mocks.searchVenues,
+  getVenues: mocks.getVenues,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -34,6 +36,31 @@ function json(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("GET /venues", () => {
+  it("returns all venues", async () => {
+    const venueList = [
+      { id: 1, apiId: 100, name: "Arena Berlin", street: "Str. 1", postalCode: "10115", city: "Berlin", latitude: "52.5200000", longitude: "13.4050000" },
+      { id: 2, apiId: 200, name: "Sporthalle Mitte", street: null, postalCode: null, city: "Hamburg", latitude: null, longitude: null },
+    ];
+    mocks.getVenues.mockResolvedValue(venueList);
+
+    const res = await app.request("/venues");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(venueList);
+    expect(mocks.getVenues).toHaveBeenCalledOnce();
+  });
+
+  it("returns empty array when no venues exist", async () => {
+    mocks.getVenues.mockResolvedValue([]);
+
+    const res = await app.request("/venues");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual([]);
+  });
 });
 
 describe("GET /venues/search", () => {

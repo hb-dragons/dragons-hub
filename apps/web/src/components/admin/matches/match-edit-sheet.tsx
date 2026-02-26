@@ -34,12 +34,27 @@ import {
   FieldDescription,
   FieldError,
 } from "@dragons/ui/components/field";
-import { Loader2, RotateCcw, Save, X } from "lucide-react";
+import { Skeleton } from "@dragons/ui/components/skeleton";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@dragons/ui/components/alert-dialog";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@dragons/ui/components/popover";
+import { Loader2, RotateCcw, Save, X, Users } from "lucide-react";
 
 import { fetchAPI } from "@/lib/api";
 import {
   formatMatchTime,
-  formatScore,
   formatPeriodScores,
 } from "./utils";
 import {
@@ -51,79 +66,79 @@ import {
 } from "./types";
 
 // ---------------------------------------------------------------------------
-// OverrideField helper — side-by-side official / local comparison
+// OverrideField — conditional layout (#2, #8)
 // ---------------------------------------------------------------------------
 
 function OverrideField({
   label,
-  remoteValue,
   remoteDisplay,
   children,
   isOverridden,
+  isDirty,
   onRelease,
+  onReset,
 }: {
   label: string;
-  remoteValue: string | null;
   remoteDisplay?: string;
   children: React.ReactNode;
   isOverridden?: boolean;
+  isDirty?: boolean;
   onRelease?: () => void;
+  onReset?: () => void;
 }) {
   const t = useTranslations();
+  const showHint = isOverridden || isDirty;
 
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
+      <div className="flex min-h-6 items-center justify-between">
         <span className="text-sm font-medium">{label}</span>
-        {isOverridden && onRelease && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs text-muted-foreground"
-            onClick={onRelease}
-          >
-            <RotateCcw className="mr-1 h-3 w-3" />
-            {t("common.release")}
-          </Button>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <span className="text-xs text-muted-foreground">
-            {t("matchDetail.overrides.official")}
-          </span>
-          <div className="rounded-md border bg-muted/50 px-3 py-2 text-sm whitespace-pre-line">
-            {remoteDisplay ?? remoteValue ?? "\u2014"}
-          </div>
-        </div>
-        <div className="space-y-1">
-          <span className="text-xs text-muted-foreground">
-            {t("matchDetail.overrides.local")}
-          </span>
-          {children}
+        <div className="flex items-center gap-1">
+          {isDirty && onReset && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground"
+              onClick={onReset}
+            >
+              <RotateCcw className="mr-1 h-3 w-3" />
+              {t("common.reset")}
+            </Button>
+          )}
+          {isOverridden && onRelease && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground"
+              onClick={onRelease}
+            >
+              <X className="mr-1 h-3 w-3" />
+              {t("common.release")}
+            </Button>
+          )}
         </div>
       </div>
+      {children}
+      {showHint && remoteDisplay && (
+        <p className="text-xs text-muted-foreground">
+          {t("matchDetail.overrides.official")}: {remoteDisplay}
+        </p>
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Default form values — mirrors match-detail-view logic
+// Default form values
 // ---------------------------------------------------------------------------
 
 function getDefaultValues(match: MatchDetail): MatchFormValues {
   return {
-    kickoffDate: match.overriddenFields.includes("kickoffDate")
-      ? match.kickoffDate
-      : null,
-    kickoffTime: match.overriddenFields.includes("kickoffTime")
-      ? match.kickoffTime
-      : null,
+    kickoffDate: match.kickoffDate,
+    kickoffTime: match.kickoffTime,
     venueNameOverride: match.venueNameOverride ?? match.venueName,
-    // Boolean fields always use the actual match value so the Switch displays
-    // the real state.  The dirty-fields-only submit ensures that unchanged
-    // booleans are never sent (which would previously send null → clear override).
     isForfeited: match.isForfeited ?? false,
     isCancelled: match.isCancelled ?? false,
     anschreiber: match.anschreiber,
@@ -135,7 +150,7 @@ function getDefaultValues(match: MatchDetail): MatchFormValues {
 }
 
 // ---------------------------------------------------------------------------
-// Team types & helpers for Kampfgericht dropdowns
+// Team types & helpers
 // ---------------------------------------------------------------------------
 
 interface OwnClubTeam {
@@ -148,6 +163,35 @@ interface OwnClubTeam {
 
 function getTeamDisplayName(team: OwnClubTeam): string {
   return team.customName ?? team.nameShort ?? team.name;
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton loading state (#5)
+// ---------------------------------------------------------------------------
+
+function SheetSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 px-4 pb-4">
+      <div className="rounded-lg bg-muted/30 p-4">
+        <Skeleton className="mb-3 h-4 w-24" />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="space-y-1">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <Separator />
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="space-y-1.5">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +219,8 @@ export function MatchEditSheet({
   const [diffs, setDiffs] = useState<FieldDiff[]>([]);
   const [saving, setSaving] = useState(false);
   const [ownClubTeams, setOwnClubTeams] = useState<OwnClubTeam[]>([]);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [setAllOpen, setSetAllOpen] = useState(false);
 
   const form = useForm<MatchFormValues>({
     resolver: zodResolver(matchFormSchema),
@@ -193,16 +239,27 @@ export function MatchEditSheet({
     mode: "onBlur",
   });
 
-  const { isDirty } = form.formState;
+  const { isDirty, dirtyFields } = form.formState;
 
-  // Fetch match detail when the sheet opens with a matchId
-  useEffect(() => {
-    if (!open || matchId == null) {
-      setMatch(null);
-      setDiffs([]);
-      setOwnClubTeams([]);
-      return;
+  // Attempt to close: if dirty, show discard dialog; otherwise close
+  const handleClose = useCallback(() => {
+    if (isDirty) {
+      setShowDiscardDialog(true);
+    } else {
+      onOpenChange(false);
     }
+  }, [isDirty, onOpenChange]);
+
+  // Confirmed discard
+  const handleDiscard = useCallback(() => {
+    form.reset();
+    setShowDiscardDialog(false);
+    onOpenChange(false);
+  }, [form, onOpenChange]);
+
+  // Fetch match detail when the sheet opens with a matchId.
+  useEffect(() => {
+    if (!open || matchId == null) return;
 
     let cancelled = false;
     setLoading(true);
@@ -247,7 +304,6 @@ export function MatchEditSheet({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
 
-  // Look up the remote value for a given field from the diffs array
   const getRemoteValue = useCallback(
     (field: string): string | null =>
       diffs.find((d) => d.field === field)?.remoteValue ?? null,
@@ -257,19 +313,15 @@ export function MatchEditSheet({
   const onSubmit = useCallback(
     async (data: MatchFormValues) => {
       if (!match) return;
-      const { dirtyFields } = form.formState;
+      const { dirtyFields: currentDirtyFields } = form.formState;
 
-      // Only send fields the user actually changed — prevents unchanged
-      // booleans (or any other field) from being sent as null/default and
-      // accidentally clearing overrides on the backend.
       const updateData: Record<string, unknown> = {};
       for (const key of Object.keys(data) as (keyof typeof data)[]) {
-        if (dirtyFields[key]) {
+        if (currentDirtyFields[key]) {
           updateData[key] = data[key];
         }
       }
 
-      // Nothing actually changed
       if (Object.keys(updateData).length === 0) return;
 
       try {
@@ -324,49 +376,70 @@ export function MatchEditSheet({
 
   const periodScores = match ? formatPeriodScores(match) : [];
 
-  // For non-overridden fields, diffs may be empty — fall back to match values
-  // (which ARE the remote values when no override exists)
   const remoteKickoffDate = match
     ? (getRemoteValue("kickoffDate") ?? match.kickoffDate)
     : null;
   const remoteKickoffTime = match
     ? (getRemoteValue("kickoffTime") ?? match.kickoffTime)
     : null;
-  const remoteIsForfeited = match
-    ? (getRemoteValue("isForfeited") ?? String(match.isForfeited ?? false))
-    : null;
-  const remoteIsCancelled = match
-    ? (getRemoteValue("isCancelled") ?? String(match.isCancelled ?? false))
-    : null;
+  // Dirty field ring indicator (#6)
+  const dirtyRing = (fieldName: keyof MatchFormValues) =>
+    dirtyFields[fieldName] ? "ring-2 ring-primary/20 rounded-md" : "";
 
   return (
-    <SheetContent className="data-[side=right]:sm:max-w-3xl">
-      <SheetHeader>
-        <SheetTitle>
-          {match
-            ? `${match.homeTeamName} vs ${match.guestTeamName}`
-            : t("matches.title")}
-        </SheetTitle>
-        {match && (
-          <SheetDescription>
-            {t("matchDetail.info.matchday")} {match.matchDay} &middot;{" "}
-            {match.leagueName ?? "\u2014"}
-          </SheetDescription>
-        )}
-      </SheetHeader>
-      {loading || !match ? (
-        <div className="flex h-full items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        <>
+    <>
+      <SheetContent
+        className="data-[side=right]:sm:max-w-3xl"
+        showCloseButton={false}
+        onInteractOutside={(e) => {
+          if (isDirty) {
+            e.preventDefault();
+            setShowDiscardDialog(true);
+          }
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isDirty) {
+            e.preventDefault();
+            setShowDiscardDialog(true);
+          }
+        }}
+      >
+        {/* Custom close button that checks dirty state */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute top-3 right-3"
+          onClick={handleClose}
+        >
+          <X />
+          <span className="sr-only">Close</span>
+        </Button>
+
+        <SheetHeader>
+          <SheetTitle>
+            {match
+              ? `${match.homeTeamName} vs ${match.guestTeamName}`
+              : t("matches.title")}
+          </SheetTitle>
+          {match && (
+            <SheetDescription>
+              {t("matchDetail.info.matchday")} {match.matchDay} &middot;{" "}
+              {match.leagueName ?? "\u2014"}
+            </SheetDescription>
+          )}
+        </SheetHeader>
+
+        {loading || !match ? (
+          <SheetSkeleton />
+        ) : (
           <form
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex min-h-0 flex-1 flex-col"
           >
            <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4">
-            {/* Match info */}
-            <section>
+            {/* #1 — Read-only match info in card-like container */}
+            <section className="rounded-lg bg-muted/30 p-4">
               <h3 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
                 {t("matchDetail.info.title")}
               </h3>
@@ -376,12 +449,6 @@ export function MatchEditSheet({
                     {t("matchDetail.info.matchNo")}
                   </dt>
                   <dd className="font-medium">{match.matchNo}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">
-                    {t("matchDetail.info.matchday")}
-                  </dt>
-                  <dd className="font-medium">{match.matchDay}</dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">
@@ -428,88 +495,82 @@ export function MatchEditSheet({
                       )}
                   </dd>
                 </div>
-                <div>
-                  <dt className="text-muted-foreground">
-                    {t("matchDetail.score.final")}
-                  </dt>
-                  <dd className="font-bold tabular-nums">
-                    {formatScore(match.homeScore, match.guestScore)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">
-                    {t("matchDetail.score.halftime")}
-                  </dt>
-                  <dd className="tabular-nums">
-                    {formatScore(
-                      match.homeHalftimeScore,
-                      match.guestHalftimeScore,
-                    )}
-                  </dd>
-                </div>
               </dl>
 
-              {/* Period scores table */}
-              {periodScores.length > 0 && (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr>
-                        <th className="px-2 py-1 text-left text-xs font-medium text-muted-foreground" />
-                        {periodScores.map((p) => (
-                          <th
-                            key={p.label}
-                            className="px-2 py-1 text-center text-xs font-medium text-muted-foreground"
-                          >
-                            {p.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="px-2 py-1 text-xs font-medium">
-                          {match.homeTeamName}
+              {/* Score table — quarters, halftime, final in one view */}
+              <div className="mt-4 overflow-x-auto rounded-md border">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="px-2 py-1.5 text-left text-xs font-medium text-muted-foreground" />
+                      {periodScores.map((p) => (
+                        <th
+                          key={p.label}
+                          className="px-2 py-1.5 text-center text-xs font-medium text-muted-foreground"
+                        >
+                          {p.label}
+                        </th>
+                      ))}
+                      {periodScores.length > 0 && (
+                        <th className="border-l px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">
+                          {t("matchDetail.score.halftime")}
+                        </th>
+                      )}
+                      <th className={`px-2 py-1.5 text-center text-xs font-semibold${periodScores.length > 0 ? "" : " border-l"}`}>
+                        {t("matchDetail.score.final")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-2 py-1.5 text-xs font-medium">{match.homeTeamName}</td>
+                      {periodScores.map((p) => (
+                        <td key={p.label} className="px-2 py-1.5 text-center tabular-nums">
+                          {p.home ?? "\u2014"}
                         </td>
-                        {periodScores.map((p) => (
-                          <td
-                            key={p.label}
-                            className="px-2 py-1 text-center tabular-nums"
-                          >
-                            {p.home ?? "\u2014"}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="px-2 py-1 text-xs font-medium">
-                          {match.guestTeamName}
+                      ))}
+                      {periodScores.length > 0 && (
+                        <td className="border-l px-2 py-1.5 text-center tabular-nums">
+                          {match.homeHalftimeScore ?? "\u2014"}
                         </td>
-                        {periodScores.map((p) => (
-                          <td
-                            key={p.label}
-                            className="px-2 py-1 text-center tabular-nums"
-                          >
-                            {p.guest ?? "\u2014"}
-                          </td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      )}
+                      <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
+                        {match.homeScore ?? "\u2014"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-1.5 text-xs font-medium">{match.guestTeamName}</td>
+                      {periodScores.map((p) => (
+                        <td key={p.label} className="px-2 py-1.5 text-center tabular-nums">
+                          {p.guest ?? "\u2014"}
+                        </td>
+                      ))}
+                      {periodScores.length > 0 && (
+                        <td className="border-l px-2 py-1.5 text-center tabular-nums">
+                          {match.guestHalftimeScore ?? "\u2014"}
+                        </td>
+                      )}
+                      <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
+                        {match.guestScore ?? "\u2014"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
-              {/* Sync metadata */}
-              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <div>
-                  {t("matchDetail.status.lastSync", {
-                    value: match.lastRemoteSync
-                      ? format.dateTime(new Date(match.lastRemoteSync), "syncTimestamp")
-                      : "\u2014",
-                  })}
-                </div>
-                <div>
+              {/* Sync metadata — subtle footer */}
+              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                {match.lastRemoteSync && (
+                  <span>
+                    {t("matchDetail.status.lastSync", {
+                      value: format.dateTime(new Date(match.lastRemoteSync), "syncTimestamp"),
+                    })}
+                  </span>
+                )}
+                {match.lastRemoteSync && <span>&middot;</span>}
+                <span>
                   {t("matchDetail.status.remoteVersion", { version: String(match.currentRemoteVersion) })}
-                </div>
+                </span>
               </div>
             </section>
 
@@ -521,125 +582,147 @@ export function MatchEditSheet({
                 {t("matchDetail.overrides.title")}
               </h3>
 
-              {/* Date */}
-              <Controller
-                control={form.control}
-                name="kickoffDate"
-                render={({ field }) => (
-                  <OverrideField
-                    label={t("matchDetail.overrides.date")}
-                    remoteValue={remoteKickoffDate}
-                    remoteDisplay={
-                      remoteKickoffDate
-                        ? format.dateTime(new Date(remoteKickoffDate + "T00:00:00"), "matchDate")
-                        : undefined
-                    }
-                    isOverridden={match.overriddenFields.includes(
-                      "kickoffDate",
-                    )}
-                    onRelease={() => handleReleaseOverride("kickoffDate")}
-                  >
-                    <DatePicker
-                      value={
-                        typeof field.value === "string" ? field.value : null
+              {/* Date + Time side by side */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Controller
+                  control={form.control}
+                  name="kickoffDate"
+                  render={({ field }) => (
+                    <OverrideField
+                      label={t("matchDetail.overrides.date")}
+                      remoteDisplay={
+                        remoteKickoffDate
+                          ? format.dateTime(new Date(remoteKickoffDate + "T00:00:00"), "matchDate")
+                          : undefined
                       }
-                      onChange={(v) => field.onChange(v)}
-                      className="h-9 w-full"
-                    />
-                  </OverrideField>
-                )}
-              />
+                      isOverridden={match.overriddenFields.includes("kickoffDate")}
+                      isDirty={!!dirtyFields.kickoffDate}
+                      onRelease={() => handleReleaseOverride("kickoffDate")}
+                      onReset={() => form.resetField("kickoffDate")}
+                    >
+                      <div className={dirtyRing("kickoffDate")}>
+                        <DatePicker
+                          value={
+                            typeof field.value === "string" ? field.value : null
+                          }
+                          onChange={(v) => field.onChange(v)}
+                          className="h-9 w-full"
+                        />
+                      </div>
+                    </OverrideField>
+                  )}
+                />
 
-              {/* Time */}
-              <Controller
-                control={form.control}
-                name="kickoffTime"
-                render={({ field }) => (
-                  <OverrideField
-                    label={t("matchDetail.overrides.time")}
-                    remoteValue={remoteKickoffTime}
-                    remoteDisplay={
-                      remoteKickoffTime
-                        ? formatMatchTime(remoteKickoffTime)
-                        : undefined
-                    }
-                    isOverridden={match.overriddenFields.includes(
-                      "kickoffTime",
-                    )}
-                    onRelease={() => handleReleaseOverride("kickoffTime")}
-                  >
-                    <TimePicker
-                      value={
-                        typeof field.value === "string" ? field.value : null
+                <Controller
+                  control={form.control}
+                  name="kickoffTime"
+                  render={({ field }) => (
+                    <OverrideField
+                      label={t("matchDetail.overrides.time")}
+                      remoteDisplay={
+                        remoteKickoffTime
+                          ? formatMatchTime(remoteKickoffTime)
+                          : undefined
                       }
-                      onChange={(v) => field.onChange(v)}
-                      className="h-9 w-full"
-                    />
-                  </OverrideField>
-                )}
-              />
+                      isOverridden={match.overriddenFields.includes("kickoffTime")}
+                      isDirty={!!dirtyFields.kickoffTime}
+                      onRelease={() => handleReleaseOverride("kickoffTime")}
+                      onReset={() => form.resetField("kickoffTime")}
+                    >
+                      <div className={dirtyRing("kickoffTime")}>
+                        <TimePicker
+                          value={
+                            typeof field.value === "string" ? field.value : null
+                          }
+                          onChange={(v) => field.onChange(v)}
+                          className="h-9 w-full"
+                        />
+                      </div>
+                    </OverrideField>
+                  )}
+                />
+              </div>
 
-              {/* Forfeited */}
-              <Controller
-                control={form.control}
-                name="isForfeited"
-                render={({ field }) => (
-                  <OverrideField
-                    label={t("matchDetail.overrides.forfeited")}
-                    remoteValue={remoteIsForfeited}
-                    remoteDisplay={
-                      remoteIsForfeited === "true"
-                        ? t("common.yes")
-                        : t("common.no")
-                    }
-                    isOverridden={match.overriddenFields.includes(
-                      "isForfeited",
-                    )}
-                    onRelease={() => handleReleaseOverride("isForfeited")}
-                  >
-                    <div className="flex items-center rounded-md border px-3 py-2">
-                      <Switch
-                        checked={field.value === true}
-                        onCheckedChange={(checked) => field.onChange(checked)}
-                      />
-                      <span className="ml-2 text-sm">
-                        {field.value ? t("common.yes") : t("common.no")}
-                      </span>
+              {/* #3 — Boolean toggles as inline switches */}
+              <div className="space-y-3">
+                <Controller
+                  control={form.control}
+                  name="isForfeited"
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {t("matchDetail.overrides.forfeited")}
+                        </span>
+                        {match.overriddenFields.includes("isForfeited") && (
+                          <span
+                            className="h-1.5 w-1.5 rounded-full bg-primary"
+                            title={t("matchDetail.overrideActive")}
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <Switch
+                            checked={field.value === true}
+                            onCheckedChange={(checked) => field.onChange(checked)}
+                            className={dirtyFields.isForfeited ? "ring-2 ring-primary/20" : ""}
+                          />
+                        {match.overriddenFields.includes("isForfeited") && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs text-muted-foreground"
+                            onClick={() => handleReleaseOverride("isForfeited")}
+                          >
+                            <RotateCcw className="mr-1 h-3 w-3" />
+                            {t("common.release")}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </OverrideField>
-                )}
-              />
+                  )}
+                />
 
-              {/* Cancelled */}
-              <Controller
-                control={form.control}
-                name="isCancelled"
-                render={({ field }) => (
-                  <OverrideField
-                    label={t("matchDetail.overrides.cancelled")}
-                    remoteValue={remoteIsCancelled}
-                    remoteDisplay={
-                      remoteIsCancelled === "true"
-                        ? t("common.yes")
-                        : t("common.no")
-                    }
-                    isOverridden={match.overriddenFields.includes(
-                      "isCancelled",
-                    )}
-                    onRelease={() => handleReleaseOverride("isCancelled")}
-                  >
-                    <div className="flex items-center rounded-md border px-3 py-2">
-                      <Switch
-                        checked={field.value === true}
-                        onCheckedChange={(checked) => field.onChange(checked)}
-                      />
-                      <span className="ml-2 text-sm">
-                        {field.value ? t("common.yes") : t("common.no")}
-                      </span>
+                <Controller
+                  control={form.control}
+                  name="isCancelled"
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {t("matchDetail.overrides.cancelled")}
+                        </span>
+                        {match.overriddenFields.includes("isCancelled") && (
+                          <span
+                            className="h-1.5 w-1.5 rounded-full bg-primary"
+                            title={t("matchDetail.overrideActive")}
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <Switch
+                            checked={field.value === true}
+                            onCheckedChange={(checked) => field.onChange(checked)}
+                            className={dirtyFields.isCancelled ? "ring-2 ring-primary/20" : ""}
+                          />
+                        {match.overriddenFields.includes("isCancelled") && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs text-muted-foreground"
+                            onClick={() => handleReleaseOverride("isCancelled")}
+                          >
+                            <RotateCcw className="mr-1 h-3 w-3" />
+                            {t("common.release")}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </OverrideField>
-                )}
-              />
+                  )}
+                />
+              </div>
 
               {/* Venue */}
               <Controller
@@ -648,7 +731,6 @@ export function MatchEditSheet({
                 render={({ field, fieldState }) => (
                   <OverrideField
                     label={t("matchDetail.overrides.venue")}
-                    remoteValue={match.venueName}
                     remoteDisplay={
                       match.venueName
                         ? [
@@ -658,42 +740,46 @@ export function MatchEditSheet({
                               .join(", "),
                           ]
                             .filter(Boolean)
-                            .join("\n")
+                            .join(" \u2014 ")
                         : undefined
                     }
                     isOverridden={match.overriddenFields.includes(
                       "venueNameOverride",
                     )}
+                    isDirty={!!dirtyFields.venueNameOverride}
                     onRelease={() =>
                       handleReleaseOverride("venueNameOverride")
                     }
+                    onReset={() => form.resetField("venueNameOverride")}
                   >
-                    <Combobox
-                      value={field.value ?? ""}
-                      onChange={(v) => field.onChange(v || null)}
-                      onSearch={async (q) => {
-                        const result = await fetchAPI<{
-                          venues: {
-                            id: number;
-                            name: string;
-                            street: string | null;
-                            city: string | null;
-                          }[];
-                        }>(`/admin/venues/search?q=${encodeURIComponent(q)}`);
-                        return result.venues.map(
-                          (v): ComboboxOption => ({
-                            value: String(v.id),
-                            label: v.name,
-                            description: [v.street, v.city]
-                              .filter(Boolean)
-                              .join(", ") || undefined,
-                          }),
-                        );
-                      }}
-                      onSelect={(option) => field.onChange(option.label)}
-                      placeholder={t("matchDetail.overrides.venuePlaceholder")}
-                      className="h-9"
-                    />
+                    <div className={dirtyRing("venueNameOverride")}>
+                      <Combobox
+                        value={field.value ?? ""}
+                        onChange={(v) => field.onChange(v || null)}
+                        onSearch={async (q) => {
+                          const result = await fetchAPI<{
+                            venues: {
+                              id: number;
+                              name: string;
+                              street: string | null;
+                              city: string | null;
+                            }[];
+                          }>(`/admin/venues/search?q=${encodeURIComponent(q)}`);
+                          return result.venues.map(
+                            (v): ComboboxOption => ({
+                              value: String(v.id),
+                              label: v.name,
+                              description: [v.street, v.city]
+                                .filter(Boolean)
+                                .join(", ") || undefined,
+                            }),
+                          );
+                        }}
+                        onSelect={(option) => field.onChange(option.label)}
+                        placeholder={t("matchDetail.overrides.venuePlaceholder")}
+                        className="h-9"
+                      />
+                    </div>
                     <FieldError>{fieldState.error?.message}</FieldError>
                   </OverrideField>
                 )}
@@ -708,78 +794,83 @@ export function MatchEditSheet({
                 {t("matchDetail.staff.title")}
               </h3>
 
-              {/* Set All dropdown — not a form field, just a convenience setter */}
-              <Field>
-                <FieldLabel>{t("matchDetail.staff.setAll")}</FieldLabel>
-                <Select
-                  value=""
-                  onValueChange={(teamName) => {
-                    form.setValue("anschreiber", teamName, { shouldDirty: true });
-                    form.setValue("zeitnehmer", teamName, { shouldDirty: true });
-                    form.setValue("shotclock", teamName, { shouldDirty: true });
-                  }}
-                >
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue placeholder={t("matchDetail.staff.teamPlaceholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ownClubTeams.map((team) => {
-                      const displayName = getTeamDisplayName(team);
-                      return (
-                        <SelectItem key={team.id} value={displayName}>
-                          {displayName}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </Field>
+              {/* #7 — Set All as button + popover */}
+              <Popover open={setAllOpen} onOpenChange={setSetAllOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" size="sm">
+                    <Users className="mr-2 h-3.5 w-3.5" />
+                    {t("matchDetail.staff.setAll")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-48 p-1">
+                  {ownClubTeams.map((team) => {
+                    const displayName = getTeamDisplayName(team);
+                    return (
+                      <button
+                        key={team.id}
+                        type="button"
+                        className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                        onClick={() => {
+                          form.setValue("anschreiber", displayName, { shouldDirty: true });
+                          form.setValue("zeitnehmer", displayName, { shouldDirty: true });
+                          form.setValue("shotclock", displayName, { shouldDirty: true });
+                          setSetAllOpen(false);
+                        }}
+                      >
+                        {displayName}
+                      </button>
+                    );
+                  })}
+                </PopoverContent>
+              </Popover>
 
-              {/* Per-role dropdowns */}
-              {(["anschreiber", "zeitnehmer", "shotclock"] as const).map((fieldName) => (
-                <Controller
-                  key={fieldName}
-                  control={form.control}
-                  name={fieldName}
-                  render={({ field, fieldState }) => (
-                    <Field>
-                      <FieldLabel>{t(`matchDetail.staff.${fieldName}`)}</FieldLabel>
-                      <div className="flex gap-2">
-                        <Select
-                          value={field.value ?? ""}
-                          onValueChange={(v) => field.onChange(v)}
-                        >
-                          <SelectTrigger className="h-9 w-full">
-                            <SelectValue placeholder={t("matchDetail.staff.placeholder")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ownClubTeams.map((team) => {
-                              const displayName = getTeamDisplayName(team);
-                              return (
-                                <SelectItem key={team.id} value={displayName}>
-                                  {displayName}
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                        {field.value && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 shrink-0"
-                            onClick={() => field.onChange(null)}
+              {/* Per-role dropdowns — 3-column grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {(["anschreiber", "zeitnehmer", "shotclock"] as const).map((fieldName) => (
+                  <Controller
+                    key={fieldName}
+                    control={form.control}
+                    name={fieldName}
+                    render={({ field, fieldState }) => (
+                      <Field>
+                        <FieldLabel>{t(`matchDetail.staff.${fieldName}`)}</FieldLabel>
+                        <div className="flex items-center gap-1">
+                          <Select
+                            value={field.value ?? ""}
+                            onValueChange={(v) => field.onChange(v)}
                           >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                      <FieldError>{fieldState.error?.message}</FieldError>
-                    </Field>
-                  )}
-                />
-              ))}
+                            <SelectTrigger className={`h-9 w-full ${dirtyRing(fieldName)}`}>
+                              <SelectValue placeholder={t("matchDetail.staff.placeholder")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ownClubTeams.map((team) => {
+                                const displayName = getTeamDisplayName(team);
+                                return (
+                                  <SelectItem key={team.id} value={displayName}>
+                                    {displayName}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          {field.value && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              className="shrink-0 text-muted-foreground"
+                              onClick={() => field.onChange(null)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                        <FieldError>{fieldState.error?.message}</FieldError>
+                      </Field>
+                    )}
+                  />
+                ))}
+              </div>
             </section>
 
             <Separator />
@@ -806,6 +897,7 @@ export function MatchEditSheet({
                         field.onChange(e.target.value || null)
                       }
                       onBlur={field.onBlur}
+                      className={dirtyRing("internalNotes")}
                     />
                     <FieldError>{fieldState.error?.message}</FieldError>
                   </Field>
@@ -828,6 +920,7 @@ export function MatchEditSheet({
                         field.onChange(e.target.value || null)
                       }
                       onBlur={field.onBlur}
+                      className={dirtyRing("publicComment")}
                     />
                     <FieldError>{fieldState.error?.message}</FieldError>
                   </Field>
@@ -837,12 +930,20 @@ export function MatchEditSheet({
 
            </div>
 
-            {/* Footer: save — sticky at bottom */}
-            <div className="border-t bg-background px-4 py-4">
+            {/* #4 — Footer: Cancel + Save — sticky at bottom */}
+            <div className="flex gap-2 border-t bg-background px-4 py-4">
+              <Button
+                type="button"
+                variant="ghost"
+                className="flex-1"
+                onClick={handleClose}
+              >
+                {t("common.cancel")}
+              </Button>
               <Button
                 type="submit"
                 disabled={saving || !isDirty}
-                className="w-full"
+                className="flex-1"
               >
                 {saving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -853,8 +954,26 @@ export function MatchEditSheet({
               </Button>
             </div>
           </form>
-        </>
-      )}
-    </SheetContent>
+        )}
+      </SheetContent>
+
+      {/* #4 — Discard confirmation dialog */}
+      <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("matchDetail.discardTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("matchDetail.discardDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDiscard}>
+              {t("matchDetail.discard")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

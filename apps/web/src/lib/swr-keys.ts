@@ -6,6 +6,9 @@ export const SWR_KEYS = {
   matches: "/admin/matches",
   matchDetail: (id: number) => `/admin/matches/${id}`,
   teams: "/admin/teams",
+  referees: "/admin/referees",
+  standings: "/admin/standings",
+  venues: "/admin/venues",
   settingsClub: "/admin/settings/club",
   settingsLeagues: "/admin/settings/leagues",
 } as const;

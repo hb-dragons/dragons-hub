@@ -16,7 +16,7 @@ vi.mock("../../config/database", () => ({
 
 // --- Imports (after mocks) ---
 
-import { searchVenues } from "./venue-admin.service";
+import { searchVenues, getVenues } from "./venue-admin.service";
 
 // --- PGlite setup ---
 
@@ -153,5 +153,66 @@ describe("searchVenues", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]!.name).toBe("Große Sporthalle");
+  });
+});
+
+describe("getVenues", () => {
+  it("returns empty array when no venues exist", async () => {
+    const result = await getVenues();
+    expect(result).toEqual([]);
+  });
+
+  it("returns all venues ordered by name", async () => {
+    await insertVenue({ api_id: 1, name: "Zeppelin Halle", city: "Munich" });
+    await insertVenue({ api_id: 2, name: "Arena Berlin", city: "Berlin" });
+
+    const result = await getVenues();
+
+    expect(result).toHaveLength(2);
+    expect(result[0]!.name).toBe("Arena Berlin");
+    expect(result[1]!.name).toBe("Zeppelin Halle");
+  });
+
+  it("includes all address fields", async () => {
+    await insertVenue({
+      api_id: 1,
+      name: "Sporthalle",
+      street: "Hauptstr. 1",
+      postal_code: "53604",
+      city: "Bad Honnef",
+      latitude: 50.6451234,
+      longitude: 7.2276543,
+    });
+
+    const result = await getVenues();
+
+    expect(result[0]).toMatchObject({
+      name: "Sporthalle",
+      street: "Hauptstr. 1",
+      postalCode: "53604",
+      city: "Bad Honnef",
+    });
+    expect(result[0]!.latitude).not.toBeNull();
+    expect(result[0]!.longitude).not.toBeNull();
+  });
+
+  it("returns null for missing optional fields", async () => {
+    await insertVenue({ api_id: 1, name: "Halle", city: null });
+
+    const result = await getVenues();
+
+    expect(result[0]!.street).toBeNull();
+    expect(result[0]!.postalCode).toBeNull();
+    expect(result[0]!.city).toBeNull();
+    expect(result[0]!.latitude).toBeNull();
+    expect(result[0]!.longitude).toBeNull();
+  });
+
+  it("includes apiId field", async () => {
+    await insertVenue({ api_id: 42, name: "Test Halle" });
+
+    const result = await getVenues();
+
+    expect(result[0]!.apiId).toBe(42);
   });
 });

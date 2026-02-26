@@ -6,9 +6,12 @@
   "nav": {
     "brand": "Dragons Admin",
     "matches": "Matches",
+    "referees": "Referees",
     "teams": "Teams",
     "sync": "Sync",
-    "settings": "Settings"
+    "settings": "Settings",
+    "standings": "Standings",
+    "venues": "Venues"
   },
   "common": {
     "save": "Save",
@@ -100,6 +103,10 @@
       "official": "Official",
       "local": "Local"
     },
+    "discardTitle": "Discard changes?",
+    "discardDescription": "You have unsaved changes that will be lost.",
+    "discard": "Discard",
+    "periodScores": "Quarter Scores",
     "staff": {
       "title": "Officials",
       "team": "Team",
@@ -233,13 +240,64 @@
         "updated": "Updated",
         "skipped": "Skipped",
         "failed": "Failed"
-      }
+      },
+      "changes": "Changes",
+      "noChanges": "No field changes recorded",
+      "loadingChanges": "Loading changes...",
+      "changesFailed": "Failed to load changes",
+      "fieldOld": "Old",
+      "fieldNew": "New",
+      "field": "Field"
     },
     "toast": {
       "triggerFailed": "Failed to trigger sync",
       "connectionLost": "Lost connection to API",
       "connectionLostDescription": "Data may be stale. Retrying in the background.",
       "loadMoreFailed": "Failed to load more logs"
+    }
+  },
+  "referees": {
+    "title": "Referees",
+    "empty": "No referees found",
+    "searchPlaceholder": "Search referees...",
+    "columns": {
+      "lastName": "Last Name",
+      "firstName": "First Name",
+      "licenseNumber": "License #",
+      "matchCount": "Matches",
+      "roles": "Roles",
+      "apiId": "API ID"
+    }
+  },
+  "standings": {
+    "title": "Standings",
+    "description": "League standings for tracked leagues",
+    "empty": "No standings data available",
+    "season": "Season: {season}",
+    "columns": {
+      "position": "#",
+      "team": "Team",
+      "played": "P",
+      "won": "W",
+      "lost": "L",
+      "pointsFor": "PF",
+      "pointsAgainst": "PA",
+      "pointsDiff": "+/-",
+      "leaguePoints": "Pts"
+    }
+  },
+  "venues": {
+    "title": "Venues",
+    "description": "All venues from synced match data",
+    "empty": "No venues found",
+    "searchPlaceholder": "Search venues...",
+    "openMap": "Open in Maps",
+    "columns": {
+      "name": "Name",
+      "street": "Street",
+      "postalCode": "Postal Code",
+      "city": "City",
+      "map": "Map"
     }
   },
   "teams": {

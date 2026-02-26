@@ -27,6 +27,7 @@ import {
   getSyncRunEntries,
   getSchedule,
   upsertSchedule,
+  getMatchChangesForEntry,
 } from "./sync-admin.service";
 import { updateSyncSchedule } from "../../workers/queues";
 
@@ -75,6 +76,43 @@ const CREATE_TABLES = `
     last_updated_at TIMESTAMPTZ,
     last_updated_by VARCHAR(255)
   );
+
+  CREATE TABLE matches (
+    id SERIAL PRIMARY KEY,
+    api_match_id INTEGER NOT NULL UNIQUE,
+    match_no INTEGER,
+    match_day INTEGER,
+    kickoff_date DATE,
+    kickoff_time TIME,
+    current_remote_version INTEGER DEFAULT 0,
+    current_local_version INTEGER DEFAULT 0,
+    remote_data_hash VARCHAR(64),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE match_remote_versions (
+    id SERIAL PRIMARY KEY,
+    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    version_number INTEGER NOT NULL,
+    sync_run_id INTEGER,
+    snapshot JSONB NOT NULL,
+    data_hash VARCHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(match_id, version_number)
+  );
+
+  CREATE TABLE match_changes (
+    id SERIAL PRIMARY KEY,
+    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    track VARCHAR(10) NOT NULL,
+    version_number INTEGER NOT NULL,
+    field_name VARCHAR(100) NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    changed_by TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
 `;
 
 let client: PGlite;
@@ -90,6 +128,9 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  await client.exec("DELETE FROM match_changes");
+  await client.exec("DELETE FROM match_remote_versions");
+  await client.exec("DELETE FROM matches");
   await client.exec("DELETE FROM sync_run_entries");
   await client.exec("DELETE FROM sync_runs");
   await client.exec("DELETE FROM sync_schedule");
@@ -97,6 +138,9 @@ beforeEach(async () => {
   await client.exec("ALTER SEQUENCE sync_runs_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE sync_run_entries_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE sync_schedule_id_seq RESTART WITH 1");
+  await client.exec("ALTER SEQUENCE matches_id_seq RESTART WITH 1");
+  await client.exec("ALTER SEQUENCE match_remote_versions_id_seq RESTART WITH 1");
+  await client.exec("ALTER SEQUENCE match_changes_id_seq RESTART WITH 1");
   vi.clearAllMocks();
 });
 
@@ -395,5 +439,106 @@ describe("upsertSchedule", () => {
     expect(result!.enabled).toBe(false);
     expect(result!.cronExpression).toBe("*/5 * * * *");
     expect(result!.timezone).toBe("America/New_York");
+  });
+});
+
+// --- Match changes helpers ---
+
+async function insertMatch(apiMatchId: number) {
+  const result = await client.query(
+    "INSERT INTO matches (api_match_id) VALUES ($1) RETURNING id",
+    [apiMatchId],
+  );
+  return (result.rows[0] as { id: number }).id;
+}
+
+async function insertRemoteVersion(matchId: number, versionNumber: number, syncRunId: number) {
+  await client.query(
+    `INSERT INTO match_remote_versions (match_id, version_number, sync_run_id, snapshot, data_hash)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [matchId, versionNumber, syncRunId, JSON.stringify({}), "hash123"],
+  );
+}
+
+async function insertMatchChange(
+  matchId: number,
+  versionNumber: number,
+  fieldName: string,
+  oldValue: string | null,
+  newValue: string | null,
+) {
+  await client.query(
+    `INSERT INTO match_changes (match_id, track, version_number, field_name, old_value, new_value)
+     VALUES ($1, 'remote', $2, $3, $4, $5)`,
+    [matchId, versionNumber, fieldName, oldValue, newValue],
+  );
+}
+
+describe("getMatchChangesForEntry", () => {
+  it("returns changes for a valid match and sync run", async () => {
+    const syncRunId = await insertSyncRun();
+    const matchId = await insertMatch(5001);
+    await insertRemoteVersion(matchId, 2, syncRunId);
+    await insertMatchChange(matchId, 2, "homeScore", "0", "85");
+    await insertMatchChange(matchId, 2, "guestScore", "0", "72");
+
+    const result = await getMatchChangesForEntry(syncRunId, 5001);
+
+    expect(result).not.toBeNull();
+    expect(result!.changes).toHaveLength(2);
+    expect(result!.changes).toEqual(
+      expect.arrayContaining([
+        { fieldName: "homeScore", oldValue: "0", newValue: "85" },
+        { fieldName: "guestScore", oldValue: "0", newValue: "72" },
+      ]),
+    );
+  });
+
+  it("returns null when match does not exist", async () => {
+    const syncRunId = await insertSyncRun();
+
+    const result = await getMatchChangesForEntry(syncRunId, 9999);
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null when no version exists for the sync run", async () => {
+    const syncRunId = await insertSyncRun();
+    const otherSyncRunId = await insertSyncRun();
+    const matchId = await insertMatch(5002);
+    await insertRemoteVersion(matchId, 1, otherSyncRunId);
+
+    const result = await getMatchChangesForEntry(syncRunId, 5002);
+
+    expect(result).toBeNull();
+  });
+
+  it("returns empty changes when version exists but no changes recorded", async () => {
+    const syncRunId = await insertSyncRun();
+    const matchId = await insertMatch(5003);
+    await insertRemoteVersion(matchId, 1, syncRunId);
+
+    const result = await getMatchChangesForEntry(syncRunId, 5003);
+
+    expect(result).not.toBeNull();
+    expect(result!.changes).toHaveLength(0);
+  });
+
+  it("only returns remote track changes, not local", async () => {
+    const syncRunId = await insertSyncRun();
+    const matchId = await insertMatch(5004);
+    await insertRemoteVersion(matchId, 1, syncRunId);
+    await insertMatchChange(matchId, 1, "homeScore", "0", "90");
+    // Insert a local track change that should be excluded
+    await client.query(
+      `INSERT INTO match_changes (match_id, track, version_number, field_name, old_value, new_value)
+       VALUES ($1, 'local', $2, $3, $4, $5)`,
+      [matchId, 1, "notes", null, "edited"],
+    );
+
+    const result = await getMatchChangesForEntry(syncRunId, 5004);
+
+    expect(result!.changes).toHaveLength(1);
+    expect(result!.changes[0]).toEqual({ fieldName: "homeScore", oldValue: "0", newValue: "90" });
   });
 });

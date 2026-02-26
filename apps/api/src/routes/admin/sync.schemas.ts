@@ -62,6 +62,10 @@ export const updateScheduleBodySchema = z.object({
   updatedBy: z.string().optional(),
 });
 
+export const matchChangesParamSchema = z.object({
+  apiMatchId: z.coerce.number().int().positive(),
+});
+
 export type SyncLogsQuery = z.infer<typeof syncLogsQuerySchema>;
 export type SyncEntriesQuery = z.infer<typeof syncEntriesQuerySchema>;
 export type UpdateScheduleBody = z.infer<typeof updateScheduleBodySchema>;

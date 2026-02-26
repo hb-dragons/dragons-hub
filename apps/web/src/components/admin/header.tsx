@@ -8,6 +8,9 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 
 const navLinks = [
   { href: "/admin/matches" as const, labelKey: "nav.matches" as const },
+  { href: "/admin/referees" as const, labelKey: "nav.referees" as const },
+  { href: "/admin/standings" as const, labelKey: "nav.standings" as const },
+  { href: "/admin/venues" as const, labelKey: "nav.venues" as const },
   { href: "/admin/teams" as const, labelKey: "nav.teams" as const },
   { href: "/admin/sync" as const, labelKey: "nav.sync" as const },
   { href: "/admin/settings" as const, labelKey: "nav.settings" as const },
@@ -43,7 +46,10 @@ export function Header() {
           })}
         </nav>
         <LocaleSwitcher />
-        <UserButton />
+        <UserButton
+          size="icon"
+          align="center"
+        />
       </div>
     </header>
   );

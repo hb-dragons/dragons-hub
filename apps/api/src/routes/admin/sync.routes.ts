@@ -8,6 +8,7 @@ import {
   getSyncRunEntries,
   getSchedule,
   upsertSchedule,
+  getMatchChangesForEntry,
 } from "../../services/admin/sync-admin.service";
 import {
   syncLogsQuerySchema,
@@ -16,6 +17,7 @@ import {
   syncStreamParamSchema,
   jobStatusesQuerySchema,
   updateScheduleBodySchema,
+  matchChangesParamSchema,
 } from "./sync.schemas";
 import type { JobType } from "bullmq";
 import Redis from "ioredis";
@@ -149,6 +151,24 @@ syncRoutes.get("/sync/logs/:id/entries", async (c) => {
   }
 
   const result = await getSyncRunEntries(id, query);
+  return c.json(result);
+});
+
+// GET /admin/sync/logs/:id/match-changes/:apiMatchId - Field-level changes for a match entry
+syncRoutes.get("/sync/logs/:id/match-changes/:apiMatchId", async (c) => {
+  const { id } = syncEntryIdParamSchema.parse({ id: c.req.param("id") });
+  const { apiMatchId } = matchChangesParamSchema.parse({ apiMatchId: c.req.param("apiMatchId") });
+
+  const syncRun = await getSyncRun(id);
+  if (!syncRun) {
+    return c.json({ error: "Sync run not found", code: "NOT_FOUND" }, 404);
+  }
+
+  const result = await getMatchChangesForEntry(id, apiMatchId);
+  if (!result) {
+    return c.json({ error: "Match or version not found", code: "NOT_FOUND" }, 404);
+  }
+
   return c.json(result);
 });
 
