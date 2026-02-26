@@ -144,8 +144,9 @@ async function fetchUsers(): Promise<UserListItem[]> {
 
 export function UserListTable() {
   const t = useTranslations("users")
+  const tCommon = useTranslations("common")
   const { data: session } = authClient.useSession()
-  const { data: users, mutate } = useSWR<UserListItem[]>(
+  const { data: users, error, isLoading, mutate } = useSWR<UserListItem[]>(
     SWR_KEYS.users,
     fetchUsers,
   )
@@ -156,6 +157,22 @@ export function UserListTable() {
     () => getColumns(t, currentUserId, () => mutate()),
     [t, currentUserId, mutate],
   )
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+        {t("empty")}
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-muted-foreground">
+        <p>{tCommon("loading")}</p>
+      </div>
+    )
+  }
 
   return (
     <>
