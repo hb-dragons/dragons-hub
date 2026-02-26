@@ -45,7 +45,46 @@ describe("teamUpdateBodySchema", () => {
     });
   });
 
-  it("rejects missing customName field", () => {
-    expect(() => teamUpdateBodySchema.parse({})).toThrow();
+  it("accepts empty object (no fields to update)", () => {
+    expect(teamUpdateBodySchema.parse({})).toEqual({});
+  });
+
+  it("accepts estimatedGameDuration as positive integer", () => {
+    expect(
+      teamUpdateBodySchema.parse({ estimatedGameDuration: 90 }),
+    ).toEqual({ estimatedGameDuration: 90 });
+  });
+
+  it("accepts null estimatedGameDuration", () => {
+    expect(
+      teamUpdateBodySchema.parse({ estimatedGameDuration: null }),
+    ).toEqual({ estimatedGameDuration: null });
+  });
+
+  it("rejects zero estimatedGameDuration", () => {
+    expect(() =>
+      teamUpdateBodySchema.parse({ estimatedGameDuration: 0 }),
+    ).toThrow();
+  });
+
+  it("rejects negative estimatedGameDuration", () => {
+    expect(() =>
+      teamUpdateBodySchema.parse({ estimatedGameDuration: -1 }),
+    ).toThrow();
+  });
+
+  it("rejects non-integer estimatedGameDuration", () => {
+    expect(() =>
+      teamUpdateBodySchema.parse({ estimatedGameDuration: 90.5 }),
+    ).toThrow();
+  });
+
+  it("accepts both fields together", () => {
+    expect(
+      teamUpdateBodySchema.parse({
+        customName: "H1",
+        estimatedGameDuration: 120,
+      }),
+    ).toEqual({ customName: "H1", estimatedGameDuration: 120 });
   });
 });

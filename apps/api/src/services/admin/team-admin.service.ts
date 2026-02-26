@@ -8,6 +8,7 @@ export interface OwnClubTeam {
   nameShort: string | null;
   customName: string | null;
   leagueName: string | null;
+  estimatedGameDuration: number | null;
 }
 
 export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
@@ -18,6 +19,7 @@ export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
       nameShort: teams.nameShort,
       customName: teams.customName,
       leagueName: leagues.name,
+      estimatedGameDuration: teams.estimatedGameDuration,
     })
     .from(teams)
     .leftJoin(standings, eq(standings.teamApiId, teams.apiTeamPermanentId))
@@ -28,19 +30,25 @@ export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function updateTeamCustomName(
+export async function updateTeam(
   id: number,
-  customName: string | null,
+  data: { customName?: string | null; estimatedGameDuration?: number | null },
 ): Promise<OwnClubTeam | null> {
+  const set: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.customName !== undefined) set.customName = data.customName;
+  if (data.estimatedGameDuration !== undefined)
+    set.estimatedGameDuration = data.estimatedGameDuration;
+
   const [updated] = await db
     .update(teams)
-    .set({ customName, updatedAt: new Date() })
+    .set(set)
     .where(and(eq(teams.id, id), eq(teams.isOwnClub, true)))
     .returning({
       id: teams.id,
       name: teams.name,
       nameShort: teams.nameShort,
       customName: teams.customName,
+      estimatedGameDuration: teams.estimatedGameDuration,
     });
 
   if (!updated) return null;

@@ -6,12 +6,12 @@ import type { AppEnv } from "../../types";
 
 const mocks = vi.hoisted(() => ({
   getOwnClubTeams: vi.fn(),
-  updateTeamCustomName: vi.fn(),
+  updateTeam: vi.fn(),
 }));
 
 vi.mock("../../services/admin/team-admin.service", () => ({
   getOwnClubTeams: mocks.getOwnClubTeams,
-  updateTeamCustomName: mocks.updateTeamCustomName,
+  updateTeam: mocks.updateTeam,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -41,8 +41,8 @@ beforeEach(() => {
 describe("GET /teams", () => {
   it("returns list of own club teams", async () => {
     const teams = [
-      { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A" },
-      { id: 2, name: "Dragons Herren 2", nameShort: null, customName: null, leagueName: null },
+      { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A", estimatedGameDuration: 90 },
+      { id: 2, name: "Dragons Herren 2", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null },
     ];
     mocks.getOwnClubTeams.mockResolvedValue(teams);
 
@@ -65,8 +65,8 @@ describe("GET /teams", () => {
 
 describe("PATCH /teams/:id", () => {
   it("updates custom name and returns team", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A" };
-    mocks.updateTeamCustomName.mockResolvedValue(updated);
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A", estimatedGameDuration: null };
+    mocks.updateTeam.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
       method: "PATCH",
@@ -76,12 +76,12 @@ describe("PATCH /teams/:id", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(updated);
-    expect(mocks.updateTeamCustomName).toHaveBeenCalledWith(1, "Herren 1");
+    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { customName: "Herren 1" });
   });
 
   it("clears custom name with null", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null };
-    mocks.updateTeamCustomName.mockResolvedValue(updated);
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null };
+    mocks.updateTeam.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
       method: "PATCH",
@@ -90,11 +90,54 @@ describe("PATCH /teams/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(mocks.updateTeamCustomName).toHaveBeenCalledWith(1, null);
+    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { customName: null });
+  });
+
+  it("updates estimatedGameDuration", async () => {
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: 120 };
+    mocks.updateTeam.mockResolvedValue(updated);
+
+    const res = await app.request("/teams/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estimatedGameDuration: 120 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(updated);
+    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { estimatedGameDuration: 120 });
+  });
+
+  it("clears estimatedGameDuration with null", async () => {
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null };
+    mocks.updateTeam.mockResolvedValue(updated);
+
+    const res = await app.request("/teams/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estimatedGameDuration: null }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { estimatedGameDuration: null });
+  });
+
+  it("updates both customName and estimatedGameDuration", async () => {
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: "H1", leagueName: null, estimatedGameDuration: 90 };
+    mocks.updateTeam.mockResolvedValue(updated);
+
+    const res = await app.request("/teams/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customName: "H1", estimatedGameDuration: 90 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { customName: "H1", estimatedGameDuration: 90 });
   });
 
   it("returns 404 for unknown or non-own-club team", async () => {
-    mocks.updateTeamCustomName.mockResolvedValue(null);
+    mocks.updateTeam.mockResolvedValue(null);
 
     const res = await app.request("/teams/999", {
       method: "PATCH",
@@ -139,11 +182,47 @@ describe("PATCH /teams/:id", () => {
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
-  it("returns 400 when customName field is missing", async () => {
+  it("accepts empty object (no fields to update)", async () => {
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null };
+    mocks.updateTeam.mockResolvedValue(updated);
+
     const res = await app.request("/teams/1", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.updateTeam).toHaveBeenCalledWith(1, {});
+  });
+
+  it("returns 400 for non-integer estimatedGameDuration", async () => {
+    const res = await app.request("/teams/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estimatedGameDuration: 90.5 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for zero estimatedGameDuration", async () => {
+    const res = await app.request("/teams/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estimatedGameDuration: 0 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for negative estimatedGameDuration", async () => {
+    const res = await app.request("/teams/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estimatedGameDuration: -1 }),
     });
 
     expect(res.status).toBe(400);

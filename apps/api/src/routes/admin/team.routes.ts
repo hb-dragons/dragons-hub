@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import {
   getOwnClubTeams,
-  updateTeamCustomName,
+  updateTeam,
 } from "../../services/admin/team-admin.service";
 import { teamIdParamSchema, teamUpdateBodySchema } from "./team.schemas";
 
@@ -13,12 +13,12 @@ teamRoutes.get("/teams", async (c) => {
   return c.json(teams);
 });
 
-// PATCH /admin/teams/:id - Update custom name
+// PATCH /admin/teams/:id - Update team properties
 teamRoutes.patch("/teams/:id", async (c) => {
   const { id } = teamIdParamSchema.parse({ id: c.req.param("id") });
   const body = teamUpdateBodySchema.parse(await c.req.json());
 
-  const result = await updateTeamCustomName(id, body.customName);
+  const result = await updateTeam(id, body);
 
   if (!result) {
     return c.json({ error: "Team not found", code: "NOT_FOUND" }, 404);

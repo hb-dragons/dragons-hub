@@ -16,7 +16,7 @@ vi.mock("../../config/database", () => ({
 
 // --- Imports (after mocks) ---
 
-import { getOwnClubTeams, updateTeamCustomName } from "./team-admin.service";
+import { getOwnClubTeams, updateTeam } from "./team-admin.service";
 
 // --- PGlite setup ---
 
@@ -51,6 +51,7 @@ const CREATE_TABLES = `
     club_id INTEGER NOT NULL,
     is_own_club BOOLEAN DEFAULT FALSE,
     verzicht BOOLEAN DEFAULT FALSE,
+    estimated_game_duration INTEGER,
     data_hash VARCHAR(64),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -243,7 +244,7 @@ describe("getOwnClubTeams", () => {
     ]);
   });
 
-  it("returns id, name, customName, leagueName fields", async () => {
+  it("returns all expected fields including estimatedGameDuration", async () => {
     await insertTeam({
       api_team_permanent_id: 1000,
       name: "Dragons Herren 1",
@@ -253,7 +254,34 @@ describe("getOwnClubTeams", () => {
 
     const result = await getOwnClubTeams();
 
-    expect(Object.keys(result[0]!).sort()).toEqual(["customName", "id", "leagueName", "name", "nameShort"]);
+    expect(Object.keys(result[0]!).sort()).toEqual([
+      "customName", "estimatedGameDuration", "id", "leagueName", "name", "nameShort",
+    ]);
+  });
+
+  it("includes estimatedGameDuration when set", async () => {
+    await insertTeam({
+      api_team_permanent_id: 1000,
+      name: "Dragons Herren 1",
+      estimated_game_duration: 120,
+      is_own_club: true,
+    });
+
+    const result = await getOwnClubTeams();
+
+    expect(result[0]!.estimatedGameDuration).toBe(120);
+  });
+
+  it("returns null estimatedGameDuration when not set", async () => {
+    await insertTeam({
+      api_team_permanent_id: 1000,
+      name: "Dragons Herren 1",
+      is_own_club: true,
+    });
+
+    const result = await getOwnClubTeams();
+
+    expect(result[0]!.estimatedGameDuration).toBeNull();
   });
 
   it("does not duplicate teams with multiple standings entries", async () => {
@@ -269,7 +297,7 @@ describe("getOwnClubTeams", () => {
   });
 });
 
-describe("updateTeamCustomName", () => {
+describe("updateTeam", () => {
   it("updates custom name for own club team", async () => {
     const id = await insertTeam({
       api_team_permanent_id: 1000,
@@ -277,7 +305,7 @@ describe("updateTeamCustomName", () => {
       is_own_club: true,
     });
 
-    const result = await updateTeamCustomName(id, "Herren 1");
+    const result = await updateTeam(id, { customName: "Herren 1" });
 
     expect(result).not.toBeNull();
     expect(result!.customName).toBe("Herren 1");
@@ -292,13 +320,53 @@ describe("updateTeamCustomName", () => {
       is_own_club: true,
     });
 
-    const result = await updateTeamCustomName(id, null);
+    const result = await updateTeam(id, { customName: null });
 
     expect(result!.customName).toBeNull();
   });
 
+  it("updates estimatedGameDuration", async () => {
+    const id = await insertTeam({
+      api_team_permanent_id: 1000,
+      name: "Dragons Herren 1",
+      is_own_club: true,
+    });
+
+    const result = await updateTeam(id, { estimatedGameDuration: 120 });
+
+    expect(result).not.toBeNull();
+    expect(result!.estimatedGameDuration).toBe(120);
+  });
+
+  it("clears estimatedGameDuration with null", async () => {
+    const id = await insertTeam({
+      api_team_permanent_id: 1000,
+      name: "Dragons Herren 1",
+      estimated_game_duration: 120,
+      is_own_club: true,
+    });
+
+    const result = await updateTeam(id, { estimatedGameDuration: null });
+
+    expect(result!.estimatedGameDuration).toBeNull();
+  });
+
+  it("updates both fields at once", async () => {
+    const id = await insertTeam({
+      api_team_permanent_id: 1000,
+      name: "Dragons Herren 1",
+      is_own_club: true,
+    });
+
+    const result = await updateTeam(id, { customName: "H1", estimatedGameDuration: 90 });
+
+    expect(result).not.toBeNull();
+    expect(result!.customName).toBe("H1");
+    expect(result!.estimatedGameDuration).toBe(90);
+  });
+
   it("returns null for non-existent team", async () => {
-    const result = await updateTeamCustomName(999, "Test");
+    const result = await updateTeam(999, { customName: "Test" });
 
     expect(result).toBeNull();
   });
@@ -310,7 +378,7 @@ describe("updateTeamCustomName", () => {
       is_own_club: false,
     });
 
-    const result = await updateTeamCustomName(id, "Test");
+    const result = await updateTeam(id, { customName: "Test" });
 
     expect(result).toBeNull();
   });
@@ -324,7 +392,7 @@ describe("updateTeamCustomName", () => {
     });
     await insertStanding(leagueId, 1000);
 
-    const result = await updateTeamCustomName(id, "Herren 1");
+    const result = await updateTeam(id, { customName: "Herren 1" });
 
     expect(result!.leagueName).toBe("Kreisliga A");
   });
@@ -336,7 +404,7 @@ describe("updateTeamCustomName", () => {
       is_own_club: true,
     });
 
-    const result = await updateTeamCustomName(id, "Herren 1");
+    const result = await updateTeam(id, { customName: "Herren 1" });
 
     expect(result!.leagueName).toBeNull();
   });
@@ -351,7 +419,7 @@ describe("updateTeamCustomName", () => {
     const before = await client.query("SELECT updated_at FROM teams WHERE id = $1", [id]);
     const beforeTime = (before.rows[0] as { updated_at: Date }).updated_at;
 
-    await updateTeamCustomName(id, "Herren 1");
+    await updateTeam(id, { customName: "Herren 1" });
 
     const after = await client.query("SELECT updated_at FROM teams WHERE id = $1", [id]);
     const afterTime = (after.rows[0] as { updated_at: Date }).updated_at;
