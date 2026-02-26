@@ -12,7 +12,9 @@
     "settings": "Einstellungen",
     "standings": "Tabellen",
     "venues": "Hallen",
-    "users": "Benutzer"
+    "users": "Benutzer",
+    "board": "Board",
+    "bookings": "Buchungen"
   },
   "common": {
     "save": "Speichern",
@@ -310,7 +312,9 @@
       "league": "Liga",
       "customName": "Eigener Name"
     },
-    "placeholder": "Eigenen Namen eingeben..."
+    "placeholder": "Eigenen Namen eingeben...",
+    "gameDuration": "Spieldauer (min)",
+    "gameDurationPlaceholder": "Standard"
   },
   "users": {
     "title": "Benutzer",
@@ -412,6 +416,42 @@
       "passwordSetFailed": "Passwort konnte nicht gesetzt werden"
     }
   },
+  "board": {
+    "title": "Operations Board",
+    "addTask": "Aufgabe hinzufügen",
+    "addColumn": "Spalte hinzufügen",
+    "editColumn": "Spalte bearbeiten",
+    "deleteColumn": "Spalte löschen",
+    "emptyColumn": "Keine Aufgaben",
+    "emptyBoard": "Kein Board gefunden. Erstelle eines, um zu beginnen.",
+    "createBoard": "Board erstellen",
+    "filters": { "assignee": "Zuständig", "priority": "Priorität", "all": "Alle" },
+    "task": {
+      "title": "Titel",
+      "description": "Beschreibung",
+      "assignee": "Zuständig",
+      "priority": "Priorität",
+      "dueDate": "Fälligkeitsdatum",
+      "checklist": "Checkliste",
+      "comments": "Kommentare",
+      "addComment": "Kommentar hinzufügen",
+      "linkedMatch": "Verknüpftes Spiel",
+      "linkedBooking": "Verknüpfte Buchung",
+      "source": "Quelle"
+    },
+    "priority": { "low": "Niedrig", "normal": "Normal", "high": "Hoch", "urgent": "Dringend" },
+    "toast": { "created": "Aufgabe erstellt", "updated": "Aufgabe aktualisiert", "deleted": "Aufgabe gelöscht", "moved": "Aufgabe verschoben" }
+  },
+  "bookings": {
+    "title": "Hallenbuchungen",
+    "description": "Buchungsstatus der Hallen für Heimspiele verfolgen",
+    "empty": "Keine Hallenbuchungen gefunden",
+    "status": { "pending": "Ausstehend", "requested": "Angefragt", "confirmed": "Bestätigt", "cancelled": "Storniert" },
+    "needsReconfirmation": "Bestätigung erforderlich",
+    "columns": { "date": "Datum", "venue": "Halle", "timeWindow": "Zeitfenster", "matches": "Spiele", "status": "Status" },
+    "override": { "label": "Zeit überschreiben", "reason": "Grund" },
+    "toast": { "updated": "Buchung aktualisiert", "statusChanged": "Status aktualisiert" }
+  },
   "settings": {
     "title": "Einstellungen",
     "description": "Verein konfigurieren und Liga-Tracking verwalten",
@@ -447,6 +487,14 @@
         "saved": "{count} Liga(s) werden verfolgt",
         "saveFailed": "Liga-Einstellungen konnten nicht gespeichert werden"
       }
+    },
+    "booking": {
+      "title": "Hallenbuchungs-Einstellungen",
+      "description": "Standardwerte für die Berechnung der Hallenbuchungszeiten konfigurieren",
+      "bufferBefore": "Vorlauf vor dem Spiel (min)",
+      "bufferAfter": "Nachlauf nach dem Spiel (min)",
+      "gameDuration": "Standard-Spieldauer (min)",
+      "dueDaysBefore": "Buchungsfrist (Tage vorher)"
     }
   },
   "time": {

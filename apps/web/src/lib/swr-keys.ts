@@ -12,4 +12,11 @@ export const SWR_KEYS = {
   settingsClub: "/admin/settings/club",
   settingsLeagues: "/admin/settings/leagues",
   users: "admin-users",
+  boards: "/admin/boards",
+  boardDetail: (id: number) => `/admin/boards/${id}`,
+  boardTasks: (boardId: number) => `/admin/boards/${boardId}/tasks`,
+  bookings: "/admin/bookings",
+  bookingDetail: (id: number) => `/admin/bookings/${id}`,
+  settingsBooking: "/admin/settings/booking",
+  notificationsUnread: "/admin/notifications/unread-count",
 } as const;

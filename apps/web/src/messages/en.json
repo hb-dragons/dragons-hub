@@ -12,7 +12,9 @@
     "settings": "Settings",
     "standings": "Standings",
     "venues": "Venues",
-    "users": "Users"
+    "users": "Users",
+    "board": "Board",
+    "bookings": "Bookings"
   },
   "common": {
     "save": "Save",
@@ -310,7 +312,9 @@
       "league": "League",
       "customName": "Custom Name"
     },
-    "placeholder": "Enter custom name..."
+    "placeholder": "Enter custom name...",
+    "gameDuration": "Game Duration (min)",
+    "gameDurationPlaceholder": "Default"
   },
   "users": {
     "title": "Users",
@@ -412,6 +416,42 @@
       "passwordSetFailed": "Failed to set password"
     }
   },
+  "board": {
+    "title": "Operations Board",
+    "addTask": "Add Task",
+    "addColumn": "Add Column",
+    "editColumn": "Edit Column",
+    "deleteColumn": "Delete Column",
+    "emptyColumn": "No tasks",
+    "emptyBoard": "No board found. Create one to get started.",
+    "createBoard": "Create Board",
+    "filters": { "assignee": "Assignee", "priority": "Priority", "all": "All" },
+    "task": {
+      "title": "Title",
+      "description": "Description",
+      "assignee": "Assignee",
+      "priority": "Priority",
+      "dueDate": "Due Date",
+      "checklist": "Checklist",
+      "comments": "Comments",
+      "addComment": "Add comment",
+      "linkedMatch": "Linked Match",
+      "linkedBooking": "Linked Booking",
+      "source": "Source"
+    },
+    "priority": { "low": "Low", "normal": "Normal", "high": "High", "urgent": "Urgent" },
+    "toast": { "created": "Task created", "updated": "Task updated", "deleted": "Task deleted", "moved": "Task moved" }
+  },
+  "bookings": {
+    "title": "Venue Bookings",
+    "description": "Track venue booking status for home games",
+    "empty": "No venue bookings found",
+    "status": { "pending": "Pending", "requested": "Requested", "confirmed": "Confirmed", "cancelled": "Cancelled" },
+    "needsReconfirmation": "Needs re-confirmation",
+    "columns": { "date": "Date", "venue": "Venue", "timeWindow": "Time Window", "matches": "Matches", "status": "Status" },
+    "override": { "label": "Override Time", "reason": "Reason" },
+    "toast": { "updated": "Booking updated", "statusChanged": "Status updated" }
+  },
   "settings": {
     "title": "Settings",
     "description": "Configure your club and manage league tracking",
@@ -447,6 +487,14 @@
         "saved": "Tracking {count} league(s)",
         "saveFailed": "Failed to save league settings"
       }
+    },
+    "booking": {
+      "title": "Venue Booking Settings",
+      "description": "Configure default values for venue booking time calculations",
+      "bufferBefore": "Buffer Before Game (min)",
+      "bufferAfter": "Buffer After Game (min)",
+      "gameDuration": "Default Game Duration (min)",
+      "dueDaysBefore": "Booking Due Days Before"
     }
   },
   "time": {
