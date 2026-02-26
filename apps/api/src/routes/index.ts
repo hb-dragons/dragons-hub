@@ -10,6 +10,7 @@ import { refereeRoutes } from "./admin/referee.routes";
 import { standingsRoutes } from "./admin/standings.routes";
 import { boardRoutes } from "./admin/board.routes";
 import { taskRoutes } from "./admin/task.routes";
+import { bookingRoutes } from "./admin/booking.routes";
 
 const routes = new Hono();
 
@@ -24,5 +25,6 @@ routes.route("/admin", refereeRoutes);
 routes.route("/admin", standingsRoutes);
 routes.route("/admin", boardRoutes);
 routes.route("/admin", taskRoutes);
+routes.route("/admin", bookingRoutes);
 
 export { routes };
