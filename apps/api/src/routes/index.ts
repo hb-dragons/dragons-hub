@@ -11,6 +11,7 @@ import { standingsRoutes } from "./admin/standings.routes";
 import { boardRoutes } from "./admin/board.routes";
 import { taskRoutes } from "./admin/task.routes";
 import { bookingRoutes } from "./admin/booking.routes";
+import { notificationRoutes } from "./admin/notification.routes";
 
 const routes = new Hono();
 
@@ -26,5 +27,6 @@ routes.route("/admin", standingsRoutes);
 routes.route("/admin", boardRoutes);
 routes.route("/admin", taskRoutes);
 routes.route("/admin", bookingRoutes);
+routes.route("/admin", notificationRoutes);
 
 export { routes };
