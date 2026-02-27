@@ -11,6 +11,12 @@ import {
 import { eq, sql, and, or, inArray, gte, lte, asc } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { computeDiffs } from "./match-diff.service";
+import type {
+  OverrideInfo,
+  MatchListItem,
+  MatchDetail,
+  MatchDetailResponse,
+} from "@dragons/shared";
 
 export type TransactionClient = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
@@ -20,88 +26,6 @@ export interface MatchListParams {
   leagueId?: number;
   dateFrom?: string;
   dateTo?: string;
-}
-
-export interface OverrideInfo {
-  fieldName: string;
-  reason: string | null;
-  changedBy: string | null;
-  createdAt: Date;
-}
-
-export interface MatchListItem {
-  id: number;
-  apiMatchId: number;
-  matchNo: number;
-  matchDay: number;
-  kickoffDate: string;
-  kickoffTime: string;
-  homeTeamApiId: number;
-  homeTeamName: string;
-  homeTeamNameShort: string | null;
-  homeTeamCustomName: string | null;
-  guestTeamApiId: number;
-  guestTeamName: string;
-  guestTeamNameShort: string | null;
-  guestTeamCustomName: string | null;
-  homeIsOwnClub: boolean;
-  guestIsOwnClub: boolean;
-  homeScore: number | null;
-  guestScore: number | null;
-  leagueId: number | null;
-  leagueName: string | null;
-  venueId: number | null;
-  venueName: string | null;
-  venueStreet: string | null;
-  venueCity: string | null;
-  venueNameOverride: string | null;
-  isConfirmed: boolean | null;
-  isForfeited: boolean | null;
-  isCancelled: boolean | null;
-  anschreiber: string | null;
-  zeitnehmer: string | null;
-  shotclock: string | null;
-  publicComment: string | null;
-  hasLocalChanges: boolean;
-  overriddenFields: string[];
-}
-
-export interface MatchDetail extends MatchListItem {
-  homeHalftimeScore: number | null;
-  guestHalftimeScore: number | null;
-  periodFormat: string | null;
-  homeQ1: number | null;
-  guestQ1: number | null;
-  homeQ2: number | null;
-  guestQ2: number | null;
-  homeQ3: number | null;
-  guestQ3: number | null;
-  homeQ4: number | null;
-  guestQ4: number | null;
-  homeQ5: number | null;
-  guestQ5: number | null;
-  homeQ6: number | null;
-  guestQ6: number | null;
-  homeQ7: number | null;
-  guestQ7: number | null;
-  homeQ8: number | null;
-  guestQ8: number | null;
-  homeOt1: number | null;
-  guestOt1: number | null;
-  homeOt2: number | null;
-  guestOt2: number | null;
-  internalNotes: string | null;
-  currentRemoteVersion: number;
-  currentLocalVersion: number;
-  lastRemoteSync: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  overrides: OverrideInfo[];
-}
-
-export interface MatchDetailResponse {
-  match: MatchDetail;
-  diffs: import("./match-diff.service").FieldDiff[];
 }
 
 export interface MatchUpdateData {
@@ -320,11 +244,8 @@ export function rowToDetail(
     homeOt2: row.homeOt2,
     guestOt2: row.guestOt2,
     internalNotes: row.internalNotes,
-    currentRemoteVersion: row.currentRemoteVersion,
-    currentLocalVersion: row.currentLocalVersion,
-    lastRemoteSync: row.lastRemoteSync,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
     overrides,
   };
 }
@@ -344,8 +265,12 @@ export async function buildDetailResponse(
   /* v8 ignore next -- defensive: row was just locked in same transaction */
   if (!row) return null;
 
-  const overrides = await loadOverrides(matchId, client);
-  const overriddenFields = overrides.map((o) => o.fieldName);
+  const rawOverrides = await loadOverrides(matchId, client);
+  const overriddenFields = rawOverrides.map((o) => o.fieldName);
+  const overrides: OverrideInfo[] = rawOverrides.map((o) => ({
+    ...o,
+    createdAt: o.createdAt.toISOString(),
+  }));
   const remoteSnapshot = await loadRemoteSnapshot(client, matchId, row.currentRemoteVersion);
 
   return {

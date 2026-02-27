@@ -1,18 +1,7 @@
 import { db } from "../../config/database";
 import { referees, refereeRoles, matchReferees } from "@dragons/db/schema";
 import { sql, asc, ilike, and, or, eq } from "drizzle-orm";
-
-export interface RefereeListItem {
-  id: number;
-  apiId: number;
-  firstName: string | null;
-  lastName: string | null;
-  licenseNumber: number | null;
-  matchCount: number;
-  roles: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
+import type { RefereeListItem, PaginatedResponse } from "@dragons/shared";
 
 export interface RefereeListParams {
   limit: number;
@@ -20,17 +9,9 @@ export interface RefereeListParams {
   search?: string;
 }
 
-export interface RefereeListResponse {
-  items: RefereeListItem[];
-  total: number;
-  limit: number;
-  offset: number;
-  hasMore: boolean;
-}
-
 export async function getReferees(
   params: RefereeListParams,
-): Promise<RefereeListResponse> {
+): Promise<PaginatedResponse<RefereeListItem>> {
   const { limit, offset, search } = params;
 
   const conditions = [];
@@ -104,8 +85,8 @@ export async function getReferees(
     licenseNumber: row.licenseNumber,
     matchCount: row.matchCount,
     roles: rolesByReferee.get(row.id) ?? [],
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   }));
 
   return { items, total, limit, offset, hasMore: offset + items.length < total };

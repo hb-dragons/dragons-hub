@@ -1,29 +1,7 @@
 import { db } from "../../config/database";
 import { boards, boardColumns, tasks } from "@dragons/db/schema";
 import { eq, asc, and, count } from "drizzle-orm";
-
-export interface BoardSummary {
-  id: number;
-  name: string;
-  description: string | null;
-  createdAt: Date;
-}
-
-export interface BoardWithColumns {
-  id: number;
-  name: string;
-  description: string | null;
-  createdBy: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  columns: {
-    id: number;
-    name: string;
-    position: number;
-    color: string | null;
-    isDoneColumn: boolean;
-  }[];
-}
+import type { BoardSummary, BoardData } from "@dragons/shared";
 
 const DEFAULT_COLUMNS = [
   { name: "To Do", position: 0, isDoneColumn: false },
@@ -32,7 +10,7 @@ const DEFAULT_COLUMNS = [
 ];
 
 export async function listBoards(): Promise<BoardSummary[]> {
-  return db
+  const rows = await db
     .select({
       id: boards.id,
       name: boards.name,
@@ -41,13 +19,14 @@ export async function listBoards(): Promise<BoardSummary[]> {
     })
     .from(boards)
     .orderBy(asc(boards.id));
+  return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
 }
 
 export async function createBoard(
   name: string,
   description?: string | null,
   createdBy?: string | null,
-): Promise<BoardWithColumns> {
+): Promise<BoardData> {
   const [board] = await db
     .insert(boards)
     .values({
@@ -74,8 +53,8 @@ export async function createBoard(
     name: board!.name,
     description: board!.description,
     createdBy: board!.createdBy,
-    createdAt: board!.createdAt,
-    updatedAt: board!.updatedAt,
+    createdAt: board!.createdAt.toISOString(),
+    updatedAt: board!.updatedAt.toISOString(),
     columns: columns
       .sort((a, b) => a.position - b.position)
       .map((col) => ({
@@ -88,7 +67,7 @@ export async function createBoard(
   };
 }
 
-export async function getBoard(id: number): Promise<BoardWithColumns | null> {
+export async function getBoard(id: number): Promise<BoardData | null> {
   const [board] = await db
     .select()
     .from(boards)
@@ -114,8 +93,8 @@ export async function getBoard(id: number): Promise<BoardWithColumns | null> {
     name: board.name,
     description: board.description,
     createdBy: board.createdBy,
-    createdAt: board.createdAt,
-    updatedAt: board.updatedAt,
+    createdAt: board.createdAt.toISOString(),
+    updatedAt: board.updatedAt.toISOString(),
     columns,
   };
 }
@@ -123,7 +102,7 @@ export async function getBoard(id: number): Promise<BoardWithColumns | null> {
 export async function updateBoard(
   id: number,
   data: { name?: string; description?: string | null },
-): Promise<BoardWithColumns | null> {
+): Promise<BoardData | null> {
   const [updated] = await db
     .update(boards)
     .set({ ...data, updatedAt: new Date() })
@@ -149,8 +128,8 @@ export async function updateBoard(
     name: updated.name,
     description: updated.description,
     createdBy: updated.createdBy,
-    createdAt: updated.createdAt,
-    updatedAt: updated.updatedAt,
+    createdAt: updated.createdAt.toISOString(),
+    updatedAt: updated.updatedAt.toISOString(),
     columns,
   };
 }

@@ -325,6 +325,14 @@ async function seedBasicData() {
   return { leagueId, venueId };
 }
 
+async function getLocalVersion(matchId: number): Promise<number> {
+  const row = await client.query(
+    "SELECT current_local_version FROM matches WHERE id = $1",
+    [matchId],
+  );
+  return (row.rows[0] as Record<string, unknown>).current_local_version as number;
+}
+
 // --- Tests ---
 
 describe("getOwnClubMatches", () => {
@@ -717,7 +725,7 @@ describe("updateMatchLocal", () => {
     expect(result).not.toBeNull();
     expect(result!.match.kickoffDate).toBe("2025-04-01");
     expect(result!.match.kickoffTime).toBe("19:00:00");
-    expect(result!.match.currentLocalVersion).toBe(1);
+    expect(await getLocalVersion(matchId)).toBe(1);
 
     // Verify override rows were created
     const overrides = await client.query(
@@ -769,7 +777,7 @@ describe("updateMatchLocal", () => {
       "admin@test.com",
     );
 
-    expect(result!.match.currentLocalVersion).toBe(1);
+    expect(await getLocalVersion(matchId)).toBe(1);
     // Restores remote value
     expect(result!.match.kickoffDate).toBe("2025-03-15");
 
@@ -792,7 +800,7 @@ describe("updateMatchLocal", () => {
     );
 
     expect(result!.match.anschreiber).toBe("Max");
-    expect(result!.match.currentLocalVersion).toBe(1);
+    expect(await getLocalVersion(matchId)).toBe(1);
 
     const changes = await client.query(
       "SELECT * FROM match_changes WHERE match_id = $1",
@@ -842,7 +850,7 @@ describe("updateMatchLocal", () => {
     );
 
     expect(result).not.toBeNull();
-    expect(result!.match.currentLocalVersion).toBe(0);
+    expect(await getLocalVersion(matchId)).toBe(0);
 
     const versions = await client.query(
       "SELECT * FROM match_local_versions WHERE match_id = $1",
@@ -858,8 +866,7 @@ describe("updateMatchLocal", () => {
     await updateMatchLocal(matchId, { anschreiber: "Max" }, "admin@test.com");
     await updateMatchLocal(matchId, { zeitnehmer: "Moritz" }, "admin@test.com");
 
-    const result = await getMatchDetail(matchId);
-    expect(result!.match.currentLocalVersion).toBe(2);
+    expect(await getLocalVersion(matchId)).toBe(2);
 
     const versions = await client.query(
       "SELECT * FROM match_local_versions WHERE match_id = $1 ORDER BY version_number",
@@ -1113,8 +1120,8 @@ describe("releaseOverride", () => {
     await insertOverride(matchId, "kickoffDate");
     await insertRemoteVersion(matchId, 1, { kickoffDate: "2025-03-15" });
 
-    const result = await releaseOverride(matchId, "kickoffDate", "admin@test.com");
+    await releaseOverride(matchId, "kickoffDate", "admin@test.com");
 
-    expect(result!.match.currentLocalVersion).toBe(4);
+    expect(await getLocalVersion(matchId)).toBe(4);
   });
 });

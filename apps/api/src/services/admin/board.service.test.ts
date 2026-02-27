@@ -115,7 +115,7 @@ describe("listBoards", () => {
     expect(result).toHaveLength(2);
     expect(result[0]!.name).toBe("Board 1");
     expect(result[0]!.description).toBe("Desc 1");
-    expect(result[0]!.createdAt).toBeInstanceOf(Date);
+    expect(typeof result[0]!.createdAt).toBe("string");
     expect(result[1]!.name).toBe("Board 2");
     expect(result[1]!.description).toBeNull();
   });

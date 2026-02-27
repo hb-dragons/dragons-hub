@@ -9,63 +9,13 @@ import {
   boardColumns,
 } from "@dragons/db/schema";
 import { eq, and, gte, lte, sql, count } from "drizzle-orm";
-
-export interface BookingListItem {
-  id: number;
-  venueId: number;
-  venueName: string;
-  date: string;
-  calculatedStartTime: string;
-  calculatedEndTime: string;
-  overrideStartTime: string | null;
-  overrideEndTime: string | null;
-  effectiveStartTime: string;
-  effectiveEndTime: string;
-  status: string;
-  needsReconfirmation: boolean;
-  notes: string | null;
-  matchCount: number;
-  task: { id: number; title: string } | null;
-}
-
-export interface BookingDetailMatch {
-  id: number;
-  matchNo: number;
-  kickoffDate: string;
-  kickoffTime: string;
-  homeTeam: string;
-  guestTeam: string;
-}
-
-export interface BookingDetailTask {
-  id: number;
-  title: string;
-  columnName: string;
-  status: string;
-}
-
-export interface BookingDetail {
-  id: number;
-  venueId: number;
-  venueName: string;
-  date: string;
-  calculatedStartTime: string;
-  calculatedEndTime: string;
-  overrideStartTime: string | null;
-  overrideEndTime: string | null;
-  overrideReason: string | null;
-  effectiveStartTime: string;
-  effectiveEndTime: string;
-  status: string;
-  needsReconfirmation: boolean;
-  notes: string | null;
-  confirmedBy: string | null;
-  confirmedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  matches: BookingDetailMatch[];
-  task: BookingDetailTask | null;
-}
+import type {
+  BookingListItem,
+  BookingDetail,
+  BookingMatch,
+  BookingDetailTask,
+  BookingStatus,
+} from "@dragons/shared";
 
 export interface BookingListFilters {
   status?: string;
@@ -135,7 +85,7 @@ export async function listBookings(
     overrideEndTime: row.overrideEndTime,
     effectiveStartTime: row.overrideStartTime ?? row.calculatedStartTime,
     effectiveEndTime: row.overrideEndTime ?? row.calculatedEndTime,
-    status: row.status,
+    status: row.status as BookingStatus,
     needsReconfirmation: row.needsReconfirmation,
     notes: row.notes,
     matchCount: Number(row.matchCount),
@@ -229,13 +179,13 @@ export async function getBookingDetail(
     effectiveStartTime:
       booking.overrideStartTime ?? booking.calculatedStartTime,
     effectiveEndTime: booking.overrideEndTime ?? booking.calculatedEndTime,
-    status: booking.status,
+    status: booking.status as BookingStatus,
     needsReconfirmation: booking.needsReconfirmation,
     notes: booking.notes,
     confirmedBy: booking.confirmedBy,
-    confirmedAt: booking.confirmedAt,
-    createdAt: booking.createdAt,
-    updatedAt: booking.updatedAt,
+    confirmedAt: booking.confirmedAt?.toISOString() ?? null,
+    createdAt: booking.createdAt.toISOString(),
+    updatedAt: booking.updatedAt.toISOString(),
     matches: linkedMatches,
     task: linkedTask ?? null,
   };
@@ -313,7 +263,7 @@ export async function updateBooking(
     effectiveStartTime:
       updated.overrideStartTime ?? updated.calculatedStartTime,
     effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-    status: updated.status,
+    status: updated.status as BookingStatus,
     needsReconfirmation: updated.needsReconfirmation,
     notes: updated.notes,
     matchCount: Number(matchCountResult[0]!.count),
@@ -383,7 +333,7 @@ export async function updateBookingStatus(
     effectiveStartTime:
       updated.overrideStartTime ?? updated.calculatedStartTime,
     effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-    status: updated.status,
+    status: updated.status as BookingStatus,
     needsReconfirmation: updated.needsReconfirmation,
     notes: updated.notes,
     matchCount: Number(matchCountResult[0]!.count),

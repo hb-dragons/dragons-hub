@@ -688,7 +688,7 @@ describe("addComment", () => {
     expect(result).not.toBeNull();
     expect(result!.body).toBe("Nice!");
     expect(result!.authorId).toBe("user-1");
-    expect(result!.createdAt).toBeInstanceOf(Date);
+    expect(typeof result!.createdAt).toBe("string");
   });
 
   it("returns null for non-existent task", async () => {

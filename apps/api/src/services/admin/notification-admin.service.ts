@@ -1,26 +1,7 @@
 import { db } from "../../config/database";
 import { notifications } from "@dragons/db/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
-
-// ── Types ───────────────────────────────────────────────────────────────────
-
-export interface NotificationItem {
-  id: number;
-  recipientId: string;
-  channel: string;
-  title: string;
-  body: string;
-  relatedTaskId: number | null;
-  relatedBookingId: number | null;
-  status: string;
-  sentAt: Date | null;
-  createdAt: Date;
-}
-
-export interface NotificationListResult {
-  notifications: NotificationItem[];
-  total: number;
-}
+import type { NotificationItem, NotificationListResult } from "@dragons/shared";
 
 // ── listNotifications ───────────────────────────────────────────────────────
 
@@ -58,7 +39,11 @@ export async function listNotifications(params: {
     .offset(offset);
 
   return {
-    notifications: rows,
+    notifications: rows.map((r) => ({
+      ...r,
+      sentAt: r.sentAt?.toISOString() ?? null,
+      createdAt: r.createdAt.toISOString(),
+    })),
     total: Number(totalRow!.count),
   };
 }

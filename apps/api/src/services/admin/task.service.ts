@@ -8,57 +8,13 @@ import {
   venueBookings,
 } from "@dragons/db/schema";
 import { eq, and, asc, sql, count } from "drizzle-orm";
-
-export interface TaskSummary {
-  id: number;
-  boardId: number;
-  columnId: number;
-  title: string;
-  description: string | null;
-  assigneeId: string | null;
-  priority: string;
-  dueDate: string | null;
-  position: number;
-  matchId: number | null;
-  venueBookingId: number | null;
-  createdAt: Date;
-  checklistTotal: number;
-  checklistChecked: number;
-}
-
-export interface TaskDetail {
-  id: number;
-  boardId: number;
-  columnId: number;
-  title: string;
-  description: string | null;
-  assigneeId: string | null;
-  priority: string;
-  dueDate: string | null;
-  position: number;
-  matchId: number | null;
-  venueBookingId: number | null;
-  sourceType: string;
-  sourceDetail: string | null;
-  createdBy: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  checklist: {
-    id: number;
-    label: string;
-    isChecked: boolean;
-    checkedBy: string | null;
-    checkedAt: Date | null;
-    position: number;
-  }[];
-  comments: {
-    id: number;
-    authorId: string;
-    body: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }[];
-}
+import type {
+  TaskCardData,
+  TaskDetail,
+  ChecklistItem,
+  TaskComment,
+  TaskPriority,
+} from "@dragons/shared";
 
 export interface TaskFilters {
   columnId?: number;
@@ -69,7 +25,7 @@ export interface TaskFilters {
 export async function listTasks(
   boardId: number,
   filters?: TaskFilters,
-): Promise<TaskSummary[]> {
+): Promise<TaskCardData[]> {
   // Build where conditions
   const conditions = [eq(tasks.boardId, boardId)];
   if (filters?.columnId) {
@@ -95,7 +51,7 @@ export async function listTasks(
       position: tasks.position,
       matchId: tasks.matchId,
       venueBookingId: tasks.venueBookingId,
-      createdAt: tasks.createdAt,
+      sourceType: tasks.sourceType,
     })
     .from(tasks)
     .where(and(...conditions))
@@ -126,6 +82,7 @@ export async function listTasks(
 
   return rows.map((row) => ({
     ...row,
+    priority: row.priority as TaskPriority,
     checklistTotal: countMap.get(row.id)?.total ?? 0,
     checklistChecked: countMap.get(row.id)?.checked ?? 0,
   }));
@@ -196,18 +153,21 @@ export async function createTask(
     title: task!.title,
     description: task!.description,
     assigneeId: task!.assigneeId,
-    priority: task!.priority,
+    priority: task!.priority as TaskPriority,
     dueDate: task!.dueDate,
     position: task!.position,
     matchId: task!.matchId,
     venueBookingId: task!.venueBookingId,
     sourceType: task!.sourceType,
+    checklistTotal: 0,
+    checklistChecked: 0,
     sourceDetail: task!.sourceDetail,
     createdBy: task!.createdBy,
-    createdAt: task!.createdAt,
-    updatedAt: task!.updatedAt,
+    createdAt: task!.createdAt.toISOString(),
+    updatedAt: task!.updatedAt.toISOString(),
     checklist: [],
     comments: [],
+    booking: null,
   };
 }
 
@@ -252,18 +212,28 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
     title: task.title,
     description: task.description,
     assigneeId: task.assigneeId,
-    priority: task.priority,
+    priority: task.priority as TaskPriority,
     dueDate: task.dueDate,
     position: task.position,
     matchId: task.matchId,
     venueBookingId: task.venueBookingId,
     sourceType: task.sourceType,
+    checklistTotal: checklist.length,
+    checklistChecked: checklist.filter((c) => c.isChecked).length,
     sourceDetail: task.sourceDetail,
     createdBy: task.createdBy,
-    createdAt: task.createdAt,
-    updatedAt: task.updatedAt,
-    checklist,
-    comments,
+    createdAt: task.createdAt.toISOString(),
+    updatedAt: task.updatedAt.toISOString(),
+    checklist: checklist.map((c) => ({
+      ...c,
+      checkedAt: c.checkedAt?.toISOString() ?? null,
+    })),
+    comments: comments.map((c) => ({
+      ...c,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+    })),
+    booking: null,
   };
 }
 
@@ -351,14 +321,7 @@ export async function deleteTask(id: number): Promise<boolean> {
 export async function addChecklistItem(
   taskId: number,
   data: { label: string; position?: number },
-): Promise<{
-  id: number;
-  label: string;
-  isChecked: boolean;
-  checkedBy: string | null;
-  checkedAt: Date | null;
-  position: number;
-} | null> {
+): Promise<ChecklistItem | null> {
   // Verify task exists
   const [task] = await db
     .select({ id: tasks.id })
@@ -393,7 +356,7 @@ export async function addChecklistItem(
     label: item!.label,
     isChecked: item!.isChecked,
     checkedBy: item!.checkedBy,
-    checkedAt: item!.checkedAt,
+    checkedAt: item!.checkedAt?.toISOString() ?? null,
     position: item!.position,
   };
 }
@@ -402,14 +365,7 @@ export async function updateChecklistItem(
   taskId: number,
   itemId: number,
   data: { label?: string; isChecked?: boolean; checkedBy?: string | null },
-): Promise<{
-  id: number;
-  label: string;
-  isChecked: boolean;
-  checkedBy: string | null;
-  checkedAt: Date | null;
-  position: number;
-} | null> {
+): Promise<ChecklistItem | null> {
   const updateData: Record<string, unknown> = {};
   if (data.label !== undefined) updateData.label = data.label;
   if (data.isChecked !== undefined) {
@@ -443,7 +399,7 @@ export async function updateChecklistItem(
     label: updated.label,
     isChecked: updated.isChecked,
     checkedBy: updated.checkedBy,
-    checkedAt: updated.checkedAt,
+    checkedAt: updated.checkedAt?.toISOString() ?? null,
     position: updated.position,
   };
 }
@@ -470,13 +426,7 @@ export async function deleteChecklistItem(
 export async function addComment(
   taskId: number,
   data: { body: string; authorId: string },
-): Promise<{
-  id: number;
-  authorId: string;
-  body: string;
-  createdAt: Date;
-  updatedAt: Date;
-} | null> {
+): Promise<TaskComment | null> {
   // Verify task exists
   const [task] = await db
     .select({ id: tasks.id })
@@ -499,8 +449,8 @@ export async function addComment(
     id: comment!.id,
     authorId: comment!.authorId,
     body: comment!.body,
-    createdAt: comment!.createdAt,
-    updatedAt: comment!.updatedAt,
+    createdAt: comment!.createdAt.toISOString(),
+    updatedAt: comment!.updatedAt.toISOString(),
   };
 }
 
@@ -508,13 +458,7 @@ export async function updateComment(
   taskId: number,
   commentId: number,
   data: { body: string },
-): Promise<{
-  id: number;
-  authorId: string;
-  body: string;
-  createdAt: Date;
-  updatedAt: Date;
-} | null> {
+): Promise<TaskComment | null> {
   const [updated] = await db
     .update(taskComments)
     .set({ body: data.body, updatedAt: new Date() })
@@ -532,8 +476,8 @@ export async function updateComment(
     id: updated.id,
     authorId: updated.authorId,
     body: updated.body,
-    createdAt: updated.createdAt,
-    updatedAt: updated.updatedAt,
+    createdAt: updated.createdAt.toISOString(),
+    updatedAt: updated.updatedAt.toISOString(),
   };
 }
 

@@ -3,6 +3,7 @@ import type { BookingInfo } from "./bookings";
 
 export interface TaskCardData {
   id: number;
+  boardId: number;
   title: string;
   description: string | null;
   assigneeId: string | null;

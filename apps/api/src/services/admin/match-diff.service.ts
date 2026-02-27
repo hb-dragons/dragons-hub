@@ -1,12 +1,4 @@
-export type DiffStatus = "diverged" | "synced" | "local-only";
-
-export interface FieldDiff {
-  field: string;
-  label: string;
-  remoteValue: string | null;
-  localValue: string | null;
-  status: DiffStatus;
-}
+import type { DiffStatus, FieldDiff } from "@dragons/shared";
 
 /** Fields that can be overridden (values written directly to matches table + match_overrides row) */
 export const OVERRIDABLE_FIELDS = [

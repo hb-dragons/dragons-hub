@@ -8,14 +8,17 @@ import {
 } from "@dragons/db/schema";
 import { eq, and } from "drizzle-orm";
 import { OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
-import type { MatchUpdateData, MatchDetailResponse } from "./match-query.service";
+import type { MatchDetailResponse } from "@dragons/shared";
+import type { MatchUpdateData } from "./match-query.service";
 import { buildDetailResponse, loadRemoteSnapshot } from "./match-query.service";
 
-// ── Re-exports for backwards compatibility ──────────────────────────────────
+// ── Re-exports ──────────────────────────────────────────────────────────────
 
 export { computeDiffs, OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
-export type { DiffStatus, FieldDiff, DiffInput, OverridableField, LocalOnlyField, AllEditableField } from "./match-diff.service";
+export type { DiffStatus, FieldDiff } from "@dragons/shared";
+export type { DiffInput, OverridableField, LocalOnlyField, AllEditableField } from "./match-diff.service";
 
+export type { OverrideInfo, MatchListItem, MatchDetail, MatchDetailResponse } from "@dragons/shared";
 export {
   getOwnClubMatches,
   getMatchDetail,
@@ -26,10 +29,6 @@ export {
 } from "./match-query.service";
 export type {
   MatchListParams,
-  OverrideInfo,
-  MatchListItem,
-  MatchDetail,
-  MatchDetailResponse,
   MatchUpdateData,
   MatchRow,
   TransactionClient,
