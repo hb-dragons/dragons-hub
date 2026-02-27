@@ -3,15 +3,15 @@ import { fetchAPIServer } from "@/lib/api.server"
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { MatchListTable } from "@/components/admin/matches/match-list-table"
-import type { MatchListResponse } from "@/components/admin/matches/types"
+import type { PaginatedResponse, MatchListItem } from "@/components/admin/matches/types"
 
 export default async function MatchesPage() {
   const t = await getTranslations();
-  let data: MatchListResponse | null = null
+  let data: PaginatedResponse<MatchListItem> | null = null
   let error: string | null = null
 
   try {
-    data = await fetchAPIServer<MatchListResponse>("/admin/matches")
+    data = await fetchAPIServer<PaginatedResponse<MatchListItem>>("/admin/matches")
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API"
   }

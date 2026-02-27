@@ -335,17 +335,6 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                       </span>
                     )}
                 </div>
-                <Separator className="my-3" />
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <div>
-                    {t("matchDetail.status.lastSync", {
-                      value: match.lastRemoteSync
-                        ? format.dateTime(new Date(match.lastRemoteSync), "syncTimestamp")
-                        : "\u2014",
-                    })}
-                  </div>
-                  <div>{t("matchDetail.status.remoteVersion", { version: String(match.currentRemoteVersion) })}</div>
-                </div>
               </CardContent>
             </Card>
           </div>

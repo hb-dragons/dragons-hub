@@ -558,20 +558,6 @@ export function MatchEditSheet({
                 </table>
               </div>
 
-              {/* Sync metadata — subtle footer */}
-              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                {match.lastRemoteSync && (
-                  <span>
-                    {t("matchDetail.status.lastSync", {
-                      value: format.dateTime(new Date(match.lastRemoteSync), "syncTimestamp"),
-                    })}
-                  </span>
-                )}
-                {match.lastRemoteSync && <span>&middot;</span>}
-                <span>
-                  {t("matchDetail.status.remoteVersion", { version: String(match.currentRemoteVersion) })}
-                </span>
-              </div>
             </section>
 
             <Separator />

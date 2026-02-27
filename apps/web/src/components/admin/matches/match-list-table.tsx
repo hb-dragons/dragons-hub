@@ -31,7 +31,7 @@ import {
   getOwnTeamLabel,
   getOpponentName,
 } from "./utils"
-import type { MatchListItem, MatchListResponse } from "./types"
+import type { MatchListItem, PaginatedResponse } from "./types"
 import { MatchEditSheet } from "./match-edit-sheet"
 
 function OverrideDot({ match, field }: { match: MatchListItem; field: string }) {
@@ -274,7 +274,7 @@ export function MatchListTable() {
   const t = useTranslations("matches")
   const format = useFormatter()
   const { mutate } = useSWRConfig()
-  const { data: response } = useSWR<MatchListResponse>(SWR_KEYS.matches, apiFetcher)
+  const { data: response } = useSWR<PaginatedResponse<MatchListItem>>(SWR_KEYS.matches, apiFetcher)
   const columns = useMemo(() => getColumns(t, format), [t, format])
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
   const displayedMatchId = useRef<number | null>(null)
