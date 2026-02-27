@@ -124,6 +124,47 @@ const CREATE_TABLES = `
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+
+  CREATE TABLE teams (
+    id SERIAL PRIMARY KEY,
+    api_team_permanent_id INTEGER NOT NULL UNIQUE,
+    name VARCHAR(200) NOT NULL,
+    short_name VARCHAR(100),
+    custom_name VARCHAR(200),
+    is_own_club BOOLEAN NOT NULL DEFAULT FALSE,
+    liga_id INTEGER,
+    data_hash VARCHAR(64),
+    estimated_game_duration INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE matches (
+    id SERIAL PRIMARY KEY,
+    api_match_id INTEGER NOT NULL UNIQUE,
+    liga_id INTEGER NOT NULL,
+    match_no INTEGER NOT NULL DEFAULT 0,
+    matchday INTEGER,
+    kickoff_date DATE,
+    kickoff_time TIME,
+    home_team_api_id INTEGER,
+    guest_team_api_id INTEGER,
+    venue_id INTEGER REFERENCES venues(id),
+    home_score INTEGER,
+    guest_score INTEGER,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    data_hash VARCHAR(64),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE venue_booking_matches (
+    id SERIAL PRIMARY KEY,
+    venue_booking_id INTEGER NOT NULL REFERENCES venue_bookings(id) ON DELETE CASCADE,
+    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(venue_booking_id, match_id)
+  );
 `;
 
 let client: PGlite;
@@ -139,13 +180,16 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  await client.exec("DELETE FROM venue_booking_matches");
   await client.exec("DELETE FROM task_comments");
   await client.exec("DELETE FROM task_checklist_items");
   await client.exec("DELETE FROM tasks");
   await client.exec("DELETE FROM board_columns");
   await client.exec("DELETE FROM boards");
+  await client.exec("DELETE FROM matches");
   await client.exec("DELETE FROM venue_bookings");
   await client.exec("DELETE FROM venues");
+  await client.exec("DELETE FROM teams");
   await client.exec("ALTER SEQUENCE boards_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE board_columns_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE tasks_id_seq RESTART WITH 1");
@@ -153,6 +197,9 @@ beforeEach(async () => {
   await client.exec("ALTER SEQUENCE task_comments_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE venues_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE venue_bookings_id_seq RESTART WITH 1");
+  await client.exec("ALTER SEQUENCE matches_id_seq RESTART WITH 1");
+  await client.exec("ALTER SEQUENCE venue_booking_matches_id_seq RESTART WITH 1");
+  await client.exec("ALTER SEQUENCE teams_id_seq RESTART WITH 1");
   vi.clearAllMocks();
 });
 
@@ -376,6 +423,7 @@ describe("getTaskDetail", () => {
 
     expect(result!.checklist).toEqual([]);
     expect(result!.comments).toEqual([]);
+    expect(result!.booking).toBeNull();
   });
 });
 

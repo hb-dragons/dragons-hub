@@ -437,6 +437,8 @@
       "addComment": "Kommentar hinzufügen",
       "linkedMatch": "Verknüpftes Spiel",
       "linkedBooking": "Verknüpfte Buchung",
+      "venueBooking": "Hallenbuchung",
+      "linkedMatches": "Verknüpfte Spiele",
       "source": "Quelle"
     },
     "priority": { "low": "Niedrig", "normal": "Normal", "high": "Hoch", "urgent": "Dringend" },

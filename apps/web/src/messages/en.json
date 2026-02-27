@@ -437,6 +437,8 @@
       "addComment": "Add comment",
       "linkedMatch": "Linked Match",
       "linkedBooking": "Linked Booking",
+      "venueBooking": "Venue Booking",
+      "linkedMatches": "Linked Matches",
       "source": "Source"
     },
     "priority": { "low": "Low", "normal": "Normal", "high": "High", "urgent": "Urgent" },

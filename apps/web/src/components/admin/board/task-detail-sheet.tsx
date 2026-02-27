@@ -28,7 +28,13 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@dragons/ui/components/sheet";
-import { Loader2, Send } from "lucide-react";
+import { AlertTriangle, Calendar, Clock, Loader2, MapPin, Send, Users } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@dragons/ui/components/card";
 import type { TaskDetail, ChecklistItem, TaskComment, TaskCardData } from "@dragons/shared";
 import { TASK_PRIORITIES } from "@dragons/shared";
 
@@ -115,7 +121,7 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
     try {
       await fetchAPI(`/admin/tasks/${task.id}/comments`, {
         method: "POST",
-        body: JSON.stringify({ body: newComment.trim() }),
+        body: JSON.stringify({ body: newComment.trim(), authorId: "admin" }),
       });
       setNewComment("");
       await mutate(`/admin/tasks/${task.id}`);
@@ -177,16 +183,77 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
               </div>
             </div>
 
-            {/* Links */}
-            {(detail.matchId || detail.venueBookingId) && (
-              <div className="flex gap-2">
-                {detail.matchId && (
-                  <Badge variant="outline">{t("board.task.linkedMatch")}: #{detail.matchId}</Badge>
-                )}
-                {detail.venueBookingId && (
-                  <Badge variant="outline">{t("board.task.linkedBooking")}: #{detail.venueBookingId}</Badge>
-                )}
-              </div>
+            {/* Booking Info */}
+            {detail.booking && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                    <MapPin className="h-4 w-4" />
+                    {t("board.task.venueBooking")}
+                    <Badge
+                      variant={
+                        detail.booking.status === "confirmed" ? "success"
+                          : detail.booking.status === "cancelled" ? "destructive"
+                            : "secondary"
+                      }
+                      className="ml-auto"
+                    >
+                      {t(`bookings.status.${detail.booking.status}`)}
+                    </Badge>
+                    {detail.booking.needsReconfirmation && (
+                      <span className="text-amber-600" title={t("bookings.needsReconfirmation")}>
+                        <AlertTriangle className="h-4 w-4" />
+                      </span>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      {detail.booking.venueName}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      {detail.booking.date}
+                    </div>
+                    <div className="col-span-2 flex items-center gap-1.5 text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {detail.booking.effectiveStartTime} – {detail.booking.effectiveEndTime}
+                    </div>
+                  </div>
+
+                  {/* Linked Matches */}
+                  {detail.booking.matches.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                        <Users className="h-3 w-3" />
+                        {t("board.task.linkedMatches")} ({detail.booking.matches.length})
+                      </p>
+                      <div className="space-y-1">
+                        {detail.booking.matches.map((match) => (
+                          <div
+                            key={match.id}
+                            className="flex items-center justify-between rounded-md border bg-muted/30 px-2.5 py-1.5 text-xs"
+                          >
+                            <span className="font-medium">
+                              {match.homeTeam} vs {match.guestTeam}
+                            </span>
+                            <span className="tabular-nums text-muted-foreground">
+                              {match.kickoffDate} {match.kickoffTime}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Match link (standalone, when no booking) */}
+            {detail.matchId && !detail.booking && (
+              <Badge variant="outline">{t("board.task.linkedMatch")}: #{detail.matchId}</Badge>
             )}
 
             {/* Save button */}
@@ -238,7 +305,7 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
                       className="rounded-md border bg-muted/50 p-2 text-sm"
                     >
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{comment.authorId ?? "Unknown"}</span>
+                        <span>{comment.authorId}</span>
                         <span>{new Date(comment.createdAt).toLocaleString()}</span>
                       </div>
                       <p className="mt-1">{comment.body}</p>

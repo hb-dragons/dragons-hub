@@ -51,6 +51,11 @@ matchRoutes.patch("/matches/:id", async (c) => {
     return c.json({ error: "Match not found", code: "NOT_FOUND" }, 404);
   }
 
+  // Fire-and-forget: reconcile venue booking for this match
+  import("../../services/venue-booking/venue-booking.service")
+    .then(({ reconcileMatch }) => reconcileMatch(id))
+    .catch(() => {}); // Booking reconciliation failure shouldn't affect the match edit response
+
   return c.json(result);
 });
 

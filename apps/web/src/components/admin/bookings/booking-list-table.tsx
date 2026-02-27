@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
+import { fetchAPI } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { Badge } from "@dragons/ui/components/badge";
 import {
@@ -21,7 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@dragons/ui/components/table";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import type { BookingListItem } from "./types";
 
 const statusVariantMap: Record<
@@ -34,13 +36,33 @@ const statusVariantMap: Record<
   cancelled: "destructive",
 };
 
+const STATUSES = ["pending", "requested", "confirmed", "cancelled"] as const;
+
 export function BookingListTable() {
   const t = useTranslations();
   const { data: bookings } = useSWR<BookingListItem[]>(
     SWR_KEYS.bookings,
     apiFetcher,
   );
+  const { mutate } = useSWRConfig();
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  async function handleStatusChange(bookingId: number, newStatus: string) {
+    setUpdatingId(bookingId);
+    try {
+      await fetchAPI(`/admin/bookings/${bookingId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      await mutate(SWR_KEYS.bookings);
+      toast.success(t("bookings.toast.statusChanged"));
+    } catch {
+      toast.error(t("common.failed"));
+    } finally {
+      setUpdatingId(null);
+    }
+  }
 
   const bookingList = bookings ?? [];
   const filtered =
@@ -99,9 +121,27 @@ export function BookingListTable() {
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <Badge variant={statusVariantMap[booking.status]}>
-                    {t(`bookings.status.${booking.status}`)}
-                  </Badge>
+                  {updatingId === booking.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Select
+                      value={booking.status}
+                      onValueChange={(value) => handleStatusChange(booking.id, value)}
+                    >
+                      <SelectTrigger className="h-7 w-[130px]">
+                        <Badge variant={statusVariantMap[booking.status]} className="text-xs">
+                          {t(`bookings.status.${booking.status}`)}
+                        </Badge>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {t(`bookings.status.${s}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   {booking.needsReconfirmation && (
                     <span
                       className="inline-flex items-center gap-1 text-xs text-amber-600"

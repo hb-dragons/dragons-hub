@@ -6,6 +6,10 @@ import {
   boardColumns,
   boards,
   venueBookings,
+  venueBookingMatches,
+  venues,
+  matches,
+  teams,
 } from "@dragons/db/schema";
 import { eq, and, asc, sql, count } from "drizzle-orm";
 import type {
@@ -14,6 +18,7 @@ import type {
   ChecklistItem,
   TaskComment,
   TaskPriority,
+  BookingInfo,
 } from "@dragons/shared";
 
 export interface TaskFilters {
@@ -205,6 +210,70 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
     .where(eq(taskComments.taskId, id))
     .orderBy(asc(taskComments.createdAt));
 
+  // Fetch linked booking info if present
+  let booking: BookingInfo | null = null;
+  if (task.venueBookingId) {
+    const [bookingRow] = await db
+      .select({
+        id: venueBookings.id,
+        venueName: venues.name,
+        date: venueBookings.date,
+        calculatedStartTime: venueBookings.calculatedStartTime,
+        calculatedEndTime: venueBookings.calculatedEndTime,
+        overrideStartTime: venueBookings.overrideStartTime,
+        overrideEndTime: venueBookings.overrideEndTime,
+        status: venueBookings.status,
+        needsReconfirmation: venueBookings.needsReconfirmation,
+      })
+      .from(venueBookings)
+      .innerJoin(venues, eq(venues.id, venueBookings.venueId))
+      .where(eq(venueBookings.id, task.venueBookingId))
+      .limit(1);
+
+    if (bookingRow) {
+      const homeTeam = db
+        .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
+        .from(teams)
+        .as("home_team");
+      const guestTeam = db
+        .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
+        .from(teams)
+        .as("guest_team");
+
+      const linkedMatches = await db
+        .select({
+          id: matches.id,
+          matchNo: matches.matchNo,
+          kickoffDate: matches.kickoffDate,
+          kickoffTime: matches.kickoffTime,
+          homeTeam: homeTeam.name,
+          guestTeam: guestTeam.name,
+        })
+        .from(venueBookingMatches)
+        .innerJoin(matches, eq(matches.id, venueBookingMatches.matchId))
+        .innerJoin(
+          homeTeam,
+          eq(homeTeam.apiTeamPermanentId, matches.homeTeamApiId),
+        )
+        .innerJoin(
+          guestTeam,
+          eq(guestTeam.apiTeamPermanentId, matches.guestTeamApiId),
+        )
+        .where(eq(venueBookingMatches.venueBookingId, task.venueBookingId));
+
+      booking = {
+        id: bookingRow.id,
+        venueName: bookingRow.venueName,
+        date: bookingRow.date,
+        effectiveStartTime: bookingRow.overrideStartTime ?? bookingRow.calculatedStartTime,
+        effectiveEndTime: bookingRow.overrideEndTime ?? bookingRow.calculatedEndTime,
+        status: bookingRow.status as BookingInfo["status"],
+        needsReconfirmation: bookingRow.needsReconfirmation,
+        matches: linkedMatches,
+      };
+    }
+  }
+
   return {
     id: task.id,
     boardId: task.boardId,
@@ -233,7 +302,7 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
     })),
-    booking: null,
+    booking,
   };
 }
 

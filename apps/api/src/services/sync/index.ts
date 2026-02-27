@@ -140,6 +140,18 @@ export class SyncOrchestrator {
       );
       allErrors.push(...assignmentsRes.errors);
 
+      // Step 5.5: Reconcile venue bookings
+      await logStep("Reconciling venue bookings...");
+      try {
+        const { reconcileAfterSync } = await import("../venue-booking/venue-booking.service");
+        await reconcileAfterSync();
+        await logStep("Venue bookings reconciled");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        allErrors.push(`Venue booking reconciliation failed: ${message}`);
+        log.error({ err: error }, "Venue booking reconciliation failed");
+      }
+
       // Step 6: Finalize
       await logStep("Step 6/6: Finalizing...");
 

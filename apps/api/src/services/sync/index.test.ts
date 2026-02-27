@@ -80,6 +80,11 @@ vi.mock("./data-fetcher", () => ({
   extractRefereeAssignments: (...args: unknown[]) => mockExtractAssignments(...args),
 }));
 
+const mockReconcileAfterSync = vi.fn();
+vi.mock("../venue-booking/venue-booking.service", () => ({
+  reconcileAfterSync: (...args: unknown[]) => mockReconcileAfterSync(...args),
+}));
+
 import { SyncOrchestrator, syncOrchestrator } from "./index";
 
 beforeEach(() => {
@@ -143,6 +148,8 @@ beforeEach(() => {
 
   mockExtractAssignments.mockReturnValue([]);
   mockSyncAssignments.mockResolvedValue({ created: 0, errors: [] });
+
+  mockReconcileAfterSync.mockResolvedValue(undefined);
 });
 
 describe("SyncOrchestrator", () => {
@@ -332,6 +339,34 @@ describe("SyncOrchestrator", () => {
       expect(result.referees.updated).toBe(1);
       expect(result.referees.rolesUpdated).toBe(3);
       expect(result.referees.assignmentsCreated).toBe(5);
+    });
+
+    it("calls venue booking reconciliation after sync steps", async () => {
+      await syncOrchestrator.fullSync("manual");
+
+      expect(mockReconcileAfterSync).toHaveBeenCalled();
+    });
+
+    it("collects error when venue booking reconciliation fails", async () => {
+      mockReconcileAfterSync.mockRejectedValue(new Error("Booking DB error"));
+
+      const result = await syncOrchestrator.fullSync("manual");
+
+      expect(result.status).toBe("completed");
+      expect(result.totalErrors).toContain(
+        "Venue booking reconciliation failed: Booking DB error",
+      );
+    });
+
+    it("handles non-Error venue booking reconciliation failure", async () => {
+      mockReconcileAfterSync.mockRejectedValue("string error");
+
+      const result = await syncOrchestrator.fullSync("manual");
+
+      expect(result.status).toBe("completed");
+      expect(result.totalErrors).toContain(
+        "Venue booking reconciliation failed: Unknown error",
+      );
     });
   });
 });
