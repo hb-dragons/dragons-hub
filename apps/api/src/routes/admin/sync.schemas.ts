@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ENTITY_TYPES, ENTRY_ACTIONS } from "@dragons/shared";
 
 export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -15,17 +16,8 @@ export const syncEntryIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
-const entityTypeEnum = z.enum([
-  "league",
-  "match",
-  "standing",
-  "team",
-  "venue",
-  "referee",
-  "refereeRole",
-]);
-
-const entryActionEnum = z.enum(["created", "updated", "skipped", "failed"]);
+const entityTypeEnum = z.enum(ENTITY_TYPES);
+const entryActionEnum = z.enum(ENTRY_ACTIONS);
 
 export const syncEntriesQuerySchema = paginationSchema.extend({
   entityType: entityTypeEnum.optional(),

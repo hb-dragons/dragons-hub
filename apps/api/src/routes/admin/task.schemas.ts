@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dateSchema, taskPrioritySchema } from "@dragons/shared";
 
 export const taskBoardIdParamSchema = z.object({
   boardId: z.coerce.number().int().positive(),
@@ -21,19 +22,15 @@ export const taskCommentParamSchema = z.object({
 export const taskListQuerySchema = z.object({
   columnId: z.coerce.number().int().positive().optional(),
   assigneeId: z.string().min(1).optional(),
-  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+  priority: taskPrioritySchema.optional(),
 });
 
 export const taskCreateBodySchema = z.object({
   title: z.string().min(1).max(300),
   description: z.string().max(5000).nullable().optional(),
   assigneeId: z.string().max(100).nullable().optional(),
-  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
-  dueDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
-    .nullable()
-    .optional(),
+  priority: taskPrioritySchema.optional(),
+  dueDate: dateSchema.nullable().optional(),
   columnId: z.number().int().positive(),
   matchId: z.number().int().positive().nullable().optional(),
   venueBookingId: z.number().int().positive().nullable().optional(),
@@ -43,12 +40,8 @@ export const taskUpdateBodySchema = z.object({
   title: z.string().min(1).max(300).optional(),
   description: z.string().max(5000).nullable().optional(),
   assigneeId: z.string().max(100).nullable().optional(),
-  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
-  dueDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD")
-    .nullable()
-    .optional(),
+  priority: taskPrioritySchema.optional(),
+  dueDate: dateSchema.nullable().optional(),
 });
 
 export const taskMoveBodySchema = z.object({
