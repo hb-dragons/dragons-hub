@@ -29,7 +29,7 @@ import {
 import { cn } from "@dragons/ui/lib/utils";
 import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
-import type { SyncRun, LogsResponse } from "./types";
+import type { SyncRun, PaginatedResponse } from "./types";
 import { SyncLogDetail } from "./sync-log-detail";
 import { useSyncLogs } from "./use-sync";
 import { formatDuration } from "./utils";
@@ -117,7 +117,7 @@ export function SyncHistoryTable() {
     try {
       setLoadingMore(true);
       const currentTotal = firstPageLogs.length + extraLogs.length;
-      const data = await fetchAPI<LogsResponse>(
+      const data = await fetchAPI<PaginatedResponse<SyncRun>>(
         `/admin/sync/logs?limit=20&offset=${currentTotal}`,
       );
       setExtraLogs((prev) => {

@@ -5,7 +5,8 @@ import { SWRConfig } from "swr";
 import { SyncRunContext } from "./use-sync";
 import type {
   SyncStatusResponse,
-  LogsResponse,
+  PaginatedResponse,
+  SyncRun,
   SyncScheduleData,
 } from "./types";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -21,7 +22,7 @@ function deriveRunningSyncRunId(
 
 interface SyncRunProviderProps {
   initialStatus: SyncStatusResponse | null;
-  initialLogs: LogsResponse | null;
+  initialLogs: PaginatedResponse<SyncRun> | null;
   initialSchedule: SyncScheduleData | null;
   children: ReactNode;
 }

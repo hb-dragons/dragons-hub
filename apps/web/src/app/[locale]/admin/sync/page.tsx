@@ -16,21 +16,22 @@ import { SyncHistoryTable } from "@/components/admin/sync/sync-history-table";
 import { SyncScheduleConfig } from "@/components/admin/sync/sync-schedule-config";
 import type {
   SyncStatusResponse,
-  LogsResponse,
+  PaginatedResponse,
+  SyncRun,
   SyncScheduleData,
 } from "@/components/admin/sync/types";
 
 export default async function SyncPage() {
   const t = await getTranslations();
   let status: SyncStatusResponse | null = null;
-  let logs: LogsResponse | null = null;
+  let logs: PaginatedResponse<SyncRun> | null = null;
   let schedule: SyncScheduleData | null = null;
   let error: string | null = null;
 
   try {
     [status, logs, schedule] = await Promise.all([
       fetchAPIServer<SyncStatusResponse>("/admin/sync/status"),
-      fetchAPIServer<LogsResponse>("/admin/sync/logs?limit=20&offset=0"),
+      fetchAPIServer<PaginatedResponse<SyncRun>>("/admin/sync/logs?limit=20&offset=0"),
       fetchAPIServer<SyncScheduleData>("/admin/sync/schedule"),
     ]);
   } catch (e) {

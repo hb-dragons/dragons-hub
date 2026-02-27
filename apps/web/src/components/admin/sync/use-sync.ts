@@ -15,7 +15,7 @@ import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type {
   SyncStatusResponse,
-  LogsResponse,
+  PaginatedResponse,
   SyncScheduleData,
   SyncRun,
   TriggerResponse,
@@ -64,7 +64,7 @@ export function useSyncLogs() {
   const { runningSyncRunId } = useSyncRunContext();
   const isRunning = runningSyncRunId !== null;
 
-  const { data, error, mutate, isLoading } = useSWR<LogsResponse>(
+  const { data, error, mutate, isLoading } = useSWR<PaginatedResponse<SyncRun>>(
     SWR_KEYS.syncLogs(20, 0),
     apiFetcher,
     {
