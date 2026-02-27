@@ -7,11 +7,12 @@ Basketball club management monorepo for the Dragons. Syncs data from the German 
 ## Monorepo Structure
 
 ```
-apps/web        @dragons/web    Next.js 16 frontend (port 3000)
-apps/api        @dragons/api    Hono REST API (port 3001)
-packages/ui     @dragons/ui     Shared shadcn/Radix UI components
-packages/sdk    @dragons/sdk    Basketball-Bund SDK type definitions
-packages/db     @dragons/db     Drizzle ORM schema & database client
+apps/web          @dragons/web      Next.js 16 frontend (port 3000)
+apps/api          @dragons/api      Hono REST API (port 3001)
+packages/ui       @dragons/ui       Shared shadcn/Radix UI components
+packages/sdk      @dragons/sdk      Basketball-Bund SDK type definitions
+packages/db       @dragons/db       Drizzle ORM schema & database client
+packages/shared   @dragons/shared   Shared types, constants, and validation schemas
 ```
 
 Managed with pnpm workspaces + Turborepo. See `AGENTS.md` for detailed architecture.

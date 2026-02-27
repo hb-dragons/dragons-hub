@@ -5,10 +5,11 @@ Detailed technical reference for AI agents working in this codebase. For guideli
 ## Package Dependency Graph
 
 ```
-@dragons/web  ──> @dragons/ui
-@dragons/api  ──> @dragons/sdk, @dragons/db
+@dragons/web  ──> @dragons/ui, @dragons/shared
+@dragons/api  ──> @dragons/sdk, @dragons/db, @dragons/shared
 @dragons/db   ──> (standalone - drizzle-orm + pg)
 @dragons/sdk  ──> (standalone - basketball-bund-sdk)
+@dragons/shared ──> (standalone - zod for validation schemas)
 @dragons/ui   ──> (standalone - radix-ui + tailwind)
 ```
 
