@@ -1,13 +1,7 @@
 import { asc, ilike } from "drizzle-orm";
 import { db } from "../../config/database";
 import { venues } from "@dragons/db/schema";
-
-export interface VenueSearchResult {
-  id: number;
-  name: string;
-  street: string | null;
-  city: string | null;
-}
+import type { VenueSearchResult, VenueListItem } from "@dragons/shared";
 
 export async function searchVenues(
   query: string,
@@ -25,17 +19,6 @@ export async function searchVenues(
     .limit(limit);
 
   return rows;
-}
-
-export interface VenueListItem {
-  id: number;
-  apiId: number;
-  name: string;
-  street: string | null;
-  postalCode: string | null;
-  city: string | null;
-  latitude: string | null;
-  longitude: string | null;
 }
 
 export async function getVenues(): Promise<VenueListItem[]> {

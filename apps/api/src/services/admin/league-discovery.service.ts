@@ -3,33 +3,12 @@ import { leagues } from "@dragons/db/schema";
 import { eq, and, notInArray } from "drizzle-orm";
 import { sdkClient } from "../sync/sdk-client";
 import type { SdkLiga } from "@dragons/sdk";
-
-export interface ResolvedLeague {
-  ligaNr: number;
-  ligaId: number;
-  name: string;
-  seasonName: string;
-}
-
-export interface ResolveResult {
-  resolved: ResolvedLeague[];
-  notFound: number[];
-  tracked: number;
-  untracked: number;
-}
-
-export interface TrackedLeague {
-  id: number;
-  ligaNr: number;
-  apiLigaId: number;
-  name: string;
-  seasonName: string;
-}
-
-export interface TrackedLeaguesResponse {
-  leagueNumbers: number[];
-  leagues: TrackedLeague[];
-}
+import type {
+  ResolvedLeague,
+  ResolveResult,
+  TrackedLeague,
+  TrackedLeaguesResponse,
+} from "@dragons/shared";
 
 export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<ResolveResult> {
   const allLigen = await sdkClient.getAllLigen();

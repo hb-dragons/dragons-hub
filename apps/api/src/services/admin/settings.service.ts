@@ -1,6 +1,8 @@
 import { db } from "../../config/database";
 import { appSettings } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
+import type { ClubConfig, BookingSettings } from "@dragons/shared";
+import { BOOKING_DEFAULTS } from "@dragons/shared";
 
 export async function getSetting(key: string): Promise<string | null> {
   const [row] = await db
@@ -21,11 +23,6 @@ export async function upsertSetting(key: string, value: string): Promise<void> {
     });
 }
 
-export interface ClubConfig {
-  clubId: number;
-  clubName: string;
-}
-
 export async function getClubConfig(): Promise<ClubConfig | null> {
   const clubId = await getSetting("club_id");
   const clubName = await getSetting("club_name");
@@ -37,20 +34,6 @@ export async function setClubConfig(clubId: number, clubName: string): Promise<v
   await upsertSetting("club_id", String(clubId));
   await upsertSetting("club_name", clubName);
 }
-
-export interface BookingSettings {
-  bufferBefore: number;
-  bufferAfter: number;
-  gameDuration: number;
-  dueDaysBefore: number;
-}
-
-const BOOKING_DEFAULTS: BookingSettings = {
-  bufferBefore: 60,
-  bufferAfter: 60,
-  gameDuration: 90,
-  dueDaysBefore: 7,
-};
 
 export async function getBookingSettings(): Promise<BookingSettings> {
   const bufferBefore = await getSetting("venue_booking_buffer_before");

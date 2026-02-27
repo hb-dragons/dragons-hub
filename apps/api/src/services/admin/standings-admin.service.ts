@@ -1,27 +1,7 @@
 import { db } from "../../config/database";
 import { standings, leagues, teams } from "@dragons/db/schema";
 import { eq, asc } from "drizzle-orm";
-
-export interface StandingItem {
-  position: number;
-  teamName: string;
-  teamNameShort: string | null;
-  isOwnClub: boolean;
-  played: number;
-  won: number;
-  lost: number;
-  pointsFor: number;
-  pointsAgainst: number;
-  pointsDiff: number;
-  leaguePoints: number;
-}
-
-export interface LeagueStandings {
-  leagueId: number;
-  leagueName: string;
-  seasonName: string;
-  standings: StandingItem[];
-}
+import type { StandingItem, LeagueStandings } from "@dragons/shared";
 
 export async function getStandings(): Promise<LeagueStandings[]> {
   const rows = await db
