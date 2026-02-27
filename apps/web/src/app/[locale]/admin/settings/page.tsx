@@ -5,6 +5,7 @@ import { SWR_KEYS } from "@/lib/swr-keys";
 import { ClubConfig } from "@/components/admin/settings/club-config";
 import { TrackedLeagues } from "@/components/admin/settings/tracked-leagues";
 import { BookingConfig } from "@/components/admin/settings/booking-config";
+import { ThemeSettings } from "@/components/admin/settings/theme-settings";
 import type {
   ClubConfig as ClubConfigType,
   TrackedLeaguesResponse,
@@ -49,6 +50,7 @@ export default async function SettingsPage() {
           </p>
         </div>
 
+        <ThemeSettings />
         <ClubConfig />
         <TrackedLeagues />
         <BookingConfig />

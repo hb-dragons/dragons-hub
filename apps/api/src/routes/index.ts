@@ -12,6 +12,10 @@ import { boardRoutes } from "./admin/board.routes";
 import { taskRoutes } from "./admin/task.routes";
 import { bookingRoutes } from "./admin/booking.routes";
 import { notificationRoutes } from "./admin/notification.routes";
+import { deviceRoutes } from "./device.routes";
+import { publicMatchRoutes } from "./public/match.routes";
+import { publicStandingsRoutes } from "./public/standings.routes";
+import { publicTeamRoutes } from "./public/team.routes";
 
 const routes = new Hono();
 
@@ -28,5 +32,9 @@ routes.route("/admin", boardRoutes);
 routes.route("/admin", taskRoutes);
 routes.route("/admin", bookingRoutes);
 routes.route("/admin", notificationRoutes);
+routes.route("/api/devices", deviceRoutes);
+routes.route("/public", publicMatchRoutes);
+routes.route("/public", publicStandingsRoutes);
+routes.route("/public", publicTeamRoutes);
 
 export { routes };

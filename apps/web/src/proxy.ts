@@ -24,7 +24,10 @@ export function proxy(request: NextRequest) {
   if (
     logicalPathname === "/" ||
     logicalPathname.startsWith("/auth") ||
-    logicalPathname.startsWith("/api/auth")
+    logicalPathname.startsWith("/api/auth") ||
+    logicalPathname.startsWith("/schedule") ||
+    logicalPathname.startsWith("/standings") ||
+    logicalPathname.startsWith("/teams")
   ) {
     return intlMiddleware(request);
   }

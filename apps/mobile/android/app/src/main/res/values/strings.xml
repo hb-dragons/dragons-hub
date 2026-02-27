@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dragons</string>
+    <string name="title_activity_main">Dragons</string>
+    <string name="package_name">com.dragons.app</string>
+    <string name="custom_url_scheme">com.dragons.app</string>
+</resources>

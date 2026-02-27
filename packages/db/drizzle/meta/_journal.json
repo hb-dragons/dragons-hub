@@ -57,6 +57,13 @@
       "when": 1772115723781,
       "tag": "0007_charming_karen_page",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772234636595,
+      "tag": "0008_icy_thunderbolts",
+      "breakpoints": true
     }
   ]
 }

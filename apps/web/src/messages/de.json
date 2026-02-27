@@ -14,7 +14,8 @@
     "venues": "Hallen",
     "users": "Benutzer",
     "board": "Board",
-    "bookings": "Buchungen"
+    "bookings": "Buchungen",
+    "menu": "Menü"
   },
   "common": {
     "save": "Speichern",
@@ -497,6 +498,12 @@
       "bufferAfter": "Nachlauf nach dem Spiel (min)",
       "gameDuration": "Standard-Spieldauer (min)",
       "dueDaysBefore": "Buchungsfrist (Tage vorher)"
+    },
+    "theme": {
+      "title": "Design",
+      "description": "Zwischen hellem und dunklem Modus wählen",
+      "light": "Hell",
+      "dark": "Dunkel"
     }
   },
   "time": {
@@ -510,6 +517,17 @@
     "switch": "Sprache",
     "de": "Deutsch",
     "en": "English"
+  },
+  "public": {
+    "schedule": "Spielplan",
+    "standings": "Tabellen",
+    "teams": "Mannschaften",
+    "upcomingMatches": "Nächste Spiele",
+    "recentResults": "Letzte Ergebnisse",
+    "noMatches": "Keine Spiele gefunden.",
+    "noStandings": "Keine Tabellen verfügbar.",
+    "noTeams": "Keine Mannschaften gefunden.",
+    "adminLink": "Admin-Bereich"
   },
   "errors": {
     "title": "Etwas ist schiefgelaufen",

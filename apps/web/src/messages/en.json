@@ -14,7 +14,8 @@
     "venues": "Venues",
     "users": "Users",
     "board": "Board",
-    "bookings": "Bookings"
+    "bookings": "Bookings",
+    "menu": "Menu"
   },
   "common": {
     "save": "Save",
@@ -497,6 +498,12 @@
       "bufferAfter": "Buffer After Game (min)",
       "gameDuration": "Default Game Duration (min)",
       "dueDaysBefore": "Booking Due Days Before"
+    },
+    "theme": {
+      "title": "Theme",
+      "description": "Choose between light and dark mode",
+      "light": "Light",
+      "dark": "Dark"
     }
   },
   "time": {
@@ -510,6 +517,17 @@
     "switch": "Language",
     "de": "Deutsch",
     "en": "English"
+  },
+  "public": {
+    "schedule": "Schedule",
+    "standings": "Standings",
+    "teams": "Teams",
+    "upcomingMatches": "Upcoming Matches",
+    "recentResults": "Recent Results",
+    "noMatches": "No matches found.",
+    "noStandings": "No standings available.",
+    "noTeams": "No teams found.",
+    "adminLink": "Admin Dashboard"
   },
   "errors": {
     "title": "Something went wrong",
