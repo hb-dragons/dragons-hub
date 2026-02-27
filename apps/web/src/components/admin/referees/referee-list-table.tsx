@@ -14,7 +14,7 @@ import { DataTable } from "@/components/ui/data-table"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 
-import type { RefereeListItem, RefereeListResponse } from "./types"
+import type { RefereeListItem, PaginatedResponse } from "./types"
 
 function getColumns(t: ReturnType<typeof useTranslations<"referees">>): ColumnDef<RefereeListItem, unknown>[] {
   return [
@@ -111,7 +111,7 @@ const refereeGlobalFilterFn: FilterFn<RefereeListItem> = (
 
 export function RefereeListTable() {
   const t = useTranslations("referees")
-  const { data: response } = useSWR<RefereeListResponse>(SWR_KEYS.referees, apiFetcher)
+  const { data: response } = useSWR<PaginatedResponse<RefereeListItem>>(SWR_KEYS.referees, apiFetcher)
   const columns = useMemo(() => getColumns(t), [t])
 
   const allItems = response?.items ?? []

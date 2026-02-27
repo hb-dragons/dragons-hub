@@ -3,15 +3,15 @@ import { fetchAPIServer } from "@/lib/api.server"
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { RefereeListTable } from "@/components/admin/referees/referee-list-table"
-import type { RefereeListResponse } from "@/components/admin/referees/types"
+import type { PaginatedResponse, RefereeListItem } from "@/components/admin/referees/types"
 
 export default async function RefereesPage() {
   const t = await getTranslations();
-  let data: RefereeListResponse | null = null
+  let data: PaginatedResponse<RefereeListItem> | null = null
   let error: string | null = null
 
   try {
-    data = await fetchAPIServer<RefereeListResponse>("/admin/referees")
+    data = await fetchAPIServer<PaginatedResponse<RefereeListItem>>("/admin/referees")
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API"
   }
