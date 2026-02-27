@@ -28,6 +28,7 @@ import {
 } from "@dragons/ui/components/dialog";
 import { Loader2 } from "lucide-react";
 import type { BoardColumnData, TaskCardData } from "./types";
+import { TASK_PRIORITIES } from "@dragons/shared";
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -132,10 +133,11 @@ export function CreateTaskDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">{t("board.priority.low")}</SelectItem>
-                  <SelectItem value="normal">{t("board.priority.normal")}</SelectItem>
-                  <SelectItem value="high">{t("board.priority.high")}</SelectItem>
-                  <SelectItem value="urgent">{t("board.priority.urgent")}</SelectItem>
+                  {TASK_PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {t(`board.priority.${p}`)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

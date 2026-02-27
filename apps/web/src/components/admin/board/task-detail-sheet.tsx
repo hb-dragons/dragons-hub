@@ -29,26 +29,8 @@ import {
   SheetDescription,
 } from "@dragons/ui/components/sheet";
 import { Loader2, Send } from "lucide-react";
-import type { TaskCardData } from "./types";
-
-interface TaskDetail extends TaskCardData {
-  checklist: ChecklistItem[];
-  comments: Comment[];
-}
-
-interface ChecklistItem {
-  id: number;
-  text: string;
-  checked: boolean;
-  position: number;
-}
-
-interface Comment {
-  id: number;
-  text: string;
-  authorName: string | null;
-  createdAt: string;
-}
+import type { TaskDetail, ChecklistItem, TaskComment, TaskCardData } from "@dragons/shared";
+import { TASK_PRIORITIES } from "@dragons/shared";
 
 interface TaskDetailSheetProps {
   task: TaskCardData | null;
@@ -113,12 +95,12 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
     }
   }
 
-  async function toggleChecklistItem(itemId: number, checked: boolean) {
+  async function toggleChecklistItem(itemId: number, isChecked: boolean) {
     if (!task) return;
     try {
       await fetchAPI(`/admin/tasks/${task.id}/checklist/${itemId}`, {
         method: "PATCH",
-        body: JSON.stringify({ checked }),
+        body: JSON.stringify({ isChecked }),
       });
       await mutate(`/admin/tasks/${task.id}`);
       await mutate(SWR_KEYS.boardTasks(boardId));
@@ -133,7 +115,7 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
     try {
       await fetchAPI(`/admin/tasks/${task.id}/comments`, {
         method: "POST",
-        body: JSON.stringify({ text: newComment.trim() }),
+        body: JSON.stringify({ body: newComment.trim() }),
       });
       setNewComment("");
       await mutate(`/admin/tasks/${task.id}`);
@@ -181,10 +163,11 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">{t("board.priority.low")}</SelectItem>
-                    <SelectItem value="normal">{t("board.priority.normal")}</SelectItem>
-                    <SelectItem value="high">{t("board.priority.high")}</SelectItem>
-                    <SelectItem value="urgent">{t("board.priority.urgent")}</SelectItem>
+                    {TASK_PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {t(`board.priority.${p}`)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -224,19 +207,19 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
                     .map((item) => (
                       <div key={item.id} className="flex items-center gap-2">
                         <Checkbox
-                          checked={item.checked}
+                          checked={item.isChecked}
                           onCheckedChange={(checked) =>
                             toggleChecklistItem(item.id, checked === true)
                           }
                         />
                         <span
                           className={
-                            item.checked
+                            item.isChecked
                               ? "text-sm text-muted-foreground line-through"
                               : "text-sm"
                           }
                         >
-                          {item.text}
+                          {item.label}
                         </span>
                       </div>
                     ))}
@@ -255,10 +238,10 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
                       className="rounded-md border bg-muted/50 p-2 text-sm"
                     >
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{comment.authorName ?? "Unknown"}</span>
+                        <span>{comment.authorId ?? "Unknown"}</span>
                         <span>{new Date(comment.createdAt).toLocaleString()}</span>
                       </div>
-                      <p className="mt-1">{comment.text}</p>
+                      <p className="mt-1">{comment.body}</p>
                     </div>
                   ))}
                 </div>

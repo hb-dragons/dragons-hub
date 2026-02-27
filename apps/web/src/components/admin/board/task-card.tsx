@@ -4,8 +4,9 @@ import { useTranslations } from "next-intl";
 import { Badge } from "@dragons/ui/components/badge";
 import { Calendar, CheckSquare, Link as LinkIcon } from "lucide-react";
 import type { TaskCardData } from "./types";
+import type { TaskPriority } from "@dragons/shared";
 
-const priorityVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+const priorityVariant: Record<TaskPriority, "default" | "secondary" | "destructive" | "outline"> = {
   low: "secondary",
   normal: "outline",
   high: "default",
@@ -20,12 +21,8 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onDragStart, onClick }: TaskCardProps) {
   const t = useTranslations("board");
-  const variant = priorityVariant[task.priority] ?? priorityVariant.normal;
-  const priorityKey = (["low", "normal", "high", "urgent"] as const).includes(
-    task.priority as "low" | "normal" | "high" | "urgent",
-  )
-    ? (task.priority as "low" | "normal" | "high" | "urgent")
-    : "normal";
+  const variant = priorityVariant[task.priority];
+  const priorityKey = task.priority;
   const hasChecklist = task.checklistTotal > 0;
   const hasLink = task.matchId !== null || task.venueBookingId !== null;
 
