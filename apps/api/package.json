@@ -17,6 +17,7 @@
     "@bull-board/hono": "^6.18.1",
     "@dragons/db": "workspace:*",
     "@dragons/sdk": "workspace:*",
+    "@dragons/shared": "workspace:*",
     "@hono/node-server": "^1.19.9",
     "basketball-bund-sdk": "github:dirkdrutschmann/basketball-bund-sdk",
     "better-auth": "^1.4.18",

@@ -29,6 +29,9 @@ importers:
       '@dragons/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
+      '@dragons/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@hono/node-server':
         specifier: ^1.19.9
         version: 1.19.9(hono@4.11.9)
@@ -99,6 +102,9 @@ importers:
       '@daveyplate/better-auth-ui':
         specifier: ^3.3.15
         version: 3.3.15(ae0d577f2e76771bde2b2fb3bfd33e86)
+      '@dragons/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@dragons/ui':
         specifier: workspace:*
         version: link:../../packages/ui
