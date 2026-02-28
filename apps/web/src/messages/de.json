@@ -519,6 +519,7 @@
     "en": "English"
   },
   "public": {
+    "home": "Home",
     "schedule": "Spielplan",
     "standings": "Tabellen",
     "teams": "Mannschaften",
@@ -527,7 +528,21 @@
     "noMatches": "Keine Spiele gefunden.",
     "noStandings": "Keine Tabellen verfügbar.",
     "noTeams": "Keine Mannschaften gefunden.",
-    "adminLink": "Admin-Bereich"
+    "adminLink": "Admin-Bereich",
+    "nextMatch": "Nächstes Spiel",
+    "allMatches": "Alle Spiele",
+    "upcoming": "Anstehend",
+    "results": "Ergebnisse",
+    "vs": "vs",
+    "at": "in",
+    "league": "Liga",
+    "season": "Saison",
+    "matchCancelled": "Abgesagt",
+    "matchForfeited": "Kampflos",
+    "noUpcoming": "Keine anstehenden Spiele",
+    "leaguesCount": "{count, plural, =1 {# Liga} other {# Ligen}}",
+    "teamsCount": "{count, plural, =1 {# Team} other {# Teams}}",
+    "matchesCount": "{count, plural, =1 {# Spiel} other {# Spiele}}"
   },
   "errors": {
     "title": "Etwas ist schiefgelaufen",

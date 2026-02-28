@@ -102,8 +102,8 @@
 }
 
 @theme inline {
-  --font-sans: Apfel Grotezk, ui-sans-serif, sans-serif, system-ui;
-  --font-mono: Departure Mono, ui-sans-serif, sans-serif, system-ui;
+  --font-sans: 'Archivo', ui-sans-serif, sans-serif, system-ui;
+  --font-mono: ui-monospace, monospace;
   /* Custom brand colors */
   --color-blue-primary: var(--blue-primary);
   --color-blue-shade: var(--blue-shade);

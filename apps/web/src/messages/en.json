@@ -519,6 +519,7 @@
     "en": "English"
   },
   "public": {
+    "home": "Home",
     "schedule": "Schedule",
     "standings": "Standings",
     "teams": "Teams",
@@ -527,7 +528,21 @@
     "noMatches": "No matches found.",
     "noStandings": "No standings available.",
     "noTeams": "No teams found.",
-    "adminLink": "Admin Dashboard"
+    "adminLink": "Admin Dashboard",
+    "nextMatch": "Next Match",
+    "allMatches": "All Matches",
+    "upcoming": "Upcoming",
+    "results": "Results",
+    "vs": "vs",
+    "at": "at",
+    "league": "League",
+    "season": "Season",
+    "matchCancelled": "Cancelled",
+    "matchForfeited": "Forfeited",
+    "noUpcoming": "No upcoming matches",
+    "leaguesCount": "{count, plural, =1 {# league} other {# leagues}}",
+    "teamsCount": "{count, plural, =1 {# team} other {# teams}}",
+    "matchesCount": "{count, plural, =1 {# match} other {# matches}}"
   },
   "errors": {
     "title": "Something went wrong",
