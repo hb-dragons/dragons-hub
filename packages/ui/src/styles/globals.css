@@ -99,6 +99,9 @@
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
 
+  /* Dark-mode brand colors for public pages */
+  --mint-tint: #1a3d2a;
+  --mint-shade: #6CE9A9;
 }
 
 @theme inline {
