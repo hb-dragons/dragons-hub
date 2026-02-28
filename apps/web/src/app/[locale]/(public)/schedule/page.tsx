@@ -1,5 +1,5 @@
 import { fetchAPI } from "@/lib/api";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import type { MatchListItem } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 
@@ -16,6 +16,7 @@ function groupByDate(matches: MatchListItem[]): Map<string, MatchListItem[]> {
 
 export default async function SchedulePage() {
   const t = await getTranslations("public");
+  const locale = await getLocale();
   const data = await fetchAPI<{ items: MatchListItem[] }>(
     "/public/matches?limit=100",
   ).catch(() => ({ items: [] }));
@@ -36,9 +37,9 @@ export default async function SchedulePage() {
 
       {Array.from(grouped.entries()).map(([date, matches]) => (
         <section key={date}>
-          <h2 className="sticky top-14 z-10 -mx-4 bg-background/95 backdrop-blur px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b">
+          <h2 className="sticky top-[calc(3.5rem+var(--safe-area-top))] z-10 -mx-4 bg-background/95 backdrop-blur px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b">
             {date !== "unknown"
-              ? new Date(date).toLocaleDateString("de-DE", {
+              ? new Date(date).toLocaleDateString(locale, {
                   weekday: "long",
                   day: "numeric",
                   month: "long",

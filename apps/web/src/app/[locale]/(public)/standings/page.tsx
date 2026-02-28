@@ -91,8 +91,8 @@ function StandingsRow({
     return (
       <tr className={cn("border-b last:border-0", isOwn && "bg-mint-tint/10")}>
         <td className="px-2 py-2.5 tabular-nums text-muted-foreground">{row.position}</td>
-        <td className={cn("px-2 py-2.5 font-medium truncate max-w-[160px]", isOwn && "text-mint-shade font-semibold")}>
-          {row.teamNameShort ?? row.teamName}
+        <td className={cn("px-2 py-2.5 font-medium", isOwn && "text-mint-shade font-semibold")}>
+          <span className="block truncate max-w-[160px]">{row.teamNameShort ?? row.teamName}</span>
         </td>
         <td className="px-2 py-2.5 text-center tabular-nums">{row.won}-{row.lost}</td>
         <td className="px-2 py-2.5 text-center font-semibold tabular-nums">{row.leaguePoints}</td>

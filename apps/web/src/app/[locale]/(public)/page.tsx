@@ -1,11 +1,12 @@
 import { fetchAPI } from "@/lib/api";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/lib/navigation";
 import { CalendarDays, Trophy, Users } from "lucide-react";
 import type { MatchListItem, LeagueStandings } from "@dragons/shared";
 
 export default async function HomePage() {
   const t = await getTranslations("public");
+  const locale = await getLocale();
 
   const [matchData, standings] = await Promise.all([
     fetchAPI<{ items: MatchListItem[]; total: number }>(
@@ -53,7 +54,7 @@ export default async function HomePage() {
                 )}
                 <span className="text-xs text-muted-foreground">
                   {nextMatch.kickoffDate
-                    ? new Date(nextMatch.kickoffDate).toLocaleDateString("de-DE", {
+                    ? new Date(nextMatch.kickoffDate).toLocaleDateString(locale, {
                         weekday: "short",
                         day: "numeric",
                         month: "short",
