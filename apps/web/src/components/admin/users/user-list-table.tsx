@@ -139,7 +139,21 @@ async function fetchUsers(): Promise<UserListItem[]> {
     },
   })
   if (error) throw error
-  return (data?.users as UserListItem[]) ?? []
+  return (
+    data?.users.map((u): UserListItem => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      emailVerified: u.emailVerified,
+      role: u.role ?? null,
+      banned: u.banned ?? null,
+      banReason: u.banReason ?? null,
+      banExpires: u.banExpires instanceof Date ? u.banExpires.getTime() : u.banExpires ?? null,
+      image: u.image ?? null,
+      createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
+      updatedAt: u.updatedAt instanceof Date ? u.updatedAt.toISOString() : String(u.updatedAt),
+    })) ?? []
+  )
 }
 
 export function UserListTable() {
