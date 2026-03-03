@@ -22,7 +22,8 @@
   "pnpm": {
     "overrides": {
       "replace>minimatch": "3.1.5",
-      "@capacitor/cli@5>tar": "7.5.9"
+      "@capacitor/cli@5>tar": "7.5.9",
+      "@better-auth/core": "1.5.2"
     }
   }
 }
