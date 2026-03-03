@@ -63,6 +63,7 @@ locals {
     "roles/secretmanager.secretAccessor",
     "roles/iam.serviceAccountUser",
     "roles/cloudsql.client",
+    "roles/serviceusage.serviceUsageViewer",
   ]
 }
 
