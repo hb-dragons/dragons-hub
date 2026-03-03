@@ -22,6 +22,10 @@ export const auth = betterAuth({
   },
   advanced: {
     cookiePrefix: "dragons",
+    crossSubDomainCookies:
+      env.NODE_ENV === "production"
+        ? { enabled: true, domain: ".app.hbdragons.de" }
+        : { enabled: false },
     defaultCookieAttributes: {
       sameSite: "lax",
       httpOnly: true,
