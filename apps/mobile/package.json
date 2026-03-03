@@ -9,17 +9,17 @@
     "cap:assets": "capacitor-assets generate"
   },
   "dependencies": {
-    "@capacitor/core": "^8.0.0",
-    "@capacitor/ios": "^8.0.0",
-    "@capacitor/android": "^8.0.0",
-    "@capacitor/splash-screen": "^8.0.0",
-    "@capacitor/push-notifications": "^8.0.0",
-    "@capacitor/preferences": "^8.0.0",
-    "@aparajita/capacitor-biometric-auth": "^10.0.0"
+    "@aparajita/capacitor-biometric-auth": "^10.0.0",
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/ios": "^8.1.0",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/push-notifications": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.0.0",
-    "@capacitor/assets": "^3.0.0",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.1.0",
     "typescript": "~5.9.3"
   }
 }
