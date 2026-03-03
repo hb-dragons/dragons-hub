@@ -2,7 +2,7 @@ FROM node:24-alpine AS base
 RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
 
 FROM base AS builder
-RUN apk add --no-cache git
+RUN apk add --no-cache git openssh-client
 WORKDIR /app
 
 # Copy workspace files
