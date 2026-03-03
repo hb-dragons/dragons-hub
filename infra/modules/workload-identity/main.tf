@@ -61,9 +61,17 @@ locals {
     "roles/run.invoker",
     "roles/artifactregistry.writer",
     "roles/secretmanager.secretAccessor",
+    "roles/secretmanager.admin",
     "roles/iam.serviceAccountUser",
-    "roles/cloudsql.client",
-    "roles/serviceusage.serviceUsageViewer",
+    "roles/iam.serviceAccountAdmin",
+    "roles/iam.workloadIdentityPoolAdmin",
+    "roles/cloudsql.admin",
+    "roles/compute.admin",
+    "roles/storage.objectAdmin",
+    "roles/serviceusage.serviceUsageAdmin",
+    "roles/vpcaccess.admin",
+    "roles/servicenetworking.networksAdmin",
+    "roles/resourcemanager.projectIamAdmin",
   ]
 }
 
