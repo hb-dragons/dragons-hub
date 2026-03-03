@@ -36,6 +36,7 @@ export const syncWorker = new Worker<SyncJobData>(
     }
   },
   {
+    prefix: "{bull}",
     connection: { url: env.REDIS_URL },
     concurrency: 1,
   },

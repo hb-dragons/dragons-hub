@@ -5,6 +5,7 @@ import { db } from "../config/database";
 import { syncSchedule, syncRuns } from "@dragons/db/schema";
 
 export const syncQueue = new Queue("sync", {
+  prefix: "{bull}",
   connection: { url: env.REDIS_URL },
   defaultJobOptions: {
     attempts: 3,

@@ -1,0 +1,102 @@
+name: Database Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Migration action"
+        required: true
+        default: "migrate"
+        type: choice
+        options:
+          - migrate
+          - push
+          - check
+
+concurrency:
+  group: migrations-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Run Migration
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.29.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Setup Cloud SQL Proxy
+        run: |
+          curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.0/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+
+      - name: Get Cloud SQL Instance
+        id: sql
+        run: |
+          INSTANCE=$(gcloud sql instances list --filter="name~dragons-db-production" --format="value(connectionName)")
+          echo "instance=${INSTANCE}" >> $GITHUB_OUTPUT
+
+      - name: Start Cloud SQL Proxy
+        run: |
+          ./cloud-sql-proxy ${{ steps.sql.outputs.instance }} --port=5432 &
+          sleep 5
+
+      - name: Get Database Credentials
+        id: creds
+        run: |
+          DB_URL=$(gcloud secrets versions access latest --secret="database-url-production" | sed 's|host=/cloudsql/[^&]*|host=localhost|')
+          echo "::add-mask::${DB_URL}"
+          echo "DATABASE_URL=${DB_URL}" >> $GITHUB_OUTPUT
+
+      - name: Apply Migrations
+        if: github.event.inputs.action == 'migrate'
+        run: pnpm --filter @dragons/db db:migrate
+        env:
+          DATABASE_URL: ${{ steps.creds.outputs.DATABASE_URL }}
+
+      - name: Push Schema
+        if: github.event.inputs.action == 'push'
+        run: pnpm --filter @dragons/db db:push
+        env:
+          DATABASE_URL: ${{ steps.creds.outputs.DATABASE_URL }}
+
+      - name: Check Schema
+        if: github.event.inputs.action == 'check'
+        run: |
+          cd packages/db
+          pnpm drizzle-kit check
+        env:
+          DATABASE_URL: ${{ steps.creds.outputs.DATABASE_URL }}
+
+      - name: Summary
+        run: |
+          echo "## Database Migration" >> $GITHUB_STEP_SUMMARY
+          echo "**Action:** ${{ github.event.inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** Completed" >> $GITHUB_STEP_SUMMARY

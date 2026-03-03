@@ -1,6 +1,8 @@
-import { config } from "dotenv";
-import { resolve } from "node:path";
-config({ path: resolve(import.meta.dirname, "../../../.env") });
+if (process.env.NODE_ENV !== "production") {
+  const { config } = await import("dotenv");
+  const { resolve } = await import("node:path");
+  config({ path: resolve(import.meta.dirname, "../../../.env") });
+}
 
 // Dynamic imports — must come after dotenv so env vars are available
 // when modules that access env at top level (e.g. queues.ts) are loaded.

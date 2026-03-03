@@ -1,0 +1,18 @@
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to version control
+
+project_id     = "your-gcp-project-id"
+project_number = "123456789012"
+region         = "europe-west3"
+
+# GitHub (for Workload Identity CI/CD)
+github_org  = "your-github-org"
+github_repo = "dragons-all"
+
+# Custom Domains
+web_domain = "app.dragons.example.com"
+api_domain = "api.dragons.example.com"
+
+# Basketball-Bund SDK credentials
+sdk_username = "your-sdk-username"
+sdk_password = "your-sdk-password"
