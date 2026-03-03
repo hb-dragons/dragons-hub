@@ -73,6 +73,7 @@ locals {
     "roles/servicenetworking.networksAdmin",
     "roles/resourcemanager.projectIamAdmin",
     "roles/networkconnectivity.admin",
+    "roles/memorystore.admin",
   ]
 }
 
