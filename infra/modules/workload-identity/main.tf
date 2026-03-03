@@ -58,15 +58,11 @@ resource "google_service_account_iam_member" "workload_identity" {
 locals {
   github_actions_roles = [
     "roles/run.admin",
+    "roles/run.invoker",
     "roles/artifactregistry.writer",
     "roles/secretmanager.secretAccessor",
-    "roles/cloudsql.admin",
-    "roles/compute.admin",
     "roles/iam.serviceAccountUser",
-    "roles/storage.objectAdmin",
-    "roles/serviceusage.serviceUsageAdmin",
-    "roles/vpcaccess.admin",
-    "roles/servicenetworking.networksAdmin",
+    "roles/cloudsql.client",
   ]
 }
 

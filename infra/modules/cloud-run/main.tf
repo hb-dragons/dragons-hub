@@ -99,6 +99,12 @@ variable "vpc_connector" {
   default     = null
 }
 
+variable "service_account" {
+  description = "Service account email for the Cloud Run service"
+  type        = string
+  default     = null
+}
+
 resource "google_cloud_run_v2_service" "main" {
   name     = var.service_name
   location = var.region
@@ -109,6 +115,8 @@ resource "google_cloud_run_v2_service" "main" {
   invoker_iam_disabled = var.ingress == "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
 
   template {
+    service_account = var.service_account
+
     scaling {
       min_instance_count = var.min_instances
       max_instance_count = var.max_instances

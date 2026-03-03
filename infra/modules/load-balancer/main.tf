@@ -39,7 +39,7 @@ resource "google_compute_global_address" "lb_ip" {
 }
 
 resource "google_compute_managed_ssl_certificate" "web_cert" {
-  name = "dragons-web-cert-${var.environment}-${replace(var.web_domain, ".", "-")}"
+  name = substr("dragons-web-cert-${var.environment}-${replace(var.web_domain, ".", "-")}", 0, 63)
 
   managed {
     domains = [var.web_domain]
@@ -51,7 +51,7 @@ resource "google_compute_managed_ssl_certificate" "web_cert" {
 }
 
 resource "google_compute_managed_ssl_certificate" "api_cert" {
-  name = "dragons-api-cert-${var.environment}-${replace(var.api_domain, ".", "-")}"
+  name = substr("dragons-api-cert-${var.environment}-${replace(var.api_domain, ".", "-")}", 0, 63)
 
   managed {
     domains = [var.api_domain]
@@ -142,6 +142,30 @@ resource "google_compute_global_forwarding_rule" "lb_forwarding_rule" {
   name                  = "dragons-lb-rule-${var.environment}"
   target                = google_compute_target_https_proxy.lb_proxy.id
   port_range            = "443"
+  ip_address            = google_compute_global_address.lb_ip.address
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+}
+
+# HTTP-to-HTTPS redirect
+resource "google_compute_url_map" "http_redirect" {
+  name = "dragons-http-redirect-${var.environment}"
+
+  default_url_redirect {
+    https_redirect         = true
+    strip_query            = false
+    redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+  }
+}
+
+resource "google_compute_target_http_proxy" "http_redirect" {
+  name    = "dragons-http-proxy-${var.environment}"
+  url_map = google_compute_url_map.http_redirect.id
+}
+
+resource "google_compute_global_forwarding_rule" "http_redirect" {
+  name                  = "dragons-http-redirect-${var.environment}"
+  target                = google_compute_target_http_proxy.http_redirect.id
+  port_range            = "80"
   ip_address            = google_compute_global_address.lb_ip.address
   load_balancing_scheme = "EXTERNAL_MANAGED"
 }

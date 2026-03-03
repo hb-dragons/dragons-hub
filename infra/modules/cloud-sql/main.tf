@@ -54,6 +54,12 @@ variable "availability_type" {
   default     = "ZONAL"
 }
 
+variable "network_id" {
+  description = "VPC network ID for private IP"
+  type        = string
+  default     = null
+}
+
 resource "google_sql_database_instance" "main" {
   name                = var.instance_name
   database_version    = "POSTGRES_17"
@@ -85,14 +91,18 @@ resource "google_sql_database_instance" "main" {
       update_track = "stable"
     }
 
-    insights_config {
-      query_insights_enabled  = true
-      record_application_tags = true
-      record_client_address   = true
+    dynamic "insights_config" {
+      for_each = can(regex("^db-f1-|^db-g1-", var.tier)) ? [] : [1]
+      content {
+        query_insights_enabled  = true
+        record_application_tags = true
+        record_client_address   = true
+      }
     }
 
     ip_configuration {
-      ipv4_enabled = true
+      ipv4_enabled    = var.network_id == null
+      private_network = var.network_id
     }
 
     database_flags {
@@ -130,6 +140,6 @@ output "database_url" {
 }
 
 output "public_ip" {
-  description = "Public IP address"
-  value       = google_sql_database_instance.main.public_ip_address
+  description = "Public IP address (null when private-only)"
+  value       = var.network_id == null ? google_sql_database_instance.main.public_ip_address : null
 }

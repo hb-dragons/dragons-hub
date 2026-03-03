@@ -22,7 +22,7 @@ variable "github_org" {
 variable "github_repo" {
   description = "GitHub repository name"
   type        = string
-  default     = "dragons-all"
+  default     = "dragons-hub"
 }
 
 variable "web_domain" {
@@ -33,6 +33,12 @@ variable "web_domain" {
 variable "api_domain" {
   description = "Custom domain for the API service (e.g., api.dragons.example.com)"
   type        = string
+}
+
+variable "image_tag" {
+  description = "Container image tag for initial deployment"
+  type        = string
+  default     = "latest"
 }
 
 variable "sdk_username" {

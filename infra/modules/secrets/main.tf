@@ -3,9 +3,9 @@ variable "project_id" {
   type        = string
 }
 
-variable "project_number" {
-  description = "GCP project number"
-  type        = string
+variable "service_account_emails" {
+  description = "Service account emails to grant secret access"
+  type        = list(string)
 }
 
 variable "secret_names" {
@@ -34,11 +34,22 @@ resource "google_secret_manager_secret_version" "versions" {
   secret_data = var.secret_values[each.key]
 }
 
+locals {
+  secret_sa_pairs = flatten([
+    for secret in var.secret_names : [
+      for email in var.service_account_emails : {
+        secret_key = secret
+        email      = email
+      }
+    ]
+  ])
+}
+
 resource "google_secret_manager_secret_iam_member" "cloud_run_access" {
-  for_each  = toset(var.secret_names)
-  secret_id = google_secret_manager_secret.secrets[each.key].id
+  for_each  = { for pair in local.secret_sa_pairs : "${pair.secret_key}-${pair.email}" => pair }
+  secret_id = google_secret_manager_secret.secrets[each.value.secret_key].id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${var.project_number}-compute@developer.gserviceaccount.com"
+  member    = "serviceAccount:${each.value.email}"
 }
 
 output "secret_ids" {

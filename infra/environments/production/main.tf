@@ -64,6 +64,21 @@ resource "random_password" "auth_secret" {
   special = false
 }
 
+resource "random_id" "db_name_suffix" {
+  byte_length = 2
+}
+
+# Dedicated service accounts for Cloud Run
+resource "google_service_account" "api" {
+  account_id   = "dragons-api"
+  display_name = "Dragons API"
+}
+
+resource "google_service_account" "web" {
+  account_id   = "dragons-web"
+  display_name = "Dragons Web"
+}
+
 # Artifact Registry
 module "artifact_registry" {
   source = "../../modules/artifact-registry"
@@ -96,7 +111,7 @@ module "database" {
 
   project_id          = var.project_id
   region              = var.region
-  instance_name       = "dragons-db-production"
+  instance_name       = "dragons-db-production-${random_id.db_name_suffix.hex}"
   database_name       = "dragons"
   database_user       = "dragons"
   database_password   = random_password.db_password.result
@@ -104,15 +119,16 @@ module "database" {
   environment         = "production"
   deletion_protection = true
   availability_type   = "ZONAL"
+  network_id          = module.network.network_id
 
-  depends_on = [google_project_service.apis]
+  depends_on = [module.network, google_project_service.apis]
 }
 
-# Grant Cloud SQL Client role for Cloud Run
-resource "google_project_iam_member" "cloud_run_cloudsql_client" {
+# Grant Cloud SQL Client role for API service account
+resource "google_project_iam_member" "api_cloudsql_client" {
   project = var.project_id
   role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${var.project_number}-compute@developer.gserviceaccount.com"
+  member  = "serviceAccount:${google_service_account.api.email}"
 
   depends_on = [google_project_service.apis]
 }
@@ -138,8 +154,8 @@ module "valkey" {
 module "secrets" {
   source = "../../modules/secrets"
 
-  project_id     = var.project_id
-  project_number = var.project_number
+  project_id             = var.project_id
+  service_account_emails = [google_service_account.api.email]
   secret_names = [
     "database-url-production",
     "redis-url-production",
@@ -162,12 +178,13 @@ module "secrets" {
 module "api" {
   source = "../../modules/cloud-run"
 
-  project_id    = var.project_id
-  region        = var.region
-  service_name  = "dragons-api-production"
-  image         = "${local.artifact_registry_url}/api:latest"
-  port          = 8080
-  vpc_connector = module.network.connector_id
+  project_id      = var.project_id
+  region          = var.region
+  service_name    = "dragons-api-production"
+  image           = "${local.artifact_registry_url}/api:${var.image_tag}"
+  port            = 8080
+  vpc_connector   = module.network.connector_id
+  service_account = google_service_account.api.email
 
   cpu           = "1"
   memory        = "512Mi"
@@ -214,11 +231,12 @@ module "api" {
 module "web" {
   source = "../../modules/cloud-run"
 
-  project_id   = var.project_id
-  region       = var.region
-  service_name = "dragons-web-production"
-  image        = "${local.artifact_registry_url}/web:latest"
-  port         = 3000
+  project_id      = var.project_id
+  region          = var.region
+  service_name    = "dragons-web-production"
+  image           = "${local.artifact_registry_url}/web:${var.image_tag}"
+  port            = 3000
+  service_account = google_service_account.web.email
 
   cpu           = "1"
   memory        = "512Mi"
