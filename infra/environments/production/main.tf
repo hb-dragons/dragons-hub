@@ -280,13 +280,6 @@ module "workload_identity" {
   depends_on = [google_project_service.apis]
 }
 
-# Grant GitHub Actions SA access to the Tofu state bucket
-resource "google_storage_bucket_iam_member" "github_actions_state" {
-  bucket = "dragons-tofu-state"
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${module.workload_identity.service_account_email}"
-}
-
 # Outputs
 output "web_url" {
   value = module.web.url
