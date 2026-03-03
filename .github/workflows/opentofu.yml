@@ -153,7 +153,7 @@ jobs:
           tofu_version: ${{ env.TOFU_VERSION }}
 
       - name: Download Plan
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: tfplan-production
           path: infra/environments/production
