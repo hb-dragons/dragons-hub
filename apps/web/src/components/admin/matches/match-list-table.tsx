@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useTranslations, useFormatter } from "next-intl"
 import useSWR, { useSWRConfig } from "swr"
 import { apiFetcher } from "@/lib/swr"
@@ -277,12 +277,8 @@ export function MatchListTable() {
   const { data: response } = useSWR<PaginatedResponse<MatchListItem>>(SWR_KEYS.matches, apiFetcher)
   const columns = useMemo(() => getColumns(t, format), [t, format])
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
-  const displayedMatchId = useRef<number | null>(null)
-  if (selectedMatchId !== null) {
-    displayedMatchId.current = selectedMatchId
-  }
 
-  const allItems = response?.items ?? []
+  const allItems = useMemo(() => response?.items ?? [], [response?.items])
   const teamOptions = useMemo(
     () => [...new Set(allItems.map((m) => getOwnTeamLabel(m)))].sort(),
     [allItems],
@@ -368,7 +364,7 @@ export function MatchListTable() {
         }}
       >
         <MatchEditSheet
-          matchId={displayedMatchId.current}
+          matchId={selectedMatchId}
           open={selectedMatchId !== null}
           onOpenChange={(open) => {
             if (!open) setSelectedMatchId(null)

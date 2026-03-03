@@ -5,7 +5,7 @@ import { Button } from "@dragons/ui/components/button";
 import { Link } from "@/lib/navigation";
 
 export default function AdminError({
-  error,
+  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };

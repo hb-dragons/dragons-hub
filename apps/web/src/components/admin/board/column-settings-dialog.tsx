@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useSWRConfig } from "swr";
-import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { Button } from "@dragons/ui/components/button";

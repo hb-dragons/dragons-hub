@@ -17,7 +17,6 @@ import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
 import { Textarea } from "@dragons/ui/components/textarea";
-import { Separator } from "@dragons/ui/components/separator";
 import {
   Field,
   FieldLabel,

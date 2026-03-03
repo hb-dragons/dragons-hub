@@ -35,7 +35,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@dragons/ui/components/card";
-import type { TaskDetail, ChecklistItem, TaskComment, TaskCardData } from "@dragons/shared";
+import type { TaskDetail, TaskCardData } from "@dragons/shared";
 import { TASK_PRIORITIES } from "@dragons/shared";
 
 interface TaskDetailSheetProps {

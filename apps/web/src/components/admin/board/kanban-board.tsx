@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
@@ -39,7 +39,7 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
 
   const columns = board?.columns ?? [];
-  const taskList = tasks ?? [];
+  const taskList = useMemo(() => tasks ?? [], [tasks]);
 
   const getColumnTasks = useCallback(
     (columnId: number) =>

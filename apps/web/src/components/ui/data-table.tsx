@@ -64,6 +64,7 @@ export function DataTable<TData, TValue>({
   )
   const [globalFilter, setGlobalFilter] = useState("")
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- opted out via "use no memo" above
   const table = useReactTable({
     data,
     columns,

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@dragons/ui/components/button";
 
 export default function LocaleError({
-  error,
+  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };
