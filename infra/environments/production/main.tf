@@ -268,6 +268,15 @@ module "load_balancer" {
   depends_on = [module.web, module.api, google_project_service.apis]
 }
 
+# Grant GitHub Actions SA access to Tofu state bucket (bootstrap dependency:
+# this must exist for tofu init to succeed, so it cannot be replaced by a
+# project-level role that is itself managed by this Tofu config)
+resource "google_storage_bucket_iam_member" "github_actions_state" {
+  bucket = "dragons-tofu-state"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${module.workload_identity.service_account_email}"
+}
+
 # Workload Identity for GitHub Actions
 module "workload_identity" {
   source = "../../modules/workload-identity"
