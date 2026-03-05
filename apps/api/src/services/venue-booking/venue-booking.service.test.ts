@@ -547,7 +547,7 @@ describe("reconcileBookingsForMatches", () => {
     expect(result.updated).toBe(0);
   });
 
-  it("sets needsReconfirmation when confirmed booking window changes", async () => {
+  it("reverts confirmed booking to pending with reconfirmation when window changes", async () => {
     await seedBasicTeams();
     const venueId = await insertVenue();
     const matchId = await insertMatch({
@@ -562,6 +562,8 @@ describe("reconcileBookingsForMatches", () => {
       calculated_end_time: "18:00:00",
       status: "confirmed",
       needs_reconfirmation: false,
+      confirmed_at: "2025-03-01T12:00:00Z",
+      confirmed_by: "admin-user",
     });
     await insertBookingMatch(bookingId, matchId);
 
@@ -571,8 +573,9 @@ describe("reconcileBookingsForMatches", () => {
 
     const bookings = await getBookings();
     expect(bookings[0]!.needs_reconfirmation).toBe(true);
-    // Status remains confirmed
-    expect(bookings[0]!.status).toBe("confirmed");
+    expect(bookings[0]!.status).toBe("pending");
+    expect(bookings[0]!.confirmed_at).toBeNull();
+    expect(bookings[0]!.confirmed_by).toBeNull();
   });
 
   it("preserves existing needsReconfirmation if already true for non-confirmed", async () => {
