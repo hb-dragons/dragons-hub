@@ -24,14 +24,6 @@ export interface BookingListItem {
   needsReconfirmation: boolean;
   notes: string | null;
   matchCount: number;
-  task: { id: number; title: string } | null;
-}
-
-export interface BookingDetailTask {
-  id: number;
-  title: string;
-  columnName: string;
-  status: string;
 }
 
 export interface BookingDetail {
@@ -53,18 +45,5 @@ export interface BookingDetail {
   confirmedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  matches: BookingMatch[];
-  task: BookingDetailTask | null;
-}
-
-/** Subset used when showing booking info on task detail */
-export interface BookingInfo {
-  id: number;
-  venueName: string;
-  date: string;
-  effectiveStartTime: string;
-  effectiveEndTime: string;
-  status: BookingStatus;
-  needsReconfirmation: boolean;
   matches: BookingMatch[];
 }

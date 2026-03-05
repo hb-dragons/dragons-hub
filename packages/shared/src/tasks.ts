@@ -1,5 +1,4 @@
 import type { TaskPriority } from "./constants";
-import type { BookingInfo } from "./bookings";
 
 export interface TaskCardData {
   id: number;
@@ -11,9 +10,6 @@ export interface TaskCardData {
   dueDate: string | null;
   position: number;
   columnId: number;
-  matchId: number | null;
-  venueBookingId: number | null;
-  sourceType: string;
   checklistTotal: number;
   checklistChecked: number;
 }
@@ -36,11 +32,9 @@ export interface TaskComment {
 }
 
 export interface TaskDetail extends TaskCardData {
-  sourceDetail: string | null;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
   checklist: ChecklistItem[];
   comments: TaskComment[];
-  booking: BookingInfo | null;
 }
