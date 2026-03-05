@@ -140,8 +140,6 @@ describe("POST /boards/:boardId/tasks", () => {
         assigneeId: "user-1",
         priority: "high",
         dueDate: "2025-06-01",
-        matchId: 10,
-        venueBookingId: 5,
       }),
     });
 
@@ -152,8 +150,6 @@ describe("POST /boards/:boardId/tasks", () => {
       assigneeId: "user-1",
       priority: "high",
       dueDate: "2025-06-01",
-      matchId: 10,
-      venueBookingId: 5,
     });
   });
 

@@ -34,38 +34,6 @@ import {
 // --- PGlite setup ---
 
 const CREATE_TABLES = `
-  CREATE TABLE venues (
-    id SERIAL PRIMARY KEY,
-    api_id INTEGER NOT NULL UNIQUE,
-    name VARCHAR(200) NOT NULL,
-    street VARCHAR(200),
-    postal_code VARCHAR(10),
-    city VARCHAR(100),
-    latitude NUMERIC(10,7),
-    longitude NUMERIC(10,7),
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE venue_bookings (
-    id SERIAL PRIMARY KEY,
-    venue_id INTEGER NOT NULL REFERENCES venues(id),
-    date DATE NOT NULL,
-    calculated_start_time TIME NOT NULL,
-    calculated_end_time TIME NOT NULL,
-    override_start_time TIME,
-    override_end_time TIME,
-    override_reason TEXT,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    needs_reconfirmation BOOLEAN NOT NULL DEFAULT FALSE,
-    notes TEXT,
-    confirmed_by TEXT,
-    confirmed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
   CREATE TABLE boards (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -96,10 +64,6 @@ const CREATE_TABLES = `
     priority VARCHAR(10) NOT NULL DEFAULT 'normal',
     due_date DATE,
     position INTEGER NOT NULL DEFAULT 0,
-    match_id INTEGER,
-    venue_booking_id INTEGER REFERENCES venue_bookings(id),
-    source_type VARCHAR(20) NOT NULL DEFAULT 'manual',
-    source_detail TEXT,
     created_by TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -125,46 +89,6 @@ const CREATE_TABLES = `
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 
-  CREATE TABLE teams (
-    id SERIAL PRIMARY KEY,
-    api_team_permanent_id INTEGER NOT NULL UNIQUE,
-    name VARCHAR(200) NOT NULL,
-    short_name VARCHAR(100),
-    custom_name VARCHAR(200),
-    is_own_club BOOLEAN NOT NULL DEFAULT FALSE,
-    liga_id INTEGER,
-    data_hash VARCHAR(64),
-    estimated_game_duration INTEGER,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE matches (
-    id SERIAL PRIMARY KEY,
-    api_match_id INTEGER NOT NULL UNIQUE,
-    liga_id INTEGER NOT NULL,
-    match_no INTEGER NOT NULL DEFAULT 0,
-    matchday INTEGER,
-    kickoff_date DATE,
-    kickoff_time TIME,
-    home_team_api_id INTEGER,
-    guest_team_api_id INTEGER,
-    venue_id INTEGER REFERENCES venues(id),
-    home_score INTEGER,
-    guest_score INTEGER,
-    status VARCHAR(20) NOT NULL DEFAULT 'active',
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE venue_booking_matches (
-    id SERIAL PRIMARY KEY,
-    venue_booking_id INTEGER NOT NULL REFERENCES venue_bookings(id) ON DELETE CASCADE,
-    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(venue_booking_id, match_id)
-  );
 `;
 
 let client: PGlite;
@@ -180,26 +104,16 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await client.exec("DELETE FROM venue_booking_matches");
   await client.exec("DELETE FROM task_comments");
   await client.exec("DELETE FROM task_checklist_items");
   await client.exec("DELETE FROM tasks");
   await client.exec("DELETE FROM board_columns");
   await client.exec("DELETE FROM boards");
-  await client.exec("DELETE FROM matches");
-  await client.exec("DELETE FROM venue_bookings");
-  await client.exec("DELETE FROM venues");
-  await client.exec("DELETE FROM teams");
   await client.exec("ALTER SEQUENCE boards_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE board_columns_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE tasks_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE task_checklist_items_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE task_comments_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venues_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venue_bookings_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE matches_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venue_booking_matches_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE teams_id_seq RESTART WITH 1");
   vi.clearAllMocks();
 });
 
@@ -216,16 +130,6 @@ async function createBoardWithColumns() {
     VALUES (1, 'To Do', 0, false), (1, 'In Progress', 1, false), (1, 'Done', 2, true)
   `);
   return { boardId: 1, todoColId: 1, inProgressColId: 2, doneColId: 3 };
-}
-
-async function createVenueAndBooking() {
-  await client.exec(
-    "INSERT INTO venues (api_id, name) VALUES (100, 'Arena')",
-  );
-  await client.exec(
-    "INSERT INTO venue_bookings (venue_id, date, calculated_start_time, calculated_end_time, status) VALUES (1, '2025-06-01', '18:00', '20:00', 'pending')",
-  );
-  return { venueId: 1, bookingId: 1 };
 }
 
 // --- Tests ---
@@ -343,15 +247,12 @@ describe("createTask", () => {
       assigneeId: "user-1",
       priority: "high",
       dueDate: "2025-06-01",
-      matchId: 10,
-      venueBookingId: null,
     });
 
     expect(result!.description).toBe("Details here");
     expect(result!.assigneeId).toBe("user-1");
     expect(result!.priority).toBe("high");
     expect(result!.dueDate).toBe("2025-06-01");
-    expect(result!.matchId).toBe(10);
   });
 
   it("auto-increments position within column", async () => {
@@ -423,7 +324,6 @@ describe("getTaskDetail", () => {
 
     expect(result!.checklist).toEqual([]);
     expect(result!.comments).toEqual([]);
-    expect(result!.booking).toBeNull();
   });
 });
 
@@ -476,58 +376,6 @@ describe("moveTask", () => {
     expect(result).not.toBeNull();
     expect(result!.columnId).toBe(inProgressColId);
     expect(result!.position).toBe(0);
-  });
-
-  it("updates venue booking when moved to done column", async () => {
-    const { boardId, todoColId, doneColId } = await createBoardWithColumns();
-    await createVenueAndBooking();
-
-    await client.exec(
-      `INSERT INTO tasks (board_id, column_id, title, venue_booking_id) VALUES (${boardId}, ${todoColId}, 'Booking Task', 1)`,
-    );
-
-    await moveTask(1, doneColId, 0);
-
-    const booking = await client.query(
-      "SELECT status, needs_reconfirmation, confirmed_at FROM venue_bookings WHERE id = 1",
-    );
-    const row = booking.rows[0] as {
-      status: string;
-      needs_reconfirmation: boolean;
-      confirmed_at: Date | null;
-    };
-    expect(row.status).toBe("confirmed");
-    expect(row.needs_reconfirmation).toBe(false);
-    expect(row.confirmed_at).not.toBeNull();
-  });
-
-  it("does not update booking when moved to non-done column", async () => {
-    const { boardId, todoColId, inProgressColId } = await createBoardWithColumns();
-    await createVenueAndBooking();
-
-    await client.exec(
-      `INSERT INTO tasks (board_id, column_id, title, venue_booking_id) VALUES (${boardId}, ${todoColId}, 'Booking Task', 1)`,
-    );
-
-    await moveTask(1, inProgressColId, 0);
-
-    const booking = await client.query(
-      "SELECT status FROM venue_bookings WHERE id = 1",
-    );
-    expect((booking.rows[0] as { status: string }).status).toBe("pending");
-  });
-
-  it("does not update booking when task has no venueBookingId", async () => {
-    const { boardId, todoColId, doneColId } = await createBoardWithColumns();
-
-    await client.exec(
-      `INSERT INTO tasks (board_id, column_id, title) VALUES (${boardId}, ${todoColId}, 'Plain Task')`,
-    );
-
-    const result = await moveTask(1, doneColId, 0);
-
-    expect(result).not.toBeNull();
-    expect(result!.columnId).toBe(doneColId);
   });
 
   it("returns null for non-existent task", async () => {

@@ -146,8 +146,6 @@ describe("taskCreateBodySchema", () => {
       assigneeId: "user-1",
       priority: "high" as const,
       dueDate: "2025-06-01",
-      matchId: 10,
-      venueBookingId: 5,
     };
     expect(taskCreateBodySchema.parse(body)).toEqual(body);
   });
@@ -159,8 +157,6 @@ describe("taskCreateBodySchema", () => {
       description: null,
       assigneeId: null,
       dueDate: null,
-      matchId: null,
-      venueBookingId: null,
     };
     expect(taskCreateBodySchema.parse(body)).toEqual(body);
   });
