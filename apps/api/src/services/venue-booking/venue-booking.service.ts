@@ -9,7 +9,6 @@ import {
 } from "@dragons/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { calculateTimeWindow, type BookingConfig } from "./booking-calculator";
-import { reconcileTasksAfterBookingUpdate } from "./task-automation.service";
 
 const log = logger.child({ service: "venue-booking" });
 
@@ -155,29 +154,27 @@ export async function reconcileBookingsForMatches(
         existing.calculatedEndTime !== window.calculatedEndTime;
 
       if (windowChanged) {
-        const needsReconfirmation =
-          existing.status === "confirmed" ? true : existing.needsReconfirmation;
+        const updateData: Record<string, unknown> = {
+          calculatedStartTime: window.calculatedStartTime,
+          calculatedEndTime: window.calculatedEndTime,
+          needsReconfirmation:
+            existing.status === "confirmed" ? true : existing.needsReconfirmation,
+          updatedAt: new Date(),
+        };
+
+        // If booking was confirmed and times changed, revert to pending
+        if (existing.status === "confirmed") {
+          updateData.status = "pending";
+          updateData.confirmedAt = null;
+          updateData.confirmedBy = null;
+        }
 
         await db
           .update(venueBookings)
-          .set({
-            calculatedStartTime: window.calculatedStartTime,
-            calculatedEndTime: window.calculatedEndTime,
-            needsReconfirmation,
-            updatedAt: new Date(),
-          })
+          .set(updateData)
           .where(eq(venueBookings.id, existing.id));
 
         result.updated++;
-
-        // Trigger task reconfirmation if booking now needs it
-        if (needsReconfirmation && !existing.needsReconfirmation) {
-          try {
-            await reconcileTasksAfterBookingUpdate(existing.id, false, true);
-          } catch (err) {
-            log.error({ err, bookingId: existing.id }, "Failed to handle task reconfirmation");
-          }
-        }
       } else {
         result.unchanged++;
       }
@@ -209,13 +206,6 @@ export async function reconcileBookingsForMatches(
 
       result.created++;
       touchedBookingIds.add(created!.id);
-
-      // Auto-create task for the new booking
-      try {
-        await reconcileTasksAfterBookingUpdate(created!.id, true, false);
-      } catch (err) {
-        log.error({ err, bookingId: created!.id }, "Failed to auto-create task for booking");
-      }
     }
   }
 
