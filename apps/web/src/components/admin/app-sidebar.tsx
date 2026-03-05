@@ -23,6 +23,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from "@dragons/ui/components/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
@@ -59,6 +60,7 @@ const navGroups = [
 export function AppSidebar() {
   const pathname = usePathname();
   const t = useTranslations();
+  const { setOpenMobile } = useSidebar();
 
   return (
     <Sidebar>
@@ -81,7 +83,7 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                     >
-                      <Link href={item.href}>
+                      <Link href={item.href} onClick={() => setOpenMobile(false)}>
                         <item.icon />
                         <span>{t(item.labelKey)}</span>
                       </Link>
