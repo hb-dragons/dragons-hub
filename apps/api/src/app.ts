@@ -1,10 +1,13 @@
 import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { openAPIRouteHandler } from "hono-openapi";
+import { Scalar } from "@scalar/hono-api-reference";
 import { errorHandler } from "./middleware/error";
 import { corsMiddleware } from "./middleware/cors";
 import { requestLogger } from "./middleware/request-logger";
 import { requireAdmin } from "./middleware/auth";
 import { auth } from "./config/auth";
+import { openApiSpec } from "./config/openapi";
 import { routes } from "./routes/index";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
@@ -25,6 +28,10 @@ createBullBoard({
 app.use("*", corsMiddleware);
 app.use("*", requestLogger);
 app.onError(errorHandler);
+
+// OpenAPI spec and interactive docs (public, before auth)
+app.get("/openapi.json", openAPIRouteHandler(app, { documentation: openApiSpec }));
+app.get("/docs", Scalar({ url: "/openapi.json" }));
 
 // Better Auth handler
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));

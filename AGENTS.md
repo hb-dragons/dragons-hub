@@ -154,6 +154,8 @@ Wrapper around basketball-bund-sdk at `services/sync/sdk-client.ts`:
 |--------|------|-------------|
 | GET | `/` | Service metadata |
 | GET | `/health` | Health check: `{ status: "ok" }` |
+| GET | `/openapi.json` | OpenAPI 3.1 spec (auto-generated from route annotations) |
+| GET | `/docs` | Interactive API docs (Scalar UI) |
 
 ### Authentication (Better Auth)
 

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import {
   getClubConfig,
@@ -10,10 +11,18 @@ import {
 const settingsRoutes = new Hono();
 
 // GET /admin/settings/club - Get current club config
-settingsRoutes.get("/settings/club", async (c) => {
-  const config = await getClubConfig();
-  return c.json(config);
-});
+settingsRoutes.get(
+  "/settings/club",
+  describeRoute({
+    description: "Get current club configuration",
+    tags: ["Settings"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const config = await getClubConfig();
+    return c.json(config);
+  },
+);
 
 const clubConfigSchema = z.object({
   clubId: z.number().int().positive(),
@@ -21,17 +30,33 @@ const clubConfigSchema = z.object({
 });
 
 // PUT /admin/settings/club - Set club config
-settingsRoutes.put("/settings/club", async (c) => {
-  const body = clubConfigSchema.parse(await c.req.json());
-  await setClubConfig(body.clubId, body.clubName);
-  return c.json({ clubId: body.clubId, clubName: body.clubName });
-});
+settingsRoutes.put(
+  "/settings/club",
+  describeRoute({
+    description: "Set club configuration",
+    tags: ["Settings"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const body = clubConfigSchema.parse(await c.req.json());
+    await setClubConfig(body.clubId, body.clubName);
+    return c.json({ clubId: body.clubId, clubName: body.clubName });
+  },
+);
 
 // GET /admin/settings/booking - Get booking config
-settingsRoutes.get("/settings/booking", async (c) => {
-  const config = await getBookingSettings();
-  return c.json(config);
-});
+settingsRoutes.get(
+  "/settings/booking",
+  describeRoute({
+    description: "Get booking configuration",
+    tags: ["Settings"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const config = await getBookingSettings();
+    return c.json(config);
+  },
+);
 
 const bookingConfigSchema = z.object({
   bufferBefore: z.number().int().min(0),
@@ -41,10 +66,18 @@ const bookingConfigSchema = z.object({
 });
 
 // PUT /admin/settings/booking - Set booking config
-settingsRoutes.put("/settings/booking", async (c) => {
-  const body = bookingConfigSchema.parse(await c.req.json());
-  await setBookingSettings(body);
-  return c.json(body);
-});
+settingsRoutes.put(
+  "/settings/booking",
+  describeRoute({
+    description: "Set booking configuration",
+    tags: ["Settings"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const body = bookingConfigSchema.parse(await c.req.json());
+    await setBookingSettings(body);
+    return c.json(body);
+  },
+);
 
 export { settingsRoutes };

@@ -91,4 +91,21 @@ describe("api routes", () => {
       message: "Hello from Hono",
     });
   });
+
+  it("serves OpenAPI spec at /openapi.json", async () => {
+    const response = await app.request("/openapi.json");
+
+    expect(response.status).toBe(200);
+    const spec = await response.json();
+    expect(spec.openapi).toBe("3.1.0");
+    expect(spec.info.title).toBe("Dragons API");
+    expect(spec.paths).toBeDefined();
+  });
+
+  it("serves Scalar docs at /docs", async () => {
+    const response = await app.request("/docs");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+  });
 });
