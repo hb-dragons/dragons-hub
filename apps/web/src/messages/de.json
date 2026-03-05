@@ -15,7 +15,10 @@
     "users": "Benutzer",
     "board": "Board",
     "bookings": "Buchungen",
-    "menu": "Menü"
+    "menu": "Menü",
+    "groupLeague": "Liga",
+    "groupOperations": "Betrieb",
+    "groupSystem": "System"
   },
   "common": {
     "save": "Speichern",
