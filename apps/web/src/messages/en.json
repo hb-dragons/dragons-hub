@@ -459,10 +459,34 @@
     "description": "Track venue booking status for home games",
     "empty": "No venue bookings found",
     "status": { "pending": "Pending", "requested": "Requested", "confirmed": "Confirmed", "cancelled": "Cancelled" },
-    "needsReconfirmation": "Needs re-confirmation",
+    "needsReconfirmation": "Needs re-confirmation — match times have changed since this was confirmed",
     "columns": { "date": "Date", "venue": "Venue", "timeWindow": "Time Window", "matches": "Matches", "status": "Status" },
+    "create": {
+      "title": "New Booking",
+      "venue": "Venue",
+      "venuePlaceholder": "Select venue...",
+      "date": "Date",
+      "startTime": "Start Time",
+      "endTime": "End Time",
+      "notes": "Notes",
+      "notesPlaceholder": "Optional notes...",
+      "submit": "Create Booking"
+    },
     "override": { "label": "Override Time", "reason": "Reason" },
-    "toast": { "updated": "Booking updated", "statusChanged": "Status updated" }
+    "toast": { "updated": "Booking updated", "statusChanged": "Status updated", "deleted": "Booking deleted", "created": "Booking created" },
+    "detail": {
+      "times": "Time Window",
+      "calculatedTime": "Calculated",
+      "overrideStart": "Override Start",
+      "overrideEnd": "Override End",
+      "reasonPlaceholder": "Reason for override...",
+      "linkedMatches": "Linked Matches",
+      "notes": "Notes",
+      "notesPlaceholder": "Add notes...",
+      "delete": "Delete Booking",
+      "deleteConfirmTitle": "Delete Booking?",
+      "deleteConfirmDescription": "This will permanently delete this booking and its match links. This action cannot be undone."
+    }
   },
   "settings": {
     "title": "Settings",

@@ -456,13 +456,37 @@
   },
   "bookings": {
     "title": "Hallenbuchungen",
-    "description": "Buchungsstatus der Hallen für Heimspiele verfolgen",
+    "description": "Buchungsstatus für Heimspiele verwalten",
     "empty": "Keine Hallenbuchungen gefunden",
     "status": { "pending": "Ausstehend", "requested": "Angefragt", "confirmed": "Bestätigt", "cancelled": "Storniert" },
-    "needsReconfirmation": "Bestätigung erforderlich",
+    "needsReconfirmation": "Erneute Bestätigung erforderlich — Spielzeiten haben sich seit der Bestätigung geändert",
     "columns": { "date": "Datum", "venue": "Halle", "timeWindow": "Zeitfenster", "matches": "Spiele", "status": "Status" },
-    "override": { "label": "Zeit überschreiben", "reason": "Grund" },
-    "toast": { "updated": "Buchung aktualisiert", "statusChanged": "Status aktualisiert" }
+    "create": {
+      "title": "Neue Buchung",
+      "venue": "Halle",
+      "venuePlaceholder": "Halle auswählen...",
+      "date": "Datum",
+      "startTime": "Startzeit",
+      "endTime": "Endzeit",
+      "notes": "Notizen",
+      "notesPlaceholder": "Optionale Notizen...",
+      "submit": "Buchung erstellen"
+    },
+    "override": { "label": "Zeitfenster überschreiben", "reason": "Grund" },
+    "toast": { "updated": "Buchung aktualisiert", "statusChanged": "Status aktualisiert", "deleted": "Buchung gelöscht", "created": "Buchung erstellt" },
+    "detail": {
+      "times": "Zeitfenster",
+      "calculatedTime": "Berechnet",
+      "overrideStart": "Überschriebener Start",
+      "overrideEnd": "Überschriebenes Ende",
+      "reasonPlaceholder": "Grund für Überschreibung...",
+      "linkedMatches": "Verknüpfte Spiele",
+      "notes": "Notizen",
+      "notesPlaceholder": "Notizen hinzufügen...",
+      "delete": "Buchung löschen",
+      "deleteConfirmTitle": "Buchung löschen?",
+      "deleteConfirmDescription": "Diese Buchung und alle Spielverknüpfungen werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+    }
   },
   "settings": {
     "title": "Einstellungen",

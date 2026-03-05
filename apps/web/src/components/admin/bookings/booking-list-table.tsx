@@ -7,6 +7,7 @@ import { apiFetcher } from "@/lib/swr";
 import { fetchAPI } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { Badge } from "@dragons/ui/components/badge";
+import { Sheet } from "@dragons/ui/components/sheet";
 import {
   Select,
   SelectContent,
@@ -22,8 +23,11 @@ import {
   TableHeader,
   TableRow,
 } from "@dragons/ui/components/table";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { Button } from "@dragons/ui/components/button";
+import { AlertTriangle, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { BookingDetailSheet } from "./booking-detail-sheet";
+import { CreateBookingDialog } from "./create-booking-dialog";
 import type { BookingListItem } from "./types";
 
 const statusVariantMap: Record<
@@ -47,6 +51,8 @@ export function BookingListTable() {
   const { mutate } = useSWRConfig();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   async function handleStatusChange(bookingId: number, newStatus: string) {
     setUpdatingId(bookingId);
@@ -94,6 +100,10 @@ export function BookingListTable() {
             <SelectItem value="cancelled">{t("bookings.status.cancelled")}</SelectItem>
           </SelectContent>
         </Select>
+        <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          {t("bookings.create.title")}
+        </Button>
       </div>
 
       <Table>
@@ -108,7 +118,11 @@ export function BookingListTable() {
         </TableHeader>
         <TableBody>
           {filtered.map((booking) => (
-            <TableRow key={booking.id}>
+            <TableRow
+              key={booking.id}
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() => setSelectedBookingId(booking.id)}
+            >
               <TableCell className="font-medium tabular-nums">
                 {booking.date}
               </TableCell>
@@ -156,6 +170,27 @@ export function BookingListTable() {
           ))}
         </TableBody>
       </Table>
+
+      <Sheet
+        open={selectedBookingId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedBookingId(null);
+        }}
+      >
+        {selectedBookingId && (
+          <BookingDetailSheet
+            bookingId={selectedBookingId}
+            onClose={() => setSelectedBookingId(null)}
+            onUpdated={() => mutate(SWR_KEYS.bookings)}
+          />
+        )}
+      </Sheet>
+
+      <CreateBookingDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onCreated={() => mutate(SWR_KEYS.bookings)}
+      />
     </div>
   );
 }
