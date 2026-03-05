@@ -347,6 +347,8 @@ export async function createBooking(
     .values({
       venueId: data.venueId,
       date: data.date,
+      calculatedStartTime: data.overrideStartTime,
+      calculatedEndTime: data.overrideEndTime,
       overrideStartTime: data.overrideStartTime,
       overrideEndTime: data.overrideEndTime,
       overrideReason: data.overrideReason ?? null,

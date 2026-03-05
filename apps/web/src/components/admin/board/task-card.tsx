@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Badge } from "@dragons/ui/components/badge";
-import { Calendar, CheckSquare, Link as LinkIcon } from "lucide-react";
+import { Calendar, CheckSquare } from "lucide-react";
 import type { TaskCardData } from "./types";
 import type { TaskPriority } from "@dragons/shared";
 
@@ -24,7 +24,6 @@ export function TaskCard({ task, onDragStart, onClick }: TaskCardProps) {
   const variant = priorityVariant[task.priority];
   const priorityKey = task.priority;
   const hasChecklist = task.checklistTotal > 0;
-  const hasLink = task.matchId !== null || task.venueBookingId !== null;
 
   return (
     <div
@@ -51,11 +50,6 @@ export function TaskCard({ task, onDragStart, onClick }: TaskCardProps) {
           <span className="inline-flex items-center gap-1">
             <CheckSquare className="h-3 w-3" />
             {task.checklistChecked}/{task.checklistTotal}
-          </span>
-        )}
-        {hasLink && (
-          <span className="inline-flex items-center gap-1">
-            <LinkIcon className="h-3 w-3" />
           </span>
         )}
       </div>
