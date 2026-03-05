@@ -32,6 +32,7 @@ import {
   reconcileBookingsForMatches,
   reconcileAfterSync,
   reconcileMatch,
+  previewReconciliation,
 } from "./venue-booking.service";
 
 // --- PGlite setup ---
@@ -1037,5 +1038,306 @@ describe("reconcileMatch", () => {
     const bookings = await getBookings();
     expect(bookings).toHaveLength(1);
     expect(bookings[0]!.id).toBe(bookingId);
+  });
+});
+
+describe("previewReconciliation", () => {
+  it("returns empty preview when no home matches exist", async () => {
+    const preview = await previewReconciliation();
+
+    expect(preview).toEqual({
+      toCreate: [],
+      toUpdate: [],
+      toRemove: [],
+      unchanged: 0,
+    });
+  });
+
+  it("returns toCreate for new bookings needed", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    await insertMatch({ venue_id: venueId });
+
+    const preview = await previewReconciliation();
+
+    expect(preview.toCreate).toHaveLength(1);
+    expect(preview.toUpdate).toHaveLength(0);
+    expect(preview.toRemove).toHaveLength(0);
+    expect(preview.unchanged).toBe(0);
+
+    const item = preview.toCreate[0]!;
+    expect(item.venueName).toBe("Sporthalle Am Park");
+    expect(item.date).toBe("2025-03-15");
+    expect(item.calculatedStartTime).toBe("17:00:00");
+    expect(item.calculatedEndTime).toBe("20:30:00");
+    expect(item.matches).toHaveLength(1);
+    expect(item.matches[0]!.homeTeam).toBe("Dragons Herren 1");
+    expect(item.matches[0]!.guestTeam).toBe("Opponents");
+    expect(item.matches[0]!.kickoffTime).toBe("18:00:00");
+    expect(item.matches[0]!.isForfeited).toBe(false);
+    expect(item.matches[0]!.isCancelled).toBe(false);
+  });
+
+  it("returns toUpdate when time window changed for existing booking", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "18:00:00" });
+
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "16:00:00",
+      calculated_end_time: "18:00:00",
+    });
+    await insertBookingMatch(bookingId, matchId);
+
+    const preview = await previewReconciliation();
+
+    expect(preview.toCreate).toHaveLength(0);
+    expect(preview.toUpdate).toHaveLength(1);
+    expect(preview.toRemove).toHaveLength(0);
+    expect(preview.unchanged).toBe(0);
+
+    const item = preview.toUpdate[0]!;
+    expect(item.bookingId).toBe(bookingId);
+    expect(item.currentStartTime).toBe("16:00:00");
+    expect(item.currentEndTime).toBe("18:00:00");
+    expect(item.newStartTime).toBe("17:00:00");
+    expect(item.newEndTime).toBe("20:30:00");
+  });
+
+  it("returns toRemove for bookings with all matches cancelled", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const matchId = await insertMatch({
+      venue_id: venueId,
+      is_cancelled: true,
+    });
+
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "17:00:00",
+      calculated_end_time: "20:30:00",
+    });
+    await insertBookingMatch(bookingId, matchId);
+
+    const preview = await previewReconciliation();
+
+    expect(preview.toCreate).toHaveLength(0);
+    expect(preview.toUpdate).toHaveLength(0);
+    expect(preview.toRemove).toHaveLength(1);
+    expect(preview.unchanged).toBe(0);
+
+    const item = preview.toRemove[0]!;
+    expect(item.bookingId).toBe(bookingId);
+    expect(item.reason).toBe("all_matches_cancelled");
+    expect(item.matches).toHaveLength(1);
+    expect(item.matches[0]!.isCancelled).toBe(true);
+  });
+
+  it("returns toRemove for orphaned bookings with no matching matches", async () => {
+    await seedBasicTeams();
+    const venue1 = await insertVenue({ api_id: 501, name: "Venue A" });
+    const venue2 = await insertVenue({ api_id: 502, name: "Venue B" });
+
+    // A real home match at venue1 so the function does not return early
+    await insertMatch({ venue_id: venue1 });
+
+    // An orphaned booking at venue2 with no corresponding home matches
+    const orphanedBookingId = await insertBooking({
+      venue_id: venue2,
+      date: "2025-04-01",
+      calculated_start_time: "17:00:00",
+      calculated_end_time: "20:30:00",
+    });
+
+    const preview = await previewReconciliation();
+
+    // venue1 match should be in toCreate, orphaned booking at venue2 should be in toRemove
+    expect(preview.toCreate).toHaveLength(1);
+    expect(preview.toRemove).toHaveLength(1);
+    expect(preview.toRemove[0]!.bookingId).toBe(orphanedBookingId);
+    expect(preview.toRemove[0]!.reason).toBe("no_matches");
+  });
+
+  it("increments unchanged for matching bookings", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "18:00:00" });
+
+    // Create booking with correct calculated times (default config: -60, +90+60)
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "17:00:00",
+      calculated_end_time: "20:30:00",
+    });
+    await insertBookingMatch(bookingId, matchId);
+
+    const preview = await previewReconciliation();
+
+    expect(preview.toCreate).toHaveLength(0);
+    expect(preview.toUpdate).toHaveLength(0);
+    expect(preview.toRemove).toHaveLength(0);
+    expect(preview.unchanged).toBe(1);
+  });
+
+  it("returns toUpdate when matches added to existing booking", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const m1 = await insertMatch({
+      api_match_id: 9001,
+      venue_id: venueId,
+      kickoff_time: "14:00:00",
+    });
+    const m2 = await insertMatch({
+      api_match_id: 9002,
+      venue_id: venueId,
+      kickoff_time: "18:00:00",
+    });
+
+    // Booking only linked to m1
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "13:00:00",
+      calculated_end_time: "16:30:00",
+    });
+    await insertBookingMatch(bookingId, m1);
+
+    const preview = await previewReconciliation();
+
+    expect(preview.toUpdate).toHaveLength(1);
+    const item = preview.toUpdate[0]!;
+    expect(item.bookingId).toBe(bookingId);
+    expect(item.matchesAdded).toHaveLength(1);
+    expect(item.matchesAdded[0]!.id).toBe(m2);
+    expect(item.matchesRemoved).toHaveLength(0);
+  });
+
+  it("returns toUpdate when matches removed from existing booking", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const m1 = await insertMatch({
+      api_match_id: 9001,
+      venue_id: venueId,
+      kickoff_time: "14:00:00",
+    });
+    // m2 is an away game at the same venue+date (home team is opponent)
+    const m2 = await insertMatch({
+      api_match_id: 9002,
+      venue_id: venueId,
+      kickoff_time: "18:00:00",
+      home_team_api_id: 2000,
+      guest_team_api_id: 1000,
+    });
+
+    // Booking linked to both m1 and m2
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "13:00:00",
+      calculated_end_time: "20:30:00",
+    });
+    await insertBookingMatch(bookingId, m1);
+    await insertBookingMatch(bookingId, m2);
+
+    const preview = await previewReconciliation();
+
+    expect(preview.toUpdate).toHaveLength(1);
+    const item = preview.toUpdate[0]!;
+    expect(item.bookingId).toBe(bookingId);
+    expect(item.matchesRemoved).toHaveLength(1);
+    expect(item.matchesRemoved[0]!.id).toBe(m2);
+  });
+});
+
+describe("reconcileBookingsForMatches — forfeited/cancelled handling", () => {
+  it("removes booking when all matches are forfeited", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const matchId = await insertMatch({
+      venue_id: venueId,
+      is_forfeited: true,
+    });
+
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "17:00:00",
+      calculated_end_time: "20:30:00",
+    });
+    await insertBookingMatch(bookingId, matchId);
+
+    const result = await reconcileBookingsForMatches([matchId]);
+
+    expect(result.removed).toBe(1);
+    const bookings = await getBookings();
+    expect(bookings).toHaveLength(0);
+    const links = await getBookingMatches();
+    expect(links).toHaveLength(0);
+  });
+
+  it("removes booking when all matches are cancelled", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const matchId = await insertMatch({
+      venue_id: venueId,
+      is_cancelled: true,
+    });
+
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "17:00:00",
+      calculated_end_time: "20:30:00",
+    });
+    await insertBookingMatch(bookingId, matchId);
+
+    const result = await reconcileBookingsForMatches([matchId]);
+
+    expect(result.removed).toBe(1);
+    const bookings = await getBookings();
+    expect(bookings).toHaveLength(0);
+    const links = await getBookingMatches();
+    expect(links).toHaveLength(0);
+  });
+
+  it("keeps booking junction entries for remaining active matches when some are forfeited", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const activeMatch = await insertMatch({
+      api_match_id: 9001,
+      venue_id: venueId,
+      kickoff_time: "14:00:00",
+    });
+    const forfeitedMatch = await insertMatch({
+      api_match_id: 9002,
+      venue_id: venueId,
+      kickoff_time: "18:00:00",
+      is_forfeited: true,
+    });
+
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "13:00:00",
+      calculated_end_time: "20:30:00",
+    });
+    await insertBookingMatch(bookingId, activeMatch);
+    await insertBookingMatch(bookingId, forfeitedMatch);
+
+    const result = await reconcileBookingsForMatches([activeMatch, forfeitedMatch]);
+
+    // Booking should still exist (has active match)
+    expect(result.removed).toBe(0);
+    const bookings = await getBookings();
+    expect(bookings).toHaveLength(1);
+
+    // Only the active match should remain in the junction
+    const links = await getBookingMatches(bookingId);
+    expect(links).toHaveLength(1);
+    expect(links[0]!.match_id).toBe(activeMatch);
   });
 });

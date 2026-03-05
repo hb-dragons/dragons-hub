@@ -413,6 +413,47 @@ describe("POST /bookings", () => {
   });
 });
 
+describe("GET /bookings/reconcile/preview", () => {
+  it("returns reconciliation preview", async () => {
+    const preview = { toCreate: [], toUpdate: [], toRemove: [], unchanged: 3 };
+    mocks.previewReconciliation.mockResolvedValue(preview);
+
+    const res = await app.request("/bookings/reconcile/preview");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(preview);
+    expect(mocks.previewReconciliation).toHaveBeenCalled();
+  });
+
+  it("returns 500 when preview fails", async () => {
+    mocks.previewReconciliation.mockRejectedValue(new Error("DB error"));
+
+    const res = await app.request("/bookings/reconcile/preview");
+
+    expect(res.status).toBe(500);
+  });
+});
+
+describe("POST /bookings/reconcile", () => {
+  it("applies reconciliation and returns result", async () => {
+    mocks.reconcileAfterSync.mockResolvedValue(undefined);
+
+    const res = await app.request("/bookings/reconcile", { method: "POST" });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ applied: true });
+    expect(mocks.reconcileAfterSync).toHaveBeenCalled();
+  });
+
+  it("returns 500 when reconciliation fails", async () => {
+    mocks.reconcileAfterSync.mockRejectedValue(new Error("DB error"));
+
+    const res = await app.request("/bookings/reconcile", { method: "POST" });
+
+    expect(res.status).toBe(500);
+  });
+});
+
 describe("DELETE /bookings/:id", () => {
   it("deletes booking and returns success", async () => {
     mocks.deleteBooking.mockResolvedValue(true);
