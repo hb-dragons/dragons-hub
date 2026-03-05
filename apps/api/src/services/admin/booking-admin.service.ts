@@ -5,8 +5,9 @@ import {
   venues,
   matches,
   teams,
+  leagues,
 } from "@dragons/db/schema";
-import { eq, and, gte, lte, sql, count } from "drizzle-orm";
+import { eq, and, gte, lte, sql, count, asc } from "drizzle-orm";
 import type {
   BookingListItem,
   BookingDetail,
@@ -117,7 +118,7 @@ export async function getBookingDetail(
 
   // Fetch linked matches
   const homeTeam = db
-    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
+    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name, customName: teams.customName })
     .from(teams)
     .as("home_team");
   const guestTeam = db
@@ -132,7 +133,9 @@ export async function getBookingDetail(
       kickoffDate: matches.kickoffDate,
       kickoffTime: matches.kickoffTime,
       homeTeam: homeTeam.name,
+      homeTeamCustomName: homeTeam.customName,
       guestTeam: guestTeam.name,
+      leagueName: leagues.name,
     })
     .from(venueBookingMatches)
     .innerJoin(matches, eq(matches.id, venueBookingMatches.matchId))
@@ -144,7 +147,9 @@ export async function getBookingDetail(
       guestTeam,
       eq(guestTeam.apiTeamPermanentId, matches.guestTeamApiId),
     )
-    .where(eq(venueBookingMatches.venueBookingId, id));
+    .leftJoin(leagues, eq(leagues.id, matches.leagueId))
+    .where(eq(venueBookingMatches.venueBookingId, id))
+    .orderBy(asc(matches.kickoffTime));
 
   return {
     id: booking.id,

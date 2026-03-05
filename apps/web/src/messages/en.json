@@ -473,19 +473,39 @@
       "submit": "Create Booking"
     },
     "override": { "label": "Override Time", "reason": "Reason" },
-    "toast": { "updated": "Booking updated", "statusChanged": "Status updated", "deleted": "Booking deleted", "created": "Booking created" },
+    "toast": { "updated": "Booking updated", "statusChanged": "Status updated", "deleted": "Booking deleted", "created": "Booking created", "reconciled": "Bookings synchronized" },
+    "reconcile": {
+      "button": "Sync from Matches",
+      "title": "Synchronize Bookings",
+      "description": "Compare current bookings with match schedule and apply changes.",
+      "noChanges": "Everything is up to date. No changes needed.",
+      "apply": "Apply Changes",
+      "toCreate": "New Bookings",
+      "toUpdate": "Updated Bookings",
+      "toRemove": "Bookings to Remove",
+      "timeWindow": "Time Window",
+      "matchesAdded": "Matches added",
+      "matchesRemoved": "Matches removed",
+      "reasonCancelled": "All matches forfeited or cancelled",
+      "reasonNoMatches": "No linked matches remaining",
+      "forfeited": "Forfeited",
+      "cancelled": "Cancelled"
+    },
     "detail": {
       "times": "Time Window",
-      "calculatedTime": "Calculated",
-      "overrideStart": "Override Start",
-      "overrideEnd": "Override End",
+      "startTime": "Start",
+      "endTime": "End",
+      "calculated": "Calculated",
       "reasonPlaceholder": "Reason for override...",
       "linkedMatches": "Linked Matches",
       "notes": "Notes",
       "notesPlaceholder": "Add notes...",
       "delete": "Delete Booking",
       "deleteConfirmTitle": "Delete Booking?",
-      "deleteConfirmDescription": "This will permanently delete this booking and its match links. This action cannot be undone."
+      "deleteConfirmDescription": "This will permanently delete this booking and its match links. This action cannot be undone.",
+      "discardTitle": "Discard changes?",
+      "discardDescription": "You have unsaved changes. Are you sure you want to discard them?",
+      "discard": "Discard"
     }
   },
   "settings": {
@@ -527,8 +547,8 @@
     "booking": {
       "title": "Venue Booking Settings",
       "description": "Configure default values for venue booking time calculations",
-      "bufferBefore": "Buffer Before Game (min)",
-      "bufferAfter": "Buffer After Game (min)",
+      "bufferBefore": "Buffer Before First Game (min)",
+      "bufferAfter": "Buffer After Last Game (min)",
       "gameDuration": "Default Game Duration (min)",
       "dueDaysBefore": "Booking Due Days Before"
     },

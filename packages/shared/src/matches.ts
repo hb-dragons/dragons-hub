@@ -1,4 +1,4 @@
-import type { DiffStatus } from "./constants";
+import type { BookingStatus, DiffStatus } from "./constants";
 
 export interface FieldDiff {
   field: string;
@@ -52,7 +52,7 @@ export interface MatchListItem {
   overriddenFields: string[];
   booking: {
     id: number;
-    status: string;
+    status: BookingStatus;
     needsReconfirmation: boolean;
   } | null;
 }

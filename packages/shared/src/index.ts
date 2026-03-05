@@ -42,7 +42,17 @@ export type {
   MatchChangesResponse,
 } from "./matches";
 
-export type { BookingMatch, BookingListItem, BookingDetail } from "./bookings";
+export type {
+  BookingMatch,
+  BookingListItem,
+  BookingDetail,
+  ReconcilePreview,
+  ReconcilePreviewCreate,
+  ReconcilePreviewUpdate,
+  ReconcilePreviewRemove,
+  ReconcilePreviewMatch,
+  ReconcileResult,
+} from "./bookings";
 
 export type {
   TaskCardData,

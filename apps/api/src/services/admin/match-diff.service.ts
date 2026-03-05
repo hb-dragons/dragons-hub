@@ -17,6 +17,7 @@ export const OVERRIDABLE_FIELDS = [
 
 /** Fields that are local-only (no remote counterpart) */
 export const LOCAL_ONLY_FIELDS = [
+  "venueId",
   "venueNameOverride",
   "anschreiber",
   "zeitnehmer",

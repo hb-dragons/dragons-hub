@@ -14,6 +14,7 @@ import { eq, sql, and, or, inArray, gte, lte, asc } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { computeDiffs } from "./match-diff.service";
 import type {
+  BookingStatus,
   OverrideInfo,
   MatchListItem,
   MatchDetail,
@@ -51,6 +52,7 @@ export interface MatchUpdateData {
   guestOt1?: number | null;
   homeOt2?: number | null;
   guestOt2?: number | null;
+  venueId?: number | null;
   venueNameOverride?: string | null;
   anschreiber?: string | null;
   zeitnehmer?: string | null;
@@ -288,7 +290,7 @@ export async function buildDetailResponse(
     .limit(1);
 
   const booking = bookingLink
-    ? { id: bookingLink.bookingId, status: bookingLink.bookingStatus, needsReconfirmation: bookingLink.needsReconfirmation }
+    ? { id: bookingLink.bookingId, status: bookingLink.bookingStatus as BookingStatus, needsReconfirmation: bookingLink.needsReconfirmation }
     : null;
 
   return {
@@ -376,12 +378,12 @@ export async function getOwnClubMatches(params: MatchListParams) {
   const bookingByMatch = new Map(
     bookingLinks.map((b) => [b.matchId, {
       id: b.bookingId,
-      status: b.bookingStatus,
+      status: b.bookingStatus as BookingStatus,
       needsReconfirmation: b.needsReconfirmation,
     }]),
   );
 
-  const items = rows.map((row) => ({
+  const items: MatchListItem[] = rows.map((row) => ({
     ...rowToListItem(row, overridesByMatch.get(row.id) ?? []),
     booking: bookingByMatch.get(row.id) ?? null,
   }));

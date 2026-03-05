@@ -38,6 +38,10 @@ export default getRequestConfig(async ({ requestLocale }) => {
           month: "2-digit",
           year: "numeric",
         },
+        matchTime: {
+          hour: "2-digit",
+          minute: "2-digit",
+        },
         timeOnly: {
           hour: "2-digit",
           minute: "2-digit",

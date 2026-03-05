@@ -14,6 +14,7 @@ export const matchIdParamSchema = z.object({
 });
 
 export const matchUpdateBodySchema = matchFormSchema.extend({
+  venueId: z.number().int().positive().nullable().optional(),
   homeScore: z.number().int().nullable().optional(),
   guestScore: z.number().int().nullable().optional(),
   homeHalftimeScore: z.number().int().nullable().optional(),

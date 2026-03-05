@@ -9,6 +9,10 @@ import {
   deleteBooking,
 } from "../../services/admin/booking-admin.service";
 import {
+  previewReconciliation,
+  reconcileAfterSync,
+} from "../../services/venue-booking/venue-booking.service";
+import {
   bookingIdParamSchema,
   bookingListQuerySchema,
   bookingUpdateBodySchema,
@@ -30,6 +34,35 @@ bookingRoutes.get(
     const query = bookingListQuerySchema.parse(c.req.query());
     const result = await listBookings(query);
     return c.json(result);
+  },
+);
+
+// GET /admin/bookings/reconcile/preview - Preview reconciliation changes
+// Must be before /bookings/:id to avoid matching "reconcile" as an id
+bookingRoutes.get(
+  "/bookings/reconcile/preview",
+  describeRoute({
+    description: "Preview booking reconciliation changes",
+    tags: ["Bookings"],
+    responses: { 200: { description: "Preview of changes" } },
+  }),
+  async (c) => {
+    const preview = await previewReconciliation();
+    return c.json(preview);
+  },
+);
+
+// POST /admin/bookings/reconcile - Apply reconciliation
+bookingRoutes.post(
+  "/bookings/reconcile",
+  describeRoute({
+    description: "Apply booking reconciliation from matches",
+    tags: ["Bookings"],
+    responses: { 200: { description: "Reconciliation result" } },
+  }),
+  async (c) => {
+    await reconcileAfterSync();
+    return c.json({ applied: true });
   },
 );
 

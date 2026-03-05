@@ -348,12 +348,14 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                       variant={
                         match.booking.status === "confirmed"
                           ? "success"
-                          : match.booking.status === "cancelled"
-                            ? "destructive"
-                            : "secondary"
+                          : match.booking.status === "requested"
+                            ? "default"
+                            : match.booking.status === "cancelled"
+                              ? "destructive"
+                              : "secondary"
                       }
                     >
-                      {match.booking.status}
+                      {t(`bookings.status.${match.booking.status}`)}
                     </Badge>
                     {match.booking.needsReconfirmation && (
                       <Badge variant="outline" className="border-amber-500 text-amber-600">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { useRouter } from "@/lib/navigation";
 import { useForm, Controller } from "react-hook-form";
@@ -50,7 +50,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@dragons/ui/components/popover";
-import { Loader2, RotateCcw, Save, X, Users } from "lucide-react";
+import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react";
 
 import { fetchAPI } from "@/lib/api";
 import {
@@ -219,6 +219,7 @@ export function MatchEditSheet({
   const [diffs, setDiffs] = useState<FieldDiff[]>([]);
   const [saving, setSaving] = useState(false);
   const [ownClubTeams, setOwnClubTeams] = useState<OwnClubTeam[]>([]);
+  const selectedVenueIdRef = useRef<number | null>(null);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [setAllOpen, setSetAllOpen] = useState(false);
 
@@ -269,6 +270,7 @@ export function MatchEditSheet({
         if (cancelled) return;
         setMatch(result.match);
         setDiffs(result.diffs);
+        selectedVenueIdRef.current = null;
         form.reset(getDefaultValues(result.match));
       })
       .catch(() => {
@@ -322,6 +324,11 @@ export function MatchEditSheet({
         }
       }
 
+      // Include venueId when a venue was selected from the combobox
+      if (currentDirtyFields.venueNameOverride && selectedVenueIdRef.current != null) {
+        updateData.venueId = selectedVenueIdRef.current;
+      }
+
       if (Object.keys(updateData).length === 0) return;
 
       try {
@@ -335,6 +342,7 @@ export function MatchEditSheet({
         );
         setMatch(result.match);
         setDiffs(result.diffs);
+        selectedVenueIdRef.current = null;
         form.reset(getDefaultValues(result.match));
         toast.success(t("matchDetail.toast.updated"));
         router.refresh();
@@ -359,6 +367,7 @@ export function MatchEditSheet({
         );
         setMatch(result.match);
         setDiffs(result.diffs);
+        selectedVenueIdRef.current = null;
         form.reset(getDefaultValues(result.match));
         toast.success(t("matchDetail.toast.overrideReleased"));
         router.refresh();
@@ -437,289 +446,289 @@ export function MatchEditSheet({
             onSubmit={form.handleSubmit(onSubmit)}
             className="flex min-h-0 flex-1 flex-col"
           >
-           <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4">
-            {/* #1 — Read-only match info in card-like container */}
-            <section className="rounded-lg bg-muted/30 p-4">
-              <h3 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                {t("matchDetail.info.title")}
-              </h3>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                <div>
-                  <dt className="text-muted-foreground">
-                    {t("matchDetail.info.matchNo")}
-                  </dt>
-                  <dd className="font-medium">{match.matchNo}</dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">
-                    {t("matchDetail.info.league")}
-                  </dt>
-                  <dd className="font-medium">
-                    {match.leagueName ?? "\u2014"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">
-                    {t("matchDetail.info.venue")}
-                  </dt>
-                  <dd className="font-medium">
-                    {match.venueNameOverride ?? match.venueName ?? "\u2014"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">
-                    {t("matchDetail.status.title")}
-                  </dt>
-                  <dd className="flex flex-wrap gap-1">
-                    {match.isConfirmed && (
-                      <Badge variant="success">
-                        {t("matchDetail.status.confirmed")}
-                      </Badge>
-                    )}
-                    {match.isForfeited && (
-                      <Badge variant="destructive">
-                        {t("matchDetail.status.forfeited")}
-                      </Badge>
-                    )}
-                    {match.isCancelled && (
-                      <Badge variant="destructive">
-                        {t("matchDetail.status.cancelled")}
-                      </Badge>
-                    )}
-                    {!match.isConfirmed &&
-                      !match.isForfeited &&
-                      !match.isCancelled && (
-                        <span className="text-muted-foreground">
-                          {t("matchDetail.status.noFlags")}
-                        </span>
+            <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4">
+              {/* #1 — Read-only match info in card-like container */}
+              <section className="rounded-lg bg-muted/30 p-4">
+                <h3 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  {t("matchDetail.info.title")}
+                </h3>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">
+                      {t("matchDetail.info.matchNo")}
+                    </dt>
+                    <dd className="font-medium">{match.matchNo}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">
+                      {t("matchDetail.info.league")}
+                    </dt>
+                    <dd className="font-medium">
+                      {match.leagueName ?? "\u2014"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">
+                      {t("matchDetail.info.venue")}
+                    </dt>
+                    <dd className="font-medium">
+                      {match.venueNameOverride ?? match.venueName ?? "\u2014"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">
+                      {t("matchDetail.status.title")}
+                    </dt>
+                    <dd className="flex flex-wrap gap-1">
+                      {match.isConfirmed && (
+                        <Badge variant="success">
+                          {t("matchDetail.status.confirmed")}
+                        </Badge>
                       )}
-                  </dd>
-                </div>
-              </dl>
-
-              {/* Score table — quarters, halftime, final in one view */}
-              <div className="mt-4 overflow-x-auto rounded-md border">
-                <table className="w-full border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="px-2 py-1.5 text-left text-xs font-medium text-muted-foreground" />
-                      {periodScores.map((p) => (
-                        <th
-                          key={p.label}
-                          className="px-2 py-1.5 text-center text-xs font-medium text-muted-foreground"
-                        >
-                          {p.label}
-                        </th>
-                      ))}
-                      {periodScores.length > 0 && (
-                        <th className="border-l px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">
-                          {t("matchDetail.score.halftime")}
-                        </th>
+                      {match.isForfeited && (
+                        <Badge variant="destructive">
+                          {t("matchDetail.status.forfeited")}
+                        </Badge>
                       )}
-                      <th className={`px-2 py-1.5 text-center text-xs font-semibold${periodScores.length > 0 ? "" : " border-l"}`}>
-                        {t("matchDetail.score.final")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="px-2 py-1.5 text-xs font-medium">{match.homeTeamName}</td>
-                      {periodScores.map((p) => (
-                        <td key={p.label} className="px-2 py-1.5 text-center tabular-nums">
-                          {p.home ?? "\u2014"}
-                        </td>
-                      ))}
-                      {periodScores.length > 0 && (
-                        <td className="border-l px-2 py-1.5 text-center tabular-nums">
-                          {match.homeHalftimeScore ?? "\u2014"}
-                        </td>
+                      {match.isCancelled && (
+                        <Badge variant="destructive">
+                          {t("matchDetail.status.cancelled")}
+                        </Badge>
                       )}
-                      <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
-                        {match.homeScore ?? "\u2014"}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-2 py-1.5 text-xs font-medium">{match.guestTeamName}</td>
-                      {periodScores.map((p) => (
-                        <td key={p.label} className="px-2 py-1.5 text-center tabular-nums">
-                          {p.guest ?? "\u2014"}
-                        </td>
-                      ))}
-                      {periodScores.length > 0 && (
-                        <td className="border-l px-2 py-1.5 text-center tabular-nums">
-                          {match.guestHalftimeScore ?? "\u2014"}
-                        </td>
-                      )}
-                      <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
-                        {match.guestScore ?? "\u2014"}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-            </section>
-
-            <Separator />
-
-            {/* Overrides */}
-            <section className="space-y-4">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                {t("matchDetail.overrides.title")}
-              </h3>
-
-              {/* Date + Time side by side */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Controller
-                  control={form.control}
-                  name="kickoffDate"
-                  render={({ field }) => (
-                    <OverrideField
-                      label={t("matchDetail.overrides.date")}
-                      remoteDisplay={
-                        remoteKickoffDate
-                          ? format.dateTime(new Date(remoteKickoffDate + "T00:00:00"), "matchDate")
-                          : undefined
-                      }
-                      isOverridden={match.overriddenFields.includes("kickoffDate")}
-                      isDirty={!!dirtyFields.kickoffDate}
-                      onRelease={() => handleReleaseOverride("kickoffDate")}
-                      onReset={() => form.resetField("kickoffDate")}
-                    >
-                      <div className={dirtyRing("kickoffDate")}>
-                        <DatePicker
-                          value={
-                            typeof field.value === "string" ? field.value : null
-                          }
-                          onChange={(v) => field.onChange(v)}
-                          className="h-9 w-full"
-                        />
-                      </div>
-                    </OverrideField>
-                  )}
-                />
-
-                <Controller
-                  control={form.control}
-                  name="kickoffTime"
-                  render={({ field }) => (
-                    <OverrideField
-                      label={t("matchDetail.overrides.time")}
-                      remoteDisplay={
-                        remoteKickoffTime
-                          ? formatMatchTime(remoteKickoffTime)
-                          : undefined
-                      }
-                      isOverridden={match.overriddenFields.includes("kickoffTime")}
-                      isDirty={!!dirtyFields.kickoffTime}
-                      onRelease={() => handleReleaseOverride("kickoffTime")}
-                      onReset={() => form.resetField("kickoffTime")}
-                    >
-                      <div className={dirtyRing("kickoffTime")}>
-                        <TimePicker
-                          value={
-                            typeof field.value === "string" ? field.value : null
-                          }
-                          onChange={(v) => field.onChange(v)}
-                          className="h-9 w-full"
-                        />
-                      </div>
-                    </OverrideField>
-                  )}
-                />
-              </div>
-
-              {/* #3 — Boolean toggles as inline switches */}
-              <div className="space-y-3">
-                <Controller
-                  control={form.control}
-                  name="isForfeited"
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">
-                          {t("matchDetail.overrides.forfeited")}
-                        </span>
-                        {match.overriddenFields.includes("isForfeited") && (
-                          <span
-                            className="h-1.5 w-1.5 rounded-full bg-primary"
-                            title={t("matchDetail.overrideActive")}
-                          />
+                      {!match.isConfirmed &&
+                        !match.isForfeited &&
+                        !match.isCancelled && (
+                          <span className="text-muted-foreground">
+                            {t("matchDetail.status.noFlags")}
+                          </span>
                         )}
-                      </div>
-                      <div className="flex items-center gap-2">
+                    </dd>
+                  </div>
+                </dl>
+
+                {/* Score table — quarters, halftime, final in one view */}
+                <div className="mt-4 overflow-x-auto rounded-md border">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="px-2 py-1.5 text-left text-xs font-medium text-muted-foreground" />
+                        {periodScores.map((p) => (
+                          <th
+                            key={p.label}
+                            className="px-2 py-1.5 text-center text-xs font-medium text-muted-foreground"
+                          >
+                            {p.label}
+                          </th>
+                        ))}
+                        {periodScores.length > 0 && (
+                          <th className="border-l px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">
+                            {t("matchDetail.score.halftime")}
+                          </th>
+                        )}
+                        <th className={`px-2 py-1.5 text-center text-xs font-semibold${periodScores.length > 0 ? "" : " border-l"}`}>
+                          {t("matchDetail.score.final")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="px-2 py-1.5 text-xs font-medium">{match.homeTeamName}</td>
+                        {periodScores.map((p) => (
+                          <td key={p.label} className="px-2 py-1.5 text-center tabular-nums">
+                            {p.home ?? "\u2014"}
+                          </td>
+                        ))}
+                        {periodScores.length > 0 && (
+                          <td className="border-l px-2 py-1.5 text-center tabular-nums">
+                            {match.homeHalftimeScore ?? "\u2014"}
+                          </td>
+                        )}
+                        <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
+                          {match.homeScore ?? "\u2014"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-2 py-1.5 text-xs font-medium">{match.guestTeamName}</td>
+                        {periodScores.map((p) => (
+                          <td key={p.label} className="px-2 py-1.5 text-center tabular-nums">
+                            {p.guest ?? "\u2014"}
+                          </td>
+                        ))}
+                        {periodScores.length > 0 && (
+                          <td className="border-l px-2 py-1.5 text-center tabular-nums">
+                            {match.guestHalftimeScore ?? "\u2014"}
+                          </td>
+                        )}
+                        <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
+                          {match.guestScore ?? "\u2014"}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+              </section>
+
+              <Separator />
+
+              {/* Overrides */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  {t("matchDetail.overrides.title")}
+                </h3>
+
+                {/* Date + Time side by side */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Controller
+                    control={form.control}
+                    name="kickoffDate"
+                    render={({ field }) => (
+                      <OverrideField
+                        label={t("matchDetail.overrides.date")}
+                        remoteDisplay={
+                          remoteKickoffDate
+                            ? format.dateTime(new Date(remoteKickoffDate + "T00:00:00"), "matchDate")
+                            : undefined
+                        }
+                        isOverridden={match.overriddenFields.includes("kickoffDate")}
+                        isDirty={!!dirtyFields.kickoffDate}
+                        onRelease={() => handleReleaseOverride("kickoffDate")}
+                        onReset={() => form.resetField("kickoffDate")}
+                      >
+                        <div className={dirtyRing("kickoffDate")}>
+                          <DatePicker
+                            value={
+                              typeof field.value === "string" ? field.value : null
+                            }
+                            onChange={(v) => field.onChange(v)}
+                            className="h-9 w-full"
+                          />
+                        </div>
+                      </OverrideField>
+                    )}
+                  />
+
+                  <Controller
+                    control={form.control}
+                    name="kickoffTime"
+                    render={({ field }) => (
+                      <OverrideField
+                        label={t("matchDetail.overrides.time")}
+                        remoteDisplay={
+                          remoteKickoffTime
+                            ? formatMatchTime(remoteKickoffTime)
+                            : undefined
+                        }
+                        isOverridden={match.overriddenFields.includes("kickoffTime")}
+                        isDirty={!!dirtyFields.kickoffTime}
+                        onRelease={() => handleReleaseOverride("kickoffTime")}
+                        onReset={() => form.resetField("kickoffTime")}
+                      >
+                        <div className={dirtyRing("kickoffTime")}>
+                          <TimePicker
+                            value={
+                              typeof field.value === "string" ? field.value : null
+                            }
+                            onChange={(v) => field.onChange(v)}
+                            className="h-9 w-full"
+                          />
+                        </div>
+                      </OverrideField>
+                    )}
+                  />
+                </div>
+
+                {/* #3 — Boolean toggles as inline switches */}
+                <div className="space-y-3">
+                  <Controller
+                    control={form.control}
+                    name="isForfeited"
+                    render={({ field }) => (
+                      <div className="flex items-center justify-start gap-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {t("matchDetail.overrides.forfeited")}
+                          </span>
+                          {match.overriddenFields.includes("isForfeited") && (
+                            <span
+                              className="h-1.5 w-1.5 rounded-full bg-primary"
+                              title={t("matchDetail.overrideActive")}
+                            />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
                           <Switch
                             checked={field.value === true}
                             onCheckedChange={(checked) => field.onChange(checked)}
                             className={dirtyFields.isForfeited ? "ring-2 ring-primary/20" : ""}
                           />
-                        {match.overriddenFields.includes("isForfeited") && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-xs text-muted-foreground"
-                            onClick={() => handleReleaseOverride("isForfeited")}
-                          >
-                            <RotateCcw className="mr-1 h-3 w-3" />
-                            {t("common.release")}
-                          </Button>
-                        )}
+                          {match.overriddenFields.includes("isForfeited") && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs text-muted-foreground"
+                              onClick={() => handleReleaseOverride("isForfeited")}
+                            >
+                              <RotateCcw className="mr-1 h-3 w-3" />
+                              {t("common.release")}
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                />
+                    )}
+                  />
 
-                <Controller
-                  control={form.control}
-                  name="isCancelled"
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">
-                          {t("matchDetail.overrides.cancelled")}
-                        </span>
-                        {match.overriddenFields.includes("isCancelled") && (
-                          <span
-                            className="h-1.5 w-1.5 rounded-full bg-primary"
-                            title={t("matchDetail.overrideActive")}
-                          />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
+                  <Controller
+                    control={form.control}
+                    name="isCancelled"
+                    render={({ field }) => (
+                      <div className="flex items-center justify-start gap-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {t("matchDetail.overrides.cancelled")}
+                          </span>
+                          {match.overriddenFields.includes("isCancelled") && (
+                            <span
+                              className="h-1.5 w-1.5 rounded-full bg-primary"
+                              title={t("matchDetail.overrideActive")}
+                            />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
                           <Switch
                             checked={field.value === true}
                             onCheckedChange={(checked) => field.onChange(checked)}
                             className={dirtyFields.isCancelled ? "ring-2 ring-primary/20" : ""}
                           />
-                        {match.overriddenFields.includes("isCancelled") && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-xs text-muted-foreground"
-                            onClick={() => handleReleaseOverride("isCancelled")}
-                          >
-                            <RotateCcw className="mr-1 h-3 w-3" />
-                            {t("common.release")}
-                          </Button>
-                        )}
+                          {match.overriddenFields.includes("isCancelled") && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs text-muted-foreground"
+                              onClick={() => handleReleaseOverride("isCancelled")}
+                            >
+                              <RotateCcw className="mr-1 h-3 w-3" />
+                              {t("common.release")}
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                />
-              </div>
+                    )}
+                  />
+                </div>
 
-              {/* Venue */}
-              <Controller
-                control={form.control}
-                name="venueNameOverride"
-                render={({ field, fieldState }) => (
-                  <OverrideField
-                    label={t("matchDetail.overrides.venue")}
-                    remoteDisplay={
-                      match.venueName
-                        ? [
+                {/* Venue */}
+                <Controller
+                  control={form.control}
+                  name="venueNameOverride"
+                  render={({ field, fieldState }) => (
+                    <OverrideField
+                      label={t("matchDetail.overrides.venue")}
+                      remoteDisplay={
+                        match.venueName
+                          ? [
                             match.venueName,
                             [match.venueStreet, match.venueCity]
                               .filter(Boolean)
@@ -727,194 +736,230 @@ export function MatchEditSheet({
                           ]
                             .filter(Boolean)
                             .join(" \u2014 ")
-                        : undefined
-                    }
-                    isOverridden={match.overriddenFields.includes(
-                      "venueNameOverride",
-                    )}
-                    isDirty={!!dirtyFields.venueNameOverride}
-                    onRelease={() =>
-                      handleReleaseOverride("venueNameOverride")
-                    }
-                    onReset={() => form.resetField("venueNameOverride")}
-                  >
-                    <div className={dirtyRing("venueNameOverride")}>
-                      <Combobox
-                        value={field.value ?? ""}
-                        onChange={(v) => field.onChange(v || null)}
-                        onSearch={async (q) => {
-                          const result = await fetchAPI<{
-                            venues: {
-                              id: number;
-                              name: string;
-                              street: string | null;
-                              city: string | null;
-                            }[];
-                          }>(`/admin/venues/search?q=${encodeURIComponent(q)}`);
-                          return result.venues.map(
-                            (v): ComboboxOption => ({
-                              value: String(v.id),
-                              label: v.name,
-                              description: [v.street, v.city]
-                                .filter(Boolean)
-                                .join(", ") || undefined,
-                            }),
-                          );
-                        }}
-                        onSelect={(option) => field.onChange(option.label)}
-                        placeholder={t("matchDetail.overrides.venuePlaceholder")}
-                        className="h-9"
-                      />
-                    </div>
-                    <FieldError>{fieldState.error?.message}</FieldError>
-                  </OverrideField>
-                )}
-              />
-            </section>
+                          : undefined
+                      }
+                      isOverridden={match.overriddenFields.includes(
+                        "venueNameOverride",
+                      )}
+                      isDirty={!!dirtyFields.venueNameOverride}
+                      onRelease={() =>
+                        handleReleaseOverride("venueNameOverride")
+                      }
+                      onReset={() => form.resetField("venueNameOverride")}
+                    >
+                      <div className={dirtyRing("venueNameOverride")}>
+                        <Combobox
+                          value={field.value ?? ""}
+                          onChange={(v) => field.onChange(v || null)}
+                          onSearch={async (q) => {
+                            const result = await fetchAPI<{
+                              venues: {
+                                id: number;
+                                name: string;
+                                street: string | null;
+                                city: string | null;
+                              }[];
+                            }>(`/admin/venues/search?q=${encodeURIComponent(q)}`);
+                            return result.venues.map(
+                              (v): ComboboxOption => ({
+                                value: String(v.id),
+                                label: v.name,
+                                description: [v.street, v.city]
+                                  .filter(Boolean)
+                                  .join(", ") || undefined,
+                              }),
+                            );
+                          }}
+                          onSelect={(option) => {
+                            field.onChange(option.label);
+                            selectedVenueIdRef.current = Number(option.value);
+                          }}
+                          placeholder={t("matchDetail.overrides.venuePlaceholder")}
+                          className="h-9"
+                        />
+                      </div>
+                      <FieldError>{fieldState.error?.message}</FieldError>
+                    </OverrideField>
+                  )}
+                />
+              </section>
 
-            <Separator />
+              <Separator />
 
-            {/* Officials */}
-            <section className="space-y-4">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                {t("matchDetail.staff.title")}
-              </h3>
+              {/* Officials */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  {t("matchDetail.staff.title")}
+                </h3>
 
-              {/* #7 — Set All as button + popover */}
-              <Popover open={setAllOpen} onOpenChange={setSetAllOpen}>
-                <PopoverTrigger asChild>
-                  <Button type="button" variant="outline" size="sm">
-                    <Users className="mr-2 h-3.5 w-3.5" />
-                    {t("matchDetail.staff.setAll")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-48 p-1">
-                  {ownClubTeams.map((team) => {
-                    const displayName = getTeamDisplayName(team);
-                    return (
-                      <button
-                        key={team.id}
-                        type="button"
-                        className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                        onClick={() => {
-                          form.setValue("anschreiber", displayName, { shouldDirty: true });
-                          form.setValue("zeitnehmer", displayName, { shouldDirty: true });
-                          form.setValue("shotclock", displayName, { shouldDirty: true });
-                          setSetAllOpen(false);
-                        }}
-                      >
-                        {displayName}
-                      </button>
-                    );
-                  })}
-                </PopoverContent>
-              </Popover>
+                {/* #7 — Set All as button + popover */}
+                <Popover open={setAllOpen} onOpenChange={setSetAllOpen}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" size="sm">
+                      <Users className="mr-2 h-3.5 w-3.5" />
+                      {t("matchDetail.staff.setAll")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-48 p-1">
+                    {ownClubTeams.map((team) => {
+                      const displayName = getTeamDisplayName(team);
+                      return (
+                        <button
+                          key={team.id}
+                          type="button"
+                          className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                          onClick={() => {
+                            form.setValue("anschreiber", displayName, { shouldDirty: true });
+                            form.setValue("zeitnehmer", displayName, { shouldDirty: true });
+                            form.setValue("shotclock", displayName, { shouldDirty: true });
+                            setSetAllOpen(false);
+                          }}
+                        >
+                          {displayName}
+                        </button>
+                      );
+                    })}
+                  </PopoverContent>
+                </Popover>
 
-              {/* Per-role dropdowns — 3-column grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {(["anschreiber", "zeitnehmer", "shotclock"] as const).map((fieldName) => (
-                  <Controller
-                    key={fieldName}
-                    control={form.control}
-                    name={fieldName}
-                    render={({ field, fieldState }) => (
-                      <Field>
-                        <FieldLabel>{t(`matchDetail.staff.${fieldName}`)}</FieldLabel>
-                        <div className="flex items-center gap-1">
-                          <Select
-                            value={field.value ?? ""}
-                            onValueChange={(v) => field.onChange(v)}
-                          >
-                            <SelectTrigger className={`h-9 w-full ${dirtyRing(fieldName)}`}>
-                              <SelectValue placeholder={t("matchDetail.staff.placeholder")} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ownClubTeams.map((team) => {
-                                const displayName = getTeamDisplayName(team);
-                                return (
-                                  <SelectItem key={team.id} value={displayName}>
-                                    {displayName}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                          {field.value && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className="shrink-0 text-muted-foreground"
-                              onClick={() => field.onChange(null)}
+                {/* Per-role dropdowns — 3-column grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {(["anschreiber", "zeitnehmer", "shotclock"] as const).map((fieldName) => (
+                    <Controller
+                      key={fieldName}
+                      control={form.control}
+                      name={fieldName}
+                      render={({ field, fieldState }) => (
+                        <Field>
+                          <FieldLabel>{t(`matchDetail.staff.${fieldName}`)}</FieldLabel>
+                          <div className="flex items-center gap-1">
+                            <Select
+                              value={field.value ?? ""}
+                              onValueChange={(v) => field.onChange(v)}
                             >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                        <FieldError>{fieldState.error?.message}</FieldError>
-                      </Field>
-                    )}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <Separator />
-
-            {/* Notes */}
-            <section className="space-y-4">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                {t("matchDetail.notes.title")}
-              </h3>
-
-              <Controller
-                control={form.control}
-                name="internalNotes"
-                render={({ field, fieldState }) => (
-                  <Field>
-                    <FieldLabel>{t("matchDetail.notes.internal")}</FieldLabel>
-                    <FieldDescription>
-                      {t("matchDetail.notes.internalDescription")}
-                    </FieldDescription>
-                    <Textarea
-                      rows={4}
-                      value={field.value ?? ""}
-                      onChange={(e) =>
-                        field.onChange(e.target.value || null)
-                      }
-                      onBlur={field.onBlur}
-                      className={dirtyRing("internalNotes")}
+                              <SelectTrigger className={`h-9 w-full ${dirtyRing(fieldName)}`}>
+                                <SelectValue placeholder={t("matchDetail.staff.placeholder")} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ownClubTeams.map((team) => {
+                                  const displayName = getTeamDisplayName(team);
+                                  return (
+                                    <SelectItem key={team.id} value={displayName}>
+                                      {displayName}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                            {field.value && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                className="shrink-0 text-muted-foreground"
+                                onClick={() => field.onChange(null)}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                          <FieldError>{fieldState.error?.message}</FieldError>
+                        </Field>
+                      )}
                     />
-                    <FieldError>{fieldState.error?.message}</FieldError>
-                  </Field>
-                )}
-              />
+                  ))}
+                </div>
+              </section>
 
-              <Controller
-                control={form.control}
-                name="publicComment"
-                render={({ field, fieldState }) => (
-                  <Field>
-                    <FieldLabel>{t("matchDetail.notes.public")}</FieldLabel>
-                    <FieldDescription>
-                      {t("matchDetail.notes.publicDescription")}
-                    </FieldDescription>
-                    <Textarea
-                      rows={3}
-                      value={field.value ?? ""}
-                      onChange={(e) =>
-                        field.onChange(e.target.value || null)
-                      }
-                      onBlur={field.onBlur}
-                      className={dirtyRing("publicComment")}
-                    />
-                    <FieldError>{fieldState.error?.message}</FieldError>
-                  </Field>
-                )}
-              />
-            </section>
+              {/* Booking */}
+              {match.booking && (
+                <>
+                  <Separator />
+                  <section className="space-y-3">
+                    <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                      {t("matchDetail.booking.title")}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          match.booking.status === "confirmed"
+                            ? "success"
+                            : match.booking.status === "requested"
+                              ? "default"
+                              : match.booking.status === "cancelled"
+                                ? "destructive"
+                                : "secondary"
+                        }
+                      >
+                        {t(`bookings.status.${match.booking.status}`)}
+                      </Badge>
+                      {match.booking.needsReconfirmation && (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                          <AlertTriangle className="h-3 w-3" />
+                          {t("matchDetail.booking.needsReconfirmation")}
+                        </span>
+                      )}
+                    </div>
+                  </section>
+                </>
+              )}
 
-           </div>
+              <Separator />
+
+              {/* Notes */}
+              <section className="space-y-4">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  {t("matchDetail.notes.title")}
+                </h3>
+
+                <Controller
+                  control={form.control}
+                  name="internalNotes"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel>{t("matchDetail.notes.internal")}</FieldLabel>
+                      <FieldDescription>
+                        {t("matchDetail.notes.internalDescription")}
+                      </FieldDescription>
+                      <Textarea
+                        rows={4}
+                        value={field.value ?? ""}
+                        onChange={(e) =>
+                          field.onChange(e.target.value || null)
+                        }
+                        onBlur={field.onBlur}
+                        className={dirtyRing("internalNotes")}
+                      />
+                      <FieldError>{fieldState.error?.message}</FieldError>
+                    </Field>
+                  )}
+                />
+
+                <Controller
+                  control={form.control}
+                  name="publicComment"
+                  render={({ field, fieldState }) => (
+                    <Field>
+                      <FieldLabel>{t("matchDetail.notes.public")}</FieldLabel>
+                      <FieldDescription>
+                        {t("matchDetail.notes.publicDescription")}
+                      </FieldDescription>
+                      <Textarea
+                        rows={3}
+                        value={field.value ?? ""}
+                        onChange={(e) =>
+                          field.onChange(e.target.value || null)
+                        }
+                        onBlur={field.onBlur}
+                        className={dirtyRing("publicComment")}
+                      />
+                      <FieldError>{fieldState.error?.message}</FieldError>
+                    </Field>
+                  )}
+                />
+              </section>
+
+            </div>
 
             {/* #4 — Footer: Cancel + Save — sticky at bottom */}
             <div className="flex gap-2 border-t bg-background px-4 py-4">

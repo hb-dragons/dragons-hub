@@ -82,7 +82,7 @@ const dateRangeFilterFn: FilterFn<MatchListItem> = (row, columnId, value) => {
   return true
 }
 
-function getColumns(t: ReturnType<typeof useTranslations<"matches">>, format: ReturnType<typeof useFormatter>): ColumnDef<MatchListItem, unknown>[] {
+function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings: ReturnType<typeof useTranslations<"bookings">>, format: ReturnType<typeof useFormatter>): ColumnDef<MatchListItem, unknown>[] {
   return [
     {
       accessorKey: "kickoffDate",
@@ -235,13 +235,15 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, format: Re
             variant={
               booking.status === "confirmed"
                 ? "success"
-                : booking.status === "cancelled"
-                  ? "destructive"
-                  : "secondary"
+                : booking.status === "requested"
+                  ? "default"
+                  : booking.status === "cancelled"
+                    ? "destructive"
+                    : "secondary"
             }
           >
             {booking.needsReconfirmation ? "\u26A0 " : ""}
-            {booking.status}
+            {tBookings(`status.${booking.status}`)}
           </Badge>
         );
       },
@@ -300,10 +302,11 @@ const matchGlobalFilterFn: FilterFn<MatchListItem> = (
 
 export function MatchListTable() {
   const t = useTranslations("matches")
+  const tBookings = useTranslations("bookings")
   const format = useFormatter()
   const { mutate } = useSWRConfig()
   const { data: response } = useSWR<PaginatedResponse<MatchListItem>>(SWR_KEYS.matches, apiFetcher)
-  const columns = useMemo(() => getColumns(t, format), [t, format])
+  const columns = useMemo(() => getColumns(t, tBookings, format), [t, tBookings, format])
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
 
   const allItems = useMemo(() => response?.items ?? [], [response?.items])

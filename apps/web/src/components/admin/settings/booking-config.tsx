@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
@@ -26,13 +26,6 @@ interface BookingSettings {
   dueDaysBefore: number;
 }
 
-const DEFAULTS: BookingSettings = {
-  bufferBefore: 60,
-  bufferAfter: 60,
-  gameDuration: 90,
-  dueDaysBefore: 7,
-};
-
 export function BookingConfig() {
   const t = useTranslations();
   const { data: settings } = useSWR<BookingSettings>(
@@ -41,22 +34,25 @@ export function BookingConfig() {
   );
   const { mutate } = useSWRConfig();
 
-  const [bufferBefore, setBufferBefore] = useState(DEFAULTS.bufferBefore.toString());
-  const [bufferAfter, setBufferAfter] = useState(DEFAULTS.bufferAfter.toString());
-  const [gameDuration, setGameDuration] = useState(DEFAULTS.gameDuration.toString());
-  const [dueDays, setDueDays] = useState(DEFAULTS.dueDaysBefore.toString());
+  const [bufferBefore, setBufferBefore] = useState(() => settings?.bufferBefore?.toString() ?? "");
+  const [bufferAfter, setBufferAfter] = useState(() => settings?.bufferAfter?.toString() ?? "");
+  const [gameDuration, setGameDuration] = useState(() => settings?.gameDuration?.toString() ?? "");
+  const [dueDays, setDueDays] = useState(() => settings?.dueDaysBefore?.toString() ?? "");
   const [saving, setSaving] = useState(false);
+  const [initialized, setInitialized] = useState(() => !!settings);
 
   useEffect(() => {
-    if (settings) {
+    if (settings && !initialized) {
       setBufferBefore(settings.bufferBefore.toString());
       setBufferAfter(settings.bufferAfter.toString());
       setGameDuration(settings.gameDuration.toString());
       setDueDays(settings.dueDaysBefore.toString());
+      setInitialized(true);
     }
-  }, [settings]);
+  }, [settings, initialized]);
 
   const hasChanges =
+    initialized &&
     settings &&
     (bufferBefore !== settings.bufferBefore.toString() ||
       bufferAfter !== settings.bufferAfter.toString() ||

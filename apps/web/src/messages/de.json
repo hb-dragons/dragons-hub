@@ -473,19 +473,39 @@
       "submit": "Buchung erstellen"
     },
     "override": { "label": "Zeitfenster überschreiben", "reason": "Grund" },
-    "toast": { "updated": "Buchung aktualisiert", "statusChanged": "Status aktualisiert", "deleted": "Buchung gelöscht", "created": "Buchung erstellt" },
+    "toast": { "updated": "Buchung aktualisiert", "statusChanged": "Status aktualisiert", "deleted": "Buchung gelöscht", "created": "Buchung erstellt", "reconciled": "Buchungen synchronisiert" },
+    "reconcile": {
+      "button": "Aus Spielplan synchronisieren",
+      "title": "Buchungen synchronisieren",
+      "description": "Aktuelle Buchungen mit dem Spielplan vergleichen und Änderungen anwenden.",
+      "noChanges": "Alles aktuell. Keine Änderungen notwendig.",
+      "apply": "Änderungen anwenden",
+      "toCreate": "Neue Buchungen",
+      "toUpdate": "Aktualisierte Buchungen",
+      "toRemove": "Zu entfernende Buchungen",
+      "timeWindow": "Zeitfenster",
+      "matchesAdded": "Spiele hinzugefügt",
+      "matchesRemoved": "Spiele entfernt",
+      "reasonCancelled": "Alle Spiele ausgefallen oder abgesagt",
+      "reasonNoMatches": "Keine verknüpften Spiele mehr",
+      "forfeited": "Ausgefallen",
+      "cancelled": "Abgesagt"
+    },
     "detail": {
       "times": "Zeitfenster",
-      "calculatedTime": "Berechnet",
-      "overrideStart": "Überschriebener Start",
-      "overrideEnd": "Überschriebenes Ende",
+      "startTime": "Start",
+      "endTime": "Ende",
+      "calculated": "Berechnet",
       "reasonPlaceholder": "Grund für Überschreibung...",
       "linkedMatches": "Verknüpfte Spiele",
       "notes": "Notizen",
       "notesPlaceholder": "Notizen hinzufügen...",
       "delete": "Buchung löschen",
       "deleteConfirmTitle": "Buchung löschen?",
-      "deleteConfirmDescription": "Diese Buchung und alle Spielverknüpfungen werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+      "deleteConfirmDescription": "Diese Buchung und alle Spielverknüpfungen werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "discardTitle": "Änderungen verwerfen?",
+      "discardDescription": "Du hast ungespeicherte Änderungen. Möchtest du sie wirklich verwerfen?",
+      "discard": "Verwerfen"
     }
   },
   "settings": {
@@ -527,8 +547,8 @@
     "booking": {
       "title": "Hallenbuchungs-Einstellungen",
       "description": "Standardwerte für die Berechnung der Hallenbuchungszeiten konfigurieren",
-      "bufferBefore": "Vorlauf vor dem Spiel (min)",
-      "bufferAfter": "Nachlauf nach dem Spiel (min)",
+      "bufferBefore": "Vorlauf vor erstem Spiel (min)",
+      "bufferAfter": "Nachlauf nach letztem Spiel (min)",
       "gameDuration": "Standard-Spieldauer (min)",
       "dueDaysBefore": "Buchungsfrist (Tage vorher)"
     },

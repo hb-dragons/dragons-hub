@@ -20,8 +20,9 @@ vi.mock("@dragons/db/schema", () => ({
   venueBookings: { id: "vb.id", venueId: "vb.venueId", date: "vb.date", calculatedStartTime: "vb.cst", calculatedEndTime: "vb.cet", overrideStartTime: "vb.ost", overrideEndTime: "vb.oet", overrideReason: "vb.or", status: "vb.status", needsReconfirmation: "vb.nr", notes: "vb.notes", confirmedBy: "vb.cb", confirmedAt: "vb.ca", createdAt: "vb.createdAt", updatedAt: "vb.updatedAt" },
   venues: { id: "v.id", name: "v.name" },
   venueBookingMatches: { venueBookingId: "vbm.vbId", matchId: "vbm.matchId" },
-  matches: { id: "m.id", matchNo: "m.matchNo", kickoffDate: "m.kd", kickoffTime: "m.kt", homeTeamApiId: "m.htId", guestTeamApiId: "m.gtId" },
-  teams: { apiTeamPermanentId: "t.aptId", name: "t.name" },
+  matches: { id: "m.id", matchNo: "m.matchNo", kickoffDate: "m.kd", kickoffTime: "m.kt", homeTeamApiId: "m.htId", guestTeamApiId: "m.gtId", leagueId: "m.leagueId" },
+  teams: { apiTeamPermanentId: "t.aptId", name: "t.name", customName: "t.customName" },
+  leagues: { id: "l.id", name: "l.name" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -34,6 +35,7 @@ vi.mock("drizzle-orm", () => ({
     { raw: vi.fn((s: string) => ({ raw: s })) },
   ),
   count: vi.fn(() => ({ as: vi.fn().mockReturnValue("count_aliased") })),
+  asc: vi.fn((...args: unknown[]) => ({ asc: args })),
 }));
 
 import {

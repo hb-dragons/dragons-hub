@@ -5,21 +5,23 @@ import {
   venueBookingMatches,
   matches,
   teams,
+  venues,
+  leagues,
   appSettings,
 } from "@dragons/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { calculateTimeWindow, type BookingConfig } from "./booking-calculator";
+import type {
+  ReconcilePreview,
+  ReconcilePreviewMatch,
+  ReconcilePreviewCreate,
+  ReconcilePreviewUpdate,
+  ReconcilePreviewRemove,
+  ReconcileResult,
+  BookingStatus,
+} from "@dragons/shared";
 
 const log = logger.child({ service: "venue-booking" });
-
-// ── Types ────────────────────────────────────────────────────────────────────
-
-export interface ReconcileResult {
-  created: number;
-  updated: number;
-  deleted: number;
-  unchanged: number;
-}
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -65,7 +67,7 @@ export async function getBookingConfig(): Promise<BookingConfig> {
   };
 }
 
-// ── Reconciliation ───────────────────────────────────────────────────────────
+// ── Shared query types ──────────────────────────────────────────────────────
 
 interface MatchWithTeam {
   matchId: number;
@@ -73,44 +75,37 @@ interface MatchWithTeam {
   kickoffDate: string;
   kickoffTime: string;
   isOwnClub: boolean | null;
+  isForfeited: boolean | null;
+  isCancelled: boolean | null;
   estimatedGameDuration: number | null;
 }
 
-export async function reconcileBookingsForMatches(
-  matchIds: number[],
-): Promise<ReconcileResult> {
-  const result: ReconcileResult = { created: 0, updated: 0, deleted: 0, unchanged: 0 };
+async function queryHomeMatches(matchIds: number[]): Promise<MatchWithTeam[]> {
+  if (matchIds.length === 0) return [];
 
-  if (matchIds.length === 0) return result;
-
-  const config = await getBookingConfig();
-
-  // 1. Query matches with home team info, only those with a venue
-  const rows: MatchWithTeam[] = await db
+  const rows = await db
     .select({
       matchId: matches.id,
       venueId: matches.venueId,
       kickoffDate: matches.kickoffDate,
       kickoffTime: matches.kickoffTime,
       isOwnClub: teams.isOwnClub,
+      isForfeited: matches.isForfeited,
+      isCancelled: matches.isCancelled,
       estimatedGameDuration: teams.estimatedGameDuration,
     })
     .from(matches)
     .innerJoin(teams, eq(teams.apiTeamPermanentId, matches.homeTeamApiId))
-    .where(and(inArray(matches.id, matchIds), sql`${matches.venueId} IS NOT NULL`))
-    .then((r) =>
-      r.map((row) => ({
-        ...row,
-        venueId: row.venueId as number,
-      })),
-    );
+    .where(and(inArray(matches.id, matchIds), sql`${matches.venueId} IS NOT NULL`));
 
-  // 2. Filter to home games only
-  const homeGames = rows.filter((r) => r.isOwnClub === true);
+  return rows
+    .filter((r) => r.isOwnClub === true)
+    .map((row) => ({ ...row, venueId: row.venueId as number }));
+}
 
-  // 3. Group by (venueId, kickoffDate)
+function groupByVenueDate(games: MatchWithTeam[]): Map<string, MatchWithTeam[]> {
   const groups = new Map<string, MatchWithTeam[]>();
-  for (const game of homeGames) {
+  for (const game of games) {
     const key = `${game.venueId}:${game.kickoffDate}`;
     const group = groups.get(key);
     if (group) {
@@ -119,21 +114,251 @@ export async function reconcileBookingsForMatches(
       groups.set(key, [game]);
     }
   }
+  return groups;
+}
 
-  // 4. Process each group
+function isActiveMatch(m: MatchWithTeam): boolean {
+  return m.isForfeited !== true && m.isCancelled !== true;
+}
+
+function sortMatchesByKickoff(matches: ReconcilePreviewMatch[]): ReconcilePreviewMatch[] {
+  return matches.sort((a, b) => a.kickoffTime.localeCompare(b.kickoffTime));
+}
+
+// ── Preview ─────────────────────────────────────────────────────────────────
+
+async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, ReconcilePreviewMatch>> {
+  if (matchIds.length === 0) return new Map();
+
+  const homeTeam = db
+    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name, customName: teams.customName })
+    .from(teams)
+    .as("home_team");
+  const guestTeam = db
+    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
+    .from(teams)
+    .as("guest_team");
+
+  const rows = await db
+    .select({
+      id: matches.id,
+      kickoffTime: matches.kickoffTime,
+      isForfeited: matches.isForfeited,
+      isCancelled: matches.isCancelled,
+      homeTeam: homeTeam.name,
+      homeTeamCustomName: homeTeam.customName,
+      guestTeam: guestTeam.name,
+    })
+    .from(matches)
+    .innerJoin(homeTeam, eq(homeTeam.apiTeamPermanentId, matches.homeTeamApiId))
+    .innerJoin(guestTeam, eq(guestTeam.apiTeamPermanentId, matches.guestTeamApiId))
+    .where(inArray(matches.id, matchIds));
+
+  const map = new Map<number, ReconcilePreviewMatch>();
+  for (const r of rows) {
+    map.set(r.id, {
+      id: r.id,
+      homeTeam: r.homeTeam,
+      homeTeamCustomName: r.homeTeamCustomName,
+      guestTeam: r.guestTeam,
+      kickoffTime: r.kickoffTime,
+      isForfeited: r.isForfeited ?? false,
+      isCancelled: r.isCancelled ?? false,
+    });
+  }
+  return map;
+}
+
+async function fetchVenueNames(venueIds: number[]): Promise<Map<number, string>> {
+  if (venueIds.length === 0) return new Map();
+  const rows = await db
+    .select({ id: venues.id, name: venues.name })
+    .from(venues)
+    .where(inArray(venues.id, venueIds));
+  return new Map(rows.map((r) => [r.id, r.name]));
+}
+
+export async function previewReconciliation(): Promise<ReconcilePreview> {
+  const preview: ReconcilePreview = { toCreate: [], toUpdate: [], toRemove: [], unchanged: 0 };
+
+  // Get all home matches (including forfeited/cancelled so we can show them)
+  const allHomeMatchRows = await db
+    .select({ id: matches.id })
+    .from(matches)
+    .innerJoin(teams, eq(teams.apiTeamPermanentId, matches.homeTeamApiId))
+    .where(and(eq(teams.isOwnClub, true), sql`${matches.venueId} IS NOT NULL`));
+
+  const allMatchIds = allHomeMatchRows.map((r) => r.id);
+  if (allMatchIds.length === 0) return preview;
+
+  const config = await getBookingConfig();
+  const homeGames = await queryHomeMatches(allMatchIds);
+  const groups = groupByVenueDate(homeGames);
+
+  // Collect all match IDs and venue IDs for display info
+  const allMatchIdsForDisplay = new Set<number>();
+  const allVenueIds = new Set<number>();
+  for (const group of groups.values()) {
+    for (const g of group) {
+      allMatchIdsForDisplay.add(g.matchId);
+      allVenueIds.add(g.venueId);
+    }
+  }
+
+  // Also get existing bookings to find removals
+  const existingBookings = await db
+    .select({
+      id: venueBookings.id,
+      venueId: venueBookings.venueId,
+      date: venueBookings.date,
+      status: venueBookings.status,
+      calculatedStartTime: venueBookings.calculatedStartTime,
+      calculatedEndTime: venueBookings.calculatedEndTime,
+    })
+    .from(venueBookings);
+
+  for (const b of existingBookings) {
+    allVenueIds.add(b.venueId);
+  }
+
+  // Get existing junction entries for each booking
+  const allJunctions = await db
+    .select({
+      venueBookingId: venueBookingMatches.venueBookingId,
+      matchId: venueBookingMatches.matchId,
+    })
+    .from(venueBookingMatches);
+
+  const bookingMatchMap = new Map<number, number[]>();
+  for (const j of allJunctions) {
+    const list = bookingMatchMap.get(j.venueBookingId) ?? [];
+    list.push(j.matchId);
+    bookingMatchMap.set(j.venueBookingId, list);
+    allMatchIdsForDisplay.add(j.matchId);
+  }
+
+  const [matchDisplay, venueNames] = await Promise.all([
+    fetchMatchDisplayInfo([...allMatchIdsForDisplay]),
+    fetchVenueNames([...allVenueIds]),
+  ]);
+
   const touchedBookingIds = new Set<number>();
 
   for (const [, group] of groups) {
     const { venueId, kickoffDate } = group[0]!;
-    const matchIdsInGroup = group.map((g) => g.matchId);
+    const activeGames = group.filter(isActiveMatch);
+    const venueName = venueNames.get(venueId) ?? "Unknown";
 
-    // Calculate time window
-    const matchInputs = group.map((g) => ({
+    // Find existing booking for this venue+date
+    const existing = existingBookings.find(
+      (b) => b.venueId === venueId && b.date === kickoffDate,
+    );
+
+    if (activeGames.length === 0) {
+      // All matches forfeited/cancelled
+      if (existing) {
+        touchedBookingIds.add(existing.id);
+        preview.toRemove.push({
+          bookingId: existing.id,
+          venueName,
+          date: kickoffDate,
+          status: existing.status as BookingStatus,
+          reason: "all_matches_cancelled",
+          matches: sortMatchesByKickoff(group.map((g) => matchDisplay.get(g.matchId)!).filter(Boolean)),
+        });
+      }
+      continue;
+    }
+
+    const matchInputs = activeGames.map((g) => ({
       kickoffTime: g.kickoffTime,
       teamGameDuration: g.estimatedGameDuration,
     }));
-    // Every group has at least one match, so window is always non-null
     const window = calculateTimeWindow(matchInputs, config)!;
+    const activeMatchIds = new Set(activeGames.map((g) => g.matchId));
+
+    if (existing) {
+      touchedBookingIds.add(existing.id);
+      const currentMatchIds = new Set(bookingMatchMap.get(existing.id) ?? []);
+
+      const windowChanged =
+        existing.calculatedStartTime !== window.calculatedStartTime ||
+        existing.calculatedEndTime !== window.calculatedEndTime;
+
+      const added = [...activeMatchIds].filter((id) => !currentMatchIds.has(id));
+      const removed = [...currentMatchIds].filter((id) => !activeMatchIds.has(id));
+
+      if (windowChanged || added.length > 0 || removed.length > 0) {
+        preview.toUpdate.push({
+          bookingId: existing.id,
+          venueName,
+          date: kickoffDate,
+          status: existing.status as BookingStatus,
+          currentStartTime: existing.calculatedStartTime,
+          currentEndTime: existing.calculatedEndTime,
+          newStartTime: window.calculatedStartTime,
+          newEndTime: window.calculatedEndTime,
+          matchesAdded: sortMatchesByKickoff(added.map((id) => matchDisplay.get(id)!).filter(Boolean)),
+          matchesRemoved: sortMatchesByKickoff(removed.map((id) => matchDisplay.get(id)!).filter(Boolean)),
+        });
+      } else {
+        preview.unchanged++;
+      }
+    } else {
+      preview.toCreate.push({
+        venueName,
+        date: kickoffDate,
+        calculatedStartTime: window.calculatedStartTime,
+        calculatedEndTime: window.calculatedEndTime,
+        matches: sortMatchesByKickoff(activeGames.map((g) => matchDisplay.get(g.matchId)!).filter(Boolean)),
+      });
+    }
+  }
+
+  // Find existing bookings not touched (no matching home games at all)
+  for (const b of existingBookings) {
+    if (!touchedBookingIds.has(b.id)) {
+      const linkedMatchIds = bookingMatchMap.get(b.id) ?? [];
+      preview.toRemove.push({
+        bookingId: b.id,
+        venueName: venueNames.get(b.venueId) ?? "Unknown",
+        date: b.date,
+        status: b.status as BookingStatus,
+        reason: "no_matches",
+        matches: sortMatchesByKickoff(linkedMatchIds.map((id) => matchDisplay.get(id)!).filter(Boolean)),
+      });
+    }
+  }
+
+  const byDateAsc = (a: { date: string }, b: { date: string }) =>
+    a.date.localeCompare(b.date);
+  preview.toCreate.sort(byDateAsc);
+  preview.toUpdate.sort(byDateAsc);
+  preview.toRemove.sort(byDateAsc);
+
+  return preview;
+}
+
+// ── Reconciliation ───────────────────────────────────────────────────────────
+
+export async function reconcileBookingsForMatches(
+  matchIds: number[],
+): Promise<ReconcileResult> {
+  const result: ReconcileResult = { created: 0, updated: 0, removed: 0, unchanged: 0 };
+
+  if (matchIds.length === 0) return result;
+
+  const config = await getBookingConfig();
+  const homeGames = await queryHomeMatches(matchIds);
+  const groups = groupByVenueDate(homeGames);
+
+  const touchedBookingIds = new Set<number>();
+
+  for (const [, group] of groups) {
+    const { venueId, kickoffDate } = group[0]!;
+
+    // Only active (non-forfeited, non-cancelled) matches count
+    const activeGames = group.filter(isActiveMatch);
 
     // Find existing booking
     const [existing] = await db
@@ -147,8 +372,46 @@ export async function reconcileBookingsForMatches(
       )
       .limit(1);
 
+    if (activeGames.length === 0) {
+      // All matches are forfeited/cancelled — mark existing booking for cleanup
+      if (existing) {
+        // Remove all junction entries for these matches
+        for (const game of group) {
+          await db
+            .delete(venueBookingMatches)
+            .where(
+              and(
+                eq(venueBookingMatches.venueBookingId, existing.id),
+                eq(venueBookingMatches.matchId, game.matchId),
+              ),
+            );
+        }
+
+        // Check if booking has any remaining matches
+        const [remaining] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(venueBookingMatches)
+          .where(eq(venueBookingMatches.venueBookingId, existing.id));
+
+        if (Number(remaining!.count) === 0) {
+          await db.delete(venueBookings).where(eq(venueBookings.id, existing.id));
+          result.removed++;
+        }
+        touchedBookingIds.add(existing.id);
+      }
+      continue;
+    }
+
+    const activeMatchIds = activeGames.map((g) => g.matchId);
+
+    // Calculate time window from active matches only
+    const matchInputs = activeGames.map((g) => ({
+      kickoffTime: g.kickoffTime,
+      teamGameDuration: g.estimatedGameDuration,
+    }));
+    const window = calculateTimeWindow(matchInputs, config)!;
+
     if (existing) {
-      // Check if time window changed
       const windowChanged =
         existing.calculatedStartTime !== window.calculatedStartTime ||
         existing.calculatedEndTime !== window.calculatedEndTime;
@@ -162,7 +425,6 @@ export async function reconcileBookingsForMatches(
           updatedAt: new Date(),
         };
 
-        // If booking was confirmed and times changed, revert to pending
         if (existing.status === "confirmed") {
           updateData.status = "pending";
           updateData.confirmedAt = null;
@@ -179,11 +441,10 @@ export async function reconcileBookingsForMatches(
         result.unchanged++;
       }
 
-      // Sync junction entries
-      await syncBookingMatches(existing.id, matchIdsInGroup);
+      // Sync junction entries — only active matches
+      await syncBookingMatches(existing.id, activeMatchIds);
       touchedBookingIds.add(existing.id);
     } else {
-      // Create new booking
       const [created] = await db
         .insert(venueBookings)
         .values({
@@ -196,8 +457,7 @@ export async function reconcileBookingsForMatches(
         })
         .returning({ id: venueBookings.id });
 
-      // Link matches
-      for (const mid of matchIdsInGroup) {
+      for (const mid of activeMatchIds) {
         await db.insert(venueBookingMatches).values({
           venueBookingId: created!.id,
           matchId: mid,
@@ -209,8 +469,7 @@ export async function reconcileBookingsForMatches(
     }
   }
 
-  // 5. Clean up: find bookings linked to these matchIds that we didn't touch,
-  //    and remove the stale junction entries
+  // Clean up stale bookings linked to these matchIds that we didn't touch
   const allLinkedBookings = await db
     .select({ venueBookingId: venueBookingMatches.venueBookingId })
     .from(venueBookingMatches)
@@ -223,7 +482,6 @@ export async function reconcileBookingsForMatches(
     }
   }
 
-  // Remove stale junction entries for these matches
   if (staleBookingIds.size > 0) {
     for (const bookingId of staleBookingIds) {
       await db
@@ -237,17 +495,15 @@ export async function reconcileBookingsForMatches(
     }
   }
 
-  // 6. Delete stale bookings that now have zero linked matches
   for (const bookingId of staleBookingIds) {
     const [remaining] = await db
       .select({ count: sql<number>`count(*)` })
       .from(venueBookingMatches)
       .where(eq(venueBookingMatches.venueBookingId, bookingId));
 
-    // count(*) always returns a row
     if (Number(remaining!.count) === 0) {
       await db.delete(venueBookings).where(eq(venueBookings.id, bookingId));
-      result.deleted++;
+      result.removed++;
     }
   }
 
@@ -269,7 +525,6 @@ async function syncBookingMatches(
   const existingIds = new Set(existing.map((r) => r.matchId));
   const expectedIds = new Set(expectedMatchIds);
 
-  // Add missing
   for (const matchId of expectedIds) {
     if (!existingIds.has(matchId)) {
       await db.insert(venueBookingMatches).values({
@@ -279,7 +534,6 @@ async function syncBookingMatches(
     }
   }
 
-  // Remove stale
   for (const matchId of existingIds) {
     if (!expectedIds.has(matchId)) {
       await db
@@ -297,8 +551,6 @@ async function syncBookingMatches(
 // ── Post-sync reconciliation ─────────────────────────────────────────────────
 
 export async function reconcileAfterSync(): Promise<void> {
-  // Reconcile ALL home matches — the reconciliation is idempotent,
-  // so unchanged bookings stay the same.
   const homeMatchRows = await db
     .select({ id: matches.id })
     .from(matches)
@@ -318,7 +570,6 @@ export async function reconcileAfterSync(): Promise<void> {
 // ── Single match reconciliation ──────────────────────────────────────────────
 
 export async function reconcileMatch(matchId: number): Promise<void> {
-  // Check if match was previously linked to a booking
   const previousLinks = await db
     .select({
       venueBookingId: venueBookingMatches.venueBookingId,
@@ -329,7 +580,6 @@ export async function reconcileMatch(matchId: number): Promise<void> {
     .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
     .where(eq(venueBookingMatches.matchId, matchId));
 
-  // Get the current match state
   const [currentMatch] = await db
     .select({
       venueId: matches.venueId,
@@ -339,7 +589,6 @@ export async function reconcileMatch(matchId: number): Promise<void> {
     .where(eq(matches.id, matchId))
     .limit(1);
 
-  // If match moved to a different venue/date, clean up old bookings
   if (currentMatch && previousLinks.length > 0) {
     for (const link of previousLinks) {
       const changed =
@@ -347,7 +596,6 @@ export async function reconcileMatch(matchId: number): Promise<void> {
         link.bookingDate !== currentMatch.kickoffDate;
 
       if (changed) {
-        // Remove this match from the old booking
         await db
           .delete(venueBookingMatches)
           .where(
@@ -357,13 +605,11 @@ export async function reconcileMatch(matchId: number): Promise<void> {
             ),
           );
 
-        // Check if old booking is now empty
         const [remaining] = await db
           .select({ count: sql<number>`count(*)` })
           .from(venueBookingMatches)
           .where(eq(venueBookingMatches.venueBookingId, link.venueBookingId));
 
-        // count(*) always returns a row
         if (Number(remaining!.count) === 0) {
           await db
             .delete(venueBookings)
@@ -373,6 +619,5 @@ export async function reconcileMatch(matchId: number): Promise<void> {
     }
   }
 
-  // Reconcile the match at its current venue/date
   await reconcileBookingsForMatches([matchId]);
 }

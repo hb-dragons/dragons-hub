@@ -379,7 +379,7 @@ describe("reconcileBookingsForMatches", () => {
   it("returns empty result for empty match IDs", async () => {
     const result = await reconcileBookingsForMatches([]);
 
-    expect(result).toEqual({ created: 0, updated: 0, deleted: 0, unchanged: 0 });
+    expect(result).toEqual({ created: 0, updated: 0, removed: 0, unchanged: 0 });
   });
 
   it("creates a booking for a home game with venue", async () => {
@@ -416,7 +416,7 @@ describe("reconcileBookingsForMatches", () => {
 
     const result = await reconcileBookingsForMatches([matchId]);
 
-    expect(result).toEqual({ created: 0, updated: 0, deleted: 0, unchanged: 0 });
+    expect(result).toEqual({ created: 0, updated: 0, removed: 0, unchanged: 0 });
     const bookings = await getBookings();
     expect(bookings).toHaveLength(0);
   });
@@ -427,7 +427,7 @@ describe("reconcileBookingsForMatches", () => {
 
     const result = await reconcileBookingsForMatches([matchId]);
 
-    expect(result).toEqual({ created: 0, updated: 0, deleted: 0, unchanged: 0 });
+    expect(result).toEqual({ created: 0, updated: 0, removed: 0, unchanged: 0 });
   });
 
   it("groups multiple matches at same venue+date into one booking", async () => {
@@ -717,7 +717,7 @@ describe("reconcileBookingsForMatches", () => {
 
     const result = await reconcileBookingsForMatches([matchId]);
 
-    expect(result.deleted).toBe(1);
+    expect(result.removed).toBe(1);
     const bookings = await getBookings();
     expect(bookings).toHaveLength(0);
   });
@@ -758,7 +758,7 @@ describe("reconcileBookingsForMatches", () => {
     const result = await reconcileBookingsForMatches([m1]);
 
     // Booking should NOT be deleted because m2 still links to it
-    expect(result.deleted).toBe(0);
+    expect(result.removed).toBe(0);
     const bookings = await getBookings();
     expect(bookings).toHaveLength(1);
 
@@ -819,7 +819,7 @@ describe("reconcileBookingsForMatches", () => {
   it("handles match IDs that do not exist", async () => {
     const result = await reconcileBookingsForMatches([9999]);
 
-    expect(result).toEqual({ created: 0, updated: 0, deleted: 0, unchanged: 0 });
+    expect(result).toEqual({ created: 0, updated: 0, removed: 0, unchanged: 0 });
   });
 });
 

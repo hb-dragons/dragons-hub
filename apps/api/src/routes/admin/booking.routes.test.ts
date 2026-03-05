@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   updateBookingStatus: vi.fn(),
   createBooking: vi.fn(),
   deleteBooking: vi.fn(),
+  previewReconciliation: vi.fn(),
+  reconcileAfterSync: vi.fn(),
 }));
 
 vi.mock("../../services/admin/booking-admin.service", () => ({
@@ -22,8 +24,16 @@ vi.mock("../../services/admin/booking-admin.service", () => ({
   deleteBooking: mocks.deleteBooking,
 }));
 
+vi.mock("../../services/venue-booking/venue-booking.service", () => ({
+  previewReconciliation: mocks.previewReconciliation,
+  reconcileAfterSync: mocks.reconcileAfterSync,
+}));
+
 vi.mock("../../config/logger", () => ({
-  logger: { error: vi.fn() },
+  logger: {
+    error: vi.fn(),
+    child: vi.fn().mockReturnValue({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }),
+  },
 }));
 
 // --- Imports (after mocks) ---
