@@ -90,9 +90,9 @@ function OverrideField({
   const showHint = isOverridden || isDirty;
 
   return (
-    <div className="space-y-1.5">
+    <Field>
       <div className="flex min-h-6 items-center justify-between">
-        <span className="text-sm font-medium">{label}</span>
+        <FieldLabel>{label}</FieldLabel>
         <div className="flex items-center gap-1">
           {isDirty && onReset && (
             <Button
@@ -122,11 +122,11 @@ function OverrideField({
       </div>
       {children}
       {showHint && remoteDisplay && (
-        <p className="text-xs text-muted-foreground">
+        <FieldDescription>
           {t("matchDetail.overrides.official")}: {remoteDisplay}
-        </p>
+        </FieldDescription>
       )}
-    </div>
+    </Field>
   );
 }
 
@@ -644,11 +644,11 @@ export function MatchEditSheet({
                     control={form.control}
                     name="isForfeited"
                     render={({ field }) => (
-                      <div className="flex items-center justify-start gap-4">
+                      <Field className="flex items-center justify-start gap-4 space-y-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
+                          <FieldLabel>
                             {t("matchDetail.overrides.forfeited")}
-                          </span>
+                          </FieldLabel>
                           {match.overriddenFields.includes("isForfeited") && (
                             <span
                               className="h-1.5 w-1.5 rounded-full bg-primary"
@@ -675,7 +675,7 @@ export function MatchEditSheet({
                             </Button>
                           )}
                         </div>
-                      </div>
+                      </Field>
                     )}
                   />
 
@@ -683,11 +683,11 @@ export function MatchEditSheet({
                     control={form.control}
                     name="isCancelled"
                     render={({ field }) => (
-                      <div className="flex items-center justify-start gap-4">
+                      <Field className="flex items-center justify-start gap-4 space-y-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
+                          <FieldLabel>
                             {t("matchDetail.overrides.cancelled")}
-                          </span>
+                          </FieldLabel>
                           {match.overriddenFields.includes("isCancelled") && (
                             <span
                               className="h-1.5 w-1.5 rounded-full bg-primary"
@@ -714,7 +714,7 @@ export function MatchEditSheet({
                             </Button>
                           )}
                         </div>
-                      </div>
+                      </Field>
                     )}
                   />
                 </div>
