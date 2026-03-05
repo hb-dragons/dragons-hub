@@ -33,7 +33,9 @@ export interface SyncResult {
     created: number;
     updated: number;
     skipped: number;
+    rolesCreated: number;
     rolesUpdated: number;
+    rolesSkipped: number;
     assignmentsCreated: number;
     errors: number;
   };
@@ -181,12 +183,14 @@ export class SyncOrchestrator {
           created: refereesRes.created,
           updated: refereesRes.updated,
           skipped: refereesRes.skipped,
+          rolesCreated: rolesRes.created,
           rolesUpdated: rolesRes.updated,
+          rolesSkipped: rolesRes.skipped,
           assignmentsCreated: assignmentsRes.created,
         },
       };
 
-      await db
+      const [updatedRun] = await db
         .update(syncRuns)
         .set({
           status: "completed",
@@ -204,7 +208,12 @@ export class SyncOrchestrator {
           errorMessage: allErrors.length > 0 ? allErrors.slice(0, 10).join("\n") : null,
           summary,
         })
-        .where(eq(syncRuns.id, syncRun.id));
+        .where(eq(syncRuns.id, syncRun.id))
+        .returning({ id: syncRuns.id });
+
+      if (!updatedRun) {
+        log.warn({ syncRunId: syncRun.id }, "Completion update did not match any rows");
+      }
 
       const syncResult: SyncResult = {
         syncRunId: syncRun.id,
@@ -231,7 +240,9 @@ export class SyncOrchestrator {
           created: refereesRes.created,
           updated: refereesRes.updated,
           skipped: refereesRes.skipped,
+          rolesCreated: rolesRes.created,
           rolesUpdated: rolesRes.updated,
+          rolesSkipped: rolesRes.skipped,
           assignmentsCreated: assignmentsRes.created,
           errors: refereesRes.errors.length + assignmentsRes.errors.length,
         },
@@ -273,7 +284,7 @@ export class SyncOrchestrator {
         matches: { created: 0, updated: 0, skipped: 0, errors: 0 },
         standings: { created: 0, updated: 0, skipped: 0, errors: 0 },
         venues: { created: 0, updated: 0, skipped: 0, errors: 0 },
-        referees: { created: 0, updated: 0, skipped: 0, rolesUpdated: 0, assignmentsCreated: 0, errors: 0 },
+        referees: { created: 0, updated: 0, skipped: 0, rolesCreated: 0, rolesUpdated: 0, rolesSkipped: 0, assignmentsCreated: 0, errors: 0 },
         totalErrors: allErrors,
         status: "failed",
       };

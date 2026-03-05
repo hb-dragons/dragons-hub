@@ -34,7 +34,7 @@ vi.mock("../config/database", () => ({
 }));
 
 vi.mock("@dragons/db/schema", () => ({
-  syncRuns: { status: "status" },
+  syncRuns: { id: "id", status: "status" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -42,6 +42,7 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 import { initializeWorkers, shutdownWorkers } from "./index";
+import { logger } from "../config/logger";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -49,9 +50,50 @@ beforeEach(() => {
 
 describe("initializeWorkers", () => {
   it("calls initializeScheduledJobs", async () => {
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
     await initializeWorkers();
 
     expect(mockInitScheduledJobs).toHaveBeenCalled();
+  });
+
+  it("marks stale running sync runs as failed on startup", async () => {
+    const mockReturning = vi.fn().mockResolvedValue([{ id: 5 }, { id: 8 }]);
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: mockReturning,
+        }),
+      }),
+    });
+
+    await initializeWorkers();
+
+    expect(mockDbUpdate).toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      { count: 2, ids: [5, 8] },
+      "Marked stale running sync runs as failed",
+    );
+  });
+
+  it("does not log warning when no stale runs found", async () => {
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    await initializeWorkers();
+
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 });
 

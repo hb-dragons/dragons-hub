@@ -191,8 +191,11 @@ module "api" {
   min_instances = 1
   max_instances = 10
 
+  cpu_idle = true
+
   env_vars = {
     NODE_ENV        = "production"
+    RUN_MODE        = "api"
     BETTER_AUTH_URL = "https://${var.api_domain}"
     TRUSTED_ORIGINS = "https://${var.web_domain}"
     LOG_LEVEL       = "info"
@@ -223,6 +226,63 @@ module "api" {
 
   cloudsql_instances = [module.database.connection_name]
   ingress            = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  depends_on = [module.secrets, google_project_service.apis]
+}
+
+# Cloud Run - Worker (same image as API, dedicated CPU for background jobs)
+module "worker" {
+  source = "../../modules/cloud-run"
+
+  project_id      = var.project_id
+  region          = var.region
+  service_name    = "dragons-worker-production"
+  image           = "${local.artifact_registry_url}/api:${var.image_tag}"
+  port            = 8080
+  vpc_connector   = module.network.connector_id
+  service_account = google_service_account.api.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  min_instances = 1
+  max_instances = 1
+  cpu_idle      = false
+  concurrency   = 1
+  timeout       = "900s"
+
+  env_vars = {
+    NODE_ENV        = "production"
+    RUN_MODE        = "worker"
+    BETTER_AUTH_URL = "https://${var.api_domain}"
+    TRUSTED_ORIGINS = "https://${var.web_domain}"
+    LOG_LEVEL       = "info"
+  }
+
+  secrets = {
+    DATABASE_URL = {
+      secret_name = "database-url-production"
+      version     = "latest"
+    }
+    REDIS_URL = {
+      secret_name = "redis-url-production"
+      version     = "latest"
+    }
+    SDK_USERNAME = {
+      secret_name = "sdk-username-production"
+      version     = "latest"
+    }
+    SDK_PASSWORD = {
+      secret_name = "sdk-password-production"
+      version     = "latest"
+    }
+    BETTER_AUTH_SECRET = {
+      secret_name = "auth-secret-production"
+      version     = "latest"
+    }
+  }
+
+  cloudsql_instances = [module.database.connection_name]
+  ingress            = "INGRESS_TRAFFIC_ALL"
 
   depends_on = [module.secrets, google_project_service.apis]
 }
@@ -292,6 +352,10 @@ output "web_url" {
 
 output "api_url" {
   value = module.api.url
+}
+
+output "worker_url" {
+  value = module.worker.url
 }
 
 output "database_connection_name" {

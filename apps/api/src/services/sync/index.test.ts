@@ -2,14 +2,16 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // --- Mock setup ---
 
+const mockSyncLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
 vi.mock("../../config/logger", () => ({
   logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
+    child: () => mockSyncLogger,
   },
 }));
 
@@ -98,7 +100,11 @@ beforeEach(() => {
   });
   mockUpdate.mockReturnValue({
     set: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
+      where: vi.fn().mockReturnValue(
+        Object.assign(Promise.resolve(undefined), {
+          returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+        }),
+      ),
     }),
   });
 
@@ -132,7 +138,7 @@ beforeEach(() => {
   });
 
   mockSyncRoles.mockResolvedValue({
-    updated: 2, roleIdLookup: new Map(),
+    created: 1, updated: 1, skipped: 0, failed: 0, roleIdLookup: new Map(),
   });
 
   mockSyncStandings.mockResolvedValue({
@@ -181,7 +187,11 @@ describe("SyncOrchestrator", () => {
       // Subsequent update calls (completion) use the default mock
       mockUpdate.mockReturnValue({
         set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
+          where: vi.fn().mockReturnValue(
+            Object.assign(Promise.resolve(undefined), {
+              returning: vi.fn().mockResolvedValue([{ id: 99 }]),
+            }),
+          ),
         }),
       });
 
@@ -208,7 +218,7 @@ describe("SyncOrchestrator", () => {
       );
     });
 
-    it("updates sync run record on completion", async () => {
+    it("updates sync run record on completion with returning", async () => {
       await syncOrchestrator.fullSync("manual");
 
       // update called at end
@@ -216,6 +226,26 @@ describe("SyncOrchestrator", () => {
       const setCall = mockUpdate.mock.results[0]!.value.set;
       expect(setCall).toHaveBeenCalledWith(
         expect.objectContaining({ status: "completed" }),
+      );
+    });
+
+    it("logs warning when completion update matches no rows", async () => {
+      // Override default mock for this test — returning empty array
+      mockUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue(
+            Object.assign(Promise.resolve(undefined), {
+              returning: vi.fn().mockResolvedValue([]),
+            }),
+          ),
+        }),
+      });
+
+      await syncOrchestrator.fullSync("manual");
+
+      expect(mockSyncLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ syncRunId: 1 }),
+        "Completion update did not match any rows",
       );
     });
 
@@ -318,6 +348,9 @@ describe("SyncOrchestrator", () => {
       expect(result.teams.created).toBe(0);
       expect(result.matches.created).toBe(0);
       expect(result.referees.assignmentsCreated).toBe(0);
+      expect(result.referees.rolesCreated).toBe(0);
+      expect(result.referees.rolesUpdated).toBe(0);
+      expect(result.referees.rolesSkipped).toBe(0);
     });
 
     it("includes durationMs", async () => {
@@ -330,14 +363,16 @@ describe("SyncOrchestrator", () => {
       mockSyncReferees.mockResolvedValue({
         created: 2, updated: 1, skipped: 0, refereeIdLookup: new Map(), errors: [],
       });
-      mockSyncRoles.mockResolvedValue({ updated: 3, roleIdLookup: new Map() });
+      mockSyncRoles.mockResolvedValue({ created: 1, updated: 2, skipped: 1, failed: 0, roleIdLookup: new Map() });
       mockSyncAssignments.mockResolvedValue({ created: 5, errors: [] });
 
       const result = await syncOrchestrator.fullSync("manual");
 
       expect(result.referees.created).toBe(2);
       expect(result.referees.updated).toBe(1);
-      expect(result.referees.rolesUpdated).toBe(3);
+      expect(result.referees.rolesCreated).toBe(1);
+      expect(result.referees.rolesUpdated).toBe(2);
+      expect(result.referees.rolesSkipped).toBe(1);
       expect(result.referees.assignmentsCreated).toBe(5);
     });
 

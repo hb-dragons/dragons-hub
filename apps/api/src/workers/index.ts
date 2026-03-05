@@ -8,6 +8,24 @@ import { eq } from "drizzle-orm";
 export async function initializeWorkers() {
   logger.info("Initializing workers...");
 
+  // Mark any stale "running" sync runs as failed (from previous crash/deploy)
+  const staleRuns = await db
+    .update(syncRuns)
+    .set({
+      status: "failed",
+      completedAt: new Date(),
+      errorMessage: "Stale: worker restarted",
+    })
+    .where(eq(syncRuns.status, "running"))
+    .returning({ id: syncRuns.id });
+
+  if (staleRuns.length > 0) {
+    logger.warn(
+      { count: staleRuns.length, ids: staleRuns.map((r) => r.id) },
+      "Marked stale running sync runs as failed",
+    );
+  }
+
   await initializeScheduledJobs();
 
   // Workers are automatically started when imported

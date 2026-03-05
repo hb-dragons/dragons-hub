@@ -28,6 +28,23 @@ vi.mock("../services/sync/index", () => ({
   },
 }));
 
+const mockDbSelect = vi.fn();
+const mockDbUpdate = vi.fn();
+vi.mock("../config/database", () => ({
+  db: {
+    select: (...args: unknown[]) => mockDbSelect(...args),
+    update: (...args: unknown[]) => mockDbUpdate(...args),
+  },
+}));
+
+vi.mock("@dragons/db/schema", () => ({
+  syncRuns: { id: "id", status: "status" },
+}));
+
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn(),
+}));
+
 const mockOnCompleted = vi.fn();
 const mockOnFailed = vi.fn();
 const mockOnError = vi.fn();
@@ -53,6 +70,7 @@ vi.mock("bullmq", () => ({
 
 // Import after mocks
 await import("./sync.worker");
+import { logger } from "../config/logger";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -146,14 +164,90 @@ describe("sync worker processor", () => {
 });
 
 describe("sync worker event handlers", () => {
-  it("handles completed event", () => {
-    mockOnCompleted({ id: "job-1" });
-    // Should not throw
+  describe("completed handler", () => {
+    it("logs completion without syncRunId", async () => {
+      await mockOnCompleted({ id: "job-1", data: {} });
+
+      expect(logger.info).toHaveBeenCalledWith({ jobId: "job-1" }, "Sync job completed");
+      expect(mockDbSelect).not.toHaveBeenCalled();
+    });
+
+    it("verifies and fixes stale running sync run on completion", async () => {
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ status: "running" }]),
+        }),
+      });
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
+
+      await mockOnCompleted({ id: "job-1", data: { syncRunId: 42 } });
+
+      expect(mockDbSelect).toHaveBeenCalled();
+      expect(mockDbUpdate).toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledWith(
+        { syncRunId: 42 },
+        "Sync run still running after job completed, marking as completed",
+      );
+    });
+
+    it("does not update when sync run is already completed", async () => {
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ status: "completed" }]),
+        }),
+      });
+
+      await mockOnCompleted({ id: "job-1", data: { syncRunId: 42 } });
+
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it("does not update when sync run is not found", async () => {
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      });
+
+      await mockOnCompleted({ id: "job-1", data: { syncRunId: 999 } });
+
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
   });
 
-  it("handles failed event", () => {
-    mockOnFailed({ id: "job-1" }, new Error("fail"));
-    // Should not throw
+  describe("failed handler", () => {
+    it("logs failure without syncRunId", async () => {
+      const err = new Error("fail");
+      await mockOnFailed({ id: "job-1", data: {} }, err);
+
+      expect(logger.error).toHaveBeenCalledWith({ jobId: "job-1", err }, "Sync job failed");
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it("marks sync run as failed in DB", async () => {
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
+
+      const err = new Error("sync crashed");
+      await mockOnFailed({ id: "job-1", data: { syncRunId: 42 } }, err);
+
+      expect(mockDbUpdate).toHaveBeenCalled();
+    });
+
+    it("handles null job in failed handler", async () => {
+      const err = new Error("fail");
+      await mockOnFailed(null, err);
+
+      expect(logger.error).toHaveBeenCalled();
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
   });
 
   it("handles error event", () => {

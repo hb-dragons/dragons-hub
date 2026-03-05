@@ -33,11 +33,26 @@ describe("env config", () => {
     delete process.env.PORT;
     delete process.env.NODE_ENV;
     delete process.env.TRUSTED_ORIGINS;
+    delete process.env.RUN_MODE;
 
     const { env } = await import("./env");
 
     expect(env.PORT).toBe(3001);
     expect(env.NODE_ENV).toBe("development");
+    expect(env.RUN_MODE).toBe("both");
+  });
+
+  it("accepts valid RUN_MODE values", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test");
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
+    vi.stubEnv("SDK_USERNAME", "user");
+    vi.stubEnv("SDK_PASSWORD", "pass");
+    vi.stubEnv("BETTER_AUTH_SECRET", "a".repeat(32));
+    vi.stubEnv("RUN_MODE", "worker");
+
+    const { env } = await import("./env");
+
+    expect(env.RUN_MODE).toBe("worker");
   });
 
   it("throws on missing required fields", async () => {

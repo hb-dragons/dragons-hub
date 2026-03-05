@@ -1,6 +1,9 @@
 import { Worker, Job } from "bullmq";
+import { eq } from "drizzle-orm";
+import { syncRuns } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
+import { db } from "../config/database";
 import { syncOrchestrator } from "../services/sync/index";
 
 interface SyncJobData {
@@ -42,12 +45,40 @@ export const syncWorker = new Worker<SyncJobData>(
   },
 );
 
-syncWorker.on("completed", (job) => {
+syncWorker.on("completed", async (job) => {
   logger.info({ jobId: job.id }, "Sync job completed");
+
+  if (job.data.syncRunId) {
+    const [run] = await db
+      .select({ status: syncRuns.status })
+      .from(syncRuns)
+      .where(eq(syncRuns.id, job.data.syncRunId));
+    if (run && run.status === "running") {
+      logger.warn(
+        { syncRunId: job.data.syncRunId },
+        "Sync run still running after job completed, marking as completed",
+      );
+      await db
+        .update(syncRuns)
+        .set({ status: "completed", completedAt: new Date() })
+        .where(eq(syncRuns.id, job.data.syncRunId));
+    }
+  }
 });
 
-syncWorker.on("failed", (job, err) => {
+syncWorker.on("failed", async (job, err) => {
   logger.error({ jobId: job?.id, err }, "Sync job failed");
+
+  if (job?.data.syncRunId) {
+    await db
+      .update(syncRuns)
+      .set({
+        status: "failed",
+        completedAt: new Date(),
+        errorMessage: err.message,
+      })
+      .where(eq(syncRuns.id, job.data.syncRunId));
+  }
 });
 
 syncWorker.on("error", (err) => {

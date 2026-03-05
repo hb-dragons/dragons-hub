@@ -105,6 +105,12 @@ variable "service_account" {
   default     = null
 }
 
+variable "cpu_idle" {
+  description = "Throttle CPU when no requests are being processed. Defaults to true when min_instances > 0."
+  type        = bool
+  default     = null
+}
+
 resource "google_cloud_run_v2_service" "main" {
   name     = var.service_name
   location = var.region
@@ -142,7 +148,7 @@ resource "google_cloud_run_v2_service" "main" {
           cpu    = var.cpu
           memory = var.memory
         }
-        cpu_idle = var.min_instances > 0
+        cpu_idle = var.cpu_idle != null ? var.cpu_idle : (var.min_instances > 0)
       }
 
       dynamic "env" {

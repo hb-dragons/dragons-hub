@@ -16,6 +16,7 @@ on:
           - all
           - web
           - api
+          - worker
 
 concurrency:
   group: deploy-production
@@ -37,6 +38,7 @@ jobs:
     outputs:
       web: ${{ steps.changes.outputs.web }}
       api: ${{ steps.changes.outputs.api }}
+      worker: ${{ steps.changes.outputs.api }}
       db: ${{ steps.changes.outputs.db }}
     steps:
       - name: Checkout repository
@@ -236,16 +238,54 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to Cloud Run
+      - name: Deploy API to Cloud Run
         run: |
           gcloud run services update dragons-api-production \
+            --image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dragons/api:${{ env.COMMIT_SHA }} \
+            --region=${{ vars.GCP_REGION }}
+
+      - name: Deploy Worker to Cloud Run
+        run: |
+          gcloud run services update dragons-worker-production \
+            --image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dragons/api:${{ env.COMMIT_SHA }} \
+            --region=${{ vars.GCP_REGION }}
+
+  build-worker:
+    name: Build & Deploy Worker
+    runs-on: ubuntu-latest
+    needs: [determine-changes, run-migrations]
+    if: |
+      always() &&
+      (needs.run-migrations.result == 'success' || needs.run-migrations.result == 'skipped') &&
+      (needs.determine-changes.outputs.worker == 'true' ||
+      github.event.inputs.services == 'all' ||
+      github.event.inputs.services == 'worker')
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      COMMIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Deploy Worker to Cloud Run
+        run: |
+          gcloud run services update dragons-worker-production \
             --image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dragons/api:${{ env.COMMIT_SHA }} \
             --region=${{ vars.GCP_REGION }}
 
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [determine-changes, run-migrations, build-web, build-api]
+    needs: [determine-changes, run-migrations, build-web, build-api, build-worker]
     if: always()
     steps:
       - name: Summary
@@ -257,3 +297,4 @@ jobs:
           echo "| Migrations | ${{ needs.run-migrations.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Web | ${{ needs.build-web.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| API | ${{ needs.build-api.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Worker | ${{ needs.build-worker.result }} |" >> $GITHUB_STEP_SUMMARY
