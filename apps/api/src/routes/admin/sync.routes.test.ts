@@ -385,6 +385,19 @@ describe("GET /sync/logs/:id/entries", () => {
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
+
+  it("passes search param to service", async () => {
+    mocks.getSyncRun.mockResolvedValue({ id: 1 });
+    mocks.getSyncRunEntries.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0, hasMore: false, summary: {} });
+
+    await app.request("/sync/logs/1/entries?search=Dragons");
+
+    expect(mocks.getSyncRunEntries).toHaveBeenCalledWith(1, {
+      limit: 20,
+      offset: 0,
+      search: "Dragons",
+    });
+  });
 });
 
 describe("GET /sync/logs/:id/match-changes/:apiMatchId", () => {

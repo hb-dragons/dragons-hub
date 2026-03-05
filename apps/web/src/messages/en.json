@@ -227,6 +227,7 @@
       "hideStack": "Hide stack trace",
       "allEntities": "All Entities",
       "allActions": "All Actions",
+      "searchPlaceholder": "Search entries...",
       "entries": "{count, plural, =1 {# entry} other {# entries}}",
       "loadingEntries": "Loading entries...",
       "noMatchingEntries": "No entries match the selected filters",

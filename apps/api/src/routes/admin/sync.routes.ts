@@ -231,6 +231,7 @@ syncRoutes.get(
       offset: c.req.query("offset"),
       entityType: c.req.query("entityType"),
       action: c.req.query("action"),
+      search: c.req.query("search"),
     });
 
     const syncRun = await getSyncRun(id);

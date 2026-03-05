@@ -211,6 +211,20 @@ export function extractOvertimeDeltas(
   };
 }
 
+function buildMatchEntityName(
+  basicMatch: SdkSpielplanMatch,
+  leagueName?: string | null,
+): string {
+  const home = basicMatch.homeTeam?.teamname;
+  const guest = basicMatch.guestTeam?.teamname;
+  const teams = home && guest ? `${home} vs ${guest}` : null;
+  const league = leagueName || basicMatch.ligaData?.liganame;
+  const parts = [`#${basicMatch.matchNo}`];
+  if (teams) parts.push(teams);
+  if (league) parts.push(`(${league})`);
+  return parts.join(" ");
+}
+
 function toRemoteSnapshot(
   basicMatch: SdkSpielplanMatch,
   details: SdkGetGameResponse | null,
@@ -408,6 +422,8 @@ const SNAPSHOT_DB_FIELDS = [
   "guestOt2",
 ] as const;
 
+export { buildMatchEntityName };
+
 export async function syncMatchesFromData(
   leagueData: LeagueFetchedData[],
   venueIdLookup: Map<number, number>,
@@ -446,13 +462,16 @@ export async function syncMatchesFromData(
       }
 
       result.total++;
+      const entityName = buildMatchEntityName(basicMatch, data.leagueName);
 
       try {
+
         if (!basicMatch.homeTeam || !basicMatch.guestTeam) {
           result.skipped++;
           await logger?.log({
             entityType: "match",
             entityId: String(apiMatchId),
+            entityName,
             action: "skipped",
             message: "Missing home or guest team",
           });
@@ -485,6 +504,7 @@ export async function syncMatchesFromData(
             await logger?.log({
               entityType: "match",
               entityId: String(apiMatchId),
+              entityName,
               action: "skipped",
               message: "No changes detected",
             });
@@ -635,6 +655,7 @@ export async function syncMatchesFromData(
             await logger?.log({
               entityType: "match",
               entityId: String(apiMatchId),
+              entityName,
               action: "updated",
               message: `Updated match ${apiMatchId}`,
             });
@@ -643,6 +664,7 @@ export async function syncMatchesFromData(
             await logger?.log({
               entityType: "match",
               entityId: String(apiMatchId),
+              entityName,
               action: "skipped",
               message: "Hash updated, no effective data changes",
             });
@@ -702,6 +724,7 @@ export async function syncMatchesFromData(
           await logger?.log({
             entityType: "match",
             entityId: String(apiMatchId),
+            entityName,
             action: "created",
             message: `Created match ${apiMatchId}`,
           });
@@ -714,6 +737,7 @@ export async function syncMatchesFromData(
         await logger?.log({
           entityType: "match",
           entityId: String(apiMatchId),
+          entityName,
           action: "failed",
           message: `Failed to sync match: ${message}`,
         });

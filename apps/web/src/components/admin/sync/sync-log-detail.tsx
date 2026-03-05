@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@dragons/ui/components/select";
+import { Input } from "@dragons/ui/components/input";
 import {
   Trophy,
   Gamepad2,
@@ -28,6 +29,7 @@ import {
   ChevronRight,
   FilterX,
   ArrowRight,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
@@ -84,15 +86,33 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [showStack, setShowStack] = useState(false);
   const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set());
   const [matchChangesCache, setMatchChangesCache] = useState<Record<number, MatchFieldChange[] | "loading" | "error">>({});
 
-  const hasActiveFilters = entityFilter !== "all" || actionFilter !== "all";
+  const hasActiveFilters = entityFilter !== "all" || actionFilter !== "all" || searchQuery !== "";
+
+  function handleSearchChange(value: string) {
+    setSearchInput(value);
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setSearchQuery(value);
+    }, 300);
+  }
+
+  useEffect(() => {
+    return () => clearTimeout(searchTimerRef.current);
+  }, []);
 
   function clearFilters() {
     setEntityFilter("all");
     setActionFilter("all");
+    setSearchInput("");
+    setSearchQuery("");
+    clearTimeout(searchTimerRef.current);
   }
 
   async function toggleMatchChanges(entry: SyncRunEntry) {
@@ -131,6 +151,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
         });
         if (entityFilter !== "all") params.set("entityType", entityFilter);
         if (actionFilter !== "all") params.set("action", actionFilter);
+        if (searchQuery) params.set("search", searchQuery);
 
         const data = await fetchAPI<SyncRunEntriesResponse>(
           `/admin/sync/logs/${syncRun.id}/entries?${params}`,
@@ -151,7 +172,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
         setLoading(false);
       }
     },
-    [syncRun.id, entityFilter, actionFilter, t],
+    [syncRun.id, entityFilter, actionFilter, searchQuery, t],
   );
 
   useEffect(() => {
@@ -196,6 +217,15 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
 
       {/* Filter Bar */}
       <div className="flex items-center gap-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={t("searchPlaceholder")}
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="h-9 w-[200px] bg-background pl-8 text-sm"
+          />
+        </div>
         <Select value={entityFilter} onValueChange={setEntityFilter}>
           <SelectTrigger className="w-[160px] bg-background">
             <SelectValue placeholder="Entity type" />

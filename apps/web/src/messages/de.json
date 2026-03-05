@@ -227,6 +227,7 @@
       "hideStack": "Stack-Trace ausblenden",
       "allEntities": "Alle Entitäten",
       "allActions": "Alle Aktionen",
+      "searchPlaceholder": "Einträge durchsuchen...",
       "entries": "{count, plural, =1 {# Eintrag} other {# Einträge}}",
       "loadingEntries": "Lade Einträge...",
       "noMatchingEntries": "Keine Einträge für die gewählten Filter",

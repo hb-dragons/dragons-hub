@@ -102,6 +102,21 @@ describe("syncEntriesQuerySchema", () => {
     });
     expect(result).toEqual({ limit: 5, offset: 10, entityType: "match", action: "updated" });
   });
+
+  it("accepts search string", () => {
+    const result = syncEntriesQuerySchema.parse({ search: "Dragons" });
+    expect(result.search).toBe("Dragons");
+  });
+
+  it("strips empty search string", () => {
+    const result = syncEntriesQuerySchema.parse({ search: "" });
+    expect(result.search).toBeUndefined();
+  });
+
+  it("allows omitting search", () => {
+    const result = syncEntriesQuerySchema.parse({});
+    expect(result.search).toBeUndefined();
+  });
 });
 
 describe("syncStreamParamSchema", () => {

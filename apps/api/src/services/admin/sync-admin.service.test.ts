@@ -360,6 +360,52 @@ describe("getSyncRunEntries", () => {
     expect(result.total).toBe(5);
     expect(result.hasMore).toBe(true);
   });
+
+  it("searches by entityName (case-insensitive)", async () => {
+    const runId = await insertSyncRun();
+    await insertEntry(runId, { entity_name: "#1 Dragons vs Tigers (Bezirksliga)", entity_type: "match" });
+    await insertEntry(runId, { entity_name: "#2 Lions vs Bears (Kreisliga)", entity_type: "match" });
+    await insertEntry(runId, { entity_name: "#3 Dragons vs Bears (Bezirksliga)", entity_type: "match" });
+
+    const result = await getSyncRunEntries(runId, { limit: 20, offset: 0, search: "dragons" });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.total).toBe(2);
+  });
+
+  it("searches by entityId", async () => {
+    const runId = await insertSyncRun();
+    await insertEntry(runId, { entity_id: "12345", entity_name: "Match A" });
+    await insertEntry(runId, { entity_id: "67890", entity_name: "Match B" });
+
+    const result = await getSyncRunEntries(runId, { limit: 20, offset: 0, search: "123" });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.entityId).toBe("12345");
+  });
+
+  it("combines search with entity type filter", async () => {
+    const runId = await insertSyncRun();
+    await insertEntry(runId, { entity_name: "Dragons Liga", entity_type: "league" });
+    await insertEntry(runId, { entity_name: "#1 Dragons vs Tigers", entity_type: "match" });
+
+    const result = await getSyncRunEntries(runId, { limit: 20, offset: 0, search: "Dragons", entityType: "match" });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.entityType).toBe("match");
+  });
+
+  it("matches all words independently for multi-word search", async () => {
+    const runId = await insertSyncRun();
+    await insertEntry(runId, { entity_name: "#1 Dragons vs Tigers (Bezirksliga)", entity_type: "match" });
+    await insertEntry(runId, { entity_name: "#2 Dragons vs Bears (Kreisliga)", entity_type: "match" });
+    await insertEntry(runId, { entity_name: "#3 Lions vs Tigers (Bezirksliga)", entity_type: "match" });
+
+    const result = await getSyncRunEntries(runId, { limit: 20, offset: 0, search: "Dragons Tigers" });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.entityName).toBe("#1 Dragons vs Tigers (Bezirksliga)");
+  });
 });
 
 describe("getSchedule", () => {

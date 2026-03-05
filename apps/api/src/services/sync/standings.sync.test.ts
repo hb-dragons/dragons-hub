@@ -57,6 +57,7 @@ function makeLeagueData(overrides: Partial<LeagueFetchedData> = {}): LeagueFetch
   return {
     leagueApiId: 1,
     leagueDbId: 10,
+    leagueName: "Bezirksliga",
     spielplan: [],
     tabelle: [
       {

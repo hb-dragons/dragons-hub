@@ -64,7 +64,7 @@ vi.mock("./hash", () => ({
   computeEntityHash: vi.fn(() => "match-hash"),
 }));
 
-import { syncMatchesFromData, extractPeriodScores, extractOvertimeDeltas } from "./matches.sync";
+import { syncMatchesFromData, extractPeriodScores, extractOvertimeDeltas, buildMatchEntityName } from "./matches.sync";
 import { computeEntityHash } from "./hash";
 
 beforeEach(() => {
@@ -150,6 +150,7 @@ function makeLeagueData(overrides: Partial<LeagueFetchedData> = {}): LeagueFetch
   return {
     leagueApiId: 1,
     leagueDbId: 10,
+    leagueName: "Bezirksliga",
     spielplan: [makeBasicMatch()],
     tabelle: [],
     gameDetails: new Map([[1000, makeGameDetails()]]),
@@ -480,7 +481,7 @@ describe("syncMatchesFromData", () => {
     await syncMatchesFromData([data], new Map(), null, mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "created", entityType: "match" }),
+      expect.objectContaining({ action: "created", entityType: "match", entityName: "#1 Home vs Guest (Bezirksliga)" }),
     );
   });
 
@@ -500,7 +501,7 @@ describe("syncMatchesFromData", () => {
     await syncMatchesFromData([data], new Map(), null, mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "skipped", message: "Missing home or guest team" }),
+      expect.objectContaining({ action: "skipped", entityName: "#1 (Bezirksliga)", message: "Missing home or guest team" }),
     );
   });
 
@@ -518,7 +519,7 @@ describe("syncMatchesFromData", () => {
     await syncMatchesFromData([data], new Map(), null, mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "skipped", message: "No changes detected" }),
+      expect.objectContaining({ action: "skipped", entityName: "#1 Home vs Guest (Bezirksliga)", message: "No changes detected" }),
     );
   });
 
@@ -537,7 +538,7 @@ describe("syncMatchesFromData", () => {
     await syncMatchesFromData([data], new Map(), 1, mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "updated" }),
+      expect.objectContaining({ action: "updated", entityName: "#1 Home vs Guest (Bezirksliga)" }),
     );
   });
 
@@ -556,7 +557,7 @@ describe("syncMatchesFromData", () => {
     await syncMatchesFromData([data], new Map(), 1, mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "skipped", message: "Hash updated, no effective data changes" }),
+      expect.objectContaining({ action: "skipped", entityName: "#1 Home vs Guest (Bezirksliga)", message: "Hash updated, no effective data changes" }),
     );
   });
 
@@ -570,7 +571,7 @@ describe("syncMatchesFromData", () => {
     await syncMatchesFromData([data], new Map(), null, mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "failed" }),
+      expect.objectContaining({ action: "failed", entityName: "#1 Home vs Guest (Bezirksliga)" }),
     );
   });
 
@@ -1244,6 +1245,43 @@ describe("extractPeriodScores", () => {
     expect(scores.homeQ1).toBe(20);
     expect(scores.homeQ4).toBe(20); // 80 - 60
     expect(scores.guestQ4).toBe(25); // 80 - 55
+  });
+});
+
+describe("buildMatchEntityName", () => {
+  it("includes match number and full team names", () => {
+    const match = makeBasicMatch({ matchNo: 42 });
+    expect(buildMatchEntityName(match)).toBe("#42 Home vs Guest");
+  });
+
+  it("includes league name from parameter", () => {
+    const match = makeBasicMatch({ matchNo: 7 });
+    expect(buildMatchEntityName(match, "Bezirksliga")).toBe("#7 Home vs Guest (Bezirksliga)");
+  });
+
+  it("falls back to ligaData when league name parameter is null", () => {
+    const match = makeBasicMatch({
+      matchNo: 7,
+      ligaData: {
+        seasonId: 1, seasonName: "2024/25", actualMatchDay: null,
+        ligaId: 100, liganame: "Kreisliga", liganr: 1,
+        skName: "", skNameSmall: "", skEbeneId: 1, skEbeneName: "",
+        akName: "", geschlechtId: 1, geschlecht: "", verbandId: 1, verbandName: "",
+        bezirknr: null, bezirkName: null, kreisnr: null, kreisname: null,
+        statisticType: null, vorabliga: false, tableExists: false, crossTableExists: false,
+      },
+    });
+    expect(buildMatchEntityName(match, null)).toBe("#7 Home vs Guest (Kreisliga)");
+  });
+
+  it("omits teams when both are null", () => {
+    const match = makeBasicMatch({ matchNo: 3, homeTeam: null, guestTeam: null });
+    expect(buildMatchEntityName(match)).toBe("#3");
+  });
+
+  it("omits teams when one is null", () => {
+    const match = makeBasicMatch({ matchNo: 3, homeTeam: null });
+    expect(buildMatchEntityName(match)).toBe("#3");
   });
 });
 

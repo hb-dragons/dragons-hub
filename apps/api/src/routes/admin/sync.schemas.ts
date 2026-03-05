@@ -22,6 +22,7 @@ const entryActionEnum = z.enum(ENTRY_ACTIONS);
 export const syncEntriesQuerySchema = paginationSchema.extend({
   entityType: entityTypeEnum.optional(),
   action: entryActionEnum.optional(),
+  search: z.preprocess((v) => (v === "" ? undefined : v), z.string().optional()),
 });
 
 export const syncStreamParamSchema = z.object({

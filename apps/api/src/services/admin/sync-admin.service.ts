@@ -1,6 +1,6 @@
 import { db } from "../../config/database";
 import { syncRuns, syncRunEntries, syncSchedule, matches, matchRemoteVersions, matchChanges } from "@dragons/db/schema";
-import { desc, eq, sql, and } from "drizzle-orm";
+import { desc, eq, sql, and, or, ilike } from "drizzle-orm";
 import { updateSyncSchedule } from "../../workers/queues";
 import type { SyncLogsQuery, SyncEntriesQuery, UpdateScheduleBody } from "../../routes/admin/sync.schemas";
 
@@ -64,7 +64,7 @@ export async function getSyncRun(id: number) {
 }
 
 export async function getSyncRunEntries(syncRunId: number, params: SyncEntriesQuery) {
-  const { limit, offset, entityType, action } = params;
+  const { limit, offset, entityType, action, search } = params;
 
   const conditions = [eq(syncRunEntries.syncRunId, syncRunId)];
 
@@ -74,6 +74,19 @@ export async function getSyncRunEntries(syncRunId: number, params: SyncEntriesQu
 
   if (action) {
     conditions.push(eq(syncRunEntries.action, action));
+  }
+
+  if (search) {
+    const words = search.split(/\s+/).filter(Boolean);
+    for (const word of words) {
+      const pattern = `%${word}%`;
+      conditions.push(
+        or(
+          ilike(syncRunEntries.entityName, pattern),
+          ilike(syncRunEntries.entityId, pattern),
+        )!,
+      );
+    }
   }
 
   const whereClause = conditions.length === 1 ? conditions[0]! : and(...conditions)!;

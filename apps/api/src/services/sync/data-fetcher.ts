@@ -17,6 +17,7 @@ import type {
 export interface LeagueFetchedData {
   leagueApiId: number;
   leagueDbId: number | null;
+  leagueName: string | null;
   spielplan: SdkSpielplanMatch[];
   tabelle: SdkTabelleEntry[];
   gameDetails: Map<number, SdkGetGameResponse>;
@@ -52,6 +53,7 @@ export interface ExtractedRefereeAssignment {
 async function fetchLeagueData(
   leagueApiId: number,
   leagueDbId: number | null,
+  leagueName: string | null,
 ): Promise<LeagueFetchedData> {
   log.info({ leagueApiId }, "Fetching data for league");
 
@@ -70,12 +72,12 @@ async function fetchLeagueData(
     "Fetched league data",
   );
 
-  return { leagueApiId, leagueDbId, spielplan, tabelle, gameDetails };
+  return { leagueApiId, leagueDbId, leagueName, spielplan, tabelle, gameDetails };
 }
 
 export async function fetchAllSyncData(): Promise<CollectedSyncData> {
   const trackedLeagues = await db
-    .select({ id: leagues.id, apiLigaId: leagues.apiLigaId })
+    .select({ id: leagues.id, apiLigaId: leagues.apiLigaId, name: leagues.name })
     .from(leagues)
     .where(eq(leagues.isTracked, true));
 
@@ -95,7 +97,7 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
   await sdkClient.ensureAuthenticated();
 
   const leagueData = await Promise.all(
-    trackedLeagues.map((l) => fetchLeagueData(l.apiLigaId, l.id)),
+    trackedLeagues.map((l) => fetchLeagueData(l.apiLigaId, l.id, l.name)),
   );
 
   const teams = collectUniqueTeams(leagueData);
