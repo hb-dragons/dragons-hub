@@ -8,8 +8,6 @@ import {
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
-import { tasks } from "./tasks";
-import { venueBookings } from "./venue-bookings";
 
 export const notifications = pgTable(
   "notifications",
@@ -19,10 +17,6 @@ export const notifications = pgTable(
     channel: varchar("channel", { length: 20 }).notNull(),
     title: varchar("title", { length: 300 }).notNull(),
     body: text("body").notNull(),
-    relatedTaskId: integer("related_task_id").references(() => tasks.id),
-    relatedBookingId: integer("related_booking_id").references(
-      () => venueBookings.id,
-    ),
     status: varchar("status", { length: 20 }).notNull().default("pending"),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     errorMessage: text("error_message"),
