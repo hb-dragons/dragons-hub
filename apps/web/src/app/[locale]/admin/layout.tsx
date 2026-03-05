@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@dragons/ui/components/sidebar";
+import { TooltipProvider } from "@dragons/ui/components/tooltip";
 import { AppSidebar } from "@/components/admin/app-sidebar";
 import { Separator } from "@dragons/ui/components/separator";
 
@@ -11,6 +12,7 @@ export default async function AdminLayout({
   const t = await getTranslations();
 
   return (
+    <TooltipProvider>
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
@@ -24,5 +26,6 @@ export default async function AdminLayout({
         </div>
       </SidebarInset>
     </SidebarProvider>
+    </TooltipProvider>
   );
 }
