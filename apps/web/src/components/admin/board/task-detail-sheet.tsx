@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
 import { fetchAPI } from "@/lib/api";
@@ -46,6 +46,7 @@ interface TaskDetailSheetProps {
 
 export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps) {
   const t = useTranslations();
+  const format = useFormatter();
   const { mutate } = useSWRConfig();
   const isOpen = task !== null;
 
@@ -306,7 +307,7 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
                     >
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{comment.authorId}</span>
-                        <span>{new Date(comment.createdAt).toLocaleString()}</span>
+                        <span>{format.dateTime(new Date(comment.createdAt), "full")}</span>
                       </div>
                       <p className="mt-1">{comment.body}</p>
                     </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useTranslations } from "next-intl"
+import { useTranslations, useFormatter } from "next-intl"
 import useSWR from "swr"
 import { Plus, SearchIcon, Users } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
@@ -27,6 +27,7 @@ import type { UserListItem } from "./types"
 
 function getColumns(
   t: ReturnType<typeof useTranslations<"users">>,
+  format: ReturnType<typeof useFormatter>,
   currentUserId: string,
   onMutated: () => void,
 ): ColumnDef<UserListItem, unknown>[] {
@@ -98,7 +99,7 @@ function getColumns(
       ),
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
-          {new Date(row.original.createdAt).toLocaleDateString()}
+          {format.dateTime(new Date(row.original.createdAt), "dateOnly")}
         </span>
       ),
       meta: { label: t("columns.created") },
@@ -159,6 +160,7 @@ async function fetchUsers(): Promise<UserListItem[]> {
 export function UserListTable() {
   const t = useTranslations("users")
   const tCommon = useTranslations("common")
+  const format = useFormatter()
   const { data: session } = authClient.useSession()
   const { data: users, error, isLoading, mutate } = useSWR<UserListItem[]>(
     SWR_KEYS.users,
@@ -168,8 +170,8 @@ export function UserListTable() {
 
   const currentUserId = session?.user?.id ?? ""
   const columns = useMemo(
-    () => getColumns(t, currentUserId, () => mutate()),
-    [t, currentUserId, mutate],
+    () => getColumns(t, format, currentUserId, () => mutate()),
+    [t, format, currentUserId, mutate],
   )
 
   if (error) {

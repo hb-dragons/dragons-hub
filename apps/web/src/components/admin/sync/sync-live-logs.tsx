@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import {
   Card,
   CardContent,
@@ -75,6 +75,7 @@ let entryCounter = 0;
 
 export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
   const t = useTranslations();
+  const format = useFormatter();
   const [entries, setEntries] = useState<(LiveLogEntry & { _key: number })[]>([]);
   const [connected, setConnected] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -221,7 +222,7 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
                     )}
                   >
                     <span className="w-20 shrink-0 text-xs text-muted-foreground">
-                      {new Date(entry.timestamp).toLocaleTimeString()}
+                      {format.dateTime(new Date(entry.timestamp), "timeOnly")}
                     </span>
                     <EntityIcon className={`h-3.5 w-3.5 shrink-0 ${entityColor}`} />
                     <span className="w-20 shrink-0 text-xs text-muted-foreground">

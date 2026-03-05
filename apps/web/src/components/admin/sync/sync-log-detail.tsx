@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
 import {
@@ -77,6 +77,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
   const tEntity = useTranslations("sync.logDetail.entity");
   const tAction = useTranslations("sync.logDetail.action");
   const tCommon = useTranslations("common");
+  const format = useFormatter();
   const [entries, setEntries] = useState<SyncRunEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -302,7 +303,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
                       {tAction(actionCfg.labelKey)}
                     </Badge>
                     <span className="w-20 shrink-0 text-right text-xs text-muted-foreground">
-                      {new Date(entry.createdAt).toLocaleTimeString()}
+                      {format.dateTime(new Date(entry.createdAt), "timeOnly")}
                     </span>
                   </div>
                   {isExpanded && (

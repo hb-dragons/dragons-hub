@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
 import {
   Card,
   CardContent,
@@ -16,6 +16,7 @@ import { formatDuration } from "./utils";
 
 export function SyncStatusCards() {
   const t = useTranslations();
+  const format = useFormatter();
   const { status } = useSyncStatus();
   const { schedule } = useSyncSchedule();
   const isRunning = status?.isRunning ?? false;
@@ -114,7 +115,7 @@ export function SyncStatusCards() {
                     : lastSync.status}
               </div>
               <p className="text-xs text-muted-foreground">
-                {new Date(lastSync.startedAt).toLocaleString()} &middot;{" "}
+                {format.dateTime(new Date(lastSync.startedAt), "full")} &middot;{" "}
                 {formatDuration(lastSync.durationMs)}
               </p>
             </>
