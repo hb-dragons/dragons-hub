@@ -10,8 +10,6 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { boards, boardColumns } from "./boards";
-import { matches } from "./matches";
-import { venueBookings } from "./venue-bookings";
 
 export const tasks = pgTable(
   "tasks",
@@ -29,14 +27,6 @@ export const tasks = pgTable(
     priority: varchar("priority", { length: 10 }).notNull().default("normal"),
     dueDate: date("due_date"),
     position: integer("position").notNull().default(0),
-    matchId: integer("match_id").references(() => matches.id),
-    venueBookingId: integer("venue_booking_id").references(
-      () => venueBookings.id,
-    ),
-    sourceType: varchar("source_type", { length: 20 })
-      .notNull()
-      .default("manual"),
-    sourceDetail: text("source_detail"),
     createdBy: text("created_by"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -49,10 +39,6 @@ export const tasks = pgTable(
     boardIdIdx: index("tasks_board_id_idx").on(table.boardId),
     columnIdIdx: index("tasks_column_id_idx").on(table.columnId),
     assigneeIdx: index("tasks_assignee_idx").on(table.assigneeId),
-    matchIdIdx: index("tasks_match_id_idx").on(table.matchId),
-    venueBookingIdx: index("tasks_venue_booking_idx").on(
-      table.venueBookingId,
-    ),
     dueDateIdx: index("tasks_due_date_idx").on(table.dueDate),
   }),
 );
