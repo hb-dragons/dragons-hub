@@ -11,7 +11,7 @@ export function Providers({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <AuthUIProvider
         authClient={authClient}
         navigate={router.push}
