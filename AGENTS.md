@@ -23,16 +23,28 @@ League (1) ──── (N) Match
            └──── (N) Team (via season)
 
 Venue (1) ──── (N) Match
+     (1) ──── (N) VenueBooking
+
+VenueBooking (N) ──── (N) Match (via VenueBookingMatch join table)
 
 Match (1) ──── (N) MatchReferee
           ├──── (N) MatchRemoteVersion (version history)
           ├──── (N) MatchLocalVersion (local edits)
-          └──── (N) MatchChange (field-level audit)
+          ├──── (N) MatchChange (field-level audit)
+          └──── (N) MatchOverride
 
 Referee (1) ──── (N) MatchReferee
 RefereeRole (1) ──── (N) MatchReferee
 
 MatchReferee unique constraint: (matchId, refereeId, roleId)
+
+Board (1) ──── (N) BoardColumn
+     (1) ──── (N) Task (via boardId)
+
+BoardColumn (1) ──── (N) Task (via columnId)
+
+Task (1) ──── (N) TaskChecklistItem
+     (1) ──── (N) TaskComment
 
 SyncRun (1) ──── (N) SyncRunEntry
 ```
@@ -55,6 +67,16 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `matchRemoteVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, snapshot JSONB, dataHash |
 | `matchLocalVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, changedBy, snapshot JSONB |
 | `matchChanges` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), track (remote/local), fieldName, oldValue, newValue |
+| `matchOverrides` | `packages/db/src/schema/match-overrides.ts` | matchId FK (cascade), fieldName, reason, changedBy — unique(matchId, fieldName) |
+| `venueBookings` | `packages/db/src/schema/venue-bookings.ts` | venueId FK, date, calculatedStartTime/EndTime, overrideStartTime/EndTime, status, needsReconfirmation, confirmedBy |
+| `venueBookingMatches` | `packages/db/src/schema/venue-booking-matches.ts` | venueBookingId FK (cascade), matchId FK — unique(venueBookingId, matchId) |
+| `boards` | `packages/db/src/schema/boards.ts` | name, description, createdBy |
+| `boardColumns` | `packages/db/src/schema/boards.ts` | boardId FK (cascade), name, position, color, isDoneColumn |
+| `tasks` | `packages/db/src/schema/tasks.ts` | boardId FK (cascade), columnId FK, title, description, assigneeId, priority, dueDate, position |
+| `taskChecklistItems` | `packages/db/src/schema/tasks.ts` | taskId FK (cascade), label, isChecked, checkedBy, position |
+| `taskComments` | `packages/db/src/schema/tasks.ts` | taskId FK (cascade), authorId, body |
+| `notifications` | `packages/db/src/schema/notifications.ts` | recipientId, channel, title, body, status, sentAt, errorMessage |
+| `userNotificationPreferences` | `packages/db/src/schema/notifications.ts` | userId (unique), whatsappEnabled, whatsappNumber, notifyOnTaskAssigned, notifyOnBookingNeedsAction, notifyOnTaskComment |
 | `syncRuns` | `packages/db/src/schema/sync-runs.ts` | syncType, status, triggeredBy, records*, durationMs, summary JSONB |
 | `syncRunEntries` | `packages/db/src/schema/sync-runs.ts` | syncRunId FK (cascade), entityType, action, metadata JSONB |
 | `syncSchedule` | `packages/db/src/schema/sync-runs.ts` | enabled, cronExpression, timezone |
@@ -218,13 +240,116 @@ Auth middleware: `apps/api/src/middleware/auth.ts` (`requireAdmin`)
 | GET | `/admin/leagues` | All leagues grouped by season with tracking status |
 | PUT | `/admin/leagues/:id/tracking` | Toggle `{ isTracked: boolean }` |
 
+### Admin - Matches
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/matches` | List own club matches (with booking info) |
+| GET | `/admin/matches/:id` | Match detail (includes booking info) |
+| PATCH | `/admin/matches/:id` | Update match local fields |
+| DELETE | `/admin/matches/:id/overrides/:field` | Release a local override |
+
+Match list and detail responses include associated venue booking data when available.
+
+### Admin - Bookings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/bookings` | List all bookings |
+| GET | `/admin/bookings/:id` | Booking detail |
+| PATCH | `/admin/bookings/:id` | Update booking |
+| PATCH | `/admin/bookings/:id/status` | Quick status change |
+| POST | `/admin/bookings` | Create a booking manually |
+| DELETE | `/admin/bookings/:id` | Delete a booking |
+
+### Admin - Boards
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/boards` | List all boards |
+| POST | `/admin/boards` | Create a board |
+| GET | `/admin/boards/:id` | Get board with columns and tasks |
+| PATCH | `/admin/boards/:id` | Update board |
+| DELETE | `/admin/boards/:id` | Delete board |
+| POST | `/admin/boards/:id/columns` | Add column to board |
+| PATCH | `/admin/boards/columns/:id` | Update column |
+| PATCH | `/admin/boards/columns/:id/position` | Reorder column |
+| DELETE | `/admin/boards/columns/:id` | Delete column |
+
+### Admin - Tasks
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/tasks` | List tasks (filterable by board, column, assignee) |
+| POST | `/admin/tasks` | Create a task |
+| GET | `/admin/tasks/:id` | Task detail with checklist + comments |
+| PATCH | `/admin/tasks/:id` | Update task fields |
+| PATCH | `/admin/tasks/:id/move` | Move task to another column/position |
+| DELETE | `/admin/tasks/:id` | Delete task |
+| POST | `/admin/tasks/:id/checklist` | Add checklist item |
+| PATCH | `/admin/tasks/checklist/:id` | Toggle/update checklist item |
+| DELETE | `/admin/tasks/checklist/:id` | Delete checklist item |
+| POST | `/admin/tasks/:id/comments` | Add comment |
+| PATCH | `/admin/tasks/comments/:id` | Update comment |
+| DELETE | `/admin/tasks/comments/:id` | Delete comment |
+
+### Admin - Teams
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/teams` | List teams |
+| PATCH | `/admin/teams/:id` | Update team (e.g. isOwnClub) |
+
+### Admin - Venues
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/venues` | List venues |
+| GET | `/admin/venues/:id` | Venue detail |
+
+### Admin - Referees
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/referees` | List referees |
+
+### Admin - Standings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/standings` | Get standings for tracked leagues |
+
+### Admin - Notifications
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/notifications` | List notifications |
+| PATCH | `/admin/notifications/preferences` | Update notification preferences |
+| PATCH | `/admin/notifications/:id/read` | Mark notification as read |
+| GET | `/admin/notifications/preferences` | Get notification preferences |
+
 ### Admin - Bull Board
 
 | GET | `/admin/queues/*` | Bull Board web UI for queue monitoring |
 
-Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/admin/sync.routes.ts`, `apps/api/src/routes/admin/settings.routes.ts`, `apps/api/src/routes/admin/league.routes.ts`
-Validation schemas: `apps/api/src/routes/admin/sync.schemas.ts`
-Service layer: `apps/api/src/services/admin/sync-admin.service.ts`, `apps/api/src/services/admin/settings.service.ts`, `apps/api/src/services/admin/league-discovery.service.ts`
+### Public
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/public/matches` | List own club matches (no auth) |
+| GET | `/public/standings` | League standings (no auth) |
+| GET | `/public/teams` | List teams (no auth) |
+
+### Device
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/devices` | Register push notification device |
+| DELETE | `/devices/:token` | Unregister device |
+
+Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/device.routes.ts`
+Validation schemas: `apps/api/src/routes/admin/*.schemas.ts`
+Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/notifications/`
 
 ## Frontend Architecture
 
