@@ -38,44 +38,53 @@ Deploy the dragons-all monorepo to Google Cloud Platform using OpenTofu for infr
 ## Decisions
 
 ### Environment: Production only
+
 Single environment to keep costs low. Staging can be added later by duplicating the environment directory.
 
 ### Routing: Subdomains
+
 - `app.<domain>` routes to the Next.js web service
 - `api.<domain>` routes to the Hono API service
 - Each gets a Google-managed SSL certificate (auto-renewal)
 - DNS records managed externally (user's registrar), pointing A records to the LB static IP
 
 ### Cache: Memorystore for Valkey 8.0
+
 Wire-compatible with Redis/ioredis/BullMQ. Newer engine than Redis 7.2, multi-threaded I/O, actively developed by Google and the Linux Foundation.
 
 ### Database: Cloud SQL PostgreSQL 17
+
 Matches the project's local dev setup (postgres:17). Connected via Cloud SQL Proxy Unix socket.
 
 ### API min-instances: 1
+
 The BullMQ sync worker runs embedded in the API process and must stay alive for scheduled cron jobs (04:00 daily sync).
 
 ### Web min-instances: 0
+
 Scales to zero when no traffic. Next.js standalone output keeps the image small.
 
 ### State: GCS bucket
+
 OpenTofu remote state stored in a GCS bucket with prefix-based isolation.
 
 ### Migrations: Automatic
+
 Run as part of the deploy workflow via Cloud SQL Proxy before deploying the new API image. Also available as a manual workflow for ad-hoc operations.
 
 ### Auth: Workload Identity Federation
+
 GitHub Actions authenticates to GCP via OIDC (no service account keys stored as secrets).
 
 ## Runtime Versions
 
-| Component | Version |
-|-----------|---------|
-| Node.js | 24 LTS (Alpine 3.21) |
-| PostgreSQL | 17 (Cloud SQL) |
-| Valkey | 8.0 (Memorystore) |
-| OpenTofu | >= 1.6.0 |
-| pnpm | 10.29.3 |
+| Component  | Version              |
+| ---------- | -------------------- |
+| Node.js    | 24 LTS (Alpine 3.21) |
+| PostgreSQL | 17 (Cloud SQL)       |
+| Valkey     | 8.0 (Memorystore)    |
+| OpenTofu   | >= 1.6.0             |
+| pnpm       | 10.30.3              |
 
 ## File Structure
 
@@ -109,21 +118,23 @@ apps/web/Dockerfile                       # Multi-stage: next build standalone, 
 
 ## Secrets (Secret Manager)
 
-| Secret Name | Source |
-|---|---|
-| `database-url-production` | Constructed from Cloud SQL Unix socket URL |
-| `redis-url-production` | Constructed from Valkey host/port/auth |
-| `sdk-username-production` | `var.sdk_username` |
-| `sdk-password-production` | `var.sdk_password` |
-| `auth-secret-production` | `random_password` (64 chars, auto-generated) |
+| Secret Name               | Source                                       |
+| ------------------------- | -------------------------------------------- |
+| `database-url-production` | Constructed from Cloud SQL Unix socket URL   |
+| `redis-url-production`    | Constructed from Valkey host/port/auth       |
+| `sdk-username-production` | `var.sdk_username`                           |
+| `sdk-password-production` | `var.sdk_password`                           |
+| `auth-secret-production`  | `random_password` (64 chars, auto-generated) |
 
 ## GitHub Repository Configuration
 
 ### Secrets (production environment)
+
 - `GCP_WORKLOAD_IDENTITY_PROVIDER` — from `tofu output workload_identity_provider`
 - `GCP_SERVICE_ACCOUNT` — from `tofu output github_service_account`
 
 ### Variables (production environment)
+
 - `GCP_PROJECT_ID` — GCP project ID
 - `GCP_REGION` — e.g. `europe-west3`
 - `WEB_DOMAIN` — e.g. `app.dragons.example.com`
@@ -163,12 +174,12 @@ push to main
 
 ## Cost Estimate (low traffic)
 
-| Service | Spec | ~Monthly |
-|---------|------|----------|
-| Cloud Run API | min 1, 1 vCPU, 512Mi | ~$15-25 |
-| Cloud Run Web | scales to zero | ~$0-5 |
-| Cloud SQL PostgreSQL | db-f1-micro, 10GB SSD | ~$10 |
-| Memorystore Valkey | Basic 1GB | ~$35 |
-| Load Balancer | Global HTTPS | ~$18 |
-| Artifact Registry | Storage | ~$1 |
-| **Total** | | **~$80-95/mo** |
+| Service              | Spec                  | ~Monthly       |
+| -------------------- | --------------------- | -------------- |
+| Cloud Run API        | min 1, 1 vCPU, 512Mi  | ~$15-25        |
+| Cloud Run Web        | scales to zero        | ~$0-5          |
+| Cloud SQL PostgreSQL | db-f1-micro, 10GB SSD | ~$10           |
+| Memorystore Valkey   | Basic 1GB             | ~$35           |
+| Load Balancer        | Global HTTPS          | ~$18           |
+| Artifact Registry    | Storage               | ~$1            |
+| **Total**            |                       | **~$80-95/mo** |

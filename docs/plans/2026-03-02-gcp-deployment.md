@@ -6,7 +6,7 @@
 
 **Architecture:** Two Cloud Run services (API + Web) behind a Global HTTPS Load Balancer with subdomain routing. Cloud SQL PostgreSQL 17 for the database, Memorystore Valkey 8.0 for BullMQ/pub-sub. Workload Identity Federation for keyless GitHub Actions auth. Automated deploy on push to main after CI passes.
 
-**Tech Stack:** OpenTofu >= 1.6.0, Google Cloud Provider ~> 5.0, Docker (node:24-alpine), GitHub Actions, pnpm 10.29.3
+**Tech Stack:** OpenTofu >= 1.6.0, Google Cloud Provider ~> 5.0, Docker (node:24-alpine), GitHub Actions, pnpm 10.30.3
 
 **Reference project:** `/Users/jn/git/kvizme-mono-v2` — proven patterns for all modules and workflows.
 
@@ -15,6 +15,7 @@
 ## Task 1: Infrastructure Scaffold + Network Module
 
 **Files:**
+
 - Create: `infra/.gitignore`
 - Create: `infra/versions.tf`
 - Create: `infra/modules/network/main.tf`
@@ -76,6 +77,7 @@ terraform {
 **Step 3: Create network module**
 
 `infra/modules/network/variables.tf`:
+
 ```hcl
 variable "project_id" {
   description = "GCP project ID"
@@ -94,6 +96,7 @@ variable "environment" {
 ```
 
 `infra/modules/network/main.tf`:
+
 ```hcl
 resource "google_compute_network" "main" {
   name                    = "dragons-vpc-${var.environment}"
@@ -131,6 +134,7 @@ resource "google_service_networking_connection" "private_vpc_connection" {
 ```
 
 `infra/modules/network/outputs.tf`:
+
 ```hcl
 output "network_name" {
   value = google_compute_network.main.name
@@ -157,12 +161,14 @@ git commit -m "infra: scaffold and network module"
 ## Task 2: Data Store Modules (Cloud SQL + Valkey)
 
 **Files:**
+
 - Create: `infra/modules/cloud-sql/main.tf`
 - Create: `infra/modules/valkey/main.tf`
 
 **Step 1: Create Cloud SQL module**
 
 `infra/modules/cloud-sql/main.tf`:
+
 ```hcl
 variable "project_id" {
   description = "GCP project ID"
@@ -303,6 +309,7 @@ output "public_ip" {
 **Step 2: Create Valkey module**
 
 `infra/modules/valkey/main.tf`:
+
 ```hcl
 variable "project_id" {
   description = "GCP project ID"
@@ -387,6 +394,7 @@ git commit -m "infra: add Cloud SQL and Valkey modules"
 ## Task 3: Service Modules (Artifact Registry + Secrets + Cloud Run)
 
 **Files:**
+
 - Create: `infra/modules/artifact-registry/main.tf`
 - Create: `infra/modules/secrets/main.tf`
 - Create: `infra/modules/cloud-run/main.tf`
@@ -394,6 +402,7 @@ git commit -m "infra: add Cloud SQL and Valkey modules"
 **Step 1: Create Artifact Registry module**
 
 `infra/modules/artifact-registry/main.tf`:
+
 ```hcl
 variable "project_id" {
   description = "GCP project ID"
@@ -451,6 +460,7 @@ output "repository_id" {
 **Step 2: Create Secrets module**
 
 `infra/modules/secrets/main.tf`:
+
 ```hcl
 variable "project_id" {
   description = "GCP project ID"
@@ -504,6 +514,7 @@ output "secret_ids" {
 **Step 3: Create Cloud Run module**
 
 `infra/modules/cloud-run/main.tf` — adapted from kvizme reference at `/Users/jn/git/kvizme-mono-v2/infra/modules/cloud-run/main.tf`:
+
 ```hcl
 variable "project_id" {
   description = "GCP project ID"
@@ -713,12 +724,14 @@ git commit -m "infra: add artifact registry, secrets, and cloud run modules"
 ## Task 4: Routing Modules (Load Balancer + Workload Identity)
 
 **Files:**
+
 - Create: `infra/modules/load-balancer/main.tf`
 - Create: `infra/modules/workload-identity/main.tf`
 
 **Step 1: Create Load Balancer module**
 
 `infra/modules/load-balancer/main.tf` — adapted from kvizme reference:
+
 ```hcl
 variable "project_id" {
   description = "GCP project ID"
@@ -887,6 +900,7 @@ output "api_domain" {
 **Step 2: Create Workload Identity module**
 
 `infra/modules/workload-identity/main.tf` — adapted from kvizme reference:
+
 ```hcl
 variable "project_id" {
   description = "GCP project ID"
@@ -991,6 +1005,7 @@ git commit -m "infra: add load balancer and workload identity modules"
 ## Task 5: Production Environment
 
 **Files:**
+
 - Create: `infra/environments/production/main.tf`
 - Create: `infra/environments/production/variables.tf`
 - Create: `infra/environments/production/terraform.tfvars.example`
@@ -998,6 +1013,7 @@ git commit -m "infra: add load balancer and workload identity modules"
 **Step 1: Create variables.tf**
 
 `infra/environments/production/variables.tf`:
+
 ```hcl
 variable "project_id" {
   description = "GCP project ID"
@@ -1052,6 +1068,7 @@ variable "sdk_password" {
 **Step 2: Create main.tf**
 
 `infra/environments/production/main.tf`:
+
 ```hcl
 terraform {
   required_version = ">= 1.6.0"
@@ -1336,6 +1353,7 @@ output "load_balancer_ip" {
 **Step 3: Create terraform.tfvars.example**
 
 `infra/environments/production/terraform.tfvars.example`:
+
 ```hcl
 # Copy this file to terraform.tfvars and fill in your values
 # DO NOT commit terraform.tfvars to version control
@@ -1373,6 +1391,7 @@ git commit -m "infra: add production environment configuration"
 ## Task 6: API Dockerfile
 
 **Files:**
+
 - Create: `apps/api/tsup.config.ts`
 - Modify: `apps/api/package.json` (update build script and target)
 - Create: `apps/api/Dockerfile`
@@ -1383,6 +1402,7 @@ git commit -m "infra: add production environment configuration"
 The API's workspace dependencies (`@dragons/db`, `@dragons/sdk`, `@dragons/shared`) export raw TypeScript source. tsup must bundle them inline (not treat them as external) so the built `dist/index.js` is self-contained and runnable by plain Node.js.
 
 `apps/api/tsup.config.ts`:
+
 ```ts
 import { defineConfig } from "tsup";
 
@@ -1400,6 +1420,7 @@ export default defineConfig({
 **Step 2: Update package.json build script**
 
 In `apps/api/package.json`, change line 8:
+
 - Old: `"build": "tsup src/index.ts --format esm --platform node --target node20 --dts --clean",`
 - New: `"build": "tsup",`
 
@@ -1408,6 +1429,7 @@ The config file now handles all options.
 **Step 3: Create .dockerignore at repo root**
 
 `.dockerignore`:
+
 ```
 node_modules
 .next
@@ -1426,9 +1448,10 @@ docs
 **Step 4: Create API Dockerfile**
 
 `apps/api/Dockerfile`:
+
 ```dockerfile
 FROM node:24-alpine AS base
-RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
 FROM base AS builder
 WORKDIR /app
@@ -1502,6 +1525,7 @@ git commit -m "feat: add API Dockerfile with tsup bundling config"
 ## Task 7: Web Dockerfile
 
 **Files:**
+
 - Create: `apps/web/Dockerfile`
 
 **Step 1: Create Web Dockerfile**
@@ -1509,9 +1533,10 @@ git commit -m "feat: add API Dockerfile with tsup bundling config"
 Next.js standalone output is already configured in `apps/web/next.config.ts` (`output: "standalone"`). The standalone build includes a self-contained `server.js` with its own node_modules.
 
 `apps/web/Dockerfile`:
+
 ```dockerfile
 FROM node:24-alpine AS base
-RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
 FROM base AS builder
 WORKDIR /app
@@ -1582,6 +1607,7 @@ git commit -m "feat: add Web Dockerfile with Next.js standalone output"
 ## Task 8: GitHub Actions Workflows
 
 **Files:**
+
 - Create: `.github/workflows/deploy.yml`
 - Create: `.github/workflows/db-migrations.yml`
 - Create: `.github/workflows/opentofu.yml`
@@ -1589,6 +1615,7 @@ git commit -m "feat: add Web Dockerfile with Next.js standalone output"
 **Step 1: Create deploy.yml**
 
 `.github/workflows/deploy.yml` — adapted from kvizme reference at `/Users/jn/git/kvizme-mono-v2/.github/workflows/deploy.yml`:
+
 ```yaml
 name: Deploy
 
@@ -1676,7 +1703,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.29.3
+          version: 10.30.3
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -1854,6 +1881,7 @@ jobs:
 **Step 2: Create db-migrations.yml**
 
 `.github/workflows/db-migrations.yml` — adapted from kvizme reference:
+
 ```yaml
 name: Database Migrations
 
@@ -1889,7 +1917,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.29.3
+          version: 10.30.3
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -1962,6 +1990,7 @@ jobs:
 **Step 3: Create opentofu.yml**
 
 `.github/workflows/opentofu.yml` — adapted from kvizme reference. Since we only have production, this is simpler:
+
 ```yaml
 name: Infrastructure (OpenTofu)
 
