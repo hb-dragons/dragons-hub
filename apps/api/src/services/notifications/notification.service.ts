@@ -11,8 +11,6 @@ interface SendNotificationParams {
   recipientId: string;
   title: string;
   body: string;
-  relatedTaskId?: number;
-  relatedBookingId?: number;
 }
 
 interface UserPrefs {
@@ -54,8 +52,6 @@ export async function sendNotification(
     channel: "in_app",
     title: params.title,
     body: params.body,
-    relatedTaskId: params.relatedTaskId ?? null,
-    relatedBookingId: params.relatedBookingId ?? null,
     status: "sent",
     sentAt: new Date(),
   });
@@ -87,7 +83,6 @@ export async function notifyTaskAssigned(
     recipientId: assigneeId,
     title: `Task assigned: ${taskTitle}`,
     body: `You have been assigned to task: ${taskTitle}`,
-    relatedTaskId: taskId,
   });
 }
 
@@ -113,7 +108,6 @@ export async function notifyBookingNeedsAction(
     recipientId: assigneeId,
     title: `Venue booking needs attention: ${venueName} on ${date}`,
     body: `The venue booking for ${venueName} on ${date} requires your attention.`,
-    relatedBookingId: venueBookingId,
   });
 }
 
@@ -139,6 +133,5 @@ export async function notifyTaskComment(
     recipientId: assigneeId,
     title: `${commenterName} commented on: ${taskTitle}`,
     body: `${commenterName} left a comment on task: ${taskTitle}`,
-    relatedTaskId: taskId,
   });
 }

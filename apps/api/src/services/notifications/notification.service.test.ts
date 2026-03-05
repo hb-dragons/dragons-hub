@@ -37,85 +37,12 @@ import {
 // --- PGlite setup ---
 
 const CREATE_TABLES = `
-  CREATE TABLE boards (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    created_by TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE board_columns (
-    id SERIAL PRIMARY KEY,
-    board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
-    position INTEGER NOT NULL DEFAULT 0,
-    color VARCHAR(7),
-    is_done_column BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE venues (
-    id SERIAL PRIMARY KEY,
-    api_id INTEGER NOT NULL UNIQUE,
-    name VARCHAR(200) NOT NULL,
-    street VARCHAR(200),
-    postal_code VARCHAR(10),
-    city VARCHAR(100),
-    latitude NUMERIC(10,7),
-    longitude NUMERIC(10,7),
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE venue_bookings (
-    id SERIAL PRIMARY KEY,
-    venue_id INTEGER NOT NULL REFERENCES venues(id),
-    date DATE NOT NULL,
-    calculated_start_time TIME NOT NULL,
-    calculated_end_time TIME NOT NULL,
-    override_start_time TIME,
-    override_end_time TIME,
-    override_reason TEXT,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    needs_reconfirmation BOOLEAN NOT NULL DEFAULT FALSE,
-    notes TEXT,
-    confirmed_by TEXT,
-    confirmed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE tasks (
-    id SERIAL PRIMARY KEY,
-    board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-    column_id INTEGER NOT NULL REFERENCES board_columns(id),
-    title VARCHAR(300) NOT NULL,
-    description TEXT,
-    assignee_id TEXT,
-    priority VARCHAR(10) NOT NULL DEFAULT 'normal',
-    due_date DATE,
-    position INTEGER NOT NULL DEFAULT 0,
-    match_id INTEGER,
-    venue_booking_id INTEGER REFERENCES venue_bookings(id),
-    source_type VARCHAR(20) NOT NULL DEFAULT 'manual',
-    source_detail TEXT,
-    created_by TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
   CREATE TABLE notifications (
     id SERIAL PRIMARY KEY,
     recipient_id TEXT NOT NULL,
     channel VARCHAR(20) NOT NULL,
     title VARCHAR(300) NOT NULL,
     body TEXT NOT NULL,
-    related_task_id INTEGER REFERENCES tasks(id),
-    related_booking_id INTEGER REFERENCES venue_bookings(id),
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     sent_at TIMESTAMPTZ,
     error_message TEXT,
@@ -150,20 +77,10 @@ beforeAll(async () => {
 beforeEach(async () => {
   await client.exec("DELETE FROM notifications");
   await client.exec("DELETE FROM user_notification_preferences");
-  await client.exec("DELETE FROM tasks");
-  await client.exec("DELETE FROM board_columns");
-  await client.exec("DELETE FROM boards");
-  await client.exec("DELETE FROM venue_bookings");
-  await client.exec("DELETE FROM venues");
   await client.exec("ALTER SEQUENCE notifications_id_seq RESTART WITH 1");
   await client.exec(
     "ALTER SEQUENCE user_notification_preferences_id_seq RESTART WITH 1",
   );
-  await client.exec("ALTER SEQUENCE tasks_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE board_columns_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE boards_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venue_bookings_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venues_id_seq RESTART WITH 1");
   vi.clearAllMocks();
 });
 
@@ -217,67 +134,12 @@ describe("sendNotification", () => {
     expect(rows[0]!.body).toBe("Test Body");
     expect(rows[0]!.status).toBe("sent");
     expect(rows[0]!.sent_at).not.toBeNull();
-    expect(rows[0]!.related_task_id).toBeNull();
-    expect(rows[0]!.related_booking_id).toBeNull();
-  });
-
-  it("stores relatedTaskId when provided", async () => {
-    // Create required board/column/task for FK
-    await client.exec("INSERT INTO boards (name) VALUES ('Board')");
-    await client.exec(
-      "INSERT INTO board_columns (board_id, name, position) VALUES (1, 'Col', 0)",
-    );
-    await client.exec(
-      "INSERT INTO tasks (board_id, column_id, title) VALUES (1, 1, 'Task 1')",
-    );
-
-    await sendNotification({
-      recipientId: "user-1",
-      title: "Task notification",
-      body: "Body",
-      relatedTaskId: 1,
-    });
-
-    const rows = await getNotifications();
-    expect(rows[0]!.related_task_id).toBe(1);
-  });
-
-  it("stores relatedBookingId when provided", async () => {
-    await client.exec(
-      "INSERT INTO venues (api_id, name) VALUES (1, 'Hall')",
-    );
-    await client.exec(
-      "INSERT INTO venue_bookings (venue_id, date, calculated_start_time, calculated_end_time) VALUES (1, '2025-03-15', '17:00', '19:00')",
-    );
-
-    await sendNotification({
-      recipientId: "user-1",
-      title: "Booking notification",
-      body: "Body",
-      relatedBookingId: 1,
-    });
-
-    const rows = await getNotifications();
-    expect(rows[0]!.related_booking_id).toBe(1);
   });
 });
 
 describe("notifyTaskAssigned", () => {
-  async function seedTask(): Promise<number> {
-    await client.exec("INSERT INTO boards (name) VALUES ('Board')");
-    await client.exec(
-      "INSERT INTO board_columns (board_id, name, position) VALUES (1, 'Col', 0)",
-    );
-    await client.exec(
-      "INSERT INTO tasks (board_id, column_id, title) VALUES (1, 1, 'Fix the thing')",
-    );
-    return 1;
-  }
-
   it("sends notification when user has no preference row (defaults)", async () => {
-    const taskId = await seedTask();
-
-    await notifyTaskAssigned(taskId, "user-1", "Fix the thing");
+    await notifyTaskAssigned(1, "user-1", "Fix the thing");
 
     const rows = await getNotifications();
     expect(rows).toHaveLength(1);
@@ -287,10 +149,9 @@ describe("notifyTaskAssigned", () => {
   });
 
   it("sends notification when user preference is enabled", async () => {
-    const taskId = await seedTask();
     await insertUserPrefs("user-1", { notify_on_task_assigned: true });
 
-    await notifyTaskAssigned(taskId, "user-1", "Fix the thing");
+    await notifyTaskAssigned(1, "user-1", "Fix the thing");
 
     const rows = await getNotifications();
     expect(rows).toHaveLength(1);
@@ -307,21 +168,9 @@ describe("notifyTaskAssigned", () => {
 });
 
 describe("notifyBookingNeedsAction", () => {
-  async function seedBooking(): Promise<number> {
-    await client.exec(
-      "INSERT INTO venues (api_id, name) VALUES (1, 'Main Hall')",
-    );
-    await client.exec(
-      "INSERT INTO venue_bookings (venue_id, date, calculated_start_time, calculated_end_time) VALUES (1, '2025-03-15', '17:00', '19:00')",
-    );
-    return 1;
-  }
-
   it("sends notification when user has default preferences", async () => {
-    const bookingId = await seedBooking();
-
     await notifyBookingNeedsAction(
-      bookingId,
+      1,
       "user-2",
       "Main Hall",
       "2025-03-15",
@@ -339,13 +188,12 @@ describe("notifyBookingNeedsAction", () => {
   });
 
   it("sends notification when user preference is enabled", async () => {
-    const bookingId = await seedBooking();
     await insertUserPrefs("user-2", {
       notify_on_booking_needs_action: true,
     });
 
     await notifyBookingNeedsAction(
-      bookingId,
+      1,
       "user-2",
       "Main Hall",
       "2025-03-15",
@@ -368,21 +216,8 @@ describe("notifyBookingNeedsAction", () => {
 });
 
 describe("notifyTaskComment", () => {
-  async function seedTask(): Promise<number> {
-    await client.exec("INSERT INTO boards (name) VALUES ('Board')");
-    await client.exec(
-      "INSERT INTO board_columns (board_id, name, position) VALUES (1, 'Col', 0)",
-    );
-    await client.exec(
-      "INSERT INTO tasks (board_id, column_id, title) VALUES (1, 1, 'Fix the thing')",
-    );
-    return 1;
-  }
-
   it("sends notification when user has default preferences", async () => {
-    const taskId = await seedTask();
-
-    await notifyTaskComment(taskId, "user-3", "John Doe", "Fix the thing");
+    await notifyTaskComment(1, "user-3", "John Doe", "Fix the thing");
 
     const rows = await getNotifications();
     expect(rows).toHaveLength(1);
@@ -394,10 +229,9 @@ describe("notifyTaskComment", () => {
   });
 
   it("sends notification when user preference is enabled", async () => {
-    const taskId = await seedTask();
     await insertUserPrefs("user-3", { notify_on_task_comment: true });
 
-    await notifyTaskComment(taskId, "user-3", "John Doe", "Fix the thing");
+    await notifyTaskComment(1, "user-3", "John Doe", "Fix the thing");
 
     const rows = await getNotifications();
     expect(rows).toHaveLength(1);

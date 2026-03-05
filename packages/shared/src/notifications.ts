@@ -4,8 +4,6 @@ export interface NotificationItem {
   channel: string;
   title: string;
   body: string;
-  relatedTaskId: number | null;
-  relatedBookingId: number | null;
   status: string;
   sentAt: string | null;
   createdAt: string;

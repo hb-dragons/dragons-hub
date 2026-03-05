@@ -26,8 +26,6 @@ export async function listNotifications(params: {
       channel: notifications.channel,
       title: notifications.title,
       body: notifications.body,
-      relatedTaskId: notifications.relatedTaskId,
-      relatedBookingId: notifications.relatedBookingId,
       status: notifications.status,
       sentAt: notifications.sentAt,
       createdAt: notifications.createdAt,

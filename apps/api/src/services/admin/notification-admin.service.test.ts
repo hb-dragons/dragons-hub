@@ -32,8 +32,6 @@ const CREATE_TABLES = `
     channel VARCHAR(20) NOT NULL,
     title VARCHAR(300) NOT NULL,
     body TEXT NOT NULL,
-    related_task_id INTEGER,
-    related_booking_id INTEGER,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     sent_at TIMESTAMPTZ,
     error_message TEXT,
