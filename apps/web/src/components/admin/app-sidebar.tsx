@@ -1,18 +1,10 @@
 "use client";
 
 import {
-  Calendar,
-  CalendarCheck,
   ChevronRight,
-  Flag,
   KanbanSquare,
-  MapPin,
-  RefreshCw,
   Settings,
   Trophy,
-  UserCog,
-  Users,
-  type LucideIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/lib/navigation";
