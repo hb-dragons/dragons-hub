@@ -121,6 +121,12 @@ export class SyncLogger {
   }
 }
 
+export function batchAction(created: number, updated: number, failed: number): ActionType {
+  if (failed > 0) return "failed";
+  if (created > 0 || updated > 0) return "updated";
+  return "skipped";
+}
+
 export function createSyncLogger(syncRunId: number): SyncLogger {
   return new SyncLogger(syncRunId);
 }

@@ -186,12 +186,30 @@ describe("syncVenuesFromData", () => {
     expect(records[0].name).toBe("Hall");
   });
 
-  it("logs success to logger", async () => {
+  it("logs success with 'skipped' action when all entries skipped", async () => {
     const venuesMap = new Map([[1, makeVenue()]]);
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         onConflictDoUpdate: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+    const mockLogger = { log: vi.fn() };
+
+    await syncVenuesFromData(venuesMap, mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "venue", action: "skipped" }),
+    );
+  });
+
+  it("logs success with 'updated' action when changes exist", async () => {
+    const venuesMap = new Map([[1, makeVenue()]]);
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 1, createdAt: FROZEN_TIME }]),
         }),
       }),
     });

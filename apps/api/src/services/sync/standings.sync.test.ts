@@ -198,11 +198,28 @@ describe("syncStandingsFromData", () => {
     expect(result.errors[0]).toContain("Unknown error");
   });
 
-  it("logs success to logger", async () => {
+  it("logs 'skipped' action when all entries skipped", async () => {
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         onConflictDoUpdate: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+    const mockLogger = { log: vi.fn() };
+
+    await syncStandingsFromData([makeLeagueData()], mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "standing", action: "skipped" }),
+    );
+  });
+
+  it("logs 'updated' action when changes exist", async () => {
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 1, createdAt: FROZEN_TIME }]),
         }),
       }),
     });

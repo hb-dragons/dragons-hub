@@ -216,7 +216,8 @@ function makeTxMock(lockedRow: Record<string, unknown>, overrides: Array<{ field
     };
   });
 
-  mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+  let lastEffectiveChanges: unknown[] = [];
+  mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
     selectCallCount = 0;
     const tx = {
       select: txSelect,
@@ -224,10 +225,11 @@ function makeTxMock(lockedRow: Record<string, unknown>, overrides: Array<{ field
       update: txUpdate,
       delete: txDelete,
     };
-    await fn(tx);
+    lastEffectiveChanges = (await fn(tx)) as unknown[] ?? [];
+    return lastEffectiveChanges;
   });
 
-  return { txInsert, txUpdate, txUpdateSet, txDelete, txDeleteWhere, txSelect };
+  return { txInsert, txUpdate, txUpdateSet, txDelete, txDeleteWhere, txSelect, getEffectiveChanges: () => lastEffectiveChanges };
 }
 
 describe("syncMatchesFromData", () => {
@@ -352,7 +354,7 @@ describe("syncMatchesFromData", () => {
     expect(result.skipped).toBe(1);
   });
 
-  it("updates existing match when hash differs", async () => {
+  it("updates existing match when hash differs and effective changes exist", async () => {
     const data = makeLeagueData();
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -364,11 +366,34 @@ describe("syncMatchesFromData", () => {
         }),
       }),
     });
-    makeTxMock(makeLockedRow());
+    // Locked row has different homeScore, so effective changes will be detected
+    makeTxMock(makeLockedRow({ homeScore: 70 }));
 
     const result = await syncMatchesFromData([data], new Map(), 1);
 
     expect(result.updated).toBe(1);
+    expect(mockTransaction).toHaveBeenCalled();
+  });
+
+  it("skips match when hash differs but no effective field changes", async () => {
+    const data = makeLeagueData();
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([{
+            id: 1,
+            remoteDataHash: "old-hash",
+          }]),
+        }),
+      }),
+    });
+    // Locked row matches the snapshot exactly — no effective changes
+    makeTxMock(makeLockedRow());
+
+    const result = await syncMatchesFromData([data], new Map(), 1);
+
+    expect(result.skipped).toBe(1);
+    expect(result.updated).toBe(0);
     expect(mockTransaction).toHaveBeenCalled();
   });
 
@@ -497,7 +522,26 @@ describe("syncMatchesFromData", () => {
     );
   });
 
-  it("logs to logger on update", async () => {
+  it("logs to logger on update when effective changes exist", async () => {
+    const data = makeLeagueData();
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([{ id: 1, remoteDataHash: "old-hash" }]),
+        }),
+      }),
+    });
+    makeTxMock(makeLockedRow({ homeScore: 70 }));
+    const mockLogger = { log: vi.fn() };
+
+    await syncMatchesFromData([data], new Map(), 1, mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "updated" }),
+    );
+  });
+
+  it("logs to logger on skip when hash changed but no effective changes", async () => {
     const data = makeLeagueData();
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -512,7 +556,7 @@ describe("syncMatchesFromData", () => {
     await syncMatchesFromData([data], new Map(), 1, mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "updated" }),
+      expect.objectContaining({ action: "skipped", message: "Hash updated, no effective data changes" }),
     );
   });
 
@@ -577,7 +621,7 @@ describe("syncMatchesFromData", () => {
         }),
       }),
     });
-    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
@@ -587,12 +631,13 @@ describe("syncMatchesFromData", () => {
           }),
         }),
       };
-      await fn(tx);
+      return await fn(tx);
     });
 
     const result = await syncMatchesFromData([data], new Map(), 1);
 
-    expect(result.updated).toBe(1);
+    // No locked row → empty effective changes → skipped
+    expect(result.skipped).toBe(1);
   });
 
   it("handles new match with no returning row", async () => {
@@ -698,10 +743,12 @@ describe("syncMatchesFromData", () => {
       guestScore: 60,      // different from snapshot
     }));
 
-    await syncMatchesFromData([data], new Map(), 1);
+    const result = await syncMatchesFromData([data], new Map(), 1);
 
     // insert called for matchRemoteVersions AND matchChanges
     expect(txInsert).toHaveBeenCalledTimes(2);
+    // Effective changes exist, so it should be counted as updated
+    expect(result.updated).toBe(1);
   });
 
   it("does not report kickoffTime change when only seconds suffix differs", async () => {

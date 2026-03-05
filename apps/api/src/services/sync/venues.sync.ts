@@ -3,7 +3,7 @@ import { venues } from "@dragons/db/schema";
 import { sql } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import type { SdkSpielfeld } from "@dragons/sdk";
-import type { SyncLogger } from "./sync-logger";
+import { batchAction, type SyncLogger } from "./sync-logger";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "venues-sync" });
@@ -93,7 +93,7 @@ export async function syncVenuesFromData(
     await logger?.log({
       entityType: "venue",
       entityId: "batch",
-      action: "updated",
+      action: batchAction(result.created, result.updated, result.failed),
       message: `Batch synced ${upsertResult.length} venues (${result.created} created, ${result.updated} updated, ${result.skipped} skipped)`,
       metadata: { created: result.created, updated: result.updated, skipped: result.skipped },
     });

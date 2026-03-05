@@ -186,7 +186,7 @@ describe("syncTeamsFromData", () => {
     expect(result.errors[0]).toContain("Unknown error");
   });
 
-  it("logs batch result to logger", async () => {
+  it("logs batch result to logger with 'updated' action when changes exist", async () => {
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue(mockInsertChain([{ id: 1, createdAt: FROZEN_TIME }]));
     mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
@@ -196,6 +196,19 @@ describe("syncTeamsFromData", () => {
 
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({ entityType: "team", entityId: "batch", action: "updated" }),
+    );
+  });
+
+  it("logs batch result with 'skipped' action when all entries are skipped", async () => {
+    const teamsMap = new Map([[1, makeTeamRef()]]);
+    mockInsert.mockReturnValue(mockInsertChain([]));
+    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
+    const mockLogger = { log: vi.fn() };
+
+    await syncTeamsFromData(teamsMap, mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "team", entityId: "batch", action: "skipped" }),
     );
   });
 

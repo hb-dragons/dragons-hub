@@ -36,7 +36,7 @@ vi.mock("ioredis", () => ({
   },
 }));
 
-import { SyncLogger, createSyncLogger, type LogEntry } from "./sync-logger";
+import { SyncLogger, createSyncLogger, batchAction, type LogEntry } from "./sync-logger";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -191,6 +191,25 @@ describe("createSyncLogger", () => {
 
     expect(logger).toBeInstanceOf(SyncLogger);
     expect(logger.getChannelName()).toBe("sync:99:logs");
+  });
+});
+
+describe("batchAction", () => {
+  it("returns 'failed' when failed > 0", () => {
+    expect(batchAction(0, 0, 1)).toBe("failed");
+    expect(batchAction(5, 3, 1)).toBe("failed");
+  });
+
+  it("returns 'updated' when created > 0", () => {
+    expect(batchAction(1, 0, 0)).toBe("updated");
+  });
+
+  it("returns 'updated' when updated > 0", () => {
+    expect(batchAction(0, 1, 0)).toBe("updated");
+  });
+
+  it("returns 'skipped' when all counts are zero", () => {
+    expect(batchAction(0, 0, 0)).toBe("skipped");
   });
 });
 

@@ -4,7 +4,7 @@ import { sql, and, eq, ne } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import { getClubConfig } from "../admin/settings.service";
 import type { SdkTeamRef } from "@dragons/sdk";
-import type { SyncLogger } from "./sync-logger";
+import { batchAction, type SyncLogger } from "./sync-logger";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "teams-sync" });
@@ -104,7 +104,7 @@ export async function syncTeamsFromData(
     await logger?.log({
       entityType: "team",
       entityId: "batch",
-      action: "updated",
+      action: batchAction(result.created, result.updated, result.failed),
       message: `Batch synced ${upsertResult.length} teams (${result.created} created, ${result.updated} updated, ${result.skipped} skipped)`,
       metadata: { created: result.created, updated: result.updated, skipped: result.skipped },
     });

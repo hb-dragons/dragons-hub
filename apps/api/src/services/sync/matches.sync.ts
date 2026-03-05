@@ -254,7 +254,6 @@ function snapshotToHashData(snapshot: RemoteSnapshot): Record<string, unknown> {
     kickoffTime: snapshot.kickoffTime,
     homeTeamApiId: snapshot.homeTeamApiId,
     guestTeamApiId: snapshot.guestTeamApiId,
-    venueApiId: snapshot.venueApiId,
     isConfirmed: snapshot.isConfirmed,
     isForfeited: snapshot.isForfeited,
     isCancelled: snapshot.isCancelled,
@@ -344,6 +343,37 @@ function detectFieldChanges(
         oldValue: oldStr,
         newValue: newStr,
       });
+    }
+  }
+
+  return changes;
+}
+
+/** Compare locked DB row against effective update values to determine real changes */
+function computeEffectiveChanges(
+  locked: typeof matches.$inferSelect,
+  updateSet: Record<string, unknown>,
+): Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> {
+  const changes: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> = [];
+  type FieldValue = string | number | boolean | null | undefined;
+  const stringify = (v: FieldValue) =>
+    v === null || v === undefined ? null : String(v);
+
+  const normalizeTime = (v: string | null) =>
+    v !== null ? v.replace(/^(\d{2}:\d{2}):00$/, "$1") : v;
+
+  for (const field of SNAPSHOT_DB_FIELDS) {
+    if (!(field in updateSet)) continue;
+    const old = locked[field as keyof typeof locked] as FieldValue;
+    const nw = updateSet[field] as FieldValue;
+    let oldStr = stringify(old);
+    let newStr = stringify(nw);
+    if (field === "kickoffTime") {
+      oldStr = normalizeTime(oldStr);
+      newStr = normalizeTime(newStr);
+    }
+    if (oldStr !== newStr) {
+      changes.push({ fieldName: field, oldValue: oldStr, newValue: newStr });
     }
   }
 
@@ -462,7 +492,7 @@ export async function syncMatchesFromData(
           }
 
           // Data changed — lock row and create version snapshot + field changes in transaction
-          await db.transaction(async (tx) => {
+          const effectiveChanges = await db.transaction(async (tx) => {
             // Re-read with FOR UPDATE to prevent concurrent version increments
             const [locked] = await tx
               .select()
@@ -470,7 +500,7 @@ export async function syncMatchesFromData(
               .where(eq(matches.id, existing.id))
               .for("update");
 
-            if (!locked) return;
+            if (!locked) return [];
 
             const newVersionNumber = locked.currentRemoteVersion + 1;
             const fieldChanges = detectFieldChanges(locked, remoteSnapshot);
@@ -484,7 +514,7 @@ export async function syncMatchesFromData(
               dataHash: newHash,
             });
 
-            // Create field-level changes
+            // Create field-level changes (audit trail)
             if (fieldChanges.length > 0) {
               await tx.insert(matchChanges).values(
                 fieldChanges.map((change) => ({
@@ -562,6 +592,9 @@ export async function syncMatchesFromData(
               }
             }
 
+            // Compute effective changes (what actually changes in DB)
+            const effective = computeEffectiveChanges(locked, updateSet);
+
             // Auto-release: if remote matches current effective value
             for (const fieldName of overriddenSet) {
               const remoteVal = String(
@@ -593,15 +626,27 @@ export async function syncMatchesFromData(
                 updatedAt: new Date(),
               })
               .where(eq(matches.id, locked.id));
+
+            return effective;
           });
 
-          result.updated++;
-          await logger?.log({
-            entityType: "match",
-            entityId: String(apiMatchId),
-            action: "updated",
-            message: `Updated match ${apiMatchId}`,
-          });
+          if (effectiveChanges.length > 0) {
+            result.updated++;
+            await logger?.log({
+              entityType: "match",
+              entityId: String(apiMatchId),
+              action: "updated",
+              message: `Updated match ${apiMatchId}`,
+            });
+          } else {
+            result.skipped++;
+            await logger?.log({
+              entityType: "match",
+              entityId: String(apiMatchId),
+              action: "skipped",
+              message: "Hash updated, no effective data changes",
+            });
+          }
         } else {
           // Create new match
           const [newMatch] = await db

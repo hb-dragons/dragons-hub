@@ -7,7 +7,7 @@ import type {
   ExtractedRefereeRole,
   ExtractedRefereeAssignment,
 } from "./data-fetcher";
-import type { SyncLogger } from "./sync-logger";
+import { batchAction, type SyncLogger } from "./sync-logger";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "referees-sync" });
@@ -22,12 +22,20 @@ export interface RefereesSyncResult {
   durationMs: number;
 }
 
+export interface RefereeRolesSyncResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  roleIdLookup: Map<number, number>;
+}
+
 export async function syncRefereeRolesFromData(
   rolesMap: Map<number, ExtractedRefereeRole>,
   logger?: SyncLogger,
-): Promise<{ updated: number; roleIdLookup: Map<number, number> }> {
+): Promise<RefereeRolesSyncResult> {
   if (rolesMap.size === 0) {
-    return { updated: 0, roleIdLookup: new Map() };
+    return { created: 0, updated: 0, skipped: 0, failed: 0, roleIdLookup: new Map() };
   }
 
   log.info({ count: rolesMap.size }, "Batch syncing referee roles");
@@ -37,7 +45,9 @@ export async function syncRefereeRolesFromData(
     apiId,
     name: role.schirirollename,
     shortName: role.schirirollekurzname,
+    dataHash: computeEntityHash({ apiId, name: role.schirirollename, shortName: role.schirirollekurzname }),
     createdAt: now,
+    updatedAt: now,
   }));
 
   try {
@@ -49,20 +59,34 @@ export async function syncRefereeRolesFromData(
         set: {
           name: sql`excluded.name`,
           shortName: sql`excluded.short_name`,
+          dataHash: sql`excluded.data_hash`,
+          updatedAt: now,
         },
+        setWhere: sql`excluded.data_hash != ${refereeRoles.dataHash}`,
       })
-      .returning({ id: refereeRoles.id, apiId: refereeRoles.apiId });
+      .returning({ id: refereeRoles.id, apiId: refereeRoles.apiId, createdAt: refereeRoles.createdAt });
 
-    log.info({ count: upsertResult.length }, "Batch upserted referee roles");
+    let created = 0;
+    let updated = 0;
+    for (const row of upsertResult) {
+      if (row.createdAt.getTime() === now.getTime()) {
+        created++;
+      } else {
+        updated++;
+      }
+    }
+    const skipped = rolesMap.size - upsertResult.length;
+
+    log.info({ total: upsertResult.length, created, updated, skipped }, "Batch synced referee roles");
     await logger?.log({
       entityType: "refereeRole",
       entityId: "batch",
-      action: "updated",
-      message: `Batch upserted ${upsertResult.length} referee roles`,
-      metadata: { count: upsertResult.length },
+      action: batchAction(created, updated, 0),
+      message: `Batch synced ${upsertResult.length} referee roles (${created} created, ${updated} updated, ${skipped} skipped)`,
+      metadata: { created, updated, skipped },
     });
     const roleIdLookup = new Map(upsertResult.map((r) => [r.apiId, r.id]));
-    return { updated: upsertResult.length, roleIdLookup };
+    return { created, updated, skipped, failed: 0, roleIdLookup };
   } catch (error) {
     log.error({ err: error }, "Batch role sync failed");
     await logger?.log({
@@ -71,7 +95,7 @@ export async function syncRefereeRolesFromData(
       action: "failed",
       message: `Batch role sync failed: ${error instanceof Error ? error.message : "Unknown error"}`,
     });
-    return { updated: 0, roleIdLookup: new Map() };
+    return { created: 0, updated: 0, skipped: 0, failed: rolesMap.size, roleIdLookup: new Map() };
   }
 }
 
@@ -141,7 +165,7 @@ export async function syncRefereesFromData(
     await logger?.log({
       entityType: "referee",
       entityId: "batch",
-      action: "updated",
+      action: batchAction(created, updated, 0),
       message: `Batch synced ${upsertResult.length} referees (${created} created, ${updated} updated, ${skipped} skipped)`,
       metadata: { created, updated, skipped },
     });

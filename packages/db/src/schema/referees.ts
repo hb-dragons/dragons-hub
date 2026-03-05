@@ -25,7 +25,9 @@ export const refereeRoles = pgTable("referee_roles", {
   apiId: integer("api_id").notNull().unique(),
   name: varchar("name", { length: 100 }).notNull(),
   shortName: varchar("short_name", { length: 20 }),
+  dataHash: varchar("data_hash", { length: 64 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const matchReferees = pgTable(

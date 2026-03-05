@@ -64,6 +64,13 @@
       "when": 1772234636595,
       "tag": "0008_icy_thunderbolts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772712160286,
+      "tag": "0009_smooth_groot",
+      "breakpoints": true
     }
   ]
 }

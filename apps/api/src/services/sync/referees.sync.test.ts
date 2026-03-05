@@ -33,6 +33,8 @@ vi.mock("@dragons/db/schema", () => ({
   refereeRoles: {
     apiId: "apiId",
     id: "id",
+    dataHash: "dataHash",
+    createdAt: "createdAt",
   },
   matchReferees: {
     matchId: "matchId",
@@ -78,26 +80,66 @@ describe("syncRefereeRolesFromData", () => {
   it("returns empty for empty map", async () => {
     const result = await syncRefereeRolesFromData(new Map());
 
+    expect(result.created).toBe(0);
     expect(result.updated).toBe(0);
+    expect(result.skipped).toBe(0);
     expect(result.roleIdLookup.size).toBe(0);
   });
 
-  it("upserts roles and returns lookup", async () => {
+  it("creates new roles and returns lookup", async () => {
     const rolesMap = new Map<number, ExtractedRefereeRole>([
       [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
     ]);
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1 }]),
+          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: FROZEN_TIME }]),
         }),
       }),
     });
 
     const result = await syncRefereeRolesFromData(rolesMap);
 
-    expect(result.updated).toBe(1);
+    expect(result.created).toBe(1);
+    expect(result.updated).toBe(0);
     expect(result.roleIdLookup.get(1)).toBe(10);
+  });
+
+  it("detects updated roles by createdAt mismatch", async () => {
+    const oldDate = new Date("2024-01-01T00:00:00Z");
+    const rolesMap = new Map<number, ExtractedRefereeRole>([
+      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
+    ]);
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: oldDate }]),
+        }),
+      }),
+    });
+
+    const result = await syncRefereeRolesFromData(rolesMap);
+
+    expect(result.created).toBe(0);
+    expect(result.updated).toBe(1);
+  });
+
+  it("calculates skipped count when hash matches", async () => {
+    const rolesMap = new Map<number, ExtractedRefereeRole>([
+      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
+      [2, { schirirolleId: 2, schirirollename: "2. SR", schirirollekurzname: "2SR" }],
+    ]);
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    const result = await syncRefereeRolesFromData(rolesMap);
+
+    expect(result.skipped).toBe(2);
   });
 
   it("handles batch error", async () => {
@@ -114,18 +156,20 @@ describe("syncRefereeRolesFromData", () => {
 
     const result = await syncRefereeRolesFromData(rolesMap);
 
+    expect(result.created).toBe(0);
     expect(result.updated).toBe(0);
+    expect(result.failed).toBe(1);
     expect(result.roleIdLookup.size).toBe(0);
   });
 
-  it("logs success to logger", async () => {
+  it("logs 'updated' action to logger when changes exist", async () => {
     const rolesMap = new Map<number, ExtractedRefereeRole>([
       [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
     ]);
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1 }]),
+          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: FROZEN_TIME }]),
         }),
       }),
     });
@@ -135,6 +179,26 @@ describe("syncRefereeRolesFromData", () => {
 
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({ entityType: "refereeRole", action: "updated" }),
+    );
+  });
+
+  it("logs 'skipped' action to logger when all entries skipped", async () => {
+    const rolesMap = new Map<number, ExtractedRefereeRole>([
+      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
+    ]);
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+    const mockLogger = { log: vi.fn() };
+
+    await syncRefereeRolesFromData(rolesMap, mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "refereeRole", action: "skipped" }),
     );
   });
 
@@ -239,7 +303,7 @@ describe("syncRefereesFromData", () => {
     expect(result.refereeIdLookup.size).toBe(0);
   });
 
-  it("logs to logger on success", async () => {
+  it("logs 'skipped' action to logger when all skipped", async () => {
     const refMap = new Map<number, ExtractedReferee>([
       [1, { schiedsrichterId: 1, vorname: "A", nachname: "B", lizenznummer: 1 }],
     ]);
@@ -247,6 +311,26 @@ describe("syncRefereesFromData", () => {
       values: vi.fn().mockReturnValue({
         onConflictDoUpdate: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+    const mockLogger = { log: vi.fn() };
+
+    await syncRefereesFromData(refMap, mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "referee", action: "skipped" }),
+    );
+  });
+
+  it("logs 'updated' action to logger when changes exist", async () => {
+    const refMap = new Map<number, ExtractedReferee>([
+      [1, { schiedsrichterId: 1, vorname: "A", nachname: "B", lizenznummer: 1 }],
+    ]);
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: FROZEN_TIME }]),
         }),
       }),
     });
