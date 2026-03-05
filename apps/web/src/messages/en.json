@@ -62,7 +62,8 @@
       "anschreiber": "Scorer",
       "zeitnehmer": "Timekeeper",
       "shotclock": "Shot Clock",
-      "comment": "Comment"
+      "comment": "Comment",
+      "booking": "Booking"
     },
     "status": {
       "label": "Status",
@@ -144,6 +145,10 @@
       "overrideReleased": "Override released",
       "overrideReleaseFailed": "Failed to release override",
       "loadFailed": "Failed to load match"
+    },
+    "booking": {
+      "title": "Venue Booking",
+      "needsReconfirmation": "Needs reconfirmation"
     },
     "diff": {
       "diverged": "Diverged",

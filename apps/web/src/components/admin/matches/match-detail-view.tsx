@@ -336,6 +336,34 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 </div>
               </CardContent>
             </Card>
+
+            {match.booking && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">{t("matchDetail.booking.title")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        match.booking.status === "confirmed"
+                          ? "success"
+                          : match.booking.status === "cancelled"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
+                      {match.booking.status}
+                    </Badge>
+                    {match.booking.needsReconfirmation && (
+                      <Badge variant="outline" className="border-amber-500 text-amber-600">
+                        {t("matchDetail.booking.needsReconfirmation")}
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right Column: Editable form */}

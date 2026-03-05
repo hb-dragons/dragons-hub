@@ -62,7 +62,8 @@
       "anschreiber": "Anschreiber",
       "zeitnehmer": "Zeitnehmer",
       "shotclock": "Shotclock",
-      "comment": "Kommentar"
+      "comment": "Kommentar",
+      "booking": "Buchung"
     },
     "status": {
       "label": "Status",
@@ -144,6 +145,10 @@
       "overrideReleased": "Override freigegeben",
       "overrideReleaseFailed": "Override-Freigabe fehlgeschlagen",
       "loadFailed": "Spiel konnte nicht geladen werden"
+    },
+    "booking": {
+      "title": "Hallenbuchung",
+      "needsReconfirmation": "Bestätigung erforderlich"
     },
     "diff": {
       "diverged": "Abweichend",

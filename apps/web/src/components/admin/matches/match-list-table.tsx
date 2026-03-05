@@ -13,6 +13,7 @@ import {
   TooltipTrigger,
 } from "@dragons/ui/components/tooltip"
 import { Sheet } from "@dragons/ui/components/sheet"
+import { Badge } from "@dragons/ui/components/badge"
 import { cn } from "@dragons/ui/lib/utils"
 import { Ban, Calendar, CircleOff, SearchIcon, SquareActivity } from "lucide-react"
 import { Input } from "@dragons/ui/components/input"
@@ -221,6 +222,33 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, format: Re
       meta: { label: t("columns.comment") },
     },
     {
+      id: "booking",
+      accessorFn: (row) => row.booking?.status ?? null,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("columns.booking")} />
+      ),
+      cell: ({ row }) => {
+        const booking = row.original.booking;
+        if (!booking) return null;
+        return (
+          <Badge
+            variant={
+              booking.status === "confirmed"
+                ? "success"
+                : booking.status === "cancelled"
+                  ? "destructive"
+                  : "secondary"
+            }
+          >
+            {booking.needsReconfirmation ? "\u26A0 " : ""}
+            {booking.status}
+          </Badge>
+        );
+      },
+      enableSorting: false,
+      meta: { label: t("columns.booking") },
+    },
+    {
       id: "status",
       accessorFn: (row) => {
         if (row.isForfeited) return "forfeited"
@@ -320,7 +348,7 @@ export function MatchListTable() {
         onRowClick={handleRowClick}
         rowClassName={getRowClassName}
         globalFilterFn={matchGlobalFilterFn}
-        initialColumnVisibility={{ score: false, publicComment: false, status: false }}
+        initialColumnVisibility={{ score: false, publicComment: false, status: false, booking: false }}
         initialColumnFilters={[{ id: "status", value: ["active", "cancelled"] }]}
         emptyState={
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
