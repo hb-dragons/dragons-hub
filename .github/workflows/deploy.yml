@@ -44,11 +44,13 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
 
       - name: Check for changes
         uses: dorny/paths-filter@v3
         id: changes
         with:
+          base: HEAD~1
           filters: |
             web:
               - 'apps/web/**'
