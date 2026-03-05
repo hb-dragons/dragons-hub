@@ -76,6 +76,25 @@ const CREATE_TABLES = `
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 
+  CREATE TABLE venue_bookings (
+    id SERIAL PRIMARY KEY,
+    venue_id INTEGER NOT NULL REFERENCES venues(id),
+    date DATE NOT NULL,
+    calculated_start_time TIME NOT NULL,
+    calculated_end_time TIME NOT NULL,
+    override_start_time TIME,
+    override_end_time TIME,
+    override_reason TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    needs_reconfirmation BOOLEAN NOT NULL DEFAULT FALSE,
+    notes TEXT,
+    confirmed_by TEXT,
+    confirmed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(venue_id, date)
+  );
+
   CREATE TABLE matches (
     id SERIAL PRIMARY KEY,
     api_match_id INTEGER NOT NULL UNIQUE,
@@ -175,6 +194,14 @@ const CREATE_TABLES = `
     changed_by TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+
+  CREATE TABLE venue_booking_matches (
+    id SERIAL PRIMARY KEY,
+    venue_booking_id INTEGER NOT NULL REFERENCES venue_bookings(id) ON DELETE CASCADE,
+    match_id INTEGER NOT NULL REFERENCES matches(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(venue_booking_id, match_id)
+  );
 `;
 
 let client: PGlite;
@@ -190,11 +217,13 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  await client.exec("DELETE FROM venue_booking_matches");
   await client.exec("DELETE FROM match_changes");
   await client.exec("DELETE FROM match_local_versions");
   await client.exec("DELETE FROM match_remote_versions");
   await client.exec("DELETE FROM match_overrides");
   await client.exec("DELETE FROM matches");
+  await client.exec("DELETE FROM venue_bookings");
   await client.exec("DELETE FROM venues");
   await client.exec("DELETE FROM teams");
   await client.exec("DELETE FROM leagues");
@@ -206,6 +235,8 @@ beforeEach(async () => {
   await client.exec("ALTER SEQUENCE match_local_versions_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE match_remote_versions_id_seq RESTART WITH 1");
   await client.exec("ALTER SEQUENCE match_changes_id_seq RESTART WITH 1");
+  await client.exec("ALTER SEQUENCE venue_bookings_id_seq RESTART WITH 1");
+  await client.exec("ALTER SEQUENCE venue_booking_matches_id_seq RESTART WITH 1");
   vi.clearAllMocks();
 });
 

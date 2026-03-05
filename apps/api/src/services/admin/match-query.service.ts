@@ -7,6 +7,8 @@ import {
   venues,
   matchOverrides,
   matchRemoteVersions,
+  venueBookingMatches,
+  venueBookings,
 } from "@dragons/db/schema";
 import { eq, sql, and, or, inArray, gte, lte, asc } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -210,6 +212,7 @@ export function rowToListItem(
     publicComment: row.publicComment,
     hasLocalChanges: row.currentLocalVersion > 0,
     overriddenFields,
+    booking: null,
   };
 }
 
@@ -273,8 +276,23 @@ export async function buildDetailResponse(
   }));
   const remoteSnapshot = await loadRemoteSnapshot(client, matchId, row.currentRemoteVersion);
 
+  const [bookingLink] = await client
+    .select({
+      bookingId: venueBookings.id,
+      bookingStatus: venueBookings.status,
+      needsReconfirmation: venueBookings.needsReconfirmation,
+    })
+    .from(venueBookingMatches)
+    .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
+    .where(eq(venueBookingMatches.matchId, matchId))
+    .limit(1);
+
+  const booking = bookingLink
+    ? { id: bookingLink.bookingId, status: bookingLink.bookingStatus, needsReconfirmation: bookingLink.needsReconfirmation }
+    : null;
+
   return {
-    match: rowToDetail(row, overriddenFields, overrides),
+    match: { ...rowToDetail(row, overriddenFields, overrides), booking },
     diffs: computeDiffs(row, overriddenFields, remoteSnapshot),
   };
 }
@@ -342,7 +360,31 @@ export async function getOwnClubMatches(params: MatchListParams) {
     overridesByMatch.set(o.matchId, existing);
   }
 
-  const items = rows.map((row) => rowToListItem(row, overridesByMatch.get(row.id) ?? []));
+  const bookingLinks = matchIds.length > 0
+    ? await db
+        .select({
+          matchId: venueBookingMatches.matchId,
+          bookingId: venueBookings.id,
+          bookingStatus: venueBookings.status,
+          needsReconfirmation: venueBookings.needsReconfirmation,
+        })
+        .from(venueBookingMatches)
+        .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
+        .where(inArray(venueBookingMatches.matchId, matchIds))
+    : [];
+
+  const bookingByMatch = new Map(
+    bookingLinks.map((b) => [b.matchId, {
+      id: b.bookingId,
+      status: b.bookingStatus,
+      needsReconfirmation: b.needsReconfirmation,
+    }]),
+  );
+
+  const items = rows.map((row) => ({
+    ...rowToListItem(row, overridesByMatch.get(row.id) ?? []),
+    booking: bookingByMatch.get(row.id) ?? null,
+  }));
 
   return { items, total, limit, offset, hasMore: offset + items.length < total };
 }

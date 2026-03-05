@@ -50,6 +50,11 @@ export interface MatchListItem {
   publicComment: string | null;
   hasLocalChanges: boolean;
   overriddenFields: string[];
+  booking: {
+    id: number;
+    status: string;
+    needsReconfirmation: boolean;
+  } | null;
 }
 
 export interface MatchDetail extends MatchListItem {
