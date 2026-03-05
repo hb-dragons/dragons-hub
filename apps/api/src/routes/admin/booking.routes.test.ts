@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   getBookingDetail: vi.fn(),
   updateBooking: vi.fn(),
   updateBookingStatus: vi.fn(),
+  createBooking: vi.fn(),
+  deleteBooking: vi.fn(),
 }));
 
 vi.mock("../../services/admin/booking-admin.service", () => ({
@@ -16,6 +18,8 @@ vi.mock("../../services/admin/booking-admin.service", () => ({
   getBookingDetail: mocks.getBookingDetail,
   updateBooking: mocks.updateBooking,
   updateBookingStatus: mocks.updateBookingStatus,
+  createBooking: mocks.createBooking,
+  deleteBooking: mocks.deleteBooking,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -117,7 +121,6 @@ describe("GET /bookings/:id", () => {
       id: 1,
       venueName: "Main Hall",
       matches: [{ id: 100, matchNo: 42 }],
-      task: { id: 5, title: "Book venue" },
     };
     mocks.getBookingDetail.mockResolvedValue(detail);
 
@@ -303,6 +306,125 @@ describe("PATCH /bookings/:id/status", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "confirmed" }),
     });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("POST /bookings", () => {
+  it("creates booking and returns 201", async () => {
+    const created = { id: 1, venueId: 10, date: "2025-03-15" };
+    mocks.createBooking.mockResolvedValue(created);
+
+    const res = await app.request("/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        venueId: 10,
+        date: "2025-03-15",
+        overrideStartTime: "14:00",
+        overrideEndTime: "17:00",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(await json(res)).toEqual(created);
+    expect(mocks.createBooking).toHaveBeenCalledWith({
+      venueId: 10,
+      date: "2025-03-15",
+      overrideStartTime: "14:00",
+      overrideEndTime: "17:00",
+    });
+  });
+
+  it("returns 409 when venue not found or duplicate", async () => {
+    mocks.createBooking.mockResolvedValue(null);
+
+    const res = await app.request("/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        venueId: 999,
+        date: "2025-03-15",
+        overrideStartTime: "14:00",
+        overrideEndTime: "17:00",
+      }),
+    });
+
+    expect(res.status).toBe(409);
+    expect(await json(res)).toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("returns 400 for invalid body", async () => {
+    const res = await app.request("/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ venueId: "abc" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for missing required fields", async () => {
+    const res = await app.request("/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ venueId: 10 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("passes matchIds to service", async () => {
+    mocks.createBooking.mockResolvedValue({ id: 1 });
+
+    await app.request("/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        venueId: 10,
+        date: "2025-03-15",
+        overrideStartTime: "14:00",
+        overrideEndTime: "17:00",
+        matchIds: [100, 200],
+      }),
+    });
+
+    expect(mocks.createBooking).toHaveBeenCalledWith({
+      venueId: 10,
+      date: "2025-03-15",
+      overrideStartTime: "14:00",
+      overrideEndTime: "17:00",
+      matchIds: [100, 200],
+    });
+  });
+});
+
+describe("DELETE /bookings/:id", () => {
+  it("deletes booking and returns success", async () => {
+    mocks.deleteBooking.mockResolvedValue(true);
+
+    const res = await app.request("/bookings/1", { method: "DELETE" });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ success: true });
+    expect(mocks.deleteBooking).toHaveBeenCalledWith(1);
+  });
+
+  it("returns 404 when booking not found", async () => {
+    mocks.deleteBooking.mockResolvedValue(false);
+
+    const res = await app.request("/bookings/999", { method: "DELETE" });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("returns 400 for invalid id", async () => {
+    const res = await app.request("/bookings/abc", { method: "DELETE" });
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });

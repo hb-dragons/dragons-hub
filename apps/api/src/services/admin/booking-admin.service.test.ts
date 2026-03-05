@@ -4,11 +4,15 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
+const mockInsert = vi.fn();
+const mockDelete = vi.fn();
 
 vi.mock("../../config/database", () => ({
   db: {
     select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
+    insert: (...args: unknown[]) => mockInsert(...args),
+    delete: (...args: unknown[]) => mockDelete(...args),
   },
 }));
 
@@ -18,8 +22,6 @@ vi.mock("@dragons/db/schema", () => ({
   venueBookingMatches: { venueBookingId: "vbm.vbId", matchId: "vbm.matchId" },
   matches: { id: "m.id", matchNo: "m.matchNo", kickoffDate: "m.kd", kickoffTime: "m.kt", homeTeamApiId: "m.htId", guestTeamApiId: "m.gtId" },
   teams: { apiTeamPermanentId: "t.aptId", name: "t.name" },
-  tasks: { id: "task.id", title: "task.title", columnId: "task.colId", venueBookingId: "task.vbId" },
-  boardColumns: { id: "bc.id", name: "bc.name", isDoneColumn: "bc.isDone" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -39,6 +41,8 @@ import {
   getBookingDetail,
   updateBooking,
   updateBookingStatus,
+  createBooking,
+  deleteBooking,
 } from "./booking-admin.service";
 
 beforeEach(() => {
@@ -92,14 +96,14 @@ function mockUpdateChain(rows: unknown[]) {
 }
 
 describe("listBookings", () => {
-  it("returns bookings with venue name, match count, and task info", async () => {
+  it("returns bookings with venue name and match count", async () => {
     const rows = [
       {
         id: 1, venueId: 10, venueName: "Main Hall", date: "2025-03-15",
         calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
         overrideStartTime: null, overrideEndTime: null,
         status: "pending", needsReconfirmation: false, notes: null,
-        matchCount: 2, taskId: 5, taskTitle: "Book venue",
+        matchCount: 2,
       },
     ];
     mockSelect.mockReturnValue(makeChain(rows));
@@ -111,7 +115,6 @@ describe("listBookings", () => {
     expect(result[0]!.effectiveStartTime).toBe("14:00:00");
     expect(result[0]!.effectiveEndTime).toBe("17:00:00");
     expect(result[0]!.matchCount).toBe(2);
-    expect(result[0]!.task).toEqual({ id: 5, title: "Book venue" });
   });
 
   it("uses override times for effective times", async () => {
@@ -121,7 +124,7 @@ describe("listBookings", () => {
         calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
         overrideStartTime: "13:00:00", overrideEndTime: "18:00:00",
         status: "confirmed", needsReconfirmation: false, notes: null,
-        matchCount: 1, taskId: null, taskTitle: null,
+        matchCount: 1,
       },
     ];
     mockSelect.mockReturnValue(makeChain(rows));
@@ -130,7 +133,6 @@ describe("listBookings", () => {
 
     expect(result[0]!.effectiveStartTime).toBe("13:00:00");
     expect(result[0]!.effectiveEndTime).toBe("18:00:00");
-    expect(result[0]!.task).toBeNull();
   });
 
   it("returns empty array when no bookings exist", async () => {
@@ -159,7 +161,7 @@ describe("listBookings", () => {
 });
 
 describe("getBookingDetail", () => {
-  it("returns full booking detail with matches and task", async () => {
+  it("returns full booking detail with matches", async () => {
     const bookingRow = {
       id: 1, venueId: 10, venueName: "Main Hall", date: "2025-03-15",
       calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
@@ -173,16 +175,13 @@ describe("getBookingDetail", () => {
       { id: 100, matchNo: 42, kickoffDate: "2025-03-15", kickoffTime: "15:00:00", homeTeam: "Dragons", guestTeam: "Eagles" },
     ];
 
-    const taskRow = { id: 5, title: "Book venue", columnName: "To Do", status: "open" };
-
     let selectCallIndex = 0;
     mockSelect.mockImplementation(() => {
       const idx = selectCallIndex++;
       if (idx === 0) return makeChain([bookingRow]);  // booking
       if (idx === 1) return makeChain([]);             // homeTeam subquery
       if (idx === 2) return makeChain([]);             // guestTeam subquery
-      if (idx === 3) return makeChain(matchRows);      // linked matches
-      return makeChain([taskRow]);                     // linked task
+      return makeChain(matchRows);                     // linked matches
     });
 
     const result = await getBookingDetail(1);
@@ -202,7 +201,7 @@ describe("getBookingDetail", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null task when no task linked", async () => {
+  it("uses override times for effective times", async () => {
     const bookingRow = {
       id: 1, venueId: 10, venueName: "Hall", date: "2025-03-15",
       calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
@@ -225,7 +224,6 @@ describe("getBookingDetail", () => {
     expect(result).not.toBeNull();
     expect(result!.effectiveStartTime).toBe("13:00:00");
     expect(result!.effectiveEndTime).toBe("17:00:00");
-    expect(result!.task).toBeNull();
   });
 });
 
@@ -244,8 +242,7 @@ describe("updateBooking", () => {
     mockSelect.mockImplementation(() => {
       const idx = selectCallIndex++;
       if (idx === 0) return makeChain([{ name: "Main Hall" }]);   // venue
-      if (idx === 1) return makeChain([{ count: 2 }]);            // matchCount
-      return makeChain([{ id: 5, title: "Book venue" }]);         // task
+      return makeChain([{ count: 2 }]);                           // matchCount
     });
 
     const result = await updateBooking(1, {
@@ -258,7 +255,6 @@ describe("updateBooking", () => {
     expect(result!.effectiveStartTime).toBe("13:00:00");
     expect(result!.notes).toBe("Updated");
     expect(result!.matchCount).toBe(2);
-    expect(result!.task).toEqual({ id: 5, title: "Book venue" });
   });
 
   it("returns null when booking not found", async () => {
@@ -283,8 +279,7 @@ describe("updateBooking", () => {
     mockSelect.mockImplementation(() => {
       const idx = selectCallIndex++;
       if (idx === 0) return makeChain([{ name: "Hall" }]);
-      if (idx === 1) return makeChain([{ count: 0 }]);
-      return makeChain([]);
+      return makeChain([{ count: 0 }]);
     });
 
     const result = await updateBooking(1, {
@@ -297,7 +292,6 @@ describe("updateBooking", () => {
 
     expect(result).not.toBeNull();
     expect(result!.effectiveStartTime).toBe("14:00:00");
-    expect(result!.task).toBeNull();
   });
 });
 
@@ -316,8 +310,7 @@ describe("updateBookingStatus", () => {
     mockSelect.mockImplementation(() => {
       const idx = selectCallIndex++;
       if (idx === 0) return makeChain([{ name: "Main Hall" }]);
-      if (idx === 1) return makeChain([{ count: 1 }]);
-      return makeChain([]);
+      return makeChain([{ count: 1 }]);
     });
 
     const result = await updateBookingStatus(1, "confirmed");
@@ -341,8 +334,7 @@ describe("updateBookingStatus", () => {
     mockSelect.mockImplementation(() => {
       const idx = selectCallIndex++;
       if (idx === 0) return makeChain([{ name: "Hall" }]);
-      if (idx === 1) return makeChain([{ count: 0 }]);
-      return makeChain([]);
+      return makeChain([{ count: 0 }]);
     });
 
     const result = await updateBookingStatus(1, "pending");
@@ -357,5 +349,148 @@ describe("updateBookingStatus", () => {
     const result = await updateBookingStatus(999, "confirmed");
 
     expect(result).toBeNull();
+  });
+});
+
+function mockInsertChain(rows: unknown[]) {
+  return {
+    values: vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue(rows),
+    }),
+  };
+}
+
+function mockDeleteChain(rows: unknown[]) {
+  return {
+    where: vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue(rows),
+    }),
+  };
+}
+
+describe("createBooking", () => {
+  it("creates a booking and returns detail", async () => {
+    // select calls: venue check, duplicate check, then getBookingDetail calls
+    const detailBookingRow = {
+      id: 1, venueId: 10, venueName: "Main Hall", date: "2025-03-15",
+      calculatedStartTime: null, calculatedEndTime: null,
+      overrideStartTime: "14:00:00", overrideEndTime: "17:00:00",
+      overrideReason: null, status: "pending", needsReconfirmation: false,
+      notes: null, confirmedBy: null, confirmedAt: null,
+      createdAt: new Date("2025-01-01"), updatedAt: new Date("2025-01-01"),
+    };
+
+    let selectCallIndex = 0;
+    mockSelect.mockImplementation(() => {
+      const idx = selectCallIndex++;
+      if (idx === 0) return makeChain([{ id: 10 }]);           // venue exists
+      if (idx === 1) return makeChain([]);                      // no duplicate
+      if (idx === 2) return makeChain([detailBookingRow]);      // getBookingDetail booking
+      if (idx === 3) return makeChain([]);                      // homeTeam subquery
+      if (idx === 4) return makeChain([]);                      // guestTeam subquery
+      return makeChain([]);                                     // linked matches
+    });
+
+    mockInsert.mockReturnValue(mockInsertChain([{ id: 1 }]));
+
+    const result = await createBooking({
+      venueId: 10,
+      date: "2025-03-15",
+      overrideStartTime: "14:00:00",
+      overrideEndTime: "17:00:00",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(1);
+    expect(mockInsert).toHaveBeenCalled();
+  });
+
+  it("creates a booking with matchIds", async () => {
+    const detailBookingRow = {
+      id: 1, venueId: 10, venueName: "Main Hall", date: "2025-03-15",
+      calculatedStartTime: null, calculatedEndTime: null,
+      overrideStartTime: "14:00:00", overrideEndTime: "17:00:00",
+      overrideReason: null, status: "pending", needsReconfirmation: false,
+      notes: null, confirmedBy: null, confirmedAt: null,
+      createdAt: new Date("2025-01-01"), updatedAt: new Date("2025-01-01"),
+    };
+
+    let selectCallIndex = 0;
+    mockSelect.mockImplementation(() => {
+      const idx = selectCallIndex++;
+      if (idx === 0) return makeChain([{ id: 10 }]);
+      if (idx === 1) return makeChain([]);
+      if (idx === 2) return makeChain([detailBookingRow]);
+      if (idx === 3) return makeChain([]);
+      if (idx === 4) return makeChain([]);
+      return makeChain([]);
+    });
+
+    // First insert call is for the booking, subsequent ones for match links
+    mockInsert
+      .mockReturnValueOnce(mockInsertChain([{ id: 1 }]))
+      .mockReturnValueOnce(mockInsertChain([]))
+      .mockReturnValueOnce(mockInsertChain([]));
+
+    const result = await createBooking({
+      venueId: 10,
+      date: "2025-03-15",
+      overrideStartTime: "14:00:00",
+      overrideEndTime: "17:00:00",
+      matchIds: [100, 200],
+    });
+
+    expect(result).not.toBeNull();
+    expect(mockInsert).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns null for non-existent venue", async () => {
+    mockSelect.mockReturnValue(makeChain([]));
+
+    const result = await createBooking({
+      venueId: 999,
+      date: "2025-03-15",
+      overrideStartTime: "14:00:00",
+      overrideEndTime: "17:00:00",
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null for duplicate venue+date", async () => {
+    let selectCallIndex = 0;
+    mockSelect.mockImplementation(() => {
+      const idx = selectCallIndex++;
+      if (idx === 0) return makeChain([{ id: 10 }]);           // venue exists
+      return makeChain([{ id: 99 }]);                           // duplicate exists
+    });
+
+    const result = await createBooking({
+      venueId: 10,
+      date: "2025-03-15",
+      overrideStartTime: "14:00:00",
+      overrideEndTime: "17:00:00",
+    });
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("deleteBooking", () => {
+  it("deletes existing booking and returns true", async () => {
+    mockDelete.mockReturnValue(mockDeleteChain([{ id: 1 }]));
+
+    const result = await deleteBooking(1);
+
+    expect(result).toBe(true);
+    expect(mockDelete).toHaveBeenCalledTimes(2); // junction + booking
+  });
+
+  it("returns false for non-existent booking", async () => {
+    mockDelete.mockReturnValue(mockDeleteChain([]));
+
+    const result = await deleteBooking(999);
+
+    expect(result).toBe(false);
   });
 });

@@ -5,15 +5,12 @@ import {
   venues,
   matches,
   teams,
-  tasks,
-  boardColumns,
 } from "@dragons/db/schema";
 import { eq, and, gte, lte, sql, count } from "drizzle-orm";
 import type {
   BookingListItem,
   BookingDetail,
   BookingMatch,
-  BookingDetailTask,
   BookingStatus,
 } from "@dragons/shared";
 
@@ -64,13 +61,10 @@ export async function listBookings(
       matchCount: sql<number>`COALESCE(${matchCountSq.count}, 0)`.as(
         "match_count",
       ),
-      taskId: tasks.id,
-      taskTitle: tasks.title,
     })
     .from(venueBookings)
     .innerJoin(venues, eq(venues.id, venueBookings.venueId))
     .leftJoin(matchCountSq, eq(matchCountSq.venueBookingId, venueBookings.id))
-    .leftJoin(tasks, eq(tasks.venueBookingId, venueBookings.id))
     .where(whereClause)
     .orderBy(venueBookings.date, venueBookings.calculatedStartTime);
 
@@ -89,7 +83,6 @@ export async function listBookings(
     needsReconfirmation: row.needsReconfirmation,
     notes: row.notes,
     matchCount: Number(row.matchCount),
-    task: row.taskId ? { id: row.taskId, title: row.taskTitle! } : null,
   }));
 }
 
@@ -153,19 +146,6 @@ export async function getBookingDetail(
     )
     .where(eq(venueBookingMatches.venueBookingId, id));
 
-  // Fetch linked task
-  const [linkedTask] = await db
-    .select({
-      id: tasks.id,
-      title: tasks.title,
-      columnName: boardColumns.name,
-      status: sql<string>`CASE WHEN ${boardColumns.isDoneColumn} THEN 'done' ELSE 'open' END`,
-    })
-    .from(tasks)
-    .innerJoin(boardColumns, eq(boardColumns.id, tasks.columnId))
-    .where(eq(tasks.venueBookingId, id))
-    .limit(1);
-
   return {
     id: booking.id,
     venueId: booking.venueId,
@@ -187,7 +167,6 @@ export async function getBookingDetail(
     createdAt: booking.createdAt.toISOString(),
     updatedAt: booking.updatedAt.toISOString(),
     matches: linkedMatches,
-    task: linkedTask ?? null,
   };
 }
 
@@ -233,7 +212,7 @@ export async function updateBooking(
 
   if (!updated) return null;
 
-  // Fetch venue name and task info
+  // Fetch venue name and match count
   const [venue] = await db
     .select({ name: venues.name })
     .from(venues)
@@ -244,12 +223,6 @@ export async function updateBooking(
     .select({ count: count() })
     .from(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, id));
-
-  const [linkedTask] = await db
-    .select({ id: tasks.id, title: tasks.title })
-    .from(tasks)
-    .where(eq(tasks.venueBookingId, id))
-    .limit(1);
 
   return {
     id: updated.id,
@@ -267,7 +240,6 @@ export async function updateBooking(
     needsReconfirmation: updated.needsReconfirmation,
     notes: updated.notes,
     matchCount: Number(matchCountResult[0]!.count),
-    task: linkedTask ?? null,
   };
 }
 
@@ -315,12 +287,6 @@ export async function updateBookingStatus(
     .from(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, id));
 
-  const [linkedTask] = await db
-    .select({ id: tasks.id, title: tasks.title })
-    .from(tasks)
-    .where(eq(tasks.venueBookingId, id))
-    .limit(1);
-
   return {
     id: updated.id,
     venueId: updated.venueId,
@@ -337,6 +303,84 @@ export async function updateBookingStatus(
     needsReconfirmation: updated.needsReconfirmation,
     notes: updated.notes,
     matchCount: Number(matchCountResult[0]!.count),
-    task: linkedTask ?? null,
   };
+}
+
+export interface BookingCreateData {
+  venueId: number;
+  date: string;
+  overrideStartTime: string;
+  overrideEndTime: string;
+  overrideReason?: string | null;
+  notes?: string | null;
+  matchIds?: number[];
+}
+
+export async function createBooking(
+  data: BookingCreateData,
+): Promise<BookingDetail | null> {
+  // Verify venue exists
+  const [venue] = await db
+    .select({ id: venues.id })
+    .from(venues)
+    .where(eq(venues.id, data.venueId))
+    .limit(1);
+
+  if (!venue) return null;
+
+  // Check for duplicate (same venue + date)
+  const [existing] = await db
+    .select({ id: venueBookings.id })
+    .from(venueBookings)
+    .where(
+      and(
+        eq(venueBookings.venueId, data.venueId),
+        eq(venueBookings.date, data.date),
+      ),
+    )
+    .limit(1);
+
+  if (existing) return null;
+
+  const [created] = await db
+    .insert(venueBookings)
+    .values({
+      venueId: data.venueId,
+      date: data.date,
+      overrideStartTime: data.overrideStartTime,
+      overrideEndTime: data.overrideEndTime,
+      overrideReason: data.overrideReason ?? null,
+      notes: data.notes ?? null,
+      status: "pending",
+      needsReconfirmation: false,
+    })
+    .returning({ id: venueBookings.id });
+
+  if (!created) return null;
+
+  // Link matches if provided
+  if (data.matchIds && data.matchIds.length > 0) {
+    for (const matchId of data.matchIds) {
+      await db.insert(venueBookingMatches).values({
+        venueBookingId: created.id,
+        matchId,
+      });
+    }
+  }
+
+  return getBookingDetail(created.id);
+}
+
+export async function deleteBooking(id: number): Promise<boolean> {
+  // Delete junction entries first (they cascade, but be explicit)
+  await db
+    .delete(venueBookingMatches)
+    .where(eq(venueBookingMatches.venueBookingId, id));
+
+  const [deleted] = await db
+    .delete(venueBookings)
+    .where(eq(venueBookings.id, id))
+    .returning({ id: venueBookings.id });
+
+  return !!deleted;
 }

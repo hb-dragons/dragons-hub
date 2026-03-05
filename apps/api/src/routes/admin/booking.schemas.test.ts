@@ -4,6 +4,7 @@ import {
   bookingListQuerySchema,
   bookingUpdateBodySchema,
   bookingStatusBodySchema,
+  bookingCreateBodySchema,
 } from "./booking.schemas";
 
 describe("bookingIdParamSchema", () => {
@@ -230,5 +231,99 @@ describe("bookingStatusBodySchema", () => {
 
   it("rejects missing status", () => {
     expect(() => bookingStatusBodySchema.parse({})).toThrow();
+  });
+});
+
+describe("bookingCreateBodySchema", () => {
+  const validInput = {
+    venueId: 10,
+    date: "2025-03-15",
+    overrideStartTime: "14:00",
+    overrideEndTime: "17:00",
+  };
+
+  it("accepts valid input with required fields only", () => {
+    expect(bookingCreateBodySchema.parse(validInput)).toEqual(validInput);
+  });
+
+  it("accepts all optional fields", () => {
+    const input = {
+      ...validInput,
+      overrideReason: "Tournament",
+      notes: "Extra setup needed",
+      matchIds: [1, 2, 3],
+    };
+    expect(bookingCreateBodySchema.parse(input)).toEqual(input);
+  });
+
+  it("accepts null overrideReason and notes", () => {
+    const input = { ...validInput, overrideReason: null, notes: null };
+    expect(bookingCreateBodySchema.parse(input)).toEqual(input);
+  });
+
+  it("rejects missing venueId", () => {
+    const { venueId: _, ...rest } = validInput;
+    expect(() => bookingCreateBodySchema.parse(rest)).toThrow();
+  });
+
+  it("rejects missing date", () => {
+    const { date: _, ...rest } = validInput;
+    expect(() => bookingCreateBodySchema.parse(rest)).toThrow();
+  });
+
+  it("rejects missing overrideStartTime", () => {
+    const { overrideStartTime: _, ...rest } = validInput;
+    expect(() => bookingCreateBodySchema.parse(rest)).toThrow();
+  });
+
+  it("rejects missing overrideEndTime", () => {
+    const { overrideEndTime: _, ...rest } = validInput;
+    expect(() => bookingCreateBodySchema.parse(rest)).toThrow();
+  });
+
+  it("rejects invalid date format", () => {
+    expect(() =>
+      bookingCreateBodySchema.parse({ ...validInput, date: "15-03-2025" }),
+    ).toThrow();
+  });
+
+  it("rejects invalid time format", () => {
+    expect(() =>
+      bookingCreateBodySchema.parse({ ...validInput, overrideStartTime: "1400" }),
+    ).toThrow();
+  });
+
+  it("rejects non-positive venueId", () => {
+    expect(() =>
+      bookingCreateBodySchema.parse({ ...validInput, venueId: 0 }),
+    ).toThrow();
+  });
+
+  it("rejects overrideReason exceeding 500 characters", () => {
+    expect(() =>
+      bookingCreateBodySchema.parse({ ...validInput, overrideReason: "x".repeat(501) }),
+    ).toThrow();
+  });
+
+  it("rejects notes exceeding 1000 characters", () => {
+    expect(() =>
+      bookingCreateBodySchema.parse({ ...validInput, notes: "x".repeat(1001) }),
+    ).toThrow();
+  });
+
+  it("rejects non-positive matchIds", () => {
+    expect(() =>
+      bookingCreateBodySchema.parse({ ...validInput, matchIds: [0] }),
+    ).toThrow();
+  });
+
+  it("accepts empty matchIds array", () => {
+    const input = { ...validInput, matchIds: [] };
+    expect(bookingCreateBodySchema.parse(input)).toEqual(input);
+  });
+
+  it("accepts HH:MM:SS time format", () => {
+    const input = { ...validInput, overrideStartTime: "14:00:00", overrideEndTime: "17:00:00" };
+    expect(bookingCreateBodySchema.parse(input)).toEqual(input);
   });
 });
