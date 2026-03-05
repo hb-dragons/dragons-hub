@@ -32,8 +32,6 @@ export const taskCreateBodySchema = z.object({
   priority: taskPrioritySchema.optional(),
   dueDate: dateSchema.nullable().optional(),
   columnId: z.number().int().positive(),
-  matchId: z.number().int().positive().nullable().optional(),
-  venueBookingId: z.number().int().positive().nullable().optional(),
 });
 
 export const taskUpdateBodySchema = z.object({
