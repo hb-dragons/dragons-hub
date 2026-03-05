@@ -47,23 +47,29 @@ jobs:
           fetch-depth: 2
 
       - name: Check for changes
-        uses: dorny/paths-filter@v3
         id: changes
-        with:
-          base: HEAD~1
-          filters: |
-            web:
-              - 'apps/web/**'
-              - 'packages/ui/**'
-              - 'packages/shared/**'
-            api:
-              - 'apps/api/**'
-              - 'packages/db/**'
-              - 'packages/sdk/**'
-              - 'packages/shared/**'
-            db:
-              - 'packages/db/src/schema/**'
-              - 'packages/db/drizzle/**'
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          web=false
+          api=false
+          db=false
+
+          if echo "$CHANGED" | grep -qE '^(apps/web/|packages/ui/|packages/shared/)'; then
+            web=true
+          fi
+          if echo "$CHANGED" | grep -qE '^(apps/api/|packages/db/|packages/sdk/|packages/shared/)'; then
+            api=true
+          fi
+          if echo "$CHANGED" | grep -qE '^(packages/db/src/schema/|packages/db/drizzle/)'; then
+            db=true
+          fi
+
+          echo "web=$web" >> $GITHUB_OUTPUT
+          echo "api=$api" >> $GITHUB_OUTPUT
+          echo "db=$db" >> $GITHUB_OUTPUT
 
   run-migrations:
     name: Run Database Migrations
