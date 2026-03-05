@@ -5,11 +5,6 @@ import {
   taskComments,
   boardColumns,
   boards,
-  venueBookings,
-  venueBookingMatches,
-  venues,
-  matches,
-  teams,
 } from "@dragons/db/schema";
 import { eq, and, asc, sql, count } from "drizzle-orm";
 import type {
@@ -18,7 +13,6 @@ import type {
   ChecklistItem,
   TaskComment,
   TaskPriority,
-  BookingInfo,
 } from "@dragons/shared";
 
 export interface TaskFilters {
@@ -54,9 +48,6 @@ export async function listTasks(
       priority: tasks.priority,
       dueDate: tasks.dueDate,
       position: tasks.position,
-      matchId: tasks.matchId,
-      venueBookingId: tasks.venueBookingId,
-      sourceType: tasks.sourceType,
     })
     .from(tasks)
     .where(and(...conditions))
@@ -102,8 +93,6 @@ export async function createTask(
     priority?: string;
     dueDate?: string | null;
     columnId: number;
-    matchId?: number | null;
-    venueBookingId?: number | null;
   },
 ): Promise<TaskDetail | null> {
   // Verify board exists
@@ -146,8 +135,6 @@ export async function createTask(
       priority: data.priority ?? "normal",
       dueDate: data.dueDate ?? null,
       position: (maxPos?.maxPosition ?? -1) + 1,
-      matchId: data.matchId ?? null,
-      venueBookingId: data.venueBookingId ?? null,
     })
     .returning();
 
@@ -161,18 +148,13 @@ export async function createTask(
     priority: task!.priority as TaskPriority,
     dueDate: task!.dueDate,
     position: task!.position,
-    matchId: task!.matchId,
-    venueBookingId: task!.venueBookingId,
-    sourceType: task!.sourceType,
     checklistTotal: 0,
     checklistChecked: 0,
-    sourceDetail: task!.sourceDetail,
     createdBy: task!.createdBy,
     createdAt: task!.createdAt.toISOString(),
     updatedAt: task!.updatedAt.toISOString(),
     checklist: [],
     comments: [],
-    booking: null,
   };
 }
 
@@ -210,70 +192,6 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
     .where(eq(taskComments.taskId, id))
     .orderBy(asc(taskComments.createdAt));
 
-  // Fetch linked booking info if present
-  let booking: BookingInfo | null = null;
-  if (task.venueBookingId) {
-    const [bookingRow] = await db
-      .select({
-        id: venueBookings.id,
-        venueName: venues.name,
-        date: venueBookings.date,
-        calculatedStartTime: venueBookings.calculatedStartTime,
-        calculatedEndTime: venueBookings.calculatedEndTime,
-        overrideStartTime: venueBookings.overrideStartTime,
-        overrideEndTime: venueBookings.overrideEndTime,
-        status: venueBookings.status,
-        needsReconfirmation: venueBookings.needsReconfirmation,
-      })
-      .from(venueBookings)
-      .innerJoin(venues, eq(venues.id, venueBookings.venueId))
-      .where(eq(venueBookings.id, task.venueBookingId))
-      .limit(1);
-
-    if (bookingRow) {
-      const homeTeam = db
-        .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
-        .from(teams)
-        .as("home_team");
-      const guestTeam = db
-        .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
-        .from(teams)
-        .as("guest_team");
-
-      const linkedMatches = await db
-        .select({
-          id: matches.id,
-          matchNo: matches.matchNo,
-          kickoffDate: matches.kickoffDate,
-          kickoffTime: matches.kickoffTime,
-          homeTeam: homeTeam.name,
-          guestTeam: guestTeam.name,
-        })
-        .from(venueBookingMatches)
-        .innerJoin(matches, eq(matches.id, venueBookingMatches.matchId))
-        .innerJoin(
-          homeTeam,
-          eq(homeTeam.apiTeamPermanentId, matches.homeTeamApiId),
-        )
-        .innerJoin(
-          guestTeam,
-          eq(guestTeam.apiTeamPermanentId, matches.guestTeamApiId),
-        )
-        .where(eq(venueBookingMatches.venueBookingId, task.venueBookingId));
-
-      booking = {
-        id: bookingRow.id,
-        venueName: bookingRow.venueName,
-        date: bookingRow.date,
-        effectiveStartTime: bookingRow.overrideStartTime ?? bookingRow.calculatedStartTime,
-        effectiveEndTime: bookingRow.overrideEndTime ?? bookingRow.calculatedEndTime,
-        status: bookingRow.status as BookingInfo["status"],
-        needsReconfirmation: bookingRow.needsReconfirmation,
-        matches: linkedMatches,
-      };
-    }
-  }
-
   return {
     id: task.id,
     boardId: task.boardId,
@@ -284,12 +202,8 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
     priority: task.priority as TaskPriority,
     dueDate: task.dueDate,
     position: task.position,
-    matchId: task.matchId,
-    venueBookingId: task.venueBookingId,
-    sourceType: task.sourceType,
     checklistTotal: checklist.length,
     checklistChecked: checklist.filter((c) => c.isChecked).length,
-    sourceDetail: task.sourceDetail,
     createdBy: task.createdBy,
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
@@ -302,7 +216,6 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
     })),
-    booking,
   };
 }
 
@@ -345,7 +258,6 @@ export async function moveTask(
   const [column] = await db
     .select({
       id: boardColumns.id,
-      isDoneColumn: boardColumns.isDoneColumn,
       boardId: boardColumns.boardId,
     })
     .from(boardColumns)
@@ -359,19 +271,6 @@ export async function moveTask(
     .update(tasks)
     .set({ columnId, position, updatedAt: new Date() })
     .where(eq(tasks.id, id));
-
-  // If task has a venueBookingId and target column isDoneColumn, update the booking
-  if (task.venueBookingId && column.isDoneColumn) {
-    await db
-      .update(venueBookings)
-      .set({
-        status: "confirmed",
-        confirmedAt: new Date(),
-        needsReconfirmation: false,
-        updatedAt: new Date(),
-      })
-      .where(eq(venueBookings.id, task.venueBookingId));
-  }
 
   return getTaskDetail(id);
 }
