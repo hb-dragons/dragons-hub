@@ -16,10 +16,12 @@ vi.mock("../../config/logger", () => ({
 
 const mockInsert = vi.fn();
 const mockSelect = vi.fn();
+const mockUpdate = vi.fn();
 vi.mock("../../config/database", () => ({
   db: {
     insert: (...args: unknown[]) => mockInsert(...args),
     select: (...args: unknown[]) => mockSelect(...args),
+    update: (...args: unknown[]) => mockUpdate(...args),
   },
 }));
 
@@ -45,6 +47,12 @@ vi.mock("@dragons/db/schema", () => ({
     id: "id",
     apiMatchId: "apiMatchId",
   },
+  refereeAssignmentIntents: {
+    id: "id",
+    matchId: "matchId",
+    refereeId: "refereeId",
+    confirmedBySyncAt: "confirmedBySyncAt",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -62,6 +70,7 @@ import {
   syncRefereesFromData,
   syncRefereeAssignmentsFromData,
   buildMatchIdLookup,
+  confirmIntentsFromSync,
 } from "./referees.sync";
 
 const FROZEN_TIME = new Date("2025-06-01T00:00:00Z");
@@ -559,5 +568,74 @@ describe("buildMatchIdLookup", () => {
 
     expect(lookup.get(1000)).toBe(1);
     expect(lookup.get(2000)).toBe(2);
+  });
+});
+
+describe("confirmIntentsFromSync", () => {
+  it("confirms intent when matching assignment exists", async () => {
+    // First call: select pending intents
+    mockSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          { intentId: 1, matchId: 10, refereeId: 20 },
+        ]),
+      }),
+    });
+    // Second call: select matching assignment
+    mockSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([{ id: 100 }]),
+        }),
+      }),
+    });
+    // Update call
+    mockUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    const result = await confirmIntentsFromSync();
+
+    expect(result).toBe(1);
+    expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it("does not confirm intent when no matching assignment exists", async () => {
+    // First call: select pending intents
+    mockSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          { intentId: 1, matchId: 10, refereeId: 20 },
+        ]),
+      }),
+    });
+    // Second call: no matching assignment
+    mockSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    const result = await confirmIntentsFromSync();
+
+    expect(result).toBe(0);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("returns 0 when no pending intents", async () => {
+    mockSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    });
+
+    const result = await confirmIntentsFromSync();
+
+    expect(result).toBe(0);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

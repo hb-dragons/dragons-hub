@@ -134,6 +134,9 @@ const CREATE_TABLES = `
     guest_ot1 INTEGER,
     home_ot2 INTEGER,
     guest_ot2 INTEGER,
+    sr1_open BOOLEAN NOT NULL DEFAULT FALSE,
+    sr2_open BOOLEAN NOT NULL DEFAULT FALSE,
+    sr3_open BOOLEAN NOT NULL DEFAULT FALSE,
     venue_name_override VARCHAR(200),
     anschreiber VARCHAR(100),
     zeitnehmer VARCHAR(100),
@@ -201,6 +204,47 @@ const CREATE_TABLES = `
     match_id INTEGER NOT NULL REFERENCES matches(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(venue_booking_id, match_id)
+  );
+
+  CREATE TABLE referees (
+    id SERIAL PRIMARY KEY,
+    api_id INTEGER NOT NULL UNIQUE,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    license_number INTEGER,
+    data_hash VARCHAR(64),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE referee_roles (
+    id SERIAL PRIMARY KEY,
+    api_id INTEGER NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    short_name VARCHAR(20),
+    data_hash VARCHAR(64),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE TABLE match_referees (
+    id SERIAL PRIMARY KEY,
+    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    referee_id INTEGER NOT NULL REFERENCES referees(id),
+    role_id INTEGER NOT NULL REFERENCES referee_roles(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(match_id, referee_id, role_id)
+  );
+
+  CREATE TABLE referee_assignment_intents (
+    id SERIAL PRIMARY KEY,
+    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    referee_id INTEGER NOT NULL REFERENCES referees(id),
+    slot_number SMALLINT NOT NULL,
+    clicked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    confirmed_by_sync_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(match_id, referee_id, slot_number)
   );
 `;
 

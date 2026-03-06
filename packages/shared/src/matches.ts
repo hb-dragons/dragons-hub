@@ -1,4 +1,5 @@
 import type { BookingStatus, DiffStatus } from "./constants";
+import type { RefereeSlotInfo } from "./referee-matches";
 
 export interface FieldDiff {
   field: string;
@@ -85,6 +86,7 @@ export interface MatchDetail extends MatchListItem {
   createdAt: string;
   updatedAt: string;
   overrides: OverrideInfo[];
+  refereeSlots?: RefereeSlotInfo[];
 }
 
 export interface MatchDetailResponse {

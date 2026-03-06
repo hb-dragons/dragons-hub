@@ -2,6 +2,7 @@ import {
   pgTable,
   serial,
   integer,
+  smallint,
   varchar,
   timestamp,
   index,
@@ -55,6 +56,35 @@ export const matchReferees = pgTable(
     ),
   }),
 );
+
+export const refereeAssignmentIntents = pgTable(
+  "referee_assignment_intents",
+  {
+    id: serial("id").primaryKey(),
+    matchId: integer("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    refereeId: integer("referee_id")
+      .notNull()
+      .references(() => referees.id),
+    slotNumber: smallint("slot_number").notNull(),
+    clickedAt: timestamp("clicked_at", { withTimezone: true }).notNull().defaultNow(),
+    confirmedBySyncAt: timestamp("confirmed_by_sync_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    matchRefereeSlotUnique: unique("referee_intent_unique").on(
+      table.matchId,
+      table.refereeId,
+      table.slotNumber,
+    ),
+    matchIdIdx: index("referee_intent_match_id_idx").on(table.matchId),
+    refereeIdIdx: index("referee_intent_referee_id_idx").on(table.refereeId),
+  }),
+);
+
+export type RefereeAssignmentIntent = typeof refereeAssignmentIntents.$inferSelect;
+export type NewRefereeAssignmentIntent = typeof refereeAssignmentIntents.$inferInsert;
 
 export type Referee = typeof referees.$inferSelect;
 export type NewReferee = typeof referees.$inferInsert;

@@ -46,6 +46,12 @@ BoardColumn (1) ──── (N) Task (via columnId)
 Task (1) ──── (N) TaskChecklistItem
      (1) ──── (N) TaskComment
 
+User (1) ──── (0..1) Referee (via refereeId FK)
+
+RefereeAssignmentIntent (N) ──── (1) Match
+RefereeAssignmentIntent (N) ──── (1) Referee
+  unique: (matchId, refereeId, slotNumber)
+
 SyncRun (1) ──── (N) SyncRunEntry
 ```
 
@@ -59,11 +65,12 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId, isTracked, discoveredAt, dataHash |
 | `teams` | `packages/db/src/schema/teams.ts` | apiTeamPermanentId (unique), name, clubId, isOwnClub, dataHash |
 | `venues` | `packages/db/src/schema/venues.ts` | apiId (unique), name, street, postalCode, city, lat/lng, dataHash |
-| `matches` | `packages/db/src/schema/matches.ts` | apiMatchId (unique), leagueId FK, venueId FK, scores, JSONB fields, versioning |
+| `matches` | `packages/db/src/schema/matches.ts` | apiMatchId (unique), leagueId FK, venueId FK, scores, sr1Open, sr2Open, sr3Open, JSONB fields, versioning |
 | `standings` | `packages/db/src/schema/standings.ts` | leagueId FK + teamApiId (unique), position, won, lost, points |
 | `referees` | `packages/db/src/schema/referees.ts` | apiId (unique), firstName, lastName, licenseNumber, dataHash |
 | `refereeRoles` | `packages/db/src/schema/referees.ts` | apiId (unique), name, shortName |
 | `matchReferees` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, roleId FK |
+| `refereeAssignmentIntents` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, slotNumber, clickedAt, confirmedBySyncAt |
 | `matchRemoteVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, snapshot JSONB, dataHash |
 | `matchLocalVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, changedBy, snapshot JSONB |
 | `matchChanges` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), track (remote/local), fieldName, oldValue, newValue |
@@ -80,7 +87,7 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `syncRuns` | `packages/db/src/schema/sync-runs.ts` | syncType, status, triggeredBy, records*, durationMs, summary JSONB |
 | `syncRunEntries` | `packages/db/src/schema/sync-runs.ts` | syncRunId FK (cascade), entityType, action, metadata JSONB |
 | `syncSchedule` | `packages/db/src/schema/sync-runs.ts` | enabled, cronExpression, timezone |
-| `user` | `packages/db/src/schema/auth.ts` | id (text PK), email (unique), name, role, banned, banReason, banExpires |
+| `user` | `packages/db/src/schema/auth.ts` | id (text PK), email (unique), name, role, refereeId FK, banned, banReason, banExpires |
 | `session` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), token (unique), expiresAt, ipAddress, userAgent, impersonatedBy |
 | `account` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), providerId, accountId, password |
 | `verification` | `packages/db/src/schema/auth.ts` | id (text PK), identifier, value, expiresAt |
@@ -140,6 +147,10 @@ Step 4: syncMatchesFromData(leagueData, venueIdLookup)
 Step 5: syncRefereeAssignmentsFromData()
   - Needs match + referee + role FK lookups
   - Upsert matchReferees entries
+
+Step 5.25: confirmIntentsFromSync()
+  - Check pending refereeAssignmentIntents (confirmedBySyncAt IS NULL)
+  - If referee now assigned in matchReferees, set confirmedBySyncAt
 
 Step 6: Finalize
   - Close SyncLogger (flush remaining entries)
@@ -347,7 +358,14 @@ Match list and detail responses include associated venue booking data when avail
 | POST | `/devices` | Register push notification device |
 | DELETE | `/devices/:token` | Unregister device |
 
-Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/device.routes.ts`
+### Referee
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/referee/matches` | referee/admin | List matches with open referee slots |
+| POST | `/referee/matches/:id/take` | referee/admin | Record take-intent, returns deep-link URL |
+
+Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`, `apps/api/src/routes/device.routes.ts`
 Validation schemas: `apps/api/src/routes/admin/*.schemas.ts`
 Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/notifications/`
 
@@ -362,6 +380,10 @@ app/
 ├── providers.tsx                     Client component wrapping AuthUIProvider
 ├── auth/
 │   └── [path]/page.tsx              better-auth-ui AuthView (sign-in, sign-up, forgot-password, etc.)
+├── referee/
+│   ├── layout.tsx                    Referee shell (simplified header)
+│   └── matches/
+│       └── page.tsx                  Referee match list with open slots
 └── admin/
     ├── layout.tsx                    Admin shell (header nav + UserButton)
     ├── page.tsx                      Redirects to /admin/sync

@@ -1,5 +1,5 @@
 import { db } from "../../config/database";
-import { referees, refereeRoles, matchReferees, matches } from "@dragons/db/schema";
+import { referees, refereeRoles, matchReferees, matches, refereeAssignmentIntents } from "@dragons/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import type {
@@ -269,4 +269,39 @@ export async function syncRefereeAssignmentsFromData(
 
   log.info({ created }, "Created referee assignments");
   return { created, errors };
+}
+
+export async function confirmIntentsFromSync(): Promise<number> {
+  const pendingIntents = await db
+    .select({
+      intentId: refereeAssignmentIntents.id,
+      matchId: refereeAssignmentIntents.matchId,
+      refereeId: refereeAssignmentIntents.refereeId,
+    })
+    .from(refereeAssignmentIntents)
+    .where(sql`${refereeAssignmentIntents.confirmedBySyncAt} IS NULL`);
+
+  let confirmed = 0;
+  for (const intent of pendingIntents) {
+    const [assignment] = await db
+      .select({ id: matchReferees.id })
+      .from(matchReferees)
+      .where(
+        and(
+          eq(matchReferees.matchId, intent.matchId),
+          eq(matchReferees.refereeId, intent.refereeId),
+        ),
+      )
+      .limit(1);
+
+    if (assignment) {
+      await db
+        .update(refereeAssignmentIntents)
+        .set({ confirmedBySyncAt: new Date() })
+        .where(eq(refereeAssignmentIntents.id, intent.intentId));
+      confirmed++;
+    }
+  }
+
+  return confirmed;
 }

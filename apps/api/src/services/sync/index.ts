@@ -11,6 +11,7 @@ import {
   syncRefereeRolesFromData,
   syncRefereeAssignmentsFromData,
   buildMatchIdLookup,
+  confirmIntentsFromSync,
 } from "./referees.sync";
 import { createSyncLogger } from "./sync-logger";
 import { fetchAllSyncData, extractRefereeAssignments } from "./data-fetcher";
@@ -141,6 +142,13 @@ export class SyncOrchestrator {
         syncLogger,
       );
       allErrors.push(...assignmentsRes.errors);
+
+      // Step 5.25: Confirm referee assignment intents
+      await logStep("Confirming referee assignment intents...");
+      const confirmedIntents = await confirmIntentsFromSync();
+      if (confirmedIntents > 0) {
+        await logStep(`Confirmed ${confirmedIntents} referee assignment intents`);
+      }
 
       // Step 5.5: Reconcile venue bookings
       await logStep("Reconciling venue bookings...");

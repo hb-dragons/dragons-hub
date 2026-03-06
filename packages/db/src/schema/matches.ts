@@ -35,6 +35,11 @@ export const matches = pgTable(
     isForfeited: boolean("is_forfeited").default(false),
     isCancelled: boolean("is_cancelled").default(false),
 
+    // Referee open-slot flags (from SDK offenAngeboten)
+    sr1Open: boolean("sr1_open").notNull().default(false),
+    sr2Open: boolean("sr2_open").notNull().default(false),
+    sr3Open: boolean("sr3_open").notNull().default(false),
+
     // Results — scalar scores
     homeScore: integer("home_score"),
     guestScore: integer("guest_score"),
