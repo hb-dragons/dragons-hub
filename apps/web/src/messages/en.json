@@ -154,6 +154,13 @@
       "diverged": "Diverged",
       "synced": "Synced",
       "local": "Local"
+    },
+    "referees": {
+      "title": "Referees",
+      "open": "Open",
+      "confirmed": "Confirmed",
+      "requested": "Requested",
+      "none": "No referee data available"
     }
   },
   "sync": {

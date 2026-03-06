@@ -366,6 +366,50 @@ export function MatchDetailView({ initialData }: MatchDetailViewProps) {
                 </CardContent>
               </Card>
             )}
+            {/* Schiedsrichter */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{t("matchDetail.referees.title")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {match.refereeSlots?.map((slot) => (
+                    <div key={slot.slotNumber} className="flex items-center justify-between rounded-md border p-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          SR {slot.slotNumber}
+                        </span>
+                        {slot.referee ? (
+                          <span className="text-sm">
+                            {slot.referee.firstName} {slot.referee.lastName}
+                            {slot.role && (
+                              <span className="text-muted-foreground">
+                                {" "}({slot.role.shortName ?? slot.role.name})
+                              </span>
+                            )}
+                          </span>
+                        ) : slot.isOpen ? (
+                          <Badge variant="destructive">{t("matchDetail.referees.open")}</Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </div>
+                      {slot.intent && (
+                        <Badge variant={slot.intent.confirmedBySyncAt ? "default" : "secondary"}>
+                          {slot.intent.confirmedBySyncAt
+                            ? t("matchDetail.referees.confirmed")
+                            : t("matchDetail.referees.requested")}
+                          : {slot.intent.refereeFirstName} {slot.intent.refereeLastName}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                  {(!match.refereeSlots || match.refereeSlots.length === 0) && (
+                    <p className="text-sm text-muted-foreground">{t("matchDetail.referees.none")}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Column: Editable form */}

@@ -154,6 +154,13 @@
       "diverged": "Abweichend",
       "synced": "Synchron",
       "local": "Lokal"
+    },
+    "referees": {
+      "title": "Schiedsrichter",
+      "open": "Offen",
+      "confirmed": "Bestätigt",
+      "requested": "Beantragt",
+      "none": "Keine Schiedsrichter-Daten verfügbar"
     }
   },
   "sync": {
