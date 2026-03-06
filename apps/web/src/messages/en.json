@@ -16,9 +16,14 @@
     "board": "Board",
     "bookings": "Bookings",
     "menu": "Menu",
+    "groupReferee": "Referee",
+    "openAssignments": "Open Assignments",
     "groupLeague": "League",
     "groupOperations": "Operations",
     "groupSystem": "System"
+  },
+  "refereeMatches": {
+    "title": "Open Referee Assignments"
   },
   "common": {
     "save": "Save",

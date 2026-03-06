@@ -2,12 +2,14 @@
 
 import {
   ChevronRight,
+  Gavel,
   KanbanSquare,
   Settings,
   Trophy,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/lib/navigation";
+import { authClient } from "@/lib/auth-client";
 import {
   Collapsible,
   CollapsibleContent,
@@ -33,33 +35,51 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { UserButton } from "@daveyplate/better-auth-ui";
 
-const navGroups = [
+interface NavGroup {
+  labelKey: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  roles: string[];
+  items: { href: string; labelKey: string }[];
+}
+
+const navGroups: NavGroup[] = [
   {
-    labelKey: "nav.groupLeague" as const,
+    labelKey: "nav.groupReferee",
+    icon: Gavel,
+    roles: ["admin", "referee"],
+    items: [
+      { href: "/admin/referee/matches", labelKey: "nav.openAssignments" },
+    ],
+  },
+  {
+    labelKey: "nav.groupLeague",
     icon: Trophy,
+    roles: ["admin"],
     items: [
-      { href: "/admin/matches" as const, labelKey: "nav.matches" as const },
-      { href: "/admin/standings" as const, labelKey: "nav.standings" as const },
-      { href: "/admin/teams" as const, labelKey: "nav.teams" as const },
-      { href: "/admin/referees" as const, labelKey: "nav.referees" as const },
+      { href: "/admin/matches", labelKey: "nav.matches" },
+      { href: "/admin/standings", labelKey: "nav.standings" },
+      { href: "/admin/teams", labelKey: "nav.teams" },
+      { href: "/admin/referees", labelKey: "nav.referees" },
     ],
   },
   {
-    labelKey: "nav.groupOperations" as const,
+    labelKey: "nav.groupOperations",
     icon: KanbanSquare,
+    roles: ["admin"],
     items: [
-      { href: "/admin/board" as const, labelKey: "nav.board" as const },
-      { href: "/admin/bookings" as const, labelKey: "nav.bookings" as const },
-      { href: "/admin/venues" as const, labelKey: "nav.venues" as const },
+      { href: "/admin/board", labelKey: "nav.board" },
+      { href: "/admin/bookings", labelKey: "nav.bookings" },
+      { href: "/admin/venues", labelKey: "nav.venues" },
     ],
   },
   {
-    labelKey: "nav.groupSystem" as const,
+    labelKey: "nav.groupSystem",
     icon: Settings,
+    roles: ["admin"],
     items: [
-      { href: "/admin/sync" as const, labelKey: "nav.sync" as const },
-      { href: "/admin/settings" as const, labelKey: "nav.settings" as const },
-      { href: "/admin/users" as const, labelKey: "nav.users" as const },
+      { href: "/admin/sync", labelKey: "nav.sync" },
+      { href: "/admin/settings", labelKey: "nav.settings" },
+      { href: "/admin/users", labelKey: "nav.users" },
     ],
   },
 ];
@@ -68,6 +88,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const t = useTranslations();
   const { setOpenMobile } = useSidebar();
+  const { data: session } = authClient.useSession();
+  const userRole = (session?.user?.role ?? "user") as string;
+  const visibleGroups = navGroups.filter((g) => g.roles.includes(userRole));
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -88,7 +111,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {navGroups.map((group) => {
+        {visibleGroups.map((group) => {
           const groupIsActive = group.items.some((item) =>
             pathname.startsWith(item.href)
           );

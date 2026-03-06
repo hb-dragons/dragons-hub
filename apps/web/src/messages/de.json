@@ -16,9 +16,14 @@
     "board": "Board",
     "bookings": "Buchungen",
     "menu": "Menü",
+    "groupReferee": "Schiedsrichter",
+    "openAssignments": "Offene Ansetzungen",
     "groupLeague": "Liga",
     "groupOperations": "Betrieb",
     "groupSystem": "System"
+  },
+  "refereeMatches": {
+    "title": "Offene Schiedsrichter-Ansetzungen"
   },
   "common": {
     "save": "Speichern",
