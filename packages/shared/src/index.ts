@@ -77,6 +77,11 @@ export type {
   LiveLogEntry,
 } from "./sync";
 
+export type {
+  RefereeSlotInfo,
+  RefereeMatchListItem,
+  TakeMatchResponse,
+} from "./referee-matches";
 export type { RefereeListItem } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";
