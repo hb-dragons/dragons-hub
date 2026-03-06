@@ -9,6 +9,10 @@ import {
   matchRemoteVersions,
   venueBookingMatches,
   venueBookings,
+  matchReferees,
+  referees,
+  refereeRoles,
+  refereeAssignmentIntents,
 } from "@dragons/db/schema";
 import { eq, sql, and, or, inArray, gte, lte, asc } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -19,6 +23,7 @@ import type {
   MatchListItem,
   MatchDetail,
   MatchDetailResponse,
+  RefereeSlotInfo,
 } from "@dragons/shared";
 
 export type TransactionClient = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -130,6 +135,9 @@ export function queryMatchWithJoins(client: Database | TransactionClient = db) {
       shotclock: matches.shotclock,
       internalNotes: matches.internalNotes,
       publicComment: matches.publicComment,
+      sr1Open: matches.sr1Open,
+      sr2Open: matches.sr2Open,
+      sr3Open: matches.sr3Open,
       lastRemoteSync: matches.lastRemoteSync,
       createdAt: matches.createdAt,
       updatedAt: matches.updatedAt,
@@ -293,8 +301,69 @@ export async function buildDetailResponse(
     ? { id: bookingLink.bookingId, status: bookingLink.bookingStatus as BookingStatus, needsReconfirmation: bookingLink.needsReconfirmation }
     : null;
 
+  // Load referee assignments for this match
+  const refAssignments = await client
+    .select({
+      refereeId: matchReferees.refereeId,
+      roleId: matchReferees.roleId,
+      roleName: refereeRoles.name,
+      roleShortName: refereeRoles.shortName,
+      firstName: referees.firstName,
+      lastName: referees.lastName,
+    })
+    .from(matchReferees)
+    .innerJoin(referees, eq(matchReferees.refereeId, referees.id))
+    .innerJoin(refereeRoles, eq(matchReferees.roleId, refereeRoles.id))
+    .where(eq(matchReferees.matchId, matchId));
+
+  // Load intents for this match
+  const intentsRows = await client
+    .select({
+      refereeId: refereeAssignmentIntents.refereeId,
+      slotNumber: refereeAssignmentIntents.slotNumber,
+      clickedAt: refereeAssignmentIntents.clickedAt,
+      confirmedBySyncAt: refereeAssignmentIntents.confirmedBySyncAt,
+      firstName: referees.firstName,
+      lastName: referees.lastName,
+    })
+    .from(refereeAssignmentIntents)
+    .innerJoin(referees, eq(refereeAssignmentIntents.refereeId, referees.id))
+    .where(eq(refereeAssignmentIntents.matchId, matchId));
+
+  // Build referee slots array
+  const refereeSlots: RefereeSlotInfo[] = [1, 2, 3].map((slotNumber) => {
+    const slotKey = `sr${slotNumber}Open` as keyof typeof row;
+    const isOpen = (row[slotKey] as boolean) ?? false;
+
+    // Find assigned referee for this slot (by role ordering convention)
+    const assignment = refAssignments[slotNumber - 1] ?? null;
+
+    // Find intent for this slot
+    const intentRow = intentsRows.find((i) => i.slotNumber === slotNumber) ?? null;
+
+    return {
+      slotNumber,
+      isOpen,
+      referee: assignment
+        ? { id: assignment.refereeId, firstName: assignment.firstName, lastName: assignment.lastName }
+        : null,
+      role: assignment
+        ? { id: assignment.roleId, name: assignment.roleName, shortName: assignment.roleShortName }
+        : null,
+      intent: intentRow
+        ? {
+            refereeId: intentRow.refereeId,
+            refereeFirstName: intentRow.firstName,
+            refereeLastName: intentRow.lastName,
+            clickedAt: intentRow.clickedAt.toISOString(),
+            confirmedBySyncAt: intentRow.confirmedBySyncAt?.toISOString() ?? null,
+          }
+        : null,
+    };
+  });
+
   return {
-    match: { ...rowToDetail(row, overriddenFields, overrides), booking },
+    match: { ...rowToDetail(row, overriddenFields, overrides), booking, refereeSlots },
     diffs: computeDiffs(row, overriddenFields, remoteSnapshot),
   };
 }

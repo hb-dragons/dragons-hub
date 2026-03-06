@@ -1,11 +1,12 @@
 import { Hono } from "hono";
+import type { AppEnv } from "../../types";
 import { requireReferee } from "../../middleware/auth";
 import { getMatchesWithOpenSlots, recordTakeIntent } from "../../services/referee/referee-match.service";
 import { db } from "../../config/database";
 import { user as userTable } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 
-const refereeMatchRoutes = new Hono();
+const refereeMatchRoutes = new Hono<AppEnv>();
 
 refereeMatchRoutes.use("/*", requireReferee);
 
