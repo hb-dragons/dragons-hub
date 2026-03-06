@@ -73,6 +73,9 @@ interface RemoteSnapshot {
   guestOt1: number | null;
   homeOt2: number | null;
   guestOt2: number | null;
+  sr1Open: boolean;
+  sr2Open: boolean;
+  sr3Open: boolean;
 }
 
 function validScoreOrNull(score: number | undefined): number | null {
@@ -257,6 +260,9 @@ function toRemoteSnapshot(
     guestHalftimeScore: validScoreOrNull(game?.gastHalbzeitstand),
     ...periodScores,
     ...overtimeDeltas,
+    sr1Open: details?.sr1?.offenAngeboten ?? false,
+    sr2Open: details?.sr2?.offenAngeboten ?? false,
+    sr3Open: details?.sr3?.offenAngeboten ?? false,
   };
 }
 
@@ -288,6 +294,9 @@ function snapshotToHashData(snapshot: RemoteSnapshot): Record<string, unknown> {
     guestOt1: snapshot.guestOt1,
     homeOt2: snapshot.homeOt2,
     guestOt2: snapshot.guestOt2,
+    sr1Open: snapshot.sr1Open,
+    sr2Open: snapshot.sr2Open,
+    sr3Open: snapshot.sr3Open,
   };
 }
 
@@ -319,6 +328,9 @@ const TRACKED_FIELDS = [
   "guestOt1",
   "homeOt2",
   "guestOt2",
+  "sr1Open",
+  "sr2Open",
+  "sr3Open",
 ] as const;
 
 function detectFieldChanges(
@@ -420,6 +432,9 @@ const SNAPSHOT_DB_FIELDS = [
   "guestOt1",
   "homeOt2",
   "guestOt2",
+  "sr1Open",
+  "sr2Open",
+  "sr3Open",
 ] as const;
 
 export { buildMatchEntityName };
@@ -703,6 +718,9 @@ export async function syncMatchesFromData(
               guestOt1: remoteSnapshot.guestOt1,
               homeOt2: remoteSnapshot.homeOt2,
               guestOt2: remoteSnapshot.guestOt2,
+              sr1Open: remoteSnapshot.sr1Open,
+              sr2Open: remoteSnapshot.sr2Open,
+              sr3Open: remoteSnapshot.sr3Open,
               currentRemoteVersion: 1,
               currentLocalVersion: 0,
               remoteDataHash: newHash,

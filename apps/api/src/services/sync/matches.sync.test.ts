@@ -113,7 +113,10 @@ function makeBasicMatch(overrides: Partial<SdkSpielplanMatch> = {}): SdkSpielpla
   };
 }
 
-function makeGameDetails(overrides: Partial<SdkGetGameResponse["game1"]> = {}): SdkGetGameResponse {
+function makeGameDetails(
+  overrides: Partial<SdkGetGameResponse["game1"]> = {},
+  refereeOverrides: { sr1?: Partial<SdkGetGameResponse["sr1"]>; sr2?: Partial<SdkGetGameResponse["sr2"]>; sr3?: Partial<SdkGetGameResponse["sr3"]> } = {},
+): SdkGetGameResponse {
   return {
     game1: {
       spielplanId: 1,
@@ -140,9 +143,9 @@ function makeGameDetails(overrides: Partial<SdkGetGameResponse["game1"]> = {}): 
       gastMannschaftLiga: null as never,
       ...overrides,
     },
-    sr1: { spielleitung: null, lizenzNr: null, offenAngeboten: false },
-    sr2: { spielleitung: null, lizenzNr: null, offenAngeboten: false },
-    sr3: { spielleitung: null, lizenzNr: null, offenAngeboten: false },
+    sr1: { spielleitung: null, lizenzNr: null, offenAngeboten: false, ...refereeOverrides.sr1 },
+    sr2: { spielleitung: null, lizenzNr: null, offenAngeboten: false, ...refereeOverrides.sr2 },
+    sr3: { spielleitung: null, lizenzNr: null, offenAngeboten: false, ...refereeOverrides.sr3 },
   };
 }
 
@@ -183,6 +186,7 @@ function makeLockedRow(overrides: Record<string, unknown> = {}) {
     homeQ4: 20, guestQ4: 15,
     homeOt1: null, guestOt1: null,
     homeOt2: null, guestOt2: null,
+    sr1Open: false, sr2Open: false, sr3Open: false,
     ...overrides,
   };
 }
@@ -1125,6 +1129,85 @@ describe("syncMatchesFromData", () => {
 
     // Should have called delete to auto-release the override
     expect(txDelete).toHaveBeenCalled();
+  });
+
+  it("creates new match with sr1Open/sr2Open/sr3Open from offenAngeboten", async () => {
+    const details = makeGameDetails({}, {
+      sr1: { offenAngeboten: true },
+      sr3: { offenAngeboten: true },
+    });
+    const data = makeLeagueData({
+      gameDetails: new Map([[1000, details]]),
+    });
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+    const mockValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+    });
+    mockInsert.mockReturnValue({ values: mockValues });
+
+    const result = await syncMatchesFromData([data], new Map(), null);
+
+    expect(result.created).toBe(1);
+    const inserted = mockValues.mock.calls[0][0];
+    expect(inserted.sr1Open).toBe(true);
+    expect(inserted.sr2Open).toBe(false);
+    expect(inserted.sr3Open).toBe(true);
+  });
+
+  it("defaults sr1Open/sr2Open/sr3Open to false when no game details", async () => {
+    const data = makeLeagueData({ gameDetails: new Map() });
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+    const mockValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+    });
+    mockInsert.mockReturnValue({ values: mockValues });
+
+    await syncMatchesFromData([data], new Map(), null);
+
+    const inserted = mockValues.mock.calls[0][0];
+    expect(inserted.sr1Open).toBe(false);
+    expect(inserted.sr2Open).toBe(false);
+    expect(inserted.sr3Open).toBe(false);
+  });
+
+  it("updates match when offenAngeboten changes", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const details = makeGameDetails({}, {
+      sr1: { offenAngeboten: true },
+    });
+    const data = makeLeagueData({
+      gameDetails: new Map([[1000, details]]),
+    });
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([{
+            id: 1,
+            remoteDataHash: "old-hash",
+          }]),
+        }),
+      }),
+    });
+    // Locked row has sr1Open: false, but remote has true
+    const { txUpdateSet } = makeTxMock(makeLockedRow({ sr1Open: false }));
+
+    const result = await syncMatchesFromData([data], new Map(), 1);
+
+    expect(result.updated).toBe(1);
+    const updatedFields = txUpdateSet.mock.calls[0][0];
+    expect(updatedFields.sr1Open).toBe(true);
   });
 });
 
