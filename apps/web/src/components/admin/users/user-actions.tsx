@@ -25,9 +25,12 @@ import {
   AlertDialogTitle,
 } from "@dragons/ui/components/alert-dialog"
 
+import { fetchAPI } from "@/lib/api"
+
 import { EditUserDialog } from "./edit-user-dialog"
 import { BanUserDialog } from "./ban-user-dialog"
 import { SetPasswordDialog } from "./set-password-dialog"
+import { LinkRefereeDialog } from "./link-referee-dialog"
 import type { UserListItem } from "./types"
 
 interface UserActionsProps {
@@ -49,6 +52,7 @@ export function UserActions({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [unbanOpen, setUnbanOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
+  const [linkRefereeOpen, setLinkRefereeOpen] = useState(false)
 
   const isSelf = user.id === currentUserId
   const isBanned = user.banned === true
@@ -103,6 +107,28 @@ export function UserActions({
     }
   }
 
+  async function handleRemoveReferee() {
+    try {
+      const { error } = await authClient.admin.setRole({
+        userId: user.id,
+        role: "user",
+      })
+      if (error) {
+        toast.error(t("users.toast.roleChangeFailed"))
+        return
+      }
+      await fetchAPI(`/admin/users/${user.id}/referee-link`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refereeId: null }),
+      })
+      toast.success(t("users.toast.roleChanged"))
+      onMutated()
+    } catch {
+      toast.error(t("users.toast.refereeLinkFailed"))
+    }
+  }
+
   return (
     <>
       <DropdownMenu>
@@ -122,6 +148,16 @@ export function UserActions({
           {!isSelf && (
             <DropdownMenuItem onSelect={() => setRoleOpen(true)}>
               {t("users.actions.changeRole")}
+            </DropdownMenuItem>
+          )}
+          {!isSelf && user.role !== "referee" && (
+            <DropdownMenuItem onSelect={() => setLinkRefereeOpen(true)}>
+              {t("users.actions.makeReferee")}
+            </DropdownMenuItem>
+          )}
+          {!isSelf && user.role === "referee" && (
+            <DropdownMenuItem onSelect={handleRemoveReferee}>
+              {t("users.actions.removeReferee")}
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
@@ -223,6 +259,13 @@ export function UserActions({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <LinkRefereeDialog
+        user={user}
+        open={linkRefereeOpen}
+        onOpenChange={setLinkRefereeOpen}
+        onLinked={onMutated}
+      />
     </>
   )
 }

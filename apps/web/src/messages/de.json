@@ -348,7 +348,8 @@
     },
     "roles": {
       "admin": "Admin",
-      "user": "Benutzer"
+      "user": "Benutzer",
+      "referee": "Schiedsrichter"
     },
     "status": {
       "active": "Aktiv",
@@ -360,7 +361,9 @@
       "setPassword": "Passwort setzen",
       "ban": "Benutzer sperren",
       "unban": "Benutzer entsperren",
-      "delete": "Benutzer löschen"
+      "delete": "Benutzer löschen",
+      "makeReferee": "Zum Schiedsrichter machen",
+      "removeReferee": "Schiedsrichterrolle entfernen"
     },
     "createDialog": {
       "title": "Benutzer erstellen",
@@ -416,6 +419,15 @@
       "description": "Rolle von {name} von {currentRole} zu {newRole} ändern?",
       "confirm": "Rolle ändern"
     },
+    "linkRefereeDialog": {
+      "title": "Schiedsrichter verknüpfen",
+      "description": "Wählen Sie einen Schiedsrichter für {name}",
+      "searchPlaceholder": "Schiedsrichter suchen...",
+      "noResults": "Keine Schiedsrichter gefunden",
+      "selected": "Ausgewählt",
+      "linking": "Verknüpfe...",
+      "link": "Verknüpfen"
+    },
     "toast": {
       "created": "Benutzer erfolgreich erstellt",
       "updated": "Benutzer erfolgreich aktualisiert",
@@ -430,7 +442,9 @@
       "banFailed": "Benutzer konnte nicht gesperrt werden",
       "unbanFailed": "Benutzer konnte nicht entsperrt werden",
       "roleChangeFailed": "Rolle konnte nicht geändert werden",
-      "passwordSetFailed": "Passwort konnte nicht gesetzt werden"
+      "passwordSetFailed": "Passwort konnte nicht gesetzt werden",
+      "refereeLinked": "Schiedsrichter erfolgreich verknüpft",
+      "refereeLinkFailed": "Verknüpfung fehlgeschlagen"
     }
   },
   "board": {

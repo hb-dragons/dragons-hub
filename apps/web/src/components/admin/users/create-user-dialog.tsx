@@ -31,7 +31,7 @@ const createUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(["user", "admin"]),
+  role: z.enum(["user", "admin", "referee"]),
 })
 
 type CreateUserFormValues = z.infer<typeof createUserSchema>
@@ -67,7 +67,7 @@ export function CreateUserDialog({
         name: values.name,
         email: values.email,
         password: values.password,
-        role: values.role,
+        role: values.role as "admin" | "user",
       })
       if (error) {
         toast.error(t("users.toast.createFailed"))
@@ -157,6 +157,7 @@ export function CreateUserDialog({
                   <SelectContent>
                     <SelectItem value="user">{t("users.roles.user")}</SelectItem>
                     <SelectItem value="admin">{t("users.roles.admin")}</SelectItem>
+                    <SelectItem value="referee">{t("users.roles.referee")}</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>

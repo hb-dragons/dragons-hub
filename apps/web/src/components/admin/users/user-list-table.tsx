@@ -61,11 +61,9 @@ function getColumns(
       ),
       cell: ({ row }) => {
         const role = row.original.role ?? "user"
-        return (
-          <Badge variant={role === "admin" ? "default" : "secondary"}>
-            {role === "admin" ? t("roles.admin") : t("roles.user")}
-          </Badge>
-        )
+        const variant = role === "admin" ? "default" : role === "referee" ? "outline" : "secondary"
+        const label = role === "admin" ? t("roles.admin") : role === "referee" ? t("roles.referee") : t("roles.user")
+        return <Badge variant={variant}>{label}</Badge>
       },
       meta: { label: t("columns.role") },
     },

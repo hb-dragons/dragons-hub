@@ -348,7 +348,8 @@
     },
     "roles": {
       "admin": "Admin",
-      "user": "User"
+      "user": "User",
+      "referee": "Referee"
     },
     "status": {
       "active": "Active",
@@ -360,7 +361,9 @@
       "setPassword": "Set Password",
       "ban": "Ban User",
       "unban": "Unban User",
-      "delete": "Delete User"
+      "delete": "Delete User",
+      "makeReferee": "Make Referee",
+      "removeReferee": "Remove Referee Role"
     },
     "createDialog": {
       "title": "Create User",
@@ -416,6 +419,15 @@
       "description": "Change {name}'s role from {currentRole} to {newRole}?",
       "confirm": "Change Role"
     },
+    "linkRefereeDialog": {
+      "title": "Link Referee",
+      "description": "Select a referee record for {name}",
+      "searchPlaceholder": "Search referees...",
+      "noResults": "No referees found",
+      "selected": "Selected",
+      "linking": "Linking...",
+      "link": "Link"
+    },
     "toast": {
       "created": "User created successfully",
       "updated": "User updated successfully",
@@ -430,7 +442,9 @@
       "banFailed": "Failed to ban user",
       "unbanFailed": "Failed to unban user",
       "roleChangeFailed": "Failed to change role",
-      "passwordSetFailed": "Failed to set password"
+      "passwordSetFailed": "Failed to set password",
+      "refereeLinked": "Referee linked successfully",
+      "refereeLinkFailed": "Failed to link referee"
     }
   },
   "board": {
