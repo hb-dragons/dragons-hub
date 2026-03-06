@@ -81,6 +81,7 @@ export type {
   RefereeSlotInfo,
   RefereeMatchListItem,
   TakeMatchResponse,
+  VerifyMatchResponse,
 } from "./referee-matches";
 export type { RefereeListItem } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";

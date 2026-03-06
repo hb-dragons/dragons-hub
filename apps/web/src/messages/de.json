@@ -23,7 +23,45 @@
     "groupSystem": "System"
   },
   "refereeMatches": {
-    "title": "Offene Schiedsrichter-Ansetzungen"
+    "title": "Offene Schiedsrichter-Ansetzungen",
+    "empty": "Keine offenen Ansetzungen gefunden",
+    "searchPlaceholder": "Spiele suchen...",
+    "columns": {
+      "date": "Datum",
+      "time": "Uhrzeit",
+      "home": "Heim",
+      "guest": "Gast",
+      "league": "Liga",
+      "venue": "Halle",
+      "sr1": "SR 1",
+      "sr2": "SR 2"
+    },
+    "status": {
+      "label": "Status",
+      "active": "Aktiv",
+      "cancelled": "Abgesagt",
+      "forfeited": "Kampflos"
+    },
+    "slot": {
+      "take": "Übernehmen",
+      "confirmed": "Bestätigt",
+      "requested": "Beantragt",
+      "open": "Offen",
+      "releaseIntent": "Anfrage freigeben",
+      "intentPending": "Anfrage — wartet auf Bestätigung",
+      "intentConfirmed": "Offiziell bestätigt"
+    },
+    "verify": {
+      "title": "Registrierung prüfen",
+      "description": "Hast du dich erfolgreich auf der Basketball-Bund-Seite für dieses Spiel eingetragen?",
+      "openLink": "Basketball-Bund-Seite öffnen",
+      "yes": "Ja, jetzt prüfen",
+      "no": "Noch nicht",
+      "retry": "Erneut prüfen",
+      "close": "Schließen",
+      "confirmed": "Registrierung bestätigt! Du bist jetzt für dieses Spiel eingetragen.",
+      "notConfirmed": "Registrierung noch nicht bestätigt. Es kann einen Moment dauern, bis das externe System aktualisiert ist. Versuche es gleich nochmal."
+    }
   },
   "common": {
     "save": "Speichern",

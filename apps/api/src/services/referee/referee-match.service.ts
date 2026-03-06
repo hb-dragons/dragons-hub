@@ -7,14 +7,20 @@ import {
   refereeAssignmentIntents,
   matchReferees,
   referees,
+  refereeRoles,
 } from "@dragons/db/schema";
 import { eq, or, and, sql, asc, gte, lte, inArray, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type {
   RefereeMatchListItem,
   TakeMatchResponse,
+  VerifyMatchResponse,
   PaginatedResponse,
 } from "@dragons/shared";
+import { sdkClient } from "../sync/sdk-client";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "referee-match" });
 
 const homeTeam = alias(teams, "homeTeam");
 const guestTeam = alias(teams, "guestTeam");
@@ -29,7 +35,7 @@ export interface OpenMatchListParams {
 
 export async function getMatchesWithOpenSlots(
   params: OpenMatchListParams,
-  refereeId: number,
+  refereeId: number | null,
 ): Promise<PaginatedResponse<RefereeMatchListItem>> {
   const { limit, offset, leagueId, dateFrom, dateTo } = params;
 
@@ -106,23 +112,22 @@ export async function getMatchesWithOpenSlots(
 
   const matchIds = rows.map((r) => r.id);
 
-  const [intents, assignments] =
+  const [allIntentsRaw, assignments] =
     matchIds.length > 0
       ? await Promise.all([
           db
             .select({
               matchId: refereeAssignmentIntents.matchId,
               slotNumber: refereeAssignmentIntents.slotNumber,
+              refereeId: refereeAssignmentIntents.refereeId,
               clickedAt: refereeAssignmentIntents.clickedAt,
               confirmedBySyncAt: refereeAssignmentIntents.confirmedBySyncAt,
+              refereeFirstName: referees.firstName,
+              refereeLastName: referees.lastName,
             })
             .from(refereeAssignmentIntents)
-            .where(
-              and(
-                inArray(refereeAssignmentIntents.matchId, matchIds),
-                eq(refereeAssignmentIntents.refereeId, refereeId),
-              ),
-            ),
+            .innerJoin(referees, eq(refereeAssignmentIntents.refereeId, referees.id))
+            .where(inArray(refereeAssignmentIntents.matchId, matchIds)),
           db
             .select({
               matchId: matchReferees.matchId,
@@ -136,11 +141,14 @@ export async function getMatchesWithOpenSlots(
         ])
       : [[], []];
 
-  const intentsByMatch = new Map<number, RefereeMatchListItem["myIntents"]>();
-  for (const i of intents) {
+  const intentsByMatch = new Map<number, RefereeMatchListItem["intents"]>();
+  for (const i of allIntentsRaw) {
     const existing = intentsByMatch.get(i.matchId) ?? [];
     existing.push({
       slotNumber: i.slotNumber,
+      refereeId: i.refereeId,
+      refereeFirstName: i.refereeFirstName,
+      refereeLastName: i.refereeLastName,
       clickedAt: i.clickedAt.toISOString(),
       confirmedBySyncAt: i.confirmedBySyncAt?.toISOString() ?? null,
     });
@@ -180,7 +188,8 @@ export async function getMatchesWithOpenSlots(
       ownClubRefs: row.ownClubRefs ?? false,
       sr1Referee: slots?.get(1) ?? null,
       sr2Referee: slots?.get(2) ?? null,
-      myIntents: intentsByMatch.get(row.id) ?? [],
+      currentRefereeId: refereeId,
+      intents: intentsByMatch.get(row.id) ?? [],
     };
   });
 
@@ -282,4 +291,171 @@ export async function cancelTakeIntent(
   }
 
   return { success: true };
+}
+
+export async function verifyMatchAssignment(
+  matchId: number,
+  refereeId: number,
+): Promise<VerifyMatchResponse | { error: string; status: number }> {
+  const [match] = await db
+    .select({
+      id: matches.id,
+      apiMatchId: matches.apiMatchId,
+    })
+    .from(matches)
+    .where(eq(matches.id, matchId))
+    .limit(1);
+
+  if (!match) {
+    return { error: "Match not found", status: 404 };
+  }
+
+  // Fetch fresh game details from the SDK
+  let details;
+  try {
+    details = await sdkClient.getGameDetails(match.apiMatchId);
+  } catch (error) {
+    log.error({ err: error, apiMatchId: match.apiMatchId }, "Failed to fetch game details for verification");
+    return { error: "Failed to fetch game details from Basketball-Bund", status: 502 };
+  }
+
+  // Update SR open status on the match
+  await db
+    .update(matches)
+    .set({
+      sr1Open: details.sr1?.offenAngeboten ?? false,
+      sr2Open: details.sr2?.offenAngeboten ?? false,
+      lastRemoteSync: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(matches.id, match.id));
+
+  // Sync referee assignments from the fresh details
+  for (const [slotKey, slotNumber] of [["sr1", 1], ["sr2", 2]] as const) {
+    const slot = details[slotKey];
+    const spielleitung = slot?.spielleitung;
+
+    if (spielleitung?.schiedsrichter?.personVO && spielleitung?.schirirolle) {
+      const { schiedsrichter, schirirolle } = spielleitung;
+
+      // Upsert referee
+      const now = new Date();
+      const [ref] = await db
+        .insert(referees)
+        .values({
+          apiId: schiedsrichter.schiedsrichterId,
+          firstName: schiedsrichter.personVO.vorname,
+          lastName: schiedsrichter.personVO.nachname,
+          licenseNumber: schiedsrichter.lizenznummer,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: referees.apiId,
+          set: {
+            firstName: schiedsrichter.personVO.vorname,
+            lastName: schiedsrichter.personVO.nachname,
+            licenseNumber: schiedsrichter.lizenznummer,
+            updatedAt: now,
+          },
+        })
+        .returning({ id: referees.id });
+
+      // Upsert role
+      const [role] = await db
+        .insert(refereeRoles)
+        .values({
+          apiId: schirirolle.schirirolleId,
+          name: schirirolle.schirirollename,
+          shortName: schirirolle.schirirollekurzname,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: refereeRoles.apiId,
+          set: {
+            name: schirirolle.schirirollename,
+            shortName: schirirolle.schirirollekurzname,
+            updatedAt: now,
+          },
+        })
+        .returning({ id: refereeRoles.id });
+
+      // Upsert match referee assignment
+      const [existing] = await db
+        .select()
+        .from(matchReferees)
+        .where(
+          and(
+            eq(matchReferees.matchId, match.id),
+            eq(matchReferees.slotNumber, slotNumber),
+          ),
+        )
+        .limit(1);
+
+      if (!existing) {
+        await db.insert(matchReferees).values({
+          matchId: match.id,
+          refereeId: ref.id,
+          roleId: role.id,
+          slotNumber,
+          createdAt: now,
+        });
+      } else if (existing.refereeId !== ref.id || existing.roleId !== role.id) {
+        await db
+          .update(matchReferees)
+          .set({ refereeId: ref.id, roleId: role.id })
+          .where(eq(matchReferees.id, existing.id));
+      }
+    }
+  }
+
+  // Check if this referee is now assigned to the match and confirm intent
+  const [assignment] = await db
+    .select({ id: matchReferees.id })
+    .from(matchReferees)
+    .where(
+      and(
+        eq(matchReferees.matchId, match.id),
+        eq(matchReferees.refereeId, refereeId),
+      ),
+    )
+    .limit(1);
+
+  const confirmed = !!assignment;
+
+  if (confirmed) {
+    await db
+      .update(refereeAssignmentIntents)
+      .set({ confirmedBySyncAt: new Date() })
+      .where(
+        and(
+          eq(refereeAssignmentIntents.matchId, match.id),
+          eq(refereeAssignmentIntents.refereeId, refereeId),
+          isNull(refereeAssignmentIntents.confirmedBySyncAt),
+        ),
+      );
+  }
+
+  // Load current referee names for response
+  const assignedRefs = await db
+    .select({
+      slotNumber: matchReferees.slotNumber,
+      firstName: referees.firstName,
+      lastName: referees.lastName,
+    })
+    .from(matchReferees)
+    .innerJoin(referees, eq(matchReferees.refereeId, referees.id))
+    .where(eq(matchReferees.matchId, match.id));
+
+  const sr1Ref = assignedRefs.find((r) => r.slotNumber === 1);
+  const sr2Ref = assignedRefs.find((r) => r.slotNumber === 2);
+
+  return {
+    confirmed,
+    sr1Open: details.sr1?.offenAngeboten ?? false,
+    sr2Open: details.sr2?.offenAngeboten ?? false,
+    sr1Referee: sr1Ref ? { firstName: sr1Ref.firstName, lastName: sr1Ref.lastName } : null,
+    sr2Referee: sr2Ref ? { firstName: sr2Ref.firstName, lastName: sr2Ref.lastName } : null,
+  };
 }

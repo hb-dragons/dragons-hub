@@ -16,6 +16,9 @@ vi.mock("../../middleware/auth", () => ({
   requireReferee: vi.fn(async (_c: unknown, next: () => Promise<void>) => {
     await next();
   }),
+  requireAdmin: vi.fn(async (_c: unknown, next: () => Promise<void>) => {
+    await next();
+  }),
 }));
 
 vi.mock("../../config/auth", () => ({
@@ -53,15 +56,23 @@ vi.mock("../../services/referee/referee-match.service", () => ({
 
 import { refereeMatchRoutes } from "./match.routes";
 
-// Test app
+// Test app (referee user)
 const app = new Hono<AppEnv>();
-// Simulate authenticated user on all requests
 app.use("/*", async (c, next) => {
   c.set("user", { id: "user-123", role: "referee" } as AppEnv["Variables"]["user"]);
   c.set("session", { id: "sess-1" } as AppEnv["Variables"]["session"]);
   await next();
 });
 app.route("/referee", refereeMatchRoutes);
+
+// Test app (admin user)
+const adminApp = new Hono<AppEnv>();
+adminApp.use("/*", async (c, next) => {
+  c.set("user", { id: "admin-1", role: "admin" } as AppEnv["Variables"]["user"]);
+  c.set("session", { id: "sess-2" } as AppEnv["Variables"]["session"]);
+  await next();
+});
+adminApp.route("/referee", refereeMatchRoutes);
 
 function json(response: Response) {
   return response.json();
@@ -103,13 +114,27 @@ describe("GET /referee/matches", () => {
     );
   });
 
-  it("returns 400 if user has no refereeId", async () => {
+  it("returns 400 if non-admin user has no refereeId", async () => {
     mockDbUserFound(null);
 
     const res = await app.request("/referee/matches");
 
     expect(res.status).toBe(400);
     expect(await json(res)).toEqual({ error: "User not linked to a referee record" });
+  });
+
+  it("allows admin without refereeId to view matches", async () => {
+    mockDbUserFound(null);
+    const mockResult = { items: [], total: 0, limit: 50, offset: 0, hasMore: false };
+    mocks.getMatchesWithOpenSlots.mockResolvedValue(mockResult);
+
+    const res = await adminApp.request("/referee/matches");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getMatchesWithOpenSlots).toHaveBeenCalledWith(
+      { limit: 50, offset: 0, leagueId: undefined, dateFrom: undefined, dateTo: undefined },
+      null,
+    );
   });
 
   it("respects query params (limit, offset, leagueId, dateFrom, dateTo)", async () => {
@@ -284,5 +309,45 @@ describe("DELETE /referee/matches/:id/take", () => {
 
     expect(res.status).toBe(400);
     expect(await json(res)).toEqual({ error: "User not linked to a referee record" });
+  });
+});
+
+describe("DELETE /referee/matches/:id/intent/:refereeId (admin)", () => {
+  it("calls cancelTakeIntent with target refereeId", async () => {
+    mocks.cancelTakeIntent.mockResolvedValue({ success: true });
+
+    const res = await adminApp.request("/referee/matches/5/intent/99", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 1 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ success: true });
+    expect(mocks.cancelTakeIntent).toHaveBeenCalledWith(5, 99, 1);
+  });
+
+  it("returns 400 for invalid slotNumber", async () => {
+    const res = await adminApp.request("/referee/matches/5/intent/99", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 4 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toEqual({ error: "slotNumber must be 1 or 2" });
+  });
+
+  it("passes through service errors (404)", async () => {
+    mocks.cancelTakeIntent.mockResolvedValue({ error: "No pending intent found", status: 404 });
+
+    const res = await adminApp.request("/referee/matches/5/intent/99", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 1 }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toEqual({ error: "No pending intent found" });
   });
 });

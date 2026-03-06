@@ -23,7 +23,45 @@
     "groupSystem": "System"
   },
   "refereeMatches": {
-    "title": "Open Referee Assignments"
+    "title": "Open Referee Assignments",
+    "empty": "No open assignments found",
+    "searchPlaceholder": "Search matches...",
+    "columns": {
+      "date": "Date",
+      "time": "Time",
+      "home": "Home",
+      "guest": "Guest",
+      "league": "League",
+      "venue": "Venue",
+      "sr1": "SR 1",
+      "sr2": "SR 2"
+    },
+    "status": {
+      "label": "Status",
+      "active": "Active",
+      "cancelled": "Cancelled",
+      "forfeited": "Forfeited"
+    },
+    "slot": {
+      "take": "Take",
+      "confirmed": "Confirmed",
+      "requested": "Requested",
+      "open": "Open",
+      "releaseIntent": "Release intent",
+      "intentPending": "Intent — awaiting confirmation",
+      "intentConfirmed": "Officially confirmed"
+    },
+    "verify": {
+      "title": "Verify Registration",
+      "description": "Did you successfully register for this game on the Basketball-Bund website?",
+      "openLink": "Open Basketball-Bund page",
+      "yes": "Yes, verify now",
+      "no": "Not yet",
+      "retry": "Retry",
+      "close": "Close",
+      "confirmed": "Registration confirmed! You are now assigned to this game.",
+      "notConfirmed": "Registration not yet confirmed. It may take a moment for the external system to update. Try again shortly."
+    }
   },
   "common": {
     "save": "Save",

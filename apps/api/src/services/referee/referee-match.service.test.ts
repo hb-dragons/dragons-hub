@@ -175,7 +175,8 @@ describe("getMatchesWithOpenSlots", () => {
       ownClubRefs: false,
       sr1Referee: null,
       sr2Referee: null,
-      myIntents: [],
+      currentRefereeId: 42,
+      intents: [],
     });
     expect(result.total).toBe(1);
     expect(result.hasMore).toBe(false);
@@ -340,14 +341,20 @@ describe("getMatchesWithOpenSlots", () => {
       {
         matchId: 10,
         slotNumber: 1,
+        refereeId: 42,
         clickedAt: new Date("2025-06-30T12:00:00Z"),
         confirmedBySyncAt: null,
+        refereeFirstName: "Max",
+        refereeLastName: "Müller",
       },
       {
         matchId: 10,
         slotNumber: 2,
+        refereeId: 42,
         clickedAt: new Date("2025-06-30T13:00:00Z"),
         confirmedBySyncAt: new Date("2025-06-30T14:00:00Z"),
+        refereeFirstName: "Max",
+        refereeLastName: "Müller",
       },
     ];
 
@@ -362,18 +369,25 @@ describe("getMatchesWithOpenSlots", () => {
       42,
     );
 
-    expect(result.items[0]?.myIntents).toEqual([
+    expect(result.items[0]?.intents).toEqual([
       {
         slotNumber: 1,
+        refereeId: 42,
+        refereeFirstName: "Max",
+        refereeLastName: "Müller",
         clickedAt: "2025-06-30T12:00:00.000Z",
         confirmedBySyncAt: null,
       },
       {
         slotNumber: 2,
+        refereeId: 42,
+        refereeFirstName: "Max",
+        refereeLastName: "Müller",
         clickedAt: "2025-06-30T13:00:00.000Z",
         confirmedBySyncAt: "2025-06-30T14:00:00.000Z",
       },
     ]);
+    expect(result.items[0]?.currentRefereeId).toBe(42);
   });
 
   it("filters by leagueId when provided", async () => {

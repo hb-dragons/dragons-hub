@@ -40,7 +40,15 @@ export interface RefereeMatchListItem {
   ownClubRefs: boolean;
   sr1Referee: { firstName: string | null; lastName: string | null } | null;
   sr2Referee: { firstName: string | null; lastName: string | null } | null;
-  myIntents: { slotNumber: number; clickedAt: string; confirmedBySyncAt: string | null }[];
+  currentRefereeId: number | null;
+  intents: {
+    slotNumber: number;
+    refereeId: number;
+    refereeFirstName: string | null;
+    refereeLastName: string | null;
+    clickedAt: string;
+    confirmedBySyncAt: string | null;
+  }[];
 }
 
 export interface TakeMatchResponse {
@@ -50,4 +58,12 @@ export interface TakeMatchResponse {
     slotNumber: number;
     clickedAt: string;
   };
+}
+
+export interface VerifyMatchResponse {
+  confirmed: boolean;
+  sr1Open: boolean;
+  sr2Open: boolean;
+  sr1Referee: { firstName: string | null; lastName: string | null } | null;
+  sr2Referee: { firstName: string | null; lastName: string | null } | null;
 }

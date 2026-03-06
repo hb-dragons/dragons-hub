@@ -19,4 +19,5 @@ export const SWR_KEYS = {
   bookingDetail: (id: number) => `/admin/bookings/${id}`,
   settingsBooking: "/admin/settings/booking",
   notificationsUnread: "/admin/notifications/unread-count",
+  refereeMatches: "/referee/matches?limit=500&offset=0",
 } as const;
