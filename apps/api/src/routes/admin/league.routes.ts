@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   getTrackedLeagues,
   resolveAndSaveLeagues,
+  setLeagueOwnClubRefs,
 } from "../../services/admin/league-discovery.service";
 
 const leagueRoutes = new Hono();
@@ -38,6 +39,26 @@ leagueRoutes.put(
     const { leagueNumbers } = leagueNumbersSchema.parse(await c.req.json());
     const result = await resolveAndSaveLeagues(leagueNumbers);
     return c.json(result);
+  },
+);
+
+const ownClubRefsSchema = z.object({
+  ownClubRefs: z.boolean(),
+});
+
+// PATCH /admin/settings/leagues/:id/own-club-refs - Toggle own-club-refs for a league
+leagueRoutes.patch(
+  "/settings/leagues/:id/own-club-refs",
+  describeRoute({
+    description: "Set whether a league uses own-club referees",
+    tags: ["Leagues"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const leagueId = parseInt(c.req.param("id"), 10);
+    const { ownClubRefs } = ownClubRefsSchema.parse(await c.req.json());
+    await setLeagueOwnClubRefs(leagueId, ownClubRefs);
+    return c.json({ ok: true });
   },
 );
 

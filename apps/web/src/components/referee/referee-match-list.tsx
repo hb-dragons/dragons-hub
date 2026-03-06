@@ -25,7 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@dragons/ui/components/card";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 import { cn } from "@dragons/ui/lib/utils";
 
 const PAGE_SIZE = 25;
@@ -42,32 +42,60 @@ function formatTime(timeStr: string): string {
 
 interface SlotCellProps {
   match: RefereeMatchListItem;
-  slotNumber: 1 | 2 | 3;
+  slotNumber: 1 | 2;
   isOpen: boolean;
+  assignedReferee: { firstName: string | null; lastName: string | null } | null;
   onTake: (matchId: number, slotNumber: number) => Promise<void>;
+  onCancel: (matchId: number, slotNumber: number) => Promise<void>;
   takingSlot: string | null;
 }
 
-function SlotCell({ match, slotNumber, isOpen, onTake, takingSlot }: SlotCellProps) {
+function refName(ref: { firstName: string | null; lastName: string | null }): string {
+  return [ref.firstName, ref.lastName].filter(Boolean).join(" ") || "—";
+}
+
+function SlotCell({ match, slotNumber, isOpen, assignedReferee, onTake, onCancel, takingSlot }: SlotCellProps) {
   const intent = match.myIntents.find((i) => i.slotNumber === slotNumber);
   const isTaking = takingSlot === `${match.id}-${slotNumber}`;
+  const isCancelling = takingSlot === `cancel-${match.id}-${slotNumber}`;
 
-  if (intent) {
-    if (intent.confirmedBySyncAt) {
-      return (
-        <Badge variant="default" className="gap-1">
-          <Check className="h-3 w-3" />
-          Bestätigt
-        </Badge>
-      );
-    }
+  // Confirmed by sync — show the assigned referee
+  if (intent?.confirmedBySyncAt) {
     return (
-      <Badge variant="secondary">
+      <Badge variant="default" className="gap-1">
+        <Check className="h-3 w-3" />
+        Bestätigt
+      </Badge>
+    );
+  }
+
+  // Pending intent — cancellable
+  if (intent) {
+    return (
+      <Badge
+        variant="secondary"
+        className="cursor-pointer gap-1 hover:bg-destructive/10 hover:text-destructive"
+        onClick={(e) => {
+          e.stopPropagation();
+          void onCancel(match.id, slotNumber);
+        }}
+      >
+        {isCancelling ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <X className="h-3 w-3" />
+        )}
         Beantragt
       </Badge>
     );
   }
 
+  // Slot already assigned to someone else
+  if (assignedReferee) {
+    return <span className="text-sm text-muted-foreground">{refName(assignedReferee)}</span>;
+  }
+
+  // Slot is open — can take
   if (isOpen) {
     return (
       <Button
@@ -134,6 +162,28 @@ export function RefereeMatchList() {
     [mutate],
   );
 
+  const handleCancel = useCallback(
+    async (matchId: number, slotNumber: number) => {
+      const key = `cancel-${matchId}-${slotNumber}`;
+      setTakingSlot(key);
+      try {
+        await fetchAPI(
+          `/referee/matches/${matchId}/take`,
+          {
+            method: "DELETE",
+            body: JSON.stringify({ slotNumber }),
+          },
+        );
+        await mutate();
+      } catch {
+        // Error handling via fetchAPI throwing APIError
+      } finally {
+        setTakingSlot(null);
+      }
+    },
+    [mutate],
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -159,68 +209,84 @@ export function RefereeMatchList() {
                 <TableHead>Halle</TableHead>
                 <TableHead className="text-center">SR1</TableHead>
                 <TableHead className="text-center">SR2</TableHead>
-                <TableHead className="text-center">SR3</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     Keine offenen Ansetzungen gefunden
                   </TableCell>
                 </TableRow>
               )}
-              {items.map((match) => (
+              {items.map((match) => {
+                const inactive = match.isCancelled || match.isForfeited;
+                return (
                 <TableRow
                   key={match.id}
                   className={cn(
                     (match.homeIsOwnClub || match.guestIsOwnClub) &&
-                      "border-l-2 border-l-amber-500 bg-amber-50/30",
+                      "border-l-2 border-l-muted-foreground/30 bg-muted/40",
+                    inactive && "opacity-60",
                   )}
                 >
-                  <TableCell className="whitespace-nowrap text-sm">
+                  <TableCell className={cn("whitespace-nowrap text-sm", inactive && "line-through")}>
                     {formatDate(match.kickoffDate)}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap tabular-nums text-sm">
+                  <TableCell className={cn("whitespace-nowrap tabular-nums text-sm", inactive && "line-through")}>
                     {formatTime(match.kickoffTime)}
                   </TableCell>
-                  <TableCell className="text-sm">{match.homeTeamName}</TableCell>
-                  <TableCell className="text-sm">{match.guestTeamName}</TableCell>
+                  <TableCell className={cn("text-sm", inactive && "line-through")}>
+                    {match.homeTeamName}
+                  </TableCell>
+                  <TableCell className={cn("text-sm", inactive && "line-through")}>
+                    {match.guestTeamName}
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {match.leagueName ?? "—"}
+                    {inactive ? (
+                      <Badge variant="outline" className="text-destructive border-destructive/30">
+                        {match.isCancelled ? "Abgesagt" : "Verzicht"}
+                      </Badge>
+                    ) : (
+                      match.leagueName ?? "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {match.venueName ?? "—"}
                   </TableCell>
                   <TableCell className="text-center">
-                    <SlotCell
-                      match={match}
-                      slotNumber={1}
-                      isOpen={match.sr1Open}
-                      onTake={handleTake}
-                      takingSlot={takingSlot}
-                    />
+                    {inactive ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <SlotCell
+                        match={match}
+                        slotNumber={1}
+                        isOpen={match.sr1Open || (match.ownClubRefs && match.homeIsOwnClub)}
+                        assignedReferee={match.sr1Referee}
+                        onTake={handleTake}
+                        onCancel={handleCancel}
+                        takingSlot={takingSlot}
+                      />
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
-                    <SlotCell
-                      match={match}
-                      slotNumber={2}
-                      isOpen={match.sr2Open}
-                      onTake={handleTake}
-                      takingSlot={takingSlot}
-                    />
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <SlotCell
-                      match={match}
-                      slotNumber={3}
-                      isOpen={match.sr3Open}
-                      onTake={handleTake}
-                      takingSlot={takingSlot}
-                    />
+                    {inactive ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <SlotCell
+                        match={match}
+                        slotNumber={2}
+                        isOpen={match.sr2Open || (match.ownClubRefs && match.homeIsOwnClub)}
+                        assignedReferee={match.sr2Referee}
+                        onTake={handleTake}
+                        onCancel={handleCancel}
+                        takingSlot={takingSlot}
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>

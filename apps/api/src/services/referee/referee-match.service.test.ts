@@ -2,11 +2,13 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockSelect = vi.fn();
 const mockInsert = vi.fn();
+const mockDelete = vi.fn();
 
 vi.mock("../../config/database", () => ({
   db: {
     select: (...args: unknown[]) => mockSelect(...args),
     insert: (...args: unknown[]) => mockInsert(...args),
+    delete: (...args: unknown[]) => mockDelete(...args),
   },
 }));
 
@@ -24,6 +26,8 @@ vi.mock("@dragons/db/schema", () => ({
     sr1Open: "m.sr1Open",
     sr2Open: "m.sr2Open",
     sr3Open: "m.sr3Open",
+    isForfeited: "m.isForfeited",
+    isCancelled: "m.isCancelled",
   },
   teams: {
     id: "t.id",
@@ -31,7 +35,7 @@ vi.mock("@dragons/db/schema", () => ({
     apiTeamPermanentId: "t.apiTeamPermanentId",
     isOwnClub: "t.isOwnClub",
   },
-  leagues: { id: "l.id", name: "l.name" },
+  leagues: { id: "l.id", name: "l.name", ownClubRefs: "l.ownClubRefs" },
   venues: { id: "v.id", name: "v.name", city: "v.city" },
   refereeAssignmentIntents: {
     matchId: "rai.matchId",
@@ -39,6 +43,16 @@ vi.mock("@dragons/db/schema", () => ({
     slotNumber: "rai.slotNumber",
     clickedAt: "rai.clickedAt",
     confirmedBySyncAt: "rai.confirmedBySyncAt",
+  },
+  matchReferees: {
+    matchId: "mr.matchId",
+    refereeId: "mr.refereeId",
+    slotNumber: "mr.slotNumber",
+  },
+  referees: {
+    id: "r.id",
+    firstName: "r.firstName",
+    lastName: "r.lastName",
   },
 }));
 
@@ -50,6 +64,7 @@ vi.mock("drizzle-orm", () => ({
   gte: vi.fn((...args: unknown[]) => ({ gte: args })),
   lte: vi.fn((...args: unknown[]) => ({ lte: args })),
   inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
+  isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
   sql: vi.fn((...args: unknown[]) => ({ sql: args })),
 }));
 
@@ -64,6 +79,7 @@ vi.mock("drizzle-orm/pg-core", () => ({
 import {
   getMatchesWithOpenSlots,
   recordTakeIntent,
+  cancelTakeIntent,
 } from "./referee-match.service";
 
 function buildChain(result: unknown) {
@@ -117,7 +133,9 @@ describe("getMatchesWithOpenSlots", () => {
         venueCity: "Berlin",
         sr1Open: true,
         sr2Open: false,
-        sr3Open: false,
+        isForfeited: false,
+        isCancelled: false,
+        ownClubRefs: false,
       },
     ];
     const countResult = [{ count: 1 }];
@@ -125,11 +143,11 @@ describe("getMatchesWithOpenSlots", () => {
     const dataChain = buildChain(rows);
     const countChain = buildChain(countResult);
 
-    mockSelect.mockReturnValueOnce(dataChain).mockReturnValueOnce(countChain);
-
-    // Intent query chain (no intents for this referee)
-    const intentChain = buildChain([]);
-    mockSelect.mockReturnValueOnce(intentChain);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain)
+      .mockReturnValueOnce(buildChain([])) // intents
+      .mockReturnValueOnce(buildChain([])); // assignments
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -152,7 +170,11 @@ describe("getMatchesWithOpenSlots", () => {
       venueCity: "Berlin",
       sr1Open: true,
       sr2Open: false,
-      sr3Open: false,
+      isForfeited: false,
+      isCancelled: false,
+      ownClubRefs: false,
+      sr1Referee: null,
+      sr2Referee: null,
       myIntents: [],
     });
     expect(result.total).toBe(1);
@@ -193,7 +215,7 @@ describe("getMatchesWithOpenSlots", () => {
         venueCity: null,
         sr1Open: false,
         sr2Open: true,
-        sr3Open: false,
+        ownClubRefs: false,
       },
     ];
     const countResult = [{ count: 1 }];
@@ -205,7 +227,8 @@ describe("getMatchesWithOpenSlots", () => {
     mockSelect
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain)
-      .mockReturnValueOnce(intentChain);
+      .mockReturnValueOnce(intentChain)
+      .mockReturnValueOnce(buildChain([])); // assignments
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -232,8 +255,8 @@ describe("getMatchesWithOpenSlots", () => {
         venueName: "Arena",
         venueCity: "Hamburg",
         sr1Open: false,
-        sr2Open: false,
-        sr3Open: true,
+        sr2Open: true,
+        ownClubRefs: null,
       },
     ];
     const countResult = [{ count: 1 }];
@@ -241,7 +264,8 @@ describe("getMatchesWithOpenSlots", () => {
     mockSelect
       .mockReturnValueOnce(buildChain(rows))
       .mockReturnValueOnce(buildChain(countResult))
-      .mockReturnValueOnce(buildChain([]));
+      .mockReturnValueOnce(buildChain([])) // intents
+      .mockReturnValueOnce(buildChain([])); // assignments
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -269,7 +293,7 @@ describe("getMatchesWithOpenSlots", () => {
         venueCity: "Munich",
         sr1Open: true,
         sr2Open: true,
-        sr3Open: false,
+        ownClubRefs: false,
       },
     ];
     const countResult = [{ count: 10 }];
@@ -277,7 +301,8 @@ describe("getMatchesWithOpenSlots", () => {
     mockSelect
       .mockReturnValueOnce(buildChain(rows))
       .mockReturnValueOnce(buildChain(countResult))
-      .mockReturnValueOnce(buildChain([]));
+      .mockReturnValueOnce(buildChain([])) // intents
+      .mockReturnValueOnce(buildChain([])); // assignments
 
     const result = await getMatchesWithOpenSlots(
       { limit: 1, offset: 4 },
@@ -307,7 +332,7 @@ describe("getMatchesWithOpenSlots", () => {
         venueCity: "Cologne",
         sr1Open: true,
         sr2Open: true,
-        sr3Open: false,
+        ownClubRefs: false,
       },
     ];
     const countResult = [{ count: 1 }];
@@ -329,7 +354,8 @@ describe("getMatchesWithOpenSlots", () => {
     mockSelect
       .mockReturnValueOnce(buildChain(rows))
       .mockReturnValueOnce(buildChain(countResult))
-      .mockReturnValueOnce(buildChain(intentRows));
+      .mockReturnValueOnce(buildChain(intentRows))
+      .mockReturnValueOnce(buildChain([])); // assignments
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -409,7 +435,8 @@ describe("recordTakeIntent", () => {
         apiMatchId: 999,
         sr1Open: true,
         sr2Open: false,
-        sr3Open: false,
+        leagueOwnClubRefs: false,
+        homeIsOwnClub: false,
       },
     ];
 
@@ -459,8 +486,9 @@ describe("recordTakeIntent", () => {
         id: 1,
         apiMatchId: 100,
         sr1Open: false,
-        sr2Open: false,
-        sr3Open: true,
+        sr2Open: true,
+        leagueOwnClubRefs: false,
+        homeIsOwnClub: false,
       },
     ];
     const selectChain = buildChain(matchRow);
@@ -481,7 +509,8 @@ describe("recordTakeIntent", () => {
         apiMatchId: 100,
         sr1Open: true,
         sr2Open: false,
-        sr3Open: false,
+        leagueOwnClubRefs: false,
+        homeIsOwnClub: false,
       },
     ];
     const selectChain = buildChain(matchRow);
@@ -495,14 +524,15 @@ describe("recordTakeIntent", () => {
     });
   });
 
-  it("allows slot 3 when sr3Open is true", async () => {
+  it("allows take on ownClubRefs home game even when slot not explicitly open", async () => {
     const matchRow = [
       {
         id: 1,
         apiMatchId: 100,
         sr1Open: false,
         sr2Open: false,
-        sr3Open: true,
+        leagueOwnClubRefs: true,
+        homeIsOwnClub: true,
       },
     ];
     const selectChain = buildChain(matchRow);
@@ -515,20 +545,20 @@ describe("recordTakeIntent", () => {
       {
         matchId: 1,
         refereeId: 42,
-        slotNumber: 3,
+        slotNumber: 1,
         clickedAt: new Date("2025-07-01T10:00:00Z"),
       },
     ]);
     mockInsert.mockReturnValueOnce(insertChain);
 
-    const result = await recordTakeIntent(1, 42, 3);
+    const result = await recordTakeIntent(1, 42, 1);
 
     expect(result).toEqual({
       deepLink:
         "https://basketball-bund.net/app.do?app=/sr/take&spielId=100",
       intent: {
         matchId: 1,
-        slotNumber: 3,
+        slotNumber: 1,
         clickedAt: "2025-07-01T10:00:00.000Z",
       },
     });
@@ -543,7 +573,8 @@ describe("recordTakeIntent", () => {
         apiMatchId: 100,
         sr1Open: true,
         sr2Open: false,
-        sr3Open: false,
+        leagueOwnClubRefs: false,
+        homeIsOwnClub: false,
       },
     ];
     const selectChain = buildChain(matchRow);
@@ -580,5 +611,40 @@ describe("recordTakeIntent", () => {
     expect(insertChain.returning).toHaveBeenCalled();
 
     vi.useRealTimers();
+  });
+});
+
+function buildDeleteChain(result: unknown) {
+  const chain: Record<string, unknown> = {};
+  chain.where = vi.fn().mockReturnValue(chain);
+  chain.returning = vi.fn().mockResolvedValue(result);
+  return chain;
+}
+
+describe("cancelTakeIntent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("deletes unconfirmed intent and returns success", async () => {
+    const deleteChain = buildDeleteChain([
+      { matchId: 1, refereeId: 42, slotNumber: 1 },
+    ]);
+    mockDelete.mockReturnValueOnce(deleteChain);
+
+    const result = await cancelTakeIntent(1, 42, 1);
+
+    expect(result).toEqual({ success: true });
+    expect(deleteChain.where).toHaveBeenCalled();
+    expect(deleteChain.returning).toHaveBeenCalled();
+  });
+
+  it("returns 404 when no pending intent exists", async () => {
+    const deleteChain = buildDeleteChain([]);
+    mockDelete.mockReturnValueOnce(deleteChain);
+
+    const result = await cancelTakeIntent(1, 42, 1);
+
+    expect(result).toEqual({ error: "No pending intent found", status: 404 });
   });
 });

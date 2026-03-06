@@ -21,6 +21,7 @@ export const leagues = pgTable("leagues", {
   verbandName: varchar("verband_name", { length: 100 }),
   isActive: boolean("is_active").default(true),
   isTracked: boolean("is_tracked").default(true),
+  ownClubRefs: boolean("own_club_refs").default(false),
   dataHash: varchar("data_hash", { length: 64 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   discoveredAt: timestamp("discovered_at", { withTimezone: true }),

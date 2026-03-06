@@ -1,0 +1,1 @@
+ALTER TABLE "leagues" ADD COLUMN "own_club_refs" boolean DEFAULT false;

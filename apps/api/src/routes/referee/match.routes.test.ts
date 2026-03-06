@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   dbSelect: vi.fn(),
   getMatchesWithOpenSlots: vi.fn(),
   recordTakeIntent: vi.fn(),
+  cancelTakeIntent: vi.fn(),
 }));
 
 vi.mock("../../middleware/auth", () => ({
@@ -45,6 +46,7 @@ vi.mock("drizzle-orm", () => ({
 vi.mock("../../services/referee/referee-match.service", () => ({
   getMatchesWithOpenSlots: (...args: unknown[]) => mocks.getMatchesWithOpenSlots(...args),
   recordTakeIntent: (...args: unknown[]) => mocks.recordTakeIntent(...args),
+  cancelTakeIntent: (...args: unknown[]) => mocks.cancelTakeIntent(...args),
 }));
 
 // --- Imports (after mocks) ---
@@ -169,7 +171,7 @@ describe("POST /referee/matches/:id/take", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toEqual({ error: "slotNumber must be 1, 2, or 3" });
+    expect(await json(res)).toEqual({ error: "slotNumber must be 1 or 2" });
     expect(mocks.recordTakeIntent).not.toHaveBeenCalled();
   });
 
@@ -183,7 +185,7 @@ describe("POST /referee/matches/:id/take", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toEqual({ error: "slotNumber must be 1, 2, or 3" });
+    expect(await json(res)).toEqual({ error: "slotNumber must be 1 or 2" });
   });
 
   it("passes through service errors (404)", async () => {
@@ -219,6 +221,63 @@ describe("POST /referee/matches/:id/take", () => {
 
     const res = await app.request("/referee/matches/5/take", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 1 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toEqual({ error: "User not linked to a referee record" });
+  });
+});
+
+describe("DELETE /referee/matches/:id/take", () => {
+  it("calls cancelTakeIntent and returns success", async () => {
+    mockDbUserFound(42);
+    mocks.cancelTakeIntent.mockResolvedValue({ success: true });
+
+    const res = await app.request("/referee/matches/5/take", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 1 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ success: true });
+    expect(mocks.cancelTakeIntent).toHaveBeenCalledWith(5, 42, 1);
+  });
+
+  it("returns 400 for invalid slotNumber", async () => {
+    mockDbUserFound(42);
+
+    const res = await app.request("/referee/matches/5/take", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 4 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toEqual({ error: "slotNumber must be 1 or 2" });
+  });
+
+  it("passes through service errors (404 no pending intent)", async () => {
+    mockDbUserFound(42);
+    mocks.cancelTakeIntent.mockResolvedValue({ error: "No pending intent found", status: 404 });
+
+    const res = await app.request("/referee/matches/5/take", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 1 }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toEqual({ error: "No pending intent found" });
+  });
+
+  it("returns 400 if user has no refereeId", async () => {
+    mockDbUserFound(null);
+
+    const res = await app.request("/referee/matches/5/take", {
+      method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slotNumber: 1 }),
     });

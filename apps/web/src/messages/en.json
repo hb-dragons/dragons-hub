@@ -562,7 +562,8 @@
       "columns": {
         "ligaNr": "Liga Nr",
         "name": "Name",
-        "season": "Season"
+        "season": "Season",
+        "ownClubRefs": "Own Refs"
       },
       "toast": {
         "partial": "Saved {tracked} league(s). {notFoundCount} not found: {notFoundList}",

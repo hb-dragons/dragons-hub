@@ -85,7 +85,11 @@ export async function syncRefereeRolesFromData(
       message: `Batch synced ${upsertResult.length} referee roles (${created} created, ${updated} updated, ${skipped} skipped)`,
       metadata: { created, updated, skipped },
     });
-    const roleIdLookup = new Map(upsertResult.map((r) => [r.apiId, r.id]));
+    // Build lookup from ALL roles in DB (not just upsert result, which misses unchanged rows)
+    const allRoles = await db
+      .select({ id: refereeRoles.id, apiId: refereeRoles.apiId })
+      .from(refereeRoles);
+    const roleIdLookup = new Map(allRoles.map((r) => [r.apiId, r.id]));
     return { created, updated, skipped, failed: 0, roleIdLookup };
   } catch (error) {
     log.error({ err: error }, "Batch role sync failed");
@@ -169,7 +173,11 @@ export async function syncRefereesFromData(
       message: `Batch synced ${upsertResult.length} referees (${created} created, ${updated} updated, ${skipped} skipped)`,
       metadata: { created, updated, skipped },
     });
-    const refereeIdLookup = new Map(upsertResult.map((r) => [r.apiId, r.id]));
+    // Build lookup from ALL referees in DB (not just upsert result, which misses unchanged rows)
+    const allRefs = await db
+      .select({ id: referees.id, apiId: referees.apiId })
+      .from(referees);
+    const refereeIdLookup = new Map(allRefs.map((r) => [r.apiId, r.id]));
     return { created, updated, skipped, refereeIdLookup, errors };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -227,6 +235,8 @@ export async function syncRefereeAssignmentsFromData(
     const refereeId = refereeIdLookup.get(assignment.schiedsrichterId)!;
     const roleId = roleIdLookup.get(assignment.schirirolleId)!;
 
+    const { slotNumber } = assignment;
+
     try {
       const [existing] = await db
         .select()
@@ -234,8 +244,7 @@ export async function syncRefereeAssignmentsFromData(
         .where(
           and(
             eq(matchReferees.matchId, matchId),
-            eq(matchReferees.refereeId, refereeId),
-            eq(matchReferees.roleId, roleId),
+            eq(matchReferees.slotNumber, slotNumber),
           ),
         )
         .limit(1);
@@ -245,6 +254,7 @@ export async function syncRefereeAssignmentsFromData(
           matchId,
           refereeId,
           roleId,
+          slotNumber,
           createdAt: now,
         });
         created++;
@@ -252,8 +262,13 @@ export async function syncRefereeAssignmentsFromData(
           entityType: "referee",
           entityId: `${matchId}-${refereeId}-${roleId}`,
           action: "created",
-          message: `Created referee assignment for match ${matchId}`,
+          message: `Created referee assignment for match ${matchId} slot ${slotNumber}`,
         });
+      } else if (existing.refereeId !== refereeId || existing.roleId !== roleId) {
+        await db
+          .update(matchReferees)
+          .set({ refereeId, roleId })
+          .where(eq(matchReferees.id, existing.id));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";

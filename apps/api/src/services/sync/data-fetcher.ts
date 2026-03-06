@@ -48,6 +48,7 @@ export interface ExtractedRefereeAssignment {
   matchApiId: number;
   schiedsrichterId: number;
   schirirolleId: number;
+  slotNumber: number;
 }
 
 async function fetchLeagueData(
@@ -199,7 +200,7 @@ export function extractRefereeAssignments(
   const assignments: ExtractedRefereeAssignment[] = [];
   for (const data of allData) {
     for (const [matchApiId, details] of data.gameDetails) {
-      for (const slotKey of ["sr1", "sr2", "sr3"] as const) {
+      for (const [slotKey, slotNumber] of [["sr1", 1], ["sr2", 2], ["sr3", 3]] as const) {
         const slot = details[slotKey];
         const spielleitung = slot?.spielleitung;
         if (!spielleitung?.schiedsrichter || !spielleitung?.schirirolle) {
@@ -209,6 +210,7 @@ export function extractRefereeAssignments(
           matchApiId,
           schiedsrichterId: spielleitung.schiedsrichter.schiedsrichterId,
           schirirolleId: spielleitung.schirirolle.schirirolleId,
+          slotNumber,
         });
       }
     }

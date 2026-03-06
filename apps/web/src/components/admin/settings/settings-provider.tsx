@@ -11,6 +11,7 @@ export interface TrackedLeague {
   ligaNr: number;
   name: string;
   seasonName: string;
+  ownClubRefs: boolean;
 }
 
 export interface TrackedLeaguesResponse {

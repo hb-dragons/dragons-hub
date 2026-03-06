@@ -16,6 +16,7 @@ import { Button } from "@dragons/ui";
 import { Input } from "@dragons/ui/components/input";
 import { Label } from "@dragons/ui/components/label";
 import { Loader2, Save } from "lucide-react";
+import { Switch } from "@dragons/ui/components/switch";
 import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
 import type {
@@ -48,6 +49,7 @@ export function TrackedLeagues() {
     ligaNr: l.ligaNr,
     name: l.name,
     seasonName: l.seasonName,
+    ownClubRefs: l.ownClubRefs ?? false,
   })) ?? [];
 
   const initialValue = trackedLeagues.map((l) => l.ligaNr).join(", ");
@@ -62,6 +64,18 @@ export function TrackedLeagues() {
       .filter((s) => s !== "")
       .map((s) => parseInt(s, 10))
       .filter((n) => !isNaN(n) && n > 0);
+  }
+
+  async function handleToggleOwnClubRefs(leagueId: number, ownClubRefs: boolean) {
+    try {
+      await fetchAPI(`/admin/settings/leagues/${leagueId}/own-club-refs`, {
+        method: "PATCH",
+        body: JSON.stringify({ ownClubRefs }),
+      });
+      await mutate(SWR_KEYS.settingsLeagues);
+    } catch {
+      toast.error(t("settings.leagues.toast.saveFailed"));
+    }
   }
 
   async function handleSave() {
@@ -152,6 +166,7 @@ export function TrackedLeagues() {
                   <th className="px-4 py-2 text-left font-medium">{t("settings.leagues.columns.ligaNr")}</th>
                   <th className="px-4 py-2 text-left font-medium">{t("settings.leagues.columns.name")}</th>
                   <th className="px-4 py-2 text-left font-medium">{t("settings.leagues.columns.season")}</th>
+                  <th className="px-4 py-2 text-left font-medium">{t("settings.leagues.columns.ownClubRefs")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,6 +175,12 @@ export function TrackedLeagues() {
                     <td className="px-4 py-2 font-mono">{league.ligaNr}</td>
                     <td className="px-4 py-2">{league.name}</td>
                     <td className="px-4 py-2 text-muted-foreground">{league.seasonName}</td>
+                    <td className="px-4 py-2">
+                      <Switch
+                        checked={league.ownClubRefs}
+                        onCheckedChange={(checked) => handleToggleOwnClubRefs(league.id, checked)}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>

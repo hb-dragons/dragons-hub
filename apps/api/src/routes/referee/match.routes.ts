@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types";
 import { requireReferee } from "../../middleware/auth";
-import { getMatchesWithOpenSlots, recordTakeIntent } from "../../services/referee/referee-match.service";
+import { getMatchesWithOpenSlots, recordTakeIntent, cancelTakeIntent } from "../../services/referee/referee-match.service";
 import { db } from "../../config/database";
 import { user as userTable } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
@@ -53,8 +53,8 @@ refereeMatchRoutes.post("/matches/:id/take", async (c) => {
   const matchId = Number(c.req.param("id"));
   const body = await c.req.json<{ slotNumber: number }>();
 
-  if (![1, 2, 3].includes(body.slotNumber)) {
-    return c.json({ error: "slotNumber must be 1, 2, or 3" }, 400);
+  if (![1, 2].includes(body.slotNumber)) {
+    return c.json({ error: "slotNumber must be 1 or 2" }, 400);
   }
 
   const result = await recordTakeIntent(matchId, dbUser.refereeId, body.slotNumber);
@@ -64,6 +64,35 @@ refereeMatchRoutes.post("/matches/:id/take", async (c) => {
   }
 
   return c.json(result, 201);
+});
+
+refereeMatchRoutes.delete("/matches/:id/take", async (c) => {
+  const sessionUser = c.get("user");
+
+  const [dbUser] = await db
+    .select({ refereeId: userTable.refereeId })
+    .from(userTable)
+    .where(eq(userTable.id, sessionUser.id))
+    .limit(1);
+
+  if (!dbUser?.refereeId) {
+    return c.json({ error: "User not linked to a referee record" }, 400);
+  }
+
+  const matchId = Number(c.req.param("id"));
+  const body = await c.req.json<{ slotNumber: number }>();
+
+  if (![1, 2].includes(body.slotNumber)) {
+    return c.json({ error: "slotNumber must be 1 or 2" }, 400);
+  }
+
+  const result = await cancelTakeIntent(matchId, dbUser.refereeId, body.slotNumber);
+
+  if ("error" in result) {
+    return c.json({ error: result.error }, result.status as 404);
+  }
+
+  return c.json(result);
 });
 
 export { refereeMatchRoutes };

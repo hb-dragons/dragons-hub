@@ -35,7 +35,11 @@ export interface RefereeMatchListItem {
   venueCity: string | null;
   sr1Open: boolean;
   sr2Open: boolean;
-  sr3Open: boolean;
+  isForfeited: boolean;
+  isCancelled: boolean;
+  ownClubRefs: boolean;
+  sr1Referee: { firstName: string | null; lastName: string | null } | null;
+  sr2Referee: { firstName: string | null; lastName: string | null } | null;
   myIntents: { slotNumber: number; clickedAt: string; confirmedBySyncAt: string | null }[];
 }
 

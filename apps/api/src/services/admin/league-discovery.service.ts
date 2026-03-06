@@ -119,12 +119,23 @@ export async function getTrackedLeagues(): Promise<TrackedLeaguesResponse> {
       apiLigaId: leagues.apiLigaId,
       name: leagues.name,
       seasonName: leagues.seasonName,
+      ownClubRefs: leagues.ownClubRefs,
     })
     .from(leagues)
     .where(eq(leagues.isTracked, true));
 
   return {
     leagueNumbers: tracked.map((l) => l.ligaNr),
-    leagues: tracked,
+    leagues: tracked.map((l) => ({ ...l, ownClubRefs: l.ownClubRefs ?? false })),
   };
+}
+
+export async function setLeagueOwnClubRefs(
+  leagueId: number,
+  ownClubRefs: boolean,
+): Promise<void> {
+  await db
+    .update(leagues)
+    .set({ ownClubRefs, updatedAt: new Date() })
+    .where(eq(leagues.id, leagueId));
 }

@@ -44,15 +44,15 @@ export const matchReferees = pgTable(
     roleId: integer("role_id")
       .notNull()
       .references(() => refereeRoles.id),
+    slotNumber: smallint("slot_number").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     matchIdIdx: index("match_referees_match_id_idx").on(table.matchId),
     refereeIdIdx: index("match_referees_referee_id_idx").on(table.refereeId),
-    matchRefereeRoleUnique: unique("match_referees_unique").on(
+    matchSlotUnique: unique("match_referees_slot_unique").on(
       table.matchId,
-      table.refereeId,
-      table.roleId,
+      table.slotNumber,
     ),
   }),
 );

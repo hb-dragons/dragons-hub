@@ -479,6 +479,7 @@ describe("extractRefereeAssignments", () => {
       matchApiId: 1000,
       schiedsrichterId: 100,
       schirirolleId: 1,
+      slotNumber: 1,
     });
   });
 

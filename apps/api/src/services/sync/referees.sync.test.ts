@@ -39,9 +39,11 @@ vi.mock("@dragons/db/schema", () => ({
     createdAt: "createdAt",
   },
   matchReferees: {
+    id: "mr.id",
     matchId: "matchId",
     refereeId: "refereeId",
     roleId: "roleId",
+    slotNumber: "slotNumber",
   },
   matches: {
     id: "id",
@@ -75,10 +77,27 @@ import {
 
 const FROZEN_TIME = new Date("2025-06-01T00:00:00Z");
 
+function buildSelectChain(result: unknown) {
+  const thenableResult = {
+    where: vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue(result),
+    }),
+    then: (resolve: (v: unknown) => void) => {
+      resolve(result);
+      return thenableResult;
+    },
+  };
+  return {
+    from: vi.fn().mockReturnValue(thenableResult),
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(FROZEN_TIME);
+  // Default: mockSelect returns empty array (for lookup queries after upsert)
+  mockSelect.mockReturnValue(buildSelectChain([]));
 });
 
 afterEach(() => {
@@ -106,6 +125,8 @@ describe("syncRefereeRolesFromData", () => {
         }),
       }),
     });
+    // After upsert, the function queries all roles from DB for lookup
+    mockSelect.mockReturnValue(buildSelectChain([{ id: 10, apiId: 1 }]));
 
     const result = await syncRefereeRolesFromData(rolesMap);
 
@@ -251,6 +272,7 @@ describe("syncRefereesFromData", () => {
         }),
       }),
     });
+    mockSelect.mockReturnValue(buildSelectChain([{ id: 10, apiId: 1 }]));
 
     const result = await syncRefereesFromData(refMap);
 
@@ -392,9 +414,9 @@ describe("syncRefereeAssignmentsFromData", () => {
 
   it("filters out assignments with missing FKs", async () => {
     const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 999, schiedsrichterId: 100, schirirolleId: 200 }, // missing match
-      { matchApiId: 300, schiedsrichterId: 888, schirirolleId: 200 }, // missing referee
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 777 }, // missing role
+      { matchApiId: 999, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 }, // missing match
+      { matchApiId: 300, schiedsrichterId: 888, schirirolleId: 200, slotNumber: 1 }, // missing referee
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 777, slotNumber: 1 }, // missing role
     ];
 
     const result = await syncRefereeAssignmentsFromData(
@@ -409,7 +431,7 @@ describe("syncRefereeAssignmentsFromData", () => {
 
   it("creates new assignment", async () => {
     const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200 },
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -434,12 +456,12 @@ describe("syncRefereeAssignmentsFromData", () => {
 
   it("skips existing assignment", async () => {
     const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200 },
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 1 }]),
+          limit: vi.fn().mockResolvedValue([{ id: 1, refereeId: 10, roleId: 20 }]),
         }),
       }),
     });
@@ -457,7 +479,7 @@ describe("syncRefereeAssignmentsFromData", () => {
 
   it("handles per-assignment errors", async () => {
     const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200 },
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -479,7 +501,7 @@ describe("syncRefereeAssignmentsFromData", () => {
 
   it("logs created assignment to logger", async () => {
     const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200 },
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -508,7 +530,7 @@ describe("syncRefereeAssignmentsFromData", () => {
 
   it("logs failed assignment to logger", async () => {
     const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200 },
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -534,7 +556,7 @@ describe("syncRefereeAssignmentsFromData", () => {
 
   it("handles non-Error exception", async () => {
     const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200 },
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
