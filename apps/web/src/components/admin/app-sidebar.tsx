@@ -35,51 +35,44 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { UserButton } from "@daveyplate/better-auth-ui";
 
-interface NavGroup {
-  labelKey: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  roles: string[];
-  items: { href: string; labelKey: string }[];
-}
-
-const navGroups: NavGroup[] = [
+const navGroups = [
   {
-    labelKey: "nav.groupReferee",
+    labelKey: "nav.groupReferee" as const,
     icon: Gavel,
     roles: ["admin", "referee"],
     items: [
-      { href: "/admin/referee/matches", labelKey: "nav.openAssignments" },
+      { href: "/admin/referee/matches", labelKey: "nav.openAssignments" as const },
     ],
   },
   {
-    labelKey: "nav.groupLeague",
+    labelKey: "nav.groupLeague" as const,
     icon: Trophy,
     roles: ["admin"],
     items: [
-      { href: "/admin/matches", labelKey: "nav.matches" },
-      { href: "/admin/standings", labelKey: "nav.standings" },
-      { href: "/admin/teams", labelKey: "nav.teams" },
-      { href: "/admin/referees", labelKey: "nav.referees" },
+      { href: "/admin/matches", labelKey: "nav.matches" as const },
+      { href: "/admin/standings", labelKey: "nav.standings" as const },
+      { href: "/admin/teams", labelKey: "nav.teams" as const },
+      { href: "/admin/referees", labelKey: "nav.referees" as const },
     ],
   },
   {
-    labelKey: "nav.groupOperations",
+    labelKey: "nav.groupOperations" as const,
     icon: KanbanSquare,
     roles: ["admin"],
     items: [
-      { href: "/admin/board", labelKey: "nav.board" },
-      { href: "/admin/bookings", labelKey: "nav.bookings" },
-      { href: "/admin/venues", labelKey: "nav.venues" },
+      { href: "/admin/board", labelKey: "nav.board" as const },
+      { href: "/admin/bookings", labelKey: "nav.bookings" as const },
+      { href: "/admin/venues", labelKey: "nav.venues" as const },
     ],
   },
   {
-    labelKey: "nav.groupSystem",
+    labelKey: "nav.groupSystem" as const,
     icon: Settings,
     roles: ["admin"],
     items: [
-      { href: "/admin/sync", labelKey: "nav.sync" },
-      { href: "/admin/settings", labelKey: "nav.settings" },
-      { href: "/admin/users", labelKey: "nav.users" },
+      { href: "/admin/sync", labelKey: "nav.sync" as const },
+      { href: "/admin/settings", labelKey: "nav.settings" as const },
+      { href: "/admin/users", labelKey: "nav.users" as const },
     ],
   },
 ];

@@ -34,7 +34,7 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 hono
 
-# Copy built dist from tsup (workspace packages compiled in)
+# Copy built dist from tsdown (workspace packages compiled in)
 COPY --from=builder --chown=hono:nodejs /app/apps/api/dist ./dist
 
 # Copy production node_modules from pnpm deploy (all external npm packages)

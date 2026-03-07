@@ -107,7 +107,7 @@ infra/
         ├── variables.tf                  # Input variables
         └── terraform.tfvars.example      # Template for secrets
 
-apps/api/Dockerfile                       # Multi-stage: build with tsup, run as non-root
+apps/api/Dockerfile                       # Multi-stage: build with tsdown, run as non-root
 apps/web/Dockerfile                       # Multi-stage: next build standalone, run as non-root
 
 .github/workflows/
