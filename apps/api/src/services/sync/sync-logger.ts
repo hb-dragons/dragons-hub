@@ -2,8 +2,8 @@ import { db } from "../../config/database";
 import { syncRunEntries } from "@dragons/db/schema";
 import type { NewSyncRunEntry } from "@dragons/db/schema";
 import { EventEmitter } from "events";
-import Redis from "ioredis";
-import { env } from "../../config/env";
+import type Redis from "ioredis";
+import { redis as sharedRedis } from "../../config/redis";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "sync-logger" });
@@ -29,13 +29,13 @@ export class SyncLogger {
   private channelName: string;
   private redisPublishFailed = false;
 
-  constructor(syncRunId: number) {
+  constructor(syncRunId: number, redisInstance?: Redis | null) {
     this.syncRunId = syncRunId;
     this.eventEmitter = new EventEmitter();
     this.channelName = `sync:${syncRunId}:logs`;
 
     try {
-      this.redis = new Redis(env.REDIS_URL);
+      this.redis = redisInstance !== undefined ? redisInstance : sharedRedis;
     } catch {
       log.warn("Redis not available, streaming disabled");
     }
@@ -99,7 +99,6 @@ export class SyncLogger {
     if (this.redis) {
       try {
         await this.redis.publish(this.channelName, JSON.stringify({ type: "complete" }));
-        await this.redis.quit();
       } catch {
         // Ignore
       }
@@ -127,6 +126,6 @@ export function batchAction(created: number, updated: number, failed: number): A
   return "skipped";
 }
 
-export function createSyncLogger(syncRunId: number): SyncLogger {
-  return new SyncLogger(syncRunId);
+export function createSyncLogger(syncRunId: number, redisInstance?: Redis | null): SyncLogger {
+  return new SyncLogger(syncRunId, redisInstance);
 }

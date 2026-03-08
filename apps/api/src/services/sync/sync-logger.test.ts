@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import type Redis from "ioredis";
 
 // --- Mock setup ---
 
@@ -23,12 +24,9 @@ vi.mock("@dragons/db/schema", () => ({
 }));
 
 const mockPublish = vi.fn().mockResolvedValue(1);
-const mockQuit = vi.fn().mockResolvedValue("OK");
-
-vi.mock("ioredis", () => ({
-  default: class MockRedis {
-    publish = mockPublish;
-    quit = mockQuit;
+vi.mock("../../config/redis", () => ({
+  redis: {
+    publish: (...args: unknown[]) => mockPublish(...args),
   },
 }));
 
@@ -168,16 +166,34 @@ describe("SyncLogger", () => {
       "sync:1:logs",
       JSON.stringify({ type: "complete" }),
     );
-    expect(mockQuit).toHaveBeenCalled();
     expect(completeListener).toHaveBeenCalled();
   });
 
-  it("close() handles Redis quit failure", async () => {
-    mockQuit.mockRejectedValueOnce(new Error("fail"));
+  it("close() handles Redis publish failure gracefully", async () => {
+    mockPublish.mockRejectedValueOnce(new Error("fail"));
     const logger = new SyncLogger(1);
 
     // Should not throw
     await logger.close();
+  });
+
+  it("uses provided Redis instance", async () => {
+    const customPublish = vi.fn().mockResolvedValue(1);
+    const customRedis = { publish: customPublish } as unknown as Redis;
+    const logger = new SyncLogger(1, customRedis);
+
+    await logger.log({ entityType: "league", entityId: "1", action: "created" });
+
+    expect(customPublish).toHaveBeenCalled();
+    expect(mockPublish).not.toHaveBeenCalled();
+  });
+
+  it("disables streaming when null Redis passed", async () => {
+    const logger = new SyncLogger(1, null);
+
+    await logger.log({ entityType: "league", entityId: "1", action: "created" });
+
+    expect(mockPublish).not.toHaveBeenCalled();
   });
 });
 
@@ -206,45 +222,5 @@ describe("batchAction", () => {
 
   it("returns 'skipped' when all counts are zero", () => {
     expect(batchAction(0, 0, 0)).toBe("skipped");
-  });
-});
-
-describe("SyncLogger with Redis failure", () => {
-  it("handles Redis constructor failure gracefully", async () => {
-    // Reset modules to test with a failing Redis constructor
-    vi.resetModules();
-    vi.doMock("ioredis", () => ({
-      default: class FailingRedis {
-        constructor() {
-          throw new Error("Redis unavailable");
-        }
-      },
-    }));
-    vi.doMock("../../config/logger", () => ({
-      logger: {
-        child: () => ({
-          info: vi.fn(),
-          warn: vi.fn(),
-          error: vi.fn(),
-          debug: vi.fn(),
-        }),
-      },
-    }));
-    vi.doMock("../../config/env", () => ({
-      env: { REDIS_URL: "redis://localhost:6379" },
-    }));
-    vi.doMock("../../config/database", () => ({
-      db: { insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }) },
-    }));
-    vi.doMock("@dragons/db/schema", () => ({
-      syncRunEntries: Symbol("syncRunEntries"),
-    }));
-
-    const { SyncLogger: SyncLoggerWithoutRedis } = await import("./sync-logger");
-    const logger = new SyncLoggerWithoutRedis(1);
-
-    // Should still work for non-Redis operations
-    await logger.log({ entityType: "league", entityId: "1", action: "created" });
-    await logger.close();
   });
 });
