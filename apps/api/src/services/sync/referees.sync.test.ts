@@ -113,7 +113,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(FROZEN_TIME);
-  // Default: mockSelect returns empty array (for lookup queries after upsert)
+  // Default: mockSelect returns empty array (for pre-load queries before upsert)
   mockSelect.mockReturnValue(buildSelectChain([]));
 });
 
@@ -142,7 +142,7 @@ describe("syncRefereeRolesFromData", () => {
         }),
       }),
     });
-    // After upsert, the function queries all roles from DB for lookup
+    // Pre-load returns existing roles before upsert
     mockSelect.mockReturnValue(buildSelectChain([{ id: 10, apiId: 1 }]));
 
     const result = await syncRefereeRolesFromData(rolesMap);
@@ -289,6 +289,7 @@ describe("syncRefereesFromData", () => {
         }),
       }),
     });
+    // Pre-load returns existing referees before upsert
     mockSelect.mockReturnValue(buildSelectChain([{ id: 10, apiId: 1 }]));
 
     const result = await syncRefereesFromData(refMap);

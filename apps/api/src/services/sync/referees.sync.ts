@@ -40,6 +40,12 @@ export async function syncRefereeRolesFromData(
 
   log.info({ count: rolesMap.size }, "Batch syncing referee roles");
 
+  // Pre-load existing roles for lookup (before upsert)
+  const existingRoles = await db
+    .select({ id: refereeRoles.id, apiId: refereeRoles.apiId })
+    .from(refereeRoles);
+  const roleIdLookup = new Map(existingRoles.map((r) => [r.apiId, r.id]));
+
   const now = new Date();
   const roleRecords = Array.from(rolesMap.entries()).map(([apiId, role]) => ({
     apiId,
@@ -85,11 +91,10 @@ export async function syncRefereeRolesFromData(
       message: `Batch synced ${upsertResult.length} referee roles (${created} created, ${updated} updated, ${skipped} skipped)`,
       metadata: { created, updated, skipped },
     });
-    // Build lookup from ALL roles in DB (not just upsert result, which misses unchanged rows)
-    const allRoles = await db
-      .select({ id: refereeRoles.id, apiId: refereeRoles.apiId })
-      .from(refereeRoles);
-    const roleIdLookup = new Map(allRoles.map((r) => [r.apiId, r.id]));
+    // Merge upsert results into pre-loaded lookup
+    for (const row of upsertResult) {
+      roleIdLookup.set(row.apiId, row.id);
+    }
     return { created, updated, skipped, failed: 0, roleIdLookup };
   } catch (error) {
     log.error({ err: error }, "Batch role sync failed");
@@ -120,6 +125,12 @@ export async function syncRefereesFromData(
   }
 
   log.info({ count: refereesMap.size }, "Batch syncing referees");
+
+  // Pre-load existing referees for lookup (before upsert)
+  const existingRefs = await db
+    .select({ id: referees.id, apiId: referees.apiId })
+    .from(referees);
+  const refereeIdLookup = new Map(existingRefs.map((r) => [r.apiId, r.id]));
 
   const now = new Date();
   const refereeRecords = Array.from(refereesMap.entries()).map(([apiId, referee]) => ({
@@ -173,11 +184,10 @@ export async function syncRefereesFromData(
       message: `Batch synced ${upsertResult.length} referees (${created} created, ${updated} updated, ${skipped} skipped)`,
       metadata: { created, updated, skipped },
     });
-    // Build lookup from ALL referees in DB (not just upsert result, which misses unchanged rows)
-    const allRefs = await db
-      .select({ id: referees.id, apiId: referees.apiId })
-      .from(referees);
-    const refereeIdLookup = new Map(allRefs.map((r) => [r.apiId, r.id]));
+    // Merge upsert results into pre-loaded lookup
+    for (const row of upsertResult) {
+      refereeIdLookup.set(row.apiId, row.id);
+    }
     return { created, updated, skipped, refereeIdLookup, errors };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
