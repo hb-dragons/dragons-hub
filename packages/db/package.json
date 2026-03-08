@@ -20,7 +20,7 @@
   "dependencies": {
     "@dragons/shared": "workspace:*",
     "drizzle-orm": "^0.45.1",
-    "pg": "^8.19.0"
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "@types/pg": "^8.18.0",
