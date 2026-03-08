@@ -17,7 +17,7 @@ import { Badge } from "@dragons/ui/components/badge"
 import { cn } from "@dragons/ui/lib/utils"
 import { Ban, Calendar, CircleOff, SearchIcon, SquareActivity } from "lucide-react"
 import { Input } from "@dragons/ui/components/input"
-import type { DateRange } from "react-day-picker"
+import type { DateRange } from "@dragons/ui/components/calendar"
 
 import { DataTable } from "@/components/ui/data-table"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"

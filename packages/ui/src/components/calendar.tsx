@@ -72,3 +72,4 @@ function Calendar({
 }
 
 export { Calendar }
+export type { DateRange } from "react-day-picker"

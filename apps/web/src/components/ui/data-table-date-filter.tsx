@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
 } from "@dragons/ui/components/popover"
 import { cn } from "@dragons/ui/lib/utils"
-import type { DateRange } from "react-day-picker"
+import type { DateRange } from "@dragons/ui/components/calendar"
 
 interface DataTableDateFilterProps<TData, TValue> {
   column: Column<TData, TValue>

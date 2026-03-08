@@ -33,7 +33,7 @@ import {
   TooltipTrigger,
 } from "@dragons/ui/components/tooltip";
 import { Ban, Calendar, Check, CheckCircle2, CircleOff, Clock, ExternalLink, Loader2, RefreshCw, SearchIcon, SquareActivity, Trash2, UserRound, X, XCircle } from "lucide-react";
-import type { DateRange } from "react-day-picker";
+import type { DateRange } from "@dragons/ui/components/calendar";
 
 import { DataTable } from "@/components/ui/data-table";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
