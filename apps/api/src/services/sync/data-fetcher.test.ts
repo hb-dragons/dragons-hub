@@ -30,6 +30,14 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
 }));
 
+const mockPLimit = vi.fn();
+vi.mock("p-limit", () => ({
+  default: (concurrency: number) => {
+    mockPLimit(concurrency);
+    return (fn: () => Promise<unknown>) => fn();
+  },
+}));
+
 const mockGetSpielplan = vi.fn();
 const mockGetTabelle = vi.fn();
 const mockGetGameDetailsBatch = vi.fn();
@@ -429,6 +437,25 @@ describe("fetchAllSyncData", () => {
     const result = await fetchAllSyncData();
 
     expect(result.referees.size).toBe(0);
+  });
+
+  it("limits league fetch concurrency to 3", async () => {
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          { id: 1, apiLigaId: 100, name: "League A" },
+          { id: 2, apiLigaId: 200, name: "League B" },
+        ]),
+      }),
+    });
+    mockEnsureAuthenticated.mockResolvedValue(undefined);
+    mockGetSpielplan.mockResolvedValue([]);
+    mockGetTabelle.mockResolvedValue([]);
+    mockGetGameDetailsBatch.mockResolvedValue(new Map());
+
+    await fetchAllSyncData();
+
+    expect(mockPLimit).toHaveBeenCalledWith(3);
   });
 });
 

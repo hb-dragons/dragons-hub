@@ -1,6 +1,7 @@
 import { db } from "../../config/database";
 import { leagues } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
+import pLimit from "p-limit";
 import { sdkClient } from "./sdk-client";
 import { logger } from "../../config/logger";
 
@@ -97,8 +98,9 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
 
   await sdkClient.ensureAuthenticated();
 
+  const limit = pLimit(3);
   const leagueData = await Promise.all(
-    trackedLeagues.map((l) => fetchLeagueData(l.apiLigaId, l.id, l.name)),
+    trackedLeagues.map((l) => limit(() => fetchLeagueData(l.apiLigaId, l.id, l.name))),
   );
 
   const teams = collectUniqueTeams(leagueData);
