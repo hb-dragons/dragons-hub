@@ -17,11 +17,13 @@ vi.mock("../../config/logger", () => ({
 const mockInsert = vi.fn();
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
+const mockExecute = vi.fn();
 vi.mock("../../config/database", () => ({
   db: {
     insert: (...args: unknown[]) => mockInsert(...args),
     select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
+    execute: (...args: unknown[]) => mockExecute(...args),
   },
 }));
 
@@ -644,70 +646,36 @@ describe("buildMatchIdLookup", () => {
 });
 
 describe("confirmIntentsFromSync", () => {
-  it("confirms intent when matching assignment exists", async () => {
-    // First call: select pending intents
-    mockSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([
-          { intentId: 1, matchId: 10, refereeId: 20 },
-        ]),
-      }),
-    });
-    // Second call: select matching assignment
-    mockSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 100 }]),
-        }),
-      }),
-    });
-    // Update call
-    mockUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    });
+  it("confirms intents with matching assignments", async () => {
+    mockExecute.mockResolvedValue({ rowCount: 3 });
 
     const result = await confirmIntentsFromSync();
 
-    expect(result).toBe(1);
-    expect(mockUpdate).toHaveBeenCalled();
+    expect(result).toBe(3);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
   });
 
-  it("does not confirm intent when no matching assignment exists", async () => {
-    // First call: select pending intents
-    mockSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([
-          { intentId: 1, matchId: 10, refereeId: 20 },
-        ]),
-      }),
-    });
-    // Second call: no matching assignment
-    mockSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+  it("returns 0 when no intents match", async () => {
+    mockExecute.mockResolvedValue({ rowCount: 0 });
 
     const result = await confirmIntentsFromSync();
 
     expect(result).toBe(0);
-    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("returns 0 when no pending intents", async () => {
-    mockSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([]),
-      }),
-    });
+  it("handles null rowCount", async () => {
+    mockExecute.mockResolvedValue({});
 
     const result = await confirmIntentsFromSync();
 
     expect(result).toBe(0);
-    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("handles undefined rowCount", async () => {
+    mockExecute.mockResolvedValue({ rowCount: undefined });
+
+    const result = await confirmIntentsFromSync();
+
+    expect(result).toBe(0);
   });
 });

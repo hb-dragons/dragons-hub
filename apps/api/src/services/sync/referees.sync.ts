@@ -290,36 +290,19 @@ export async function syncRefereeAssignmentsFromData(
 }
 
 export async function confirmIntentsFromSync(): Promise<number> {
-  const pendingIntents = await db
-    .select({
-      intentId: refereeAssignmentIntents.id,
-      matchId: refereeAssignmentIntents.matchId,
-      refereeId: refereeAssignmentIntents.refereeId,
-    })
-    .from(refereeAssignmentIntents)
-    .where(sql`${refereeAssignmentIntents.confirmedBySyncAt} IS NULL`);
+  const now = new Date();
 
-  let confirmed = 0;
-  for (const intent of pendingIntents) {
-    const [assignment] = await db
-      .select({ id: matchReferees.id })
-      .from(matchReferees)
-      .where(
-        and(
-          eq(matchReferees.matchId, intent.matchId),
-          eq(matchReferees.refereeId, intent.refereeId),
-        ),
+  // Single query: update all pending intents that have a matching assignment
+  const result = await db.execute(sql`
+    UPDATE ${refereeAssignmentIntents}
+    SET confirmed_by_sync_at = ${now}
+    WHERE ${refereeAssignmentIntents.confirmedBySyncAt} IS NULL
+      AND EXISTS (
+        SELECT 1 FROM ${matchReferees} mr
+        WHERE mr.match_id = ${refereeAssignmentIntents}.match_id
+          AND mr.referee_id = ${refereeAssignmentIntents}.referee_id
       )
-      .limit(1);
+  `);
 
-    if (assignment) {
-      await db
-        .update(refereeAssignmentIntents)
-        .set({ confirmedBySyncAt: new Date() })
-        .where(eq(refereeAssignmentIntents.id, intent.intentId));
-      confirmed++;
-    }
-  }
-
-  return confirmed;
+  return Number(result.rowCount ?? 0);
 }
