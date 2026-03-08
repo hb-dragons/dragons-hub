@@ -68,6 +68,16 @@ resource "random_id" "db_name_suffix" {
   byte_length = 2
 }
 
+resource "random_password" "turbo_token" {
+  length  = 48
+  special = false
+}
+
+resource "random_password" "turbo_signature_key" {
+  length  = 48
+  special = false
+}
+
 # Dedicated service accounts for Cloud Run
 resource "google_service_account" "api" {
   account_id   = "dragons-api"
@@ -77,6 +87,11 @@ resource "google_service_account" "api" {
 resource "google_service_account" "web" {
   account_id   = "dragons-web"
   display_name = "Dragons Web"
+}
+
+resource "google_service_account" "turbo_cache" {
+  account_id   = "dragons-turbo-cache"
+  display_name = "Dragons Turbo Cache"
 }
 
 # Artifact Registry
@@ -345,6 +360,150 @@ module "workload_identity" {
   depends_on = [google_project_service.apis]
 }
 
+# Turbo Remote Cache - GCS bucket for build artifacts
+resource "google_storage_bucket" "turbo_cache" {
+  name                        = "${var.project_id}-turbo-cache"
+  location                    = var.region
+  project                     = var.project_id
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+
+  lifecycle_rule {
+    condition {
+      age = 30
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_storage_bucket_iam_member" "turbo_cache_storage" {
+  bucket = google_storage_bucket.turbo_cache.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.turbo_cache.email}"
+}
+
+# Turbo Remote Cache - Secrets
+resource "google_secret_manager_secret" "turbo_token" {
+  secret_id = "turbo-token-production"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "turbo_token" {
+  secret      = google_secret_manager_secret.turbo_token.id
+  secret_data = random_password.turbo_token.result
+}
+
+resource "google_secret_manager_secret" "turbo_signature_key" {
+  secret_id = "turbo-signature-key-production"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "turbo_signature_key" {
+  secret      = google_secret_manager_secret.turbo_signature_key.id
+  secret_data = random_password.turbo_signature_key.result
+}
+
+resource "google_secret_manager_secret_iam_member" "turbo_cache_token_access" {
+  secret_id = google_secret_manager_secret.turbo_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.turbo_cache.email}"
+  project   = var.project_id
+}
+
+resource "google_secret_manager_secret_iam_member" "turbo_cache_signature_key_access" {
+  secret_id = google_secret_manager_secret.turbo_signature_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.turbo_cache.email}"
+  project   = var.project_id
+}
+
+# Grant GitHub Actions SA access to read turbo secrets (for CI env vars)
+resource "google_secret_manager_secret_iam_member" "github_turbo_token_access" {
+  secret_id = google_secret_manager_secret.turbo_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.workload_identity.service_account_email}"
+  project   = var.project_id
+}
+
+resource "google_secret_manager_secret_iam_member" "github_turbo_signature_key_access" {
+  secret_id = google_secret_manager_secret.turbo_signature_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${module.workload_identity.service_account_email}"
+  project   = var.project_id
+}
+
+# Turbo Remote Cache - Cloud Run service
+module "turbo_cache" {
+  source = "../../modules/cloud-run"
+
+  project_id      = var.project_id
+  region          = var.region
+  service_name    = "dragons-turbo-cache-production"
+  image           = "ducktors/turborepo-remote-cache:latest"
+  port            = 3000
+  service_account = google_service_account.turbo_cache.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  min_instances = 0
+  max_instances = 2
+  cpu_idle      = true
+  timeout       = "60s"
+
+  allow_unauthenticated = false
+  ingress               = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    NODE_ENV         = "production"
+    STORAGE_PROVIDER = "google-cloud-storage"
+    STORAGE_PATH     = google_storage_bucket.turbo_cache.name
+    LOG_LEVEL        = "info"
+  }
+
+  secrets = {
+    TURBO_TOKEN = {
+      secret_name = google_secret_manager_secret.turbo_token.secret_id
+      version     = "latest"
+    }
+    TURBO_REMOTE_CACHE_SIGNATURE_KEY = {
+      secret_name = google_secret_manager_secret.turbo_signature_key.secret_id
+      version     = "latest"
+    }
+  }
+
+  depends_on = [
+    google_project_service.apis,
+    google_secret_manager_secret_version.turbo_token,
+    google_secret_manager_secret_version.turbo_signature_key,
+    google_secret_manager_secret_iam_member.turbo_cache_token_access,
+    google_secret_manager_secret_iam_member.turbo_cache_signature_key_access,
+  ]
+}
+
+# Grant GitHub Actions SA permission to invoke the turbo cache service
+resource "google_cloud_run_v2_service_iam_member" "turbo_cache_github_invoker" {
+  location = var.region
+  name     = module.turbo_cache.service_name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${module.workload_identity.service_account_email}"
+}
+
 # Outputs
 output "web_url" {
   value = module.web.url
@@ -377,4 +536,9 @@ output "github_service_account" {
 output "load_balancer_ip" {
   description = "Add A records for both subdomains pointing to this IP"
   value       = module.load_balancer.load_balancer_ip
+}
+
+output "turbo_cache_url" {
+  description = "Turbo remote cache URL (set as TURBO_API in GitHub Actions)"
+  value       = module.turbo_cache.url
 }

@@ -15,15 +15,35 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  id-token: write
 
 jobs:
   quality:
     name: Quality Checks
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      TURBO_API: http://localhost:9080
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_REMOTE_CACHE_SIGNATURE_KEY: ${{ secrets.TURBO_REMOTE_CACHE_SIGNATURE_KEY }}
+      TURBO_TEAM: dragons
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Start Turbo cache proxy
+        run: |
+          gcloud run services proxy dragons-turbo-cache-production --region=europe-west3 --port=9080 &
+          sleep 2
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
