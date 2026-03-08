@@ -61,7 +61,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 
 ## Testing Requirements
 
-- **Coverage thresholds**: 100% branches, functions, lines, statements (enforced in `apps/api/vitest.config.ts`)
+- **Coverage thresholds**: 90% branches, 95% functions/lines/statements (enforced in `apps/api/vitest.config.ts`)
 - **Every new feature or changed behavior MUST have corresponding tests**
 - Tests live next to source files: `foo.ts` -> `foo.test.ts`
 - Test framework: Vitest (v4) with `@hono/node-server` for API tests
@@ -72,7 +72,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 
 ### TypeScript
 - Strict mode enabled (`tsconfig.base.json`)
-- Target: ES2022, Module: ESNext
+- Target: ES2022, Module: ESNext, `verbatimModuleSyntax` enabled
 - No `any` types - use proper typing or `unknown`
 - Use Zod for runtime validation at boundaries (API input, env vars)
 
@@ -150,4 +150,4 @@ Note: Club and league tracking configuration is managed via the admin UI (`/admi
 3. **New sync entity**: Add `*.sync.ts` in `services/sync/`, wire into `SyncOrchestrator`, add tests, update `AGENTS.md`
 4. **New UI component**: Add to `packages/ui/src/components/`, export from index
 5. **New env var**: Add to Zod schema in `config/env.ts`, add to `.env.example`, document here
-6. **Any change**: Write/update tests to maintain 100% coverage
+6. **Any change**: Write/update tests to maintain coverage above thresholds

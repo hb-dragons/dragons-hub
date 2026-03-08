@@ -14,20 +14,9 @@
         "dist/**"
       ]
     },
-    "lint": {
-      "dependsOn": [
-        "^lint"
-      ]
-    },
-    "typecheck": {
-      "dependsOn": [
-        "^typecheck"
-      ]
-    },
+    "lint": {},
+    "typecheck": {},
     "test": {
-      "dependsOn": [
-        "^test"
-      ],
       "outputs": []
     },
     "coverage": {
