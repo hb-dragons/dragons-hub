@@ -1,6 +1,6 @@
 import { db } from "../../config/database";
 import { referees, refereeRoles, matchReferees, matches, refereeAssignmentIntents } from "@dragons/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import type {
   ExtractedReferee,
@@ -230,6 +230,18 @@ export async function syncRefereeAssignmentsFromData(
 
   const now = new Date();
 
+  // Batch-load existing assignments to avoid N+1 SELECTs
+  const matchIdsToCheck = [...new Set(validAssignments.map((a) => matchIdLookup.get(a.matchApiId)!))];
+  const existingAssignments = matchIdsToCheck.length > 0
+    ? await db
+        .select()
+        .from(matchReferees)
+        .where(inArray(matchReferees.matchId, matchIdsToCheck))
+    : [];
+  const existingBySlot = new Map(
+    existingAssignments.map((r) => [`${r.matchId}-${r.slotNumber}`, r]),
+  );
+
   for (const assignment of validAssignments) {
     const matchId = matchIdLookup.get(assignment.matchApiId)!;
     const refereeId = refereeIdLookup.get(assignment.schiedsrichterId)!;
@@ -238,16 +250,7 @@ export async function syncRefereeAssignmentsFromData(
     const { slotNumber } = assignment;
 
     try {
-      const [existing] = await db
-        .select()
-        .from(matchReferees)
-        .where(
-          and(
-            eq(matchReferees.matchId, matchId),
-            eq(matchReferees.slotNumber, slotNumber),
-          ),
-        )
-        .limit(1);
+      const existing = existingBySlot.get(`${matchId}-${slotNumber}`) ?? null;
 
       if (!existing) {
         await db.insert(matchReferees).values({

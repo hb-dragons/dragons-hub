@@ -60,6 +60,7 @@ vi.mock("@dragons/db/schema", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
   and: vi.fn((...args: unknown[]) => ({ and: args })),
+  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
   sql: (...args: unknown[]) => args,
 }));
 
@@ -89,6 +90,20 @@ function buildSelectChain(result: unknown) {
   };
   return {
     from: vi.fn().mockReturnValue(thenableResult),
+  };
+}
+
+function buildBatchSelectChain(result: unknown) {
+  const whereResult = {
+    then: (resolve: (v: unknown) => void) => {
+      resolve(result);
+      return whereResult;
+    },
+  };
+  return {
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue(whereResult),
+    }),
   };
 }
 
@@ -433,13 +448,8 @@ describe("syncRefereeAssignmentsFromData", () => {
     const assignments: ExtractedRefereeAssignment[] = [
       { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    // Batch-load returns no existing assignments
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
     mockInsert.mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
     });
@@ -454,17 +464,14 @@ describe("syncRefereeAssignmentsFromData", () => {
     expect(result.created).toBe(1);
   });
 
-  it("skips existing assignment", async () => {
+  it("skips existing assignment with same referee and role", async () => {
     const assignments: ExtractedRefereeAssignment[] = [
       { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 1, refereeId: 10, roleId: 20 }]),
-        }),
-      }),
-    });
+    // Batch-load returns existing assignment with same refereeId and roleId
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 1, matchId: 3, slotNumber: 1, refereeId: 1, roleId: 2 },
+    ]));
 
     const result = await syncRefereeAssignmentsFromData(
       assignments,
@@ -481,12 +488,11 @@ describe("syncRefereeAssignmentsFromData", () => {
     const assignments: ExtractedRefereeAssignment[] = [
       { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockRejectedValue(new Error("DB error")),
-        }),
-      }),
+    // Batch-load returns no existing assignments
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // Insert fails
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockRejectedValue(new Error("DB error")),
     });
 
     const result = await syncRefereeAssignmentsFromData(
@@ -503,13 +509,8 @@ describe("syncRefereeAssignmentsFromData", () => {
     const assignments: ExtractedRefereeAssignment[] = [
       { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    // Batch-load returns no existing assignments
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
     mockInsert.mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
     });
@@ -532,12 +533,11 @@ describe("syncRefereeAssignmentsFromData", () => {
     const assignments: ExtractedRefereeAssignment[] = [
       { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockRejectedValue(new Error("fail")),
-        }),
-      }),
+    // Batch-load returns no existing assignments
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // Insert fails
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockRejectedValue(new Error("fail")),
     });
     const mockLogger = { log: vi.fn() };
 
@@ -558,12 +558,11 @@ describe("syncRefereeAssignmentsFromData", () => {
     const assignments: ExtractedRefereeAssignment[] = [
       { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
     ];
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockRejectedValue("string"),
-        }),
-      }),
+    // Batch-load returns no existing assignments
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // Insert fails with non-Error
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockRejectedValue("string"),
     });
 
     const result = await syncRefereeAssignmentsFromData(
@@ -574,6 +573,57 @@ describe("syncRefereeAssignmentsFromData", () => {
     );
 
     expect(result.errors[0]).toContain("Unknown error");
+  });
+
+  it("updates existing assignment when referee or role changed", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    // Batch-load returns existing assignment with different refereeId
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
+    ]));
+    mockUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    const result = await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    expect(result.created).toBe(0);
+    expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it("batch-loads existing assignments before processing loop", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 2 },
+    ];
+    // Batch-load returns one existing assignment
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 1, matchId: 3, slotNumber: 1, refereeId: 1, roleId: 2 },
+    ]));
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const result = await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    // Only one SELECT call for batch-load, not one per assignment
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+    // Slot 1 exists, slot 2 is new
+    expect(result.created).toBe(1);
   });
 });
 
