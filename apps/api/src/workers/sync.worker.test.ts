@@ -2,10 +2,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // --- Mock setup ---
 
-vi.mock("../config/env", () => ({
-  env: { REDIS_URL: "redis://localhost:6379" },
-}));
-
 const mockChildLogger = vi.hoisted(() => ({
   info: vi.fn(),
   error: vi.fn(),

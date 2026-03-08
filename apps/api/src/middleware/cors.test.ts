@@ -1,12 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
-
-vi.mock("../config/env", () => ({
-  env: {
-    TRUSTED_ORIGINS: ["http://localhost:3000"],
-  },
-}));
-
-// Import after mock
+import { describe, expect, it } from "vitest";
 import { corsMiddleware } from "./cors";
 
 describe("corsMiddleware", () => {

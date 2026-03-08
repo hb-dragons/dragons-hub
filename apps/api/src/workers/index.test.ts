@@ -2,10 +2,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // --- Mock setup ---
 
-vi.mock("../config/env", () => ({
-  env: { REDIS_URL: "redis://localhost:6379" },
-}));
-
 vi.mock("../config/logger", () => ({
   logger: {
     info: vi.fn(),

@@ -68,6 +68,16 @@ vi.mock("drizzle-orm", () => ({
   sql: vi.fn((...args: unknown[]) => ({ sql: args })),
 }));
 
+vi.mock("../../config/logger", () => ({
+  logger: {
+    child: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }),
+  },
+}));
+
+vi.mock("../sync/sdk-client", () => ({
+  sdkClient: {},
+}));
+
 vi.mock("drizzle-orm/pg-core", () => ({
   alias: vi.fn((_table: unknown, name: string) => ({
     name: `${name}.name`,

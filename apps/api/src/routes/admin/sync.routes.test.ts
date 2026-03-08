@@ -45,10 +45,6 @@ vi.mock("../../services/admin/sync-admin.service", () => ({
   getMatchChangesForEntry: mocks.getMatchChangesForEntry,
 }));
 
-vi.mock("../../config/env", () => ({
-  env: { REDIS_URL: "redis://localhost:6379" },
-}));
-
 vi.mock("../../config/logger", () => ({
   logger: { error: vi.fn() },
 }));

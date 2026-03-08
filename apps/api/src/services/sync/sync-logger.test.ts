@@ -13,10 +13,6 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
-vi.mock("../../config/env", () => ({
-  env: { REDIS_URL: "redis://localhost:6379" },
-}));
-
 const mockInsert = vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
 vi.mock("../../config/database", () => ({
   db: { insert: (...args: unknown[]) => mockInsert(...args) },
