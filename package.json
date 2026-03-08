@@ -13,8 +13,7 @@
     "check:ai-slop": "node scripts/check-ai-slop.mjs",
     "check:i18n": "pnpm --filter @dragons/web i18n:check",
     "security:audit": "pnpm audit --audit-level=high",
-    "knip": "knip --no-exit-code",
-    "knip:strict": "knip",
+    "knip": "knip",
     "clean": "turbo clean"
   },
   "devDependencies": {

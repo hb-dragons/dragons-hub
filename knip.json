@@ -4,7 +4,8 @@
   "workspaces": {
     ".": {
       "entry": ["scripts/*.{js,mjs,ts}"],
-      "project": ["scripts/**/*.{js,mjs,ts}"]
+      "project": ["scripts/**/*.{js,mjs,ts}"],
+      "ignoreDependencies": ["dotenv", "basketball-bund-sdk"]
     },
     "apps/api": {
       "project": ["src/**/*.ts"],
