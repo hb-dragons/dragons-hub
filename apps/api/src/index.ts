@@ -47,6 +47,8 @@ async function shutdown() {
   logger.info("Shutting down...");
   if (shutdownWorkersFn) await shutdownWorkersFn();
   if (httpServer) (httpServer as { close: () => void }).close();
+  const { closeDb } = await import("./config/database");
+  await closeDb();
   process.exit(0);
 }
 

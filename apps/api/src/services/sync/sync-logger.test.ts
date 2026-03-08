@@ -153,6 +153,55 @@ describe("SyncLogger", () => {
     expect(mockInsert).toHaveBeenCalledTimes(2);
   });
 
+  it("drops entries after max flush retries", async () => {
+    const failingInsert = {
+      values: vi.fn().mockRejectedValue(new Error("DB error")),
+    };
+    mockInsert.mockReturnValue(failingInsert);
+    const logger = new SyncLogger(1);
+
+    await logger.log({ entityType: "league", entityId: "1", action: "created" });
+
+    // Flush fails 3 times (MAX_FLUSH_RETRIES)
+    await logger.flush(); // retry 1 - entries retained
+    await logger.flush(); // retry 2 - entries retained
+    await logger.flush(); // retry 3 - entries DROPPED
+
+    // 4th flush should have nothing to insert (entries were dropped)
+    mockInsert.mockClear();
+    await logger.flush();
+
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("resets retry counter after successful flush", async () => {
+    const logger = new SyncLogger(1);
+
+    // Fail twice
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockRejectedValue(new Error("DB error")),
+    });
+    await logger.log({ entityType: "league", entityId: "1", action: "created" });
+    await logger.flush(); // retry 1
+    await logger.flush(); // retry 2
+
+    // Now succeed
+    mockInsert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
+    await logger.flush(); // success - resets counter
+
+    // Fail again - should start retry count from 0
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockRejectedValue(new Error("DB error")),
+    });
+    await logger.log({ entityType: "league", entityId: "2", action: "created" });
+    await logger.flush(); // retry 1 (not 3)
+
+    // Entry should still be in buffer (retained for retry)
+    mockInsert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
+    await logger.flush();
+    expect(mockInsert).toHaveBeenCalled();
+  });
+
   it("close() flushes and publishes complete event", async () => {
     const logger = new SyncLogger(1);
     const completeListener = vi.fn();

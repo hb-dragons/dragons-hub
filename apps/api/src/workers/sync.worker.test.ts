@@ -19,9 +19,7 @@ vi.mock("../config/logger", () => ({
 
 const mockFullSync = vi.fn();
 vi.mock("../services/sync/index", () => ({
-  syncOrchestrator: {
-    fullSync: (...args: unknown[]) => mockFullSync(...args),
-  },
+  fullSync: (...args: unknown[]) => mockFullSync(...args),
 }));
 
 const mockDbSelect = vi.fn();

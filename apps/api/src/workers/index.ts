@@ -2,8 +2,8 @@ import { syncWorker } from "./sync.worker";
 import { initializeScheduledJobs, syncQueue } from "./queues";
 import { db } from "../config/database";
 import { logger } from "../config/logger";
-import { syncRuns } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
+import { syncRuns, syncRunEntries } from "@dragons/db/schema";
+import { eq, lt, inArray } from "drizzle-orm";
 
 export async function initializeWorkers() {
   logger.info("Initializing workers...");
@@ -26,11 +26,41 @@ export async function initializeWorkers() {
     );
   }
 
+  // Cleanup old sync runs (retention policy)
+  try {
+    const cleaned = await cleanupOldSyncRuns();
+    if (cleaned > 0) {
+      logger.info({ count: cleaned }, "Cleaned up old sync runs");
+    }
+  } catch (error) {
+    logger.warn({ err: error }, "Failed to cleanup old sync runs");
+  }
+
   await initializeScheduledJobs();
 
   // Workers are automatically started when imported
   logger.info("Sync worker started");
   logger.info("Workers initialized");
+}
+
+export async function cleanupOldSyncRuns(retentionDays: number = 90): Promise<number> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+
+  const oldRuns = await db
+    .select({ id: syncRuns.id })
+    .from(syncRuns)
+    .where(lt(syncRuns.startedAt, cutoff));
+
+  if (oldRuns.length === 0) return 0;
+
+  const oldRunIds = oldRuns.map((r) => r.id);
+
+  // Delete entries first (FK dependency), then runs
+  await db.delete(syncRunEntries).where(inArray(syncRunEntries.syncRunId, oldRunIds));
+  await db.delete(syncRuns).where(inArray(syncRuns.id, oldRunIds));
+
+  return oldRuns.length;
 }
 
 export async function shutdownWorkers() {

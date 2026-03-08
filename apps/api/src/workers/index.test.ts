@@ -23,37 +23,53 @@ vi.mock("./sync.worker", () => ({
 }));
 
 const mockDbUpdate = vi.fn();
+const mockDbSelect = vi.fn();
+const mockDbDelete = vi.fn();
 vi.mock("../config/database", () => ({
   db: {
     update: (...args: unknown[]) => mockDbUpdate(...args),
+    select: (...args: unknown[]) => mockDbSelect(...args),
+    delete: (...args: unknown[]) => mockDbDelete(...args),
   },
 }));
 
 vi.mock("@dragons/db/schema", () => ({
-  syncRuns: { id: "id", status: "status" },
+  syncRuns: { id: "id", status: "status", startedAt: "startedAt" },
+  syncRunEntries: { syncRunId: "syncRunId" },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+  lt: vi.fn(),
+  inArray: vi.fn(),
 }));
 
-import { initializeWorkers, shutdownWorkers } from "./index";
+import { initializeWorkers, shutdownWorkers, cleanupOldSyncRuns } from "./index";
 import { logger } from "../config/logger";
 
 beforeEach(() => {
   vi.clearAllMocks();
+
+  // Default: no stale runs, no old runs
+  mockDbUpdate.mockReturnValue({
+    set: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([]),
+      }),
+    }),
+  });
+  mockDbSelect.mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue([]),
+    }),
+  });
+  mockDbDelete.mockReturnValue({
+    where: vi.fn().mockResolvedValue(undefined),
+  });
 });
 
 describe("initializeWorkers", () => {
   it("calls initializeScheduledJobs", async () => {
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
-
     await initializeWorkers();
 
     expect(mockInitScheduledJobs).toHaveBeenCalled();
@@ -79,17 +95,77 @@ describe("initializeWorkers", () => {
   });
 
   it("does not log warning when no stale runs found", async () => {
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
-        }),
+    await initializeWorkers();
+
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("runs cleanup of old sync runs", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ id: 10 }, { id: 11 }]),
       }),
     });
 
     await initializeWorkers();
 
-    expect(logger.warn).not.toHaveBeenCalled();
+    expect(mockDbDelete).toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(
+      { count: 2 },
+      "Cleaned up old sync runs",
+    );
+  });
+
+  it("continues if cleanup fails", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockRejectedValue(new Error("DB error")),
+      }),
+    });
+
+    await initializeWorkers();
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: expect.any(Error) }),
+      "Failed to cleanup old sync runs",
+    );
+    expect(mockInitScheduledJobs).toHaveBeenCalled();
+  });
+});
+
+describe("cleanupOldSyncRuns", () => {
+  it("returns 0 when no old runs found", async () => {
+    const result = await cleanupOldSyncRuns();
+
+    expect(result).toBe(0);
+    expect(mockDbDelete).not.toHaveBeenCalled();
+  });
+
+  it("deletes entries then runs for old data", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]),
+      }),
+    });
+
+    const result = await cleanupOldSyncRuns(90);
+
+    expect(result).toBe(3);
+    // Should delete entries first, then runs
+    expect(mockDbDelete).toHaveBeenCalledTimes(2);
+  });
+
+  it("accepts custom retention days", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    });
+
+    const result = await cleanupOldSyncRuns(30);
+
+    expect(result).toBe(0);
+    expect(mockDbSelect).toHaveBeenCalled();
   });
 });
 

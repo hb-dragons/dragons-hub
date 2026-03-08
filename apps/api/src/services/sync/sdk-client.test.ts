@@ -706,6 +706,23 @@ describe("SdkClient", () => {
     });
   });
 
+  describe("TokenBucket concurrency", () => {
+    it("handles concurrent acquires without errors", async () => {
+      const testClient = new SdkClient();
+
+      for (let i = 0; i < 20; i++) {
+        mockGetSpielplan.mockResolvedValueOnce({ matches: [] });
+      }
+
+      // Fire 20 calls concurrently
+      await Promise.all(
+        Array.from({ length: 20 }, (_, i) => testClient.getSpielplan(i)),
+      );
+
+      expect(mockGetSpielplan).toHaveBeenCalledTimes(20);
+    });
+  });
+
   describe("logout", () => {
     it("clears authentication state", async () => {
       // Login first

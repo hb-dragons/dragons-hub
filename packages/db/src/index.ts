@@ -10,8 +10,10 @@ export function createDb(connectionString: string) {
     connectionTimeoutMillis: 2000,
   });
 
-  return drizzle(pool, { schema });
+  const db = drizzle(pool, { schema });
+
+  return { db, pool };
 }
 
-export type Database = ReturnType<typeof createDb>;
+export type Database = ReturnType<typeof createDb>["db"];
 export * from "./schema";

@@ -28,6 +28,8 @@ export class SyncLogger {
   private redis: Redis | null = null;
   private channelName: string;
   private redisPublishFailed = false;
+  private flushRetries = 0;
+  private static readonly MAX_FLUSH_RETRIES = 3;
 
   constructor(syncRunId: number, redisInstance?: Redis | null) {
     this.syncRunId = syncRunId;
@@ -87,9 +89,19 @@ export class SyncLogger {
 
     try {
       await db.insert(syncRunEntries).values(toInsert);
+      this.flushRetries = 0;
     } catch (error) {
-      log.error({ err: error }, "Failed to flush entries");
-      this.entries.push(...toInsert);
+      this.flushRetries++;
+      if (this.flushRetries < SyncLogger.MAX_FLUSH_RETRIES) {
+        log.error({ err: error, retry: this.flushRetries }, "Failed to flush entries, will retry");
+        this.entries.push(...toInsert);
+      } else {
+        log.error(
+          { err: error, droppedCount: toInsert.length },
+          "Failed to flush entries after max retries, dropping batch",
+        );
+        this.flushRetries = 0;
+      }
     }
   }
 

@@ -108,9 +108,6 @@ export function extractPeriodScores(
 
   if (!game) return nullScores;
 
-  const validScore = (score: number | undefined) =>
-    score !== undefined && score >= 0 ? score : null;
-
   // When V5-V8 fields are present the game uses achtel (8-period) format.
   // We don't extract per-period data for achtel — just return nulls so the
   // caller falls back to end-result only.
@@ -125,20 +122,20 @@ export function extractPeriodScores(
   const hasOvertime = game.heimOt1stand >= 0 || game.gastOt1stand >= 0;
 
   // Standard 4-quarter format: cumulative → delta
-  const cumH1 = validScore(game.heimV1stand);
-  const cumG1 = validScore(game.gastV1stand);
+  const cumH1 = validScoreOrNull(game.heimV1stand);
+  const cumG1 = validScoreOrNull(game.gastV1stand);
   const cumH2 =
-    validScore(game.heimV2stand) ?? validScore(game.heimHalbzeitstand);
+    validScoreOrNull(game.heimV2stand) ?? validScoreOrNull(game.heimHalbzeitstand);
   const cumG2 =
-    validScore(game.gastV2stand) ?? validScore(game.gastHalbzeitstand);
-  const cumH3 = validScore(game.heimV3stand);
-  const cumG3 = validScore(game.gastV3stand);
+    validScoreOrNull(game.gastV2stand) ?? validScoreOrNull(game.gastHalbzeitstand);
+  const cumH3 = validScoreOrNull(game.heimV3stand);
+  const cumG3 = validScoreOrNull(game.gastV3stand);
   const cumH4 =
-    validScore(game.heimV4stand) ??
-    (hasOvertime ? null : validScore(game.heimEndstand));
+    validScoreOrNull(game.heimV4stand) ??
+    (hasOvertime ? null : validScoreOrNull(game.heimEndstand));
   const cumG4 =
-    validScore(game.gastV4stand) ??
-    (hasOvertime ? null : validScore(game.gastEndstand));
+    validScoreOrNull(game.gastV4stand) ??
+    (hasOvertime ? null : validScoreOrNull(game.gastEndstand));
 
   // Only set periodFormat if any Q data exists
   const hasAnyData =

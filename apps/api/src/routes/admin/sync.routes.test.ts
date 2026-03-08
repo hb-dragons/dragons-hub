@@ -79,8 +79,12 @@ vi.mock("ioredis", () => {
 import { syncRoutes } from "./sync.routes";
 import { errorHandler } from "../../middleware/error";
 
-// Test app without auth middleware
+// Test app without auth middleware — inject a fake user for routes that need it
 const app = new Hono<AppEnv>();
+app.use("*", async (c, next) => {
+  c.set("user", { id: "test-user-123" } as AppEnv["Variables"]["user"]);
+  await next();
+});
 app.onError(errorHandler);
 app.route("/", syncRoutes);
 
@@ -113,6 +117,7 @@ describe("POST /sync/trigger", () => {
       status: "queued",
       message: "Sync job has been queued",
     });
+    expect(mocks.triggerManualSync).toHaveBeenCalledWith("test-user-123");
   });
 
   it("returns error when sync already queued", async () => {

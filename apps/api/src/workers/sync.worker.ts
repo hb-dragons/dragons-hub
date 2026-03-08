@@ -4,7 +4,7 @@ import { syncRuns } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { db } from "../config/database";
-import { syncOrchestrator } from "../services/sync/index";
+import { fullSync } from "../services/sync/index";
 
 interface SyncJobData {
   type: "full" | "leagues" | "matches" | "standings";
@@ -27,7 +27,7 @@ export const syncWorker = new Worker<SyncJobData>(
 
       switch (job.data.type) {
         case "full": {
-          const fullResult = await syncOrchestrator.fullSync(triggeredBy, jobLogger, job.data.syncRunId);
+          const fullResult = await fullSync(triggeredBy, jobLogger, job.data.syncRunId);
           return { completed: true, type: job.data.type, result: fullResult };
         }
         default:

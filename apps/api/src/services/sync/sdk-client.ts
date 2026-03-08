@@ -22,6 +22,7 @@ const BASE_URL = "https://www.basketball-bund.net";
 class TokenBucket {
   private tokens: number;
   private lastRefill: number;
+  private pending: Promise<void> = Promise.resolve();
 
   constructor(
     private maxTokens: number = 15,
@@ -32,16 +33,20 @@ class TokenBucket {
   }
 
   async acquire(): Promise<void> {
+    this.pending = this.pending.then(() => this.acquireInternal());
+    return this.pending;
+  }
+
+  private async acquireInternal(): Promise<void> {
     this.refill();
-    if (this.tokens > 0) {
+    if (this.tokens >= 1) {
       this.tokens--;
       return;
     }
-    // Wait for a token
     const waitMs = (1 / this.refillRate) * 1000;
     await new Promise((resolve) => setTimeout(resolve, waitMs));
     this.refill();
-    this.tokens--;
+    this.tokens = Math.max(0, this.tokens - 1);
   }
 
   private refill(): void {

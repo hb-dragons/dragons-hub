@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { describeRoute } from "hono-openapi";
+import type { AppEnv } from "../../types";
 import { triggerManualSync, getJobStatus, syncQueue } from "../../workers/queues";
 import {
   getSyncStatus,
@@ -24,7 +25,7 @@ import type { JobType } from "bullmq";
 import Redis from "ioredis";
 import { env } from "../../config/env";
 
-const syncRoutes = new Hono();
+const syncRoutes = new Hono<AppEnv>();
 
 const DEFAULT_JOB_STATUSES: JobType[] = ["active", "waiting", "delayed", "failed"];
 
@@ -37,7 +38,8 @@ syncRoutes.post(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const result = await triggerManualSync();
+    const userId = c.get("user")?.id;
+    const result = await triggerManualSync(userId);
     return c.json(result);
   },
 );

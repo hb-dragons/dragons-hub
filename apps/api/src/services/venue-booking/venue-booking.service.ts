@@ -376,16 +376,15 @@ export async function reconcileBookingsForMatches(
       // All matches are forfeited/cancelled — mark existing booking for cleanup
       if (existing) {
         // Remove all junction entries for these matches
-        for (const game of group) {
-          await db
-            .delete(venueBookingMatches)
-            .where(
-              and(
-                eq(venueBookingMatches.venueBookingId, existing.id),
-                eq(venueBookingMatches.matchId, game.matchId),
-              ),
-            );
-        }
+        const cancelledMatchIds = group.map((g) => g.matchId);
+        await db
+          .delete(venueBookingMatches)
+          .where(
+            and(
+              eq(venueBookingMatches.venueBookingId, existing.id),
+              inArray(venueBookingMatches.matchId, cancelledMatchIds),
+            ),
+          );
 
         // Check if booking has any remaining matches
         const [remaining] = await db
@@ -457,11 +456,13 @@ export async function reconcileBookingsForMatches(
         })
         .returning({ id: venueBookings.id });
 
-      for (const mid of activeMatchIds) {
-        await db.insert(venueBookingMatches).values({
-          venueBookingId: created!.id,
-          matchId: mid,
-        });
+      if (activeMatchIds.length > 0) {
+        await db.insert(venueBookingMatches).values(
+          activeMatchIds.map((matchId) => ({
+            venueBookingId: created!.id,
+            matchId,
+          })),
+        );
       }
 
       result.created++;
@@ -525,26 +526,24 @@ async function syncBookingMatches(
   const existingIds = new Set(existing.map((r) => r.matchId));
   const expectedIds = new Set(expectedMatchIds);
 
-  for (const matchId of expectedIds) {
-    if (!existingIds.has(matchId)) {
-      await db.insert(venueBookingMatches).values({
-        venueBookingId: bookingId,
-        matchId,
-      });
-    }
+  const toInsert = [...expectedIds].filter((id) => !existingIds.has(id));
+  const toDelete = [...existingIds].filter((id) => !expectedIds.has(id));
+
+  if (toInsert.length > 0) {
+    await db.insert(venueBookingMatches).values(
+      toInsert.map((matchId) => ({ venueBookingId: bookingId, matchId })),
+    );
   }
 
-  for (const matchId of existingIds) {
-    if (!expectedIds.has(matchId)) {
-      await db
-        .delete(venueBookingMatches)
-        .where(
-          and(
-            eq(venueBookingMatches.venueBookingId, bookingId),
-            eq(venueBookingMatches.matchId, matchId),
-          ),
-        );
-    }
+  if (toDelete.length > 0) {
+    await db
+      .delete(venueBookingMatches)
+      .where(
+        and(
+          eq(venueBookingMatches.venueBookingId, bookingId),
+          inArray(venueBookingMatches.matchId, toDelete),
+        ),
+      );
   }
 }
 

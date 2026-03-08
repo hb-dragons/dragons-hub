@@ -89,7 +89,7 @@ vi.mock("../venue-booking/venue-booking.service", () => ({
   reconcileAfterSync: (...args: unknown[]) => mockReconcileAfterSync(...args),
 }));
 
-import { SyncOrchestrator, syncOrchestrator } from "./index";
+import { fullSync } from "./index";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -161,10 +161,10 @@ beforeEach(() => {
   mockReconcileAfterSync.mockResolvedValue(undefined);
 });
 
-describe("SyncOrchestrator", () => {
-  describe("fullSync", () => {
+describe("fullSync", () => {
+  describe("sync pipeline", () => {
     it("completes a successful full sync", async () => {
-      const result = await syncOrchestrator.fullSync("manual");
+      const result = await fullSync("manual");
 
       expect(result.status).toBe("completed");
       expect(result.triggeredBy).toBe("manual");
@@ -175,7 +175,7 @@ describe("SyncOrchestrator", () => {
     });
 
     it("creates sync run record", async () => {
-      await syncOrchestrator.fullSync("cron");
+      await fullSync("cron");
 
       expect(mockInsert).toHaveBeenCalled();
     });
@@ -198,7 +198,7 @@ describe("SyncOrchestrator", () => {
         }),
       });
 
-      const result = await syncOrchestrator.fullSync("manual", undefined, 99);
+      const result = await fullSync("manual", undefined, 99);
 
       expect(result.syncRunId).toBe(99);
       expect(mockInsert).not.toHaveBeenCalled();
@@ -216,13 +216,13 @@ describe("SyncOrchestrator", () => {
         }),
       });
 
-      await expect(syncOrchestrator.fullSync("manual", undefined, 999)).rejects.toThrow(
+      await expect(fullSync("manual", undefined, 999)).rejects.toThrow(
         "Failed to update sync run",
       );
     });
 
     it("updates sync run record on completion with returning", async () => {
-      await syncOrchestrator.fullSync("manual");
+      await fullSync("manual");
 
       // update called at end
       expect(mockUpdate).toHaveBeenCalled();
@@ -244,7 +244,7 @@ describe("SyncOrchestrator", () => {
         }),
       });
 
-      await syncOrchestrator.fullSync("manual");
+      await fullSync("manual");
 
       expect(mockSyncLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({ syncRunId: 1 }),
@@ -253,7 +253,7 @@ describe("SyncOrchestrator", () => {
     });
 
     it("calls all sync steps in order", async () => {
-      await syncOrchestrator.fullSync("manual");
+      await fullSync("manual");
 
       expect(mockSyncLeagues).toHaveBeenCalled();
       expect(mockFetchAllSyncData).toHaveBeenCalled();
@@ -272,7 +272,7 @@ describe("SyncOrchestrator", () => {
     it("calls the jobLogger", async () => {
       const jobLogger = vi.fn();
 
-      await syncOrchestrator.fullSync("manual", jobLogger);
+      await fullSync("manual", jobLogger);
 
       expect(jobLogger).toHaveBeenCalled();
     });
@@ -287,7 +287,7 @@ describe("SyncOrchestrator", () => {
         errors: ["team error"], durationMs: 0,
       });
 
-      const result = await syncOrchestrator.fullSync("manual");
+      const result = await fullSync("manual");
 
       expect(result.totalErrors).toContain("league error");
       expect(result.totalErrors).toContain("team error");
@@ -296,7 +296,7 @@ describe("SyncOrchestrator", () => {
     it("handles fatal error during sync", async () => {
       mockSyncLeagues.mockRejectedValue(new Error("Fatal crash"));
 
-      const result = await syncOrchestrator.fullSync("manual");
+      const result = await fullSync("manual");
 
       expect(result.status).toBe("failed");
       expect(result.totalErrors[0]).toContain("Fatal sync error");
@@ -305,7 +305,7 @@ describe("SyncOrchestrator", () => {
     it("handles non-Error fatal exception", async () => {
       mockSyncLeagues.mockRejectedValue("string crash");
 
-      const result = await syncOrchestrator.fullSync("manual");
+      const result = await fullSync("manual");
 
       expect(result.status).toBe("failed");
       expect(result.totalErrors[0]).toContain("Unknown error");
@@ -315,7 +315,7 @@ describe("SyncOrchestrator", () => {
       const mockLogger = { close: vi.fn().mockResolvedValue(undefined), log: vi.fn() };
       mockCreateSyncLogger.mockReturnValue(mockLogger);
 
-      await syncOrchestrator.fullSync("manual");
+      await fullSync("manual");
 
       expect(mockLogger.close).toHaveBeenCalled();
     });
@@ -325,7 +325,7 @@ describe("SyncOrchestrator", () => {
       mockCreateSyncLogger.mockReturnValue(mockLogger);
       mockSyncLeagues.mockRejectedValue(new Error("crash"));
 
-      await syncOrchestrator.fullSync("manual");
+      await fullSync("manual");
 
       expect(mockLogger.close).toHaveBeenCalled();
     });
@@ -337,7 +337,7 @@ describe("SyncOrchestrator", () => {
         }),
       });
 
-      await expect(syncOrchestrator.fullSync("manual")).rejects.toThrow(
+      await expect(fullSync("manual")).rejects.toThrow(
         "Failed to create sync run",
       );
     });
@@ -345,7 +345,7 @@ describe("SyncOrchestrator", () => {
     it("returns zero counts on fatal failure", async () => {
       mockSyncLeagues.mockRejectedValue(new Error("crash"));
 
-      const result = await syncOrchestrator.fullSync("manual");
+      const result = await fullSync("manual");
 
       expect(result.leagues.created).toBe(0);
       expect(result.teams.created).toBe(0);
@@ -357,7 +357,7 @@ describe("SyncOrchestrator", () => {
     });
 
     it("includes durationMs", async () => {
-      const result = await syncOrchestrator.fullSync("manual");
+      const result = await fullSync("manual");
 
       expect(result.durationMs).toBeGreaterThanOrEqual(0);
     });
@@ -369,7 +369,7 @@ describe("SyncOrchestrator", () => {
       mockSyncRoles.mockResolvedValue({ created: 1, updated: 2, skipped: 1, failed: 0, roleIdLookup: new Map() });
       mockSyncAssignments.mockResolvedValue({ created: 5, errors: [] });
 
-      const result = await syncOrchestrator.fullSync("manual");
+      const result = await fullSync("manual");
 
       expect(result.referees.created).toBe(2);
       expect(result.referees.updated).toBe(1);
@@ -380,7 +380,7 @@ describe("SyncOrchestrator", () => {
     });
 
     it("calls venue booking reconciliation after sync steps", async () => {
-      await syncOrchestrator.fullSync("manual");
+      await fullSync("manual");
 
       expect(mockReconcileAfterSync).toHaveBeenCalled();
     });
@@ -388,7 +388,7 @@ describe("SyncOrchestrator", () => {
     it("collects error when venue booking reconciliation fails", async () => {
       mockReconcileAfterSync.mockRejectedValue(new Error("Booking DB error"));
 
-      const result = await syncOrchestrator.fullSync("manual");
+      const result = await fullSync("manual");
 
       expect(result.status).toBe("completed");
       expect(result.totalErrors).toContain(
@@ -399,18 +399,12 @@ describe("SyncOrchestrator", () => {
     it("handles non-Error venue booking reconciliation failure", async () => {
       mockReconcileAfterSync.mockRejectedValue("string error");
 
-      const result = await syncOrchestrator.fullSync("manual");
+      const result = await fullSync("manual");
 
       expect(result.status).toBe("completed");
       expect(result.totalErrors).toContain(
         "Venue booking reconciliation failed: Unknown error",
       );
     });
-  });
-});
-
-describe("syncOrchestrator singleton", () => {
-  it("is an instance of SyncOrchestrator", () => {
-    expect(syncOrchestrator).toBeInstanceOf(SyncOrchestrator);
   });
 });
