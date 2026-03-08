@@ -9,36 +9,22 @@ import {
   boolean,
   index,
 } from "drizzle-orm/pg-core";
-
-interface EntitySyncStats {
-  total: number;
-  created: number;
-  updated: number;
-  skipped: number;
-}
-
-export interface SyncRunSummary {
-  leagues: EntitySyncStats;
-  teams: EntitySyncStats;
-  matches: EntitySyncStats;
-  standings: EntitySyncStats;
-  venues: EntitySyncStats;
-  referees: {
-    created: number;
-    updated: number;
-    skipped: number;
-    rolesUpdated: number;
-    assignmentsCreated: number;
-  };
-}
+import type {
+  SyncRunSummary,
+  SyncStatus,
+  EntityType,
+  EntryAction,
+} from "@dragons/shared";
+// Re-export SyncRunSummary from shared as the single source of truth
+export type { SyncRunSummary } from "@dragons/shared";
 
 export const syncRuns = pgTable(
   "sync_runs",
   {
     id: serial("id").primaryKey(),
-    syncType: varchar("sync_type", { length: 50 }).notNull(), // 'full', 'leagues', 'matches', 'standings'
-    status: varchar("status", { length: 20 }).notNull(), // 'pending', 'running', 'completed', 'failed'
-    triggeredBy: varchar("triggered_by", { length: 50 }).notNull(), // 'cron', 'manual'
+    syncType: varchar("sync_type", { length: 50 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().$type<SyncStatus>(),
+    triggeredBy: varchar("triggered_by", { length: 50 }).notNull(),
     recordsProcessed: integer("records_processed").default(0),
     recordsCreated: integer("records_created").default(0),
     recordsUpdated: integer("records_updated").default(0),
@@ -64,10 +50,10 @@ export const syncRunEntries = pgTable(
     syncRunId: integer("sync_run_id")
       .notNull()
       .references(() => syncRuns.id, { onDelete: "cascade" }),
-    entityType: varchar("entity_type", { length: 20 }).notNull(),
+    entityType: varchar("entity_type", { length: 20 }).notNull().$type<EntityType>(),
     entityId: varchar("entity_id", { length: 100 }).notNull(),
     entityName: varchar("entity_name", { length: 255 }),
-    action: varchar("action", { length: 20 }).notNull(), // 'created', 'updated', 'skipped', 'failed'
+    action: varchar("action", { length: 20 }).notNull().$type<EntryAction>(),
     message: text("message"),
     metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

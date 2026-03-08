@@ -18,7 +18,7 @@ const MAX_MINUTES_IN_DAY = 23 * 60 + 59;
 const MAX_SECONDS_IN_DAY = MAX_MINUTES_IN_DAY * 60 + 59;
 
 function parseTimeToMinutes(time: string): number {
-  const [hours, minutes] = time.split(":").map(Number);
+  const [hours, minutes] = time.split(":").map(Number) as [number, number];
   return hours * 60 + minutes;
 }
 
@@ -54,7 +54,7 @@ export function calculateTimeWindow(
       m.teamGameDuration !== null
         ? m.teamGameDuration
         : config.defaultGameDurationMinutes;
-    return kickoffMinutes[i] + duration;
+    return kickoffMinutes[i]! + duration;
   });
 
   const latestMatchEnd = Math.max(...matchEndMinutes);

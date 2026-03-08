@@ -180,7 +180,7 @@ export function SyncHistoryTable() {
               </TableHeader>
               <TableBody>
                 {logs.map((run) => {
-                  const statusCfg = STATUS_CONFIG[run.status] ?? STATUS_CONFIG.pending;
+                  const statusCfg = (STATUS_CONFIG[run.status] ?? STATUS_CONFIG.pending)!;
                   const StatusIcon = statusCfg.icon;
                   const isExpanded = expandedId === run.id;
 

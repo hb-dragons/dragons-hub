@@ -494,7 +494,7 @@ describe("GET /sync/logs/:id/stream", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(mocks.redisInstances.length).toBe(1);
-    const redis = mocks.redisInstances[0];
+    const redis = mocks.redisInstances[0]!;
     expect(redis.subscribe).toHaveBeenCalledWith("sync:1:logs");
 
     // Emit events through mock Redis

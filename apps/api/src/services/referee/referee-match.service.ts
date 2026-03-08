@@ -262,9 +262,9 @@ export async function recordTakeIntent(
   return {
     deepLink: `https://basketball-bund.net/app.do?app=/sr/take&spielId=${match.apiMatchId}`,
     intent: {
-      matchId: intent.matchId,
-      slotNumber: intent.slotNumber,
-      clickedAt: intent.clickedAt.toISOString(),
+      matchId: intent!.matchId,
+      slotNumber: intent!.slotNumber,
+      clickedAt: intent!.clickedAt.toISOString(),
     },
   };
 }
@@ -396,15 +396,15 @@ export async function verifyMatchAssignment(
       if (!existing) {
         await db.insert(matchReferees).values({
           matchId: match.id,
-          refereeId: ref.id,
-          roleId: role.id,
+          refereeId: ref!.id,
+          roleId: role!.id,
           slotNumber,
           createdAt: now,
         });
-      } else if (existing.refereeId !== ref.id || existing.roleId !== role.id) {
+      } else if (existing.refereeId !== ref!.id || existing.roleId !== role!.id) {
         await db
           .update(matchReferees)
-          .set({ refereeId: ref.id, roleId: role.id })
+          .set({ refereeId: ref!.id, roleId: role!.id })
           .where(eq(matchReferees.id, existing.id));
       }
     }

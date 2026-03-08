@@ -11,6 +11,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { BookingStatus } from "@dragons/shared";
 import { venues } from "./venues";
 
 export const venueBookings = pgTable(
@@ -26,7 +27,7 @@ export const venueBookings = pgTable(
     overrideStartTime: time("override_start_time"),
     overrideEndTime: time("override_end_time"),
     overrideReason: text("override_reason"),
-    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    status: varchar("status", { length: 20 }).notNull().default("pending").$type<BookingStatus>(),
     needsReconfirmation: boolean("needs_reconfirmation")
       .notNull()
       .default(false),

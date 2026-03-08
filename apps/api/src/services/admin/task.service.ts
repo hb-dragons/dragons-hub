@@ -34,7 +34,7 @@ export async function listTasks(
     conditions.push(eq(tasks.assigneeId, filters.assigneeId));
   }
   if (filters?.priority) {
-    conditions.push(eq(tasks.priority, filters.priority));
+    conditions.push(eq(tasks.priority, filters.priority as TaskPriority));
   }
 
   const rows = await db
@@ -132,7 +132,7 @@ export async function createTask(
       title: data.title,
       description: data.description ?? null,
       assigneeId: data.assigneeId ?? null,
-      priority: data.priority ?? "normal",
+      priority: (data.priority ?? "normal") as TaskPriority,
       dueDate: data.dueDate ?? null,
       position: (maxPos?.maxPosition ?? -1) + 1,
     })
@@ -229,9 +229,16 @@ export async function updateTask(
     dueDate?: string | null;
   },
 ): Promise<TaskDetail | null> {
+  const setData: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.title !== undefined) setData.title = data.title;
+  if (data.description !== undefined) setData.description = data.description;
+  if (data.assigneeId !== undefined) setData.assigneeId = data.assigneeId;
+  if (data.priority !== undefined) setData.priority = data.priority;
+  if (data.dueDate !== undefined) setData.dueDate = data.dueDate;
+
   const [updated] = await db
     .update(tasks)
-    .set({ ...data, updatedAt: new Date() })
+    .set(setData)
     .where(eq(tasks.id, id))
     .returning();
 

@@ -26,7 +26,7 @@ export async function listBookings(
 ): Promise<BookingListItem[]> {
   const conditions = [];
   if (filters?.status) {
-    conditions.push(eq(venueBookings.status, filters.status));
+    conditions.push(eq(venueBookings.status, filters.status as BookingStatus));
   }
   if (filters?.dateFrom) {
     conditions.push(gte(venueBookings.date, filters.dateFrom));

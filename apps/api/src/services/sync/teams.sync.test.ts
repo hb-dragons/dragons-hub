@@ -242,7 +242,7 @@ describe("syncTeamsFromData", () => {
 
     await syncTeamsFromData(teamsMap);
 
-    const records = chain.values.mock.calls[0][0];
+    const records = chain.values.mock.calls[0]![0];
     const ownTeam = records.find((r: { apiTeamPermanentId: number }) => r.apiTeamPermanentId === 1);
     const otherTeam = records.find((r: { apiTeamPermanentId: number }) => r.apiTeamPermanentId === 2);
     expect(ownTeam.isOwnClub).toBe(true);
@@ -257,7 +257,7 @@ describe("syncTeamsFromData", () => {
 
     await syncTeamsFromData(teamsMap);
 
-    const records = chain.values.mock.calls[0][0];
+    const records = chain.values.mock.calls[0]![0];
     expect(records[0].isOwnClub).toBe(false);
     // Should not call update when ownClubId is 0
     expect(mockUpdate).not.toHaveBeenCalled();
@@ -277,7 +277,7 @@ describe("syncTeamsFromData", () => {
 
     await syncTeamsFromData(teamsMap);
 
-    const records = chain.values.mock.calls[0][0];
+    const records = chain.values.mock.calls[0]![0];
     expect(records[0].nameShort).toBeNull();
   });
 

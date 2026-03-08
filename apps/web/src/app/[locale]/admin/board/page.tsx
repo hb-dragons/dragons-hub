@@ -16,9 +16,10 @@ export default async function BoardPage() {
   try {
     boards = await fetchAPIServer<BoardData[]>("/admin/boards");
     if (boards && boards.length > 0) {
+      const firstBoard = boards[0]!;
       [board, tasks] = await Promise.all([
-        fetchAPIServer<BoardData>(`/admin/boards/${boards[0].id}`),
-        fetchAPIServer<TaskCardData[]>(`/admin/boards/${boards[0].id}/tasks`),
+        fetchAPIServer<BoardData>(`/admin/boards/${firstBoard.id}`),
+        fetchAPIServer<TaskCardData[]>(`/admin/boards/${firstBoard.id}/tasks`),
       ]);
     }
   } catch (e) {

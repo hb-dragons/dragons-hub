@@ -46,8 +46,7 @@ export const matches = pgTable(
     homeHalftimeScore: integer("home_halftime_score"),
     guestHalftimeScore: integer("guest_halftime_score"),
 
-    // Period format: 'quarters' | 'achtel' | null
-    periodFormat: varchar("period_format", { length: 10 }),
+    periodFormat: varchar("period_format", { length: 10 }).$type<"quarters" | "achtel">(),
 
     // Per-period delta scores (Q1–Q8 for achtel, Q1–Q4 for quarters)
     homeQ1: integer("home_q1"),

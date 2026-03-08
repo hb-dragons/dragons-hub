@@ -305,7 +305,7 @@ describe("syncMatchesFromData", () => {
     expect(result.total).toBe(1);
 
     // Verify period scores are delta values, not cumulative
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockValues.mock.calls[0]![0];
     expect(inserted.periodFormat).toBe("quarters");
     expect(inserted.homeQ1).toBe(20);
     expect(inserted.guestQ1).toBe(18);
@@ -376,7 +376,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], venueIdLookup, null);
 
-    const insertedValues = mockValues.mock.calls[0][0];
+    const insertedValues = mockValues.mock.calls[0]![0];
     expect(insertedValues.venueId).toBe(500);
   });
 
@@ -524,7 +524,7 @@ describe("syncMatchesFromData", () => {
     const result = await syncMatchesFromData([data], new Map(), null);
 
     expect(result.created).toBe(1);
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockValues.mock.calls[0]![0];
     // OT1 delta = 90 - 80 = 10
     expect(inserted.homeOt1).toBe(10);
     // OT1 guest delta = 78 - 70 = 8
@@ -586,7 +586,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), null);
 
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockValues.mock.calls[0]![0];
     expect(inserted.homeScore).toBe(63);
     expect(inserted.guestScore).toBe(61);
   });
@@ -616,7 +616,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), null);
 
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockValues.mock.calls[0]![0];
     expect(inserted.homeScore).toBeNull();
     expect(inserted.guestScore).toBeNull();
     expect(inserted.homeHalftimeScore).toBeNull();
@@ -669,7 +669,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), 1);
 
-    const updatedFields = txUpdateSet.mock.calls[0][0];
+    const updatedFields = txUpdateSet.mock.calls[0]![0];
     expect(updatedFields.venueId).toBe(500);
     expect(updatedFields.homeHalftimeScore).toBe(40);
     expect(updatedFields.guestHalftimeScore).toBe(35);
@@ -689,7 +689,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], venueIdLookup, 1);
 
-    const updatedFields = txUpdateSet.mock.calls[0][0];
+    const updatedFields = txUpdateSet.mock.calls[0]![0];
     expect(updatedFields.venueId).toBe(600);
     expect(updatedFields.homeHalftimeScore).toBe(40);
     expect(updatedFields.guestHalftimeScore).toBe(35);
@@ -724,7 +724,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), null);
 
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockValues.mock.calls[0]![0];
     expect(inserted.periodFormat).toBe("quarters");
     // Q1 delta = cumulative first period
     expect(inserted.homeQ1).toBe(13);
@@ -769,7 +769,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), null);
 
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockValues.mock.calls[0]![0];
     // Q4 should NOT be derived from endstand since overtime was played
     expect(inserted.homeQ4).toBeNull();
     expect(inserted.guestQ4).toBeNull();
@@ -790,7 +790,7 @@ describe("syncMatchesFromData", () => {
     await syncMatchesFromData([data], new Map(), 1);
 
     // When details ARE available but spielfeldId is 0, venueId should be null
-    const updatedFields = txUpdateSet.mock.calls[0][0];
+    const updatedFields = txUpdateSet.mock.calls[0]![0];
     expect(updatedFields.venueId).toBeNull();
   });
 
@@ -806,7 +806,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), 1);
 
-    const updatedFields = txUpdateSet.mock.calls[0][0];
+    const updatedFields = txUpdateSet.mock.calls[0]![0];
     // kickoffDate should NOT be in update set (it's overridden)
     expect(updatedFields.kickoffDate).toBeUndefined();
     // Other fields should still be updated
@@ -825,7 +825,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), null);
 
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockValues.mock.calls[0]![0];
     expect(inserted.matchDay).toBe(0);
   });
 
@@ -850,7 +850,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), 1);
 
-    const updatedFields = txUpdateSet.mock.calls[0][0];
+    const updatedFields = txUpdateSet.mock.calls[0]![0];
     // guestHalftimeScore is overridden, so should NOT be preserved
     expect(updatedFields.guestHalftimeScore).toBeUndefined();
     // homeHalftimeScore is NOT overridden and remote is null → should be preserved
@@ -888,7 +888,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), 1);
 
-    const updatedFields = txUpdateSet.mock.calls[0][0];
+    const updatedFields = txUpdateSet.mock.calls[0]![0];
     // Overridden fields should NOT be preserved (skipped from update entirely)
     expect(updatedFields.homeHalftimeScore).toBeUndefined();
     expect(updatedFields.homeQ1).toBeUndefined();
@@ -931,7 +931,7 @@ describe("syncMatchesFromData", () => {
     const result = await syncMatchesFromData([data], new Map(), null);
 
     expect(result.created).toBe(1);
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockValues.mock.calls[0]![0];
     expect(inserted.sr1Open).toBe(true);
     expect(inserted.sr2Open).toBe(false);
     expect(inserted.sr3Open).toBe(true);
@@ -947,7 +947,7 @@ describe("syncMatchesFromData", () => {
 
     await syncMatchesFromData([data], new Map(), null);
 
-    const inserted = mockValues.mock.calls[0][0];
+    const inserted = mockValues.mock.calls[0]![0];
     expect(inserted.sr1Open).toBe(false);
     expect(inserted.sr2Open).toBe(false);
     expect(inserted.sr3Open).toBe(false);
@@ -968,7 +968,7 @@ describe("syncMatchesFromData", () => {
     const result = await syncMatchesFromData([data], new Map(), 1);
 
     expect(result.updated).toBe(1);
-    const updatedFields = txUpdateSet.mock.calls[0][0];
+    const updatedFields = txUpdateSet.mock.calls[0]![0];
     expect(updatedFields.sr1Open).toBe(true);
   });
 });

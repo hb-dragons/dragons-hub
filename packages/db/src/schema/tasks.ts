@@ -9,6 +9,7 @@ import {
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
+import type { TaskPriority } from "@dragons/shared";
 import { boards, boardColumns } from "./boards";
 
 export const tasks = pgTable(
@@ -24,7 +25,7 @@ export const tasks = pgTable(
     title: varchar("title", { length: 300 }).notNull(),
     description: text("description"),
     assigneeId: text("assignee_id"),
-    priority: varchar("priority", { length: 10 }).notNull().default("normal"),
+    priority: varchar("priority", { length: 10 }).notNull().default("normal").$type<TaskPriority>(),
     dueDate: date("due_date"),
     position: integer("position").notNull().default(0),
     createdBy: text("created_by"),

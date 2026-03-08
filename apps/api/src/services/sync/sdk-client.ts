@@ -349,12 +349,12 @@ export class SdkClient {
     let failedCount = 0;
     const failedErrors: string[] = [];
     for (let i = 0; i < results.length; i++) {
-      const result = results[i];
+      const result = results[i]!;
       if (result.status === "fulfilled") {
         detailsMap.set(result.value.matchId, result.value.details);
       } else {
         failedCount++;
-        const matchId = matchIds[i];
+        const matchId = matchIds[i]!;
         const reason =
           result.reason instanceof Error
             ? result.reason.message

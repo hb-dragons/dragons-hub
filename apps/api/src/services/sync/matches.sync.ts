@@ -11,6 +11,7 @@ import type { SdkSpielplanMatch, SdkGetGameResponse } from "@dragons/sdk";
 import type { LeagueFetchedData } from "./data-fetcher";
 import { computeEntityHash } from "./hash";
 import type { SyncLogger } from "./sync-logger";
+import type { CurrentRemoteSnapshot } from "@dragons/db/schema";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "matches-sync" });
@@ -554,7 +555,7 @@ export async function syncMatchesFromData(
               matchId: locked.id,
               versionNumber: newVersionNumber,
               syncRunId,
-              snapshot: remoteSnapshot,
+              snapshot: remoteSnapshot as unknown as CurrentRemoteSnapshot,
               dataHash: newHash,
             });
 
@@ -563,7 +564,7 @@ export async function syncMatchesFromData(
               await tx.insert(matchChanges).values(
                 fieldChanges.map((change) => ({
                   matchId: locked.id,
-                  track: "remote",
+                  track: "remote" as const,
                   versionNumber: newVersionNumber,
                   fieldName: change.fieldName,
                   oldValue: change.oldValue,
@@ -742,7 +743,7 @@ export async function syncMatchesFromData(
               matchId: newMatch.id,
               versionNumber: 1,
               syncRunId,
-              snapshot: remoteSnapshot,
+              snapshot: remoteSnapshot as unknown as CurrentRemoteSnapshot,
               dataHash: newHash,
             });
           }

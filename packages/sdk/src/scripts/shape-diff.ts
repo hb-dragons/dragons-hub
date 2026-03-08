@@ -25,7 +25,7 @@ function getJsonType(value: unknown): JsonType {
 function normalizeType(types: JsonType[]): JsonType | JsonType[] {
   const unique = [...new Set(types)];
   unique.sort();
-  return unique.length === 1 ? unique[0] : unique;
+  return unique.length === 1 ? unique[0]! : unique;
 }
 
 export function mergeShapes(a: ShapeNode, b: ShapeNode): ShapeNode {
@@ -39,8 +39,9 @@ export function mergeShapes(a: ShapeNode, b: ShapeNode): ShapeNode {
   if (a.fields || b.fields) {
     result.fields = { ...a.fields };
     for (const [key, bShape] of Object.entries(b.fields ?? {})) {
-      if (result.fields[key]) {
-        result.fields[key] = mergeShapes(result.fields[key], bShape);
+      const existing = result.fields[key];
+      if (existing) {
+        result.fields[key] = mergeShapes(existing, bShape);
       } else {
         result.fields[key] = bShape;
       }
@@ -117,12 +118,14 @@ export function diffShapes(
 
     for (const key of allKeys) {
       const childPath = `${path}.${key}`;
-      if (!(key in baseFields)) {
-        diffs.push({ path: childPath, kind: "added", liveType: typeToString(liveFields[key].type) });
-      } else if (!(key in liveFields)) {
-        diffs.push({ path: childPath, kind: "removed", baselineType: typeToString(baseFields[key].type) });
+      const baseShape = baseFields[key];
+      const liveShape = liveFields[key];
+      if (!baseShape) {
+        diffs.push({ path: childPath, kind: "added", liveType: typeToString(liveShape!.type) });
+      } else if (!liveShape) {
+        diffs.push({ path: childPath, kind: "removed", baselineType: typeToString(baseShape.type) });
       } else {
-        diffs.push(...diffShapes(baseFields[key], liveFields[key], childPath));
+        diffs.push(...diffShapes(baseShape, liveShape, childPath));
       }
     }
   }

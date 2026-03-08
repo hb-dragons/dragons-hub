@@ -83,12 +83,12 @@ export async function triggerManualSync(userId?: string) {
   const job = await syncQueue.add("manual-sync", {
     type: "full",
     triggeredBy: userId,
-    syncRunId: syncRun.id,
+    syncRunId: syncRun!.id,
   });
 
   return {
     jobId: job.id,
-    syncRunId: syncRun.id,
+    syncRunId: syncRun!.id,
     status: "queued",
     message: "Sync job has been queued",
   };

@@ -18,8 +18,8 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@dragons/shared": "workspace:*",
     "drizzle-orm": "^0.45.1",
-    "kysely": "^0.28.11",
     "pg": "^8.19.0"
   },
   "devDependencies": {

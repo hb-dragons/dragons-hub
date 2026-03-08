@@ -20,7 +20,7 @@ export const matchRemoteVersions = pgTable(
       .references(() => matches.id, { onDelete: "cascade" }),
     versionNumber: integer("version_number").notNull(),
     syncRunId: integer("sync_run_id"),
-    snapshot: jsonb("snapshot").notNull(),
+    snapshot: jsonb("snapshot").notNull().$type<LegacyRemoteSnapshot | CurrentRemoteSnapshot>(),
     dataHash: varchar("data_hash", { length: 64 }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -62,7 +62,7 @@ export const matchChanges = pgTable(
     matchId: integer("match_id")
       .notNull()
       .references(() => matches.id, { onDelete: "cascade" }),
-    track: varchar("track", { length: 10 }).notNull(), // 'remote' | 'local'
+    track: varchar("track", { length: 10 }).notNull().$type<"remote" | "local">(),
     versionNumber: integer("version_number").notNull(),
     fieldName: varchar("field_name", { length: 100 }).notNull(),
     oldValue: text("old_value"),

@@ -167,7 +167,7 @@ describe("syncVenuesFromData", () => {
 
     await syncVenuesFromData(venuesMap);
 
-    const records = mockValues.mock.calls[0][0];
+    const records = mockValues.mock.calls[0]![0];
     expect(records[0].name).toBe("Venue 99");
   });
 
@@ -182,7 +182,7 @@ describe("syncVenuesFromData", () => {
 
     await syncVenuesFromData(venuesMap);
 
-    const records = mockValues.mock.calls[0][0];
+    const records = mockValues.mock.calls[0]![0];
     expect(records[0].name).toBe("Hall");
   });
 
@@ -257,7 +257,7 @@ describe("syncVenuesFromData", () => {
 
     await syncVenuesFromData(venuesMap);
 
-    const records = mockValues.mock.calls[0][0];
+    const records = mockValues.mock.calls[0]![0];
     expect(records[0].street).toBeNull();
     expect(records[0].postalCode).toBeNull();
     expect(records[0].city).toBeNull();

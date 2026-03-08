@@ -180,7 +180,7 @@ export async function loadRemoteSnapshot(
       ),
     )
     .limit(1);
-  return (latestRemote?.snapshot as Record<string, unknown>) ?? null;
+  return (latestRemote?.snapshot as unknown as Record<string, unknown>) ?? null;
 }
 
 export function rowToListItem(
