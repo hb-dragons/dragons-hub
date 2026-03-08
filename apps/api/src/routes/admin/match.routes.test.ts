@@ -32,8 +32,13 @@ vi.mock("../../config/logger", () => ({
 import { matchRoutes } from "./match.routes";
 import { errorHandler } from "../../middleware/error";
 
-// Test app without auth middleware
+// Test app with mock auth middleware
 const app = new Hono<AppEnv>();
+app.use("/*", async (c, next) => {
+  c.set("user", { id: "user-123", role: "admin", name: "Test Admin", email: "admin@test.com", emailVerified: true, image: null, createdAt: new Date(), updatedAt: new Date() } as AppEnv["Variables"]["user"]);
+  c.set("logger", { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() } as unknown as AppEnv["Variables"]["logger"]);
+  await next();
+});
 app.onError(errorHandler);
 app.route("/", matchRoutes);
 
@@ -157,7 +162,7 @@ describe("PATCH /matches/:id", () => {
     expect(mocks.updateMatchLocal).toHaveBeenCalledWith(
       1,
       { kickoffDate: "2025-04-01", changeReason: "Rescheduled" },
-      "admin",
+      "user-123",
     );
   });
 
@@ -212,7 +217,7 @@ describe("PATCH /matches/:id", () => {
     expect(mocks.updateMatchLocal).toHaveBeenCalledWith(
       1,
       { kickoffDate: null },
-      "admin",
+      "user-123",
     );
   });
 
@@ -243,7 +248,7 @@ describe("PATCH /matches/:id", () => {
     expect(mocks.updateMatchLocal).toHaveBeenCalledWith(
       1,
       { isForfeited: true, isCancelled: false },
-      "admin",
+      "user-123",
     );
   });
 
@@ -274,7 +279,7 @@ describe("PATCH /matches/:id", () => {
     expect(mocks.updateMatchLocal).toHaveBeenCalledWith(
       1,
       { homeScore: 85, homeQ1: 20 },
-      "admin",
+      "user-123",
     );
   });
 
@@ -310,7 +315,7 @@ describe("PATCH /matches/:id", () => {
     expect(mocks.reconcileMatch).not.toHaveBeenCalled();
   });
 
-  it("swallows booking reconciliation errors silently", async () => {
+  it("logs booking reconciliation errors without affecting response", async () => {
     mocks.updateMatchLocal.mockResolvedValue({
       match: { id: 1, kickoffDate: "2025-04-01" },
       diffs: [],
@@ -344,7 +349,7 @@ describe("DELETE /matches/:id/overrides/:fieldName", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(detail);
-    expect(mocks.releaseOverride).toHaveBeenCalledWith(1, "kickoffDate", "admin");
+    expect(mocks.releaseOverride).toHaveBeenCalledWith(1, "kickoffDate", "user-123");
   });
 
   it("returns 404 when override not found", async () => {

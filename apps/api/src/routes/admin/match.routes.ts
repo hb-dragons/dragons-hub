@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
+import type { AppEnv } from "../../types";
 import {
   getOwnClubMatches,
   getMatchDetail,
@@ -13,7 +14,7 @@ import {
   releaseOverrideParamsSchema,
 } from "./match.schemas";
 
-const matchRoutes = new Hono();
+const matchRoutes = new Hono<AppEnv>();
 
 // GET /admin/matches - List own club matches
 matchRoutes.get(
@@ -74,7 +75,7 @@ matchRoutes.patch(
     const { id } = matchIdParamSchema.parse({ id: c.req.param("id") });
     const body = matchUpdateBodySchema.parse(await c.req.json());
 
-    const changedBy = "admin";
+    const changedBy = c.get("user")?.id ?? "unknown";
     const result = await updateMatchLocal(id, body, changedBy);
 
     if (!result) {
@@ -84,7 +85,12 @@ matchRoutes.patch(
     // Fire-and-forget: reconcile venue booking for this match
     import("../../services/venue-booking/venue-booking.service")
       .then(({ reconcileMatch }) => reconcileMatch(id))
-      .catch(() => {}); // Booking reconciliation failure shouldn't affect the match edit response
+      .catch((err) => {
+        const log = c.get("logger");
+        if (log) {
+          log.error({ err, matchId: id }, "Venue booking reconciliation failed after match update");
+        }
+      });
 
     return c.json(result);
   },
@@ -107,7 +113,7 @@ matchRoutes.delete(
       fieldName: c.req.param("fieldName"),
     });
 
-    const changedBy = "admin";
+    const changedBy = c.get("user")?.id ?? "unknown";
     const result = await releaseOverride(id, fieldName, changedBy);
 
     if (!result) {
