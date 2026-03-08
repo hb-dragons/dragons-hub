@@ -67,7 +67,7 @@ locals {
     "roles/iam.workloadIdentityPoolAdmin",
     "roles/cloudsql.admin",
     "roles/compute.admin",
-    "roles/storage.objectAdmin",
+    "roles/storage.admin",
     "roles/serviceusage.serviceUsageAdmin",
     "roles/vpcaccess.admin",
     "roles/servicenetworking.networksAdmin",
