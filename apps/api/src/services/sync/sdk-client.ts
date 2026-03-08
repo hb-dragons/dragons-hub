@@ -81,6 +81,7 @@ async function withRetry<T>(
 class AuthenticatedClient {
   private sessionCookie: string | null = null;
   private isAuthenticated = false;
+  private lastAuthenticatedAt: number = 0;
 
   async login(): Promise<boolean> {
     const loginUrl = `${BASE_URL}/login.do?reqCode=login`;
@@ -115,6 +116,7 @@ class AuthenticatedClient {
 
     await this.verifyLogin();
     this.isAuthenticated = true;
+    this.lastAuthenticatedAt = Date.now();
     log.info("Successfully authenticated with basketball-bund.net");
     return true;
   }
@@ -160,6 +162,11 @@ class AuthenticatedClient {
   logout(): void {
     this.sessionCookie = null;
     this.isAuthenticated = false;
+    this.lastAuthenticatedAt = 0;
+  }
+
+  get authenticatedAt(): number {
+    return this.lastAuthenticatedAt;
   }
 }
 
@@ -167,9 +174,14 @@ export class SdkClient {
   private authClient = new AuthenticatedClient();
   public sdk = new BasketballBundSDK();
   private rateLimiter = new TokenBucket(15, 10);
+  private static readonly SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
   async ensureAuthenticated(): Promise<void> {
-    if (!this.authClient.authenticated) {
+    const sessionAge = Date.now() - this.authClient.authenticatedAt;
+    if (!this.authClient.authenticated || sessionAge > SdkClient.SESSION_MAX_AGE_MS) {
+      if (this.authClient.authenticated) {
+        log.info({ sessionAgeMs: sessionAge }, "Session expired, re-authenticating");
+      }
       await withRetry(() => this.authClient.login(), 3, "login");
     }
   }

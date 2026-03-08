@@ -99,6 +99,60 @@ describe("SdkClient", () => {
 
       expect(mockFetch).not.toHaveBeenCalled();
     });
+
+    it("re-authenticates when session is older than 30 minutes", async () => {
+      // First login
+      mockFetch
+        .mockResolvedValueOnce({
+          text: vi.fn().mockResolvedValue("OK"),
+          headers: { getSetCookie: () => ["SESSION=abc123; Path=/"] },
+        })
+        .mockResolvedValueOnce({
+          json: vi.fn().mockResolvedValue({ data: { loginName: "testuser" } }),
+        });
+
+      await client.ensureAuthenticated();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      // Advance time past 30 minutes
+      vi.advanceTimersByTime(31 * 60 * 1000);
+
+      // Second login after session expiry
+      mockFetch
+        .mockResolvedValueOnce({
+          text: vi.fn().mockResolvedValue("OK"),
+          headers: { getSetCookie: () => ["SESSION=new456; Path=/"] },
+        })
+        .mockResolvedValueOnce({
+          json: vi.fn().mockResolvedValue({ data: { loginName: "testuser" } }),
+        });
+
+      await client.ensureAuthenticated();
+      // 2 original + 2 re-login = 4
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+    });
+
+    it("does not re-authenticate when session is fresh", async () => {
+      // First login
+      mockFetch
+        .mockResolvedValueOnce({
+          text: vi.fn().mockResolvedValue("OK"),
+          headers: { getSetCookie: () => ["SESSION=abc123; Path=/"] },
+        })
+        .mockResolvedValueOnce({
+          json: vi.fn().mockResolvedValue({ data: { loginName: "testuser" } }),
+        });
+
+      await client.ensureAuthenticated();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      // Only 5 minutes later
+      vi.advanceTimersByTime(5 * 60 * 1000);
+
+      await client.ensureAuthenticated();
+      // Should still be only 2 calls (no re-login)
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("getAllLigen", () => {
