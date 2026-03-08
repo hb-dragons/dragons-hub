@@ -1,0 +1,36 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "exclude": ["exports", "types", "enumMembers", "classMembers"],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.{js,mjs,ts}"],
+      "project": ["scripts/**/*.{js,mjs,ts}"]
+    },
+    "apps/api": {
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["pino-pretty"]
+    },
+    "apps/web": {
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["@tailwindcss/postcss"]
+    },
+    "packages/ui": {
+      "entry": ["src/components/*.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["@tailwindcss/postcss"]
+    },
+    "packages/db": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/sdk": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/shared": {
+      "project": ["src/**/*.ts"]
+    }
+  },
+  "ignore": [
+    "apps/mobile/**"
+  ],
+  "ignoreBinaries": ["drizzle-kit"]
+}

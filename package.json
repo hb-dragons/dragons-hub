@@ -13,9 +13,12 @@
     "check:ai-slop": "node scripts/check-ai-slop.mjs",
     "check:i18n": "pnpm --filter @dragons/web i18n:check",
     "security:audit": "pnpm audit --audit-level=high",
+    "knip": "knip --no-exit-code",
+    "knip:strict": "knip",
     "clean": "turbo clean"
   },
   "devDependencies": {
+    "knip": "^5.86.0",
     "turbo": "^2.8.14",
     "typescript": "^5.9.3"
   },

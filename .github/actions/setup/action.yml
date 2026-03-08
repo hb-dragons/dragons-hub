@@ -1,0 +1,53 @@
+name: Setup
+description: Setup pnpm, Node.js, and optionally Turbo remote cache
+
+inputs:
+  install:
+    description: Run pnpm install
+    default: "true"
+  turbo-cache:
+    description: Enable Turbo remote cache via Cloud Run proxy
+    default: "false"
+  gcp-workload-identity-provider:
+    description: GCP Workload Identity Provider
+    default: ""
+  gcp-service-account:
+    description: GCP Service Account
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+      with:
+        version: 10.30.3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Install dependencies
+      if: inputs.install == 'true'
+      run: pnpm install --frozen-lockfile
+      shell: bash
+
+    - name: Authenticate to Google Cloud
+      if: inputs.turbo-cache == 'true'
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+      with:
+        workload_identity_provider: ${{ inputs.gcp-workload-identity-provider }}
+        service_account: ${{ inputs.gcp-service-account }}
+
+    - name: Set up Cloud SDK
+      if: inputs.turbo-cache == 'true'
+      uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+    - name: Start Turbo cache proxy
+      if: inputs.turbo-cache == 'true'
+      run: |
+        gcloud run services proxy dragons-turbo-cache-production --region=europe-west3 --port=9080 &
+        sleep 2
+      shell: bash
