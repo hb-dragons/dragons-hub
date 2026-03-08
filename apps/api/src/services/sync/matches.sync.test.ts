@@ -47,6 +47,7 @@ vi.mock("@dragons/db/schema", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
   and: vi.fn((...args: unknown[]) => ({ and: args })),
+  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
 }));
 
 vi.mock("@dragons/sdk", () => ({
@@ -161,6 +162,15 @@ function makeLeagueData(overrides: Partial<LeagueFetchedData> = {}): LeagueFetch
   };
 }
 
+/** Helper to set up the batch-load mock for existing matches */
+function setupBatchSelect(existingMatches: Record<string, unknown>[] = []) {
+  mockSelect.mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(existingMatches),
+    }),
+  });
+}
+
 /** Helper to create a default locked row with period score fields */
 function makeLockedRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -240,6 +250,7 @@ function makeTxMock(lockedRow: Record<string, unknown>, overrides: Array<{ field
 describe("syncMatchesFromData", () => {
   it("skips league without leagueDbId", async () => {
     const data = makeLeagueData({ leagueDbId: null });
+    setupBatchSelect([]);
 
     const result = await syncMatchesFromData([data], new Map(), null);
 
@@ -262,13 +273,7 @@ describe("syncMatchesFromData", () => {
     const data = makeLeagueData({
       spielplan: [makeBasicMatch({ homeTeam: null })],
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
 
     const result = await syncMatchesFromData([data], new Map(), null);
 
@@ -279,13 +284,7 @@ describe("syncMatchesFromData", () => {
     const data = makeLeagueData({
       spielplan: [makeBasicMatch({ guestTeam: null })],
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
 
     const result = await syncMatchesFromData([data], new Map(), null);
 
@@ -294,13 +293,7 @@ describe("syncMatchesFromData", () => {
 
   it("creates new match with period score columns", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -326,13 +319,7 @@ describe("syncMatchesFromData", () => {
 
   it("creates initial remote version for new match", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -346,13 +333,7 @@ describe("syncMatchesFromData", () => {
 
   it("skips existing match when hash matches", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 1, remoteDataHash: "match-hash" }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "match-hash" }]);
 
     const result = await syncMatchesFromData([data], new Map(), null);
 
@@ -361,16 +342,7 @@ describe("syncMatchesFromData", () => {
 
   it("updates existing match when hash differs and effective changes exist", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     // Locked row has different homeScore, so effective changes will be detected
     makeTxMock(makeLockedRow({ homeScore: 70 }));
 
@@ -382,16 +354,7 @@ describe("syncMatchesFromData", () => {
 
   it("skips match when hash differs but no effective field changes", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     // Locked row matches the snapshot exactly — no effective changes
     makeTxMock(makeLockedRow());
 
@@ -405,13 +368,7 @@ describe("syncMatchesFromData", () => {
   it("resolves venue ID from lookup", async () => {
     const data = makeLeagueData();
     const venueIdLookup = new Map([[50, 500]]);
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -425,7 +382,8 @@ describe("syncMatchesFromData", () => {
 
   it("handles per-match errors", async () => {
     const data = makeLeagueData();
-    mockSelect.mockImplementation(() => {
+    setupBatchSelect([]);
+    mockInsert.mockImplementation(() => {
       throw new Error("DB down");
     });
 
@@ -437,7 +395,8 @@ describe("syncMatchesFromData", () => {
 
   it("handles non-Error per-match exception", async () => {
     const data = makeLeagueData();
-    mockSelect.mockImplementation(() => {
+    setupBatchSelect([]);
+    mockInsert.mockImplementation(() => {
       throw "string error";
     });
 
@@ -448,13 +407,7 @@ describe("syncMatchesFromData", () => {
 
   it("creates match without game details", async () => {
     const data = makeLeagueData({ gameDetails: new Map() });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([{ id: 1 }]),
@@ -468,13 +421,7 @@ describe("syncMatchesFromData", () => {
 
   it("logs to logger on create", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([{ id: 1 }]),
@@ -493,13 +440,7 @@ describe("syncMatchesFromData", () => {
     const data = makeLeagueData({
       spielplan: [makeBasicMatch({ homeTeam: null })],
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockLogger = { log: vi.fn() };
 
     await syncMatchesFromData([data], new Map(), null, mockLogger as never);
@@ -511,13 +452,7 @@ describe("syncMatchesFromData", () => {
 
   it("logs to logger on skip (hash match)", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 1, remoteDataHash: "match-hash" }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "match-hash" }]);
     const mockLogger = { log: vi.fn() };
 
     await syncMatchesFromData([data], new Map(), null, mockLogger as never);
@@ -529,13 +464,7 @@ describe("syncMatchesFromData", () => {
 
   it("logs to logger on update when effective changes exist", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 1, remoteDataHash: "old-hash" }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     makeTxMock(makeLockedRow({ homeScore: 70 }));
     const mockLogger = { log: vi.fn() };
 
@@ -548,13 +477,7 @@ describe("syncMatchesFromData", () => {
 
   it("logs to logger on skip when hash changed but no effective changes", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 1, remoteDataHash: "old-hash" }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     makeTxMock(makeLockedRow());
     const mockLogger = { log: vi.fn() };
 
@@ -567,7 +490,8 @@ describe("syncMatchesFromData", () => {
 
   it("logs to logger on failure", async () => {
     const data = makeLeagueData();
-    mockSelect.mockImplementation(() => {
+    setupBatchSelect([]);
+    mockInsert.mockImplementation(() => {
       throw new Error("fail");
     });
     const mockLogger = { log: vi.fn() };
@@ -591,13 +515,7 @@ describe("syncMatchesFromData", () => {
     const data = makeLeagueData({
       gameDetails: new Map([[1000, details]]),
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -619,13 +537,7 @@ describe("syncMatchesFromData", () => {
 
   it("handles transaction with null locked row", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 1, remoteDataHash: "old-hash" }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
         select: vi.fn().mockReturnValue({
@@ -647,13 +559,7 @@ describe("syncMatchesFromData", () => {
 
   it("handles new match with no returning row", async () => {
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([]),
@@ -672,13 +578,7 @@ describe("syncMatchesFromData", () => {
       spielplan: [makeBasicMatch({ result: "63:61" })],
       gameDetails: new Map(),
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -708,13 +608,7 @@ describe("syncMatchesFromData", () => {
       spielplan: [makeBasicMatch({ result: null })],
       gameDetails: new Map([[1000, details]]),
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -732,16 +626,7 @@ describe("syncMatchesFromData", () => {
   it("detects field changes during update including period scores", async () => {
     vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     const { txInsert } = makeTxMock(makeLockedRow({
       isConfirmed: false,  // different from snapshot
       homeScore: 70,       // different from snapshot
@@ -762,16 +647,7 @@ describe("syncMatchesFromData", () => {
     const data = makeLeagueData({
       spielplan: [makeBasicMatch({ kickoffTime: "18:00" })],
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     const { txInsert } = makeTxMock(makeLockedRow({
       kickoffTime: "18:00:00", // DB returns with seconds
     }));
@@ -788,17 +664,7 @@ describe("syncMatchesFromData", () => {
       spielplan: [makeBasicMatch()],
       gameDetails: new Map(), // no game details available
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-            venueId: 500,
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash", venueId: 500 }]);
     const { txUpdateSet } = makeTxMock(makeLockedRow({ venueId: 500 }));
 
     await syncMatchesFromData([data], new Map(), 1);
@@ -818,17 +684,7 @@ describe("syncMatchesFromData", () => {
       gameDetails: new Map([[1000, makeGameDetails({ spielfeldId: 60 })]]),
     });
     const venueIdLookup = new Map([[60, 600]]);
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-            venueId: 500,
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash", venueId: 500 }]);
     const { txUpdateSet } = makeTxMock(makeLockedRow({ venueId: 500 }));
 
     await syncMatchesFromData([data], venueIdLookup, 1);
@@ -860,13 +716,7 @@ describe("syncMatchesFromData", () => {
       spielplan: [makeBasicMatch()],
       gameDetails: new Map([[1000, details]]),
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -911,13 +761,7 @@ describe("syncMatchesFromData", () => {
       spielplan: [makeBasicMatch()],
       gameDetails: new Map([[1000, details]]),
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -940,17 +784,7 @@ describe("syncMatchesFromData", () => {
       spielplan: [makeBasicMatch()],
       gameDetails: new Map([[1000, makeGameDetails({ spielfeldId: 0 })]]),
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-            venueId: 500,
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash", venueId: 500 }]);
     const { txUpdateSet } = makeTxMock(makeLockedRow({ venueId: 500 }));
 
     await syncMatchesFromData([data], new Map(), 1);
@@ -963,16 +797,7 @@ describe("syncMatchesFromData", () => {
   it("skips overridden fields during update", async () => {
     vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     // Match has an override on kickoffDate
     const { txUpdateSet } = makeTxMock(
       makeLockedRow({ kickoffDate: "2025-02-01" }),
@@ -992,13 +817,7 @@ describe("syncMatchesFromData", () => {
     const data = makeLeagueData({
       spielplan: [makeBasicMatch({ matchDay: null as unknown as number })],
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -1023,16 +842,7 @@ describe("syncMatchesFromData", () => {
       spielplan: [makeBasicMatch()],
       gameDetails: new Map(), // no details → halftime scores null in snapshot
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     const { txUpdateSet } = makeTxMock(
       makeLockedRow({ guestHalftimeScore: 38 }),
       [{ fieldName: "guestHalftimeScore" }],
@@ -1050,16 +860,7 @@ describe("syncMatchesFromData", () => {
   it("does not auto-release override when remote differs from effective value", async () => {
     vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     // Override on kickoffDate, but remote ("2025-01-15") != locked ("2025-02-01")
     const { txDelete } = makeTxMock(
       makeLockedRow({ kickoffDate: "2025-02-01" }),
@@ -1078,16 +879,7 @@ describe("syncMatchesFromData", () => {
       spielplan: [makeBasicMatch()],
       gameDetails: new Map(), // no details
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     // homeHalftimeScore and homeQ1 are overridden
     const { txUpdateSet } = makeTxMock(
       makeLockedRow({ homeHalftimeScore: 45, homeQ1: 25, periodFormat: "quarters" }),
@@ -1109,16 +901,7 @@ describe("syncMatchesFromData", () => {
   it("auto-releases override when remote matches effective value", async () => {
     vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
     const data = makeLeagueData();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     // Match has override on kickoffDate, but remote now matches
     const { txDelete } = makeTxMock(
       makeLockedRow({ kickoffDate: "2025-01-15" }), // matches remote
@@ -1139,13 +922,7 @@ describe("syncMatchesFromData", () => {
     const data = makeLeagueData({
       gameDetails: new Map([[1000, details]]),
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -1162,13 +939,7 @@ describe("syncMatchesFromData", () => {
 
   it("defaults sr1Open/sr2Open/sr3Open to false when no game details", async () => {
     const data = makeLeagueData({ gameDetails: new Map() });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    setupBatchSelect([]);
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1 }]),
     });
@@ -1190,16 +961,7 @@ describe("syncMatchesFromData", () => {
     const data = makeLeagueData({
       gameDetails: new Map([[1000, details]]),
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{
-            id: 1,
-            remoteDataHash: "old-hash",
-          }]),
-        }),
-      }),
-    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     // Locked row has sr1Open: false, but remote has true
     const { txUpdateSet } = makeTxMock(makeLockedRow({ sr1Open: false }));
 

@@ -5,7 +5,7 @@ import {
   matchRemoteVersions,
   matchChanges,
 } from "@dragons/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { parseResult } from "@dragons/sdk";
 import type { SdkSpielplanMatch, SdkGetGameResponse } from "@dragons/sdk";
 import type { LeagueFetchedData } from "./data-fetcher";
@@ -456,6 +456,22 @@ export async function syncMatchesFromData(
     durationMs: 0,
   };
 
+  // Batch-load all existing matches to avoid N+1 SELECTs
+  const allApiMatchIds = leagueData
+    .flatMap((d) => d.spielplan.map((m) => m.matchId))
+    .filter((id): id is number => !!id);
+
+  const existingMatchesByApiId = new Map<number, typeof matches.$inferSelect>();
+  if (allApiMatchIds.length > 0) {
+    const existingMatches = await db
+      .select()
+      .from(matches)
+      .where(inArray(matches.apiMatchId, allApiMatchIds));
+    for (const m of existingMatches) {
+      existingMatchesByApiId.set(m.apiMatchId, m);
+    }
+  }
+
   for (const data of leagueData) {
     if (!data.leagueDbId) {
       result.errors.push(`No DB ID for league API ID ${data.leagueApiId}`);
@@ -501,11 +517,7 @@ export async function syncMatchesFromData(
         );
         const newHash = computeEntityHash(snapshotToHashData(remoteSnapshot));
 
-        const [existing] = await db
-          .select()
-          .from(matches)
-          .where(eq(matches.apiMatchId, apiMatchId))
-          .limit(1);
+        const existing = existingMatchesByApiId.get(apiMatchId) ?? null;
 
         const apiVenueId = remoteSnapshot.venueApiId;
         const internalVenueId = apiVenueId
