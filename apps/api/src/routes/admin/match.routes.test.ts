@@ -62,7 +62,7 @@ describe("GET /matches", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(listResult);
-    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith({ limit: 1000, offset: 0 });
+    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith(expect.objectContaining({ limit: 1000, offset: 0, sort: "asc" }));
   });
 
   it("passes query params to service", async () => {
@@ -70,13 +70,14 @@ describe("GET /matches", () => {
 
     await app.request("/matches?limit=10&offset=5&leagueId=3&dateFrom=2025-01-01&dateTo=2025-12-31");
 
-    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith({
+    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith(expect.objectContaining({
       limit: 10,
       offset: 5,
       leagueId: 3,
       dateFrom: "2025-01-01",
       dateTo: "2025-12-31",
-    });
+      sort: "asc",
+    }));
   });
 
   it("returns 400 for invalid date format", async () => {
