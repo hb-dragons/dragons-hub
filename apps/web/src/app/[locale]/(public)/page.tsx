@@ -2,7 +2,7 @@ import { fetchAPI } from "@/lib/api";
 import { getTranslations, getFormatter } from "next-intl/server";
 import { Link } from "@/lib/navigation";
 import { CalendarDays, Trophy, Users, Home } from "lucide-react";
-import type { MatchListItem, LeagueStandings } from "@dragons/shared";
+import type { MatchListItem } from "@dragons/shared";
 
 function teamName(match: MatchListItem, side: "home" | "guest") {
   if (side === "home") return match.homeTeamCustomName ?? match.homeTeamNameShort ?? match.homeTeamName;
@@ -22,14 +22,13 @@ export default async function HomePage() {
   const format = await getFormatter();
   const today = todayDateString();
 
-  const [nextMatchData, lastResultData, standings] = await Promise.all([
+  const [nextMatchData, lastResultData] = await Promise.all([
     fetchAPI<{ items: MatchListItem[] }>(
       `/public/matches?limit=1&dateFrom=${today}&hasScore=false`,
     ).catch(() => ({ items: [] })),
     fetchAPI<{ items: MatchListItem[] }>(
       `/public/matches?limit=1&dateTo=${today}&hasScore=true&sort=desc`,
     ).catch(() => ({ items: [] })),
-    fetchAPI<LeagueStandings[]>("/public/standings").catch(() => []),
   ]);
 
   const nextMatch = nextMatchData.items[0];
