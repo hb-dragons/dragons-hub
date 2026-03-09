@@ -6,6 +6,7 @@ import type { MatchListItem } from "@dragons/shared";
 import { TeamFilter } from "./team-filter";
 import { WeekendPicker } from "./weekend-picker";
 import { MatchList } from "./match-list";
+import type { PublicTeam } from "./types";
 import {
   getSunday,
   toDateString,
@@ -13,15 +14,8 @@ import {
   nextSaturday,
 } from "@/lib/weekend-utils";
 
-interface Team {
-  apiTeamPermanentId: number;
-  name: string;
-  nameShort: string | null;
-  customName: string | null;
-}
-
 interface ScheduleViewProps {
-  teams: Team[];
+  teams: PublicTeam[];
   initialMatches: MatchListItem[];
   initialSaturday: string;
   formatDate: (date: string) => string;
@@ -122,7 +116,6 @@ export function ScheduleView({
       />
 
       <WeekendPicker
-        saturday={toDateString(saturday)}
         label={weekendLabel}
         onPrevious={handlePrevious}
         onNext={handleNext}

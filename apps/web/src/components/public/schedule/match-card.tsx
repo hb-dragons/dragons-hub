@@ -1,6 +1,7 @@
 import type { MatchListItem } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 import { Home } from "lucide-react";
+import { resolveTeamName } from "./types";
 
 interface MatchCardProps {
   match: MatchListItem;
@@ -17,10 +18,10 @@ export function MatchCard({ match, translations }: MatchCardProps) {
   const isOwnGuest = match.guestIsOwnClub;
   const isCancelledOrForfeited = match.isCancelled || match.isForfeited;
 
-  const teamName = (m: MatchListItem, side: "home" | "guest") => {
+  const getTeamName = (m: MatchListItem, side: "home" | "guest") => {
     if (side === "home")
-      return m.homeTeamCustomName ?? m.homeTeamNameShort ?? m.homeTeamName;
-    return m.guestTeamCustomName ?? m.guestTeamNameShort ?? m.guestTeamName;
+      return resolveTeamName({ customName: m.homeTeamCustomName, nameShort: m.homeTeamNameShort, name: m.homeTeamName });
+    return resolveTeamName({ customName: m.guestTeamCustomName, nameShort: m.guestTeamNameShort, name: m.guestTeamName });
   };
 
   return (
@@ -43,7 +44,7 @@ export function MatchCard({ match, translations }: MatchCardProps) {
           <p
             className={`text-sm font-semibold leading-tight ${isOwnHome ? "text-mint-shade" : ""}`}
           >
-            {teamName(match, "home")}
+            {getTeamName(match, "home")}
           </p>
         </div>
         <div className="flex flex-col items-center min-w-[56px]">
@@ -61,7 +62,7 @@ export function MatchCard({ match, translations }: MatchCardProps) {
           <p
             className={`text-sm font-semibold leading-tight ${isOwnGuest ? "text-mint-shade" : ""}`}
           >
-            {teamName(match, "guest")}
+            {getTeamName(match, "guest")}
           </p>
         </div>
       </div>

@@ -3,10 +3,12 @@ import { getTranslations, getFormatter } from "next-intl/server";
 import { Link } from "@/lib/navigation";
 import { CalendarDays, Trophy, Users, Home } from "lucide-react";
 import type { MatchListItem } from "@dragons/shared";
+import { resolveTeamName } from "@/components/public/schedule/types";
 
-function teamName(match: MatchListItem, side: "home" | "guest") {
-  if (side === "home") return match.homeTeamCustomName ?? match.homeTeamNameShort ?? match.homeTeamName;
-  return match.guestTeamCustomName ?? match.guestTeamNameShort ?? match.guestTeamName;
+function getTeamName(match: MatchListItem, side: "home" | "guest") {
+  if (side === "home")
+    return resolveTeamName({ customName: match.homeTeamCustomName, nameShort: match.homeTeamNameShort, name: match.homeTeamName });
+  return resolveTeamName({ customName: match.guestTeamCustomName, nameShort: match.guestTeamNameShort, name: match.guestTeamName });
 }
 
 function todayDateString(): string {
@@ -63,7 +65,7 @@ export default async function HomePage() {
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 text-right">
                 <p className={`font-semibold ${nextMatch.homeIsOwnClub ? "text-mint-shade" : ""}`}>
-                  {teamName(nextMatch, "home")}
+                  {getTeamName(nextMatch, "home")}
                 </p>
               </div>
               <span className="text-sm font-medium text-muted-foreground">
@@ -71,7 +73,7 @@ export default async function HomePage() {
               </span>
               <div className="flex-1">
                 <p className={`font-semibold ${nextMatch.guestIsOwnClub ? "text-mint-shade" : ""}`}>
-                  {teamName(nextMatch, "guest")}
+                  {getTeamName(nextMatch, "guest")}
                 </p>
               </div>
             </div>
@@ -107,7 +109,7 @@ export default async function HomePage() {
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 text-right">
                 <p className={`font-semibold ${lastResult.homeIsOwnClub ? "text-mint-shade" : ""}`}>
-                  {teamName(lastResult, "home")}
+                  {getTeamName(lastResult, "home")}
                 </p>
               </div>
               <span className="text-xl font-bold tabular-nums">
@@ -115,7 +117,7 @@ export default async function HomePage() {
               </span>
               <div className="flex-1">
                 <p className={`font-semibold ${lastResult.guestIsOwnClub ? "text-mint-shade" : ""}`}>
-                  {teamName(lastResult, "guest")}
+                  {getTeamName(lastResult, "guest")}
                 </p>
               </div>
             </div>

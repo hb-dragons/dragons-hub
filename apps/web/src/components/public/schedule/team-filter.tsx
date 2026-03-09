@@ -7,23 +7,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@dragons/ui/components/select";
-
-interface Team {
-  apiTeamPermanentId: number;
-  name: string;
-  nameShort: string | null;
-  customName: string | null;
-}
+import type { PublicTeam } from "./types";
+import { resolveTeamName } from "./types";
 
 interface TeamFilterProps {
-  teams: Team[];
+  teams: PublicTeam[];
   selectedTeamApiId: number | null;
   onSelect: (teamApiId: number | null) => void;
   allTeamsLabel: string;
-}
-
-function displayName(team: Team): string {
-  return team.customName ?? team.nameShort ?? team.name;
 }
 
 export function TeamFilter({
@@ -49,7 +40,7 @@ export function TeamFilter({
             key={team.apiTeamPermanentId}
             value={team.apiTeamPermanentId.toString()}
           >
-            {displayName(team)}
+            {resolveTeamName(team)}
           </SelectItem>
         ))}
       </SelectContent>

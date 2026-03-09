@@ -2,15 +2,8 @@ import { fetchAPI } from "@/lib/api";
 import { getTranslations, getFormatter } from "next-intl/server";
 import type { MatchListItem } from "@dragons/shared";
 import { ScheduleView } from "@/components/public/schedule/schedule-view";
+import type { PublicTeamWithClubFlag } from "@/components/public/schedule/types";
 import { getSaturday, getSunday, toDateString } from "@/lib/weekend-utils";
-
-interface Team {
-  apiTeamPermanentId: number;
-  name: string;
-  nameShort: string | null;
-  customName: string | null;
-  isOwnClub: boolean;
-}
 
 export default async function SchedulePage({
   searchParams,
@@ -40,7 +33,7 @@ export default async function SchedulePage({
     fetchAPI<{ items: MatchListItem[] }>(
       `/public/matches?${queryParams}`,
     ).catch(() => ({ items: [] })),
-    fetchAPI<Team[]>("/public/teams").catch(() => []),
+    fetchAPI<PublicTeamWithClubFlag[]>("/public/teams").catch(() => []),
   ]);
 
   const ownClubTeams = allTeams.filter((team) => team.isOwnClub);

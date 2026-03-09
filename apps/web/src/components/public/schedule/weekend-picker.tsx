@@ -5,8 +5,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useRef } from "react";
 
 interface WeekendPickerProps {
-  /** The Saturday date string (YYYY-MM-DD) for the current weekend */
-  saturday: string;
   /** Formatted label, e.g. "Sa/So 14/15 Mär" */
   label: string;
   onPrevious: () => void;
