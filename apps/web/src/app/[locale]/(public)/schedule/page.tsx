@@ -1,5 +1,5 @@
 import { fetchAPI } from "@/lib/api";
-import { getTranslations, getFormatter } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 import type { MatchListItem } from "@dragons/shared";
 import { ScheduleView } from "@/components/public/schedule/schedule-view";
 import type { PublicTeamWithClubFlag } from "@/components/public/schedule/types";
@@ -12,7 +12,6 @@ export default async function SchedulePage({
 }) {
   const params = await searchParams;
   const t = await getTranslations("public");
-  const format = await getFormatter();
 
   const teamParam = typeof params.team === "string" ? params.team : undefined;
 
@@ -48,19 +47,6 @@ export default async function SchedulePage({
         teams={ownClubTeams}
         initialMatches={matchData.items}
         initialSaturday={toDateString(saturday)}
-        formatDate={(date) =>
-          format.dateTime(new Date(date + "T12:00:00"), {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-          })
-        }
-        formatWeekendLabel={(sat, sun) => {
-          const satDay = sat.getDate();
-          const sunDay = sun.getDate();
-          const month = format.dateTime(sat, { month: "short" });
-          return `Sa/So ${satDay}/${sunDay} ${month}`;
-        }}
         translations={{
           allTeams: t("allTeams"),
           vs: t("vs"),

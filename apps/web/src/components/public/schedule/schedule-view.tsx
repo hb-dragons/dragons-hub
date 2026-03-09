@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useFormatter } from "next-intl";
 import type { MatchListItem } from "@dragons/shared";
 import { TeamFilter } from "./team-filter";
 import { WeekendPicker } from "./weekend-picker";
@@ -18,8 +19,6 @@ interface ScheduleViewProps {
   teams: PublicTeam[];
   initialMatches: MatchListItem[];
   initialSaturday: string;
-  formatDate: (date: string) => string;
-  formatWeekendLabel: (saturday: Date, sunday: Date) => string;
   translations: {
     allTeams: string;
     vs: string;
@@ -34,14 +33,33 @@ export function ScheduleView({
   teams,
   initialMatches,
   initialSaturday,
-  formatDate,
-  formatWeekendLabel,
   translations,
   apiBaseUrl,
 }: ScheduleViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const format = useFormatter();
+
+  const formatDate = useCallback(
+    (date: string) =>
+      format.dateTime(new Date(date + "T12:00:00"), {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }),
+    [format],
+  );
+
+  const formatWeekendLabel = useCallback(
+    (sat: Date, sun: Date) => {
+      const satDay = sat.getDate();
+      const sunDay = sun.getDate();
+      const month = format.dateTime(sat, { month: "short" });
+      return `Sa/So ${satDay}/${sunDay} ${month}`;
+    },
+    [format],
+  );
 
   const teamParam = searchParams.get("team");
   const selectedTeamApiId = teamParam ? Number(teamParam) : null;
