@@ -560,6 +560,61 @@ describe("getOwnClubMatches", () => {
     ]);
   });
 
+  it("sorts by kickoff date descending when sort=desc", async () => {
+    await seedBasicData();
+    await insertMatch({ api_match_id: 9001, kickoff_date: "2025-03-01" });
+    await insertMatch({ api_match_id: 9002, kickoff_date: "2025-03-15" });
+    await insertMatch({ api_match_id: 9003, kickoff_date: "2025-03-10" });
+
+    const result = await getOwnClubMatches({ limit: 20, offset: 0, sort: "desc" });
+
+    expect(result.items.map((m) => m.kickoffDate)).toEqual([
+      "2025-03-15",
+      "2025-03-10",
+      "2025-03-01",
+    ]);
+  });
+
+  it("filters to matches with scores when hasScore=true", async () => {
+    await seedBasicData();
+    await insertMatch({ api_match_id: 9001, home_score: 80, guest_score: 72 });
+    await insertMatch({ api_match_id: 9002 }); // no scores
+
+    const result = await getOwnClubMatches({ limit: 20, offset: 0, hasScore: true });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.apiMatchId).toBe(9001);
+  });
+
+  it("filters to matches without scores when hasScore=false", async () => {
+    await seedBasicData();
+    await insertMatch({ api_match_id: 9001, home_score: 80, guest_score: 72 });
+    await insertMatch({ api_match_id: 9002 }); // no scores
+
+    const result = await getOwnClubMatches({ limit: 20, offset: 0, hasScore: false });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]!.apiMatchId).toBe(9002);
+  });
+
+  it("filters by teamApiId", async () => {
+    await seedBasicData();
+    // Add a third team
+    await insertTeam({ api_team_permanent_id: 3000, name: "Third Team", club_id: 7777, is_own_club: true });
+    // Match with team 1000 (home) vs 2000
+    await insertMatch({ api_match_id: 9001, home_team_api_id: 1000, guest_team_api_id: 2000 });
+    // Match with team 3000 (home) vs 2000
+    await insertMatch({ api_match_id: 9002, home_team_api_id: 3000, guest_team_api_id: 2000 });
+    // Match with team 2000 (home) vs 3000 — team 3000 is guest
+    await insertMatch({ api_match_id: 9003, home_team_api_id: 2000, guest_team_api_id: 3000 });
+
+    const result = await getOwnClubMatches({ limit: 20, offset: 0, teamApiId: 3000 });
+
+    expect(result.items).toHaveLength(2);
+    const matchIds = result.items.map((m) => m.apiMatchId).sort();
+    expect(matchIds).toEqual([9002, 9003]);
+  });
+
   it("includes overriddenFields from match_overrides", async () => {
     await seedBasicData();
     const matchId = await insertMatch();

@@ -104,4 +104,40 @@ describe("GET /matches (public)", () => {
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
+
+  it("passes sort param to service", async () => {
+    mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+    await app.request("/matches?sort=desc");
+    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: "desc" }),
+    );
+  });
+
+  it("passes hasScore param to service", async () => {
+    mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+    await app.request("/matches?hasScore=true");
+    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith(
+      expect.objectContaining({ hasScore: true }),
+    );
+  });
+
+  it("passes teamApiId param to service", async () => {
+    mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+    await app.request("/matches?teamApiId=42");
+    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith(
+      expect.objectContaining({ teamApiId: 42 }),
+    );
+  });
+
+  it("returns 400 for invalid sort value", async () => {
+    const res = await app.request("/matches?sort=invalid");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for invalid teamApiId", async () => {
+    const res = await app.request("/matches?teamApiId=abc");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
 });
