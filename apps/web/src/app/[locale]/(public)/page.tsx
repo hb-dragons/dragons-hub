@@ -1,77 +1,128 @@
 import { fetchAPI } from "@/lib/api";
 import { getTranslations, getFormatter } from "next-intl/server";
 import { Link } from "@/lib/navigation";
-import { CalendarDays, Trophy, Users } from "lucide-react";
+import { CalendarDays, Trophy, Users, Home } from "lucide-react";
 import type { MatchListItem, LeagueStandings } from "@dragons/shared";
+
+function teamName(match: MatchListItem, side: "home" | "guest") {
+  if (side === "home") return match.homeTeamCustomName ?? match.homeTeamNameShort ?? match.homeTeamName;
+  return match.guestTeamCustomName ?? match.guestTeamNameShort ?? match.guestTeamName;
+}
+
+function todayDateString(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default async function HomePage() {
   const t = await getTranslations("public");
   const format = await getFormatter();
+  const today = todayDateString();
 
-  const [matchData, standings] = await Promise.all([
-    fetchAPI<{ items: MatchListItem[]; total: number }>(
-      "/public/matches?limit=1",
-    ).catch(() => ({ items: [], total: 0 })),
+  const [nextMatchData, lastResultData, standings] = await Promise.all([
+    fetchAPI<{ items: MatchListItem[] }>(
+      `/public/matches?limit=1&dateFrom=${today}&hasScore=false`,
+    ).catch(() => ({ items: [] })),
+    fetchAPI<{ items: MatchListItem[] }>(
+      `/public/matches?limit=1&dateTo=${today}&hasScore=true&sort=desc`,
+    ).catch(() => ({ items: [] })),
     fetchAPI<LeagueStandings[]>("/public/standings").catch(() => []),
   ]);
 
-  const nextMatch = matchData.items[0];
+  const nextMatch = nextMatchData.items[0];
+  const lastResult = lastResultData.items[0];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Hero */}
       <section className="flex flex-col items-center gap-2 pt-8 pb-4 text-center">
         <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
           Dragons
         </h1>
-        <p className="text-muted-foreground text-sm">
-          Basketball
-        </p>
+        <p className="text-muted-foreground text-sm">Basketball</p>
       </section>
 
-      {/* Next Match Preview */}
+      {/* Next Match */}
       {nextMatch && (
         <Link href="/schedule" className="block">
           <div className="rounded-xl border bg-card p-5 transition-colors hover:bg-muted/50">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
               {t("nextMatch")}
+              {nextMatch.kickoffDate && (
+                <span className="ml-2">
+                  &middot;{" "}
+                  {format.dateTime(new Date(nextMatch.kickoffDate + "T12:00:00"), {
+                    weekday: "short",
+                  })}
+                  {nextMatch.kickoffTime && ` ${nextMatch.kickoffTime.slice(0, 5)}`}
+                </span>
+              )}
             </p>
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 text-right">
                 <p className={`font-semibold ${nextMatch.homeIsOwnClub ? "text-mint-shade" : ""}`}>
-                  {nextMatch.homeTeamCustomName ?? nextMatch.homeTeamNameShort ?? nextMatch.homeTeamName}
+                  {teamName(nextMatch, "home")}
                 </p>
               </div>
-              <div className="flex flex-col items-center gap-0.5">
-                {nextMatch.homeScore !== null && nextMatch.guestScore !== null ? (
-                  <span className="text-xl font-bold tabular-nums">
-                    {nextMatch.homeScore} : {nextMatch.guestScore}
-                  </span>
-                ) : (
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {nextMatch.kickoffTime?.slice(0, 5) ?? t("vs")}
-                  </span>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  {nextMatch.kickoffDate
-                    ? format.dateTime(new Date(nextMatch.kickoffDate + "T12:00:00"), {
-                        weekday: "short",
-                        day: "numeric",
-                        month: "short",
-                      })
-                    : ""}
-                </span>
-              </div>
+              <span className="text-sm font-medium text-muted-foreground">
+                {t("vs")}
+              </span>
               <div className="flex-1">
                 <p className={`font-semibold ${nextMatch.guestIsOwnClub ? "text-mint-shade" : ""}`}>
-                  {nextMatch.guestTeamCustomName ?? nextMatch.guestTeamNameShort ?? nextMatch.guestTeamName}
+                  {teamName(nextMatch, "guest")}
                 </p>
               </div>
             </div>
-            {nextMatch.venueName && (
-              <p className="text-xs text-muted-foreground mt-3 text-center">
-                {nextMatch.venueNameOverride ?? nextMatch.venueName}
+            <div className="mt-3 space-y-0.5 text-center">
+              {nextMatch.leagueName && (
+                <p className="text-xs text-muted-foreground">{nextMatch.leagueName}</p>
+              )}
+              <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                {nextMatch.homeIsOwnClub && <Home className="h-3 w-3" />}
+                {nextMatch.venueNameOverride ?? nextMatch.venueName ?? ""}
                 {nextMatch.venueCity ? `, ${nextMatch.venueCity}` : ""}
+              </p>
+            </div>
+          </div>
+        </Link>
+      )}
+
+      {/* Last Result */}
+      {lastResult && (
+        <Link href="/schedule" className="block">
+          <div className="rounded-xl border bg-card p-5 transition-colors hover:bg-muted/50">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+              {t("lastResult")}
+              {lastResult.kickoffDate && (
+                <span className="ml-2">
+                  &middot;{" "}
+                  {format.dateTime(new Date(lastResult.kickoffDate + "T12:00:00"), {
+                    weekday: "short",
+                  })}
+                </span>
+              )}
+            </p>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 text-right">
+                <p className={`font-semibold ${lastResult.homeIsOwnClub ? "text-mint-shade" : ""}`}>
+                  {teamName(lastResult, "home")}
+                </p>
+              </div>
+              <span className="text-xl font-bold tabular-nums">
+                {lastResult.homeScore} : {lastResult.guestScore}
+              </span>
+              <div className="flex-1">
+                <p className={`font-semibold ${lastResult.guestIsOwnClub ? "text-mint-shade" : ""}`}>
+                  {teamName(lastResult, "guest")}
+                </p>
+              </div>
+            </div>
+            {lastResult.leagueName && (
+              <p className="text-xs text-muted-foreground mt-3 text-center">
+                {lastResult.leagueName}
               </p>
             )}
           </div>
@@ -79,41 +130,23 @@ export default async function HomePage() {
       )}
 
       {/* Navigation Cards */}
-      <div className="grid gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <Link href="/schedule">
-          <div className="flex items-center gap-4 rounded-xl border p-4 transition-colors hover:bg-muted/50">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-              <CalendarDays className="h-5 w-5 text-accent-foreground" />
-            </div>
-            <div>
-              <p className="font-semibold">{t("schedule")}</p>
-              <p className="text-sm text-muted-foreground">
-                {t("matchesCount", { count: matchData.total })}
-              </p>
-            </div>
+          <div className="flex flex-col items-center gap-2 rounded-xl border p-4 transition-colors hover:bg-muted/50">
+            <CalendarDays className="h-5 w-5 text-muted-foreground" />
+            <p className="text-sm font-semibold">{t("schedule")}</p>
           </div>
         </Link>
         <Link href="/standings">
-          <div className="flex items-center gap-4 rounded-xl border p-4 transition-colors hover:bg-muted/50">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-              <Trophy className="h-5 w-5 text-accent-foreground" />
-            </div>
-            <div>
-              <p className="font-semibold">{t("standings")}</p>
-              <p className="text-sm text-muted-foreground">
-                {t("leaguesCount", { count: standings.length })}
-              </p>
-            </div>
+          <div className="flex flex-col items-center gap-2 rounded-xl border p-4 transition-colors hover:bg-muted/50">
+            <Trophy className="h-5 w-5 text-muted-foreground" />
+            <p className="text-sm font-semibold">{t("standings")}</p>
           </div>
         </Link>
-        <Link href="/teams">
-          <div className="flex items-center gap-4 rounded-xl border p-4 transition-colors hover:bg-muted/50">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
-              <Users className="h-5 w-5 text-accent-foreground" />
-            </div>
-            <div>
-              <p className="font-semibold">{t("teams")}</p>
-            </div>
+        <Link href="/teams" className="col-span-2">
+          <div className="flex flex-col items-center gap-2 rounded-xl border p-4 transition-colors hover:bg-muted/50">
+            <Users className="h-5 w-5 text-muted-foreground" />
+            <p className="text-sm font-semibold">{t("teams")}</p>
           </div>
         </Link>
       </div>

@@ -660,7 +660,10 @@
     "noUpcoming": "Keine anstehenden Spiele",
     "leaguesCount": "{count, plural, =1 {# Liga} other {# Ligen}}",
     "teamsCount": "{count, plural, =1 {# Team} other {# Teams}}",
-    "matchesCount": "{count, plural, =1 {# Spiel} other {# Spiele}}"
+    "matchesCount": "{count, plural, =1 {# Spiel} other {# Spiele}}",
+    "allTeams": "Alle Teams",
+    "noMatchesThisWeekend": "Keine Spiele an diesem Wochenende.",
+    "lastResult": "Letztes Ergebnis"
   },
   "errors": {
     "title": "Etwas ist schiefgelaufen",
