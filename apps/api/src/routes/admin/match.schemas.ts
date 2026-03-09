@@ -7,6 +7,12 @@ export const matchListQuerySchema = z.object({
   leagueId: z.coerce.number().int().positive().optional(),
   dateFrom: dateSchema.optional(),
   dateTo: dateSchema.optional(),
+  sort: z.enum(["asc", "desc"]).default("asc"),
+  hasScore: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  teamApiId: z.coerce.number().int().positive().optional(),
 });
 
 export const matchIdParamSchema = z.object({

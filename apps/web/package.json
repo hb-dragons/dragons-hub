@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "i18n:check": "i18n-check -l src/messages -s en -f next-intl"
+    "i18n:check": "i18n-check -l src/messages -s en -f next-intl",
+    "test": "vitest run"
   },
   "dependencies": {
     "@daveyplate/better-auth-ui": "^3.3.15",
@@ -39,6 +40,7 @@
     "eslint": "^9.39.3",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4.2.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

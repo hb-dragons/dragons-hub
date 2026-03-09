@@ -14,7 +14,7 @@ import {
   refereeRoles,
   refereeAssignmentIntents,
 } from "@dragons/db/schema";
-import { eq, sql, and, or, inArray, gte, lte, asc } from "drizzle-orm";
+import { eq, sql, and, or, inArray, gte, lte, asc, desc, isNull, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { computeDiffs } from "./match-diff.service";
 import type {
@@ -34,6 +34,9 @@ export interface MatchListParams {
   leagueId?: number;
   dateFrom?: string;
   dateTo?: string;
+  sort?: "asc" | "desc";
+  hasScore?: boolean;
+  teamApiId?: number;
 }
 
 export interface MatchUpdateData {
@@ -369,7 +372,7 @@ export async function buildDetailResponse(
 }
 
 export async function getOwnClubMatches(params: MatchListParams) {
-  const { limit, offset, leagueId, dateFrom, dateTo } = params;
+  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId } = params;
 
   const ownTeams = await db
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId })
@@ -398,13 +401,32 @@ export async function getOwnClubMatches(params: MatchListParams) {
   if (dateTo) {
     conditions.push(lte(matches.kickoffDate, dateTo));
   }
+  if (teamApiId) {
+    conditions.push(
+      or(
+        eq(matches.homeTeamApiId, teamApiId),
+        eq(matches.guestTeamApiId, teamApiId),
+      )!,
+    );
+  }
+  if (hasScore === true) {
+    conditions.push(isNotNull(matches.homeScore));
+    conditions.push(isNotNull(matches.guestScore));
+  }
+  if (hasScore === false) {
+    conditions.push(
+      or(isNull(matches.homeScore), isNull(matches.guestScore))!,
+    );
+  }
 
   const whereClause = conditions.length === 1 ? conditions[0]! : and(...conditions)!;
+
+  const orderDirection = sort === "desc" ? desc : asc;
 
   const [rows, countResult] = await Promise.all([
     queryMatchWithJoins()
       .where(whereClause)
-      .orderBy(asc(matches.kickoffDate), asc(matches.kickoffTime))
+      .orderBy(orderDirection(matches.kickoffDate), orderDirection(matches.kickoffTime))
       .limit(limit)
       .offset(offset),
     db

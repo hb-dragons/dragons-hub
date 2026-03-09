@@ -21,6 +21,9 @@ publicMatchRoutes.get(
       leagueId: c.req.query("leagueId"),
       dateFrom: c.req.query("dateFrom"),
       dateTo: c.req.query("dateTo"),
+      sort: c.req.query("sort"),
+      hasScore: c.req.query("hasScore"),
+      teamApiId: c.req.query("teamApiId"),
     });
     const result = await getOwnClubMatches(query);
     return c.json(result);
