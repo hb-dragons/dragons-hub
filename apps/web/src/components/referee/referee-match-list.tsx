@@ -32,7 +32,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@dragons/ui/components/tooltip";
-import { Ban, Calendar, Check, CheckCircle2, CircleOff, Clock, ExternalLink, Loader2, RefreshCw, SearchIcon, SquareActivity, Trash2, UserRound, X, XCircle } from "lucide-react";
+import { Ban, Calendar, Check, CheckCircle2, CircleOff, Clock, ExternalLink, Loader2, RefreshCw, SearchIcon, SquareActivity, Trash2, X, XCircle } from "lucide-react";
 import type { DateRange } from "@dragons/ui/components/calendar";
 
 import { DataTable } from "@/components/ui/data-table";
@@ -530,7 +530,7 @@ export function RefereeMatchList() {
   function getRowClassName(row: Row<RefereeMatchListItem>) {
     return cn(
       (row.original.homeIsOwnClub || row.original.guestIsOwnClub) &&
-        "border-l-2 border-l-muted-foreground/30 bg-muted/40",
+      "border-l-2 border-l-muted-foreground/30 bg-muted/40",
       (row.original.isCancelled || row.original.isForfeited) && "opacity-60",
     );
   }
