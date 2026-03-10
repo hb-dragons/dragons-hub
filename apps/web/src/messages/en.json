@@ -374,7 +374,8 @@
     },
     "placeholder": "Enter custom name...",
     "gameDuration": "Game Duration (min)",
-    "gameDurationPlaceholder": "Default"
+    "gameDurationPlaceholder": "Default",
+    "badgeColor": "Badge Color"
   },
   "users": {
     "title": "Users",
@@ -663,7 +664,10 @@
     "matchesCount": "{count, plural, =1 {# match} other {# matches}}",
     "allTeams": "All Teams",
     "noMatchesThisWeekend": "No games this weekend.",
-    "lastResult": "Last Result"
+    "lastResult": "Last Result",
+    "weekendView": "Weekend",
+    "calendarView": "Calendar",
+    "noMatchesOnDay": "No games on this day."
   },
   "errors": {
     "title": "Something went wrong",

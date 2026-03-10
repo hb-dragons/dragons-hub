@@ -374,7 +374,8 @@
     },
     "placeholder": "Eigenen Namen eingeben...",
     "gameDuration": "Spieldauer (min)",
-    "gameDurationPlaceholder": "Standard"
+    "gameDurationPlaceholder": "Standard",
+    "badgeColor": "Badge-Farbe"
   },
   "users": {
     "title": "Benutzer",
@@ -663,7 +664,10 @@
     "matchesCount": "{count, plural, =1 {# Spiel} other {# Spiele}}",
     "allTeams": "Alle Teams",
     "noMatchesThisWeekend": "Keine Spiele an diesem Wochenende.",
-    "lastResult": "Letztes Ergebnis"
+    "lastResult": "Letztes Ergebnis",
+    "weekendView": "Wochenende",
+    "calendarView": "Kalender",
+    "noMatchesOnDay": "Keine Spiele an diesem Tag."
   },
   "errors": {
     "title": "Etwas ist schiefgelaufen",
