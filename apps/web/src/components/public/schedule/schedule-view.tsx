@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useFormatter } from "next-intl";
 import type { MatchListItem } from "@dragons/shared";
-import { TeamFilter } from "./team-filter";
 import { WeekendPicker } from "./weekend-picker";
 import { MatchList } from "./match-list";
 import type { PublicTeam } from "./types";
@@ -20,7 +19,6 @@ interface ScheduleViewProps {
   initialMatches: MatchListItem[];
   initialSaturday: string;
   translations: {
-    allTeams: string;
     vs: string;
     matchCancelled: string;
     matchForfeited: string;
@@ -30,15 +28,12 @@ interface ScheduleViewProps {
 }
 
 export function ScheduleView({
-  teams,
   initialMatches,
   initialSaturday,
   translations,
   apiBaseUrl,
 }: ScheduleViewProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
   const format = useFormatter();
 
   const formatDate = useCallback(
@@ -64,7 +59,9 @@ export function ScheduleView({
   const teamParam = searchParams.get("team");
   const selectedTeamApiId = teamParam ? Number(teamParam) : null;
 
-  const [saturday, setSaturday] = useState(() => new Date(initialSaturday + "T12:00:00"));
+  const [saturday, setSaturday] = useState(
+    () => new Date(initialSaturday + "T12:00:00"),
+  );
   const [matches, setMatches] = useState(initialMatches);
   const [loading, setLoading] = useState(false);
 
@@ -94,21 +91,14 @@ export function ScheduleView({
     [apiBaseUrl],
   );
 
-  const handleTeamSelect = useCallback(
-    (teamApiId: number | null) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (teamApiId) {
-        params.set("team", teamApiId.toString());
-      } else {
-        params.delete("team");
-      }
-      startTransition(() => {
-        router.replace(`?${params.toString()}`, { scroll: false });
-      });
-      fetchMatches(saturday, teamApiId);
-    },
-    [saturday, searchParams, router, fetchMatches],
-  );
+  // Re-fetch when the team filter changes at the page level
+  const prevTeamRef = useRef(selectedTeamApiId);
+  useEffect(() => {
+    if (prevTeamRef.current !== selectedTeamApiId) {
+      prevTeamRef.current = selectedTeamApiId;
+      fetchMatches(saturday, selectedTeamApiId);
+    }
+  }, [selectedTeamApiId, saturday, fetchMatches]);
 
   const handlePrevious = useCallback(() => {
     const prev = previousSaturday(saturday);
@@ -126,13 +116,6 @@ export function ScheduleView({
 
   return (
     <div className="space-y-4">
-      <TeamFilter
-        teams={teams}
-        selectedTeamApiId={selectedTeamApiId}
-        onSelect={handleTeamSelect}
-        allTeamsLabel={translations.allTeams}
-      />
-
       <WeekendPicker
         label={weekendLabel}
         onPrevious={handlePrevious}
@@ -141,7 +124,7 @@ export function ScheduleView({
         hasNext={true}
       />
 
-      <div className={loading || isPending ? "opacity-50 transition-opacity" : ""}>
+      <div className={loading ? "opacity-50 transition-opacity" : ""}>
         <MatchList
           matches={matches}
           formatDate={formatDate}
