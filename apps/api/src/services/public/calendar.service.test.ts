@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { buildCalendarFeed } from "./calendar.service";
 import type { MatchListItem } from "@dragons/shared";
 
+/** Unfold ICS line continuations (RFC 5545 §3.1) so toContain works across folds */
+function unfold(ics: string): string {
+  return ics.replace(/\r\n[ \t]/g, "");
+}
+
 function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
   return {
     id: 1,
@@ -29,6 +34,7 @@ function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
     venueId: 1,
     venueName: "Sporthalle Am Park",
     venueStreet: "Parkstr. 1",
+    venuePostalCode: "10115",
     venueCity: "Berlin",
     venueNameOverride: null,
     isConfirmed: true,
@@ -89,10 +95,45 @@ describe("buildCalendarFeed", () => {
     expect(ics).toContain("match-99@");
   });
 
-  it("sets location from venue name and city", () => {
+  // --- Description ---
+
+  it("includes full team names in description", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("Dragons U14 vs Eagles U14");
+  });
+
+  it("includes league in description", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("U14 Kreisliga");
+  });
+
+  it("includes score in description when available", () => {
+    const ics = buildCalendarFeed(
+      [makeMatch({ homeScore: 65, guestScore: 48 })],
+      {},
+    );
+    expect(ics).toContain("65:48");
+  });
+
+  it("includes publicComment in description", () => {
+    const ics = unfold(buildCalendarFeed(
+      [makeMatch({ publicComment: "Heimspiel verlegt" })],
+      {},
+    ));
+    expect(ics).toContain("Heimspiel verlegt");
+  });
+
+  // --- Location ---
+
+  it("sets location with venue name", () => {
     const ics = buildCalendarFeed([makeMatch()], {});
     expect(ics).toContain("Sporthalle Am Park");
-    expect(ics).toContain("Berlin");
+  });
+
+  it("includes street and postal code in location address", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("Parkstr. 1");
+    expect(ics).toContain("10115 Berlin");
   });
 
   it("uses venueNameOverride when present", () => {
@@ -102,6 +143,8 @@ describe("buildCalendarFeed", () => {
     );
     expect(ics).toContain("Turnhalle Mitte");
   });
+
+  // --- Status ---
 
   it("marks cancelled matches as CANCELLED", () => {
     const ics = buildCalendarFeed([makeMatch({ isCancelled: true })], {});
@@ -113,26 +156,7 @@ describe("buildCalendarFeed", () => {
     expect(ics).toContain("STATUS:CONFIRMED");
   });
 
-  it("includes score in description when available", () => {
-    const ics = buildCalendarFeed(
-      [makeMatch({ homeScore: 65, guestScore: 48 })],
-      {},
-    );
-    expect(ics).toContain("65:48");
-  });
-
-  it("includes league in description", () => {
-    const ics = buildCalendarFeed([makeMatch()], {});
-    expect(ics).toContain("U14 Kreisliga");
-  });
-
-  it("includes publicComment in description", () => {
-    const ics = buildCalendarFeed(
-      [makeMatch({ publicComment: "Heimspiel verlegt" })],
-      {},
-    );
-    expect(ics).toContain("Heimspiel verlegt");
-  });
+  // --- Calendar metadata ---
 
   it("returns empty calendar for empty match list", () => {
     const ics = buildCalendarFeed([], {});

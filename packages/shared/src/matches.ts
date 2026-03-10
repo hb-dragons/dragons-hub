@@ -42,6 +42,7 @@ export interface MatchListItem {
   venueId: number | null;
   venueName: string | null;
   venueStreet: string | null;
+  venuePostalCode: string | null;
   venueCity: string | null;
   venueNameOverride: string | null;
   isConfirmed: boolean | null;

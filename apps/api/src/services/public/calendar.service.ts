@@ -22,8 +22,16 @@ function resolveTeamName(team: {
   return team.customName ?? team.nameShort ?? team.name;
 }
 
-function buildDescription(match: MatchListItem): string {
+function buildDescription(
+  match: MatchListItem,
+  homeName: string,
+  guestName: string,
+): string {
   const parts: string[] = [];
+
+  // Full team names (summary only has short names)
+  parts.push(`${match.homeTeamName} vs ${match.guestTeamName}`);
+
   if (match.leagueName) parts.push(match.leagueName);
   if (match.homeScore !== null && match.guestScore !== null) {
     parts.push(`Ergebnis: ${match.homeScore}:${match.guestScore}`);
@@ -32,10 +40,28 @@ function buildDescription(match: MatchListItem): string {
   return parts.join("\n");
 }
 
-function buildLocation(match: MatchListItem): string | undefined {
+interface LocationData {
+  title: string;
+  address?: string;
+}
+
+function buildLocation(match: MatchListItem): LocationData | undefined {
   const venueName = match.venueNameOverride ?? match.venueName;
   if (!venueName) return undefined;
-  return match.venueCity ? `${venueName}, ${match.venueCity}` : venueName;
+
+  const addressParts: string[] = [];
+  if (match.venueStreet) addressParts.push(match.venueStreet);
+  if (match.venuePostalCode && match.venueCity) {
+    addressParts.push(`${match.venuePostalCode} ${match.venueCity}`);
+  } else if (match.venueCity) {
+    addressParts.push(match.venueCity);
+  }
+
+  const location: LocationData = { title: venueName };
+  if (addressParts.length > 0) {
+    location.address = addressParts.join(", ");
+  }
+  return location;
 }
 
 function getStatus(match: MatchListItem): ICalEventStatus {
@@ -84,16 +110,20 @@ export function buildCalendarFeed(
     );
     const end = new Date(start.getTime() + GAME_DURATION_MS);
 
-    calendar.createEvent({
+    const event = calendar.createEvent({
       id: `match-${match.id}@${hostname}`,
       start,
       end,
       timezone: TIMEZONE,
       summary: `${homeName} vs ${guestName}`,
-      description: buildDescription(match),
-      location: buildLocation(match),
+      description: buildDescription(match, homeName, guestName),
       status: getStatus(match),
     });
+
+    const loc = buildLocation(match);
+    if (loc) {
+      event.location(loc);
+    }
   }
 
   return calendar.toString();
