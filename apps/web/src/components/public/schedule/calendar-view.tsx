@@ -7,6 +7,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { MatchListItem } from "@dragons/shared";
 import { getColorPreset } from "@dragons/shared";
 import { Calendar } from "@dragons/ui/components/calendar";
+import { Button } from "@dragons/ui/components/button";
 import { cn } from "@dragons/ui/lib/utils";
 import { MatchCard } from "./match-card";
 import type { PublicTeam } from "./types";
@@ -59,8 +60,59 @@ function getOwnTeamApiIds(match: MatchListItem): number[] {
 }
 
 interface DotInfo {
-  colorClass: string;
+  color: string;
   played: boolean;
+}
+
+/** SVG ring radius and stroke config */
+const RING_RADIUS = 15;
+const RING_STROKE = 2.5;
+const RING_GAP_DEG = 12;
+const SVG_SIZE = 40;
+const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+/** Render colored arc segments around a day number */
+function DayRing({ dots }: { dots: DotInfo[] }) {
+  if (dots.length === 0) return null;
+
+  const n = dots.length;
+  const gapDeg = n > 1 ? RING_GAP_DEG : 0;
+  const totalGapDeg = gapDeg * n;
+  const availableDeg = 360 - totalGapDeg;
+  const segmentDeg = availableDeg / n;
+
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0"
+      width={SVG_SIZE}
+      height={SVG_SIZE}
+      viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
+    >
+      {dots.map((dot, i) => {
+        const segmentLength = (segmentDeg / 360) * CIRCUMFERENCE;
+        const offset = -((segmentDeg + gapDeg) * i / 360) * CIRCUMFERENCE;
+        return (
+          <circle
+            key={i}
+            cx={SVG_SIZE / 2}
+            cy={SVG_SIZE / 2}
+            r={RING_RADIUS}
+            fill="none"
+            stroke={dot.color}
+            strokeWidth={RING_STROKE}
+            strokeDasharray={`${segmentLength} ${CIRCUMFERENCE - segmentLength}`}
+            strokeDashoffset={-offset + CIRCUMFERENCE / 4}
+            strokeLinecap="round"
+            className={dot.played ? "opacity-35" : undefined}
+            style={{
+              transform: "rotate(-90deg)",
+              transformOrigin: "center",
+            }}
+          />
+        );
+      })}
+    </svg>
+  );
 }
 
 export function CalendarView({
@@ -104,9 +156,9 @@ export function CalendarView({
         const ownIds = getOwnTeamApiIds(match);
         const played = match.homeScore !== null && match.guestScore !== null;
         for (const id of ownIds) {
-          const colorClass = teamDotMap.get(id);
-          if (colorClass) {
-            dots.push({ colorClass, played });
+          const color = teamDotMap.get(id);
+          if (color) {
+            dots.push({ color, played });
           }
         }
       }
@@ -146,6 +198,23 @@ export function CalendarView({
     [fetchMatches],
   );
 
+  const goToPreviousMonth = useCallback(() => {
+    const prev = new Date(month);
+    prev.setMonth(prev.getMonth() - 1);
+    handleMonthChange(prev);
+  }, [month, handleMonthChange]);
+
+  const goToNextMonth = useCallback(() => {
+    const next = new Date(month);
+    next.setMonth(next.getMonth() + 1);
+    handleMonthChange(next);
+  }, [month, handleMonthChange]);
+
+  const monthLabel = useMemo(
+    () => format.dateTime(month, { month: "long", year: "numeric" }),
+    [month, format],
+  );
+
   const handleDayClick = useCallback((date: Date) => {
     setSelectedDate(date);
   }, []);
@@ -165,7 +234,7 @@ export function CalendarView({
     });
   }, [selectedDate, format]);
 
-  /** Custom DayButton that renders dots below the day number */
+  /** Custom DayButton that renders colored ring segments around the day number */
   const CustomDayButton = useCallback(
     ({
       day,
@@ -178,24 +247,13 @@ export function CalendarView({
       const dots = getDotsForDate(day.date);
 
       return (
-        <button type="button" {...buttonProps}>
-          <span className="flex flex-col items-center gap-0.5">
-            <span>{children}</span>
-            {dots.length > 0 && (
-              <span className="flex gap-0.5">
-                {dots.map((dot, i) => (
-                  <span
-                    key={i}
-                    style={{ backgroundColor: dot.colorClass }}
-                    className={cn(
-                      "size-1.5 rounded-full",
-                      dot.played && "opacity-40",
-                    )}
-                  />
-                ))}
-              </span>
-            )}
-          </span>
+        <button
+          type="button"
+          {...buttonProps}
+          className={cn(buttonProps.className, "relative")}
+        >
+          <span className="relative z-10">{children}</span>
+          <DayRing dots={dots} />
         </button>
       );
     },
@@ -204,7 +262,23 @@ export function CalendarView({
 
   return (
     <div className="space-y-4">
-      <div className={cn("flex justify-center", loading && "opacity-50 transition-opacity")}>
+      {/* Month navigation header */}
+      <div className="flex items-center justify-between px-1">
+        <Button variant="ghost" size="icon" className="size-8" onClick={goToPreviousMonth}>
+          <ChevronLeftIcon className="size-4" />
+        </Button>
+        <span className="text-sm font-semibold capitalize">{monthLabel}</span>
+        <Button variant="ghost" size="icon" className="size-8" onClick={goToNextMonth}>
+          <ChevronRightIcon className="size-4" />
+        </Button>
+      </div>
+
+      <div
+        className={cn(
+          "flex justify-center",
+          loading && "opacity-50",
+        )}
+      >
         <Calendar
           mode="single"
           selected={selectedDate}
@@ -214,24 +288,22 @@ export function CalendarView({
           month={month}
           onMonthChange={handleMonthChange}
           weekStartsOn={1}
-          showOutsideDays={false}
+          showOutsideDays
+          hideNavigation
           classNames={{
+            month_caption: "hidden",
             weekday: "text-muted-foreground rounded-md w-10 font-normal text-[0.8rem]",
-            day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:bg-accent [&:has([aria-selected])]:rounded-md",
+            day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 [&:has([aria-selected])]:rounded-full",
             day_button:
-              "inline-flex items-center justify-center whitespace-nowrap font-normal transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-auto min-h-10 w-10 p-1 aria-selected:opacity-100",
+              "inline-flex items-center justify-center whitespace-nowrap font-normal focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent/50 hover:text-accent-foreground h-10 w-10 p-0 aria-selected:opacity-100 rounded-full",
             selected:
-              "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-md",
-            today: "bg-accent text-accent-foreground rounded-md",
-            outside: "day-outside text-muted-foreground opacity-50",
+              "bg-accent font-semibold text-accent-foreground hover:bg-accent focus:bg-accent rounded-full",
+            today: "text-primary font-semibold",
+            outside: "day-outside text-muted-foreground opacity-30",
             disabled: "text-muted-foreground opacity-50",
             hidden: "invisible",
           }}
           components={{
-            Chevron: ({ orientation }) => {
-              const Icon = orientation === "left" ? ChevronLeftIcon : ChevronRightIcon;
-              return <Icon className="size-4" />;
-            },
             DayButton: CustomDayButton,
           }}
         />

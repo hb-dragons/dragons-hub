@@ -33,6 +33,8 @@ export interface MatchListItem {
   guestTeamCustomName: string | null;
   homeIsOwnClub: boolean;
   guestIsOwnClub: boolean;
+  homeBadgeColor: string | null;
+  guestBadgeColor: string | null;
   homeScore: number | null;
   guestScore: number | null;
   leagueId: number | null;

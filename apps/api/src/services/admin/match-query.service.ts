@@ -37,6 +37,7 @@ export interface MatchListParams {
   sort?: "asc" | "desc";
   hasScore?: boolean;
   teamApiId?: number;
+  excludeInactive?: boolean;
 }
 
 export interface MatchUpdateData {
@@ -96,6 +97,8 @@ export function queryMatchWithJoins(client: Database | TransactionClient = db) {
       guestTeamCustomName: guestTeam.customName,
       homeIsOwnClub: homeTeam.isOwnClub,
       guestIsOwnClub: guestTeam.isOwnClub,
+      homeBadgeColor: homeTeam.badgeColor,
+      guestBadgeColor: guestTeam.badgeColor,
       homeScore: matches.homeScore,
       guestScore: matches.guestScore,
       leagueId: matches.leagueId,
@@ -207,6 +210,8 @@ export function rowToListItem(
     guestTeamCustomName: row.guestTeamCustomName,
     homeIsOwnClub: row.homeIsOwnClub ?? false,
     guestIsOwnClub: row.guestIsOwnClub ?? false,
+    homeBadgeColor: row.homeBadgeColor,
+    guestBadgeColor: row.guestBadgeColor,
     homeScore: row.homeScore,
     guestScore: row.guestScore,
     leagueId: row.leagueId,
@@ -372,7 +377,7 @@ export async function buildDetailResponse(
 }
 
 export async function getOwnClubMatches(params: MatchListParams) {
-  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId } = params;
+  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId, excludeInactive } = params;
 
   const ownTeams = await db
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId })
@@ -416,6 +421,14 @@ export async function getOwnClubMatches(params: MatchListParams) {
   if (hasScore === false) {
     conditions.push(
       or(isNull(matches.homeScore), isNull(matches.guestScore))!,
+    );
+  }
+  if (excludeInactive) {
+    conditions.push(
+      or(isNull(matches.isForfeited), eq(matches.isForfeited, false))!,
+    );
+    conditions.push(
+      or(isNull(matches.isCancelled), eq(matches.isCancelled, false))!,
     );
   }
 

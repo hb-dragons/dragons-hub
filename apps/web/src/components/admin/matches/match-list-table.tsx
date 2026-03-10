@@ -51,8 +51,8 @@ function OverrideDot({ match, field }: { match: MatchListItem; field: string }) 
   )
 }
 
-function TeamBadge({ name }: { name: string }) {
-  const color = getTeamColor(name)
+function TeamBadge({ name, badgeColor }: { name: string; badgeColor?: string | null }) {
+  const color = getTeamColor(name, badgeColor)
   return (
     <span
       className={cn(
@@ -117,7 +117,11 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t("columns.team")} />
       ),
-      cell: ({ row }) => <TeamBadge name={getOwnTeamLabel(row.original)} />,
+      cell: ({ row }) => {
+        const m = row.original
+        const badgeColor = m.homeIsOwnClub ? m.homeBadgeColor : m.guestBadgeColor
+        return <TeamBadge name={getOwnTeamLabel(m)} badgeColor={badgeColor} />
+      },
       filterFn: (row, id, value) => {
         const filterValues = value as string[] | undefined
         if (!filterValues || filterValues.length === 0) return true
