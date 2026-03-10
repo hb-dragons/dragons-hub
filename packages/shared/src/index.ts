@@ -96,3 +96,7 @@ export type {
   TrackedLeague,
   TrackedLeaguesResponse,
 } from "./leagues";
+
+// Team colors
+export { COLOR_PRESETS, COLOR_PRESET_KEYS, getColorPreset } from "./team-colors";
+export type { ColorPreset, ColorPresetMode } from "./team-colors";
