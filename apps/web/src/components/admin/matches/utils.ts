@@ -1,3 +1,4 @@
+import { getColorPreset } from "@dragons/shared";
 import type { MatchDetail, MatchListItem } from "./types";
 
 export function formatMatchTime(timeStr: string): string {
@@ -54,29 +55,9 @@ export function getOpponentName(match: MatchListItem): string {
   return match.homeTeamName;
 }
 
-// Deterministic color palette for team badges
-const TEAM_COLORS = [
-  { bg: "bg-blue-800", border: "border-blue-600", text: "text-blue-100" },
-  { bg: "bg-teal-700", border: "border-teal-500", text: "text-teal-100" },
-  { bg: "bg-green-700", border: "border-green-500", text: "text-green-100" },
-  { bg: "bg-orange-700", border: "border-orange-500", text: "text-orange-100" },
-  { bg: "bg-rose-800", border: "border-rose-600", text: "text-rose-100" },
-  { bg: "bg-pink-700", border: "border-pink-500", text: "text-pink-100" },
-  { bg: "bg-cyan-700", border: "border-cyan-500", text: "text-cyan-100" },
-  { bg: "bg-indigo-700", border: "border-indigo-500", text: "text-indigo-100" },
-  { bg: "bg-emerald-800", border: "border-emerald-600", text: "text-emerald-100" },
-  { bg: "bg-violet-700", border: "border-violet-500", text: "text-violet-100" },
-];
-
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash * 31 + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-export function getTeamColor(teamName: string) {
-  const index = hashString(teamName) % TEAM_COLORS.length;
-  return TEAM_COLORS[index]!;
+// Re-export for admin badge usage: returns { bg, border, text } for current color scheme
+export function getTeamColor(teamName: string, badgeColor?: string | null) {
+  const preset = getColorPreset(badgeColor, teamName);
+  // Admin always uses dark mode style (dark bg, light text) for badge contrast
+  return preset.dark;
 }
