@@ -1,0 +1,173 @@
+import { describe, expect, it } from "vitest";
+import { buildCalendarFeed } from "./calendar.service";
+import type { MatchListItem } from "@dragons/shared";
+
+function makeMatch(overrides: Partial<MatchListItem> = {}): MatchListItem {
+  return {
+    id: 1,
+    apiMatchId: 10001,
+    matchNo: 42,
+    matchDay: 5,
+    kickoffDate: "2026-04-15",
+    kickoffTime: "14:00",
+    homeTeamApiId: 100,
+    homeTeamName: "Dragons U14",
+    homeTeamNameShort: "Dragons",
+    homeTeamCustomName: null,
+    guestTeamApiId: 200,
+    guestTeamName: "Eagles U14",
+    guestTeamNameShort: "Eagles",
+    guestTeamCustomName: null,
+    homeIsOwnClub: true,
+    guestIsOwnClub: false,
+    homeBadgeColor: null,
+    guestBadgeColor: null,
+    homeScore: null,
+    guestScore: null,
+    leagueId: 1,
+    leagueName: "U14 Kreisliga",
+    venueId: 1,
+    venueName: "Sporthalle Am Park",
+    venueStreet: "Parkstr. 1",
+    venueCity: "Berlin",
+    venueNameOverride: null,
+    isConfirmed: true,
+    isForfeited: false,
+    isCancelled: false,
+    anschreiber: null,
+    zeitnehmer: null,
+    shotclock: null,
+    publicComment: null,
+    hasLocalChanges: false,
+    overriddenFields: [],
+    booking: null,
+    ...overrides,
+  };
+}
+
+describe("buildCalendarFeed", () => {
+  it("returns valid ICS with BEGIN:VCALENDAR and VEVENT", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("BEGIN:VCALENDAR");
+    expect(ics).toContain("BEGIN:VEVENT");
+    expect(ics).toContain("END:VCALENDAR");
+  });
+
+  it("uses PUBLISH method", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("METHOD:PUBLISH");
+  });
+
+  it("sets event summary to home vs guest (prefers nameShort)", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("Dragons vs Eagles");
+  });
+
+  it("falls back to full name when nameShort is null", () => {
+    const ics = buildCalendarFeed(
+      [makeMatch({ homeTeamNameShort: null, guestTeamNameShort: null })],
+      {},
+    );
+    expect(ics).toContain("Dragons U14 vs Eagles U14");
+  });
+
+  it("prefers customName > nameShort for summary", () => {
+    const ics = buildCalendarFeed(
+      [
+        makeMatch({
+          homeTeamCustomName: "Drachen U14",
+          guestTeamCustomName: "Adler U14",
+        }),
+      ],
+      {},
+    );
+    expect(ics).toContain("Drachen U14 vs Adler U14");
+  });
+
+  it("sets stable UID per match", () => {
+    const ics = buildCalendarFeed([makeMatch({ id: 99 })], {});
+    expect(ics).toContain("match-99@");
+  });
+
+  it("sets location from venue name and city", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("Sporthalle Am Park");
+    expect(ics).toContain("Berlin");
+  });
+
+  it("uses venueNameOverride when present", () => {
+    const ics = buildCalendarFeed(
+      [makeMatch({ venueNameOverride: "Turnhalle Mitte" })],
+      {},
+    );
+    expect(ics).toContain("Turnhalle Mitte");
+  });
+
+  it("marks cancelled matches as CANCELLED", () => {
+    const ics = buildCalendarFeed([makeMatch({ isCancelled: true })], {});
+    expect(ics).toContain("STATUS:CANCELLED");
+  });
+
+  it("marks normal matches as CONFIRMED", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("STATUS:CONFIRMED");
+  });
+
+  it("includes score in description when available", () => {
+    const ics = buildCalendarFeed(
+      [makeMatch({ homeScore: 65, guestScore: 48 })],
+      {},
+    );
+    expect(ics).toContain("65:48");
+  });
+
+  it("includes league in description", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("U14 Kreisliga");
+  });
+
+  it("includes publicComment in description", () => {
+    const ics = buildCalendarFeed(
+      [makeMatch({ publicComment: "Heimspiel verlegt" })],
+      {},
+    );
+    expect(ics).toContain("Heimspiel verlegt");
+  });
+
+  it("returns empty calendar for empty match list", () => {
+    const ics = buildCalendarFeed([], {});
+    expect(ics).toContain("BEGIN:VCALENDAR");
+    expect(ics).not.toContain("BEGIN:VEVENT");
+  });
+
+  it("includes Europe/Berlin timezone", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("Europe/Berlin");
+  });
+
+  it("sets calendar name from calendarName option", () => {
+    const ics = buildCalendarFeed([makeMatch()], {
+      calendarName: "Dragons U14",
+    });
+    expect(ics).toContain("Dragons U14");
+  });
+
+  it("uses default calendar name when not provided", () => {
+    const ics = buildCalendarFeed([makeMatch()], {});
+    expect(ics).toContain("Dragons Spielplan");
+  });
+
+  it("handles multiple matches", () => {
+    const matches = [
+      makeMatch({ id: 1 }),
+      makeMatch({
+        id: 2,
+        kickoffDate: "2026-04-16",
+        guestTeamName: "Hawks U14",
+      }),
+    ];
+    const ics = buildCalendarFeed(matches, {});
+    const eventCount = (ics.match(/BEGIN:VEVENT/g) ?? []).length;
+    expect(eventCount).toBe(2);
+  });
+});

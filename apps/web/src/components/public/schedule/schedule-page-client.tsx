@@ -7,6 +7,7 @@ import { ScheduleView } from "./schedule-view";
 import { CalendarView } from "./calendar-view";
 import { ViewToggle } from "./view-toggle";
 import { TeamFilter } from "./team-filter";
+import { SubscribeButton } from "./subscribe-button";
 import type { PublicTeam } from "./types";
 
 interface SchedulePageClientProps {
@@ -24,6 +25,13 @@ interface SchedulePageClientProps {
     noMatchesOnDay: string;
     weekendView: string;
     calendarView: string;
+    subscribe: string;
+    subscribeTitle: string;
+    copy: string;
+    copied: string;
+    instructionApple: string;
+    instructionGoogle: string;
+    instructionOutlook: string;
   };
   apiBaseUrl: string;
 }
@@ -71,6 +79,19 @@ export function SchedulePageClient({
             allTeamsLabel={translations.allTeams}
           />
         </div>
+        <SubscribeButton
+          apiBaseUrl={apiBaseUrl}
+          teamApiId={selectedTeamApiId}
+          translations={{
+            subscribe: translations.subscribe,
+            subscribeTitle: translations.subscribeTitle,
+            copy: translations.copy,
+            copied: translations.copied,
+            instructionApple: translations.instructionApple,
+            instructionGoogle: translations.instructionGoogle,
+            instructionOutlook: translations.instructionOutlook,
+          }}
+        />
         <ViewToggle
           view={view}
           weekendLabel={translations.weekendView}

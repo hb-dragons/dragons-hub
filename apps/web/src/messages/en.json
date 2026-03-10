@@ -667,7 +667,14 @@
     "lastResult": "Last Result",
     "weekendView": "Weekend",
     "calendarView": "Calendar",
-    "noMatchesOnDay": "No games on this day."
+    "noMatchesOnDay": "No games on this day.",
+    "subscribe": "Subscribe",
+    "subscribeTitle": "Subscribe to calendar",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "instructionApple": "Calendar → File → New Calendar Subscription",
+    "instructionGoogle": "Settings → Add calendar → From URL",
+    "instructionOutlook": "Add calendar → From the internet"
   },
   "errors": {
     "title": "Something went wrong",

@@ -67,6 +67,13 @@ export default async function SchedulePage({
           noMatchesOnDay: t("noMatchesOnDay"),
           weekendView: t("weekendView"),
           calendarView: t("calendarView"),
+          subscribe: t("subscribe"),
+          subscribeTitle: t("subscribeTitle"),
+          copy: t("copy"),
+          copied: t("copied"),
+          instructionApple: t("instructionApple"),
+          instructionGoogle: t("instructionGoogle"),
+          instructionOutlook: t("instructionOutlook"),
         }}
         apiBaseUrl={apiBaseUrl}
       />

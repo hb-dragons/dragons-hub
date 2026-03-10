@@ -667,7 +667,14 @@
     "lastResult": "Letztes Ergebnis",
     "weekendView": "Wochenende",
     "calendarView": "Kalender",
-    "noMatchesOnDay": "Keine Spiele an diesem Tag."
+    "noMatchesOnDay": "Keine Spiele an diesem Tag.",
+    "subscribe": "Abonnieren",
+    "subscribeTitle": "Kalender abonnieren",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "instructionApple": "Kalender → Ablage → Neues Kalenderabo",
+    "instructionGoogle": "Einstellungen → Weitere Kalender → Per URL",
+    "instructionOutlook": "Kalender hinzufügen → Aus dem Internet"
   },
   "errors": {
     "title": "Etwas ist schiefgelaufen",
