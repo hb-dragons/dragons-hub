@@ -1,0 +1,1 @@
+ALTER TABLE "teams" ADD COLUMN "badge_color" varchar(20);
