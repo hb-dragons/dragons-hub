@@ -39,3 +39,19 @@ export function nextSaturday(saturday: Date): Date {
   d.setDate(d.getDate() + 7);
   return d;
 }
+
+/** Get the first day of the month containing the given date */
+export function getMonthStart(date: Date): Date {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setHours(12, 0, 0, 0);
+  return d;
+}
+
+/** Get the last day of the month containing the given date */
+export function getMonthEnd(date: Date): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + 1, 0); // Day 0 of next month = last day of current month
+  d.setHours(12, 0, 0, 0);
+  return d;
+}

@@ -5,6 +5,8 @@ import {
   toDateString,
   previousSaturday,
   nextSaturday,
+  getMonthStart,
+  getMonthEnd,
 } from "./weekend-utils";
 
 describe("getSaturday", () => {
@@ -62,5 +64,28 @@ describe("nextSaturday", () => {
   it("returns 7 days later", () => {
     const sat = new Date("2026-03-14T12:00:00");
     expect(toDateString(nextSaturday(sat))).toBe("2026-03-21");
+  });
+});
+
+describe("getMonthStart", () => {
+  it("returns the first day of the month", () => {
+    const result = getMonthStart(new Date("2026-03-15T12:00:00"));
+    expect(result.getFullYear()).toBe(2026);
+    expect(result.getMonth()).toBe(2); // March
+    expect(result.getDate()).toBe(1);
+  });
+});
+
+describe("getMonthEnd", () => {
+  it("returns the last day of the month", () => {
+    const result = getMonthEnd(new Date("2026-03-15T12:00:00"));
+    expect(result.getFullYear()).toBe(2026);
+    expect(result.getMonth()).toBe(2);
+    expect(result.getDate()).toBe(31);
+  });
+
+  it("handles February correctly", () => {
+    const result = getMonthEnd(new Date("2026-02-10T12:00:00"));
+    expect(result.getDate()).toBe(28);
   });
 });
