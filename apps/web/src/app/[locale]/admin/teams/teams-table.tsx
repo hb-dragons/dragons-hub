@@ -158,9 +158,9 @@ export function TeamsTable() {
                     <button
                       key={colorKey}
                       type="button"
+                      style={{ backgroundColor: preset.dot }}
                       className={cn(
                         "size-6 rounded-full border-2 transition-transform",
-                        preset.dot,
                         isSelected ? "scale-110 border-foreground ring-2 ring-foreground/20" : "border-transparent hover:scale-105"
                       )}
                       onClick={() =>

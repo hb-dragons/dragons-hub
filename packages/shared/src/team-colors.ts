@@ -7,7 +7,7 @@ export interface ColorPresetMode {
 export interface ColorPreset {
   light: ColorPresetMode;
   dark: ColorPresetMode;
-  /** Tailwind bg class for the calendar dot (works in both modes) */
+  /** Hex color for calendar dots and admin swatches (inline style, not Tailwind) */
   dot: string;
 }
 
@@ -23,7 +23,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-blue-600",
       text: "text-blue-100",
     },
-    dot: "bg-blue-500",
+    dot: "#3b82f6",
   },
   teal: {
     light: {
@@ -36,7 +36,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-teal-500",
       text: "text-teal-100",
     },
-    dot: "bg-teal-500",
+    dot: "#14b8a6",
   },
   green: {
     light: {
@@ -49,7 +49,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-green-500",
       text: "text-green-100",
     },
-    dot: "bg-green-500",
+    dot: "#22c55e",
   },
   orange: {
     light: {
@@ -62,7 +62,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-orange-500",
       text: "text-orange-100",
     },
-    dot: "bg-orange-500",
+    dot: "#f97316",
   },
   rose: {
     light: {
@@ -75,7 +75,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-rose-600",
       text: "text-rose-100",
     },
-    dot: "bg-rose-500",
+    dot: "#f43f5e",
   },
   pink: {
     light: {
@@ -88,7 +88,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-pink-500",
       text: "text-pink-100",
     },
-    dot: "bg-pink-500",
+    dot: "#ec4899",
   },
   cyan: {
     light: {
@@ -101,7 +101,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-cyan-500",
       text: "text-cyan-100",
     },
-    dot: "bg-cyan-500",
+    dot: "#06b6d4",
   },
   indigo: {
     light: {
@@ -114,7 +114,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-indigo-500",
       text: "text-indigo-100",
     },
-    dot: "bg-indigo-500",
+    dot: "#6366f1",
   },
   emerald: {
     light: {
@@ -127,7 +127,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-emerald-600",
       text: "text-emerald-100",
     },
-    dot: "bg-emerald-500",
+    dot: "#10b981",
   },
   violet: {
     light: {
@@ -140,7 +140,7 @@ export const COLOR_PRESETS: Record<string, ColorPreset> = {
       border: "border-violet-500",
       text: "text-violet-100",
     },
-    dot: "bg-violet-500",
+    dot: "#8b5cf6",
   },
 };
 

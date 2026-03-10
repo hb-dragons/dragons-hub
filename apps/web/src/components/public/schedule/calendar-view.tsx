@@ -40,7 +40,7 @@ function buildMatchesByDate(matches: MatchListItem[]): Map<string, MatchListItem
   return map;
 }
 
-/** Build a lookup from team API permanent ID to dot color class */
+/** Build a lookup from team API permanent ID to dot hex color */
 function buildTeamDotMap(teams: PublicTeam[]): Map<number, string> {
   const map = new Map<number, string>();
   for (const team of teams) {
@@ -186,9 +186,9 @@ export function CalendarView({
                 {dots.map((dot, i) => (
                   <span
                     key={i}
+                    style={{ backgroundColor: dot.colorClass }}
                     className={cn(
                       "size-1.5 rounded-full",
-                      dot.colorClass,
                       dot.played && "opacity-40",
                     )}
                   />
