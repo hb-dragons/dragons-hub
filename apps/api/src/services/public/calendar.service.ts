@@ -31,6 +31,7 @@ function buildDescription(
 
   // Full team names (summary only has short names)
   parts.push(`${match.homeTeamName} vs ${match.guestTeamName}`);
+  if (match.kickoffTime) parts.push(`Anpfiff: ${match.kickoffTime} Uhr`);
 
   if (match.leagueName) parts.push(match.leagueName);
   if (match.homeScore !== null && match.guestScore !== null) {

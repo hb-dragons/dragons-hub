@@ -102,6 +102,11 @@ describe("buildCalendarFeed", () => {
     expect(ics).toContain("Dragons U14 vs Eagles U14");
   });
 
+  it("includes kickoff time in description", () => {
+    const ics = unfold(buildCalendarFeed([makeMatch()], {}));
+    expect(ics).toContain("Anpfiff: 14:00 Uhr");
+  });
+
   it("includes league in description", () => {
     const ics = buildCalendarFeed([makeMatch()], {});
     expect(ics).toContain("U14 Kreisliga");
