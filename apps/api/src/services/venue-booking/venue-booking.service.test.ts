@@ -57,6 +57,7 @@ const CREATE_TABLES = `
     is_own_club BOOLEAN DEFAULT FALSE,
     verzicht BOOLEAN DEFAULT FALSE,
     estimated_game_duration INTEGER,
+    badge_color VARCHAR(20),
     data_hash VARCHAR(64),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
