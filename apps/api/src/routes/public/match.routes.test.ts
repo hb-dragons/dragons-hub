@@ -212,12 +212,12 @@ describe("GET /schedule.ics", () => {
 
     await app.request("/schedule.ics");
 
-    const call = mocks.getOwnClubMatches.mock.calls[0][0];
+    const call = mocks.getOwnClubMatches.mock.calls[0]![0] as Record<string, string>;
     expect(call.dateFrom).toBeDefined();
     expect(call.dateTo).toBeDefined();
     // Default window: ~30 days back, ~180 days forward
-    const from = new Date(call.dateFrom);
-    const to = new Date(call.dateTo);
+    const from = new Date(call.dateFrom!);
+    const to = new Date(call.dateTo!);
     const diffDays = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24);
     expect(diffDays).toBeGreaterThanOrEqual(209);
     expect(diffDays).toBeLessThanOrEqual(211);
