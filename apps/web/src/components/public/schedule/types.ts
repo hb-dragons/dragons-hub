@@ -3,6 +3,7 @@ export interface PublicTeam {
   name: string;
   nameShort: string | null;
   customName: string | null;
+  badgeColor: string | null;
 }
 
 export interface PublicTeamWithClubFlag extends PublicTeam {
