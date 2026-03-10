@@ -9,6 +9,7 @@ export interface OwnClubTeam {
   customName: string | null;
   leagueName: string | null;
   estimatedGameDuration: number | null;
+  badgeColor: string | null;
 }
 
 export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
@@ -20,6 +21,7 @@ export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
       customName: teams.customName,
       leagueName: leagues.name,
       estimatedGameDuration: teams.estimatedGameDuration,
+      badgeColor: teams.badgeColor,
     })
     .from(teams)
     .leftJoin(standings, eq(standings.teamApiId, teams.apiTeamPermanentId))
@@ -32,12 +34,13 @@ export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
 
 export async function updateTeam(
   id: number,
-  data: { customName?: string | null; estimatedGameDuration?: number | null },
+  data: { customName?: string | null; estimatedGameDuration?: number | null; badgeColor?: string | null },
 ): Promise<OwnClubTeam | null> {
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (data.customName !== undefined) set.customName = data.customName;
   if (data.estimatedGameDuration !== undefined)
     set.estimatedGameDuration = data.estimatedGameDuration;
+  if (data.badgeColor !== undefined) set.badgeColor = data.badgeColor;
 
   const [updated] = await db
     .update(teams)
@@ -49,6 +52,7 @@ export async function updateTeam(
       nameShort: teams.nameShort,
       customName: teams.customName,
       estimatedGameDuration: teams.estimatedGameDuration,
+      badgeColor: teams.badgeColor,
     });
 
   if (!updated) return null;
