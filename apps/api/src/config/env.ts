@@ -17,6 +17,8 @@ const envSchema = z.object({
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])
     .default("info"),
   RUN_MODE: z.enum(["api", "worker", "both"]).default("both"),
+  GCS_BUCKET_NAME: z.string().min(1).optional(),
+  GCS_PROJECT_ID: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
