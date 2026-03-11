@@ -214,6 +214,8 @@ module "api" {
     BETTER_AUTH_URL = "https://${var.api_domain}"
     TRUSTED_ORIGINS = "https://${var.web_domain}"
     LOG_LEVEL       = "info"
+    GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
+    GCS_PROJECT_ID  = var.project_id
   }
 
   secrets = {
@@ -271,6 +273,8 @@ module "worker" {
     BETTER_AUTH_URL = "https://${var.api_domain}"
     TRUSTED_ORIGINS = "https://${var.web_domain}"
     LOG_LEVEL       = "info"
+    GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
+    GCS_PROJECT_ID  = var.project_id
   }
 
   secrets = {
@@ -358,6 +362,23 @@ module "workload_identity" {
   github_repo    = var.github_repo
 
   depends_on = [google_project_service.apis]
+}
+
+# Social Assets - GCS bucket for player photos, backgrounds, fonts
+resource "google_storage_bucket" "social_assets" {
+  name                        = "${var.project_id}-social-assets"
+  location                    = var.region
+  project                     = var.project_id
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_storage_bucket_iam_member" "social_assets_api" {
+  bucket = google_storage_bucket.social_assets.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.api.email}"
 }
 
 # Turbo Remote Cache - GCS bucket for build artifacts
@@ -536,6 +557,11 @@ output "github_service_account" {
 output "load_balancer_ip" {
   description = "Add A records for both subdomains pointing to this IP"
   value       = module.load_balancer.load_balancer_ip
+}
+
+output "social_assets_bucket" {
+  description = "GCS bucket for social media assets (player photos, backgrounds, fonts)"
+  value       = google_storage_bucket.social_assets.name
 }
 
 output "turbo_cache_url" {
