@@ -382,6 +382,7 @@ Match list and detail responses include associated venue booking data when avail
 | POST | `/admin/social/backgrounds` | Upload background (multipart) |
 | DELETE | `/admin/social/backgrounds/:id` | Delete background |
 | PATCH | `/admin/social/backgrounds/:id/default` | Set default background |
+| POST | `/admin/social/generate` | Generate social post PNG (Satori + Sharp compositing) |
 
 Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`, `apps/api/src/routes/device.routes.ts`
 Validation schemas: `apps/api/src/routes/admin/*.schemas.ts`
@@ -407,6 +408,9 @@ app/
     ├── page.tsx                      Redirects to /admin/sync
     ├── settings/
     │   └── page.tsx                  Server component: club config + league discovery + league list
+    ├── social/
+    │   └── create/
+    │       └── page.tsx              Social post wizard (4-step: type/week → matches → assets → preview/download)
     └── sync/
         └── page.tsx                  Server component: fetches initial data, renders SyncDashboard
 ```

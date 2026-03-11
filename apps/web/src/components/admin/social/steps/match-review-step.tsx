@@ -58,7 +58,9 @@ export function MatchReviewStep({ state, onUpdate, onNext, onBack }: MatchReview
   function moveUp(index: number) {
     if (index === 0) return;
     const updated = [...matches];
-    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    const temp = updated[index - 1]!;
+    updated[index - 1] = updated[index]!;
+    updated[index] = temp;
     setMatches(updated);
     onUpdate({ matches: updated });
   }
@@ -66,7 +68,9 @@ export function MatchReviewStep({ state, onUpdate, onNext, onBack }: MatchReview
   function moveDown(index: number) {
     if (index === matches.length - 1) return;
     const updated = [...matches];
-    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    const temp = updated[index]!;
+    updated[index] = updated[index + 1]!;
+    updated[index + 1] = temp;
     setMatches(updated);
     onUpdate({ matches: updated });
   }

@@ -57,7 +57,6 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
 
   useEffect(() => {
     void loadPhotos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
