@@ -1,6 +1,10 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  esbuild: {
+    jsx: "automatic",
+    jsxImportSource: "react",
+  },
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
@@ -10,7 +14,7 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
       include: ["src/**/*.ts"],
-      exclude: ["src/**/*.test.ts", "src/index.ts", "src/services/test.ts"],
+      exclude: ["src/**/*.test.ts", "src/index.ts", "src/services/test.ts", "src/**/*.tsx"],
       thresholds: {
         branches: 90,
         functions: 95,
