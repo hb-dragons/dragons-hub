@@ -8,18 +8,23 @@ import type { MatchRow } from "./templates/shared";
 
 const SIZE = 1080;
 
-// Font cache — loaded from GCS on first use
-let leagueSpartanFont: ArrayBuffer | null = null;
-let greaterTheoryFont: ArrayBuffer | null = null;
+// Font cache — loaded from GCS on first use, guarded against concurrent requests
+let fontPromise: Promise<{ leagueSpartan: ArrayBuffer; greaterTheory: ArrayBuffer }> | null = null;
 
 async function loadFonts() {
-  if (leagueSpartanFont && greaterTheoryFont) return;
-  const [lsBuf, gtBuf] = await Promise.all([
-    downloadFromGcs("assets/fonts/LeagueSpartan-VariableFont_wght.ttf"),
-    downloadFromGcs("assets/fonts/greatertheory.otf"),
-  ]);
-  leagueSpartanFont = lsBuf.buffer.slice(lsBuf.byteOffset, lsBuf.byteOffset + lsBuf.byteLength) as ArrayBuffer;
-  greaterTheoryFont = gtBuf.buffer.slice(gtBuf.byteOffset, gtBuf.byteOffset + gtBuf.byteLength) as ArrayBuffer;
+  if (!fontPromise) {
+    fontPromise = (async () => {
+      const [lsBuf, gtBuf] = await Promise.all([
+        downloadFromGcs("assets/fonts/LeagueSpartan-VariableFont_wght.ttf"),
+        downloadFromGcs("assets/fonts/greatertheory.otf"),
+      ]);
+      return {
+        leagueSpartan: lsBuf.buffer.slice(lsBuf.byteOffset, lsBuf.byteOffset + lsBuf.byteLength) as ArrayBuffer,
+        greaterTheory: gtBuf.buffer.slice(gtBuf.byteOffset, gtBuf.byteOffset + gtBuf.byteLength) as ArrayBuffer,
+      };
+    })();
+  }
+  return fontPromise;
 }
 
 export interface GenerateParams {
@@ -33,7 +38,7 @@ export interface GenerateParams {
 }
 
 export async function generatePostImage(params: GenerateParams): Promise<Buffer> {
-  await loadFonts();
+  const fonts = await loadFonts();
 
   const { type, calendarWeek, matches, footer, backgroundFilename, playerPhotoFilename, playerPosition } = params;
 
@@ -47,10 +52,10 @@ export async function generatePostImage(params: GenerateParams): Promise<Buffer>
     width: SIZE,
     height: SIZE,
     fonts: [
-      { name: "League Spartan", data: leagueSpartanFont!, weight: 400, style: "normal" },
-      { name: "League Spartan", data: leagueSpartanFont!, weight: 700, style: "normal" },
-      { name: "League Spartan", data: leagueSpartanFont!, weight: 800, style: "normal" },
-      { name: "Greater Theory", data: greaterTheoryFont!, weight: 900, style: "normal" },
+      { name: "League Spartan", data: fonts.leagueSpartan, weight: 400, style: "normal" },
+      { name: "League Spartan", data: fonts.leagueSpartan, weight: 700, style: "normal" },
+      { name: "League Spartan", data: fonts.leagueSpartan, weight: 800, style: "normal" },
+      { name: "Greater Theory", data: fonts.greaterTheory, weight: 900, style: "normal" },
     ],
   });
 

@@ -139,14 +139,14 @@ socialRoutes.post("/generate", async (c) => {
   const orderedMatches = matchInputs
     .sort((a, b) => a.order - b.order)
     .map((input) => weekMatches.find((m) => m.id === input.matchId))
-    .filter(Boolean)
+    .filter((m): m is NonNullable<typeof m> => m != null)
     .map((m) => ({
-      teamLabel: m!.teamLabel,
-      opponent: m!.opponent,
-      isHome: m!.isHome,
-      kickoffTime: m!.kickoffTime,
-      homeScore: m!.homeScore ?? undefined,
-      guestScore: m!.guestScore ?? undefined,
+      teamLabel: m.teamLabel,
+      opponent: m.opponent,
+      isHome: m.isHome,
+      kickoffTime: m.kickoffTime,
+      homeScore: m.homeScore ?? undefined,
+      guestScore: m.guestScore ?? undefined,
     }));
 
   if (orderedMatches.length === 0) return c.json({ error: "No valid matches found" }, 400);
