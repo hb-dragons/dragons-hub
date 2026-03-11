@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { matchesQuerySchema, idParamSchema } from "./social.schemas";
+import { matchesQuerySchema, idParamSchema, generateBodySchema } from "./social.schemas";
 import {
   listPlayerPhotos,
   uploadPlayerPhoto,
@@ -16,6 +16,7 @@ import {
   getBackgroundImage,
 } from "../../services/social/background.service";
 import { getWeekendMatches } from "../../services/social/match-social.service";
+import { generatePostImage } from "../../services/social/social-image.service";
 
 const socialRoutes = new Hono();
 
@@ -118,6 +119,61 @@ socialRoutes.patch("/backgrounds/:id/default", async (c) => {
   if (!bg) return c.json({ error: "Not found" }, 404);
   await setDefaultBackground(id);
   return c.json({ success: true });
+});
+
+// --- Generate ---
+
+socialRoutes.post("/generate", async (c) => {
+  const body = generateBodySchema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: body.error.flatten() }, 400);
+
+  const { type, calendarWeek, year, matches: matchInputs, playerPhotoId, backgroundId, playerPosition } = body.data;
+
+  const photo = await getPlayerPhotoById(playerPhotoId);
+  if (!photo) return c.json({ error: "Player photo not found" }, 404);
+
+  const bg = await getBackgroundById(backgroundId);
+  if (!bg) return c.json({ error: "Background not found" }, 404);
+
+  const weekMatches = await getWeekendMatches({ type, week: calendarWeek, year });
+  const orderedMatches = matchInputs
+    .sort((a, b) => a.order - b.order)
+    .map((input) => weekMatches.find((m) => m.id === input.matchId))
+    .filter(Boolean)
+    .map((m) => ({
+      teamLabel: m!.teamLabel,
+      opponent: m!.opponent,
+      isHome: m!.isHome,
+      kickoffTime: m!.kickoffTime,
+      homeScore: m!.homeScore ?? undefined,
+      guestScore: m!.guestScore ?? undefined,
+    }));
+
+  if (orderedMatches.length === 0) return c.json({ error: "No valid matches found" }, 400);
+
+  const footer = "HEIMHALLE: FRIEDRICH-EBERT-SCHULE | SALZWEG 34 30455 HANNOVER";
+
+  try {
+    const png = await generatePostImage({
+      type,
+      calendarWeek,
+      matches: orderedMatches,
+      footer,
+      backgroundFilename: bg.filename,
+      playerPhotoFilename: photo.filename,
+      playerPosition,
+    });
+
+    return new Response(new Uint8Array(png), {
+      headers: {
+        "Content-Type": "image/png",
+        "Content-Length": String(png.length),
+        "Content-Disposition": `attachment; filename="dragons-${type}-kw${calendarWeek}.png"`,
+      },
+    });
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : "Image generation failed" }, 500);
+  }
 });
 
 export { socialRoutes };

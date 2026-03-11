@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getBackgroundById: vi.fn(),
   getBackgroundImage: vi.fn(),
   getWeekendMatches: vi.fn(),
+  generatePostImage: vi.fn(),
 }));
 
 vi.mock("../../services/social/player-photo.service", () => ({
@@ -37,6 +38,10 @@ vi.mock("../../services/social/background.service", () => ({
 
 vi.mock("../../services/social/match-social.service", () => ({
   getWeekendMatches: mocks.getWeekendMatches,
+}));
+
+vi.mock("../../services/social/social-image.service", () => ({
+  generatePostImage: mocks.generatePostImage,
 }));
 
 // --- Imports (after mocks) ---
@@ -350,5 +355,124 @@ describe("GET /matches", () => {
 
     expect(res.status).toBe(400);
     expect(mocks.getWeekendMatches).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /generate", () => {
+  const validBody = {
+    type: "results",
+    calendarWeek: 10,
+    year: 2026,
+    matches: [{ matchId: 1, order: 1 }],
+    playerPhotoId: 1,
+    backgroundId: 2,
+    playerPosition: { x: 100, y: 200, scale: 1.0 },
+  };
+
+  const weekMatches = [
+    {
+      id: 1,
+      teamLabel: "Dragons U16",
+      opponent: "Tigers",
+      isHome: true,
+      kickoffDate: "2026-03-07",
+      kickoffTime: "14:00",
+      homeScore: 78,
+      guestScore: 62,
+    },
+  ];
+
+  it("returns 200 with PNG image on valid body", async () => {
+    mocks.getPlayerPhotoById.mockResolvedValue({ id: 1, filename: "player.png" });
+    mocks.getBackgroundById.mockResolvedValue({ id: 2, filename: "bg.png" });
+    mocks.getWeekendMatches.mockResolvedValue(weekMatches);
+    const pngBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    mocks.generatePostImage.mockResolvedValue(pngBuffer);
+
+    const res = await app.request("/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validBody),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
+    expect(res.headers.get("Content-Disposition")).toBe(
+      `attachment; filename="dragons-results-kw10.png"`,
+    );
+    expect(mocks.generatePostImage).toHaveBeenCalledOnce();
+  });
+
+  it("returns 400 for invalid body", async () => {
+    const res = await app.request("/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "bad", calendarWeek: 0 }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(mocks.generatePostImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when player photo not found", async () => {
+    mocks.getPlayerPhotoById.mockResolvedValue(null);
+
+    const res = await app.request("/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validBody),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: "Player photo not found" });
+    expect(mocks.generatePostImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when background not found", async () => {
+    mocks.getPlayerPhotoById.mockResolvedValue({ id: 1, filename: "player.png" });
+    mocks.getBackgroundById.mockResolvedValue(null);
+
+    const res = await app.request("/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validBody),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: "Background not found" });
+    expect(mocks.generatePostImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when no valid matches resolve", async () => {
+    mocks.getPlayerPhotoById.mockResolvedValue({ id: 1, filename: "player.png" });
+    mocks.getBackgroundById.mockResolvedValue({ id: 2, filename: "bg.png" });
+    // week matches do not include the requested matchId
+    mocks.getWeekendMatches.mockResolvedValue([{ id: 99, teamLabel: "Other", opponent: "X", isHome: false, kickoffDate: "2026-03-07", kickoffTime: "12:00", homeScore: null, guestScore: null }]);
+
+    const res = await app.request("/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validBody),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "No valid matches found" });
+    expect(mocks.generatePostImage).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when generation service throws", async () => {
+    mocks.getPlayerPhotoById.mockResolvedValue({ id: 1, filename: "player.png" });
+    mocks.getBackgroundById.mockResolvedValue({ id: 2, filename: "bg.png" });
+    mocks.getWeekendMatches.mockResolvedValue(weekMatches);
+    mocks.generatePostImage.mockRejectedValue(new Error("Canvas render failed"));
+
+    const res = await app.request("/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validBody),
+    });
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ error: "Canvas render failed" });
   });
 });
