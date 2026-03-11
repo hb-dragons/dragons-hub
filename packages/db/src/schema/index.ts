@@ -15,3 +15,5 @@ export * from "./boards";
 export * from "./tasks";
 export * from "./notifications";
 export * from "./push-devices";
+export * from "./player-photos";
+export * from "./social-backgrounds";
