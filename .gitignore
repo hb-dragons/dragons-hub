@@ -18,6 +18,9 @@ apps/*/tsconfig.tsbuildinfo
 # Worktrees
 .worktrees/
 
+# Superpowers brainstorm sessions
+.superpowers/
+
 # next-intl generated type declarations
 apps/web/src/messages/*.d.json.ts
 
