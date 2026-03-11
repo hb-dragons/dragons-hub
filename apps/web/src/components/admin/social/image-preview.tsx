@@ -28,7 +28,7 @@ export function ImagePreview({ state, onUpdate }: ImagePreviewProps) {
 
   return (
     <div
-      style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE, position: "relative", overflow: "hidden" }}
+      style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE, position: "relative", overflow: "visible" }}
       className="rounded-md border border-border select-none"
     >
       {/* Layer 1: Background image */}

@@ -118,7 +118,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp"
         className="hidden"
         onChange={handleFileChange}
       />

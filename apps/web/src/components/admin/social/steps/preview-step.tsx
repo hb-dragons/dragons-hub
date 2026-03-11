@@ -42,8 +42,8 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Fehler: HTTP ${res.status}`);
+        const body = await res.json().catch(() => ({})) as { message?: string; error?: string };
+        throw new Error(body.message ?? body.error ?? `Fehler: HTTP ${res.status}`);
       }
 
       const blob = await res.blob();
@@ -70,7 +70,7 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Spielerfoto per Drag &amp; Drop positionieren und mit den Ecken skalieren.
+          Spielerfoto per Drag & Drop positionieren und mit den Ecken skalieren.
         </p>
 
         <div className="flex justify-center">
@@ -102,7 +102,7 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
             ) : (
               <>
                 <Download className="mr-2 h-4 w-4" />
-                Generieren &amp; Herunterladen
+                Generieren & Herunterladen
               </>
             )}
           </Button>
