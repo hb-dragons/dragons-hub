@@ -5,6 +5,7 @@ import type { WizardState } from "./types";
 import { PostTypeStep } from "./steps/post-type-step";
 import { MatchReviewStep } from "./steps/match-review-step";
 import { AssetSelectStep } from "./steps/asset-select-step";
+import { PreviewStep } from "./steps/preview-step";
 
 /** Returns the ISO 8601 week number for the given date. */
 function getISOWeek(date: Date): number {
@@ -120,14 +121,7 @@ export function PostWizard() {
       )}
 
       {state.step === 4 && (
-        <div className="rounded-lg border p-6 text-muted-foreground">
-          Schritt 4 — Vorschau (folgt)
-          <div className="mt-4">
-            <button onClick={handleBack} className="text-sm underline">
-              Zurück
-            </button>
-          </div>
-        </div>
+        <PreviewStep state={state} onUpdate={handleUpdate} onBack={handleBack} />
       )}
     </div>
   );
