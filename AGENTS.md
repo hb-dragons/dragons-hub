@@ -92,6 +92,9 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `account` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), providerId, accountId, password |
 | `verification` | `packages/db/src/schema/auth.ts` | id (text PK), identifier, value, expiresAt |
 
+| `playerPhotos` | `packages/db/src/schema/player-photos.ts` | filename, originalName, width, height — uploaded player photos for social posts |
+| `socialBackgrounds` | `packages/db/src/schema/social-backgrounds.ts` | filename, originalName, width, height, isDefault — background images for social posts |
+
 Schema index: `packages/db/src/schema/index.ts` re-exports all tables.
 
 ### JSONB Fields on Matches
@@ -365,9 +368,24 @@ Match list and detail responses include associated venue booking data when avail
 | GET | `/referee/matches` | referee/admin | List matches with open referee slots |
 | POST | `/referee/matches/:id/take` | referee/admin | Record take-intent, returns deep-link URL |
 
+### Admin - Social Post Generator
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/social/matches?type=&week=&year=` | Weekend matches filtered by type (preview/results) |
+| GET | `/admin/social/player-photos` | List player photos |
+| GET | `/admin/social/player-photos/:id/image` | Proxy player photo image from GCS |
+| POST | `/admin/social/player-photos` | Upload player photo (multipart) |
+| DELETE | `/admin/social/player-photos/:id` | Delete player photo |
+| GET | `/admin/social/backgrounds` | List backgrounds |
+| GET | `/admin/social/backgrounds/:id/image` | Proxy background image from GCS |
+| POST | `/admin/social/backgrounds` | Upload background (multipart) |
+| DELETE | `/admin/social/backgrounds/:id` | Delete background |
+| PATCH | `/admin/social/backgrounds/:id/default` | Set default background |
+
 Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`, `apps/api/src/routes/device.routes.ts`
 Validation schemas: `apps/api/src/routes/admin/*.schemas.ts`
-Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/notifications/`
+Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
 
 ## Frontend Architecture
 

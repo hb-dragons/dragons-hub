@@ -40,9 +40,11 @@ socialRoutes.get("/player-photos/:id/image", async (c) => {
   const photo = await getPlayerPhotoById(id);
   if (!photo) return c.json({ error: "Not found" }, 404);
   const buffer = await getPlayerPhotoImage(photo.filename);
+  const ext = photo.filename.split(".").pop()?.toLowerCase();
+  const contentType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
   return new Response(buffer, {
     headers: {
-      "Content-Type": "image/png",
+      "Content-Type": contentType,
       "Content-Length": String(buffer.length),
       "Cache-Control": "private, max-age=3600",
     },
@@ -112,6 +114,8 @@ socialRoutes.delete("/backgrounds/:id", async (c) => {
 
 socialRoutes.patch("/backgrounds/:id/default", async (c) => {
   const { id } = idParamSchema.parse(c.req.param());
+  const bg = await getBackgroundById(id);
+  if (!bg) return c.json({ error: "Not found" }, 404);
   await setDefaultBackground(id);
   return c.json({ success: true });
 });

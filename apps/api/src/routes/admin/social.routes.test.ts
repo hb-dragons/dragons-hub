@@ -85,6 +85,26 @@ describe("GET /player-photos/:id/image", () => {
     expect(mocks.getPlayerPhotoImage).toHaveBeenCalledWith("abc.png");
   });
 
+  it("returns correct content type for JPEG photos", async () => {
+    mocks.getPlayerPhotoById.mockResolvedValue({ id: 2, filename: "abc.jpg" });
+    mocks.getPlayerPhotoImage.mockResolvedValue(Buffer.from("image-data"));
+
+    const res = await app.request("/player-photos/2/image");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/jpeg");
+  });
+
+  it("returns correct content type for WebP photos", async () => {
+    mocks.getPlayerPhotoById.mockResolvedValue({ id: 3, filename: "abc.webp" });
+    mocks.getPlayerPhotoImage.mockResolvedValue(Buffer.from("image-data"));
+
+    const res = await app.request("/player-photos/3/image");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/webp");
+  });
+
   it("returns 404 when photo not found", async () => {
     mocks.getPlayerPhotoById.mockResolvedValue(null);
 
@@ -268,6 +288,7 @@ describe("DELETE /backgrounds/:id", () => {
 
 describe("PATCH /backgrounds/:id/default", () => {
   it("returns 200 on success", async () => {
+    mocks.getBackgroundById.mockResolvedValue({ id: 3, filename: "bg.png" });
     mocks.setDefaultBackground.mockResolvedValue(undefined);
 
     const res = await app.request("/backgrounds/3/default", { method: "PATCH" });
@@ -275,6 +296,16 @@ describe("PATCH /backgrounds/:id/default", () => {
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ success: true });
     expect(mocks.setDefaultBackground).toHaveBeenCalledWith(3);
+  });
+
+  it("returns 404 if background does not exist", async () => {
+    mocks.getBackgroundById.mockResolvedValue(null);
+
+    const res = await app.request("/backgrounds/999/default", { method: "PATCH" });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ error: "Not found" });
+    expect(mocks.setDefaultBackground).not.toHaveBeenCalled();
   });
 });
 

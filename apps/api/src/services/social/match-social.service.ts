@@ -26,7 +26,7 @@ function resolveTeamLabel(team: {
   nameShort: string | null;
   name: string;
 }): string {
-  return team.customName ?? team.nameShort ?? team.name;
+  return team.customName || team.nameShort || team.name;
 }
 
 const homeTeam = alias(teams, "home_team");
