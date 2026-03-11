@@ -20,4 +20,8 @@ export const SWR_KEYS = {
   settingsBooking: "/admin/settings/booking",
   notificationsUnread: "/admin/notifications/unread-count",
   refereeMatches: "/referee/matches?limit=500&offset=0",
+  socialPlayerPhotos: "/admin/social/player-photos",
+  socialBackgrounds: "/admin/social/backgrounds",
+  socialMatches: (type: string, week: number, year: number) =>
+    `/admin/social/matches?type=${type}&week=${week}&year=${year}`,
 } as const;
