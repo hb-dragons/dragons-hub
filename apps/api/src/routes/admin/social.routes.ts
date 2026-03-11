@@ -42,7 +42,7 @@ socialRoutes.get("/player-photos/:id/image", async (c) => {
   const buffer = await getPlayerPhotoImage(photo.filename);
   const ext = photo.filename.split(".").pop()?.toLowerCase();
   const contentType = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
-  return new Response(buffer, {
+  return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": contentType,
       "Content-Length": String(buffer.length),
@@ -83,7 +83,7 @@ socialRoutes.get("/backgrounds/:id/image", async (c) => {
   const bg = await getBackgroundById(id);
   if (!bg) return c.json({ error: "Not found" }, 404);
   const buffer = await getBackgroundImage(bg.filename);
-  return new Response(buffer, {
+  return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "image/png",
       "Content-Length": String(buffer.length),

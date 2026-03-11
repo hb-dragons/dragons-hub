@@ -45,6 +45,7 @@ import { socialRoutes } from "./social.routes";
 import { errorHandler } from "../../middleware/error";
 
 const app = new Hono();
+// @ts-expect-error - AppEnv type mismatch in test context
 app.onError(errorHandler);
 app.route("/", socialRoutes);
 
