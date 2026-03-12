@@ -34,7 +34,7 @@ function GridImage({ src, alt }: { src: string; alt: string }) {
 
   return (
     <div className="relative h-full w-full">
-      {/* Blur placeholder */}
+      {/* Loading skeleton */}
       {!loaded && (
         <div className="absolute inset-0 animate-pulse bg-muted" />
       )}
@@ -67,7 +67,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
 }: PhotoGridProps<T>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -76,7 +76,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
     if (!file) return;
 
     setUploading(true);
-    setUploadError(null);
+    setError(null);
 
     try {
       const formData = new FormData();
@@ -95,7 +95,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
 
       onUploadComplete();
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload fehlgeschlagen");
+      setError(err instanceof Error ? err.message : "Upload fehlgeschlagen");
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -118,7 +118,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
       }
       onDelete(deleteTarget);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+      setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
@@ -129,9 +129,9 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
     <div className="space-y-2">
       <p className="text-sm font-medium">{label}</p>
 
-      {uploadError && (
+      {error && (
         <div className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {uploadError}
+          {error}
         </div>
       )}
 
@@ -139,51 +139,44 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
         {items.map((item) => {
           const isSelected = item.id === selectedId;
           return (
-            <button
+            <div
               key={item.id}
-              type="button"
-              onClick={() => onSelect(item)}
+              className="group relative"
               style={{ aspectRatio }}
-              className={[
-                "group relative overflow-hidden rounded-md border bg-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                isSelected ? "ring-2 ring-primary" : "hover:border-muted-foreground/40",
-              ].join(" ")}
-              aria-label={item.originalName}
-              aria-pressed={isSelected}
             >
-              <GridImage
-                src={`${API_BASE}${imageEndpoint}/${item.id}/image`}
-                alt={item.originalName}
-              />
+              <button
+                type="button"
+                onClick={() => onSelect(item)}
+                className={[
+                  "absolute inset-0 overflow-hidden rounded-md border bg-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isSelected ? "ring-2 ring-primary" : "hover:border-muted-foreground/40",
+                ].join(" ")}
+                aria-label={item.originalName}
+                aria-pressed={isSelected}
+              >
+                <GridImage
+                  src={`${API_BASE}${imageEndpoint}/${item.id}/image`}
+                  alt={item.originalName}
+                />
 
-              {/* Selection badge */}
-              {isSelected && (
-                <span className="absolute top-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Check className="h-3 w-3" />
-                </span>
-              )}
+                {/* Selection badge */}
+                {isSelected && (
+                  <span className="absolute top-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="h-3 w-3" />
+                  </span>
+                )}
+              </button>
 
-              {/* Hover delete button */}
-              <span
-                role="button"
-                tabIndex={0}
+              {/* Delete button — sibling to select button for valid HTML */}
+              <button
+                type="button"
                 aria-label={`${item.originalName} löschen`}
-                className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-red-400 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-black/90 hover:text-red-300"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteTarget(item);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    setDeleteTarget(item);
-                  }
-                }}
+                className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-red-400 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-black/90 hover:text-red-300"
+                onClick={() => setDeleteTarget(item)}
               >
                 <X className="h-3.5 w-3.5" />
-              </span>
-            </button>
+              </button>
+            </div>
           );
         })}
 
@@ -218,7 +211,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
           <AlertDialogHeader>
             <AlertDialogTitle>Bild löschen?</AlertDialogTitle>
             <AlertDialogDescription>
-              &bdquo;{deleteTarget?.originalName}&ldquo; wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+              &bdquo;{deleteTarget?.originalName}&rdquo; wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
