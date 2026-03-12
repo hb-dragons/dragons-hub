@@ -28,6 +28,15 @@ export interface Background {
   isDefault: boolean;
 }
 
+export interface WeekendOption {
+  week: number;
+  year: number;
+  dateFrom: string;
+  dateTo: string;
+  matchCount: number;
+  matches: MatchItem[];
+}
+
 export interface PlayerPosition {
   x: number;
   y: number;
@@ -36,12 +45,15 @@ export interface PlayerPosition {
 
 export interface WizardState {
   step: 1 | 2 | 3 | 4;
+  furthestStep: 1 | 2 | 3 | 4;
   postType: PostType;
   calendarWeek: number;
   year: number;
+  weekendLabel: string;
   matches: MatchItem[];
   selectedPhotoId: number | null;
   selectedPhoto: PlayerPhoto | null;
   selectedBackgroundId: number | null;
+  selectedBackground: Background | null;
   playerPosition: PlayerPosition;
 }
