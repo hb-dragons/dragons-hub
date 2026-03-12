@@ -1,6 +1,8 @@
 "use client";
 
 import { Rnd } from "react-rnd";
+import { WeekendPreview, WeekendResults } from "@dragons/shared/social-templates";
+import type { MatchRow } from "@dragons/shared/social-templates";
 import type { WizardState } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -11,6 +13,18 @@ const SCALE_FACTOR = 2; // maps display coords to 1080-space
 interface ImagePreviewProps {
   state: WizardState;
   onUpdate: (updates: Partial<WizardState>) => void;
+}
+
+/** Map frontend MatchItem to the shared MatchRow type used by templates */
+function toMatchRows(state: WizardState): MatchRow[] {
+  return state.matches.map((m) => ({
+    teamLabel: m.teamLabel,
+    opponent: m.opponent,
+    isHome: m.isHome,
+    kickoffTime: m.kickoffTime,
+    homeScore: m.homeScore ?? undefined,
+    guestScore: m.guestScore ?? undefined,
+  }));
 }
 
 export function ImagePreview({ state, onUpdate }: ImagePreviewProps) {
@@ -24,7 +38,8 @@ export function ImagePreview({ state, onUpdate }: ImagePreviewProps) {
     ? Math.round((photo.height * state.playerPosition.scale) / SCALE_FACTOR)
     : 0;
 
-  const title = state.postType === "preview" ? "SPIELTAG" : "ERGEBNISSE";
+  const matchRows = toMatchRows(state);
+  const footer = "@dragons_hannover";
 
   return (
     <div
@@ -42,71 +57,22 @@ export function ImagePreview({ state, onUpdate }: ImagePreviewProps) {
         />
       )}
 
-      {/* Layer 2: Text overlay (CSS approximation of the Satori template) */}
+      {/* Layer 2: Text overlay — same template as server-side export, scaled to fit preview */}
       <div
-        style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", padding: "20px 18px 14px" }}
-        className="text-white"
+        style={{
+          position: "absolute",
+          inset: 0,
+          transform: `scale(${1 / SCALE_FACTOR})`,
+          transformOrigin: "top left",
+          width: 1080,
+          height: 1080,
+          pointerEvents: "none",
+        }}
       >
-        {/* Header */}
-        <div className="mb-1">
-          <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: "0.08em", lineHeight: 1 }}>
-            {title}
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.12em", opacity: 0.8 }}>
-            KALENDERWOCHE {state.calendarWeek}
-          </div>
-        </div>
-
-        {/* Match rows */}
-        <div className="mt-2 flex-1 space-y-1 overflow-hidden">
-          {state.matches.map((match) => {
-            const isAway = !match.isHome;
-            const hasScore =
-              match.homeScore !== null && match.guestScore !== null;
-            const scoreOrTime = hasScore
-              ? `${match.homeScore ?? ""}:${match.guestScore ?? ""}`
-              : match.kickoffTime ?? "";
-
-            return (
-              <div
-                key={match.id}
-                style={{
-                  fontSize: 9,
-                  padding: "3px 5px",
-                  borderRadius: 2,
-                  backgroundColor: isAway ? "rgba(249,115,22,0.15)" : "rgba(255,255,255,0.08)",
-                  borderLeft: isAway ? "2px solid rgb(249,115,22)" : "2px solid transparent",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <span style={{ fontWeight: 700, flexShrink: 0 }}>{match.teamLabel}</span>
-                <span style={{ fontWeight: 900, flexShrink: 0 }}>{scoreOrTime}</span>
-                <span style={{ opacity: 0.8, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  vs {match.opponent}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Legend */}
-        <div style={{ fontSize: 7, opacity: 0.7, marginTop: 4, display: "flex", gap: 10 }}>
-          <span>● Heimspiel</span>
-          <span style={{ color: "rgb(249,115,22)" }}>● Auswärtsspiel</span>
-        </div>
-
-        {/* Footer */}
-        <div style={{ fontSize: 7, opacity: 0.6, marginTop: 2 }}>
-          Dragons Basketball · Halle Musterstraße 1
-        </div>
-
-        {/* Approximation note */}
-        <div style={{ fontSize: 6, opacity: 0.45, marginTop: 1, fontStyle: "italic" }}>
-          Generiertes Bild kann leicht abweichen
-        </div>
+        {state.postType === "preview"
+          ? <WeekendPreview calendarWeek={state.calendarWeek} matches={matchRows} footer={footer} />
+          : <WeekendResults calendarWeek={state.calendarWeek} matches={matchRows} footer={footer} />
+        }
       </div>
 
       {/* Layer 3: Player photo (draggable/resizable) */}
