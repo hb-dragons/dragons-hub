@@ -1,60 +1,168 @@
 "use client";
 
-import { useState } from "react";
-import type { WizardState } from "./types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { MatchItem, PostType, WeekendOption, WizardState } from "./types";
 import { PostTypeStep } from "./steps/post-type-step";
 import { MatchReviewStep } from "./steps/match-review-step";
 import { AssetSelectStep } from "./steps/asset-select-step";
 import { PreviewStep } from "./steps/preview-step";
+import { CollapsedStepSummary } from "./collapsed-step-summary";
+import {
+  getLastWeekendSaturday,
+  getNextWeekendSaturday,
+  getISOWeekAndYear,
+  previousSaturday,
+  nextSaturday,
+  toDateString,
+} from "./weekend-utils";
+import { getSunday } from "@/lib/weekend-utils";
+import { fetchAPI } from "@/lib/api";
 
-/** Returns the ISO 8601 week number for the given date. */
-function getISOWeek(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+const MAX_WEEK_OFFSET = 8;
+
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
+  "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
+];
+
+function formatDateRange(dateFrom: string, dateTo: string): string {
+  const sat = new Date(dateFrom + "T12:00:00");
+  const sun = new Date(dateTo + "T12:00:00");
+  const satMonth = MONTH_NAMES[sat.getMonth()]!;
+  const sunMonth = MONTH_NAMES[sun.getMonth()]!;
+  if (satMonth === sunMonth) {
+    return `Sa ${sat.getDate()}. – So ${sun.getDate()}. ${satMonth}`;
+  }
+  return `Sa ${sat.getDate()}. ${satMonth} – So ${sun.getDate()}. ${sunMonth}`;
 }
-
-function getYear(date: Date): number {
-  return date.getFullYear();
-}
-
-const STEP_LABELS: Record<1 | 2 | 3 | 4, string> = {
-  1: "Typ & Woche",
-  2: "Spiele",
-  3: "Assets",
-  4: "Vorschau",
-};
-
-const STEPS = [1, 2, 3, 4] as const;
 
 function getInitialState(): WizardState {
-  const now = new Date();
   return {
     step: 1,
+    furthestStep: 1,
     postType: "results",
-    calendarWeek: getISOWeek(now),
-    year: getYear(now),
+    calendarWeek: 1,
+    year: 2026,
+    weekendLabel: "",
     matches: [],
     selectedPhotoId: null,
     selectedPhoto: null,
     selectedBackgroundId: null,
+    selectedBackground: null,
     playerPosition: { x: 0, y: 0, scale: 1 },
   };
+}
+
+async function fetchWeekendOption(
+  type: "results" | "preview",
+  saturday: Date,
+): Promise<WeekendOption> {
+  const { week, year } = getISOWeekAndYear(saturday);
+  const dateFrom = toDateString(saturday);
+  const dateTo = toDateString(getSunday(saturday));
+  const matches = await fetchAPI<MatchItem[]>(
+    `/admin/social/matches?type=${type}&week=${week}&year=${year}`,
+  );
+  const sliced = matches.slice(0, 6);
+  return { week, year, dateFrom, dateTo, matchCount: sliced.length, matches: sliced };
 }
 
 export function PostWizard() {
   const [state, setState] = useState<WizardState>(getInitialState);
 
+  // Weekend navigation state
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [resultsOption, setResultsOption] = useState<WeekendOption | null>(null);
+  const [previewOption, setPreviewOption] = useState<WeekendOption | null>(null);
+  const [cardLoading, setCardLoading] = useState(true);
+  const [cardError, setCardError] = useState<string | null>(null);
+
+  // Track what week/type the current matches were fetched for
+  const matchSourceRef = useRef<{ week: number; type: PostType } | null>(null);
+
+  // Calculate the base Saturdays (offset = 0)
+  const baseSatResults = getLastWeekendSaturday();
+  const baseSatPreview = getNextWeekendSaturday();
+
+  // Apply offset
+  function applyOffset(base: Date, offset: number): Date {
+    let d = new Date(base);
+    const step = offset > 0 ? nextSaturday : previousSaturday;
+    for (let i = 0; i < Math.abs(offset); i++) {
+      d = step(d);
+    }
+    return d;
+  }
+
+  const currentResultsSat = applyOffset(baseSatResults, weekOffset);
+  const currentPreviewSat = applyOffset(baseSatPreview, weekOffset);
+  const weekLabel = `KW ${getISOWeekAndYear(currentResultsSat).week} / ${getISOWeekAndYear(currentPreviewSat).week}`;
+
+  // Fetch weekend data whenever offset changes
+  useEffect(() => {
+    let cancelled = false;
+    setCardLoading(true);
+    setCardError(null);
+
+    Promise.all([
+      fetchWeekendOption("results", currentResultsSat),
+      fetchWeekendOption("preview", currentPreviewSat),
+    ])
+      .then(([results, preview]) => {
+        if (!cancelled) {
+          setResultsOption(results);
+          setPreviewOption(preview);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setCardError(err instanceof Error ? err.message : "Fehler beim Laden");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCardLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekOffset]);
+
   function handleUpdate(updates: Partial<WizardState>) {
     setState((prev) => ({ ...prev, ...updates }));
+  }
+
+  function handleSelectCard(type: PostType, option: WeekendOption) {
+    const source = matchSourceRef.current;
+    const needsNewMatches = !source || source.week !== option.week || source.type !== type;
+    const label = formatDateRange(option.dateFrom, option.dateTo);
+
+    setState((prev) => ({
+      ...prev,
+      postType: type,
+      calendarWeek: option.week,
+      year: option.year,
+      weekendLabel: label,
+      matches: needsNewMatches ? option.matches : prev.matches,
+      step: 2,
+      furthestStep: Math.max(prev.furthestStep, 2) as WizardState["furthestStep"],
+    }));
+
+    if (needsNewMatches) {
+      matchSourceRef.current = { week: option.week, type };
+    }
   }
 
   function handleNext() {
     setState((prev) => {
       if (prev.step < 4) {
-        return { ...prev, step: (prev.step + 1) as WizardState["step"] };
+        const next = (prev.step + 1) as WizardState["step"];
+        return {
+          ...prev,
+          step: next,
+          furthestStep: Math.max(prev.furthestStep, next) as WizardState["furthestStep"],
+        };
       }
       return prev;
     });
@@ -69,51 +177,57 @@ export function PostWizard() {
     });
   }
 
-  return (
-    <div className="space-y-6">
-      <nav aria-label="Wizard-Schritte">
-        <ol className="flex items-center gap-2">
-          {STEPS.map((step, index) => {
-            const isActive = state.step === step;
-            const isCompleted = state.step > step;
-            return (
-              <li key={step} className="flex items-center gap-2">
-                {index > 0 && (
-                  <span className="h-px w-8 bg-border" aria-hidden="true" />
-                )}
-                <span
-                  className={[
-                    "flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : isCompleted
-                        ? "bg-primary/20 text-primary"
-                        : "bg-muted text-muted-foreground",
-                  ].join(" ")}
-                  aria-current={isActive ? "step" : undefined}
-                >
-                  {step}
-                </span>
-                <span
-                  className={[
-                    "text-sm",
-                    isActive ? "font-medium text-foreground" : "text-muted-foreground",
-                  ].join(" ")}
-                >
-                  {STEP_LABELS[step]}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
+  function handleGoToStep(step: 1 | 2 | 3) {
+    setState((prev) => ({ ...prev, step }));
+  }
 
+  const handleUpdateMatches = useCallback((matches: MatchItem[]) => {
+    setState((prev) => ({ ...prev, matches }));
+  }, []);
+
+  return (
+    <div className="space-y-3">
+      {/* Collapsed strips for completed steps before the active one */}
+      {state.step > 1 && state.furthestStep >= 1 && (
+        <CollapsedStepSummary step={1} state={state} onEdit={() => handleGoToStep(1)} />
+      )}
+
+      {state.step > 2 && state.furthestStep >= 2 && (
+        <CollapsedStepSummary step={2} state={state} onEdit={() => handleGoToStep(2)} />
+      )}
+
+      {state.step > 3 && state.furthestStep >= 3 && (
+        <CollapsedStepSummary step={3} state={state} onEdit={() => handleGoToStep(3)} />
+      )}
+
+      {/* Active step */}
       {state.step === 1 && (
-        <PostTypeStep state={state} onUpdate={handleUpdate} onNext={handleNext} />
+        <PostTypeStep
+          resultsOption={resultsOption}
+          previewOption={previewOption}
+          loading={cardLoading}
+          error={cardError}
+          onSelectCard={handleSelectCard}
+          onNavigateWeek={(dir) =>
+            setWeekOffset((prev) =>
+              dir === "prev" ? Math.max(prev - 1, -MAX_WEEK_OFFSET) : Math.min(prev + 1, MAX_WEEK_OFFSET),
+            )
+          }
+          canNavigatePrev={weekOffset > -MAX_WEEK_OFFSET}
+          canNavigateNext={weekOffset < MAX_WEEK_OFFSET}
+          weekLabel={weekLabel}
+        />
       )}
 
       {state.step === 2 && (
-        <MatchReviewStep state={state} onUpdate={handleUpdate} onNext={handleNext} onBack={handleBack} />
+        <MatchReviewStep
+          matches={state.matches}
+          loading={false}
+          error={null}
+          onUpdateMatches={handleUpdateMatches}
+          onNext={handleNext}
+          onBack={handleBack}
+        />
       )}
 
       {state.step === 3 && (
