@@ -98,7 +98,12 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
             imageEndpoint="/admin/social/player-photos"
             deleteEndpoint="/admin/social/player-photos"
             onUploadComplete={() => void loadPhotos()}
-            onDelete={(photo) => setPhotos((prev) => prev.filter((p) => p.id !== photo.id))}
+            onDelete={(photo) => {
+              setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+              if (photo.id === state.selectedPhotoId) {
+                onUpdate({ selectedPhotoId: null, selectedPhoto: null });
+              }
+            }}
             label="Spielerfoto"
             aspectRatio="3/4"
           />
@@ -121,7 +126,12 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
             imageEndpoint="/admin/social/backgrounds"
             deleteEndpoint="/admin/social/backgrounds"
             onUploadComplete={() => void loadBackgrounds()}
-            onDelete={(bg) => setBackgrounds((prev) => prev.filter((b) => b.id !== bg.id))}
+            onDelete={(bg) => {
+              setBackgrounds((prev) => prev.filter((b) => b.id !== bg.id));
+              if (bg.id === state.selectedBackgroundId) {
+                onUpdate({ selectedBackgroundId: null, selectedBackground: null });
+              }
+            }}
             label="Hintergrund"
             aspectRatio="1/1"
           />
