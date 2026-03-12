@@ -1,3 +1,5 @@
+/** @jsxRuntime classic */
+import * as React from "react";
 import { PostLayout, type MatchRow } from "./shared";
 import { DEFAULT_THEME, type PostTheme } from "./theme";
 

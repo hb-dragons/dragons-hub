@@ -1,3 +1,5 @@
+/** @jsxRuntime classic */
+import * as React from "react";
 import type { ReactNode } from "react";
 import { DEFAULT_THEME, type PostTheme } from "./theme";
 
