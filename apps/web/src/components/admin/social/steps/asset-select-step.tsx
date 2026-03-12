@@ -45,7 +45,7 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
       if (state.selectedBackgroundId === null) {
         const defaultBg = data.find((bg) => bg.isDefault);
         if (defaultBg) {
-          onUpdate({ selectedBackgroundId: defaultBg.id });
+          onUpdate({ selectedBackgroundId: defaultBg.id, selectedBackground: defaultBg });
         }
       }
     } catch (err) {
@@ -69,7 +69,7 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
   }
 
   function handleSelectBackground(bg: Background) {
-    onUpdate({ selectedBackgroundId: bg.id });
+    onUpdate({ selectedBackgroundId: bg.id, selectedBackground: bg });
   }
 
   const canProceed =
