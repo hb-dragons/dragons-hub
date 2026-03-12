@@ -2,9 +2,8 @@ import satori from "satori";
 import { Resvg } from "@resvg/resvg-js";
 import sharp from "sharp";
 import { downloadFromGcs } from "./gcs-storage.service";
-import { WeekendPreview } from "./templates/weekend-preview";
-import { WeekendResults } from "./templates/weekend-results";
-import type { MatchRow } from "./templates/shared";
+import { WeekendPreview, WeekendResults } from "@dragons/shared/social-templates";
+import type { MatchRow } from "@dragons/shared/social-templates";
 
 const SIZE = 1080;
 
