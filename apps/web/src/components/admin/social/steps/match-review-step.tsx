@@ -1,68 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { ArrowUp, ArrowDown, X } from "lucide-react";
 import { Button } from "@dragons/ui/components/button";
 import { Badge } from "@dragons/ui/components/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@dragons/ui/components/card";
-import { fetchAPI } from "@/lib/api";
-import type { MatchItem, WizardState } from "../types";
+import type { MatchItem } from "../types";
 
 interface MatchReviewStepProps {
-  state: WizardState;
-  onUpdate: (updates: Partial<WizardState>) => void;
+  matches: MatchItem[];
+  loading: boolean;
+  error: string | null;
+  onUpdateMatches: (matches: MatchItem[]) => void;
   onNext: () => void;
   onBack: () => void;
 }
 
-export function MatchReviewStep({ state, onUpdate, onNext, onBack }: MatchReviewStepProps) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [matches, setMatches] = useState<MatchItem[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadMatches() {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchAPI<MatchItem[]>(
-          `/admin/social/matches?type=${state.postType}&week=${state.calendarWeek}&year=${state.year}`,
-        );
-        if (!cancelled) {
-          const sliced = data.slice(0, 6);
-          setMatches(sliced);
-          onUpdate({ matches: sliced });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Fehler beim Laden der Spiele");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadMatches();
-
-    return () => {
-      cancelled = true;
-    };
-    // Only re-fetch when the query parameters change, not when onUpdate changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.postType, state.calendarWeek, state.year]);
-
+export function MatchReviewStep({
+  matches,
+  loading,
+  error,
+  onUpdateMatches,
+  onNext,
+  onBack,
+}: MatchReviewStepProps) {
   function moveUp(index: number) {
     if (index === 0) return;
     const updated = [...matches];
     const temp = updated[index - 1]!;
     updated[index - 1] = updated[index]!;
     updated[index] = temp;
-    setMatches(updated);
-    onUpdate({ matches: updated });
+    onUpdateMatches(updated);
   }
 
   function moveDown(index: number) {
@@ -71,14 +38,12 @@ export function MatchReviewStep({ state, onUpdate, onNext, onBack }: MatchReview
     const temp = updated[index]!;
     updated[index] = updated[index + 1]!;
     updated[index + 1] = temp;
-    setMatches(updated);
-    onUpdate({ matches: updated });
+    onUpdateMatches(updated);
   }
 
   function removeMatch(index: number) {
     const updated = matches.filter((_, i) => i !== index);
-    setMatches(updated);
-    onUpdate({ matches: updated });
+    onUpdateMatches(updated);
   }
 
   function formatScore(match: MatchItem): string {
