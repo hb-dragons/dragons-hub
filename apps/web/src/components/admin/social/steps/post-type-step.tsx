@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@dragons/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dragons/ui/components/card";
 import type { WeekendOption } from "../types";
+import { formatDateRange } from "../weekend-utils";
 
 interface PostTypeStepProps {
   resultsOption: WeekendOption | null;
@@ -63,21 +64,6 @@ function ActionCard({
       ) : null}
     </button>
   );
-}
-
-function formatDateRange(dateFrom: string, dateTo: string): string {
-  const monthNames = [
-    "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
-    "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
-  ];
-  const sat = new Date(dateFrom + "T12:00:00");
-  const sun = new Date(dateTo + "T12:00:00");
-  const satMonth = monthNames[sat.getMonth()]!;
-  const sunMonth = monthNames[sun.getMonth()]!;
-  if (satMonth === sunMonth) {
-    return `Sa ${sat.getDate()}. – So ${sun.getDate()}. ${satMonth}`;
-  }
-  return `Sa ${sat.getDate()}. ${satMonth} – So ${sun.getDate()}. ${sunMonth}`;
 }
 
 export function PostTypeStep({

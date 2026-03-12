@@ -56,22 +56,35 @@ export function getISOWeekAndYear(date: Date): { week: number; year: number } {
   return { week, year: d.getUTCFullYear() };
 }
 
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
+  "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
+];
+
 /** Format a weekend date range for display: "Sa 7. – So 8. Mär" */
 export function formatWeekendLabel(saturday: Date): string {
   const sunday = getSunday(saturday);
-  const monthNames = [
-    "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
-    "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
-  ];
   const satDay = saturday.getDate();
   const sunDay = sunday.getDate();
-  const satMonth = monthNames[saturday.getMonth()]!;
-  const sunMonth = monthNames[sunday.getMonth()]!;
+  const satMonth = MONTH_NAMES[saturday.getMonth()]!;
+  const sunMonth = MONTH_NAMES[sunday.getMonth()]!;
 
   if (satMonth === sunMonth) {
     return `Sa ${satDay}. – So ${sunDay}. ${satMonth}`;
   }
   return `Sa ${satDay}. ${satMonth} – So ${sunDay}. ${sunMonth}`;
+}
+
+/** Format a date range from YYYY-MM-DD strings: "Sa 7. – So 8. Mär" */
+export function formatDateRange(dateFrom: string, dateTo: string): string {
+  const sat = new Date(dateFrom + "T12:00:00");
+  const sun = new Date(dateTo + "T12:00:00");
+  const satMonth = MONTH_NAMES[sat.getMonth()]!;
+  const sunMonth = MONTH_NAMES[sun.getMonth()]!;
+  if (satMonth === sunMonth) {
+    return `Sa ${sat.getDate()}. – So ${sun.getDate()}. ${satMonth}`;
+  }
+  return `Sa ${sat.getDate()}. ${satMonth} – So ${sun.getDate()}. ${sunMonth}`;
 }
 
 export { toDateString, previousSaturday, nextSaturday } from "@/lib/weekend-utils";

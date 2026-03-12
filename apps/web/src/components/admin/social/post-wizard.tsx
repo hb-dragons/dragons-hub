@@ -11,6 +11,7 @@ import {
   getLastWeekendSaturday,
   getNextWeekendSaturday,
   getISOWeekAndYear,
+  formatDateRange,
   previousSaturday,
   nextSaturday,
   toDateString,
@@ -19,22 +20,6 @@ import { getSunday } from "@/lib/weekend-utils";
 import { fetchAPI } from "@/lib/api";
 
 const MAX_WEEK_OFFSET = 8;
-
-const MONTH_NAMES = [
-  "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
-  "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
-];
-
-function formatDateRange(dateFrom: string, dateTo: string): string {
-  const sat = new Date(dateFrom + "T12:00:00");
-  const sun = new Date(dateTo + "T12:00:00");
-  const satMonth = MONTH_NAMES[sat.getMonth()]!;
-  const sunMonth = MONTH_NAMES[sun.getMonth()]!;
-  if (satMonth === sunMonth) {
-    return `Sa ${sat.getDate()}. – So ${sun.getDate()}. ${satMonth}`;
-  }
-  return `Sa ${sat.getDate()}. ${satMonth} – So ${sun.getDate()}. ${sunMonth}`;
-}
 
 function getInitialState(): WizardState {
   return {
