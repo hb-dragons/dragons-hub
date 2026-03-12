@@ -2,6 +2,7 @@ import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import "@dragons/ui/globals.css";
 import "@daveyplate/better-auth-ui/css";
+import "./social-fonts.css";
 
 const ibmPlexSans = IBM_Plex_Sans({
   variable: "--font-sans",

@@ -1,0 +1,33 @@
+/* Social post template fonts — used by the preview component to match server-side Satori rendering */
+
+@font-face {
+  font-family: "League Spartan";
+  src: url("/fonts/LeagueSpartan-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "League Spartan";
+  src: url("/fonts/LeagueSpartan-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "League Spartan";
+  src: url("/fonts/LeagueSpartan-ExtraBold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Greater Theory";
+  src: url("/fonts/greatertheory.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
