@@ -6,7 +6,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./social-templates": "./src/social-templates/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -16,7 +17,12 @@
   "dependencies": {
     "zod": "^4.3.6"
   },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
   "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "19.2.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }
