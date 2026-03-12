@@ -161,10 +161,10 @@ describe("generatePostImage", () => {
       // paths are correct by checking what was called across the test suite.
       // We just verify the bg/player paths are correct prefixes here.
       await generatePostImage({ type: "preview", ...baseParams });
-      const calls = mocks.downloadFromGcs.mock.calls.map((c: string[]) => c[0]);
+      const calls = mocks.downloadFromGcs.mock.calls.map((c: string[]) => c[0] as string);
       // At minimum, background and player downloads must happen every call
-      expect(calls.filter((p: string) => p.startsWith("backgrounds/")).length).toBeGreaterThan(0);
-      expect(calls.filter((p: string) => p.startsWith("player-photos/")).length).toBeGreaterThan(0);
+      expect(calls.filter((p) => p.startsWith("backgrounds/")).length).toBeGreaterThan(0);
+      expect(calls.filter((p) => p.startsWith("player-photos/")).length).toBeGreaterThan(0);
     });
   });
 
