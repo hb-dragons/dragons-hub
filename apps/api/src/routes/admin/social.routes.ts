@@ -172,6 +172,7 @@ socialRoutes.post("/generate", async (c) => {
       },
     });
   } catch (e) {
+    console.error("Image generation failed:", e);
     return c.json({ error: e instanceof Error ? e.message : "Image generation failed" }, 500);
   }
 });

@@ -3,6 +3,7 @@
 import {
   ChevronRight,
   Gavel,
+  Image,
   KanbanSquare,
   Settings,
   Trophy,
@@ -63,6 +64,14 @@ const navGroups = [
       { href: "/admin/board", labelKey: "nav.board" as const },
       { href: "/admin/bookings", labelKey: "nav.bookings" as const },
       { href: "/admin/venues", labelKey: "nav.venues" as const },
+    ],
+  },
+  {
+    labelKey: "nav.groupSocial" as const,
+    icon: Image,
+    roles: ["admin"],
+    items: [
+      { href: "/admin/social/create", labelKey: "nav.createPost" as const },
     ],
   },
   {

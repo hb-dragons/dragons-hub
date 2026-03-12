@@ -42,7 +42,7 @@ export function PostLayout({ title, subtitle, matches, footer, renderMatchDetail
               <div style={{ fontSize: 36, fontWeight: 800 }}>{match.teamLabel}</div>
               {renderMatchDetail(match)}
             </div>
-            <div style={{ fontSize: 24, opacity: 0.85 }}>vs {match.opponent}</div>
+            <div style={{ display: "flex", fontSize: 24, opacity: 0.85 }}>{`vs ${match.opponent}`}</div>
           </div>
         ))}
       </div>

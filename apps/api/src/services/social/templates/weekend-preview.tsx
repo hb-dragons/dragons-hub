@@ -10,7 +10,7 @@ export function WeekendPreview({ calendarWeek, matches, footer }: Props) {
       matches={matches}
       footer={footer}
       renderMatchDetail={(match) => (
-        <div style={{ fontSize: 36, fontWeight: 700 }}>| {match.kickoffTime}</div>
+        <div style={{ display: "flex", fontSize: 36, fontWeight: 700 }}>{`| ${match.kickoffTime}`}</div>
       )}
     />
   );
