@@ -32,6 +32,8 @@ import type { RefereeListItem } from "./types"
 interface Team {
   id: number
   name: string
+  customName: string | null
+  leagueName: string | null
 }
 
 interface RuleRow {
@@ -167,7 +169,12 @@ export function RefereeRulesDialog({
                   <SelectContent>
                     {availableTeams.map((team) => (
                       <SelectItem key={team.id} value={team.id.toString()}>
-                        {team.name}
+                        {team.customName ?? team.name}
+                        {team.leagueName && (
+                          <span className="ml-1 text-muted-foreground">
+                            ({team.leagueName})
+                          </span>
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>
