@@ -462,7 +462,7 @@ function classifyMatchChanges(
   }
 
   if (changedFields.has("kickoffDate") || changedFields.has("kickoffTime")) {
-    eventTypes.push(EVENT_TYPES.MATCH_TIME_CHANGED);
+    eventTypes.push(EVENT_TYPES.MATCH_SCHEDULE_CHANGED);
   }
 
   if (changedFields.has("venueId")) {
@@ -734,6 +734,7 @@ export async function syncMatchesFromData(
             const homeTeamName = basicMatch.homeTeam?.teamname ?? "Unknown";
             const guestTeamName = basicMatch.guestTeam?.teamname ?? "Unknown";
             const leagueName = data.leagueName ?? "";
+            const teamIds = [remoteSnapshot.homeTeamApiId, remoteSnapshot.guestTeamApiId];
             const matchEventTypes = classifyMatchChanges(effectiveChanges);
 
             for (const eventType of matchEventTypes) {
@@ -743,9 +744,11 @@ export async function syncMatchesFromData(
                   homeTeam: homeTeamName,
                   guestTeam: guestTeamName,
                   leagueName,
+                  leagueId: data.leagueDbId,
+                  teamIds,
                 };
 
-                if (eventType === EVENT_TYPES.MATCH_TIME_CHANGED) {
+                if (eventType === EVENT_TYPES.MATCH_SCHEDULE_CHANGED) {
                   eventPayload.changes = effectiveChanges
                     .filter((c) => c.fieldName === "kickoffDate" || c.fieldName === "kickoffTime")
                     .map((c) => ({ field: c.fieldName, oldValue: c.oldValue, newValue: c.newValue }));
@@ -857,11 +860,11 @@ export async function syncMatchesFromData(
 
           result.created++;
 
-          // Emit match.scheduled event for new match
+          // Emit match.created event for new match
           if (newMatch) {
             try {
               await publishDomainEvent({
-                type: EVENT_TYPES.MATCH_SCHEDULED,
+                type: EVENT_TYPES.MATCH_CREATED,
                 source: "sync",
                 entityType: "match",
                 entityId: newMatch.id,
@@ -877,11 +880,12 @@ export async function syncMatchesFromData(
                   kickoffTime: remoteSnapshot.kickoffTime,
                   venueId: internalVenueId,
                   venueName: null,
+                  teamIds: [remoteSnapshot.homeTeamApiId, remoteSnapshot.guestTeamApiId],
                 },
                 syncRunId,
               });
             } catch (error) {
-              log.warn({ err: error, matchId: newMatch.id }, "Failed to emit match.scheduled event");
+              log.warn({ err: error, matchId: newMatch.id }, "Failed to emit match.created event");
             }
           }
 

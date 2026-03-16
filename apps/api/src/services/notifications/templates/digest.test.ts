@@ -3,7 +3,7 @@ import { renderDigestMessage, type DigestItem } from "./digest";
 
 function makeItem(overrides: Partial<DigestItem> = {}): DigestItem {
   return {
-    eventType: "match.time_changed",
+    eventType: "match.schedule.changed",
     payload: { oldDate: "2026-03-10", newDate: "2026-03-15" },
     entityName: "Dragons vs. Hawks",
     deepLinkPath: "/matches/42",
@@ -33,7 +33,7 @@ describe("renderDigestMessage", () => {
   });
 
   it("uses plural form for multiple items in German", () => {
-    const items = [makeItem(), makeItem({ eventType: "match.venue_changed" })];
+    const items = [makeItem(), makeItem({ eventType: "match.venue.changed" })];
     const result = renderDigestMessage(items, "de");
     expect(result.title).toContain("2 Ereignisse");
   });
@@ -52,8 +52,8 @@ describe("renderDigestMessage", () => {
 
   it("renders each item as a line in the body", () => {
     const items = [
-      makeItem({ eventType: "match.time_changed" }),
-      makeItem({ eventType: "match.venue_changed", payload: { oldVenue: "A", newVenue: "B" } }),
+      makeItem({ eventType: "match.schedule.changed" }),
+      makeItem({ eventType: "match.venue.changed", payload: { oldVenue: "A", newVenue: "B" } }),
     ];
     const result = renderDigestMessage(items, "de");
     const lines = result.body.split("\n");
@@ -71,7 +71,7 @@ describe("renderDigestMessage", () => {
   it("renders known event types with proper titles", () => {
     const items = [
       makeItem({
-        eventType: "match.time_changed",
+        eventType: "match.schedule.changed",
         payload: { oldDate: "2026-03-10", newDate: "2026-03-15" },
         entityName: "Dragons vs. Hawks",
       }),

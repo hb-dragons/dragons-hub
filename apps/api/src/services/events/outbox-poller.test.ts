@@ -79,7 +79,7 @@ describe("pollOutbox", () => {
     const pending = [
       {
         id: "evt-1",
-        type: "match.scheduled",
+        type: "match.created",
         urgency: "routine",
         entityType: "match",
         entityId: 1,
@@ -106,7 +106,7 @@ describe("pollOutbox", () => {
     expect(result).toBe(2);
     expect(mockQueueAdd).toHaveBeenCalledTimes(2);
     expect(mockQueueAdd).toHaveBeenCalledWith(
-      "match.scheduled",
+      "match.created",
       expect.objectContaining({ eventId: "evt-1" }),
     );
     expect(mockQueueAdd).toHaveBeenCalledWith(
@@ -120,7 +120,7 @@ describe("pollOutbox", () => {
     const pending = [
       {
         id: "evt-1",
-        type: "match.scheduled",
+        type: "match.created",
         urgency: "routine",
         entityType: "match",
         entityId: 1,

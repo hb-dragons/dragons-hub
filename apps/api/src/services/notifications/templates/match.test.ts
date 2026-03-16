@@ -4,7 +4,7 @@ import { renderEventMessage } from "./index";
 import { EVENT_TYPES } from "@dragons/shared";
 
 describe("renderMatchMessage", () => {
-  describe("match.time_changed", () => {
+  describe("match.schedule.changed", () => {
     const payload = {
       matchNo: 42,
       homeTeam: "Dragons",
@@ -17,7 +17,7 @@ describe("renderMatchMessage", () => {
 
     it("renders schedule change in German", () => {
       const result = renderMatchMessage(
-        EVENT_TYPES.MATCH_TIME_CHANGED,
+        EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
         payload,
         "Dragons vs Tigers",
         "de",
@@ -34,7 +34,7 @@ describe("renderMatchMessage", () => {
 
     it("renders schedule change in English", () => {
       const result = renderMatchMessage(
-        EVENT_TYPES.MATCH_TIME_CHANGED,
+        EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
         payload,
         "Dragons vs Tigers",
         "en",
@@ -48,7 +48,7 @@ describe("renderMatchMessage", () => {
     it("renders without changes array gracefully", () => {
       const noChanges = { ...payload, changes: undefined };
       const result = renderMatchMessage(
-        EVENT_TYPES.MATCH_TIME_CHANGED,
+        EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
         noChanges,
         "Dragons vs Tigers",
         "de",
@@ -107,7 +107,7 @@ describe("renderMatchMessage", () => {
     });
   });
 
-  describe("match.venue_changed", () => {
+  describe("match.venue.changed", () => {
     const payload = {
       matchNo: 10,
       homeTeam: "Dragons",
@@ -165,7 +165,7 @@ describe("renderMatchMessage", () => {
     });
   });
 
-  describe("match.scheduled", () => {
+  describe("match.created", () => {
     it("renders new game in German with formatted date", () => {
       const payload = {
         matchNo: 99,
@@ -179,7 +179,7 @@ describe("renderMatchMessage", () => {
         venueName: null,
       };
       const result = renderMatchMessage(
-        EVENT_TYPES.MATCH_SCHEDULED,
+        EVENT_TYPES.MATCH_CREATED,
         payload,
         "Dragons vs Wolves",
         "de",
@@ -203,7 +203,7 @@ describe("renderMatchMessage", () => {
         venueName: null,
       };
       const result = renderMatchMessage(
-        EVENT_TYPES.MATCH_SCHEDULED,
+        EVENT_TYPES.MATCH_CREATED,
         payload,
         "Dragons vs Wolves",
         "en",
@@ -258,6 +258,76 @@ describe("renderMatchMessage", () => {
       expect(result!.title).toContain("Ergebnis\u{00E4}nderung");
       expect(result!.body).toContain("80:65");
       expect(result!.body).toContain("78:65");
+    });
+  });
+
+  describe("match.score.changed", () => {
+    it("renders new score in German", () => {
+      const payload = {
+        matchNo: 3,
+        homeTeam: "Dragons",
+        guestTeam: "Hawks",
+        leagueName: "Bezirksliga",
+        homeScore: 78,
+        guestScore: 65,
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_SCORE_CHANGED,
+        payload,
+        "Dragons vs Hawks",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Ergebnis");
+      expect(result!.body).toContain("78:65");
+    });
+
+    it("renders score correction with old scores", () => {
+      const payload = {
+        matchNo: 3,
+        homeTeam: "Dragons",
+        guestTeam: "Hawks",
+        leagueName: "Bezirksliga",
+        homeScore: 80,
+        guestScore: 65,
+        oldHomeScore: 78,
+        oldGuestScore: 65,
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_SCORE_CHANGED,
+        payload,
+        "Dragons vs Hawks",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Ergebnis\u{00E4}nderung");
+      expect(result!.body).toContain("80:65");
+      expect(result!.body).toContain("78:65");
+    });
+  });
+
+  describe("match.removed", () => {
+    it("renders removed in German", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_REMOVED,
+        {},
+        "Match #42",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Spiel entfernt");
+      expect(result!.body).toContain("Spielplan entfernt");
+    });
+
+    it("renders removed in English", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_REMOVED,
+        {},
+        "Match #42",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Match removed");
     });
   });
 

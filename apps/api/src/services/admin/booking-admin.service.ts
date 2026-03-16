@@ -243,7 +243,7 @@ export async function updateBooking(
     .from(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, id));
 
-  // Emit booking.time_changed if override times changed
+  // Emit booking.status.changed if override times changed
   const timeChanged =
     data.overrideStartTime !== undefined || data.overrideEndTime !== undefined;
   if (timeChanged && venue) {
@@ -256,7 +256,7 @@ export async function updateBooking(
 
       if (oldStart !== newStart || oldEnd !== newEnd) {
         await publishDomainEvent({
-          type: EVENT_TYPES.BOOKING_TIME_CHANGED,
+          type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
           source: "manual",
           entityType: "booking",
           entityId: id,
@@ -273,7 +273,7 @@ export async function updateBooking(
         });
       }
     } catch (error) {
-      log.warn({ err: error, bookingId: id }, "Failed to emit booking.time_changed event");
+      log.warn({ err: error, bookingId: id }, "Failed to emit booking.status.changed event");
     }
   }
 
@@ -340,11 +340,11 @@ export async function updateBookingStatus(
     .from(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, id));
 
-  // Emit booking.cancelled event when status changes to cancelled
+  // Emit booking.status.changed event when status changes to cancelled
   if (status === "cancelled") {
     try {
       await publishDomainEvent({
-        type: EVENT_TYPES.BOOKING_CANCELLED,
+        type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
         source: "manual",
         entityType: "booking",
         entityId: id,
@@ -357,7 +357,7 @@ export async function updateBookingStatus(
         },
       });
     } catch (error) {
-      log.warn({ err: error, bookingId: id }, "Failed to emit booking.cancelled event");
+      log.warn({ err: error, bookingId: id }, "Failed to emit booking.status.changed event");
     }
   }
 
@@ -494,7 +494,7 @@ export async function deleteBooking(id: number): Promise<boolean> {
     try {
       const venueName = await getVenueName(bookingInfo.venueId);
       await publishDomainEvent({
-        type: EVENT_TYPES.BOOKING_CANCELLED,
+        type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
         source: "manual",
         entityType: "booking",
         entityId: id,
@@ -507,7 +507,7 @@ export async function deleteBooking(id: number): Promise<boolean> {
         },
       });
     } catch (error) {
-      log.warn({ err: error, bookingId: id }, "Failed to emit booking.cancelled event");
+      log.warn({ err: error, bookingId: id }, "Failed to emit booking.status.changed event");
     }
   }
 

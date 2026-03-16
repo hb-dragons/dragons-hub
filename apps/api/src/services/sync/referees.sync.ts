@@ -228,6 +228,7 @@ async function getMatchInfoForEvent(matchId: number): Promise<{
   homeTeam: string;
   guestTeam: string;
   entityName: string;
+  teamIds: number[];
 } | null> {
   const [match] = await db
     .select({
@@ -247,6 +248,7 @@ async function getMatchInfoForEvent(matchId: number): Promise<{
     homeTeam: String(match.homeTeamApiId),
     guestTeam: String(match.guestTeamApiId),
     entityName: `Match #${match.matchNo}`,
+    teamIds: [match.homeTeamApiId, match.guestTeamApiId],
   };
 }
 
@@ -344,6 +346,7 @@ export async function syncRefereeAssignmentsFromData(
                 refereeName: refName,
                 role: roleName,
                 refereeId,
+                teamIds: matchInfo.teamIds,
               },
             });
           }
@@ -365,7 +368,7 @@ export async function syncRefereeAssignmentsFromData(
           .set({ refereeId, roleId })
           .where(eq(matchReferees.id, existing.id));
 
-        // Emit referee.changed event when referee changed
+        // Emit referee.reassigned event when referee changed
         if (oldRefereeId !== refereeId) {
           try {
             const [oldRefName, newRefName, matchInfo, roleName] = await Promise.all([
@@ -376,7 +379,7 @@ export async function syncRefereeAssignmentsFromData(
             ]);
             if (matchInfo) {
               await publishDomainEvent({
-                type: EVENT_TYPES.REFEREE_CHANGED,
+                type: EVENT_TYPES.REFEREE_REASSIGNED,
                 source: "sync",
                 entityType: "referee",
                 entityId: matchId,
@@ -391,11 +394,12 @@ export async function syncRefereeAssignmentsFromData(
                   role: roleName,
                   oldRefereeId: oldRefereeId,
                   newRefereeId: refereeId,
+                  teamIds: matchInfo.teamIds,
                 },
               });
             }
           } catch (error) {
-            log.warn({ err: error, matchId, refereeId }, "Failed to emit referee.changed event");
+            log.warn({ err: error, matchId, refereeId }, "Failed to emit referee.reassigned event");
           }
         }
       }

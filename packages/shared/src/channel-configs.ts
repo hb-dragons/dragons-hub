@@ -1,7 +1,7 @@
 // ── Channel types ────────────────────────────────────────────────────────────
 
 export type ChannelType = "in_app" | "whatsapp_group" | "push" | "email";
-export type DigestMode = "immediate" | "per_sync" | "daily" | "weekly";
+export type DigestMode = "per_sync" | "scheduled" | "none";
 
 // ── API response types ───────────────────────────────────────────────────────
 

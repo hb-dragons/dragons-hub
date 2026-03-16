@@ -8,27 +8,31 @@ export type EventEntityType = "match" | "booking" | "referee";
 
 export const EVENT_TYPES = {
   // Match events
-  MATCH_SCHEDULED: "match.scheduled",
-  MATCH_TIME_CHANGED: "match.time_changed",
-  MATCH_VENUE_CHANGED: "match.venue_changed",
+  MATCH_CREATED: "match.created",
+  MATCH_SCHEDULE_CHANGED: "match.schedule.changed",
+  MATCH_VENUE_CHANGED: "match.venue.changed",
   MATCH_CANCELLED: "match.cancelled",
   MATCH_FORFEITED: "match.forfeited",
+  MATCH_SCORE_CHANGED: "match.score.changed",
+  MATCH_REMOVED: "match.removed",
+  // Extra match events (not in spec but valid)
   MATCH_RESULT_ENTERED: "match.result_entered",
   MATCH_RESULT_CHANGED: "match.result_changed",
 
   // Referee events
   REFEREE_ASSIGNED: "referee.assigned",
-  REFEREE_REMOVED: "referee.removed",
-  REFEREE_CHANGED: "referee.changed",
+  REFEREE_UNASSIGNED: "referee.unassigned",
+  REFEREE_REASSIGNED: "referee.reassigned",
 
   // Booking events
   BOOKING_CREATED: "booking.created",
-  BOOKING_TIME_CHANGED: "booking.time_changed",
-  BOOKING_CANCELLED: "booking.cancelled",
+  BOOKING_STATUS_CHANGED: "booking.status.changed",
   BOOKING_NEEDS_RECONFIRMATION: "booking.needs_reconfirmation",
 
   // Override events
+  OVERRIDE_CONFLICT: "override.conflict",
   OVERRIDE_APPLIED: "override.applied",
+  // Extra override events (not in spec but valid)
   OVERRIDE_REVERTED: "override.reverted",
 
   // Sync events
@@ -45,7 +49,7 @@ export interface FieldChange {
   newValue: string | number | boolean | null;
 }
 
-export interface MatchScheduledPayload {
+export interface MatchCreatedPayload {
   matchNo: number;
   homeTeam: string;
   guestTeam: string;
@@ -55,13 +59,16 @@ export interface MatchScheduledPayload {
   kickoffTime: string;
   venueId: number | null;
   venueName: string | null;
+  teamIds: number[];
 }
 
-export interface MatchTimeChangedPayload {
+export interface MatchScheduleChangedPayload {
   matchNo: number;
   homeTeam: string;
   guestTeam: string;
   leagueName: string;
+  leagueId?: number | null;
+  teamIds: number[];
   changes: FieldChange[];
 }
 
@@ -70,6 +77,8 @@ export interface MatchVenueChangedPayload {
   homeTeam: string;
   guestTeam: string;
   leagueName: string;
+  leagueId?: number | null;
+  teamIds: number[];
   oldVenueId: number | null;
   oldVenueName: string | null;
   newVenueId: number | null;
@@ -81,6 +90,8 @@ export interface MatchCancelledPayload {
   homeTeam: string;
   guestTeam: string;
   leagueName: string;
+  leagueId?: number | null;
+  teamIds: number[];
   reason: string | null;
 }
 
@@ -89,6 +100,30 @@ export interface MatchForfeitedPayload {
   homeTeam: string;
   guestTeam: string;
   leagueName: string;
+  leagueId?: number | null;
+  teamIds: number[];
+}
+
+export interface MatchScoreChangedPayload {
+  matchNo: number;
+  homeTeam: string;
+  guestTeam: string;
+  leagueName: string;
+  leagueId?: number | null;
+  teamIds: number[];
+  homeScore: number;
+  guestScore: number;
+  oldHomeScore?: number | null;
+  oldGuestScore?: number | null;
+}
+
+export interface MatchRemovedPayload {
+  matchNo: number;
+  homeTeam: string;
+  guestTeam: string;
+  leagueName: string;
+  leagueId?: number | null;
+  teamIds: number[];
 }
 
 export interface MatchResultEnteredPayload {
@@ -96,6 +131,8 @@ export interface MatchResultEnteredPayload {
   homeTeam: string;
   guestTeam: string;
   leagueName: string;
+  leagueId?: number | null;
+  teamIds: number[];
   homeScore: number;
   guestScore: number;
 }
@@ -105,6 +142,8 @@ export interface MatchResultChangedPayload {
   homeTeam: string;
   guestTeam: string;
   leagueName: string;
+  leagueId?: number | null;
+  teamIds: number[];
   oldHomeScore: number;
   oldGuestScore: number;
   newHomeScore: number;
@@ -117,23 +156,26 @@ export interface RefereeAssignedPayload {
   guestTeam: string;
   refereeName: string;
   role: string;
+  teamIds: number[];
 }
 
-export interface RefereeRemovedPayload {
+export interface RefereeUnassignedPayload {
   matchNo: number;
   homeTeam: string;
   guestTeam: string;
   refereeName: string;
   role: string;
+  teamIds: number[];
 }
 
-export interface RefereeChangedPayload {
+export interface RefereeReassignedPayload {
   matchNo: number;
   homeTeam: string;
   guestTeam: string;
   oldRefereeName: string;
   newRefereeName: string;
   role: string;
+  teamIds: number[];
 }
 
 export interface BookingCreatedPayload {
@@ -144,25 +186,31 @@ export interface BookingCreatedPayload {
   matchCount: number;
 }
 
-export interface BookingTimeChangedPayload {
+export interface BookingStatusChangedPayload {
   venueName: string;
   date: string;
-  oldStartTime: string;
-  oldEndTime: string;
-  newStartTime: string;
-  newEndTime: string;
-}
-
-export interface BookingCancelledPayload {
-  venueName: string;
-  date: string;
-  reason: string;
+  oldStartTime?: string;
+  oldEndTime?: string;
+  newStartTime?: string;
+  newEndTime?: string;
+  oldStatus?: string;
+  newStatus?: string;
+  reason?: string;
 }
 
 export interface BookingNeedsReconfirmationPayload {
   venueName: string;
   date: string;
   reason: string;
+}
+
+export interface OverrideConflictPayload {
+  matchNo: number;
+  homeTeam: string;
+  guestTeam: string;
+  field: string;
+  overrideValue: string | number | boolean | null;
+  remoteValue: string | number | boolean | null;
 }
 
 export interface OverrideAppliedPayload {
@@ -198,20 +246,22 @@ export interface SyncCompletedPayload {
 // ── Union payload type ───────────────────────────────────────────────────────
 
 export type DomainEventPayload =
-  | MatchScheduledPayload
-  | MatchTimeChangedPayload
+  | MatchCreatedPayload
+  | MatchScheduleChangedPayload
   | MatchVenueChangedPayload
   | MatchCancelledPayload
   | MatchForfeitedPayload
+  | MatchScoreChangedPayload
+  | MatchRemovedPayload
   | MatchResultEnteredPayload
   | MatchResultChangedPayload
   | RefereeAssignedPayload
-  | RefereeRemovedPayload
-  | RefereeChangedPayload
+  | RefereeUnassignedPayload
+  | RefereeReassignedPayload
   | BookingCreatedPayload
-  | BookingTimeChangedPayload
-  | BookingCancelledPayload
+  | BookingStatusChangedPayload
   | BookingNeedsReconfirmationPayload
+  | OverrideConflictPayload
   | OverrideAppliedPayload
   | OverrideRevertedPayload
   | SyncCompletedPayload;

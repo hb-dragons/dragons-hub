@@ -22,7 +22,7 @@ const ALWAYS_IMMEDIATE = new Set<string>([
 
 // Events whose urgency depends on whether affected dates are within 7 days
 const DATE_DEPENDENT = new Set<string>([
-  EVENT_TYPES.MATCH_TIME_CHANGED,
+  EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
   EVENT_TYPES.MATCH_VENUE_CHANGED,
 ]);
 

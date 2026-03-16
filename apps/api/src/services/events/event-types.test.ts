@@ -90,8 +90,8 @@ describe("classifyUrgency", () => {
 
   // --- Always routine events ---
 
-  it("classifies match.scheduled as routine", () => {
-    expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULED, {})).toBe("routine");
+  it("classifies match.created as routine", () => {
+    expect(classifyUrgency(EVENT_TYPES.MATCH_CREATED, {})).toBe("routine");
   });
 
   it("classifies match.result_entered as routine", () => {
@@ -106,30 +106,32 @@ describe("classifyUrgency", () => {
     );
   });
 
+  it("classifies match.score.changed as routine", () => {
+    expect(classifyUrgency(EVENT_TYPES.MATCH_SCORE_CHANGED, {})).toBe(
+      "routine",
+    );
+  });
+
   it("classifies referee.assigned as routine", () => {
     expect(classifyUrgency(EVENT_TYPES.REFEREE_ASSIGNED, {})).toBe("routine");
   });
 
-  it("classifies referee.removed as routine", () => {
-    expect(classifyUrgency(EVENT_TYPES.REFEREE_REMOVED, {})).toBe("routine");
+  it("classifies referee.unassigned as routine", () => {
+    expect(classifyUrgency(EVENT_TYPES.REFEREE_UNASSIGNED, {})).toBe("routine");
   });
 
-  it("classifies referee.changed as routine", () => {
-    expect(classifyUrgency(EVENT_TYPES.REFEREE_CHANGED, {})).toBe("routine");
+  it("classifies referee.reassigned as routine", () => {
+    expect(classifyUrgency(EVENT_TYPES.REFEREE_REASSIGNED, {})).toBe("routine");
   });
 
   it("classifies booking.created as routine", () => {
     expect(classifyUrgency(EVENT_TYPES.BOOKING_CREATED, {})).toBe("routine");
   });
 
-  it("classifies booking.time_changed as routine", () => {
-    expect(classifyUrgency(EVENT_TYPES.BOOKING_TIME_CHANGED, {})).toBe(
+  it("classifies booking.status.changed as routine", () => {
+    expect(classifyUrgency(EVENT_TYPES.BOOKING_STATUS_CHANGED, {})).toBe(
       "routine",
     );
-  });
-
-  it("classifies booking.cancelled as routine", () => {
-    expect(classifyUrgency(EVENT_TYPES.BOOKING_CANCELLED, {})).toBe("routine");
   });
 
   it("classifies override.applied as routine", () => {
@@ -140,13 +142,17 @@ describe("classifyUrgency", () => {
     expect(classifyUrgency(EVENT_TYPES.OVERRIDE_REVERTED, {})).toBe("routine");
   });
 
+  it("classifies override.conflict as routine", () => {
+    expect(classifyUrgency(EVENT_TYPES.OVERRIDE_CONFLICT, {})).toBe("routine");
+  });
+
   it("classifies sync.completed as routine", () => {
     expect(classifyUrgency(EVENT_TYPES.SYNC_COMPLETED, {})).toBe("routine");
   });
 
   // --- Date-dependent events ---
 
-  describe("match.time_changed", () => {
+  describe("match.schedule.changed", () => {
     it("is immediate when changes contain a near-future date", () => {
       const payload = {
         changes: [
@@ -157,7 +163,7 @@ describe("classifyUrgency", () => {
           },
         ],
       };
-      expect(classifyUrgency(EVENT_TYPES.MATCH_TIME_CHANGED, payload)).toBe(
+      expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
         "immediate",
       );
     });
@@ -172,7 +178,7 @@ describe("classifyUrgency", () => {
           },
         ],
       };
-      expect(classifyUrgency(EVENT_TYPES.MATCH_TIME_CHANGED, payload)).toBe(
+      expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
         "immediate",
       );
     });
@@ -187,19 +193,19 @@ describe("classifyUrgency", () => {
           },
         ],
       };
-      expect(classifyUrgency(EVENT_TYPES.MATCH_TIME_CHANGED, payload)).toBe(
+      expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
         "routine",
       );
     });
 
     it("is routine when there are no changes", () => {
-      expect(classifyUrgency(EVENT_TYPES.MATCH_TIME_CHANGED, {})).toBe(
+      expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, {})).toBe(
         "routine",
       );
     });
   });
 
-  describe("match.venue_changed", () => {
+  describe("match.venue.changed", () => {
     it("is immediate when kickoffDate is within 7 days", () => {
       const payload = {
         kickoffDate: "2026-03-20T18:00:00Z",
@@ -241,7 +247,7 @@ describe("classifyUrgency", () => {
         },
       ],
     };
-    expect(classifyUrgency(EVENT_TYPES.MATCH_TIME_CHANGED, payload)).toBe(
+    expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
       "routine",
     );
   });
@@ -250,7 +256,7 @@ describe("classifyUrgency", () => {
     const payload = {
       changes: [null, undefined, 42],
     };
-    expect(classifyUrgency(EVENT_TYPES.MATCH_TIME_CHANGED, payload)).toBe(
+    expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
       "routine",
     );
   });

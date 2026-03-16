@@ -178,6 +178,7 @@ export async function updateMatchLocal(
     const changedFieldNames = new Set(fieldChanges.map((c) => c.field));
     const entityName = `Match #${locked.matchNo}`;
 
+    const teamIds = [locked.homeTeamApiId, locked.guestTeamApiId];
     const emitEvent = async (eventType: string, extraPayload: Record<string, unknown>) => {
       try {
         await publishDomainEvent({
@@ -192,6 +193,8 @@ export async function updateMatchLocal(
             matchNo: locked.matchNo,
             homeTeam: String(locked.homeTeamApiId),
             guestTeam: String(locked.guestTeamApiId),
+            leagueId: locked.leagueId,
+            teamIds,
             ...extraPayload,
           },
         }, tx);
@@ -201,7 +204,7 @@ export async function updateMatchLocal(
     };
 
     if (changedFieldNames.has("kickoffDate") || changedFieldNames.has("kickoffTime")) {
-      await emitEvent(EVENT_TYPES.MATCH_TIME_CHANGED, {
+      await emitEvent(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, {
         leagueName: "",
         changes: fieldChanges
           .filter((c) => c.field === "kickoffDate" || c.field === "kickoffTime")

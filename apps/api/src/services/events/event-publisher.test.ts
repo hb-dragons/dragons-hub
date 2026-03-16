@@ -68,7 +68,7 @@ beforeEach(() => {
 describe("buildDomainEvent", () => {
   it("produces an event with ULID id", () => {
     const event = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       entityType: "match",
       entityId: 1,
@@ -82,7 +82,7 @@ describe("buildDomainEvent", () => {
 
   it("classifies urgency based on event type", () => {
     const routine = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       entityType: "match",
       entityId: 1,
@@ -107,7 +107,7 @@ describe("buildDomainEvent", () => {
   it("uses provided occurredAt or defaults to now", () => {
     const customDate = new Date("2026-01-01T00:00:00Z");
     const withDate = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       occurredAt: customDate,
       entityType: "match",
@@ -119,7 +119,7 @@ describe("buildDomainEvent", () => {
     expect(withDate.occurredAt).toBe(customDate);
 
     const withoutDate = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       entityType: "match",
       entityId: 1,
@@ -132,7 +132,7 @@ describe("buildDomainEvent", () => {
 
   it("defaults actor and syncRunId to null", () => {
     const event = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       entityType: "match",
       entityId: 1,
@@ -146,7 +146,7 @@ describe("buildDomainEvent", () => {
 
   it("carries through provided actor and syncRunId", () => {
     const event = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       actor: "user-123",
       syncRunId: 42,
@@ -163,7 +163,7 @@ describe("buildDomainEvent", () => {
   it("preserves all fields in payload", () => {
     const payload = { matchNo: 100, homeTeam: "Dragons", guestTeam: "Bears" };
     const event = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       entityType: "match",
       entityId: 1,
@@ -178,7 +178,7 @@ describe("buildDomainEvent", () => {
 describe("insertDomainEvent", () => {
   it("inserts event into domainEvents table", async () => {
     const event = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       entityType: "match",
       entityId: 1,
@@ -203,7 +203,7 @@ describe("insertDomainEvent", () => {
     >[0];
 
     const event = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       entityType: "match",
       entityId: 1,
@@ -248,7 +248,7 @@ describe("enqueueDomainEvent", () => {
     mockQueueAdd.mockRejectedValueOnce(new Error("Redis down"));
 
     const event = buildDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       entityType: "match",
       entityId: 1,
@@ -268,7 +268,7 @@ describe("enqueueDomainEvent", () => {
 describe("publishDomainEvent", () => {
   it("inserts and enqueues in one call", async () => {
     const event = await publishDomainEvent({
-      type: EVENT_TYPES.MATCH_SCHEDULED,
+      type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
       entityType: "match",
       entityId: 1,
@@ -278,7 +278,7 @@ describe("publishDomainEvent", () => {
     });
 
     expect(event.id).toBeDefined();
-    expect(event.type).toBe(EVENT_TYPES.MATCH_SCHEDULED);
+    expect(event.type).toBe(EVENT_TYPES.MATCH_CREATED);
     expect(mockInsert).toHaveBeenCalled();
     // enqueue is fire-and-forget, but the mock should be called
   });

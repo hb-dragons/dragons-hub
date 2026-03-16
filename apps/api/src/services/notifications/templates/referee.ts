@@ -25,7 +25,7 @@ const refereeRenderers: Record<
         };
   },
 
-  [EVENT_TYPES.REFEREE_REMOVED]: (payload, _entityName, locale) => {
+  [EVENT_TYPES.REFEREE_UNASSIGNED]: (payload, _entityName, locale) => {
     const ref = String(payload.refereeName ?? "?");
     const role = String(payload.role ?? "");
     const match = `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")}`;
@@ -41,7 +41,7 @@ const refereeRenderers: Record<
         };
   },
 
-  [EVENT_TYPES.REFEREE_CHANGED]: (payload, _entityName, locale) => {
+  [EVENT_TYPES.REFEREE_REASSIGNED]: (payload, _entityName, locale) => {
     const oldRef = String(payload.oldRefereeName ?? "?");
     const newRef = String(payload.newRefereeName ?? "?");
     const role = String(payload.role ?? "");

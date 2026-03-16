@@ -42,6 +42,21 @@ const overrideRenderers: Record<
           body: `${match}: Override for ${field} has been reverted (by ${by}).`,
         };
   },
+
+  [EVENT_TYPES.OVERRIDE_CONFLICT]: (payload, _entityName, locale) => {
+    const field = String(payload.field ?? "?");
+    const match = `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")}`;
+
+    return locale === "de"
+      ? {
+          title: `\u{26A0}\u{FE0F} Override-Konflikt`,
+          body: `${match}: Konflikt bei Feld ${field}. Remote-Wert weicht ab.`,
+        }
+      : {
+          title: `\u{26A0}\u{FE0F} Override conflict`,
+          body: `${match}: Conflict on field ${field}. Remote value differs.`,
+        };
+  },
 };
 
 export function renderOverrideMessage(

@@ -7,10 +7,10 @@ describe("getDefaultNotificationsForEvent", () => {
   describe("admin defaults", () => {
     it.each([
       "match.cancelled",
-      "match.rescheduled",
       "match.schedule.changed",
+      "match.created",
       "booking.created",
-      "booking.needs_action",
+      "booking.status.changed",
       "override.applied",
       "referee.assigned",
       "referee.unassigned",
