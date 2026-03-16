@@ -332,6 +332,18 @@
       "matchCount": "Matches",
       "roles": "Roles",
       "apiId": "API ID"
+    },
+    "rules": {
+      "title": "Assignment Rules for {name}",
+      "description": "No rules = referee sees all home games. Adding rules restricts visibility to only the specified teams and slots.",
+      "selectTeam": "Select team...",
+      "addRule": "Add Rule",
+      "noRules": "No rules defined — referee sees all home games.",
+      "save": "Save",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "saved": "Rules saved successfully",
+      "saveFailed": "Failed to save rules"
     }
   },
   "standings": {
