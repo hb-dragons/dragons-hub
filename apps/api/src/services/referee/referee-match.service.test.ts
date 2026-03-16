@@ -178,7 +178,8 @@ describe("getMatchesWithOpenSlots", () => {
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain)
       .mockReturnValueOnce(buildChain([])) // intents
-      .mockReturnValueOnce(buildChain([])); // assignments
+      .mockReturnValueOnce(buildChain([])) // assignments
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -206,6 +207,8 @@ describe("getMatchesWithOpenSlots", () => {
       ownClubRefs: false,
       sr1Referee: null,
       sr2Referee: null,
+      sr1Allowed: true,
+      sr2Allowed: true,
       currentRefereeId: 42,
       intents: [],
     });
@@ -220,7 +223,8 @@ describe("getMatchesWithOpenSlots", () => {
     mockSelect
       .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
+      .mockReturnValueOnce(countChain)
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -229,8 +233,8 @@ describe("getMatchesWithOpenSlots", () => {
 
     expect(result.items).toEqual([]);
     expect(result.total).toBe(0);
-    // Should not query intents when no matchIds (rules check + data + count = 3)
-    expect(mockSelect).toHaveBeenCalledTimes(3);
+    // Should not query intents when no matchIds (rules check + data + count + allRefRules = 4)
+    expect(mockSelect).toHaveBeenCalledTimes(4);
   });
 
   it("includes own-club flags correctly", async () => {
@@ -251,6 +255,7 @@ describe("getMatchesWithOpenSlots", () => {
         sr1Open: false,
         sr2Open: true,
         ownClubRefs: false,
+        homeTeamId: 10,
       },
     ];
     const countResult = [{ count: 1 }];
@@ -264,7 +269,8 @@ describe("getMatchesWithOpenSlots", () => {
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain)
       .mockReturnValueOnce(intentChain)
-      .mockReturnValueOnce(buildChain([])); // assignments
+      .mockReturnValueOnce(buildChain([])) // assignments
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -293,6 +299,7 @@ describe("getMatchesWithOpenSlots", () => {
         sr1Open: false,
         sr2Open: true,
         ownClubRefs: null,
+        homeTeamId: 10,
       },
     ];
     const countResult = [{ count: 1 }];
@@ -302,7 +309,8 @@ describe("getMatchesWithOpenSlots", () => {
       .mockReturnValueOnce(buildChain(rows))
       .mockReturnValueOnce(buildChain(countResult))
       .mockReturnValueOnce(buildChain([])) // intents
-      .mockReturnValueOnce(buildChain([])); // assignments
+      .mockReturnValueOnce(buildChain([])) // assignments
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -331,6 +339,7 @@ describe("getMatchesWithOpenSlots", () => {
         sr1Open: true,
         sr2Open: true,
         ownClubRefs: false,
+        homeTeamId: 10,
       },
     ];
     const countResult = [{ count: 10 }];
@@ -340,7 +349,8 @@ describe("getMatchesWithOpenSlots", () => {
       .mockReturnValueOnce(buildChain(rows))
       .mockReturnValueOnce(buildChain(countResult))
       .mockReturnValueOnce(buildChain([])) // intents
-      .mockReturnValueOnce(buildChain([])); // assignments
+      .mockReturnValueOnce(buildChain([])) // assignments
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       { limit: 1, offset: 4 },
@@ -371,6 +381,7 @@ describe("getMatchesWithOpenSlots", () => {
         sr1Open: true,
         sr2Open: true,
         ownClubRefs: false,
+        homeTeamId: 10,
       },
     ];
     const countResult = [{ count: 1 }];
@@ -400,7 +411,8 @@ describe("getMatchesWithOpenSlots", () => {
       .mockReturnValueOnce(buildChain(rows))
       .mockReturnValueOnce(buildChain(countResult))
       .mockReturnValueOnce(buildChain(intentRows))
-      .mockReturnValueOnce(buildChain([])); // assignments
+      .mockReturnValueOnce(buildChain([])) // assignments
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -432,7 +444,8 @@ describe("getMatchesWithOpenSlots", () => {
     mockSelect
       .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(buildChain([]))
-      .mockReturnValueOnce(buildChain([{ count: 0 }]));
+      .mockReturnValueOnce(buildChain([{ count: 0 }]))
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0, leagueId: 5 },
@@ -440,14 +453,15 @@ describe("getMatchesWithOpenSlots", () => {
     );
 
     expect(result.items).toEqual([]);
-    expect(mockSelect).toHaveBeenCalledTimes(3);
+    expect(mockSelect).toHaveBeenCalledTimes(4);
   });
 
   it("filters by dateFrom and dateTo when provided", async () => {
     mockSelect
       .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(buildChain([]))
-      .mockReturnValueOnce(buildChain([{ count: 0 }]));
+      .mockReturnValueOnce(buildChain([{ count: 0 }]))
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       {
@@ -460,14 +474,15 @@ describe("getMatchesWithOpenSlots", () => {
     );
 
     expect(result.items).toEqual([]);
-    expect(mockSelect).toHaveBeenCalledTimes(3);
+    expect(mockSelect).toHaveBeenCalledTimes(4);
   });
 
   it("defaults total to 0 when count result is empty", async () => {
     mockSelect
       .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(buildChain([]))
-      .mockReturnValueOnce(buildChain([]));
+      .mockReturnValueOnce(buildChain([]))
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -722,7 +737,8 @@ describe("getMatchesWithOpenSlots - rule-based filtering", () => {
       .mockReturnValueOnce(buildChain([])) // notExists subquery builder
       .mockReturnValueOnce(buildChain([])) // exists subquery builder
       .mockReturnValueOnce(buildChain([])) // data
-      .mockReturnValueOnce(buildChain([{ count: 0 }])); // count
+      .mockReturnValueOnce(buildChain([{ count: 0 }])) // count
+      .mockReturnValueOnce(buildChain([])); // allRefRules for slot eligibility
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -731,8 +747,8 @@ describe("getMatchesWithOpenSlots - rule-based filtering", () => {
 
     expect(result.items).toEqual([]);
     expect(result.total).toBe(0);
-    // rules check + notExists subquery + exists subquery + data + count = 5
-    expect(mockSelect).toHaveBeenCalledTimes(5);
+    // rules check + notExists subquery + exists subquery + data + count + allRefRules = 6
+    expect(mockSelect).toHaveBeenCalledTimes(6);
   });
 
   it("skips rule check when refereeId is null", async () => {

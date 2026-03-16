@@ -40,6 +40,8 @@ export interface RefereeMatchListItem {
   ownClubRefs: boolean;
   sr1Referee: { firstName: string | null; lastName: string | null } | null;
   sr2Referee: { firstName: string | null; lastName: string | null } | null;
+  sr1Allowed: boolean;
+  sr2Allowed: boolean;
   currentRefereeId: number | null;
   intents: {
     slotNumber: number;

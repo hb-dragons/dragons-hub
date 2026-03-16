@@ -49,6 +49,7 @@ interface SlotCellProps {
   match: RefereeMatchListItem;
   slotNumber: 1 | 2;
   isOpen: boolean;
+  slotAllowed: boolean;
   assignedReferee: { firstName: string | null; lastName: string | null } | null;
   onTake: (matchId: number, slotNumber: number) => Promise<void>;
   onCancel: (matchId: number, slotNumber: number) => Promise<void>;
@@ -58,7 +59,7 @@ interface SlotCellProps {
   t: ReturnType<typeof useTranslations<"refereeMatches">>;
 }
 
-function SlotCell({ match, slotNumber, isOpen, assignedReferee, onTake, onCancel, onAdminRelease, takingSlot, isAdmin, t }: SlotCellProps) {
+function SlotCell({ match, slotNumber, isOpen, slotAllowed, assignedReferee, onTake, onCancel, onAdminRelease, takingSlot, isAdmin, t }: SlotCellProps) {
   const currentRefereeId = match.currentRefereeId;
   const slotIntents = match.intents.filter((i) => i.slotNumber === slotNumber);
   const myIntent = slotIntents.find((i) => i.refereeId === currentRefereeId);
@@ -145,8 +146,13 @@ function SlotCell({ match, slotNumber, isOpen, assignedReferee, onTake, onCancel
         <Button
           size="sm"
           variant="outline"
-          className="h-7 border-green-500 text-green-700 hover:bg-green-50 hover:text-green-800"
-          disabled={isTaking}
+          className={cn(
+            "h-7",
+            slotAllowed
+              ? "border-green-500 text-green-700 hover:bg-green-50 hover:text-green-800"
+              : "cursor-not-allowed opacity-50",
+          )}
+          disabled={isTaking || !slotAllowed}
           onClick={(e) => {
             e.stopPropagation();
             void onTake(match.id, slotNumber);
@@ -315,6 +321,7 @@ function getColumns(
             match={m}
             slotNumber={1}
             isOpen={m.sr1Open || (m.ownClubRefs && m.homeIsOwnClub)}
+            slotAllowed={m.sr1Allowed}
             assignedReferee={m.sr1Referee}
             onTake={onTake}
             onCancel={onCancel}
@@ -343,6 +350,7 @@ function getColumns(
             match={m}
             slotNumber={2}
             isOpen={m.sr2Open || (m.ownClubRefs && m.homeIsOwnClub)}
+            slotAllowed={m.sr2Allowed}
             assignedReferee={m.sr2Referee}
             onTake={onTake}
             onCancel={onCancel}

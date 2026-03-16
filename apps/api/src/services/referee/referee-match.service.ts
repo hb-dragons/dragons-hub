@@ -145,6 +145,7 @@ export async function getMatchesWithOpenSlots(
         matchNo: matches.matchNo,
         kickoffDate: matches.kickoffDate,
         kickoffTime: matches.kickoffTime,
+        homeTeamId: homeTeam.id,
         homeTeamName: homeTeam.name,
         guestTeamName: guestTeam.name,
         homeIsOwnClub: homeTeam.isOwnClub,
@@ -242,8 +243,52 @@ export async function getMatchesWithOpenSlots(
     slots.set(a.slotNumber, { firstName: a.firstName, lastName: a.lastName });
   }
 
+  // Load referee's rules to determine slot eligibility per match
+  type SlotRule = { deny: boolean; allowSr1: boolean; allowSr2: boolean };
+  const rulesByTeamId = new Map<number, SlotRule>();
+  let refereeHasAnyAllowRules = false;
+
+  if (refereeId !== null) {
+    const allRefRules = await db
+      .select({
+        teamId: refereeAssignmentRules.teamId,
+        deny: refereeAssignmentRules.deny,
+        allowSr1: refereeAssignmentRules.allowSr1,
+        allowSr2: refereeAssignmentRules.allowSr2,
+      })
+      .from(refereeAssignmentRules)
+      .where(eq(refereeAssignmentRules.refereeId, refereeId));
+
+    for (const r of allRefRules) {
+      rulesByTeamId.set(r.teamId, r);
+      if (!r.deny) refereeHasAnyAllowRules = true;
+    }
+  }
+
   const items: RefereeMatchListItem[] = rows.map((row) => {
     const slots = assignmentsByMatch.get(row.id);
+    const isOwnClubHome = (row.ownClubRefs ?? false) && (row.homeIsOwnClub ?? false);
+
+    // Determine slot eligibility based on rules
+    let sr1Allowed = true;
+    let sr2Allowed = true;
+
+    if (isOwnClubHome && rulesByTeamId.size > 0) {
+      const rule = rulesByTeamId.get(row.homeTeamId);
+      if (rule?.deny) {
+        sr1Allowed = false;
+        sr2Allowed = false;
+      } else if (rule) {
+        sr1Allowed = rule.allowSr1;
+        sr2Allowed = rule.allowSr2;
+      } else if (refereeHasAnyAllowRules) {
+        // Has allow rules but none for this team: not allowed
+        sr1Allowed = false;
+        sr2Allowed = false;
+      }
+      // else: only deny rules and this team isn't denied → both allowed
+    }
+
     return {
       id: row.id,
       apiMatchId: row.apiMatchId,
@@ -264,6 +309,8 @@ export async function getMatchesWithOpenSlots(
       ownClubRefs: row.ownClubRefs ?? false,
       sr1Referee: slots?.get(1) ?? null,
       sr2Referee: slots?.get(2) ?? null,
+      sr1Allowed,
+      sr2Allowed,
       currentRefereeId: refereeId,
       intents: intentsByMatch.get(row.id) ?? [],
     };
