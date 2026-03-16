@@ -9,6 +9,8 @@ import type {
 } from "./data-fetcher";
 import { batchAction, type SyncLogger } from "./sync-logger";
 import { logger } from "../../config/logger";
+import { publishDomainEvent } from "../events/event-publisher";
+import { EVENT_TYPES } from "@dragons/shared";
 
 const log = logger.child({ service: "referees-sync" });
 
@@ -210,6 +212,54 @@ export async function buildMatchIdLookup(): Promise<Map<number, number>> {
   return new Map(allMatches.map((m) => [m.apiMatchId, m.id]));
 }
 
+/** Helper to look up referee name by internal ID */
+async function getRefereeNameById(refId: number): Promise<string> {
+  const [ref] = await db
+    .select({ firstName: referees.firstName, lastName: referees.lastName })
+    .from(referees)
+    .where(eq(referees.id, refId))
+    .limit(1);
+  return ref ? `${ref.firstName} ${ref.lastName}`.trim() : "Unknown";
+}
+
+/** Helper to look up match info for referee event payloads */
+async function getMatchInfoForEvent(matchId: number): Promise<{
+  matchNo: number;
+  homeTeam: string;
+  guestTeam: string;
+  entityName: string;
+} | null> {
+  const [match] = await db
+    .select({
+      matchNo: matches.matchNo,
+      homeTeamApiId: matches.homeTeamApiId,
+      guestTeamApiId: matches.guestTeamApiId,
+    })
+    .from(matches)
+    .where(eq(matches.id, matchId))
+    .limit(1);
+
+  if (!match) return null;
+
+  // We don't have team names readily available here, use API IDs as placeholders
+  return {
+    matchNo: match.matchNo,
+    homeTeam: String(match.homeTeamApiId),
+    guestTeam: String(match.guestTeamApiId),
+    entityName: `Match #${match.matchNo}`,
+  };
+}
+
+/** Helper to look up role name by internal ID */
+async function getRoleNameById(roleId: number): Promise<string> {
+  const [role] = await db
+    .select({ name: refereeRoles.name })
+    .from(refereeRoles)
+    .where(eq(refereeRoles.id, roleId))
+    .limit(1);
+  return role?.name ?? "Unknown";
+}
+
 export async function syncRefereeAssignmentsFromData(
   assignments: ExtractedRefereeAssignment[],
   refereeIdLookup: Map<number, number>,
@@ -271,6 +321,36 @@ export async function syncRefereeAssignmentsFromData(
           createdAt: now,
         });
         created++;
+
+        // Emit referee.assigned event
+        try {
+          const [refName, matchInfo, roleName] = await Promise.all([
+            getRefereeNameById(refereeId),
+            getMatchInfoForEvent(matchId),
+            getRoleNameById(roleId),
+          ]);
+          if (matchInfo) {
+            await publishDomainEvent({
+              type: EVENT_TYPES.REFEREE_ASSIGNED,
+              source: "sync",
+              entityType: "referee",
+              entityId: matchId,
+              entityName: matchInfo.entityName,
+              deepLinkPath: `/admin/matches/${matchId}`,
+              payload: {
+                matchNo: matchInfo.matchNo,
+                homeTeam: matchInfo.homeTeam,
+                guestTeam: matchInfo.guestTeam,
+                refereeName: refName,
+                role: roleName,
+                refereeId,
+              },
+            });
+          }
+        } catch (error) {
+          log.warn({ err: error, matchId, refereeId }, "Failed to emit referee.assigned event");
+        }
+
         await logger?.log({
           entityType: "referee",
           entityId: `${matchId}-${refereeId}-${roleId}`,
@@ -278,10 +358,46 @@ export async function syncRefereeAssignmentsFromData(
           message: `Created referee assignment for match ${matchId} slot ${slotNumber}`,
         });
       } else if (existing.refereeId !== refereeId || existing.roleId !== roleId) {
+        const oldRefereeId = existing.refereeId;
+
         await db
           .update(matchReferees)
           .set({ refereeId, roleId })
           .where(eq(matchReferees.id, existing.id));
+
+        // Emit referee.changed event when referee changed
+        if (oldRefereeId !== refereeId) {
+          try {
+            const [oldRefName, newRefName, matchInfo, roleName] = await Promise.all([
+              getRefereeNameById(oldRefereeId),
+              getRefereeNameById(refereeId),
+              getMatchInfoForEvent(matchId),
+              getRoleNameById(roleId),
+            ]);
+            if (matchInfo) {
+              await publishDomainEvent({
+                type: EVENT_TYPES.REFEREE_CHANGED,
+                source: "sync",
+                entityType: "referee",
+                entityId: matchId,
+                entityName: matchInfo.entityName,
+                deepLinkPath: `/admin/matches/${matchId}`,
+                payload: {
+                  matchNo: matchInfo.matchNo,
+                  homeTeam: matchInfo.homeTeam,
+                  guestTeam: matchInfo.guestTeam,
+                  oldRefereeName: oldRefName,
+                  newRefereeName: newRefName,
+                  role: roleName,
+                  oldRefereeId: oldRefereeId,
+                  newRefereeId: refereeId,
+                },
+              });
+            }
+          } catch (error) {
+            log.warn({ err: error, matchId, refereeId }, "Failed to emit referee.changed event");
+          }
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
