@@ -22,6 +22,18 @@ vi.mock("./sync.worker", () => ({
   syncWorker: { close: (...args: unknown[]) => mockWorkerClose(...args) },
 }));
 
+const mockEventWorkerClose = vi.fn().mockResolvedValue(undefined);
+vi.mock("./event.worker", () => ({
+  eventWorker: { close: (...args: unknown[]) => mockEventWorkerClose(...args) },
+}));
+
+const mockStartOutboxPoller = vi.fn();
+const mockStopOutboxPoller = vi.fn();
+vi.mock("../services/events/outbox-poller", () => ({
+  startOutboxPoller: (...args: unknown[]) => mockStartOutboxPoller(...args),
+  stopOutboxPoller: (...args: unknown[]) => mockStopOutboxPoller(...args),
+}));
+
 const mockDbUpdate = vi.fn();
 const mockDbSelect = vi.fn();
 const mockDbDelete = vi.fn();
@@ -36,6 +48,9 @@ vi.mock("../config/database", () => ({
 vi.mock("@dragons/db/schema", () => ({
   syncRuns: { id: "id", status: "status", startedAt: "startedAt" },
   syncRunEntries: { syncRunId: "syncRunId" },
+  domainEvents: { id: "id", occurredAt: "occurredAt" },
+  notificationLog: { id: "id", eventId: "eventId" },
+  digestBuffer: { id: "id", eventId: "eventId" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -44,7 +59,7 @@ vi.mock("drizzle-orm", () => ({
   inArray: vi.fn(),
 }));
 
-import { initializeWorkers, shutdownWorkers, cleanupOldSyncRuns } from "./index";
+import { initializeWorkers, shutdownWorkers, cleanupOldSyncRuns, cleanupOldDomainEvents } from "./index";
 import { logger } from "../config/logger";
 
 beforeEach(() => {
@@ -64,7 +79,9 @@ beforeEach(() => {
     }),
   });
   mockDbDelete.mockReturnValue({
-    where: vi.fn().mockResolvedValue(undefined),
+    where: vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([]),
+    }),
   });
 });
 
@@ -165,6 +182,46 @@ describe("cleanupOldSyncRuns", () => {
     const result = await cleanupOldSyncRuns(30);
 
     expect(result).toBe(0);
+    expect(mockDbSelect).toHaveBeenCalled();
+  });
+});
+
+describe("cleanupOldDomainEvents", () => {
+  it("returns zeros when no old events found", async () => {
+    const result = await cleanupOldDomainEvents();
+
+    expect(result).toEqual({ notifications: 0, digestEntries: 0, events: 0 });
+    expect(mockDbDelete).not.toHaveBeenCalled();
+  });
+
+  it("deletes notification_log, digest_buffer, then domain_events", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ id: "evt-1" }, { id: "evt-2" }]),
+      }),
+    });
+
+    const mockDeleteReturning = vi.fn()
+      .mockResolvedValueOnce([{ id: 1 }, { id: 2 }])  // notification_log
+      .mockResolvedValueOnce([{ id: 3 }]);              // digest_buffer
+    const mockDeleteWhere = vi.fn().mockReturnValue({
+      returning: mockDeleteReturning,
+    });
+    mockDbDelete.mockReturnValue({
+      where: mockDeleteWhere,
+    });
+
+    const result = await cleanupOldDomainEvents(365);
+
+    expect(result).toEqual({ notifications: 2, digestEntries: 1, events: 2 });
+    // 3 deletes: notification_log, digest_buffer, domain_events
+    expect(mockDbDelete).toHaveBeenCalledTimes(3);
+  });
+
+  it("accepts custom retention days", async () => {
+    const result = await cleanupOldDomainEvents(30);
+
+    expect(result).toEqual({ notifications: 0, digestEntries: 0, events: 0 });
     expect(mockDbSelect).toHaveBeenCalled();
   });
 });
