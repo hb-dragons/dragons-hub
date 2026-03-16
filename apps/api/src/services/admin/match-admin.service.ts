@@ -9,8 +9,13 @@ import {
 import { eq, and } from "drizzle-orm";
 import { OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
 import type { MatchDetailResponse } from "@dragons/shared";
+import { EVENT_TYPES } from "@dragons/shared";
 import type { MatchUpdateData } from "./match-query.service";
 import { buildDetailResponse, loadRemoteSnapshot } from "./match-query.service";
+import { publishDomainEvent } from "../events/event-publisher";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "match-admin" });
 
 // ── Re-exports ──────────────────────────────────────────────────────────────
 
@@ -169,6 +174,71 @@ export async function updateMatchLocal(
       })
       .where(eq(matches.id, id));
 
+    // Emit domain events based on what changed
+    const changedFieldNames = new Set(fieldChanges.map((c) => c.field));
+    const entityName = `Match #${locked.matchNo}`;
+
+    const emitEvent = async (eventType: string, extraPayload: Record<string, unknown>) => {
+      try {
+        await publishDomainEvent({
+          type: eventType as import("@dragons/shared").EventType,
+          source: "manual",
+          actor: changedBy,
+          entityType: "match",
+          entityId: id,
+          entityName,
+          deepLinkPath: `/admin/matches/${id}`,
+          payload: {
+            matchNo: locked.matchNo,
+            homeTeam: String(locked.homeTeamApiId),
+            guestTeam: String(locked.guestTeamApiId),
+            ...extraPayload,
+          },
+        }, tx);
+      } catch (error) {
+        log.warn({ err: error, eventType, matchId: id }, "Failed to emit match admin event");
+      }
+    };
+
+    if (changedFieldNames.has("kickoffDate") || changedFieldNames.has("kickoffTime")) {
+      await emitEvent(EVENT_TYPES.MATCH_TIME_CHANGED, {
+        leagueName: "",
+        changes: fieldChanges
+          .filter((c) => c.field === "kickoffDate" || c.field === "kickoffTime")
+          .map((c) => ({ field: c.field, oldValue: c.oldValue, newValue: c.newValue })),
+      });
+    }
+
+    if (changedFieldNames.has("venueId")) {
+      const venueChange = fieldChanges.find((c) => c.field === "venueId");
+      await emitEvent(EVENT_TYPES.MATCH_VENUE_CHANGED, {
+        leagueName: "",
+        oldVenueId: venueChange?.oldValue ? Number(venueChange.oldValue) : null,
+        oldVenueName: null,
+        newVenueId: venueChange?.newValue ? Number(venueChange.newValue) : null,
+        newVenueName: null,
+      });
+    }
+
+    if (changedFieldNames.has("isCancelled")) {
+      const change = fieldChanges.find((c) => c.field === "isCancelled");
+      if (change?.newValue === "true") {
+        await emitEvent(EVENT_TYPES.MATCH_CANCELLED, {
+          leagueName: "",
+          reason: data.changeReason ?? null,
+        });
+      }
+    }
+
+    if (changedFieldNames.has("isForfeited")) {
+      const change = fieldChanges.find((c) => c.field === "isForfeited");
+      if (change?.newValue === "true") {
+        await emitEvent(EVENT_TYPES.MATCH_FORFEITED, {
+          leagueName: "",
+        });
+      }
+    }
+
     // Re-query within transaction for full response
     return buildDetailResponse(tx, id);
   });
@@ -271,6 +341,29 @@ export async function releaseOverride(
         eq(matchOverrides.fieldName, fieldName),
       ),
     );
+
+    // Emit override.reverted event
+    try {
+      await publishDomainEvent({
+        type: EVENT_TYPES.OVERRIDE_REVERTED,
+        source: "manual",
+        actor: changedBy,
+        entityType: "match",
+        entityId: matchId,
+        entityName: `Match #${locked.matchNo}`,
+        deepLinkPath: `/admin/matches/${matchId}`,
+        payload: {
+          matchNo: locked.matchNo,
+          homeTeam: String(locked.homeTeamApiId),
+          guestTeam: String(locked.guestTeamApiId),
+          field: fieldName,
+          overrideValue: currentStr,
+          revertedBy: changedBy,
+        },
+      }, tx);
+    } catch (error) {
+      log.warn({ err: error, matchId, fieldName }, "Failed to emit override.reverted event");
+    }
 
     // Re-query within transaction for full response
     return buildDetailResponse(tx, matchId);
