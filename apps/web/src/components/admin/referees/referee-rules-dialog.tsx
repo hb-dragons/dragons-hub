@@ -142,7 +142,7 @@ export function RefereeRulesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>
             {t("rules.title", {
@@ -162,12 +162,12 @@ export function RefereeRulesDialog({
             )
 
             return (
-              <div key={index} className="flex items-center gap-2">
+              <div key={index} className="flex items-center gap-2 min-w-0">
                 <Select
                   value={rule.teamId?.toString() ?? ""}
                   onValueChange={(val) => updateRule(index, { teamId: Number(val) })}
                 >
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger className="min-w-0 flex-1 truncate">
                     <SelectValue placeholder={t("rules.selectTeam")} />
                   </SelectTrigger>
                   <SelectContent>
@@ -186,7 +186,7 @@ export function RefereeRulesDialog({
 
                 <button
                   type="button"
-                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                  className={`flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
                     rule.deny
                       ? "bg-destructive/10 text-destructive"
                       : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
@@ -203,7 +203,7 @@ export function RefereeRulesDialog({
 
                 {!rule.deny && (
                   <>
-                    <label className="flex items-center gap-1 text-sm">
+                    <label className="flex shrink-0 items-center gap-1 text-sm">
                       <Checkbox
                         checked={rule.allowSr1}
                         onCheckedChange={(checked) =>
@@ -213,7 +213,7 @@ export function RefereeRulesDialog({
                       SR1
                     </label>
 
-                    <label className="flex items-center gap-1 text-sm">
+                    <label className="flex shrink-0 items-center gap-1 text-sm">
                       <Checkbox
                         checked={rule.allowSr2}
                         onCheckedChange={(checked) =>
