@@ -32,7 +32,6 @@ import type { RefereeListItem } from "./types"
 interface Team {
   id: number
   name: string
-  isOwnClub: boolean
 }
 
 interface RuleRow {
@@ -60,11 +59,10 @@ export function RefereeRulesDialog({
   const [rules, setRules] = useState<RuleRow[]>([])
   const [submitting, setSubmitting] = useState(false)
 
-  const { data: teamsData } = useSWR<{ items: Team[] }>(
+  const { data: ownClubTeams = [] } = useSWR<Team[]>(
     open ? SWR_KEYS.teams : null,
     apiFetcher,
   )
-  const ownClubTeams = teamsData?.items?.filter((t) => t.isOwnClub) ?? []
 
   const { data: rulesData } = useSWR<RulesResponse>(
     open && referee ? SWR_KEYS.refereeRules(referee.id) : null,
