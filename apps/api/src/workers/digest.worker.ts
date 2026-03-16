@@ -71,8 +71,8 @@ export const digestWorker = new Worker<DigestJobData>(
       occurredAt: row.occurredAt,
     }));
 
-    // 4. Render digest message (locale defaults to German for now)
-    const locale = "de";
+    // 4. Render digest message — read locale from channel config, fall back to German
+    const locale = (config.config as Record<string, unknown>)?.locale as string ?? "de";
     const message = renderDigestMessage(items, locale);
 
     // 5. Deliver via the appropriate channel adapter
@@ -95,11 +95,8 @@ export const digestWorker = new Worker<DigestJobData>(
       log.warn({ channelType: config.type }, "Unsupported channel type for digest, skipping delivery");
     }
 
-    // 6. Clear the buffer for this channel
-    const bufferIds = bufferedRows.map((r) => r.bufferId);
-    for (const id of bufferIds) {
-      await db.delete(digestBuffer).where(eq(digestBuffer.id, id));
-    }
+    // 6. Clear the buffer for this channel (single batch delete)
+    await db.delete(digestBuffer).where(eq(digestBuffer.channelConfigId, channelConfigId));
 
     log.info(
       { eventCount: bufferedRows.length, channelType: config.type },

@@ -84,10 +84,8 @@ export const eventWorker = new Worker<EventJobData>(
         if (dispatched.has(dedupKey)) continue;
         dispatched.add(dedupKey);
 
-        // Find matching channel config
-        const config = configs.find(
-          (c) => c.type === channelTarget.channel,
-        );
+        // Look up channel config by targetId (the config's ID)
+        const config = configById.get(Number(channelTarget.targetId));
         if (!config) continue;
 
         // Always buffer for digest
@@ -96,11 +94,12 @@ export const eventWorker = new Worker<EventJobData>(
 
         // For immediate events, also dispatch now
         if (urgency === "immediate") {
+          const locale = (config.config as Record<string, unknown>)?.locale as string ?? "de";
           const message = renderEventMessage(
             event.type,
             payload,
             event.entityName,
-            "de",
+            locale,
           );
 
           if (channelTarget.channel === "in_app") {
@@ -111,7 +110,7 @@ export const eventWorker = new Worker<EventJobData>(
               recipientId: channelTarget.targetId,
               title: message.title,
               body: message.body,
-              locale: "de",
+              locale,
             });
             dispatchedCount++;
           }
@@ -139,11 +138,12 @@ export const eventWorker = new Worker<EventJobData>(
 
       // For immediate events, dispatch now
       if (effectiveUrgency === "immediate") {
+        const locale = (config.config as Record<string, unknown>)?.locale as string ?? "de";
         const message = renderEventMessage(
           event.type,
           payload,
           event.entityName,
-          "de",
+          locale,
         );
 
         if (defaultNotif.channel === "in_app") {
@@ -154,7 +154,7 @@ export const eventWorker = new Worker<EventJobData>(
             recipientId,
             title: message.title,
             body: message.body,
-            locale: "de",
+            locale,
           });
           dispatchedCount++;
         }
