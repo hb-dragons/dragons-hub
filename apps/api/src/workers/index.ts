@@ -1,5 +1,7 @@
 import { syncWorker } from "./sync.worker";
+import { eventWorker } from "./event.worker";
 import { initializeScheduledJobs, syncQueue } from "./queues";
+import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-poller";
 import { db } from "../config/database";
 import { logger } from "../config/logger";
 import { syncRuns, syncRunEntries } from "@dragons/db/schema";
@@ -38,8 +40,12 @@ export async function initializeWorkers() {
 
   await initializeScheduledJobs();
 
+  // Start outbox poller for domain events
+  startOutboxPoller();
+
   // Workers are automatically started when imported
   logger.info("Sync worker started");
+  logger.info("Event worker started");
   logger.info("Workers initialized");
 }
 
@@ -80,6 +86,8 @@ export async function shutdownWorkers() {
     logger.error({ err: error }, "Failed to mark running syncs as failed");
   }
 
+  stopOutboxPoller();
+  await eventWorker.close();
   await syncWorker.close();
   await syncQueue.close();
 
@@ -87,4 +95,5 @@ export async function shutdownWorkers() {
 }
 
 export { syncWorker };
+export { eventWorker };
 export * from "./queues";
