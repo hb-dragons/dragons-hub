@@ -1,5 +1,6 @@
 import { syncWorker } from "./sync.worker";
 import { eventWorker } from "./event.worker";
+import { digestWorker } from "./digest.worker";
 import { initializeScheduledJobs, syncQueue } from "./queues";
 import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-poller";
 import { db } from "../config/database";
@@ -46,6 +47,7 @@ export async function initializeWorkers() {
   // Workers are automatically started when imported
   logger.info("Sync worker started");
   logger.info("Event worker started");
+  logger.info("Digest worker started");
   logger.info("Workers initialized");
 }
 
@@ -87,6 +89,7 @@ export async function shutdownWorkers() {
   }
 
   stopOutboxPoller();
+  await digestWorker.close();
   await eventWorker.close();
   await syncWorker.close();
   await syncQueue.close();
@@ -96,4 +99,5 @@ export async function shutdownWorkers() {
 
 export { syncWorker };
 export { eventWorker };
+export { digestWorker };
 export * from "./queues";
