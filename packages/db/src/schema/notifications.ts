@@ -49,6 +49,8 @@ export const userNotificationPreferences = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+    locale: text("locale").notNull().default("de"),
+    mutedEventTypes: text("muted_event_types").array().notNull().default([]),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
