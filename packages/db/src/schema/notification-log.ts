@@ -10,6 +10,10 @@ import { domainEvents } from "./domain-events";
 import { watchRules } from "./watch-rules";
 import { channelConfigs } from "./channel-configs";
 
+// NOTE: A COALESCE-based unique dedup index exists in migration 0018 but cannot be
+// expressed in Drizzle schema. If regenerating migrations, manually re-add:
+// CREATE UNIQUE INDEX "notification_log_dedup_idx" ON "notification_log"
+//   ("event_id", "channel_config_id", COALESCE("recipient_id", '__group__'));
 export const notificationLog = pgTable(
   "notification_log",
   {

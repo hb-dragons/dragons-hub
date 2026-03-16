@@ -8,6 +8,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { syncRuns } from "./sync-runs";
 
+// NOTE: A partial outbox index exists in migration 0019 but cannot be expressed in Drizzle schema.
+// If regenerating migrations, manually re-add:
+// CREATE INDEX "domain_events_outbox_idx" ON "domain_events" ("enqueued_at") WHERE "enqueued_at" IS NULL;
 export const domainEvents = pgTable(
   "domain_events",
   {
