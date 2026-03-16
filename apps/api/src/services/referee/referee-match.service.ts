@@ -8,8 +8,9 @@ import {
   matchReferees,
   referees,
   refereeRoles,
+  refereeAssignmentRules,
 } from "@dragons/db/schema";
-import { eq, or, and, sql, asc, gte, lte, inArray, isNull } from "drizzle-orm";
+import { eq, or, and, sql, asc, gte, lte, inArray, isNull, exists } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type {
   RefereeMatchListItem,
@@ -17,6 +18,7 @@ import type {
   VerifyMatchResponse,
   PaginatedResponse,
 } from "@dragons/shared";
+import { hasAnyRules, getRuleForRefereeAndTeam } from "./referee-rules.service";
 import { sdkClient } from "../sync/sdk-client";
 import { logger } from "../../config/logger";
 
@@ -58,6 +60,41 @@ export async function getMatchesWithOpenSlots(
   if (leagueId) conditions.push(eq(matches.leagueId, leagueId));
   if (dateFrom) conditions.push(gte(matches.kickoffDate, dateFrom));
   if (dateTo) conditions.push(lte(matches.kickoffDate, dateTo));
+
+  // Rule-based filtering for own-club home games
+  if (refereeId !== null) {
+    const refRules = await db
+      .select({ id: refereeAssignmentRules.id })
+      .from(refereeAssignmentRules)
+      .where(eq(refereeAssignmentRules.refereeId, refereeId))
+      .limit(1);
+
+    if (refRules.length > 0) {
+      // Replace only index 0 (base visibility condition).
+      // This preserves leagueId/dateFrom/dateTo filters at indices 1+.
+      conditions[0] = or(
+        or(
+          eq(matches.sr1Open, true),
+          eq(matches.sr2Open, true),
+        ),
+        and(
+          eq(leagues.ownClubRefs, true),
+          eq(homeTeam.isOwnClub, true),
+          exists(
+            db
+              .select({ id: refereeAssignmentRules.id })
+              .from(refereeAssignmentRules)
+              .where(
+                and(
+                  eq(refereeAssignmentRules.refereeId, refereeId),
+                  eq(refereeAssignmentRules.teamId, homeTeam.id),
+                ),
+              ),
+          ),
+        ),
+      )!;
+    }
+  }
 
   const whereClause = and(...conditions)!;
 
@@ -215,6 +252,7 @@ export async function recordTakeIntent(
       sr2Open: matches.sr2Open,
       leagueOwnClubRefs: leagues.ownClubRefs,
       homeIsOwnClub: homeTeam.isOwnClub,
+      homeTeamId: homeTeam.id,
     })
     .from(matches)
     .innerJoin(
@@ -231,6 +269,27 @@ export async function recordTakeIntent(
 
   const isOwnClubRefsMatch =
     match.leagueOwnClubRefs === true && match.homeIsOwnClub === true;
+
+  // Rule-based guard for own-club home games
+  if (isOwnClubRefsMatch) {
+    const refHasRules = await hasAnyRules(refereeId);
+
+    if (refHasRules) {
+      const rule = await getRuleForRefereeAndTeam(refereeId, match.homeTeamId);
+
+      if (!rule) {
+        return { error: "Not eligible for this match", status: 403 };
+      }
+
+      const slotAllowed =
+        (slotNumber === 1 && rule.allowSr1) ||
+        (slotNumber === 2 && rule.allowSr2);
+
+      if (!slotAllowed) {
+        return { error: "Not eligible for this slot", status: 403 };
+      }
+    }
+  }
 
   const slotOpen =
     (slotNumber === 1 && match.sr1Open) ||

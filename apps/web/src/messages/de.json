@@ -332,6 +332,18 @@
       "matchCount": "Spiele",
       "roles": "Rollen",
       "apiId": "API-ID"
+    },
+    "rules": {
+      "title": "Einsatzregeln für {name}",
+      "description": "Keine Regeln = Schiedsrichter sieht alle Heimspiele. Regeln schränken die Sichtbarkeit auf die angegebenen Teams und Positionen ein.",
+      "selectTeam": "Team auswählen...",
+      "addRule": "Regel hinzufügen",
+      "noRules": "Keine Regeln definiert — Schiedsrichter sieht alle Heimspiele.",
+      "save": "Speichern",
+      "saving": "Speichern...",
+      "cancel": "Abbrechen",
+      "saved": "Regeln erfolgreich gespeichert",
+      "saveFailed": "Fehler beim Speichern der Regeln"
     }
   },
   "standings": {

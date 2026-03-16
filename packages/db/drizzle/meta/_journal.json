@@ -113,6 +113,13 @@
       "when": 1773225505694,
       "tag": "0015_previous_wraith",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1773658921792,
+      "tag": "0016_petite_boomerang",
+      "breakpoints": true
     }
   ]
 }

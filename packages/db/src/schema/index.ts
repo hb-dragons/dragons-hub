@@ -6,6 +6,7 @@ export * from "./matches";
 export * from "./match-overrides";
 export * from "./standings";
 export * from "./referees";
+export * from "./referee-assignment-rules";
 export * from "./versions";
 export * from "./sync-runs";
 export * from "./auth";
