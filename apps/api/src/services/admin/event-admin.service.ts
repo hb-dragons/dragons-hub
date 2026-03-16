@@ -3,6 +3,12 @@ import { domainEvents } from "@dragons/db/schema";
 import { and, desc, eq, gte, lte, ilike, count } from "drizzle-orm";
 import type { DomainEventListResult } from "@dragons/shared";
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function escapeLikePattern(str: string): string {
+  return str.replace(/[%_\\]/g, "\\$&");
+}
+
 // ── listDomainEvents ────────────────────────────────────────────────────────
 
 export async function listDomainEvents(params: {
@@ -36,7 +42,7 @@ export async function listDomainEvents(params: {
     conditions.push(lte(domainEvents.occurredAt, new Date(to)));
   }
   if (search) {
-    conditions.push(ilike(domainEvents.entityName, `%${search}%`));
+    conditions.push(ilike(domainEvents.entityName, `%${escapeLikePattern(search)}%`));
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;

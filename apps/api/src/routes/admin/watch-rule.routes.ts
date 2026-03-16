@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
+import type { AppEnv } from "../../types";
 import {
   listWatchRules,
   getWatchRule,
@@ -14,7 +15,7 @@ import {
   updateWatchRuleSchema,
 } from "./watch-rule.schemas";
 
-const watchRuleRoutes = new Hono();
+const watchRuleRoutes = new Hono<AppEnv>();
 
 // GET /admin/watch-rules - List watch rules
 watchRuleRoutes.get(
@@ -67,8 +68,7 @@ watchRuleRoutes.post(
   }),
   async (c) => {
     const body = createWatchRuleSchema.parse(await c.req.json());
-    // TODO: extract userId from auth context when auth is wired up
-    const userId = "system";
+    const userId = c.get("user")?.id ?? "system";
     const rule = await createWatchRule(body, userId);
     return c.json(rule, 201);
   },
