@@ -54,6 +54,13 @@ vi.mock("@dragons/db/schema", () => ({
     firstName: "r.firstName",
     lastName: "r.lastName",
   },
+  refereeAssignmentRules: {
+    id: "rar.id",
+    refereeId: "rar.refereeId",
+    teamId: "rar.teamId",
+    allowSr1: "rar.allowSr1",
+    allowSr2: "rar.allowSr2",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -66,6 +73,7 @@ vi.mock("drizzle-orm", () => ({
   inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
   isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
   sql: vi.fn((...args: unknown[]) => ({ sql: args })),
+  exists: vi.fn((...args: unknown[]) => ({ exists: args })),
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -78,8 +86,14 @@ vi.mock("../sync/sdk-client", () => ({
   sdkClient: {},
 }));
 
+vi.mock("./referee-rules.service", () => ({
+  hasAnyRules: vi.fn(),
+  getRuleForRefereeAndTeam: vi.fn(),
+}));
+
 vi.mock("drizzle-orm/pg-core", () => ({
   alias: vi.fn((_table: unknown, name: string) => ({
+    id: `${name}.id`,
     name: `${name}.name`,
     apiTeamPermanentId: `${name}.apiTeamPermanentId`,
     isOwnClub: `${name}.isOwnClub`,
@@ -91,6 +105,10 @@ import {
   recordTakeIntent,
   cancelTakeIntent,
 } from "./referee-match.service";
+import { hasAnyRules, getRuleForRefereeAndTeam } from "./referee-rules.service";
+
+const mockHasAnyRules = hasAnyRules as ReturnType<typeof vi.fn>;
+const mockGetRuleForRefereeAndTeam = getRuleForRefereeAndTeam as ReturnType<typeof vi.fn>;
 
 function buildChain(result: unknown) {
   const chain: Record<string, unknown> = {};
@@ -154,6 +172,7 @@ describe("getMatchesWithOpenSlots", () => {
     const countChain = buildChain(countResult);
 
     mockSelect
+      .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain)
       .mockReturnValueOnce(buildChain([])) // intents
@@ -196,7 +215,10 @@ describe("getMatchesWithOpenSlots", () => {
     const dataChain = buildChain([]);
     const countChain = buildChain([{ count: 0 }]);
 
-    mockSelect.mockReturnValueOnce(dataChain).mockReturnValueOnce(countChain);
+    mockSelect
+      .mockReturnValueOnce(buildChain([])) // rules check (no rules)
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
 
     const result = await getMatchesWithOpenSlots(
       { limit: 20, offset: 0 },
@@ -205,8 +227,8 @@ describe("getMatchesWithOpenSlots", () => {
 
     expect(result.items).toEqual([]);
     expect(result.total).toBe(0);
-    // Should not query intents when no matchIds
-    expect(mockSelect).toHaveBeenCalledTimes(2);
+    // Should not query intents when no matchIds (rules check + data + count = 3)
+    expect(mockSelect).toHaveBeenCalledTimes(3);
   });
 
   it("includes own-club flags correctly", async () => {
@@ -236,6 +258,7 @@ describe("getMatchesWithOpenSlots", () => {
     const intentChain = buildChain([]);
 
     mockSelect
+      .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain)
       .mockReturnValueOnce(intentChain)
@@ -273,6 +296,7 @@ describe("getMatchesWithOpenSlots", () => {
     const countResult = [{ count: 1 }];
 
     mockSelect
+      .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(buildChain(rows))
       .mockReturnValueOnce(buildChain(countResult))
       .mockReturnValueOnce(buildChain([])) // intents
@@ -310,6 +334,7 @@ describe("getMatchesWithOpenSlots", () => {
     const countResult = [{ count: 10 }];
 
     mockSelect
+      .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(buildChain(rows))
       .mockReturnValueOnce(buildChain(countResult))
       .mockReturnValueOnce(buildChain([])) // intents
@@ -369,6 +394,7 @@ describe("getMatchesWithOpenSlots", () => {
     ];
 
     mockSelect
+      .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(buildChain(rows))
       .mockReturnValueOnce(buildChain(countResult))
       .mockReturnValueOnce(buildChain(intentRows))
@@ -402,6 +428,7 @@ describe("getMatchesWithOpenSlots", () => {
 
   it("filters by leagueId when provided", async () => {
     mockSelect
+      .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(buildChain([]))
       .mockReturnValueOnce(buildChain([{ count: 0 }]));
 
@@ -411,11 +438,12 @@ describe("getMatchesWithOpenSlots", () => {
     );
 
     expect(result.items).toEqual([]);
-    expect(mockSelect).toHaveBeenCalledTimes(2);
+    expect(mockSelect).toHaveBeenCalledTimes(3);
   });
 
   it("filters by dateFrom and dateTo when provided", async () => {
     mockSelect
+      .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(buildChain([]))
       .mockReturnValueOnce(buildChain([{ count: 0 }]));
 
@@ -430,11 +458,12 @@ describe("getMatchesWithOpenSlots", () => {
     );
 
     expect(result.items).toEqual([]);
-    expect(mockSelect).toHaveBeenCalledTimes(2);
+    expect(mockSelect).toHaveBeenCalledTimes(3);
   });
 
   it("defaults total to 0 when count result is empty", async () => {
     mockSelect
+      .mockReturnValueOnce(buildChain([])) // rules check (no rules)
       .mockReturnValueOnce(buildChain([]))
       .mockReturnValueOnce(buildChain([]));
 
@@ -461,6 +490,7 @@ describe("recordTakeIntent", () => {
         sr2Open: false,
         leagueOwnClubRefs: false,
         homeIsOwnClub: false,
+        homeTeamId: 10,
       },
     ];
 
@@ -513,6 +543,7 @@ describe("recordTakeIntent", () => {
         sr2Open: true,
         leagueOwnClubRefs: false,
         homeIsOwnClub: false,
+        homeTeamId: 10,
       },
     ];
     const selectChain = buildChain(matchRow);
@@ -535,6 +566,7 @@ describe("recordTakeIntent", () => {
         sr2Open: false,
         leagueOwnClubRefs: false,
         homeIsOwnClub: false,
+        homeTeamId: 10,
       },
     ];
     const selectChain = buildChain(matchRow);
@@ -557,10 +589,12 @@ describe("recordTakeIntent", () => {
         sr2Open: false,
         leagueOwnClubRefs: true,
         homeIsOwnClub: true,
+        homeTeamId: 10,
       },
     ];
     const selectChain = buildChain(matchRow);
     mockSelect.mockReturnValueOnce(selectChain);
+    mockHasAnyRules.mockResolvedValueOnce(false);
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-07-01T10:00:00Z"));
@@ -599,6 +633,7 @@ describe("recordTakeIntent", () => {
         sr2Open: false,
         leagueOwnClubRefs: false,
         homeIsOwnClub: false,
+        homeTeamId: 10,
       },
     ];
     const selectChain = buildChain(matchRow);
@@ -670,5 +705,222 @@ describe("cancelTakeIntent", () => {
     const result = await cancelTakeIntent(1, 42, 1);
 
     expect(result).toEqual({ error: "No pending intent found", status: 404 });
+  });
+});
+
+describe("getMatchesWithOpenSlots - rule-based filtering", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("replaces base condition with exists subquery when referee has rules", async () => {
+    // Rules check returns a row (referee has rules)
+    mockSelect
+      .mockReturnValueOnce(buildChain([{ id: 1 }])) // rules check (has rules)
+      .mockReturnValueOnce(buildChain([])) // exists subquery builder
+      .mockReturnValueOnce(buildChain([])) // data
+      .mockReturnValueOnce(buildChain([{ count: 0 }])); // count
+
+    const result = await getMatchesWithOpenSlots(
+      { limit: 20, offset: 0 },
+      42,
+    );
+
+    expect(result.items).toEqual([]);
+    expect(result.total).toBe(0);
+    // rules check + exists subquery + data + count = 4
+    expect(mockSelect).toHaveBeenCalledTimes(4);
+  });
+
+  it("skips rule check when refereeId is null", async () => {
+    mockSelect
+      .mockReturnValueOnce(buildChain([])) // data
+      .mockReturnValueOnce(buildChain([{ count: 0 }])); // count
+
+    const result = await getMatchesWithOpenSlots(
+      { limit: 20, offset: 0 },
+      null,
+    );
+
+    expect(result.items).toEqual([]);
+    // No rules check when refereeId is null: data + count = 2
+    expect(mockSelect).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("recordTakeIntent - rule-based guard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 403 when referee has rules but no rule for this team", async () => {
+    const matchRow = [
+      {
+        id: 1,
+        apiMatchId: 100,
+        sr1Open: false,
+        sr2Open: false,
+        leagueOwnClubRefs: true,
+        homeIsOwnClub: true,
+        homeTeamId: 10,
+      },
+    ];
+    mockSelect.mockReturnValueOnce(buildChain(matchRow));
+    mockHasAnyRules.mockResolvedValueOnce(true);
+    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce(null);
+
+    const result = await recordTakeIntent(1, 42, 1);
+
+    expect(result).toEqual({ error: "Not eligible for this match", status: 403 });
+  });
+
+  it("returns 403 when rule exists but slot is not allowed", async () => {
+    const matchRow = [
+      {
+        id: 1,
+        apiMatchId: 100,
+        sr1Open: false,
+        sr2Open: false,
+        leagueOwnClubRefs: true,
+        homeIsOwnClub: true,
+        homeTeamId: 10,
+      },
+    ];
+    mockSelect.mockReturnValueOnce(buildChain(matchRow));
+    mockHasAnyRules.mockResolvedValueOnce(true);
+    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce({ allowSr1: false, allowSr2: true });
+
+    const result = await recordTakeIntent(1, 42, 1);
+
+    expect(result).toEqual({ error: "Not eligible for this slot", status: 403 });
+  });
+
+  it("allows take when rule exists and slot is allowed", async () => {
+    const matchRow = [
+      {
+        id: 1,
+        apiMatchId: 100,
+        sr1Open: false,
+        sr2Open: false,
+        leagueOwnClubRefs: true,
+        homeIsOwnClub: true,
+        homeTeamId: 10,
+      },
+    ];
+    mockSelect.mockReturnValueOnce(buildChain(matchRow));
+    mockHasAnyRules.mockResolvedValueOnce(true);
+    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce({ allowSr1: true, allowSr2: false });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-07-01T10:00:00Z"));
+
+    const insertChain = buildInsertChain([
+      {
+        matchId: 1,
+        refereeId: 42,
+        slotNumber: 1,
+        clickedAt: new Date("2025-07-01T10:00:00Z"),
+      },
+    ]);
+    mockInsert.mockReturnValueOnce(insertChain);
+
+    const result = await recordTakeIntent(1, 42, 1);
+
+    expect(result).toEqual({
+      deepLink: "https://basketball-bund.net/app.do?app=/sr/take&spielId=100",
+      intent: {
+        matchId: 1,
+        slotNumber: 1,
+        clickedAt: "2025-07-01T10:00:00.000Z",
+      },
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("allows take for slot 2 when rule allows sr2", async () => {
+    const matchRow = [
+      {
+        id: 1,
+        apiMatchId: 100,
+        sr1Open: false,
+        sr2Open: false,
+        leagueOwnClubRefs: true,
+        homeIsOwnClub: true,
+        homeTeamId: 10,
+      },
+    ];
+    mockSelect.mockReturnValueOnce(buildChain(matchRow));
+    mockHasAnyRules.mockResolvedValueOnce(true);
+    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce({ allowSr1: false, allowSr2: true });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-07-01T10:00:00Z"));
+
+    const insertChain = buildInsertChain([
+      {
+        matchId: 1,
+        refereeId: 42,
+        slotNumber: 2,
+        clickedAt: new Date("2025-07-01T10:00:00Z"),
+      },
+    ]);
+    mockInsert.mockReturnValueOnce(insertChain);
+
+    const result = await recordTakeIntent(1, 42, 2);
+
+    expect(result).toEqual({
+      deepLink: "https://basketball-bund.net/app.do?app=/sr/take&spielId=100",
+      intent: {
+        matchId: 1,
+        slotNumber: 2,
+        clickedAt: "2025-07-01T10:00:00.000Z",
+      },
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("skips rule guard for non-ownClubRefs matches", async () => {
+    const matchRow = [
+      {
+        id: 1,
+        apiMatchId: 100,
+        sr1Open: true,
+        sr2Open: false,
+        leagueOwnClubRefs: false,
+        homeIsOwnClub: false,
+        homeTeamId: 10,
+      },
+    ];
+    mockSelect.mockReturnValueOnce(buildChain(matchRow));
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-07-01T10:00:00Z"));
+
+    const insertChain = buildInsertChain([
+      {
+        matchId: 1,
+        refereeId: 42,
+        slotNumber: 1,
+        clickedAt: new Date("2025-07-01T10:00:00Z"),
+      },
+    ]);
+    mockInsert.mockReturnValueOnce(insertChain);
+
+    const result = await recordTakeIntent(1, 42, 1);
+
+    expect(result).toEqual({
+      deepLink: "https://basketball-bund.net/app.do?app=/sr/take&spielId=100",
+      intent: {
+        matchId: 1,
+        slotNumber: 1,
+        clickedAt: "2025-07-01T10:00:00.000Z",
+      },
+    });
+    // hasAnyRules should NOT have been called
+    expect(mockHasAnyRules).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 });
