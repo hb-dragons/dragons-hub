@@ -342,6 +342,8 @@
       "save": "Save",
       "saving": "Saving...",
       "cancel": "Cancel",
+      "deny": "Deny",
+      "allow": "Allow",
       "saved": "Rules saved successfully",
       "saveFailed": "Failed to save rules"
     }

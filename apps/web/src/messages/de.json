@@ -342,6 +342,8 @@
       "save": "Speichern",
       "saving": "Speichern...",
       "cancel": "Abbrechen",
+      "deny": "Sperren",
+      "allow": "Erlauben",
       "saved": "Regeln erfolgreich gespeichert",
       "saveFailed": "Fehler beim Speichern der Regeln"
     }

@@ -19,6 +19,7 @@ export const refereeAssignmentRules = pgTable(
     teamId: integer("team_id")
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
+    deny: boolean("deny").notNull().default(false),
     allowSr1: boolean("allow_sr1").notNull().default(false),
     allowSr2: boolean("allow_sr2").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

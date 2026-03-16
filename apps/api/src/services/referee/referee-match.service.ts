@@ -10,7 +10,7 @@ import {
   refereeRoles,
   refereeAssignmentRules,
 } from "@dragons/db/schema";
-import { eq, or, and, sql, asc, gte, lte, inArray, isNull, exists } from "drizzle-orm";
+import { eq, or, and, sql, asc, gte, lte, inArray, isNull, exists, notExists } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type {
   RefereeMatchListItem,
@@ -62,37 +62,76 @@ export async function getMatchesWithOpenSlots(
   if (dateTo) conditions.push(lte(matches.kickoffDate, dateTo));
 
   // Rule-based filtering for own-club home games
+  // - Deny rules: always exclude those teams (even under permissive default)
+  // - Allow rules: if any exist, restrict to only allowed teams (whitelist)
+  // - No rules at all: see everything (permissive default)
   if (refereeId !== null) {
     const refRules = await db
-      .select({ id: refereeAssignmentRules.id })
+      .select({
+        id: refereeAssignmentRules.id,
+        deny: refereeAssignmentRules.deny,
+      })
       .from(refereeAssignmentRules)
-      .where(eq(refereeAssignmentRules.refereeId, refereeId))
-      .limit(1);
+      .where(eq(refereeAssignmentRules.refereeId, refereeId));
 
-    if (refRules.length > 0) {
-      // Replace only index 0 (base visibility condition).
-      // This preserves leagueId/dateFrom/dateTo filters at indices 1+.
-      conditions[0] = or(
-        or(
-          eq(matches.sr1Open, true),
-          eq(matches.sr2Open, true),
-        ),
-        and(
-          eq(leagues.ownClubRefs, true),
-          eq(homeTeam.isOwnClub, true),
-          exists(
-            db
-              .select({ id: refereeAssignmentRules.id })
-              .from(refereeAssignmentRules)
-              .where(
-                and(
-                  eq(refereeAssignmentRules.refereeId, refereeId),
-                  eq(refereeAssignmentRules.teamId, homeTeam.id),
-                ),
-              ),
+    const hasDenyRules = refRules.some((r) => r.deny);
+    const hasAllowRules = refRules.some((r) => !r.deny);
+
+    if (hasDenyRules || hasAllowRules) {
+      // Build the deny subquery: exclude teams with deny rules
+      const denyCheck = notExists(
+        db
+          .select({ id: refereeAssignmentRules.id })
+          .from(refereeAssignmentRules)
+          .where(
+            and(
+              eq(refereeAssignmentRules.refereeId, refereeId),
+              eq(refereeAssignmentRules.teamId, homeTeam.id),
+              eq(refereeAssignmentRules.deny, true),
+            ),
           ),
-        ),
-      )!;
+      );
+
+      if (hasAllowRules) {
+        // Has allow rules (maybe deny too): whitelist + deny exclusion
+        // Show federation open slots OR (own-club home games with matching allow rule AND not denied)
+        conditions[0] = or(
+          or(
+            eq(matches.sr1Open, true),
+            eq(matches.sr2Open, true),
+          ),
+          and(
+            eq(leagues.ownClubRefs, true),
+            eq(homeTeam.isOwnClub, true),
+            denyCheck,
+            exists(
+              db
+                .select({ id: refereeAssignmentRules.id })
+                .from(refereeAssignmentRules)
+                .where(
+                  and(
+                    eq(refereeAssignmentRules.refereeId, refereeId),
+                    eq(refereeAssignmentRules.teamId, homeTeam.id),
+                    eq(refereeAssignmentRules.deny, false),
+                  ),
+                ),
+            ),
+          ),
+        )!;
+      } else {
+        // Only deny rules, no allow rules: permissive default minus denied teams
+        conditions[0] = or(
+          or(
+            eq(matches.sr1Open, true),
+            eq(matches.sr2Open, true),
+          ),
+          and(
+            eq(leagues.ownClubRefs, true),
+            eq(homeTeam.isOwnClub, true),
+            denyCheck,
+          ),
+        )!;
+      }
     }
   }
 
@@ -277,16 +316,33 @@ export async function recordTakeIntent(
     if (refHasRules) {
       const rule = await getRuleForRefereeAndTeam(refereeId, match.homeTeamId);
 
-      if (!rule) {
+      // Deny rule: block completely
+      if (rule?.deny) {
         return { error: "Not eligible for this match", status: 403 };
       }
 
-      const slotAllowed =
-        (slotNumber === 1 && rule.allowSr1) ||
-        (slotNumber === 2 && rule.allowSr2);
+      // No rule for this team but referee has allow rules elsewhere: block
+      if (!rule) {
+        // Check if referee has any allow rules at all
+        const allRules = await db
+          .select({ deny: refereeAssignmentRules.deny })
+          .from(refereeAssignmentRules)
+          .where(eq(refereeAssignmentRules.refereeId, refereeId));
 
-      if (!slotAllowed) {
-        return { error: "Not eligible for this slot", status: 403 };
+        const hasAllowRules = allRules.some((r) => !r.deny);
+        if (hasAllowRules) {
+          return { error: "Not eligible for this match", status: 403 };
+        }
+        // Only deny rules and this team isn't denied: allow
+      } else {
+        // Allow rule exists: check slot
+        const slotAllowed =
+          (slotNumber === 1 && rule.allowSr1) ||
+          (slotNumber === 2 && rule.allowSr2);
+
+        if (!slotAllowed) {
+          return { error: "Not eligible for this slot", status: 403 };
+        }
       }
     }
   }

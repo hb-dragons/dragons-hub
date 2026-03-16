@@ -14,6 +14,7 @@ export interface RefereeRule {
   id: number;
   teamId: number;
   teamName: string;
+  deny: boolean;
   allowSr1: boolean;
   allowSr2: boolean;
 }
@@ -25,6 +26,7 @@ export interface RefereeRulesResponse {
 export interface UpdateRefereeRulesBody {
   rules: Array<{
     teamId: number;
+    deny: boolean;
     allowSr1: boolean;
     allowSr2: boolean;
   }>;

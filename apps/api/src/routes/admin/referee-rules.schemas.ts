@@ -7,11 +7,12 @@ export const refereeRulesParamSchema = z.object({
 const ruleItemSchema = z
   .object({
     teamId: z.number().int().positive(),
+    deny: z.boolean(),
     allowSr1: z.boolean(),
     allowSr2: z.boolean(),
   })
-  .refine((rule) => rule.allowSr1 || rule.allowSr2, {
-    message: "At least one of allowSr1 or allowSr2 must be true",
+  .refine((rule) => rule.deny || rule.allowSr1 || rule.allowSr2, {
+    message: "Deny must be true, or at least one of allowSr1/allowSr2 must be true",
   });
 
 export const updateRefereeRulesBodySchema = z.object({

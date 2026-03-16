@@ -1,0 +1,1 @@
+ALTER TABLE "referee_assignment_rules" ADD COLUMN "deny" boolean DEFAULT false NOT NULL;

@@ -58,6 +58,7 @@ vi.mock("@dragons/db/schema", () => ({
     id: "rar.id",
     refereeId: "rar.refereeId",
     teamId: "rar.teamId",
+    deny: "rar.deny",
     allowSr1: "rar.allowSr1",
     allowSr2: "rar.allowSr2",
   },
@@ -74,6 +75,7 @@ vi.mock("drizzle-orm", () => ({
   isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
   sql: vi.fn((...args: unknown[]) => ({ sql: args })),
   exists: vi.fn((...args: unknown[]) => ({ exists: args })),
+  notExists: vi.fn((...args: unknown[]) => ({ notExists: args })),
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -714,9 +716,10 @@ describe("getMatchesWithOpenSlots - rule-based filtering", () => {
   });
 
   it("replaces base condition with exists subquery when referee has rules", async () => {
-    // Rules check returns a row (referee has rules)
+    // Rules check returns a row (referee has allow rules)
     mockSelect
-      .mockReturnValueOnce(buildChain([{ id: 1 }])) // rules check (has rules)
+      .mockReturnValueOnce(buildChain([{ id: 1, deny: false }])) // rules check (has allow rules)
+      .mockReturnValueOnce(buildChain([])) // notExists subquery builder
       .mockReturnValueOnce(buildChain([])) // exists subquery builder
       .mockReturnValueOnce(buildChain([])) // data
       .mockReturnValueOnce(buildChain([{ count: 0 }])); // count
@@ -728,8 +731,8 @@ describe("getMatchesWithOpenSlots - rule-based filtering", () => {
 
     expect(result.items).toEqual([]);
     expect(result.total).toBe(0);
-    // rules check + exists subquery + data + count = 4
-    expect(mockSelect).toHaveBeenCalledTimes(4);
+    // rules check + notExists subquery + exists subquery + data + count = 5
+    expect(mockSelect).toHaveBeenCalledTimes(5);
   });
 
   it("skips rule check when refereeId is null", async () => {
@@ -765,7 +768,9 @@ describe("recordTakeIntent - rule-based guard", () => {
         homeTeamId: 10,
       },
     ];
-    mockSelect.mockReturnValueOnce(buildChain(matchRow));
+    mockSelect
+      .mockReturnValueOnce(buildChain(matchRow)) // match lookup
+      .mockReturnValueOnce(buildChain([{ deny: false }])); // allRules check (has allow rules)
     mockHasAnyRules.mockResolvedValueOnce(true);
     mockGetRuleForRefereeAndTeam.mockResolvedValueOnce(null);
 
@@ -788,7 +793,7 @@ describe("recordTakeIntent - rule-based guard", () => {
     ];
     mockSelect.mockReturnValueOnce(buildChain(matchRow));
     mockHasAnyRules.mockResolvedValueOnce(true);
-    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce({ allowSr1: false, allowSr2: true });
+    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce({ deny: false, allowSr1: false, allowSr2: true });
 
     const result = await recordTakeIntent(1, 42, 1);
 
@@ -809,7 +814,7 @@ describe("recordTakeIntent - rule-based guard", () => {
     ];
     mockSelect.mockReturnValueOnce(buildChain(matchRow));
     mockHasAnyRules.mockResolvedValueOnce(true);
-    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce({ allowSr1: true, allowSr2: false });
+    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce({ deny: false, allowSr1: true, allowSr2: false });
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-07-01T10:00:00Z"));
@@ -852,7 +857,7 @@ describe("recordTakeIntent - rule-based guard", () => {
     ];
     mockSelect.mockReturnValueOnce(buildChain(matchRow));
     mockHasAnyRules.mockResolvedValueOnce(true);
-    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce({ allowSr1: false, allowSr2: true });
+    mockGetRuleForRefereeAndTeam.mockResolvedValueOnce({ deny: false, allowSr1: false, allowSr2: true });
 
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-07-01T10:00:00Z"));

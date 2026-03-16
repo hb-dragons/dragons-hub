@@ -70,9 +70,9 @@ describe("GET /referees/:id/rules", () => {
 
 describe("PUT /referees/:id/rules", () => {
   it("replaces rules for a referee", async () => {
-    const body = { rules: [{ teamId: 42, allowSr1: true, allowSr2: false }] };
+    const body = { rules: [{ teamId: 42, deny: false, allowSr1: true, allowSr2: false }] };
     const rulesResponse = {
-      rules: [{ id: 1, teamId: 42, teamName: "Dragons 1", allowSr1: true, allowSr2: false }],
+      rules: [{ id: 1, teamId: 42, teamName: "Dragons 1", deny: false, allowSr1: true, allowSr2: false }],
     };
     mocks.dbSelect.mockReturnValue({
       from: () => ({ where: () => [{ id: 42 }] }),
@@ -98,7 +98,7 @@ describe("PUT /referees/:id/rules", () => {
     const res = await app.request("/referees/1/rules", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rules: [{ teamId: 999, allowSr1: true, allowSr2: false }] }),
+      body: JSON.stringify({ rules: [{ teamId: 999, deny: false, allowSr1: true, allowSr2: false }] }),
     });
 
     expect(res.status).toBe(400);
@@ -117,14 +117,29 @@ describe("PUT /referees/:id/rules", () => {
     expect(res.status).toBe(200);
   });
 
-  it("returns 400 when neither slot is allowed", async () => {
+  it("returns 400 when neither slot is allowed and deny is false", async () => {
     const res = await app.request("/referees/1/rules", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rules: [{ teamId: 42, allowSr1: false, allowSr2: false }] }),
+      body: JSON.stringify({ rules: [{ teamId: 42, deny: false, allowSr1: false, allowSr2: false }] }),
     });
 
     expect(res.status).toBe(400);
+  });
+
+  it("accepts deny rule with no slots", async () => {
+    mocks.dbSelect.mockReturnValue({
+      from: () => ({ where: () => [{ id: 42 }] }),
+    });
+    mocks.updateRulesForReferee.mockResolvedValue({ rules: [] });
+
+    const res = await app.request("/referees/1/rules", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rules: [{ teamId: 42, deny: true, allowSr1: false, allowSr2: false }] }),
+    });
+
+    expect(res.status).toBe(200);
   });
 
   it("returns 400 for duplicate teamIds", async () => {
@@ -133,8 +148,8 @@ describe("PUT /referees/:id/rules", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         rules: [
-          { teamId: 42, allowSr1: true, allowSr2: false },
-          { teamId: 42, allowSr1: false, allowSr2: true },
+          { teamId: 42, deny: false, allowSr1: true, allowSr2: false },
+          { teamId: 42, deny: false, allowSr1: false, allowSr2: true },
         ],
       }),
     });

@@ -25,7 +25,8 @@ import {
   SelectValue,
 } from "@dragons/ui/components/select"
 import { Checkbox } from "@dragons/ui/components/checkbox"
-import { Trash2, Plus } from "lucide-react"
+import { Switch } from "@dragons/ui/components/switch"
+import { Trash2, Plus, Ban, Check } from "lucide-react"
 
 import type { RefereeListItem } from "./types"
 
@@ -38,12 +39,13 @@ interface Team {
 
 interface RuleRow {
   teamId: number | null
+  deny: boolean
   allowSr1: boolean
   allowSr2: boolean
 }
 
 interface RulesResponse {
-  rules: { teamId: number; allowSr1: boolean; allowSr2: boolean }[]
+  rules: { teamId: number; deny: boolean; allowSr1: boolean; allowSr2: boolean }[]
 }
 
 interface RefereeRulesDialogProps {
@@ -76,6 +78,7 @@ export function RefereeRulesDialog({
       setRules(
         rulesData.rules.map((r) => ({
           teamId: r.teamId,
+          deny: r.deny,
           allowSr1: r.allowSr1,
           allowSr2: r.allowSr2,
         })),
@@ -86,7 +89,7 @@ export function RefereeRulesDialog({
   }, [rulesData, open])
 
   function addRule() {
-    setRules([...rules, { teamId: null, allowSr1: false, allowSr2: true }])
+    setRules([...rules, { teamId: null, deny: false, allowSr1: false, allowSr2: true }])
   }
 
   function removeRule(index: number) {
@@ -110,7 +113,7 @@ export function RefereeRulesDialog({
     if (!referee) return
 
     const validRules = rules.filter(
-      (r) => r.teamId !== null && (r.allowSr1 || r.allowSr2),
+      (r) => r.teamId !== null && (r.deny || r.allowSr1 || r.allowSr2),
     )
 
     setSubmitting(true)
@@ -120,8 +123,9 @@ export function RefereeRulesDialog({
         body: JSON.stringify({
           rules: validRules.map((r) => ({
             teamId: r.teamId,
-            allowSr1: r.allowSr1,
-            allowSr2: r.allowSr2,
+            deny: r.deny,
+            allowSr1: r.deny ? false : r.allowSr1,
+            allowSr2: r.deny ? false : r.allowSr2,
           })),
         }),
       })
@@ -180,25 +184,46 @@ export function RefereeRulesDialog({
                   </SelectContent>
                 </Select>
 
-                <label className="flex items-center gap-1 text-sm">
-                  <Checkbox
-                    checked={rule.allowSr1}
-                    onCheckedChange={(checked) =>
-                      updateRule(index, { allowSr1: checked === true })
-                    }
-                  />
-                  SR1
-                </label>
+                <button
+                  type="button"
+                  className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                    rule.deny
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                  }`}
+                  onClick={() => updateRule(index, {
+                    deny: !rule.deny,
+                    allowSr1: !rule.deny ? false : rule.allowSr1,
+                    allowSr2: !rule.deny ? false : rule.allowSr2,
+                  })}
+                >
+                  {rule.deny ? <Ban className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                  {rule.deny ? t("rules.deny") : t("rules.allow")}
+                </button>
 
-                <label className="flex items-center gap-1 text-sm">
-                  <Checkbox
-                    checked={rule.allowSr2}
-                    onCheckedChange={(checked) =>
-                      updateRule(index, { allowSr2: checked === true })
-                    }
-                  />
-                  SR2
-                </label>
+                {!rule.deny && (
+                  <>
+                    <label className="flex items-center gap-1 text-sm">
+                      <Checkbox
+                        checked={rule.allowSr1}
+                        onCheckedChange={(checked) =>
+                          updateRule(index, { allowSr1: checked === true })
+                        }
+                      />
+                      SR1
+                    </label>
+
+                    <label className="flex items-center gap-1 text-sm">
+                      <Checkbox
+                        checked={rule.allowSr2}
+                        onCheckedChange={(checked) =>
+                          updateRule(index, { allowSr2: checked === true })
+                        }
+                      />
+                      SR2
+                    </label>
+                  </>
+                )}
 
                 <Button
                   variant="ghost"

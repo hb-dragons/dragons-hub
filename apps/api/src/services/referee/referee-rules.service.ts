@@ -9,6 +9,7 @@ export async function getRulesForReferee(refereeId: number): Promise<RefereeRule
       id: refereeAssignmentRules.id,
       teamId: refereeAssignmentRules.teamId,
       teamName: teams.name,
+      deny: refereeAssignmentRules.deny,
       allowSr1: refereeAssignmentRules.allowSr1,
       allowSr2: refereeAssignmentRules.allowSr2,
     })
@@ -34,6 +35,7 @@ export async function updateRulesForReferee(
         body.rules.map((rule) => ({
           refereeId,
           teamId: rule.teamId,
+          deny: rule.deny,
           allowSr1: rule.allowSr1,
           allowSr2: rule.allowSr2,
           createdAt: now,
@@ -59,9 +61,10 @@ export async function hasAnyRules(refereeId: number): Promise<boolean> {
 export async function getRuleForRefereeAndTeam(
   refereeId: number,
   teamId: number,
-): Promise<{ allowSr1: boolean; allowSr2: boolean } | null> {
+): Promise<{ deny: boolean; allowSr1: boolean; allowSr2: boolean } | null> {
   const [rule] = await db
     .select({
+      deny: refereeAssignmentRules.deny,
       allowSr1: refereeAssignmentRules.allowSr1,
       allowSr2: refereeAssignmentRules.allowSr2,
     })

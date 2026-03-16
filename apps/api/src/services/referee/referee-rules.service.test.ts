@@ -19,6 +19,7 @@ vi.mock("@dragons/db/schema", () => ({
     id: "rar.id",
     refereeId: "rar.refereeId",
     teamId: "rar.teamId",
+    deny: "rar.deny",
     allowSr1: "rar.allowSr1",
     allowSr2: "rar.allowSr2",
   },
@@ -76,7 +77,7 @@ describe("updateRulesForReferee", () => {
     mockSelect.mockReturnValue({ from: () => ({ innerJoin: () => ({ where: () => updatedRules }) }) });
 
     const result = await updateRulesForReferee(1, {
-      rules: [{ teamId: 43, allowSr1: false, allowSr2: true }],
+      rules: [{ teamId: 43, deny: false, allowSr1: false, allowSr2: true }],
     });
 
     expect(mockTransaction).toHaveBeenCalled();
