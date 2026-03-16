@@ -1,22 +1,9 @@
 import { EVENT_TYPES } from "@dragons/shared";
+import { formatDate } from "./utils";
 
 export interface RenderedMessage {
   title: string;
   body: string;
-}
-
-/**
- * Format a date string (YYYY-MM-DD) as DD.MM. for German display
- * or MM/DD for English. Uses string splitting to avoid timezone issues.
- */
-function formatDate(dateStr: string, locale: string): string {
-  const parts = dateStr.split("-");
-  if (parts.length < 3) return dateStr;
-  const [, month, day] = parts;
-  if (locale === "de") {
-    return `${day}.${month}.`;
-  }
-  return `${month}/${day}`;
 }
 
 const matchRenderers: Record<
@@ -27,7 +14,7 @@ const matchRenderers: Record<
     locale: string,
   ) => RenderedMessage
 > = {
-  [EVENT_TYPES.MATCH_TIME_CHANGED]: (payload, entityName, locale) => {
+  [EVENT_TYPES.MATCH_SCHEDULE_CHANGED]: (payload, entityName, locale) => {
     const changes = payload.changes as
       | Array<{ field: string; oldValue: unknown; newValue: unknown }>
       | undefined;
@@ -97,7 +84,7 @@ const matchRenderers: Record<
         };
   },
 
-  [EVENT_TYPES.MATCH_SCHEDULED]: (payload, _entityName, locale) => {
+  [EVENT_TYPES.MATCH_CREATED]: (payload, _entityName, locale) => {
     const date = payload.kickoffDate
       ? formatDate(String(payload.kickoffDate), locale)
       : "";
@@ -111,6 +98,34 @@ const matchRenderers: Record<
       : {
           title: `\u{1F195} New game`,
           body: `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")} (${String(payload.leagueName ?? "")}) on ${date}${time}`,
+        };
+  },
+
+  [EVENT_TYPES.MATCH_SCORE_CHANGED]: (payload, _entityName, locale) => {
+    const score = `${String(payload.homeScore ?? "?")}:${String(payload.guestScore ?? "?")}`;
+    const hadOldScore = payload.oldHomeScore != null && payload.oldGuestScore != null;
+
+    if (hadOldScore) {
+      const oldScore = `${String(payload.oldHomeScore ?? "?")}:${String(payload.oldGuestScore ?? "?")}`;
+      return locale === "de"
+        ? {
+            title: `\u{1F4CA} Ergebnis\u{00E4}nderung`,
+            body: `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")} (${String(payload.leagueName ?? "")}): ${score} (vorher: ${oldScore})`,
+          }
+        : {
+            title: `\u{1F4CA} Score correction`,
+            body: `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")} (${String(payload.leagueName ?? "")}): ${score} (was: ${oldScore})`,
+          };
+    }
+
+    return locale === "de"
+      ? {
+          title: `\u{1F4CA} Ergebnis`,
+          body: `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")} (${String(payload.leagueName ?? "")}): ${score}`,
+        }
+      : {
+          title: `\u{1F4CA} Score update`,
+          body: `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")} (${String(payload.leagueName ?? "")}): ${score}`,
         };
   },
 
@@ -140,6 +155,18 @@ const matchRenderers: Record<
       : {
           title: `\u{1F4CA} Score correction`,
           body: `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")} (${String(payload.leagueName ?? "")}): ${newScore} (was: ${oldScore})`,
+        };
+  },
+
+  [EVENT_TYPES.MATCH_REMOVED]: (_payload, entityName, locale) => {
+    return locale === "de"
+      ? {
+          title: `\u{274C} Spiel entfernt`,
+          body: `${entityName} wurde aus dem Spielplan entfernt.`,
+        }
+      : {
+          title: `\u{274C} Match removed`,
+          body: `${entityName} has been removed from the schedule.`,
         };
   },
 };
