@@ -142,7 +142,7 @@ export function RefereeRulesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {t("rules.title", {
