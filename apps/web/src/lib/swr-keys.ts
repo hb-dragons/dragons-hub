@@ -7,6 +7,7 @@ export const SWR_KEYS = {
   matchDetail: (id: number) => `/admin/matches/${id}`,
   teams: "/admin/teams",
   referees: "/admin/referees",
+  refereeRules: (refereeId: number) => `/admin/referees/${refereeId}/rules`,
   standings: "/admin/standings",
   venues: "/admin/venues",
   settingsClub: "/admin/settings/club",

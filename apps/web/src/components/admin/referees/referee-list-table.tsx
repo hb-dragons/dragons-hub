@@ -1,14 +1,16 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useTranslations } from "next-intl"
 import useSWR from "swr"
 import { apiFetcher } from "@/lib/swr"
 import { SWR_KEYS } from "@/lib/swr-keys"
 import type { ColumnDef, FilterFn } from "@tanstack/react-table"
-import { SearchIcon, Users } from "lucide-react"
+import { SearchIcon, Settings2, Users } from "lucide-react"
+import { Button } from "@dragons/ui/components/button"
 import { Input } from "@dragons/ui/components/input"
 import { Badge } from "@dragons/ui/components/badge"
+import { RefereeRulesDialog } from "./referee-rules-dialog"
 
 import { DataTable } from "@/components/ui/data-table"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
@@ -16,7 +18,10 @@ import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 
 import type { RefereeListItem, PaginatedResponse } from "./types"
 
-function getColumns(t: ReturnType<typeof useTranslations<"referees">>): ColumnDef<RefereeListItem, unknown>[] {
+function getColumns(
+  t: ReturnType<typeof useTranslations<"referees">>,
+  onRulesClick: (referee: RefereeListItem) => void,
+): ColumnDef<RefereeListItem, unknown>[] {
   return [
     {
       accessorKey: "lastName",
@@ -85,6 +90,21 @@ function getColumns(t: ReturnType<typeof useTranslations<"referees">>): ColumnDe
       ),
       meta: { label: t("columns.apiId") },
     },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onRulesClick(row.original)}
+        >
+          <Settings2 className="h-4 w-4" />
+        </Button>
+      ),
+      enableSorting: false,
+    },
   ]
 }
 
@@ -112,36 +132,44 @@ const refereeGlobalFilterFn: FilterFn<RefereeListItem> = (
 export function RefereeListTable() {
   const t = useTranslations("referees")
   const { data: response } = useSWR<PaginatedResponse<RefereeListItem>>(SWR_KEYS.referees, apiFetcher)
-  const columns = useMemo(() => getColumns(t), [t])
+  const [rulesReferee, setRulesReferee] = useState<RefereeListItem | null>(null)
+  const columns = useMemo(() => getColumns(t, setRulesReferee), [t])
 
   const allItems = response?.items ?? []
 
   return (
-    <DataTable
-      columns={columns}
-      data={allItems}
-      globalFilterFn={refereeGlobalFilterFn}
-      initialColumnVisibility={{ apiId: false }}
-      emptyState={
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-          <Users className="mb-2 h-8 w-8" />
-          <p>{t("empty")}</p>
-        </div>
-      }
-    >
-      {(table) => (
-        <DataTableToolbar table={table}>
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={t("searchPlaceholder")}
-              value={(table.getState().globalFilter as string) ?? ""}
-              onChange={(event) => table.setGlobalFilter(event.target.value)}
-              className="h-8 w-[150px] pl-8 lg:w-[250px]"
-            />
+    <>
+      <DataTable
+        columns={columns}
+        data={allItems}
+        globalFilterFn={refereeGlobalFilterFn}
+        initialColumnVisibility={{ apiId: false }}
+        emptyState={
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Users className="mb-2 h-8 w-8" />
+            <p>{t("empty")}</p>
           </div>
-        </DataTableToolbar>
-      )}
-    </DataTable>
+        }
+      >
+        {(table) => (
+          <DataTableToolbar table={table}>
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={t("searchPlaceholder")}
+                value={(table.getState().globalFilter as string) ?? ""}
+                onChange={(event) => table.setGlobalFilter(event.target.value)}
+                className="h-8 w-[150px] pl-8 lg:w-[250px]"
+              />
+            </div>
+          </DataTableToolbar>
+        )}
+      </DataTable>
+      <RefereeRulesDialog
+        referee={rulesReferee}
+        open={rulesReferee !== null}
+        onOpenChange={(open) => { if (!open) setRulesReferee(null) }}
+      />
+    </>
   )
 }
