@@ -83,7 +83,7 @@ export type {
   TakeMatchResponse,
   VerifyMatchResponse,
 } from "./referee-matches";
-export type { RefereeListItem } from "./referees";
+export type { RefereeListItem, RefereeRule, RefereeRulesResponse, UpdateRefereeRulesBody } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";
 export type { UserListItem } from "./users";
