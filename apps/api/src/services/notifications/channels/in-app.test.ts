@@ -67,6 +67,9 @@ const CREATE_TABLES = `
     retry_count INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+
+  CREATE UNIQUE INDEX notification_log_dedup_idx ON notification_log
+    (event_id, channel_config_id, COALESCE(recipient_id, '__group__'));
 `;
 
 let client: PGlite;
@@ -130,6 +133,7 @@ describe("InAppChannelAdapter", () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.duplicate).toBe(false);
     expect(result.error).toBeUndefined();
 
     const rows = await getNotificationLogs();
@@ -140,6 +144,34 @@ describe("InAppChannelAdapter", () => {
     expect(rows[0]!.status).toBe("sent");
     expect(rows[0]!.sent_at).not.toBeNull();
     expect(rows[0]!.locale).toBe("de");
+  });
+
+  it("returns duplicate=true when dedup constraint fires", async () => {
+    const adapter = new InAppChannelAdapter();
+    const params = {
+      eventId: "evt-001",
+      watchRuleId: null,
+      channelConfigId: 1,
+      recipientId: "user-1",
+      title: "First",
+      body: "First body",
+      locale: "de",
+    };
+
+    // First send succeeds
+    const first = await adapter.send(params);
+    expect(first.success).toBe(true);
+    expect(first.duplicate).toBe(false);
+
+    // Second send is deduplicated
+    const second = await adapter.send({ ...params, title: "Duplicate" });
+    expect(second.success).toBe(true);
+    expect(second.duplicate).toBe(true);
+
+    // Only one row in the DB
+    const rows = await getNotificationLogs();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.title).toBe("First");
   });
 
   it("returns error result on database failure", async () => {

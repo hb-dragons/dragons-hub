@@ -6,6 +6,7 @@ import {
   channelConfigs,
   digestBuffer,
 } from "@dragons/db/schema";
+import { EVENT_TYPES } from "@dragons/shared";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { db } from "../config/database";
@@ -13,6 +14,7 @@ import { evaluateRule, type RuleInput } from "../services/notifications/rule-eng
 import { getDefaultNotificationsForEvent } from "../services/notifications/role-defaults";
 import { renderEventMessage } from "../services/notifications/templates/index";
 import { InAppChannelAdapter } from "../services/notifications/channels/in-app";
+import { digestQueue } from "./queues";
 
 interface EventJobData {
   eventId: string;
@@ -23,6 +25,9 @@ interface EventJobData {
 }
 
 const inAppAdapter = new InAppChannelAdapter();
+
+/** Counter for digest run IDs (increments per worker lifetime) */
+let digestRunCounter = Date.now();
 
 export const eventWorker = new Worker<EventJobData>(
   "domain-events",
@@ -118,47 +123,62 @@ export const eventWorker = new Worker<EventJobData>(
       }
     }
 
-    // Role-based defaults
+    // Role-based defaults — dispatch to configs matching the channel type AND audience
     const defaults = getDefaultNotificationsForEvent(event.type, payload, event.source);
     for (const defaultNotif of defaults) {
-      const config = configs.find((c) => c.type === defaultNotif.channel);
-      if (!config) continue;
+      const matchingConfigs = configs.filter((c) => {
+        if (c.type !== defaultNotif.channel) return false;
+        // Filter by audience: config.config.audienceRole must match the default's audience,
+        // or be absent (legacy configs without audience scope match all defaults)
+        const configData = c.config as Record<string, unknown> | null;
+        const audienceRole = configData?.audienceRole as string | undefined;
+        if (!audienceRole) return true; // no audience filter = matches all
+        return audienceRole === defaultNotif.audience;
+      });
+      if (matchingConfigs.length === 0) continue;
 
       const recipientId = defaultNotif.refereeId
         ? `referee:${defaultNotif.refereeId}`
         : `audience:${defaultNotif.audience}`;
 
-      const dedupKey = `default:${defaultNotif.channel}:${recipientId}`;
-      if (dispatched.has(dedupKey)) continue;
-      dispatched.add(dedupKey);
+      for (const config of matchingConfigs) {
+        const dedupKey = `default:${config.id}:${recipientId}`;
+        if (dispatched.has(dedupKey)) continue;
+        dispatched.add(dedupKey);
 
-      // Always buffer for digest
-      await bufferForDigest(event.id, config.id);
-      bufferedCount++;
+        // Always buffer for digest
+        await bufferForDigest(event.id, config.id);
+        bufferedCount++;
 
-      // For immediate events, dispatch now
-      if (effectiveUrgency === "immediate") {
-        const locale = (config.config as Record<string, unknown>)?.locale as string ?? "de";
-        const message = renderEventMessage(
-          event.type,
-          payload,
-          event.entityName,
-          locale,
-        );
-
-        if (defaultNotif.channel === "in_app") {
-          await inAppAdapter.send({
-            eventId: event.id,
-            watchRuleId: null,
-            channelConfigId: config.id,
-            recipientId,
-            title: message.title,
-            body: message.body,
+        // For immediate events, dispatch now
+        if (effectiveUrgency === "immediate") {
+          const locale = (config.config as Record<string, unknown>)?.locale as string ?? "de";
+          const message = renderEventMessage(
+            event.type,
+            payload,
+            event.entityName,
             locale,
-          });
-          dispatchedCount++;
+          );
+
+          if (defaultNotif.channel === "in_app") {
+            await inAppAdapter.send({
+              eventId: event.id,
+              watchRuleId: null,
+              channelConfigId: config.id,
+              recipientId,
+              title: message.title,
+              body: message.body,
+              locale,
+            });
+            dispatchedCount++;
+          }
         }
       }
+    }
+
+    // Trigger per_sync digests when a sync completes
+    if (event.type === EVENT_TYPES.SYNC_COMPLETED) {
+      await triggerPerSyncDigests(configs, log);
     }
 
     log.info(
@@ -186,6 +206,40 @@ async function bufferForDigest(eventId: string, channelConfigId: number): Promis
       { eventId, channelConfigId, error },
       "Failed to buffer event for digest",
     );
+  }
+}
+
+/**
+ * Enqueue a digest job for every enabled channel config with digestMode = "per_sync".
+ */
+async function triggerPerSyncDigests(
+  configs: { id: number; digestMode: string; enabled: boolean }[],
+  log: Pick<typeof logger, "info" | "error">,
+): Promise<void> {
+  const perSyncConfigs = configs.filter(
+    (c) => c.enabled && c.digestMode === "per_sync",
+  );
+
+  if (perSyncConfigs.length === 0) return;
+
+  const digestRunId = ++digestRunCounter;
+  log.info(
+    { digestRunId, channelCount: perSyncConfigs.length },
+    "Triggering per_sync digests",
+  );
+
+  for (const config of perSyncConfigs) {
+    try {
+      await digestQueue.add(`digest:${config.id}`, {
+        channelConfigId: config.id,
+        digestRunId,
+      });
+    } catch (error) {
+      log.error(
+        { channelConfigId: config.id, error },
+        "Failed to enqueue per_sync digest job",
+      );
+    }
   }
 }
 

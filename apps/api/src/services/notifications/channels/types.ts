@@ -1,6 +1,8 @@
 export interface DeliveryResult {
   success: boolean;
   error?: string;
+  /** True when the notification was deduplicated (conflict, nothing inserted) */
+  duplicate?: boolean;
 }
 
 export interface ChannelSendParams {

@@ -12,9 +12,19 @@ vi.mock("../config/logger", () => ({
 
 const mockInitScheduledJobs = vi.fn().mockResolvedValue(undefined);
 const mockSyncQueueClose = vi.fn().mockResolvedValue(undefined);
+const mockDigestQueueClose = vi.fn().mockResolvedValue(undefined);
+const mockDigestQueueAdd = vi.fn().mockResolvedValue({ id: "digest-job-1" });
+const mockDigestQueueGetRepeatableJobs = vi.fn().mockResolvedValue([]);
+const mockDigestQueueRemoveRepeatableByKey = vi.fn().mockResolvedValue(undefined);
 vi.mock("./queues", () => ({
   initializeScheduledJobs: (...args: unknown[]) => mockInitScheduledJobs(...args),
   syncQueue: { close: (...args: unknown[]) => mockSyncQueueClose(...args) },
+  digestQueue: {
+    close: (...args: unknown[]) => mockDigestQueueClose(...args),
+    add: (...args: unknown[]) => mockDigestQueueAdd(...args),
+    getRepeatableJobs: () => mockDigestQueueGetRepeatableJobs(),
+    removeRepeatableByKey: (...args: unknown[]) => mockDigestQueueRemoveRepeatableByKey(...args),
+  },
 }));
 
 const mockWorkerClose = vi.fn().mockResolvedValue(undefined);
@@ -51,15 +61,17 @@ vi.mock("@dragons/db/schema", () => ({
   domainEvents: { id: "id", occurredAt: "occurredAt" },
   notificationLog: { id: "id", eventId: "eventId" },
   digestBuffer: { id: "id", eventId: "eventId" },
+  channelConfigs: { id: "id", enabled: "enabled", digestMode: "digestMode" },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   lt: vi.fn(),
+  and: vi.fn(),
   inArray: vi.fn(),
 }));
 
-import { initializeWorkers, shutdownWorkers, cleanupOldSyncRuns, cleanupOldDomainEvents } from "./index";
+import { initializeWorkers, shutdownWorkers, cleanupOldSyncRuns, cleanupOldDomainEvents, initializeScheduledDigests } from "./index";
 import { logger } from "../config/logger";
 
 beforeEach(() => {
@@ -239,7 +251,7 @@ describe("shutdownWorkers", () => {
     expect(mockDbUpdate).toHaveBeenCalled();
   });
 
-  it("closes worker and queue", async () => {
+  it("closes workers and queues", async () => {
     mockDbUpdate.mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
@@ -250,6 +262,7 @@ describe("shutdownWorkers", () => {
 
     expect(mockWorkerClose).toHaveBeenCalled();
     expect(mockSyncQueueClose).toHaveBeenCalled();
+    expect(mockDigestQueueClose).toHaveBeenCalled();
   });
 
   it("continues shutdown even if DB update fails", async () => {
@@ -261,5 +274,81 @@ describe("shutdownWorkers", () => {
 
     expect(mockWorkerClose).toHaveBeenCalled();
     expect(mockSyncQueueClose).toHaveBeenCalled();
+    expect(mockDigestQueueClose).toHaveBeenCalled();
+  });
+});
+
+describe("initializeScheduledDigests", () => {
+  it("removes stale repeatable jobs and creates new ones for scheduled channels", async () => {
+    mockDigestQueueGetRepeatableJobs.mockResolvedValue([
+      { key: "old-key-1" },
+      { key: "old-key-2" },
+    ]);
+
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          {
+            id: 1,
+            enabled: true,
+            digestMode: "scheduled",
+            digestCron: "0 8 * * *",
+            digestTimezone: "Europe/Berlin",
+          },
+          {
+            id: 2,
+            enabled: true,
+            digestMode: "scheduled",
+            digestCron: "0 18 * * *",
+            digestTimezone: "America/New_York",
+          },
+        ]),
+      }),
+    });
+
+    await initializeScheduledDigests();
+
+    expect(mockDigestQueueRemoveRepeatableByKey).toHaveBeenCalledTimes(2);
+    expect(mockDigestQueueAdd).toHaveBeenCalledTimes(2);
+    expect(logger.info).toHaveBeenCalledWith(
+      { count: 2 },
+      "Scheduled digest jobs initialized",
+    );
+  });
+
+  it("skips channels with no digestCron", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          {
+            id: 1,
+            enabled: true,
+            digestMode: "scheduled",
+            digestCron: null,
+            digestTimezone: "Europe/Berlin",
+          },
+        ]),
+      }),
+    });
+
+    await initializeScheduledDigests();
+
+    expect(mockDigestQueueAdd).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      { channelConfigId: 1 },
+      "Channel has digestMode=scheduled but no digestCron, skipping",
+    );
+  });
+
+  it("does nothing when no scheduled channels exist", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    });
+
+    await initializeScheduledDigests();
+
+    expect(mockDigestQueueAdd).not.toHaveBeenCalled();
   });
 });

@@ -5,7 +5,7 @@ import type { ChannelAdapter, ChannelSendParams, DeliveryResult } from "./types"
 export class InAppChannelAdapter implements ChannelAdapter {
   async send(params: ChannelSendParams): Promise<DeliveryResult> {
     try {
-      await db
+      const rows = await db
         .insert(notificationLog)
         .values({
           eventId: params.eventId,
@@ -18,9 +18,10 @@ export class InAppChannelAdapter implements ChannelAdapter {
           status: "sent",
           sentAt: new Date(),
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ id: notificationLog.id });
 
-      return { success: true };
+      return { success: true, duplicate: rows.length === 0 };
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Unknown error during in-app delivery";

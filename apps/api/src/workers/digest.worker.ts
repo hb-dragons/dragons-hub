@@ -1,6 +1,6 @@
 import { Worker, type Job } from "bullmq";
 import { eq } from "drizzle-orm";
-import { digestBuffer, domainEvents, channelConfigs } from "@dragons/db/schema";
+import { digestBuffer, domainEvents, channelConfigs, notificationLog } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { db } from "../config/database";
@@ -77,19 +77,28 @@ export const digestWorker = new Worker<DigestJobData>(
 
     // 5. Deliver via the appropriate channel adapter
     if (config.type === "in_app") {
-      const result = await inAppAdapter.send({
-        eventId: bufferedRows[0]!.eventId,
-        watchRuleId: null,
-        channelConfigId: config.id,
-        recipientId: `digest:${config.id}`,
-        title: message.title,
-        body: message.body,
-        locale,
-      });
+      // Create one notification_log entry per event in the digest,
+      // all sharing the same digestRunId for grouping
+      for (const row of bufferedRows) {
+        const result = await inAppAdapter.send({
+          eventId: row.eventId,
+          watchRuleId: null,
+          channelConfigId: config.id,
+          recipientId: `digest:${config.id}`,
+          title: message.title,
+          body: message.body,
+          locale,
+        });
 
-      if (!result.success) {
-        log.error({ error: result.error }, "Failed to deliver digest");
-        throw new Error(`Digest delivery failed: ${result.error}`);
+        if (result.success) {
+          // Tag the notification_log entry with the digestRunId
+          await db
+            .update(notificationLog)
+            .set({ digestRunId })
+            .where(eq(notificationLog.eventId, row.eventId));
+        } else {
+          log.error({ eventId: row.eventId, error: result.error }, "Failed to deliver digest item");
+        }
       }
     } else {
       log.warn({ channelType: config.type }, "Unsupported channel type for digest, skipping delivery");

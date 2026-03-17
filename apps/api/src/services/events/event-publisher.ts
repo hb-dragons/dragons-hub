@@ -114,6 +114,12 @@ export async function enqueueDomainEvent(event: DomainEvent): Promise<void> {
 /**
  * High-level publish: insert into DB (in the provided transaction)
  * then fire-and-forget enqueue to BullMQ.
+ *
+ * When a transaction client is provided, the enqueue is **not** fired
+ * immediately because the row is not yet committed — the worker would
+ * see "event not found" and skip it. Instead, the outbox poller picks
+ * it up after the caller commits. For non-transactional inserts the
+ * enqueue fires right away for near-instant processing.
  */
 export async function publishDomainEvent(
   params: BuildDomainEventParams,
@@ -122,9 +128,13 @@ export async function publishDomainEvent(
   const event = buildDomainEvent(params);
   await insertDomainEvent(event, tx);
 
-  // Fire-and-forget: enqueue after commit. If it fails, the outbox
-  // poller picks it up.
-  void enqueueDomainEvent(event);
+  if (!tx) {
+    // Fire-and-forget: enqueue immediately. If it fails, the outbox
+    // poller picks it up.
+    void enqueueDomainEvent(event);
+  }
+  // When tx is provided the row isn't committed yet — the outbox poller
+  // (every 30s) will find the un-enqueued event and process it.
 
   return event;
 }

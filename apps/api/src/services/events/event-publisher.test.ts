@@ -266,7 +266,7 @@ describe("enqueueDomainEvent", () => {
 });
 
 describe("publishDomainEvent", () => {
-  it("inserts and enqueues in one call", async () => {
+  it("inserts and enqueues when no tx provided", async () => {
     const event = await publishDomainEvent({
       type: EVENT_TYPES.MATCH_CREATED,
       source: "sync",
@@ -281,5 +281,35 @@ describe("publishDomainEvent", () => {
     expect(event.type).toBe(EVENT_TYPES.MATCH_CREATED);
     expect(mockInsert).toHaveBeenCalled();
     // enqueue is fire-and-forget, but the mock should be called
+    expect(mockQueueAdd).toHaveBeenCalled();
+  });
+
+  it("inserts but does NOT enqueue when tx is provided", async () => {
+    const mockTxInsert = vi.fn().mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([]),
+      }),
+    });
+    const tx = { insert: mockTxInsert } as unknown as Parameters<
+      Parameters<typeof import("../../config/database").db.transaction>[0]
+    >[0];
+
+    const event = await publishDomainEvent(
+      {
+        type: EVENT_TYPES.MATCH_CREATED,
+        source: "sync",
+        entityType: "match",
+        entityId: 1,
+        entityName: "Game",
+        deepLinkPath: "/matches/1",
+        payload: {},
+      },
+      tx,
+    );
+
+    expect(event.id).toBeDefined();
+    expect(mockTxInsert).toHaveBeenCalled();
+    // Should NOT enqueue — outbox poller will handle it after tx commits
+    expect(mockQueueAdd).not.toHaveBeenCalled();
   });
 });
