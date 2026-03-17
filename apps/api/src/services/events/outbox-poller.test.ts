@@ -27,12 +27,15 @@ vi.mock("@dragons/db/schema", () => ({
     entityType: "entityType",
     entityId: "entityId",
     enqueuedAt: "enqueuedAt",
+    createdAt: "createdAt",
   },
 }));
 
 vi.mock("drizzle-orm", () => ({
   isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
+  lte: vi.fn((...args: unknown[]) => ({ lte: args })),
 }));
 
 const mockQueueAdd = vi.fn().mockResolvedValue({ id: "job-1" });

@@ -1,6 +1,6 @@
 import { db } from "../../config/database";
 import { domainEvents } from "@dragons/db/schema";
-import { isNull, eq } from "drizzle-orm";
+import { isNull, eq, and, lte } from "drizzle-orm";
 import { domainEventsQueue } from "../../workers/queues";
 import { logger } from "../../config/logger";
 
@@ -11,6 +11,12 @@ import { logger } from "../../config/logger";
  * Returns the number of events successfully enqueued.
  */
 export async function pollOutbox(): Promise<number> {
+  // Use a 1-second delay to avoid picking up rows from uncommitted transactions.
+  // A transaction that INSERTed an event but hasn't committed yet would be invisible
+  // to this query, but without the delay we could poll again after commit and miss it
+  // if the next poll starts before the row becomes visible.
+  const oneSecondAgo = new Date(Date.now() - 1000);
+
   const pending = await db
     .select({
       id: domainEvents.id,
@@ -20,7 +26,7 @@ export async function pollOutbox(): Promise<number> {
       entityId: domainEvents.entityId,
     })
     .from(domainEvents)
-    .where(isNull(domainEvents.enqueuedAt))
+    .where(and(isNull(domainEvents.enqueuedAt), lte(domainEvents.createdAt, oneSecondAgo)))
     .limit(100);
 
   if (pending.length === 0) return 0;

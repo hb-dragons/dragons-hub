@@ -6,10 +6,14 @@ import type { AppEnv } from "../../types";
 
 const mocks = vi.hoisted(() => ({
   listDomainEvents: vi.fn(),
+  triggerManualEvent: vi.fn(),
+  listFailedNotifications: vi.fn(),
 }));
 
 vi.mock("../../services/admin/event-admin.service", () => ({
   listDomainEvents: mocks.listDomainEvents,
+  triggerManualEvent: mocks.triggerManualEvent,
+  listFailedNotifications: mocks.listFailedNotifications,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -179,6 +183,144 @@ describe("GET /events", () => {
     expect(res.status).toBe(200);
     expect(mocks.listDomainEvents).toHaveBeenCalledWith({
       search: maxSearch,
+    });
+  });
+});
+
+describe("POST /events/trigger", () => {
+  it("returns 201 with created event", async () => {
+    const triggerResult = {
+      eventId: "01ABC",
+      type: "match.cancelled",
+      urgency: "immediate",
+      entityType: "match",
+      entityId: 42,
+    };
+    mocks.triggerManualEvent.mockResolvedValue(triggerResult);
+
+    const res = await app.request("/events/trigger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "match.cancelled",
+        entityType: "match",
+        entityId: 42,
+        entityName: "Dragons vs. Tigers",
+        deepLinkPath: "/admin/matches/42",
+        payload: { reason: "weather" },
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(await json(res)).toEqual(triggerResult);
+    expect(mocks.triggerManualEvent).toHaveBeenCalledWith({
+      type: "match.cancelled",
+      entityType: "match",
+      entityId: 42,
+      entityName: "Dragons vs. Tigers",
+      deepLinkPath: "/admin/matches/42",
+      payload: { reason: "weather" },
+      actor: "test-user-123",
+    });
+  });
+
+  it("passes urgencyOverride when provided", async () => {
+    mocks.triggerManualEvent.mockResolvedValue({ eventId: "01ABC" });
+
+    await app.request("/events/trigger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "match.schedule.changed",
+        entityType: "match",
+        entityId: 42,
+        entityName: "Test",
+        deepLinkPath: "/admin/matches/42",
+        urgencyOverride: "immediate",
+      }),
+    });
+
+    expect(mocks.triggerManualEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ urgencyOverride: "immediate" }),
+    );
+  });
+
+  it("returns 400 for missing required fields", async () => {
+    const res = await app.request("/events/trigger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "match.cancelled" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for invalid entityType", async () => {
+    const res = await app.request("/events/trigger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "match.cancelled",
+        entityType: "invalid",
+        entityId: 42,
+        entityName: "Test",
+        deepLinkPath: "/admin/matches/42",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("defaults payload to empty object when not provided", async () => {
+    mocks.triggerManualEvent.mockResolvedValue({ eventId: "01ABC" });
+
+    await app.request("/events/trigger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "match.cancelled",
+        entityType: "match",
+        entityId: 42,
+        entityName: "Test",
+        deepLinkPath: "/admin/matches/42",
+      }),
+    });
+
+    expect(mocks.triggerManualEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: {} }),
+    );
+  });
+});
+
+describe("GET /events/failed", () => {
+  it("returns 200 with failed notifications", async () => {
+    const failedResult = {
+      notifications: [
+        {
+          id: 1,
+          eventId: "evt-1",
+          errorMessage: "Connection refused",
+          status: "failed",
+        },
+      ],
+      total: 1,
+    };
+    mocks.listFailedNotifications.mockResolvedValue(failedResult);
+
+    const res = await app.request("/events/failed");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(failedResult);
+  });
+
+  it("passes pagination to service", async () => {
+    mocks.listFailedNotifications.mockResolvedValue({ notifications: [], total: 0 });
+
+    await app.request("/events/failed?page=2&limit=10");
+
+    expect(mocks.listFailedNotifications).toHaveBeenCalledWith({
+      page: 2,
+      limit: 10,
     });
   });
 });

@@ -42,11 +42,9 @@ vi.mock("../config/env", () => ({
 // --- Mock database ---
 
 const mockDbSelect = vi.fn();
-const mockDbInsert = vi.fn();
 vi.mock("../config/database", () => ({
   db: {
     select: (...args: unknown[]) => mockDbSelect(...args),
-    insert: (...args: unknown[]) => mockDbInsert(...args),
   },
 }));
 
@@ -54,9 +52,7 @@ vi.mock("../config/database", () => ({
 
 vi.mock("@dragons/db/schema", () => ({
   domainEvents: { id: "id" },
-  watchRules: { enabled: "enabled" },
   channelConfigs: { id: "id", enabled: "enabled" },
-  digestBuffer: { eventId: "eventId", channelConfigId: "channelConfigId" },
 }));
 
 // --- Mock drizzle-orm ---
@@ -65,37 +61,11 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((_col: unknown, val: unknown) => ({ _eq: val })),
 }));
 
-// --- Mock rule engine ---
+// --- Mock notification pipeline ---
 
-const mockEvaluateRule = vi.fn();
-vi.mock("../services/notifications/rule-engine", () => ({
-  evaluateRule: (...args: unknown[]) => mockEvaluateRule(...args),
-}));
-
-// --- Mock role defaults ---
-
-const mockGetDefaultNotificationsForEvent = vi.fn();
-vi.mock("../services/notifications/role-defaults", () => ({
-  getDefaultNotificationsForEvent: (...args: unknown[]) =>
-    mockGetDefaultNotificationsForEvent(...args),
-}));
-
-// --- Mock templates ---
-
-const mockRenderEventMessage = vi.fn();
-vi.mock("../services/notifications/templates/index", () => ({
-  renderEventMessage: (...args: unknown[]) => mockRenderEventMessage(...args),
-}));
-
-// --- Mock InAppChannelAdapter ---
-
-const mockInAppSend = vi.fn().mockResolvedValue(undefined);
-vi.mock("../services/notifications/channels/in-app", () => ({
-  InAppChannelAdapter: class {
-    send(...args: unknown[]) {
-      return mockInAppSend(...args);
-    }
-  },
+const mockProcessEvent = vi.fn();
+vi.mock("../services/notifications/notification-pipeline", () => ({
+  processEvent: (...args: unknown[]) => mockProcessEvent(...args),
 }));
 
 // --- Mock queues ---
@@ -143,18 +113,8 @@ function makeEvent(overrides: Record<string, unknown> = {}) {
     payload: { matchId: 42, reason: "weather" },
     source: "sync",
     entityName: "Dragons vs. Tigers",
-    ...overrides,
-  };
-}
-
-function makeRule(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 1,
-    eventTypes: ["match.cancelled"],
-    filters: [],
-    channels: [{ channel: "in_app", targetId: "10" }],
-    urgencyOverride: null,
-    enabled: true,
+    entityType: "match",
+    entityId: 42,
     ...overrides,
   };
 }
@@ -170,57 +130,32 @@ function makeChannelConfig(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Set up DB mocks for a standard flow: event found, rules, configs */
+/** Set up DB mocks for a standard flow */
 function setupDbMocks(opts: {
   event?: Record<string, unknown> | null;
-  rules?: Record<string, unknown>[];
   configs?: Record<string, unknown>[];
 }) {
   const event = opts.event === undefined ? makeEvent() : opts.event;
-  const rules = opts.rules ?? [];
   const configs = opts.configs ?? [];
 
-  // db.select() is called 3 times: event lookup, watch rules, channel configs
   const callSequence = [
     event ? [event] : [], // event lookup
-    rules,                // watch rules
-    configs,              // channel configs
+    configs,              // channel configs (for sync.completed digest triggering)
   ];
   let callIndex = 0;
 
-  mockDbSelect.mockImplementation(() => ({
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue(callSequence[callIndex++] ?? []),
-      }),
-    }),
-  }));
-
-  // For watch rules and channel configs (no .limit() call)
-  // We need a smarter mock that handles both patterns:
-  // - .select().from().where().limit() for events
-  // - .select().from().where() for rules/configs
-  callIndex = 0;
   mockDbSelect.mockImplementation(() => {
     const idx = callIndex++;
     const data = callSequence[idx] ?? [];
     return {
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockImplementation(() => {
-          // Return both a promise (for rules/configs) and a .limit() method (for events)
           const result = Promise.resolve(data);
           (result as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue(data);
           return result;
         }),
       }),
     };
-  });
-
-  // db.insert() for digest buffer
-  mockDbInsert.mockReturnValue({
-    values: vi.fn().mockReturnValue({
-      onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
-    }),
   });
 }
 
@@ -229,10 +164,11 @@ function setupDbMocks(opts: {
 describe("event worker processor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetDefaultNotificationsForEvent.mockReturnValue([]);
-    mockRenderEventMessage.mockReturnValue({
-      title: "Match Cancelled",
-      body: "The match has been cancelled.",
+    mockProcessEvent.mockResolvedValue({
+      dispatched: 0,
+      buffered: 0,
+      coalesced: 0,
+      muted: 0,
     });
   });
 
@@ -249,323 +185,51 @@ describe("event worker processor", () => {
       expect(result).toEqual({ skipped: true, reason: "event_not_found" });
     });
 
-    it("does not query rules or configs when event is missing", async () => {
+    it("does not call processEvent when event is missing", async () => {
       setupDbMocks({ event: null });
 
       await capturedProcessor!(makeJob());
 
-      // Only one select call (the event lookup)
-      expect(mockDbSelect).toHaveBeenCalledTimes(1);
+      expect(mockProcessEvent).not.toHaveBeenCalled();
     });
   });
 
-  describe("no matching rules", () => {
-    it("returns zero dispatches when no rules exist", async () => {
-      setupDbMocks({ event: makeEvent(), rules: [], configs: [] });
-      mockGetDefaultNotificationsForEvent.mockReturnValue([]);
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(result).toEqual({ dispatched: 0, buffered: 0 });
-    });
-
-    it("returns zero dispatches when rules do not match", async () => {
-      const rule = makeRule();
-      const config = makeChannelConfig();
-      setupDbMocks({ event: makeEvent(), rules: [rule], configs: [config] });
-      mockEvaluateRule.mockReturnValue({ matched: false, channels: [], urgencyOverride: null });
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(result).toEqual({ dispatched: 0, buffered: 0 });
-      expect(mockInAppSend).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("rule matching with immediate dispatch", () => {
-    it("dispatches via in-app adapter and buffers for digest", async () => {
-      const rule = makeRule();
-      const config = makeChannelConfig();
-      setupDbMocks({ event: makeEvent(), rules: [rule], configs: [config] });
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [{ channel: "in_app", targetId: "10" }],
-        urgencyOverride: null,
-      });
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).toHaveBeenCalledTimes(1);
-      expect(mockInAppSend).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventId: "evt-1",
-          watchRuleId: 1,
-          channelConfigId: 10,
-          recipientId: "10",
-          title: "Match Cancelled",
-          body: "The match has been cancelled.",
-          locale: "de",
-        }),
-      );
-      expect(mockDbInsert).toHaveBeenCalled();
-      expect(result).toEqual({ dispatched: 1, buffered: 1 });
-    });
-
-    it("uses urgencyOverride from rule when present", async () => {
-      const rule = makeRule({ urgencyOverride: "immediate" });
-      const config = makeChannelConfig();
-      // Event has routine urgency, but rule overrides to immediate
-      const event = makeEvent({ urgency: "routine" });
-      setupDbMocks({ event, rules: [rule], configs: [config] });
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [{ channel: "in_app", targetId: "10" }],
-        urgencyOverride: "immediate",
-      });
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ dispatched: 1, buffered: 1 });
-    });
-
-    it("renders message with locale from channel config", async () => {
-      const config = makeChannelConfig({ config: { locale: "en" } });
-      const rule = makeRule();
-      setupDbMocks({ event: makeEvent(), rules: [rule], configs: [config] });
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [{ channel: "in_app", targetId: "10" }],
-        urgencyOverride: null,
-      });
+  describe("pipeline delegation", () => {
+    it("calls processEvent with the full event from DB", async () => {
+      const event = makeEvent();
+      setupDbMocks({ event });
 
       await capturedProcessor!(makeJob());
 
-      expect(mockRenderEventMessage).toHaveBeenCalledWith(
-        "match.cancelled",
-        { matchId: 42, reason: "weather" },
-        "Dragons vs. Tigers",
-        "en",
-      );
-    });
-
-    it("defaults locale to 'de' when config has no locale", async () => {
-      const config = makeChannelConfig({ config: {} });
-      const rule = makeRule();
-      setupDbMocks({ event: makeEvent(), rules: [rule], configs: [config] });
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [{ channel: "in_app", targetId: "10" }],
-        urgencyOverride: null,
-      });
-
-      await capturedProcessor!(makeJob());
-
-      expect(mockRenderEventMessage).toHaveBeenCalledWith(
-        "match.cancelled",
-        expect.anything(),
-        "Dragons vs. Tigers",
-        "de",
-      );
-    });
-  });
-
-  describe("rule matching with routine urgency", () => {
-    it("only buffers for digest, does not dispatch immediately", async () => {
-      const rule = makeRule();
-      const config = makeChannelConfig();
-      const event = makeEvent({ urgency: "routine" });
-      setupDbMocks({ event, rules: [rule], configs: [config] });
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [{ channel: "in_app", targetId: "10" }],
-        urgencyOverride: null,
-      });
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).not.toHaveBeenCalled();
-      expect(mockDbInsert).toHaveBeenCalled();
-      expect(result).toEqual({ dispatched: 0, buffered: 1 });
-    });
-  });
-
-  describe("deduplication", () => {
-    it("does not dispatch same channel target twice from same rule", async () => {
-      const rule = makeRule();
-      const config = makeChannelConfig();
-      setupDbMocks({ event: makeEvent(), rules: [rule], configs: [config] });
-      // Rule returns duplicate channels
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [
-          { channel: "in_app", targetId: "10" },
-          { channel: "in_app", targetId: "10" },
-        ],
-        urgencyOverride: null,
-      });
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ dispatched: 1, buffered: 1 });
-    });
-
-    it("dispatches to different channel targets from different rules", async () => {
-      const rule1 = makeRule({ id: 1, channels: [{ channel: "in_app", targetId: "10" }] });
-      const rule2 = makeRule({ id: 2, channels: [{ channel: "in_app", targetId: "20" }] });
-      const config1 = makeChannelConfig({ id: 10 });
-      const config2 = makeChannelConfig({ id: 20 });
-      setupDbMocks({
-        event: makeEvent(),
-        rules: [rule1, rule2],
-        configs: [config1, config2],
-      });
-      mockEvaluateRule
-        .mockReturnValueOnce({
-          matched: true,
-          channels: [{ channel: "in_app", targetId: "10" }],
-          urgencyOverride: null,
-        })
-        .mockReturnValueOnce({
-          matched: true,
-          channels: [{ channel: "in_app", targetId: "20" }],
-          urgencyOverride: null,
-        });
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).toHaveBeenCalledTimes(2);
-      expect(result).toEqual({ dispatched: 2, buffered: 2 });
-    });
-  });
-
-  describe("channel config lookup", () => {
-    it("skips channel targets with no matching config", async () => {
-      const rule = makeRule();
-      // Config ID 99 does not match targetId "10"
-      const config = makeChannelConfig({ id: 99 });
-      setupDbMocks({ event: makeEvent(), rules: [rule], configs: [config] });
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [{ channel: "in_app", targetId: "10" }],
-        urgencyOverride: null,
-      });
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).not.toHaveBeenCalled();
-      expect(result).toEqual({ dispatched: 0, buffered: 0 });
-    });
-  });
-
-  describe("role-based defaults", () => {
-    it("dispatches admin defaults to matching channel configs", async () => {
-      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "admin", locale: "de" } });
-      setupDbMocks({ event: makeEvent(), rules: [], configs: [config] });
-      mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "admin", channel: "in_app" },
-      ]);
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).toHaveBeenCalledTimes(1);
-      expect(mockInAppSend).toHaveBeenCalledWith(
+      expect(mockProcessEvent).toHaveBeenCalledTimes(1);
+      expect(mockProcessEvent).toHaveBeenCalledWith(
         expect.objectContaining({
-          eventId: "evt-1",
-          watchRuleId: null,
-          channelConfigId: 10,
-          recipientId: "audience:admin",
+          id: "evt-1",
+          type: "match.cancelled",
         }),
       );
-      expect(result).toEqual({ dispatched: 1, buffered: 1 });
     });
 
-    it("dispatches referee defaults with refereeId in recipientId", async () => {
-      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
-      setupDbMocks({ event: makeEvent(), rules: [], configs: [config] });
-      mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "referee", channel: "in_app", refereeId: 77 },
-      ]);
+    it("returns dispatched and buffered counts from pipeline", async () => {
+      setupDbMocks({ event: makeEvent() });
+      mockProcessEvent.mockResolvedValue({
+        dispatched: 3,
+        buffered: 5,
+        coalesced: 1,
+        muted: 0,
+      });
 
       const result = await capturedProcessor!(makeJob());
 
-      expect(mockInAppSend).toHaveBeenCalledWith(
-        expect.objectContaining({
-          recipientId: "referee:77",
-        }),
-      );
-      expect(result).toEqual({ dispatched: 1, buffered: 1 });
+      expect(result).toEqual({ dispatched: 3, buffered: 5 });
     });
 
-    it("matches configs without audienceRole to all defaults", async () => {
-      const config = makeChannelConfig({ id: 10, type: "in_app", config: { locale: "de" } });
-      setupDbMocks({ event: makeEvent(), rules: [], configs: [config] });
-      mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "admin", channel: "in_app" },
-      ]);
+    it("returns zero counts when pipeline processes nothing", async () => {
+      setupDbMocks({ event: makeEvent() });
 
       const result = await capturedProcessor!(makeJob());
 
-      expect(mockInAppSend).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ dispatched: 1, buffered: 1 });
-    });
-
-    it("filters out configs with non-matching audienceRole", async () => {
-      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
-      setupDbMocks({ event: makeEvent(), rules: [], configs: [config] });
-      mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "admin", channel: "in_app" },
-      ]);
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).not.toHaveBeenCalled();
       expect(result).toEqual({ dispatched: 0, buffered: 0 });
-    });
-
-    it("filters out configs with non-matching channel type", async () => {
-      const config = makeChannelConfig({ id: 10, type: "email", config: { audienceRole: "admin", locale: "de" } });
-      setupDbMocks({ event: makeEvent(), rules: [], configs: [config] });
-      mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "admin", channel: "in_app" },
-      ]);
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).not.toHaveBeenCalled();
-      expect(result).toEqual({ dispatched: 0, buffered: 0 });
-    });
-
-    it("does not dispatch defaults for routine urgency events", async () => {
-      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "admin", locale: "de" } });
-      const event = makeEvent({ urgency: "routine" });
-      setupDbMocks({ event, rules: [], configs: [config] });
-      mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "admin", channel: "in_app" },
-      ]);
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).not.toHaveBeenCalled();
-      // Should still buffer
-      expect(mockDbInsert).toHaveBeenCalled();
-      expect(result).toEqual({ dispatched: 0, buffered: 1 });
-    });
-
-    it("deduplicates default dispatches to same config and recipient", async () => {
-      const config = makeChannelConfig({ id: 10, type: "in_app", config: { locale: "de" } });
-      setupDbMocks({ event: makeEvent(), rules: [], configs: [config] });
-      // Two defaults that would go to the same config + audience
-      mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "admin", channel: "in_app" },
-        { audience: "admin", channel: "in_app" },
-      ]);
-
-      const result = await capturedProcessor!(makeJob());
-
-      expect(mockInAppSend).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ dispatched: 1, buffered: 1 });
     });
   });
 
@@ -574,7 +238,7 @@ describe("event worker processor", () => {
       const config1 = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
       const config2 = makeChannelConfig({ id: 20, digestMode: "per_sync", enabled: true });
       const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event, rules: [], configs: [config1, config2] });
+      setupDbMocks({ event, configs: [config1, config2] });
 
       await capturedProcessor!(makeJob({ type: "sync.completed" }));
 
@@ -593,7 +257,7 @@ describe("event worker processor", () => {
       const config1 = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
       const config2 = makeChannelConfig({ id: 20, digestMode: "scheduled", enabled: true });
       const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event, rules: [], configs: [config1, config2] });
+      setupDbMocks({ event, configs: [config1, config2] });
 
       await capturedProcessor!(makeJob({ type: "sync.completed" }));
 
@@ -607,7 +271,7 @@ describe("event worker processor", () => {
     it("skips disabled configs for per_sync digest", async () => {
       const config = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: false });
       const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event, rules: [], configs: [config] });
+      setupDbMocks({ event, configs: [config] });
 
       await capturedProcessor!(makeJob({ type: "sync.completed" }));
 
@@ -615,9 +279,7 @@ describe("event worker processor", () => {
     });
 
     it("does not trigger digests for non-sync.completed events", async () => {
-      const config = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
-      const event = makeEvent({ type: "match.cancelled" });
-      setupDbMocks({ event, rules: [], configs: [config] });
+      setupDbMocks({ event: makeEvent() });
 
       await capturedProcessor!(makeJob());
 
@@ -627,81 +289,13 @@ describe("event worker processor", () => {
     it("handles digest queue add failure gracefully", async () => {
       const config = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
       const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event, rules: [], configs: [config] });
+      setupDbMocks({ event, configs: [config] });
       mockDigestQueueAdd.mockRejectedValueOnce(new Error("Redis error"));
 
       // Should not throw
       const result = await capturedProcessor!(makeJob({ type: "sync.completed" }));
 
       expect(result).toEqual({ dispatched: 0, buffered: 0 });
-    });
-  });
-
-  describe("digest buffer", () => {
-    it("buffers event for digest on rule match", async () => {
-      const rule = makeRule();
-      const config = makeChannelConfig();
-      const event = makeEvent({ urgency: "routine" });
-      setupDbMocks({ event, rules: [rule], configs: [config] });
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [{ channel: "in_app", targetId: "10" }],
-        urgencyOverride: null,
-      });
-
-      await capturedProcessor!(makeJob());
-
-      expect(mockDbInsert).toHaveBeenCalled();
-    });
-
-    it("continues processing when buffer insert fails", async () => {
-      const rule = makeRule();
-      const config = makeChannelConfig();
-      setupDbMocks({ event: makeEvent(), rules: [rule], configs: [config] });
-      // Override insert to fail
-      mockDbInsert.mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          onConflictDoNothing: vi.fn().mockRejectedValue(new Error("DB write error")),
-        }),
-      });
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [{ channel: "in_app", targetId: "10" }],
-        urgencyOverride: null,
-      });
-
-      // Should not throw — bufferForDigest catches errors
-      const result = await capturedProcessor!(makeJob());
-
-      // Dispatch still happens (bufferedCount increments before await, but the important thing is no crash)
-      expect(result).toBeDefined();
-    });
-  });
-
-  describe("combined rule + default flow", () => {
-    it("processes both watch rules and role-based defaults", async () => {
-      const rule = makeRule({ id: 1 });
-      const config1 = makeChannelConfig({ id: 10, type: "in_app", config: { locale: "de" } });
-      const config2 = makeChannelConfig({ id: 20, type: "in_app", config: { audienceRole: "admin", locale: "de" } });
-      setupDbMocks({
-        event: makeEvent(),
-        rules: [rule],
-        configs: [config1, config2],
-      });
-      mockEvaluateRule.mockReturnValue({
-        matched: true,
-        channels: [{ channel: "in_app", targetId: "10" }],
-        urgencyOverride: null,
-      });
-      mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "admin", channel: "in_app" },
-      ]);
-
-      const result = await capturedProcessor!(makeJob());
-
-      // Rule dispatches to config 10, defaults dispatch to config 20 (and config 10 since no audienceRole filter)
-      expect(mockInAppSend).toHaveBeenCalledTimes(3);
-      expect((result as Record<string, number>).dispatched).toBe(3);
     });
   });
 });
