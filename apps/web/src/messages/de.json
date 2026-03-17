@@ -22,6 +22,11 @@
     "groupOperations": "Betrieb",
     "groupSocial": "Social Media",
     "createPost": "Beitrag erstellen",
+    "groupNotifications": "Benachrichtigungen",
+    "notificationCenter": "Posteingang",
+    "watchRules": "Regeln",
+    "channels": "Kanäle",
+    "domainEvents": "Events",
     "groupSystem": "System"
   },
   "refereeMatches": {
@@ -691,6 +696,105 @@
     "instructionApple": "Kalender → Ablage → Neues Kalenderabo",
     "instructionGoogle": "Einstellungen → Weitere Kalender → Per URL",
     "instructionOutlook": "Kalender hinzufügen → Aus dem Internet"
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "description": "Alle Änderungen und Benachrichtigungen im Überblick",
+    "empty": "Keine Benachrichtigungen vorhanden",
+    "markRead": "Als gelesen markieren",
+    "markAllRead": "Alle als gelesen markieren",
+    "retry": "Erneut senden",
+    "retrySuccess": "Benachrichtigung erneut gesendet",
+    "retryFailed": "Erneutes Senden fehlgeschlagen",
+    "unread": "Ungelesen",
+    "read": "Gelesen",
+    "failed": "Fehlgeschlagen",
+    "pending": "Ausstehend",
+    "sent": "Gesendet",
+    "immediate": "Sofort",
+    "routine": "Routine",
+    "tabs": {
+      "inbox": "Posteingang",
+      "failed": "Fehlgeschlagen"
+    },
+    "columns": {
+      "title": "Titel",
+      "status": "Status",
+      "type": "Typ",
+      "entity": "Objekt",
+      "date": "Datum",
+      "urgency": "Priorität",
+      "error": "Fehler",
+      "retries": "Versuche"
+    }
+  },
+  "watchRules": {
+    "title": "Benachrichtigungsregeln",
+    "description": "Regeln für automatische Benachrichtigungen konfigurieren",
+    "empty": "Keine Regeln konfiguriert",
+    "create": "Regel erstellen",
+    "edit": "Regel bearbeiten",
+    "delete": "Regel löschen",
+    "deleteConfirm": "Regel wirklich löschen?",
+    "saved": "Regel gespeichert",
+    "deleted": "Regel gelöscht",
+    "name": "Name",
+    "enabled": "Aktiv",
+    "disabled": "Deaktiviert",
+    "eventTypes": "Ereignistypen",
+    "filters": "Filter",
+    "channels": "Kanäle",
+    "urgencyOverride": "Priorität überschreiben",
+    "noOverride": "Standard",
+    "addFilter": "Filter hinzufügen",
+    "when": "Wenn",
+    "and": "Und",
+    "then": "Dann"
+  },
+  "channelConfigs": {
+    "title": "Benachrichtigungskanäle",
+    "description": "Kanäle für die Benachrichtigungszustellung konfigurieren",
+    "empty": "Keine Kanäle konfiguriert",
+    "create": "Kanal erstellen",
+    "edit": "Kanal bearbeiten",
+    "saved": "Kanal gespeichert",
+    "name": "Name",
+    "type": "Typ",
+    "enabled": "Aktiv",
+    "disabled": "Deaktiviert",
+    "digestMode": "Zusammenfassungsmodus",
+    "digestCron": "Cron-Ausdruck",
+    "digestTimezone": "Zeitzone",
+    "perSync": "Nach Synchronisation",
+    "scheduled": "Geplant",
+    "none": "Keine",
+    "typeLabels": {
+      "in_app": "In-App",
+      "whatsapp_group": "WhatsApp-Gruppe",
+      "push": "Push",
+      "email": "E-Mail"
+    }
+  },
+  "domainEvents": {
+    "title": "Domain Events",
+    "description": "Alle erkannten Änderungen im System",
+    "empty": "Keine Events vorhanden",
+    "trigger": "Event auslösen",
+    "triggerSuccess": "Event ausgelöst",
+    "triggerFailed": "Event konnte nicht ausgelöst werden",
+    "columns": {
+      "type": "Typ",
+      "entity": "Objekt",
+      "source": "Quelle",
+      "urgency": "Priorität",
+      "date": "Datum",
+      "actor": "Auslöser"
+    },
+    "sourceLabels": {
+      "sync": "Synchronisation",
+      "manual": "Manuell",
+      "reconciliation": "Abgleich"
+    }
   },
   "errors": {
     "title": "Etwas ist schiefgelaufen",

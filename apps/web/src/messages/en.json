@@ -22,6 +22,11 @@
     "groupOperations": "Operations",
     "groupSocial": "Social Media",
     "createPost": "Create Post",
+    "groupNotifications": "Notifications",
+    "notificationCenter": "Inbox",
+    "watchRules": "Rules",
+    "channels": "Channels",
+    "domainEvents": "Events",
     "groupSystem": "System"
   },
   "refereeMatches": {
@@ -691,6 +696,105 @@
     "instructionApple": "Calendar → File → New Calendar Subscription",
     "instructionGoogle": "Settings → Add calendar → From URL",
     "instructionOutlook": "Add calendar → From the internet"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "description": "All changes and notification deliveries at a glance",
+    "empty": "No notifications",
+    "markRead": "Mark as read",
+    "markAllRead": "Mark all as read",
+    "retry": "Retry",
+    "retrySuccess": "Notification resent",
+    "retryFailed": "Retry failed",
+    "unread": "Unread",
+    "read": "Read",
+    "failed": "Failed",
+    "pending": "Pending",
+    "sent": "Sent",
+    "immediate": "Immediate",
+    "routine": "Routine",
+    "tabs": {
+      "inbox": "Inbox",
+      "failed": "Failed"
+    },
+    "columns": {
+      "title": "Title",
+      "status": "Status",
+      "type": "Type",
+      "entity": "Entity",
+      "date": "Date",
+      "urgency": "Urgency",
+      "error": "Error",
+      "retries": "Retries"
+    }
+  },
+  "watchRules": {
+    "title": "Watch Rules",
+    "description": "Configure rules for automatic notifications",
+    "empty": "No rules configured",
+    "create": "Create rule",
+    "edit": "Edit rule",
+    "delete": "Delete rule",
+    "deleteConfirm": "Are you sure you want to delete this rule?",
+    "saved": "Rule saved",
+    "deleted": "Rule deleted",
+    "name": "Name",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "eventTypes": "Event types",
+    "filters": "Filters",
+    "channels": "Channels",
+    "urgencyOverride": "Override urgency",
+    "noOverride": "Default",
+    "addFilter": "Add filter",
+    "when": "When",
+    "and": "And",
+    "then": "Then"
+  },
+  "channelConfigs": {
+    "title": "Notification Channels",
+    "description": "Configure channels for notification delivery",
+    "empty": "No channels configured",
+    "create": "Create channel",
+    "edit": "Edit channel",
+    "saved": "Channel saved",
+    "name": "Name",
+    "type": "Type",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "digestMode": "Digest mode",
+    "digestCron": "Cron expression",
+    "digestTimezone": "Timezone",
+    "perSync": "After sync",
+    "scheduled": "Scheduled",
+    "none": "None",
+    "typeLabels": {
+      "in_app": "In-App",
+      "whatsapp_group": "WhatsApp Group",
+      "push": "Push",
+      "email": "Email"
+    }
+  },
+  "domainEvents": {
+    "title": "Domain Events",
+    "description": "All detected changes in the system",
+    "empty": "No events found",
+    "trigger": "Trigger event",
+    "triggerSuccess": "Event triggered",
+    "triggerFailed": "Failed to trigger event",
+    "columns": {
+      "type": "Type",
+      "entity": "Entity",
+      "source": "Source",
+      "urgency": "Urgency",
+      "date": "Date",
+      "actor": "Actor"
+    },
+    "sourceLabels": {
+      "sync": "Sync",
+      "manual": "Manual",
+      "reconciliation": "Reconciliation"
+    }
   },
   "errors": {
     "title": "Something went wrong",

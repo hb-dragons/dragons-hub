@@ -19,7 +19,15 @@ export const SWR_KEYS = {
   bookings: "/admin/bookings",
   bookingDetail: (id: number) => `/admin/bookings/${id}`,
   settingsBooking: "/admin/settings/booking",
+  notifications: (userId: string, limit?: number, offset?: number) =>
+    `/admin/notifications?userId=${userId}&limit=${limit ?? 20}&offset=${offset ?? 0}`,
   notificationsUnread: "/admin/notifications/unread-count",
+  domainEvents: (params?: string) =>
+    `/admin/events${params ? `?${params}` : ""}`,
+  domainEventsFailed: (page?: number, limit?: number) =>
+    `/admin/events/failed?page=${page ?? 1}&limit=${limit ?? 20}`,
+  watchRules: "/admin/watch-rules",
+  channelConfigs: "/admin/channel-configs",
   refereeMatches: "/referee/matches?limit=500&offset=0",
   socialPlayerPhotos: "/admin/social/player-photos",
   socialBackgrounds: "/admin/social/backgrounds",

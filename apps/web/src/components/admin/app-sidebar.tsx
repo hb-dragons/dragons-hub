@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bell,
   ChevronRight,
   Gavel,
   Image,
@@ -72,6 +73,17 @@ const navGroups = [
     roles: ["admin"],
     items: [
       { href: "/admin/social/create", labelKey: "nav.createPost" as const },
+    ],
+  },
+  {
+    labelKey: "nav.groupNotifications" as const,
+    icon: Bell,
+    roles: ["admin"],
+    items: [
+      { href: "/admin/notifications", labelKey: "nav.notificationCenter" as const },
+      { href: "/admin/notifications/rules", labelKey: "nav.watchRules" as const },
+      { href: "/admin/notifications/channels", labelKey: "nav.channels" as const },
+      { href: "/admin/notifications/events", labelKey: "nav.domainEvents" as const },
     ],
   },
   {
