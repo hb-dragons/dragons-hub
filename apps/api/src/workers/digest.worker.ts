@@ -1,5 +1,5 @@
 import { Worker, type Job } from "bullmq";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { digestBuffer, domainEvents, channelConfigs, notificationLog } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
@@ -76,29 +76,34 @@ export const digestWorker = new Worker<DigestJobData>(
     const message = renderDigestMessage(items, locale);
 
     // 5. Deliver via the appropriate channel adapter
+    // Create a single summary notification_log entry for the whole digest
     if (config.type === "in_app") {
-      // Create one notification_log entry per event in the digest,
-      // all sharing the same digestRunId for grouping
-      for (const row of bufferedRows) {
-        const result = await inAppAdapter.send({
-          eventId: row.eventId,
-          watchRuleId: null,
-          channelConfigId: config.id,
-          recipientId: `digest:${config.id}`,
-          title: message.title,
-          body: message.body,
-          locale,
-        });
+      // Use the first event's ID as the anchor for the digest notification
+      const anchorEventId = bufferedRows[0]!.eventId;
+      const result = await inAppAdapter.send({
+        eventId: anchorEventId,
+        watchRuleId: null,
+        channelConfigId: config.id,
+        recipientId: `digest:${config.id}`,
+        title: message.title,
+        body: message.body,
+        locale,
+      });
 
-        if (result.success) {
-          // Tag the notification_log entry with the digestRunId
-          await db
-            .update(notificationLog)
-            .set({ digestRunId })
-            .where(eq(notificationLog.eventId, row.eventId));
-        } else {
-          log.error({ eventId: row.eventId, error: result.error }, "Failed to deliver digest item");
-        }
+      if (result.success && !result.duplicate) {
+        // Tag the notification_log entry with the digestRunId
+        await db
+          .update(notificationLog)
+          .set({ digestRunId })
+          .where(
+            and(
+              eq(notificationLog.eventId, anchorEventId),
+              eq(notificationLog.channelConfigId, config.id),
+              eq(notificationLog.recipientId, `digest:${config.id}`),
+            ),
+          );
+      } else if (!result.success) {
+        log.error({ eventId: anchorEventId, error: result.error }, "Failed to deliver digest");
       }
     } else {
       log.warn({ channelType: config.type }, "Unsupported channel type for digest, skipping delivery");
@@ -121,14 +126,17 @@ export const digestWorker = new Worker<DigestJobData>(
   },
 );
 
+/* v8 ignore next 3 */
 digestWorker.on("completed", (job) => {
   logger.debug({ jobId: job.id }, "Digest job completed");
 });
 
+/* v8 ignore next 3 */
 digestWorker.on("failed", (job, err) => {
   logger.error({ jobId: job?.id, err }, "Digest job failed");
 });
 
+/* v8 ignore next 3 */
 digestWorker.on("error", (err) => {
   logger.error({ err }, "Digest worker error");
 });

@@ -282,7 +282,27 @@ describe("renderMatchMessage", () => {
       expect(result!.body).toContain("78:65");
     });
 
-    it("renders score correction with old scores", () => {
+    it("renders new score in English without old scores", () => {
+      const payload = {
+        matchNo: 3,
+        homeTeam: "Dragons",
+        guestTeam: "Hawks",
+        leagueName: "Bezirksliga",
+        homeScore: 78,
+        guestScore: 65,
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_SCORE_CHANGED,
+        payload,
+        "Dragons vs Hawks",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Score update");
+      expect(result!.body).toContain("78:65");
+    });
+
+    it("renders score correction with old scores in German", () => {
       const payload = {
         matchNo: 3,
         homeTeam: "Dragons",
@@ -303,6 +323,167 @@ describe("renderMatchMessage", () => {
       expect(result!.title).toContain("Ergebnis\u{00E4}nderung");
       expect(result!.body).toContain("80:65");
       expect(result!.body).toContain("78:65");
+    });
+
+    it("renders score correction with old scores in English", () => {
+      const payload = {
+        matchNo: 3,
+        homeTeam: "Dragons",
+        guestTeam: "Hawks",
+        leagueName: "Bezirksliga",
+        homeScore: 80,
+        guestScore: 65,
+        oldHomeScore: 78,
+        oldGuestScore: 65,
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_SCORE_CHANGED,
+        payload,
+        "Dragons vs Hawks",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Score correction");
+      expect(result!.body).toContain("80:65");
+      expect(result!.body).toContain("was: 78:65");
+    });
+  });
+
+  describe("match.schedule.changed (non-date changes)", () => {
+    it("renders without detail when changes has no date/time fields", () => {
+      const payload = {
+        homeTeam: "Dragons",
+        guestTeam: "Tigers",
+        leagueName: "Bezirksliga",
+        changes: [
+          { field: "venueId", oldValue: 1, newValue: 2 },
+        ],
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
+        payload,
+        "Dragons vs Tigers",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).not.toContain("Neu:");
+    });
+
+    it("renders with empty changes array", () => {
+      const payload = {
+        homeTeam: "Dragons",
+        guestTeam: "Tigers",
+        leagueName: "Bezirksliga",
+        changes: [],
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
+        payload,
+        "Dragons vs Tigers",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).not.toContain("Neu:");
+    });
+  });
+
+  describe("match.created edge cases", () => {
+    it("renders without kickoff date", () => {
+      const payload = {
+        homeTeam: "Dragons",
+        guestTeam: "Bears",
+        leagueName: "Bezirksliga",
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_CREATED,
+        payload,
+        "Dragons vs Bears",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Neues Spiel");
+    });
+
+    it("renders without kickoff time", () => {
+      const payload = {
+        homeTeam: "Dragons",
+        guestTeam: "Bears",
+        leagueName: "Bezirksliga",
+        kickoffDate: "2026-05-01",
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_CREATED,
+        payload,
+        "Dragons vs Bears",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("01.05.");
+      expect(result!.body).not.toContain("undefined");
+    });
+  });
+
+  describe("match.forfeited in English", () => {
+    it("renders forfeited in English", () => {
+      const payload = {
+        homeTeam: "Dragons",
+        guestTeam: "Eagles",
+        leagueName: "Kreisliga",
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_FORFEITED,
+        payload,
+        "Dragons vs Eagles",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Game forfeited");
+      expect(result!.body).toContain("forfeited");
+    });
+  });
+
+  describe("match.result_entered in English", () => {
+    it("renders score in English", () => {
+      const payload = {
+        homeTeam: "Dragons",
+        guestTeam: "Hawks",
+        leagueName: "Bezirksliga",
+        homeScore: 78,
+        guestScore: 65,
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_RESULT_ENTERED,
+        payload,
+        "Dragons vs Hawks",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Score update");
+      expect(result!.body).toContain("78:65");
+    });
+  });
+
+  describe("match.result_changed in English", () => {
+    it("renders score correction in English", () => {
+      const payload = {
+        homeTeam: "Dragons",
+        guestTeam: "Hawks",
+        leagueName: "Bezirksliga",
+        oldHomeScore: 78,
+        oldGuestScore: 65,
+        newHomeScore: 80,
+        newGuestScore: 65,
+      };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_RESULT_CHANGED,
+        payload,
+        "Dragons vs Hawks",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Score correction");
+      expect(result!.body).toContain("80:65");
+      expect(result!.body).toContain("was: 78:65");
     });
   });
 
@@ -328,6 +509,142 @@ describe("renderMatchMessage", () => {
       );
       expect(result).not.toBeNull();
       expect(result!.title).toContain("Match removed");
+    });
+  });
+
+  describe("missing field fallbacks", () => {
+    it("renders match.result_changed with missing score fields (de)", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_RESULT_CHANGED,
+        { matchNo: 1 },
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?:?");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("renders match.result_changed with missing score fields (en)", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_RESULT_CHANGED,
+        { matchNo: 1 },
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Score correction");
+      expect(result!.body).toContain("?:?");
+      expect(result!.body).toContain("was: ?:?");
+    });
+
+    it("renders match.result_entered with missing team and score fields", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_RESULT_ENTERED,
+        {},
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?:?");
+      expect(result!.body).toContain(" vs ");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("renders match.cancelled with missing team and league fields", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_CANCELLED,
+        {},
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain(" vs ");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("renders match.cancelled with missing fields (en)", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_CANCELLED,
+        {},
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("cancelled");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("renders match.venue_changed with missing venue names", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_VENUE_CHANGED,
+        {},
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("renders match.venue_changed with missing fields (en)", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_VENUE_CHANGED,
+        {},
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("New venue: ?");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("renders match.forfeited with missing team fields", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_FORFEITED,
+        {},
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain(" vs ");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("renders match.score_changed with missing all fields (de)", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_SCORE_CHANGED,
+        {},
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?:?");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("renders match.created with missing all fields (en)", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_CREATED,
+        {},
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("New game");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("renders match.schedule_changed with missing team/league fields", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
+        {},
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain(" vs ");
+      expect(result!.body).not.toContain("undefined");
     });
   });
 

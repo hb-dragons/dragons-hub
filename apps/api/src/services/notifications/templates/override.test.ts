@@ -97,6 +97,118 @@ describe("renderOverrideMessage", () => {
     });
   });
 
+  describe(EVENT_TYPES.OVERRIDE_CONFLICT, () => {
+    const payload = {
+      matchNo: 42,
+      homeTeam: "Dragons",
+      guestTeam: "Tigers",
+      field: "kickoffTime",
+    };
+
+    it("renders override conflict in German", () => {
+      const result = renderOverrideMessage(
+        EVENT_TYPES.OVERRIDE_CONFLICT,
+        payload,
+        "Dragons vs Tigers",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Override-Konflikt");
+      expect(result!.body).toContain("Dragons vs Tigers");
+      expect(result!.body).toContain("kickoffTime");
+      expect(result!.body).toContain("Konflikt");
+    });
+
+    it("renders override conflict in English", () => {
+      const result = renderOverrideMessage(
+        EVENT_TYPES.OVERRIDE_CONFLICT,
+        payload,
+        "Dragons vs Tigers",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Override conflict");
+      expect(result!.body).toContain("Conflict on field kickoffTime");
+      expect(result!.body).toContain("Remote value differs");
+    });
+  });
+
+  describe("missing field fallbacks", () => {
+    it("handles missing revertedBy, homeTeam, guestTeam in reverted (de)", () => {
+      const result = renderOverrideMessage(
+        EVENT_TYPES.OVERRIDE_REVERTED,
+        { field: "kickoffTime" },
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?");
+      expect(result!.body).toContain(" vs ");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles missing revertedBy, homeTeam, guestTeam in reverted (en)", () => {
+      const result = renderOverrideMessage(
+        EVENT_TYPES.OVERRIDE_REVERTED,
+        { field: "kickoffTime" },
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("by ?");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles missing all fields in reverted", () => {
+      const result = renderOverrideMessage(
+        EVENT_TYPES.OVERRIDE_REVERTED,
+        {},
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      // field => "?", revertedBy => "?"
+      expect(result!.body).toContain("?");
+    });
+
+    it("handles missing homeTeam, guestTeam in conflict (de)", () => {
+      const result = renderOverrideMessage(
+        EVENT_TYPES.OVERRIDE_CONFLICT,
+        { field: "venue" },
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain(" vs ");
+      expect(result!.body).toContain("Konflikt");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles missing homeTeam, guestTeam in conflict (en)", () => {
+      const result = renderOverrideMessage(
+        EVENT_TYPES.OVERRIDE_CONFLICT,
+        { field: "venue" },
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain(" vs ");
+      expect(result!.body).toContain("Conflict on field venue");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles missing all fields in conflict", () => {
+      const result = renderOverrideMessage(
+        EVENT_TYPES.OVERRIDE_CONFLICT,
+        {},
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?");
+    });
+  });
+
   describe("unknown event type", () => {
     it("returns null for non-override events", () => {
       const result = renderOverrideMessage(

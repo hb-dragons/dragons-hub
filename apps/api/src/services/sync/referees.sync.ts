@@ -268,6 +268,7 @@ export async function syncRefereeAssignmentsFromData(
   roleIdLookup: Map<number, number>,
   matchIdLookup: Map<number, number>,
   logger?: SyncLogger,
+  syncRunId?: number | null,
 ): Promise<{ created: number; errors: string[] }> {
   const errors: string[] = [];
   let created = 0;
@@ -304,6 +305,38 @@ export async function syncRefereeAssignmentsFromData(
     existingAssignments.map((r) => [`${r.matchId}-${r.slotNumber}`, r]),
   );
 
+  // Batch-load referee names, match info, and role names for event emission
+  const allRefereeIds = [...new Set([
+    ...validAssignments.map((a) => refereeIdLookup.get(a.schiedsrichterId)!),
+    ...existingAssignments.map((a) => a.refereeId),
+  ])];
+  const allRoleIds = [...new Set(validAssignments.map((a) => roleIdLookup.get(a.schirirolleId)!))];
+
+  const [refRows, matchRows, roleRows] = await Promise.all([
+    allRefereeIds.length > 0
+      ? db.select({ id: referees.id, firstName: referees.firstName, lastName: referees.lastName })
+          .from(referees).where(inArray(referees.id, allRefereeIds))
+      : Promise.resolve([]),
+    matchIdsToCheck.length > 0
+      ? db.select({ id: matches.id, matchNo: matches.matchNo, homeTeamApiId: matches.homeTeamApiId, guestTeamApiId: matches.guestTeamApiId })
+          .from(matches).where(inArray(matches.id, matchIdsToCheck))
+      : Promise.resolve([]),
+    allRoleIds.length > 0
+      ? db.select({ id: refereeRoles.id, name: refereeRoles.name })
+          .from(refereeRoles).where(inArray(refereeRoles.id, allRoleIds))
+      : Promise.resolve([]),
+  ]);
+
+  const refNameMap = new Map(refRows.map((r) => [r.id, `${r.firstName} ${r.lastName}`.trim()]));
+  const matchInfoMap = new Map(matchRows.map((m) => [m.id, {
+    matchNo: m.matchNo,
+    homeTeam: String(m.homeTeamApiId),
+    guestTeam: String(m.guestTeamApiId),
+    entityName: `Match #${m.matchNo}`,
+    teamIds: [m.homeTeamApiId, m.guestTeamApiId],
+  }]));
+  const roleNameMap = new Map(roleRows.map((r) => [r.id, r.name]));
+
   for (const assignment of validAssignments) {
     const matchId = matchIdLookup.get(assignment.matchApiId)!;
     const refereeId = refereeIdLookup.get(assignment.schiedsrichterId)!;
@@ -326,11 +359,9 @@ export async function syncRefereeAssignmentsFromData(
 
         // Emit referee.assigned event
         try {
-          const [refName, matchInfo, roleName] = await Promise.all([
-            getRefereeNameById(refereeId),
-            getMatchInfoForEvent(matchId),
-            getRoleNameById(roleId),
-          ]);
+          const refName = refNameMap.get(refereeId) ?? "Unknown";
+          const matchInfo = matchInfoMap.get(matchId);
+          const roleName = roleNameMap.get(roleId) ?? "Unknown";
           if (matchInfo) {
             await publishDomainEvent({
               type: EVENT_TYPES.REFEREE_ASSIGNED,
@@ -339,6 +370,7 @@ export async function syncRefereeAssignmentsFromData(
               entityId: matchId,
               entityName: matchInfo.entityName,
               deepLinkPath: `/admin/matches/${matchId}`,
+              syncRunId: syncRunId ?? null,
               payload: {
                 matchNo: matchInfo.matchNo,
                 homeTeam: matchInfo.homeTeam,
@@ -371,12 +403,10 @@ export async function syncRefereeAssignmentsFromData(
         // Emit referee.reassigned event when referee changed
         if (oldRefereeId !== refereeId) {
           try {
-            const [oldRefName, newRefName, matchInfo, roleName] = await Promise.all([
-              getRefereeNameById(oldRefereeId),
-              getRefereeNameById(refereeId),
-              getMatchInfoForEvent(matchId),
-              getRoleNameById(roleId),
-            ]);
+            const oldRefName = refNameMap.get(oldRefereeId) ?? "Unknown";
+            const newRefName = refNameMap.get(refereeId) ?? "Unknown";
+            const matchInfo = matchInfoMap.get(matchId);
+            const roleName = roleNameMap.get(roleId) ?? "Unknown";
             if (matchInfo) {
               await publishDomainEvent({
                 type: EVENT_TYPES.REFEREE_REASSIGNED,
@@ -385,6 +415,7 @@ export async function syncRefereeAssignmentsFromData(
                 entityId: matchId,
                 entityName: matchInfo.entityName,
                 deepLinkPath: `/admin/matches/${matchId}`,
+                syncRunId: syncRunId ?? null,
                 payload: {
                   matchNo: matchInfo.matchNo,
                   homeTeam: matchInfo.homeTeam,

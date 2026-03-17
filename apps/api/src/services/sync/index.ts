@@ -142,6 +142,7 @@ export async function fullSync(
       rolesRes.roleIdLookup,
       matchIdLookup,
       syncLogger,
+      syncRun.id,
     );
     allErrors.push(...assignmentsRes.errors);
 

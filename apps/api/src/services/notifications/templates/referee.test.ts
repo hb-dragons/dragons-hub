@@ -129,6 +129,73 @@ describe("renderRefereeMessage", () => {
     });
   });
 
+  describe("missing field fallbacks", () => {
+    it("handles missing refereeName, role, homeTeam, guestTeam in unassigned (de)", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_UNASSIGNED,
+        { matchNo: 1 },
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?");
+      expect(result!.body).toContain(" vs ");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles missing refereeName, role, homeTeam, guestTeam in unassigned (en)", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_UNASSIGNED,
+        { matchNo: 1 },
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?");
+      expect(result!.body).toContain("removed from");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles missing all fields in reassigned (de)", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_REASSIGNED,
+        { matchNo: 1 },
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?");
+      expect(result!.body).toContain("ersetzt");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles missing all fields in reassigned (en)", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_REASSIGNED,
+        { matchNo: 1 },
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?");
+      expect(result!.body).toContain("replaces");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles empty payload in assigned (en)", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_ASSIGNED,
+        {},
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?");
+      expect(result!.body).toContain("assigned to");
+      expect(result!.body).not.toContain("undefined");
+    });
+  });
+
   describe("unknown event type", () => {
     it("returns null for non-referee events", () => {
       const result = renderRefereeMessage(

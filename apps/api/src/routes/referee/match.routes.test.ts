@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getMatchesWithOpenSlots: vi.fn(),
   recordTakeIntent: vi.fn(),
   cancelTakeIntent: vi.fn(),
+  verifyMatchAssignment: vi.fn(),
 }));
 
 vi.mock("../../middleware/auth", () => ({
@@ -50,6 +51,7 @@ vi.mock("../../services/referee/referee-match.service", () => ({
   getMatchesWithOpenSlots: (...args: unknown[]) => mocks.getMatchesWithOpenSlots(...args),
   recordTakeIntent: (...args: unknown[]) => mocks.recordTakeIntent(...args),
   cancelTakeIntent: (...args: unknown[]) => mocks.cancelTakeIntent(...args),
+  verifyMatchAssignment: (...args: unknown[]) => mocks.verifyMatchAssignment(...args),
 }));
 
 // --- Imports (after mocks) ---
@@ -349,5 +351,57 @@ describe("DELETE /referee/matches/:id/intent/:refereeId (admin)", () => {
 
     expect(res.status).toBe(404);
     expect(await json(res)).toEqual({ error: "No pending intent found" });
+  });
+});
+
+describe("POST /referee/matches/:id/verify", () => {
+  it("returns verified result on success", async () => {
+    mockDbUserFound(42);
+    const mockResult = { verified: true, matchId: 5, refereeId: 42 };
+    mocks.verifyMatchAssignment.mockResolvedValue(mockResult);
+
+    const res = await app.request("/referee/matches/5/verify", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(mockResult);
+    expect(mocks.verifyMatchAssignment).toHaveBeenCalledWith(5, 42);
+  });
+
+  it("returns 400 if user has no refereeId", async () => {
+    mockDbUserFound(null);
+
+    const res = await app.request("/referee/matches/5/verify", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toEqual({ error: "User not linked to a referee record" });
+    expect(mocks.verifyMatchAssignment).not.toHaveBeenCalled();
+  });
+
+  it("passes through 404 error from service", async () => {
+    mockDbUserFound(42);
+    mocks.verifyMatchAssignment.mockResolvedValue({ error: "Match not found", status: 404 });
+
+    const res = await app.request("/referee/matches/999/verify", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toEqual({ error: "Match not found" });
+  });
+
+  it("passes through 502 error from service", async () => {
+    mockDbUserFound(42);
+    mocks.verifyMatchAssignment.mockResolvedValue({ error: "Upstream verification failed", status: 502 });
+
+    const res = await app.request("/referee/matches/5/verify", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(502);
+    expect(await json(res)).toEqual({ error: "Upstream verification failed" });
   });
 });

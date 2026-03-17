@@ -88,6 +88,53 @@ describe("renderBookingMessage", () => {
     });
   });
 
+  describe(`${EVENT_TYPES.BOOKING_STATUS_CHANGED} (cancelled variant)`, () => {
+    const cancelledPayload = {
+      venueName: "Sporthalle Ost",
+      date: "2026-05-01",
+      reason: "Doppelbelegung",
+    };
+
+    it("renders cancelled booking in German with reason", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        cancelledPayload,
+        "Sporthalle Ost",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Buchung storniert");
+      expect(result!.body).toContain("storniert");
+      expect(result!.body).toContain("Doppelbelegung");
+    });
+
+    it("renders cancelled booking in English with reason", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        cancelledPayload,
+        "Sporthalle Ost",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Booking cancelled");
+      expect(result!.body).toContain("cancelled");
+      expect(result!.body).toContain("Doppelbelegung");
+    });
+
+    it("renders cancelled booking without reason", () => {
+      const noReason = { venueName: "Sporthalle Ost", date: "2026-05-01" };
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        noReason,
+        "Sporthalle Ost",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("storniert");
+      expect(result!.body).not.toContain("(");
+    });
+  });
+
   describe(EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION, () => {
     const payload = {
       venueName: "Sporthalle Mitte",
@@ -118,6 +165,99 @@ describe("renderBookingMessage", () => {
       expect(result).not.toBeNull();
       expect(result!.title).toContain("Reconfirmation needed");
       expect(result!.body).toContain("needs reconfirmation");
+    });
+  });
+
+  describe("missing field fallbacks", () => {
+    it("handles missing time fields in time-change variant", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        { venueName: "Halle", changeType: "time_change", newStartTime: "19:00" },
+        "Halle",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Buchungszeit");
+      expect(result!.body).not.toContain("undefined");
+      // date fallback => empty string
+      expect(result!.body).toContain("Halle am :");
+    });
+
+    it("handles missing time fields in time-change variant (English)", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        { venueName: "Halle", oldStartTime: "18:00" },
+        "Halle",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Booking time changed");
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles missing date in time-change variant", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        {
+          venueName: "Halle",
+          oldStartTime: "18:00",
+          oldEndTime: "20:00",
+          newStartTime: "19:00",
+          newEndTime: "21:00",
+        },
+        "Halle",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      // date is missing so formatDate is not called, empty string used
+      expect(result!.body).not.toContain("undefined");
+    });
+
+    it("handles missing date and reason in reconfirmation", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION,
+        { venueName: "Halle" },
+        "Halle",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).not.toContain("undefined");
+      // reason fallback => no trailing text
+      expect(result!.body).toContain("werden.");
+    });
+
+    it("handles missing date and reason in reconfirmation (English)", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION,
+        { venueName: "Halle" },
+        "Halle",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).not.toContain("undefined");
+      expect(result!.body).toContain("reconfirmation.");
+    });
+
+    it("handles missing venueName with ?? fallback", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_CREATED,
+        {},
+        "entity",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("?");
+    });
+
+    it("handles missing startTime and endTime in booking created", () => {
+      const result = renderBookingMessage(
+        EVENT_TYPES.BOOKING_CREATED,
+        { venueName: "Halle", date: "2026-04-15" },
+        "Halle",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).not.toContain("undefined");
     });
   });
 

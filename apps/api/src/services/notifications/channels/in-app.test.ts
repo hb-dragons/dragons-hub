@@ -190,4 +190,37 @@ describe("InAppChannelAdapter", () => {
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
   });
+
+  it("handles non-Error exceptions with fallback message", async () => {
+    // Temporarily swap out the db proxy to throw a non-Error value
+    const realRef = dbHolder.ref;
+    dbHolder.ref = {
+      insert: () => ({
+        values: () => ({
+          onConflictDoNothing: () => ({
+            returning: () => Promise.reject("raw string rejection"),
+          }),
+        }),
+      }),
+    };
+
+    const adapter = new InAppChannelAdapter();
+    const result = await adapter.send({
+      eventId: "evt-001",
+      watchRuleId: null,
+      channelConfigId: 1,
+      recipientId: "user-1",
+      title: "Non-Error throw",
+      body: "Test body",
+      locale: "de",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Unknown error during in-app delivery",
+    });
+
+    // Restore real db
+    dbHolder.ref = realRef;
+  });
 });

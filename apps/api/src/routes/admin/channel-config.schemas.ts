@@ -21,7 +21,8 @@ export const createChannelConfigSchema = z.object({
 
 export const updateChannelConfigSchema = z.object({
   name: z.string().min(1).optional(),
-  type: z.enum(["in_app", "whatsapp_group", "push", "email"]).optional(),
+  // type is immutable after creation — changing it would invalidate
+  // existing watch rules and notification_log entries referencing this config.
   enabled: z.boolean().optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   digestMode: z.enum(["per_sync", "scheduled", "none"]).optional(),

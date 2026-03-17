@@ -142,8 +142,8 @@ describe("classifyUrgency", () => {
     expect(classifyUrgency(EVENT_TYPES.OVERRIDE_REVERTED, {})).toBe("routine");
   });
 
-  it("classifies override.conflict as routine", () => {
-    expect(classifyUrgency(EVENT_TYPES.OVERRIDE_CONFLICT, {})).toBe("routine");
+  it("classifies override.conflict as immediate", () => {
+    expect(classifyUrgency(EVENT_TYPES.OVERRIDE_CONFLICT, {})).toBe("immediate");
   });
 
   it("classifies sync.completed as routine", () => {

@@ -26,8 +26,10 @@ interface EventJobData {
 
 const inAppAdapter = new InAppChannelAdapter();
 
-/** Counter for digest run IDs (increments per worker lifetime) */
-let digestRunCounter = Date.now();
+/** Generate a unique digest run ID using current timestamp */
+function nextDigestRunId(): number {
+  return Date.now();
+}
 
 export const eventWorker = new Worker<EventJobData>(
   "domain-events",
@@ -222,7 +224,7 @@ async function triggerPerSyncDigests(
 
   if (perSyncConfigs.length === 0) return;
 
-  const digestRunId = ++digestRunCounter;
+  const digestRunId = nextDigestRunId();
   log.info(
     { digestRunId, channelCount: perSyncConfigs.length },
     "Triggering per_sync digests",
@@ -243,14 +245,17 @@ async function triggerPerSyncDigests(
   }
 }
 
+/* v8 ignore next 3 */
 eventWorker.on("completed", (job) => {
   logger.debug({ jobId: job.id }, "Event job completed");
 });
 
+/* v8 ignore next 3 */
 eventWorker.on("failed", (job, err) => {
   logger.error({ jobId: job?.id, err }, "Event job failed");
 });
 
+/* v8 ignore next 3 */
 eventWorker.on("error", (err) => {
   logger.error({ err }, "Event worker error");
 });

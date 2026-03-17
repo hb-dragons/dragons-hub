@@ -149,6 +149,17 @@ describe("buildCalendarFeed", () => {
     expect(ics).toContain("Turnhalle Mitte");
   });
 
+  it("includes city without postal code in location", () => {
+    const ics = unfold(buildCalendarFeed(
+      [makeMatch({ venuePostalCode: null, venueCity: "Berlin" })],
+      {},
+    ));
+    expect(ics).toContain("Berlin");
+    expect(ics).not.toContain("null Berlin");
+    // Should have street and city separated by comma, without postal code
+    expect(ics).toContain("Parkstr. 1");
+  });
+
   // --- Status ---
 
   it("marks cancelled matches as CANCELLED", () => {

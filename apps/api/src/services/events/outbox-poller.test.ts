@@ -182,4 +182,31 @@ describe("startOutboxPoller / stopOutboxPoller", () => {
     // Should not throw
     stopOutboxPoller();
   });
+
+  it("logs error when pollOutbox rejects inside interval callback", async () => {
+    vi.useFakeTimers();
+
+    // Make pollOutbox reject by having the select chain throw
+    mockSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockRejectedValue(new Error("DB connection lost")),
+        }),
+      }),
+    });
+
+    startOutboxPoller(100);
+
+    // Advance past one interval tick
+    await vi.advanceTimersByTimeAsync(150);
+
+    const { logger: mockLogger } = await import("../../config/logger");
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Error) }),
+      "Outbox poller iteration failed",
+    );
+
+    stopOutboxPoller();
+    vi.useRealTimers();
+  });
 });

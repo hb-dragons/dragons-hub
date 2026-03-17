@@ -94,7 +94,6 @@ export async function updateChannelConfig(
   const updates: Record<string, unknown> = { updatedAt: new Date() };
 
   if (data.name !== undefined) updates.name = data.name;
-  if (data.type !== undefined) updates.type = data.type;
   if (data.enabled !== undefined) updates.enabled = data.enabled;
   if (data.config !== undefined) updates.config = data.config;
   if (data.digestMode !== undefined) updates.digestMode = data.digestMode;

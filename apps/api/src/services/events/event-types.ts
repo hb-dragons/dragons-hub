@@ -18,6 +18,7 @@ const ALWAYS_IMMEDIATE = new Set<string>([
   EVENT_TYPES.MATCH_CANCELLED,
   EVENT_TYPES.MATCH_FORFEITED,
   EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION,
+  EVENT_TYPES.OVERRIDE_CONFLICT,
 ]);
 
 // Events whose urgency depends on whether affected dates are within 7 days

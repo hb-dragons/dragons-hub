@@ -37,7 +37,6 @@ export interface CreateChannelConfigBody {
 
 export interface UpdateChannelConfigBody {
   name?: string;
-  type?: ChannelType;
   enabled?: boolean;
   config?: Record<string, unknown>;
   digestMode?: DigestMode;

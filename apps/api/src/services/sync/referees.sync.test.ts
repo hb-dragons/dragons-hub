@@ -27,8 +27,9 @@ vi.mock("../../config/database", () => ({
   },
 }));
 
+const mockPublishDomainEvent = vi.fn().mockResolvedValue({ id: "mock-event-id" });
 vi.mock("../events/event-publisher", () => ({
-  publishDomainEvent: vi.fn().mockResolvedValue({ id: "mock-event-id" }),
+  publishDomainEvent: (...args: unknown[]) => mockPublishDomainEvent(...args),
 }));
 
 vi.mock("@dragons/db/schema", () => ({
@@ -111,6 +112,26 @@ function buildBatchSelectChain(result: unknown) {
       where: vi.fn().mockReturnValue(whereResult),
     }),
   };
+}
+
+/**
+ * Set up mock select calls for the batch-loaded lookup maps
+ * used by syncRefereeAssignmentsFromData for event emission.
+ * Call after setting up the existing-assignments batch select mock.
+ */
+function mockBatchLookups() {
+  // referee names batch
+  mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+    { id: 1, firstName: "John", lastName: "Doe" },
+  ]));
+  // match info batch
+  mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+    { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
+  ]));
+  // role names batch
+  mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+    { id: 2, name: "SR1" },
+  ]));
 }
 
 beforeEach(() => {
@@ -457,6 +478,7 @@ describe("syncRefereeAssignmentsFromData", () => {
     ];
     // Batch-load returns no existing assignments
     mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockBatchLookups();
     mockInsert.mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
     });
@@ -479,6 +501,7 @@ describe("syncRefereeAssignmentsFromData", () => {
     mockSelect.mockReturnValueOnce(buildBatchSelectChain([
       { id: 1, matchId: 3, slotNumber: 1, refereeId: 1, roleId: 2 },
     ]));
+    mockBatchLookups();
 
     const result = await syncRefereeAssignmentsFromData(
       assignments,
@@ -497,6 +520,7 @@ describe("syncRefereeAssignmentsFromData", () => {
     ];
     // Batch-load returns no existing assignments
     mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockBatchLookups();
     // Insert fails
     mockInsert.mockReturnValue({
       values: vi.fn().mockRejectedValue(new Error("DB error")),
@@ -518,6 +542,7 @@ describe("syncRefereeAssignmentsFromData", () => {
     ];
     // Batch-load returns no existing assignments
     mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockBatchLookups();
     mockInsert.mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
     });
@@ -542,6 +567,7 @@ describe("syncRefereeAssignmentsFromData", () => {
     ];
     // Batch-load returns no existing assignments
     mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockBatchLookups();
     // Insert fails
     mockInsert.mockReturnValue({
       values: vi.fn().mockRejectedValue(new Error("fail")),
@@ -567,6 +593,7 @@ describe("syncRefereeAssignmentsFromData", () => {
     ];
     // Batch-load returns no existing assignments
     mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockBatchLookups();
     // Insert fails with non-Error
     mockInsert.mockReturnValue({
       values: vi.fn().mockRejectedValue("string"),
@@ -590,6 +617,7 @@ describe("syncRefereeAssignmentsFromData", () => {
     mockSelect.mockReturnValueOnce(buildBatchSelectChain([
       { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
     ]));
+    mockBatchLookups();
     mockUpdate.mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
@@ -607,7 +635,177 @@ describe("syncRefereeAssignmentsFromData", () => {
     expect(mockUpdate).toHaveBeenCalled();
   });
 
-  it("batch-loads existing assignments before processing loop", async () => {
+  it("emits referee.assigned event with correct payload and syncRunId", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockBatchLookups();
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+      undefined,
+      42,
+    );
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "referee.assigned",
+        source: "sync",
+        entityType: "referee",
+        entityId: 3,
+        syncRunId: 42,
+        payload: expect.objectContaining({
+          refereeName: "John Doe",
+          refereeId: 1,
+          teamIds: [100, 200],
+          role: "SR1",
+        }),
+      }),
+    );
+  });
+
+  it("emits referee.reassigned event with syncRunId when referee changed", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    // Existing assignment has different referee (id: 99)
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
+    ]));
+    // Batch lookups need to include both old (99) and new (1) referee
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 1, firstName: "John", lastName: "Doe" },
+      { id: 99, firstName: "Old", lastName: "Ref" },
+    ]));
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
+    ]));
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 2, name: "SR1" },
+    ]));
+    mockUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+      undefined,
+      99,
+    );
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "referee.reassigned",
+        source: "sync",
+        syncRunId: 99,
+        payload: expect.objectContaining({
+          oldRefereeName: "Old Ref",
+          newRefereeName: "John Doe",
+          oldRefereeId: 99,
+          newRefereeId: 1,
+        }),
+      }),
+    );
+  });
+
+  it("passes null syncRunId when not provided", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockBatchLookups();
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        syncRunId: null,
+      }),
+    );
+  });
+
+  it("logs warning when publishDomainEvent throws during referee.assigned", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockBatchLookups();
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockResolvedValue(undefined),
+    });
+    mockPublishDomainEvent.mockRejectedValueOnce(new Error("publish failed"));
+
+    const result = await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    // Assignment still created despite event emission failure
+    expect(result.created).toBe(1);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("logs warning when publishDomainEvent throws during referee.reassigned", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    // Existing assignment has different referee (id: 99)
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
+    ]));
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 1, firstName: "John", lastName: "Doe" },
+      { id: 99, firstName: "Old", lastName: "Ref" },
+    ]));
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
+    ]));
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 2, name: "SR1" },
+    ]));
+    mockUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+    mockPublishDomainEvent.mockRejectedValueOnce(new Error("publish failed"));
+
+    const result = await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    // Update still succeeds despite event emission failure
+    expect(result.created).toBe(0);
+    expect(result.errors).toHaveLength(0);
+    expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it("batch-loads existing assignments and lookup data before processing loop", async () => {
     const assignments: ExtractedRefereeAssignment[] = [
       { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
       { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 2 },
@@ -616,10 +814,8 @@ describe("syncRefereeAssignmentsFromData", () => {
     mockSelect.mockReturnValueOnce(buildBatchSelectChain([
       { id: 1, matchId: 3, slotNumber: 1, refereeId: 1, roleId: 2 },
     ]));
-    // Additional SELECTs for event emission (referee name, match info, role name)
-    mockSelect.mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([{ firstName: "John", lastName: "Doe" }]) }) }) });
-    mockSelect.mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([{ matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 }]) }) }) });
-    mockSelect.mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([{ name: "Referee 1" }]) }) }) });
+    // Batch lookup maps for event emission
+    mockBatchLookups();
     mockInsert.mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
     });
@@ -631,7 +827,7 @@ describe("syncRefereeAssignmentsFromData", () => {
       matchIdLookup,
     );
 
-    // First SELECT is batch-load, subsequent ones are for event emission (referee name, match info, role name)
+    // 1 existing assignments + 3 batch lookups (referees, matches, roles)
     expect(mockSelect).toHaveBeenCalledTimes(4);
     // Slot 1 exists, slot 2 is new
     expect(result.created).toBe(1);

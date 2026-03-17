@@ -25,28 +25,40 @@ export async function pollOutbox(): Promise<number> {
 
   if (pending.length === 0) return 0;
 
+  // Process in batches of 10 for better throughput
+  const BATCH_SIZE = 10;
   let enqueued = 0;
-  for (const event of pending) {
-    try {
-      await domainEventsQueue.add(event.type, {
-        eventId: event.id,
-        type: event.type,
-        urgency: event.urgency,
-        entityType: event.entityType,
-        entityId: event.entityId,
-      });
 
-      await db
-        .update(domainEvents)
-        .set({ enqueuedAt: new Date() })
-        .where(eq(domainEvents.id, event.id));
+  for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+    const batch = pending.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map(async (event) => {
+        await domainEventsQueue.add(event.type, {
+          eventId: event.id,
+          type: event.type,
+          urgency: event.urgency,
+          entityType: event.entityType,
+          entityId: event.entityId,
+        });
 
-      enqueued++;
-    } catch (error) {
-      logger.error(
-        { eventId: event.id, error },
-        "Outbox poller failed to enqueue event",
-      );
+        await db
+          .update(domainEvents)
+          .set({ enqueuedAt: new Date() })
+          .where(eq(domainEvents.id, event.id));
+
+        return event.id;
+      }),
+    );
+
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        enqueued++;
+      } else {
+        logger.error(
+          { error: result.reason },
+          "Outbox poller failed to enqueue event",
+        );
+      }
     }
   }
 

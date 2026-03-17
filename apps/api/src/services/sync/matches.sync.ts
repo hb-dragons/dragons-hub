@@ -692,7 +692,7 @@ export async function syncMatchesFromData(
             // Compute effective changes (what actually changes in DB)
             const effective = computeEffectiveChanges(locked, updateSet);
 
-            // Auto-release: if remote matches current effective value
+            // Auto-release or conflict: check each overridden field
             for (const fieldName of overriddenSet) {
               const remoteVal = String(
                 remoteSnapshot[fieldName as keyof RemoteSnapshot] ?? "",
@@ -701,6 +701,7 @@ export async function syncMatchesFromData(
                 locked[fieldName as keyof typeof locked] ?? "",
               );
               if (remoteVal === lockedVal) {
+                // Remote now matches local override — auto-release
                 await tx
                   .delete(matchOverrides)
                   .where(
@@ -709,6 +710,29 @@ export async function syncMatchesFromData(
                       eq(matchOverrides.fieldName, fieldName),
                     ),
                   );
+              } else {
+                // Remote diverges from local override — emit conflict event
+                try {
+                  await publishDomainEvent({
+                    type: EVENT_TYPES.OVERRIDE_CONFLICT,
+                    source: "sync",
+                    entityType: "match",
+                    entityId: existing.id,
+                    entityName,
+                    deepLinkPath: `/admin/matches/${existing.id}`,
+                    payload: {
+                      matchNo: basicMatch.matchNo,
+                      homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
+                      guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
+                      fieldName,
+                      localValue: lockedVal,
+                      newRemoteValue: remoteVal,
+                    },
+                    syncRunId,
+                  });
+                } catch (error) {
+                  log.warn({ err: error, matchId: existing.id, fieldName }, "Failed to emit override.conflict event");
+                }
               }
             }
 
@@ -752,6 +776,7 @@ export async function syncMatchesFromData(
                   eventPayload.changes = effectiveChanges
                     .filter((c) => c.fieldName === "kickoffDate" || c.fieldName === "kickoffTime")
                     .map((c) => ({ field: c.fieldName, oldValue: c.oldValue, newValue: c.newValue }));
+                /* v8 ignore next 6 */ // venueId not in TRACKED_FIELDS — dead branch until venue tracking is implemented
                 } else if (eventType === EVENT_TYPES.MATCH_VENUE_CHANGED) {
                   const venueChange = effectiveChanges.find((c) => c.fieldName === "venueId");
                   eventPayload.oldVenueId = venueChange?.oldValue ? Number(venueChange.oldValue) : null;

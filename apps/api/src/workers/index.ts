@@ -1,7 +1,7 @@
 import { syncWorker } from "./sync.worker";
 import { eventWorker } from "./event.worker";
 import { digestWorker } from "./digest.worker";
-import { initializeScheduledJobs, syncQueue, digestQueue } from "./queues";
+import { initializeScheduledJobs, syncQueue, digestQueue, domainEventsQueue } from "./queues";
 import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-poller";
 import { db } from "../config/database";
 import { logger } from "../config/logger";
@@ -95,42 +95,56 @@ export async function cleanupOldSyncRuns(retentionDays: number = 90): Promise<nu
   return oldRuns.length;
 }
 
+const CLEANUP_BATCH_SIZE = 500;
+
 export async function cleanupOldDomainEvents(
   retentionDays: number = 365,
 ): Promise<{ notifications: number; digestEntries: number; events: number }> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - retentionDays);
 
-  const oldEventIds = await db
-    .select({ id: domainEvents.id })
-    .from(domainEvents)
-    .where(lt(domainEvents.occurredAt, cutoff));
+  let totalNotifications = 0;
+  let totalDigestEntries = 0;
+  let totalEvents = 0;
 
-  if (oldEventIds.length === 0) {
-    return { notifications: 0, digestEntries: 0, events: 0 };
+  // Process in batches to avoid loading thousands of IDs into memory
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const batch = await db
+      .select({ id: domainEvents.id })
+      .from(domainEvents)
+      .where(lt(domainEvents.occurredAt, cutoff))
+      .limit(CLEANUP_BATCH_SIZE);
+
+    if (batch.length === 0) break;
+
+    const ids = batch.map((e) => e.id);
+
+    // Delete FK-dependent rows first, then the events
+    const deletedNotifications = await db
+      .delete(notificationLog)
+      .where(inArray(notificationLog.eventId, ids))
+      .returning({ id: notificationLog.id });
+
+    const deletedDigest = await db
+      .delete(digestBuffer)
+      .where(inArray(digestBuffer.eventId, ids))
+      .returning({ id: digestBuffer.id });
+
+    await db.delete(domainEvents).where(inArray(domainEvents.id, ids));
+
+    totalNotifications += deletedNotifications.length;
+    totalDigestEntries += deletedDigest.length;
+    totalEvents += batch.length;
+
+    // If we got fewer than batch size, we're done
+    if (batch.length < CLEANUP_BATCH_SIZE) break;
   }
 
-  const ids = oldEventIds.map((e) => e.id);
-
-  // Delete notification_log entries referencing old domain events
-  const deletedNotifications = await db
-    .delete(notificationLog)
-    .where(inArray(notificationLog.eventId, ids))
-    .returning({ id: notificationLog.id });
-
-  // Delete digest_buffer entries referencing old domain events
-  const deletedDigest = await db
-    .delete(digestBuffer)
-    .where(inArray(digestBuffer.eventId, ids))
-    .returning({ id: digestBuffer.id });
-
-  // Delete the domain events themselves
-  await db.delete(domainEvents).where(inArray(domainEvents.id, ids));
-
   return {
-    notifications: deletedNotifications.length,
-    digestEntries: deletedDigest.length,
-    events: oldEventIds.length,
+    notifications: totalNotifications,
+    digestEntries: totalDigestEntries,
+    events: totalEvents,
   };
 }
 
@@ -155,8 +169,6 @@ export async function initializeScheduledDigests(): Promise<void> {
       ),
     );
 
-  let digestRunCounter = Date.now();
-
   for (const channel of scheduledChannels) {
     if (!channel.digestCron) {
       logger.warn(
@@ -170,7 +182,7 @@ export async function initializeScheduledDigests(): Promise<void> {
       `scheduled-digest:${channel.id}`,
       {
         channelConfigId: channel.id,
-        digestRunId: ++digestRunCounter,
+        digestRunId: Date.now(),
       },
       {
         repeat: {
@@ -219,6 +231,7 @@ export async function shutdownWorkers() {
   await digestWorker.close();
   await eventWorker.close();
   await syncWorker.close();
+  await domainEventsQueue.close();
   await digestQueue.close();
   await syncQueue.close();
 

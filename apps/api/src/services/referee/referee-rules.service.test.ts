@@ -39,7 +39,7 @@ vi.mock("drizzle-orm", () => ({
   inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
 }));
 
-import { getRulesForReferee, updateRulesForReferee, hasAnyRules } from "./referee-rules.service";
+import { getRulesForReferee, updateRulesForReferee, hasAnyRules, getRuleForRefereeAndTeam, getAllowedTeamIdsForReferee } from "./referee-rules.service";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -123,5 +123,58 @@ describe("hasAnyRules", () => {
 
     const result = await hasAnyRules(1);
     expect(result).toBe(true);
+  });
+});
+
+describe("getRuleForRefereeAndTeam", () => {
+  it("returns rule when found", async () => {
+    const rule = { deny: false, allowSr1: true, allowSr2: false };
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => [rule],
+        }),
+      }),
+    });
+
+    const result = await getRuleForRefereeAndTeam(1, 42);
+    expect(result).toEqual(rule);
+  });
+
+  it("returns null when no rule exists", async () => {
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => [],
+        }),
+      }),
+    });
+
+    const result = await getRuleForRefereeAndTeam(1, 999);
+    expect(result).toBeNull();
+  });
+});
+
+describe("getAllowedTeamIdsForReferee", () => {
+  it("returns team IDs for referee", async () => {
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => [{ teamId: 10 }, { teamId: 20 }, { teamId: 30 }],
+      }),
+    });
+
+    const result = await getAllowedTeamIdsForReferee(1);
+    expect(result).toEqual([10, 20, 30]);
+  });
+
+  it("returns empty array when no rules exist", async () => {
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => [],
+      }),
+    });
+
+    const result = await getAllowedTeamIdsForReferee(999);
+    expect(result).toEqual([]);
   });
 });

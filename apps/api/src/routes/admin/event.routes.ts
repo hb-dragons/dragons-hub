@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
+import type { AppEnv } from "../../types";
 import { listDomainEvents } from "../../services/admin/event-admin.service";
 import { eventListQuerySchema } from "./event.schemas";
 
-const eventRoutes = new Hono();
+const eventRoutes = new Hono<AppEnv>();
 
 // GET /admin/events - List domain events
 eventRoutes.get(

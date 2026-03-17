@@ -7,11 +7,13 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   getTrackedLeagues: vi.fn(),
   resolveAndSaveLeagues: vi.fn(),
+  setLeagueOwnClubRefs: vi.fn(),
 }));
 
 vi.mock("../../services/admin/league-discovery.service", () => ({
   getTrackedLeagues: mocks.getTrackedLeagues,
   resolveAndSaveLeagues: mocks.resolveAndSaveLeagues,
+  setLeagueOwnClubRefs: mocks.setLeagueOwnClubRefs,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -137,6 +139,44 @@ describe("PUT /settings/leagues", () => {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leagueNumbers: [4102.5] }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("PATCH /settings/leagues/:id/own-club-refs", () => {
+  it("sets ownClubRefs and returns ok", async () => {
+    mocks.setLeagueOwnClubRefs.mockResolvedValue(undefined);
+
+    const res = await app.request("/settings/leagues/7/own-club-refs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ownClubRefs: true }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ ok: true });
+    expect(mocks.setLeagueOwnClubRefs).toHaveBeenCalledWith(7, true);
+  });
+
+  it("returns 400 for missing body", async () => {
+    const res = await app.request("/settings/leagues/7/own-club-refs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for non-boolean ownClubRefs", async () => {
+    const res = await app.request("/settings/leagues/7/own-club-refs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ownClubRefs: "yes" }),
     });
 
     expect(res.status).toBe(400);

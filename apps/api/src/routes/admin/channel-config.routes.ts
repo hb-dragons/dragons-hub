@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
+import type { AppEnv } from "../../types";
 import {
   listChannelConfigs,
   getChannelConfig,
@@ -14,7 +15,7 @@ import {
   updateChannelConfigSchema,
 } from "./channel-config.schemas";
 
-const channelConfigRoutes = new Hono();
+const channelConfigRoutes = new Hono<AppEnv>();
 
 // GET /admin/channel-configs - List channel configs
 channelConfigRoutes.get(

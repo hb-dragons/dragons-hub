@@ -8,7 +8,7 @@ export const domainEventsQueue = new Queue("domain-events", {
   prefix: "{bull}",
   connection: { url: env.REDIS_URL },
   defaultJobOptions: {
-    attempts: 1,
+    attempts: 1, // events are idempotent; outbox poller handles retries
     removeOnComplete: { count: 1000 },
     removeOnFail: { count: 5000 },
   },

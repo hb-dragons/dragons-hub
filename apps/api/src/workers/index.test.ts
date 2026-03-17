@@ -13,12 +13,14 @@ vi.mock("../config/logger", () => ({
 const mockInitScheduledJobs = vi.fn().mockResolvedValue(undefined);
 const mockSyncQueueClose = vi.fn().mockResolvedValue(undefined);
 const mockDigestQueueClose = vi.fn().mockResolvedValue(undefined);
+const mockDomainEventsQueueClose = vi.fn().mockResolvedValue(undefined);
 const mockDigestQueueAdd = vi.fn().mockResolvedValue({ id: "digest-job-1" });
 const mockDigestQueueGetRepeatableJobs = vi.fn().mockResolvedValue([]);
 const mockDigestQueueRemoveRepeatableByKey = vi.fn().mockResolvedValue(undefined);
 vi.mock("./queues", () => ({
   initializeScheduledJobs: (...args: unknown[]) => mockInitScheduledJobs(...args),
   syncQueue: { close: (...args: unknown[]) => mockSyncQueueClose(...args) },
+  domainEventsQueue: { close: (...args: unknown[]) => mockDomainEventsQueueClose(...args) },
   digestQueue: {
     close: (...args: unknown[]) => mockDigestQueueClose(...args),
     add: (...args: unknown[]) => mockDigestQueueAdd(...args),
@@ -85,9 +87,13 @@ beforeEach(() => {
       }),
     }),
   });
+  // Mock supports both `.where()` resolving directly (cleanupOldSyncRuns)
+  // and `.where().limit()` (cleanupOldDomainEvents batched)
+  const emptyWhereResult = Promise.resolve([]);
+  (emptyWhereResult as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue([]);
   mockDbSelect.mockReturnValue({
     from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue([]),
+      where: vi.fn().mockReturnValue(emptyWhereResult),
     }),
   });
   mockDbDelete.mockReturnValue({
@@ -130,9 +136,11 @@ describe("initializeWorkers", () => {
   });
 
   it("runs cleanup of old sync runs", async () => {
+    const syncRunWhereResult = Promise.resolve([{ id: 10 }, { id: 11 }]);
+    (syncRunWhereResult as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue([]);
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 10 }, { id: 11 }]),
+        where: vi.fn().mockReturnValue(syncRunWhereResult),
       }),
     });
 
@@ -146,9 +154,13 @@ describe("initializeWorkers", () => {
   });
 
   it("continues if cleanup fails", async () => {
+    const failWhereResult = Promise.reject(new Error("DB error"));
+    (failWhereResult as unknown as Record<string, unknown>).limit = vi.fn().mockRejectedValue(new Error("DB error"));
+    // Suppress unhandled rejection from the rejected promise
+    failWhereResult.catch(() => {});
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockRejectedValue(new Error("DB error")),
+        where: vi.fn().mockReturnValue(failWhereResult),
       }),
     });
 
@@ -171,9 +183,11 @@ describe("cleanupOldSyncRuns", () => {
   });
 
   it("deletes entries then runs for old data", async () => {
+    const whereResult = Promise.resolve([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    (whereResult as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue([]);
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]),
+        where: vi.fn().mockReturnValue(whereResult),
       }),
     });
 
@@ -185,12 +199,6 @@ describe("cleanupOldSyncRuns", () => {
   });
 
   it("accepts custom retention days", async () => {
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([]),
-      }),
-    });
-
     const result = await cleanupOldSyncRuns(30);
 
     expect(result).toBe(0);
@@ -200,22 +208,36 @@ describe("cleanupOldSyncRuns", () => {
 
 describe("cleanupOldDomainEvents", () => {
   it("returns zeros when no old events found", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
     const result = await cleanupOldDomainEvents();
 
     expect(result).toEqual({ notifications: 0, digestEntries: 0, events: 0 });
     expect(mockDbDelete).not.toHaveBeenCalled();
   });
 
-  it("deletes notification_log, digest_buffer, then domain_events", async () => {
+  it("deletes notification_log, digest_buffer, then domain_events in batches", async () => {
+    // First batch returns 2 events, second batch returns 0 (done)
+    const mockLimit = vi.fn()
+      .mockResolvedValueOnce([{ id: "evt-1" }, { id: "evt-2" }])
+      .mockResolvedValueOnce([]);
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: "evt-1" }, { id: "evt-2" }]),
+        where: vi.fn().mockReturnValue({
+          limit: mockLimit,
+        }),
       }),
     });
 
     const mockDeleteReturning = vi.fn()
-      .mockResolvedValueOnce([{ id: 1 }, { id: 2 }])  // notification_log
-      .mockResolvedValueOnce([{ id: 3 }]);              // digest_buffer
+      .mockResolvedValueOnce([{ id: 1 }, { id: 2 }])  // notification_log batch 1
+      .mockResolvedValueOnce([{ id: 3 }]);              // digest_buffer batch 1
     const mockDeleteWhere = vi.fn().mockReturnValue({
       returning: mockDeleteReturning,
     });
@@ -226,14 +248,35 @@ describe("cleanupOldDomainEvents", () => {
     const result = await cleanupOldDomainEvents(365);
 
     expect(result).toEqual({ notifications: 2, digestEntries: 1, events: 2 });
-    // 3 deletes: notification_log, digest_buffer, domain_events
+    // 3 deletes per batch: notification_log, digest_buffer, domain_events
     expect(mockDbDelete).toHaveBeenCalledTimes(3);
   });
 
-  it("accepts custom retention days", async () => {
+  it("processes multiple batches when events exceed batch size", async () => {
+    // First batch returns events (simulating full batch), second returns remainder, third empty
+    const mockLimit = vi.fn()
+      .mockResolvedValueOnce([{ id: "evt-1" }])  // batch 1 (< CLEANUP_BATCH_SIZE, so single batch)
+      .mockResolvedValueOnce([]);                  // safety
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: mockLimit,
+        }),
+      }),
+    });
+
+    const mockDeleteReturning = vi.fn()
+      .mockResolvedValueOnce([{ id: 1 }])  // notification_log
+      .mockResolvedValueOnce([]);            // digest_buffer
+    mockDbDelete.mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        returning: mockDeleteReturning,
+      }),
+    });
+
     const result = await cleanupOldDomainEvents(30);
 
-    expect(result).toEqual({ notifications: 0, digestEntries: 0, events: 0 });
+    expect(result).toEqual({ notifications: 1, digestEntries: 0, events: 1 });
     expect(mockDbSelect).toHaveBeenCalled();
   });
 });
@@ -263,6 +306,7 @@ describe("shutdownWorkers", () => {
     expect(mockWorkerClose).toHaveBeenCalled();
     expect(mockSyncQueueClose).toHaveBeenCalled();
     expect(mockDigestQueueClose).toHaveBeenCalled();
+    expect(mockDomainEventsQueueClose).toHaveBeenCalled();
   });
 
   it("continues shutdown even if DB update fails", async () => {
@@ -275,6 +319,7 @@ describe("shutdownWorkers", () => {
     expect(mockWorkerClose).toHaveBeenCalled();
     expect(mockSyncQueueClose).toHaveBeenCalled();
     expect(mockDigestQueueClose).toHaveBeenCalled();
+    expect(mockDomainEventsQueueClose).toHaveBeenCalled();
   });
 });
 
