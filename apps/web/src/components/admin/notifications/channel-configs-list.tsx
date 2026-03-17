@@ -116,7 +116,7 @@ export function ChannelConfigsList() {
   const [form, setForm] = useState<ChannelFormState>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
 
-  const channels = result?.channels ?? [];
+  const channels = result?.configs ?? [];
 
   function openCreate() {
     setEditingChannel(null);

@@ -121,7 +121,7 @@ export interface ChannelConfigItem {
 }
 
 export interface ChannelConfigListResult {
-  channels: ChannelConfigItem[];
+  configs: ChannelConfigItem[];
   total: number;
 }
 

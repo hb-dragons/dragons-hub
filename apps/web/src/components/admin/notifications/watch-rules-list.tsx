@@ -137,7 +137,7 @@ export function WatchRulesList() {
   const [submitting, setSubmitting] = useState(false);
 
   const rules = rulesResult?.rules ?? [];
-  const availableChannels = channelsResult?.channels ?? [];
+  const availableChannels = channelsResult?.configs ?? [];
 
   function openCreate() {
     setEditingRule(null);
