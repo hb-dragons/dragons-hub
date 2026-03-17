@@ -13,6 +13,8 @@ import { computeEntityHash } from "./hash";
 import type { SyncLogger } from "./sync-logger";
 import type { CurrentRemoteSnapshot } from "@dragons/db/schema";
 import { logger } from "../../config/logger";
+import { publishDomainEvent } from "../events/event-publisher";
+import { EVENT_TYPES } from "@dragons/shared";
 
 const log = logger.child({ service: "matches-sync" });
 
@@ -435,6 +437,56 @@ const SNAPSHOT_DB_FIELDS = [
   "sr3Open",
 ] as const;
 
+/**
+ * Determine which domain events to emit based on the fields that changed.
+ * Returns an array of event types to publish.
+ */
+function classifyMatchChanges(
+  effectiveChanges: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }>,
+): string[] {
+  const eventTypes: string[] = [];
+  const changedFields = new Set(effectiveChanges.map((c) => c.fieldName));
+
+  if (changedFields.has("isCancelled")) {
+    const change = effectiveChanges.find((c) => c.fieldName === "isCancelled");
+    if (change?.newValue === "true") {
+      eventTypes.push(EVENT_TYPES.MATCH_CANCELLED);
+    }
+  }
+
+  if (changedFields.has("isForfeited")) {
+    const change = effectiveChanges.find((c) => c.fieldName === "isForfeited");
+    if (change?.newValue === "true") {
+      eventTypes.push(EVENT_TYPES.MATCH_FORFEITED);
+    }
+  }
+
+  if (changedFields.has("kickoffDate") || changedFields.has("kickoffTime")) {
+    eventTypes.push(EVENT_TYPES.MATCH_SCHEDULE_CHANGED);
+  }
+
+  if (changedFields.has("venueId")) {
+    eventTypes.push(EVENT_TYPES.MATCH_VENUE_CHANGED);
+  }
+
+  // Score changes
+  if (changedFields.has("homeScore") || changedFields.has("guestScore")) {
+    const homeChange = effectiveChanges.find((c) => c.fieldName === "homeScore");
+    const guestChange = effectiveChanges.find((c) => c.fieldName === "guestScore");
+    const hadScore =
+      (homeChange?.oldValue != null && homeChange.oldValue !== "null") ||
+      (guestChange?.oldValue != null && guestChange.oldValue !== "null");
+
+    if (hadScore) {
+      eventTypes.push(EVENT_TYPES.MATCH_RESULT_CHANGED);
+    } else {
+      eventTypes.push(EVENT_TYPES.MATCH_RESULT_ENTERED);
+    }
+  }
+
+  return eventTypes;
+}
+
 export { buildMatchEntityName };
 
 export async function syncMatchesFromData(
@@ -677,6 +729,64 @@ export async function syncMatchesFromData(
 
           if (effectiveChanges.length > 0) {
             result.updated++;
+
+            // Emit domain events based on what changed
+            const homeTeamName = basicMatch.homeTeam?.teamname ?? "Unknown";
+            const guestTeamName = basicMatch.guestTeam?.teamname ?? "Unknown";
+            const leagueName = data.leagueName ?? "";
+            const teamIds = [remoteSnapshot.homeTeamApiId, remoteSnapshot.guestTeamApiId];
+            const matchEventTypes = classifyMatchChanges(effectiveChanges);
+
+            for (const eventType of matchEventTypes) {
+              try {
+                const eventPayload: Record<string, unknown> = {
+                  matchNo: basicMatch.matchNo,
+                  homeTeam: homeTeamName,
+                  guestTeam: guestTeamName,
+                  leagueName,
+                  leagueId: data.leagueDbId,
+                  teamIds,
+                };
+
+                if (eventType === EVENT_TYPES.MATCH_SCHEDULE_CHANGED) {
+                  eventPayload.changes = effectiveChanges
+                    .filter((c) => c.fieldName === "kickoffDate" || c.fieldName === "kickoffTime")
+                    .map((c) => ({ field: c.fieldName, oldValue: c.oldValue, newValue: c.newValue }));
+                } else if (eventType === EVENT_TYPES.MATCH_VENUE_CHANGED) {
+                  const venueChange = effectiveChanges.find((c) => c.fieldName === "venueId");
+                  eventPayload.oldVenueId = venueChange?.oldValue ? Number(venueChange.oldValue) : null;
+                  eventPayload.oldVenueName = null;
+                  eventPayload.newVenueId = venueChange?.newValue ? Number(venueChange.newValue) : null;
+                  eventPayload.newVenueName = null;
+                } else if (eventType === EVENT_TYPES.MATCH_RESULT_ENTERED) {
+                  const homeScoreChange = effectiveChanges.find((c) => c.fieldName === "homeScore");
+                  const guestScoreChange = effectiveChanges.find((c) => c.fieldName === "guestScore");
+                  eventPayload.homeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : 0;
+                  eventPayload.guestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : 0;
+                } else if (eventType === EVENT_TYPES.MATCH_RESULT_CHANGED) {
+                  const homeScoreChange = effectiveChanges.find((c) => c.fieldName === "homeScore");
+                  const guestScoreChange = effectiveChanges.find((c) => c.fieldName === "guestScore");
+                  eventPayload.oldHomeScore = homeScoreChange?.oldValue ? Number(homeScoreChange.oldValue) : 0;
+                  eventPayload.oldGuestScore = guestScoreChange?.oldValue ? Number(guestScoreChange.oldValue) : 0;
+                  eventPayload.newHomeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : 0;
+                  eventPayload.newGuestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : 0;
+                }
+
+                await publishDomainEvent({
+                  type: eventType as import("@dragons/shared").EventType,
+                  source: "sync",
+                  entityType: "match",
+                  entityId: existing.id,
+                  entityName,
+                  deepLinkPath: `/admin/matches/${existing.id}`,
+                  payload: eventPayload,
+                  syncRunId,
+                });
+              } catch (error) {
+                log.warn({ err: error, eventType, matchId: existing.id }, "Failed to emit match event");
+              }
+            }
+
             await logger?.log({
               entityType: "match",
               entityId: String(apiMatchId),
@@ -749,6 +859,36 @@ export async function syncMatchesFromData(
           }
 
           result.created++;
+
+          // Emit match.created event for new match
+          if (newMatch) {
+            try {
+              await publishDomainEvent({
+                type: EVENT_TYPES.MATCH_CREATED,
+                source: "sync",
+                entityType: "match",
+                entityId: newMatch.id,
+                entityName,
+                deepLinkPath: `/admin/matches/${newMatch.id}`,
+                payload: {
+                  matchNo: basicMatch.matchNo,
+                  homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
+                  guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
+                  leagueId: data.leagueDbId,
+                  leagueName: data.leagueName ?? "",
+                  kickoffDate: remoteSnapshot.kickoffDate,
+                  kickoffTime: remoteSnapshot.kickoffTime,
+                  venueId: internalVenueId,
+                  venueName: null,
+                  teamIds: [remoteSnapshot.homeTeamApiId, remoteSnapshot.guestTeamApiId],
+                },
+                syncRunId,
+              });
+            } catch (error) {
+              log.warn({ err: error, matchId: newMatch.id }, "Failed to emit match.created event");
+            }
+          }
+
           await logger?.log({
             entityType: "match",
             entityId: String(apiMatchId),

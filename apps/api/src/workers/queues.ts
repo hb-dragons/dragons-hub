@@ -4,6 +4,27 @@ import { logger } from "../config/logger";
 import { db } from "../config/database";
 import { syncSchedule, syncRuns } from "@dragons/db/schema";
 
+export const domainEventsQueue = new Queue("domain-events", {
+  prefix: "{bull}",
+  connection: { url: env.REDIS_URL },
+  defaultJobOptions: {
+    attempts: 1,
+    removeOnComplete: { count: 1000 },
+    removeOnFail: { count: 5000 },
+  },
+});
+
+export const digestQueue = new Queue("digest", {
+  prefix: "{bull}",
+  connection: { url: env.REDIS_URL },
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 5000 },
+    removeOnComplete: { count: 100 },
+    removeOnFail: { count: 500 },
+  },
+});
+
 export const syncQueue = new Queue("sync", {
   prefix: "{bull}",
   connection: { url: env.REDIS_URL },

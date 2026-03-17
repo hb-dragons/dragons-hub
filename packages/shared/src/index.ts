@@ -97,6 +97,15 @@ export type {
   TrackedLeaguesResponse,
 } from "./leagues";
 
+// Domain events
+export * from "./domain-events";
+
+// Watch rules
+export * from "./watch-rules";
+
+// Channel configs
+export * from "./channel-configs";
+
 // Team colors
 export { COLOR_PRESETS, COLOR_PRESET_KEYS, getColorPreset } from "./team-colors";
 export type { ColorPreset, ColorPresetMode } from "./team-colors";

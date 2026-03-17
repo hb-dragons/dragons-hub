@@ -14,6 +14,20 @@ import type {
   BookingMatch,
   BookingStatus,
 } from "@dragons/shared";
+import { EVENT_TYPES } from "@dragons/shared";
+import { publishDomainEvent } from "../events/event-publisher";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "booking-admin" });
+
+async function getVenueName(venueId: number): Promise<string> {
+  const [venue] = await db
+    .select({ name: venues.name })
+    .from(venues)
+    .where(eq(venues.id, venueId))
+    .limit(1);
+  return venue?.name ?? "Unknown";
+}
 
 export interface BookingListFilters {
   status?: string;
@@ -229,6 +243,40 @@ export async function updateBooking(
     .from(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, id));
 
+  // Emit booking.status.changed if override times changed
+  const timeChanged =
+    data.overrideStartTime !== undefined || data.overrideEndTime !== undefined;
+  if (timeChanged && venue) {
+    try {
+      // Fetch old values for comparison
+      const oldStart = updated.overrideStartTime ?? updated.calculatedStartTime;
+      const oldEnd = updated.overrideEndTime ?? updated.calculatedEndTime;
+      const newStart = data.overrideStartTime ?? oldStart;
+      const newEnd = data.overrideEndTime ?? oldEnd;
+
+      if (oldStart !== newStart || oldEnd !== newEnd) {
+        await publishDomainEvent({
+          type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
+          source: "manual",
+          entityType: "booking",
+          entityId: id,
+          entityName: `${venue.name} - ${updated.date}`,
+          deepLinkPath: `/admin/bookings/${id}`,
+          payload: {
+            venueName: venue.name,
+            date: updated.date,
+            oldStartTime: oldStart,
+            oldEndTime: oldEnd,
+            newStartTime: newStart,
+            newEndTime: newEnd,
+          },
+        });
+      }
+    } catch (error) {
+      log.warn({ err: error, bookingId: id }, "Failed to emit booking.status.changed event");
+    }
+  }
+
   return {
     id: updated.id,
     venueId: updated.venueId,
@@ -291,6 +339,27 @@ export async function updateBookingStatus(
     .select({ count: count() })
     .from(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, id));
+
+  // Emit booking.status.changed event when status changes to cancelled
+  if (status === "cancelled") {
+    try {
+      await publishDomainEvent({
+        type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        source: "manual",
+        entityType: "booking",
+        entityId: id,
+        entityName: `${venue!.name} - ${updated.date}`,
+        deepLinkPath: `/admin/bookings/${id}`,
+        payload: {
+          venueName: venue!.name,
+          date: updated.date,
+          reason: "Status changed to cancelled",
+        },
+      });
+    } catch (error) {
+      log.warn({ err: error, bookingId: id }, "Failed to emit booking.status.changed event");
+    }
+  }
 
   return {
     id: updated.id,
@@ -375,10 +444,42 @@ export async function createBooking(
     }
   }
 
+  // Emit booking.created event
+  try {
+    const venueName = await getVenueName(data.venueId);
+    await publishDomainEvent({
+      type: EVENT_TYPES.BOOKING_CREATED,
+      source: "manual",
+      entityType: "booking",
+      entityId: created.id,
+      entityName: `${venueName} - ${data.date}`,
+      deepLinkPath: `/admin/bookings/${created.id}`,
+      payload: {
+        venueName,
+        date: data.date,
+        startTime: data.overrideStartTime,
+        endTime: data.overrideEndTime,
+        matchCount: data.matchIds?.length ?? 0,
+      },
+    });
+  } catch (error) {
+    log.warn({ err: error, bookingId: created.id }, "Failed to emit booking.created event");
+  }
+
   return getBookingDetail(created.id);
 }
 
 export async function deleteBooking(id: number): Promise<boolean> {
+  // Fetch booking info before deletion for event emission
+  const [bookingInfo] = await db
+    .select({
+      venueId: venueBookings.venueId,
+      date: venueBookings.date,
+    })
+    .from(venueBookings)
+    .where(eq(venueBookings.id, id))
+    .limit(1);
+
   // Delete junction entries first (they cascade, but be explicit)
   await db
     .delete(venueBookingMatches)
@@ -388,6 +489,27 @@ export async function deleteBooking(id: number): Promise<boolean> {
     .delete(venueBookings)
     .where(eq(venueBookings.id, id))
     .returning({ id: venueBookings.id });
+
+  if (deleted && bookingInfo) {
+    try {
+      const venueName = await getVenueName(bookingInfo.venueId);
+      await publishDomainEvent({
+        type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        source: "manual",
+        entityType: "booking",
+        entityId: id,
+        entityName: `${venueName} - ${bookingInfo.date}`,
+        deepLinkPath: `/admin/bookings/${id}`,
+        payload: {
+          venueName,
+          date: bookingInfo.date,
+          reason: "Booking deleted",
+        },
+      });
+    } catch (error) {
+      log.warn({ err: error, bookingId: id }, "Failed to emit booking.status.changed event");
+    }
+  }
 
   return !!deleted;
 }

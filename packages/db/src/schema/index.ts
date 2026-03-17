@@ -18,3 +18,8 @@ export * from "./notifications";
 export * from "./push-devices";
 export * from "./player-photos";
 export * from "./social-backgrounds";
+export * from "./domain-events";
+export * from "./watch-rules";
+export * from "./channel-configs";
+export * from "./notification-log";
+export * from "./digest-buffer";

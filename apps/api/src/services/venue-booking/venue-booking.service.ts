@@ -20,6 +20,8 @@ import type {
   ReconcileResult,
   BookingStatus,
 } from "@dragons/shared";
+import { EVENT_TYPES } from "@dragons/shared";
+import { publishDomainEvent } from "../events/event-publisher";
 
 const log = logger.child({ service: "venue-booking" });
 
@@ -416,15 +418,15 @@ export async function reconcileBookingsForMatches(
         existing.calculatedEndTime !== window.calculatedEndTime;
 
       if (windowChanged) {
+        const wasConfirmed = existing.status === "confirmed";
         const updateData: Record<string, unknown> = {
           calculatedStartTime: window.calculatedStartTime,
           calculatedEndTime: window.calculatedEndTime,
-          needsReconfirmation:
-            existing.status === "confirmed" ? true : existing.needsReconfirmation,
+          needsReconfirmation: wasConfirmed ? true : existing.needsReconfirmation,
           updatedAt: new Date(),
         };
 
-        if (existing.status === "confirmed") {
+        if (wasConfirmed) {
           updateData.status = "pending";
           updateData.confirmedAt = null;
           updateData.confirmedBy = null;
@@ -434,6 +436,34 @@ export async function reconcileBookingsForMatches(
           .update(venueBookings)
           .set(updateData)
           .where(eq(venueBookings.id, existing.id));
+
+        // Emit booking.needs_reconfirmation when a confirmed booking's times shift
+        if (wasConfirmed) {
+          try {
+            const [venueRow] = await db
+              .select({ name: venues.name })
+              .from(venues)
+              .where(eq(venues.id, venueId))
+              .limit(1);
+            const venueName = venueRow?.name ?? "Unknown";
+
+            await publishDomainEvent({
+              type: EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION,
+              source: "reconciliation",
+              entityType: "booking",
+              entityId: existing.id,
+              entityName: `${venueName} - ${kickoffDate}`,
+              deepLinkPath: `/admin/bookings/${existing.id}`,
+              payload: {
+                venueName,
+                date: kickoffDate,
+                reason: "Time window changed after sync reconciliation",
+              },
+            });
+          } catch (error) {
+            log.warn({ err: error, bookingId: existing.id }, "Failed to emit booking.needs_reconfirmation event");
+          }
+        }
 
         result.updated++;
       } else {

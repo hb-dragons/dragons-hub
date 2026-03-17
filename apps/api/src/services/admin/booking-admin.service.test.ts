@@ -16,6 +16,25 @@ vi.mock("../../config/database", () => ({
   },
 }));
 
+vi.mock("../events/event-publisher", () => ({
+  publishDomainEvent: vi.fn().mockResolvedValue({ id: "mock-event-id" }),
+}));
+
+vi.mock("../../config/logger", () => ({
+  logger: {
+    child: () => ({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    }),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 vi.mock("@dragons/db/schema", () => ({
   venueBookings: { id: "vb.id", venueId: "vb.venueId", date: "vb.date", calculatedStartTime: "vb.cst", calculatedEndTime: "vb.cet", overrideStartTime: "vb.ost", overrideEndTime: "vb.oet", overrideReason: "vb.or", status: "vb.status", needsReconfirmation: "vb.nr", notes: "vb.notes", confirmedBy: "vb.cb", confirmedAt: "vb.ca", createdAt: "vb.createdAt", updatedAt: "vb.updatedAt" },
   venues: { id: "v.id", name: "v.name" },
@@ -387,9 +406,10 @@ describe("createBooking", () => {
       const idx = selectCallIndex++;
       if (idx === 0) return makeChain([{ id: 10 }]);           // venue exists
       if (idx === 1) return makeChain([]);                      // no duplicate
-      if (idx === 2) return makeChain([detailBookingRow]);      // getBookingDetail booking
-      if (idx === 3) return makeChain([]);                      // homeTeam subquery
-      if (idx === 4) return makeChain([]);                      // guestTeam subquery
+      if (idx === 2) return makeChain([{ name: "Main Hall" }]); // getVenueName for event
+      if (idx === 3) return makeChain([detailBookingRow]);      // getBookingDetail booking
+      if (idx === 4) return makeChain([]);                      // homeTeam subquery
+      if (idx === 5) return makeChain([]);                      // guestTeam subquery
       return makeChain([]);                                     // linked matches
     });
 
@@ -422,9 +442,10 @@ describe("createBooking", () => {
       const idx = selectCallIndex++;
       if (idx === 0) return makeChain([{ id: 10 }]);
       if (idx === 1) return makeChain([]);
-      if (idx === 2) return makeChain([detailBookingRow]);
-      if (idx === 3) return makeChain([]);
+      if (idx === 2) return makeChain([{ name: "Main Hall" }]); // getVenueName for event
+      if (idx === 3) return makeChain([detailBookingRow]);
       if (idx === 4) return makeChain([]);
+      if (idx === 5) return makeChain([]);
       return makeChain([]);
     });
 

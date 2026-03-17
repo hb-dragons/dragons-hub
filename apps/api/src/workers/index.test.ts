@@ -12,14 +12,36 @@ vi.mock("../config/logger", () => ({
 
 const mockInitScheduledJobs = vi.fn().mockResolvedValue(undefined);
 const mockSyncQueueClose = vi.fn().mockResolvedValue(undefined);
+const mockDigestQueueClose = vi.fn().mockResolvedValue(undefined);
+const mockDigestQueueAdd = vi.fn().mockResolvedValue({ id: "digest-job-1" });
+const mockDigestQueueGetRepeatableJobs = vi.fn().mockResolvedValue([]);
+const mockDigestQueueRemoveRepeatableByKey = vi.fn().mockResolvedValue(undefined);
 vi.mock("./queues", () => ({
   initializeScheduledJobs: (...args: unknown[]) => mockInitScheduledJobs(...args),
   syncQueue: { close: (...args: unknown[]) => mockSyncQueueClose(...args) },
+  digestQueue: {
+    close: (...args: unknown[]) => mockDigestQueueClose(...args),
+    add: (...args: unknown[]) => mockDigestQueueAdd(...args),
+    getRepeatableJobs: () => mockDigestQueueGetRepeatableJobs(),
+    removeRepeatableByKey: (...args: unknown[]) => mockDigestQueueRemoveRepeatableByKey(...args),
+  },
 }));
 
 const mockWorkerClose = vi.fn().mockResolvedValue(undefined);
 vi.mock("./sync.worker", () => ({
   syncWorker: { close: (...args: unknown[]) => mockWorkerClose(...args) },
+}));
+
+const mockEventWorkerClose = vi.fn().mockResolvedValue(undefined);
+vi.mock("./event.worker", () => ({
+  eventWorker: { close: (...args: unknown[]) => mockEventWorkerClose(...args) },
+}));
+
+const mockStartOutboxPoller = vi.fn();
+const mockStopOutboxPoller = vi.fn();
+vi.mock("../services/events/outbox-poller", () => ({
+  startOutboxPoller: (...args: unknown[]) => mockStartOutboxPoller(...args),
+  stopOutboxPoller: (...args: unknown[]) => mockStopOutboxPoller(...args),
 }));
 
 const mockDbUpdate = vi.fn();
@@ -36,15 +58,20 @@ vi.mock("../config/database", () => ({
 vi.mock("@dragons/db/schema", () => ({
   syncRuns: { id: "id", status: "status", startedAt: "startedAt" },
   syncRunEntries: { syncRunId: "syncRunId" },
+  domainEvents: { id: "id", occurredAt: "occurredAt" },
+  notificationLog: { id: "id", eventId: "eventId" },
+  digestBuffer: { id: "id", eventId: "eventId" },
+  channelConfigs: { id: "id", enabled: "enabled", digestMode: "digestMode" },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   lt: vi.fn(),
+  and: vi.fn(),
   inArray: vi.fn(),
 }));
 
-import { initializeWorkers, shutdownWorkers, cleanupOldSyncRuns } from "./index";
+import { initializeWorkers, shutdownWorkers, cleanupOldSyncRuns, cleanupOldDomainEvents, initializeScheduledDigests } from "./index";
 import { logger } from "../config/logger";
 
 beforeEach(() => {
@@ -64,7 +91,9 @@ beforeEach(() => {
     }),
   });
   mockDbDelete.mockReturnValue({
-    where: vi.fn().mockResolvedValue(undefined),
+    where: vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([]),
+    }),
   });
 });
 
@@ -169,6 +198,46 @@ describe("cleanupOldSyncRuns", () => {
   });
 });
 
+describe("cleanupOldDomainEvents", () => {
+  it("returns zeros when no old events found", async () => {
+    const result = await cleanupOldDomainEvents();
+
+    expect(result).toEqual({ notifications: 0, digestEntries: 0, events: 0 });
+    expect(mockDbDelete).not.toHaveBeenCalled();
+  });
+
+  it("deletes notification_log, digest_buffer, then domain_events", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ id: "evt-1" }, { id: "evt-2" }]),
+      }),
+    });
+
+    const mockDeleteReturning = vi.fn()
+      .mockResolvedValueOnce([{ id: 1 }, { id: 2 }])  // notification_log
+      .mockResolvedValueOnce([{ id: 3 }]);              // digest_buffer
+    const mockDeleteWhere = vi.fn().mockReturnValue({
+      returning: mockDeleteReturning,
+    });
+    mockDbDelete.mockReturnValue({
+      where: mockDeleteWhere,
+    });
+
+    const result = await cleanupOldDomainEvents(365);
+
+    expect(result).toEqual({ notifications: 2, digestEntries: 1, events: 2 });
+    // 3 deletes: notification_log, digest_buffer, domain_events
+    expect(mockDbDelete).toHaveBeenCalledTimes(3);
+  });
+
+  it("accepts custom retention days", async () => {
+    const result = await cleanupOldDomainEvents(30);
+
+    expect(result).toEqual({ notifications: 0, digestEntries: 0, events: 0 });
+    expect(mockDbSelect).toHaveBeenCalled();
+  });
+});
+
 describe("shutdownWorkers", () => {
   it("marks running syncs as failed", async () => {
     mockDbUpdate.mockReturnValue({
@@ -182,7 +251,7 @@ describe("shutdownWorkers", () => {
     expect(mockDbUpdate).toHaveBeenCalled();
   });
 
-  it("closes worker and queue", async () => {
+  it("closes workers and queues", async () => {
     mockDbUpdate.mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
@@ -193,6 +262,7 @@ describe("shutdownWorkers", () => {
 
     expect(mockWorkerClose).toHaveBeenCalled();
     expect(mockSyncQueueClose).toHaveBeenCalled();
+    expect(mockDigestQueueClose).toHaveBeenCalled();
   });
 
   it("continues shutdown even if DB update fails", async () => {
@@ -204,5 +274,81 @@ describe("shutdownWorkers", () => {
 
     expect(mockWorkerClose).toHaveBeenCalled();
     expect(mockSyncQueueClose).toHaveBeenCalled();
+    expect(mockDigestQueueClose).toHaveBeenCalled();
+  });
+});
+
+describe("initializeScheduledDigests", () => {
+  it("removes stale repeatable jobs and creates new ones for scheduled channels", async () => {
+    mockDigestQueueGetRepeatableJobs.mockResolvedValue([
+      { key: "old-key-1" },
+      { key: "old-key-2" },
+    ]);
+
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          {
+            id: 1,
+            enabled: true,
+            digestMode: "scheduled",
+            digestCron: "0 8 * * *",
+            digestTimezone: "Europe/Berlin",
+          },
+          {
+            id: 2,
+            enabled: true,
+            digestMode: "scheduled",
+            digestCron: "0 18 * * *",
+            digestTimezone: "America/New_York",
+          },
+        ]),
+      }),
+    });
+
+    await initializeScheduledDigests();
+
+    expect(mockDigestQueueRemoveRepeatableByKey).toHaveBeenCalledTimes(2);
+    expect(mockDigestQueueAdd).toHaveBeenCalledTimes(2);
+    expect(logger.info).toHaveBeenCalledWith(
+      { count: 2 },
+      "Scheduled digest jobs initialized",
+    );
+  });
+
+  it("skips channels with no digestCron", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([
+          {
+            id: 1,
+            enabled: true,
+            digestMode: "scheduled",
+            digestCron: null,
+            digestTimezone: "Europe/Berlin",
+          },
+        ]),
+      }),
+    });
+
+    await initializeScheduledDigests();
+
+    expect(mockDigestQueueAdd).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      { channelConfigId: 1 },
+      "Channel has digestMode=scheduled but no digestCron, skipping",
+    );
+  });
+
+  it("does nothing when no scheduled channels exist", async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([]),
+      }),
+    });
+
+    await initializeScheduledDigests();
+
+    expect(mockDigestQueueAdd).not.toHaveBeenCalled();
   });
 });

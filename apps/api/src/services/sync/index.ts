@@ -17,6 +17,8 @@ import { createSyncLogger } from "./sync-logger";
 import { fetchAllSyncData, extractRefereeAssignments } from "./data-fetcher";
 import { reconcileAfterSync } from "../venue-booking/venue-booking.service";
 import { logger } from "../../config/logger";
+import { publishDomainEvent } from "../events/event-publisher";
+import { EVENT_TYPES } from "@dragons/shared";
 
 const log = logger.child({ service: "sync" });
 
@@ -256,6 +258,38 @@ export async function fullSync(
       totalErrors: allErrors,
       status: "completed",
     };
+
+    // Emit sync.completed domain event
+    try {
+      const totalProcessed =
+        leaguesResult.total + teamsRes.total + matchesRes.total + standingsRes.total + venuesRes.total;
+      const totalCreated =
+        leaguesResult.created + teamsRes.created + matchesRes.created + standingsRes.created + venuesRes.created + refereesRes.created;
+      const totalUpdated =
+        leaguesResult.updated + teamsRes.updated + matchesRes.updated + standingsRes.updated + venuesRes.updated + refereesRes.updated;
+
+      await publishDomainEvent({
+        type: EVENT_TYPES.SYNC_COMPLETED,
+        source: "sync",
+        entityType: "match",
+        entityId: 0,
+        entityName: "Sync Run",
+        deepLinkPath: `/admin/sync/logs/${syncRun.id}`,
+        payload: {
+          syncRunId: syncRun.id,
+          syncType: "full",
+          durationMs,
+          recordsProcessed: totalProcessed,
+          recordsCreated: totalCreated,
+          recordsUpdated: totalUpdated,
+          recordsFailed: allErrors.length,
+          eventsEmitted: 0,
+        },
+        syncRunId: syncRun.id,
+      });
+    } catch (error) {
+      log.warn({ err: error }, "Failed to emit sync.completed event");
+    }
 
     await logStep(`Full sync completed in ${durationMs}ms with ${allErrors.length} errors`);
     return syncResult;

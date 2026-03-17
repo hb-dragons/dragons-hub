@@ -27,6 +27,10 @@ vi.mock("../../config/database", () => ({
   },
 }));
 
+vi.mock("../events/event-publisher", () => ({
+  publishDomainEvent: vi.fn().mockResolvedValue({ id: "mock-event-id" }),
+}));
+
 vi.mock("@dragons/db/schema", () => ({
   referees: {
     apiId: "apiId",
@@ -612,6 +616,10 @@ describe("syncRefereeAssignmentsFromData", () => {
     mockSelect.mockReturnValueOnce(buildBatchSelectChain([
       { id: 1, matchId: 3, slotNumber: 1, refereeId: 1, roleId: 2 },
     ]));
+    // Additional SELECTs for event emission (referee name, match info, role name)
+    mockSelect.mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([{ firstName: "John", lastName: "Doe" }]) }) }) });
+    mockSelect.mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([{ matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 }]) }) }) });
+    mockSelect.mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([{ name: "Referee 1" }]) }) }) });
     mockInsert.mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
     });
@@ -623,8 +631,8 @@ describe("syncRefereeAssignmentsFromData", () => {
       matchIdLookup,
     );
 
-    // Only one SELECT call for batch-load, not one per assignment
-    expect(mockSelect).toHaveBeenCalledTimes(1);
+    // First SELECT is batch-load, subsequent ones are for event emission (referee name, match info, role name)
+    expect(mockSelect).toHaveBeenCalledTimes(4);
     // Slot 1 exists, slot 2 is new
     expect(result.created).toBe(1);
   });

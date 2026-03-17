@@ -14,6 +14,25 @@ vi.mock("../../config/database", () => ({
   ),
 }));
 
+vi.mock("../events/event-publisher", () => ({
+  publishDomainEvent: vi.fn().mockResolvedValue({ id: "mock-event-id" }),
+}));
+
+vi.mock("../../config/logger", () => ({
+  logger: {
+    child: () => ({
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    }),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 // --- Imports (after mocks) ---
 
 import {
