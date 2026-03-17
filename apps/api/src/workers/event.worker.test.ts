@@ -52,7 +52,6 @@ vi.mock("../config/database", () => ({
 
 vi.mock("@dragons/db/schema", () => ({
   domainEvents: { id: "id" },
-  channelConfigs: { id: "id", enabled: "enabled" },
 }));
 
 // --- Mock drizzle-orm ---
@@ -130,33 +129,22 @@ function makeChannelConfig(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Set up DB mocks for a standard flow */
+/** Set up DB mocks for event lookup */
 function setupDbMocks(opts: {
   event?: Record<string, unknown> | null;
-  configs?: Record<string, unknown>[];
 }) {
   const event = opts.event === undefined ? makeEvent() : opts.event;
-  const configs = opts.configs ?? [];
+  const data = event ? [event] : [];
 
-  const callSequence = [
-    event ? [event] : [], // event lookup
-    configs,              // channel configs (for sync.completed digest triggering)
-  ];
-  let callIndex = 0;
-
-  mockDbSelect.mockImplementation(() => {
-    const idx = callIndex++;
-    const data = callSequence[idx] ?? [];
-    return {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockImplementation(() => {
-          const result = Promise.resolve(data);
-          (result as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue(data);
-          return result;
-        }),
+  mockDbSelect.mockImplementation(() => ({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockImplementation(() => {
+        const result = Promise.resolve(data);
+        (result as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue(data);
+        return result;
       }),
-    };
-  });
+    }),
+  }));
 }
 
 // --- Tests ---
@@ -169,6 +157,7 @@ describe("event worker processor", () => {
       buffered: 0,
       coalesced: 0,
       muted: 0,
+      configs: [],
     });
   });
 
@@ -234,11 +223,15 @@ describe("event worker processor", () => {
   });
 
   describe("digest triggering for sync.completed", () => {
-    it("enqueues digest jobs for per_sync channel configs", async () => {
+    it("enqueues digest jobs for per_sync channel configs from pipeline result", async () => {
       const config1 = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
       const config2 = makeChannelConfig({ id: 20, digestMode: "per_sync", enabled: true });
       const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event, configs: [config1, config2] });
+      setupDbMocks({ event });
+      mockProcessEvent.mockResolvedValue({
+        dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
+        configs: [config1, config2],
+      });
 
       await capturedProcessor!(makeJob({ type: "sync.completed" }));
 
@@ -257,7 +250,11 @@ describe("event worker processor", () => {
       const config1 = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
       const config2 = makeChannelConfig({ id: 20, digestMode: "scheduled", enabled: true });
       const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event, configs: [config1, config2] });
+      setupDbMocks({ event });
+      mockProcessEvent.mockResolvedValue({
+        dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
+        configs: [config1, config2],
+      });
 
       await capturedProcessor!(makeJob({ type: "sync.completed" }));
 
@@ -271,7 +268,11 @@ describe("event worker processor", () => {
     it("skips disabled configs for per_sync digest", async () => {
       const config = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: false });
       const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event, configs: [config] });
+      setupDbMocks({ event });
+      mockProcessEvent.mockResolvedValue({
+        dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
+        configs: [config],
+      });
 
       await capturedProcessor!(makeJob({ type: "sync.completed" }));
 
@@ -289,7 +290,11 @@ describe("event worker processor", () => {
     it("handles digest queue add failure gracefully", async () => {
       const config = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
       const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event, configs: [config] });
+      setupDbMocks({ event });
+      mockProcessEvent.mockResolvedValue({
+        dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
+        configs: [config],
+      });
       mockDigestQueueAdd.mockRejectedValueOnce(new Error("Redis error"));
 
       // Should not throw

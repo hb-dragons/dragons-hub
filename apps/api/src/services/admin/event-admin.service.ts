@@ -1,8 +1,15 @@
 import { db } from "../../config/database";
-import { domainEvents, notificationLog } from "@dragons/db/schema";
+import { domainEvents, notificationLog, channelConfigs } from "@dragons/db/schema";
 import { and, desc, eq, gte, lte, ilike, count } from "drizzle-orm";
 import type { DomainEventListResult, EventType, EventEntityType } from "@dragons/shared";
-import { publishDomainEvent } from "../events/event-publisher";
+import {
+  buildDomainEvent,
+  insertDomainEvent,
+  enqueueDomainEvent,
+} from "../events/event-publisher";
+import { renderEventMessage } from "../notifications/templates/index";
+import { InAppChannelAdapter } from "../notifications/channels/in-app";
+import { logger } from "../../config/logger";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -96,7 +103,8 @@ export interface TriggerEventParams {
 }
 
 export async function triggerManualEvent(params: TriggerEventParams) {
-  const event = await publishDomainEvent({
+  // Build the event first so we can override urgency before persisting
+  const event = buildDomainEvent({
     type: params.type as EventType,
     source: "manual",
     entityType: params.entityType as EventEntityType,
@@ -107,10 +115,18 @@ export async function triggerManualEvent(params: TriggerEventParams) {
     actor: params.actor,
   });
 
+  // Apply urgency override before persisting — the DB stores the actual urgency
+  if (params.urgencyOverride) {
+    event.urgency = params.urgencyOverride;
+  }
+
+  await insertDomainEvent(event);
+  void enqueueDomainEvent(event);
+
   return {
     eventId: event.id,
     type: event.type,
-    urgency: params.urgencyOverride ?? event.urgency,
+    urgency: event.urgency,
     entityType: event.entityType,
     entityId: event.entityId,
   };

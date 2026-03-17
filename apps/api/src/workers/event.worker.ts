@@ -1,6 +1,6 @@
 import { Worker, Job } from "bullmq";
 import { eq } from "drizzle-orm";
-import { domainEvents, channelConfigs } from "@dragons/db/schema";
+import { domainEvents } from "@dragons/db/schema";
 import { EVENT_TYPES } from "@dragons/shared";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
@@ -39,16 +39,12 @@ export const eventWorker = new Worker<EventJobData>(
       return { skipped: true, reason: "event_not_found" };
     }
 
-    // Run through notification pipeline
+    // Run through notification pipeline (returns configs for reuse)
     const result = await processEvent(event);
 
-    // Trigger per_sync digests when a sync completes
+    // Trigger per_sync digests when a sync completes — reuse configs from pipeline
     if (event.type === EVENT_TYPES.SYNC_COMPLETED) {
-      const configs = await db
-        .select()
-        .from(channelConfigs)
-        .where(eq(channelConfigs.enabled, true));
-      await triggerPerSyncDigests(configs, log);
+      await triggerPerSyncDigests(result.configs, log);
     }
 
     log.info(

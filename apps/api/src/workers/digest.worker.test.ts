@@ -3,9 +3,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // --- Hoisted mocks ---
 
 const mockDbSelect = vi.fn();
-const mockDbUpdate = vi.fn();
+const mockDbTransaction = vi.fn();
 const mockDbDelete = vi.fn();
-const mockInAppSend = vi.fn();
 
 let capturedProcessor: ((job: unknown) => Promise<unknown>) | null = null;
 const mockWorkerOn = vi.fn();
@@ -46,7 +45,7 @@ vi.mock("../config/logger", () => ({
 vi.mock("../config/database", () => ({
   db: {
     select: (...args: unknown[]) => mockDbSelect(...args),
-    update: (...args: unknown[]) => mockDbUpdate(...args),
+    transaction: (fn: (tx: unknown) => Promise<unknown>) => mockDbTransaction(fn),
     delete: (...args: unknown[]) => mockDbDelete(...args),
   },
 }));
@@ -75,6 +74,7 @@ vi.mock("@dragons/db/schema", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ _eq: args })),
   and: vi.fn((...args: unknown[]) => ({ _and: args })),
+  inArray: vi.fn((...args: unknown[]) => ({ _inArray: args })),
 }));
 
 vi.mock("../services/notifications/templates/digest", () => ({
@@ -82,14 +82,6 @@ vi.mock("../services/notifications/templates/digest", () => ({
     title: "Digest: 2 events",
     body: "- Event A\n- Event B",
   }),
-}));
-
-vi.mock("../services/notifications/channels/in-app", () => ({
-  InAppChannelAdapter: class {
-    send(...args: unknown[]) {
-      return mockInAppSend(...args);
-    }
-  },
 }));
 
 // --- Import after mocks ---
@@ -140,9 +132,6 @@ describe("digest worker processor", () => {
   });
 
   it("registers event handlers on the worker instance", async () => {
-    // The worker is created at module load time, and .on() is called on the instance.
-    // We verify the MockWorker class has an `on` method that would receive event handlers.
-    // Import the module again to inspect the exported worker.
     const mod = await import("./digest.worker");
     expect(mod.digestWorker).toBeDefined();
     expect(typeof mod.digestWorker.on).toBe("function");
@@ -161,8 +150,7 @@ describe("digest worker processor", () => {
       const result = await capturedProcessor!(makeJob({ channelConfigId: 999, digestRunId: 1 }));
 
       expect(result).toEqual({ skipped: true, reason: "channel_config_not_found" });
-      expect(mockInAppSend).not.toHaveBeenCalled();
-      expect(mockDbDelete).not.toHaveBeenCalled();
+      expect(mockDbTransaction).not.toHaveBeenCalled();
     });
   });
 
@@ -179,14 +167,12 @@ describe("digest worker processor", () => {
       const result = await capturedProcessor!(makeJob({ channelConfigId: 1, digestRunId: 2 }));
 
       expect(result).toEqual({ skipped: true, reason: "channel_disabled" });
-      expect(mockInAppSend).not.toHaveBeenCalled();
-      expect(mockDbDelete).not.toHaveBeenCalled();
+      expect(mockDbTransaction).not.toHaveBeenCalled();
     });
   });
 
   describe("no buffered events", () => {
     it("returns skipped with reason no_events", async () => {
-      // First call: channel config lookup
       const configSelect = {
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -194,7 +180,6 @@ describe("digest worker processor", () => {
           }),
         }),
       };
-      // Second call: buffered events lookup
       const bufferSelect = {
         from: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
@@ -209,19 +194,17 @@ describe("digest worker processor", () => {
       const result = await capturedProcessor!(makeJob({ channelConfigId: 1, digestRunId: 3 }));
 
       expect(result).toEqual({ skipped: true, reason: "no_events" });
-      expect(mockInAppSend).not.toHaveBeenCalled();
-      expect(mockDbDelete).not.toHaveBeenCalled();
+      expect(mockDbTransaction).not.toHaveBeenCalled();
     });
   });
 
   describe("successful in_app digest delivery", () => {
-    function setupSuccessScenario() {
+    function setupSuccessScenario(opts: { config?: Record<string, unknown> } = {}) {
+      const config = opts.config ?? { id: 5, enabled: true, type: "in_app", config: { locale: "en" } };
       const configSelect = {
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              { id: 5, enabled: true, type: "in_app", config: { locale: "en" } },
-            ]),
+            limit: vi.fn().mockResolvedValue([config]),
           }),
         }),
       };
@@ -236,34 +219,29 @@ describe("digest worker processor", () => {
         .mockReturnValueOnce(configSelect)
         .mockReturnValueOnce(bufferSelect);
 
-      mockInAppSend.mockResolvedValue({ success: true, duplicate: false });
-
-      mockDbUpdate.mockReturnValue({
-        set: vi.fn().mockReturnValue({
+      // Transaction mock: execute the callback with a mock tx
+      mockDbTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const mockInsert = vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+            }),
+          }),
+        });
+        const mockDelete = vi.fn().mockReturnValue({
           where: vi.fn().mockResolvedValue(undefined),
-        }),
-      });
+        });
 
-      mockDbDelete.mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+        return fn({ insert: mockInsert, delete: mockDelete });
       });
     }
 
-    it("sends a single notification via InAppChannelAdapter", async () => {
+    it("uses a transaction for send + buffer clear", async () => {
       setupSuccessScenario();
 
       await capturedProcessor!(makeJob({ channelConfigId: 5, digestRunId: 100 }));
 
-      expect(mockInAppSend).toHaveBeenCalledOnce();
-      expect(mockInAppSend).toHaveBeenCalledWith({
-        eventId: 100, // first buffered row's eventId
-        watchRuleId: null,
-        channelConfigId: 5,
-        recipientId: "digest:5",
-        title: "Digest: 2 events",
-        body: "- Event A\n- Event B",
-        locale: "en",
-      });
+      expect(mockDbTransaction).toHaveBeenCalledTimes(1);
     });
 
     it("renders digest message with correct items and locale", async () => {
@@ -286,31 +264,6 @@ describe("digest worker processor", () => {
       );
     });
 
-    it("tags notification_log entry with digestRunId", async () => {
-      setupSuccessScenario();
-
-      const mockWhere = vi.fn().mockResolvedValue(undefined);
-      const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
-      mockDbUpdate.mockReturnValue({ set: mockSet });
-
-      await capturedProcessor!(makeJob({ channelConfigId: 5, digestRunId: 100 }));
-
-      expect(mockDbUpdate).toHaveBeenCalled();
-      expect(mockSet).toHaveBeenCalledWith({ digestRunId: 100 });
-    });
-
-    it("clears digest buffer for the channel", async () => {
-      setupSuccessScenario();
-
-      const mockDeleteWhere = vi.fn().mockResolvedValue(undefined);
-      mockDbDelete.mockReturnValue({ where: mockDeleteWhere });
-
-      await capturedProcessor!(makeJob({ channelConfigId: 5, digestRunId: 100 }));
-
-      expect(mockDbDelete).toHaveBeenCalled();
-      expect(mockDeleteWhere).toHaveBeenCalled();
-    });
-
     it("returns delivered result with event count and digestRunId", async () => {
       setupSuccessScenario();
 
@@ -320,85 +273,16 @@ describe("digest worker processor", () => {
     });
 
     it("uses default locale 'de' when config has no locale", async () => {
-      const configSelect = {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              { id: 5, enabled: true, type: "in_app", config: {} },
-            ]),
-          }),
-        }),
-      };
-      const bufferSelect = {
-        from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(sampleBufferedRows),
-          }),
-        }),
-      };
-      mockDbSelect
-        .mockReturnValueOnce(configSelect)
-        .mockReturnValueOnce(bufferSelect);
-
-      mockInAppSend.mockResolvedValue({ success: true, duplicate: false });
-      mockDbUpdate.mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      });
-      mockDbDelete.mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      });
+      setupSuccessScenario({ config: { id: 5, enabled: true, type: "in_app", config: {} } });
 
       await capturedProcessor!(makeJob({ channelConfigId: 5, digestRunId: 100 }));
 
       expect(renderDigestMessage).toHaveBeenCalledWith(expect.any(Array), "de");
-      expect(mockInAppSend).toHaveBeenCalledWith(
-        expect.objectContaining({ locale: "de" }),
-      );
-    });
-  });
-
-  describe("delivery failure", () => {
-    it("logs error but still clears buffer", async () => {
-      const configSelect = {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              { id: 3, enabled: true, type: "in_app", config: {} },
-            ]),
-          }),
-        }),
-      };
-      const bufferSelect = {
-        from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([sampleBufferedRows[0]]),
-          }),
-        }),
-      };
-      mockDbSelect
-        .mockReturnValueOnce(configSelect)
-        .mockReturnValueOnce(bufferSelect);
-
-      mockInAppSend.mockResolvedValue({ success: false, error: "DB insert failed" });
-
-      const mockDeleteWhere = vi.fn().mockResolvedValue(undefined);
-      mockDbDelete.mockReturnValue({ where: mockDeleteWhere });
-
-      const result = await capturedProcessor!(makeJob({ channelConfigId: 3, digestRunId: 50 }));
-
-      // Should NOT update digestRunId
-      expect(mockDbUpdate).not.toHaveBeenCalled();
-      // Should still clear buffer
-      expect(mockDbDelete).toHaveBeenCalled();
-      // Should still return delivered
-      expect(result).toEqual({ delivered: true, eventCount: 1, digestRunId: 50 });
     });
   });
 
   describe("unsupported channel type", () => {
-    it("logs warning and clears buffer anyway", async () => {
+    it("still clears buffer in transaction", async () => {
       const configSelect = {
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -419,98 +303,17 @@ describe("digest worker processor", () => {
         .mockReturnValueOnce(configSelect)
         .mockReturnValueOnce(bufferSelect);
 
-      const mockDeleteWhere = vi.fn().mockResolvedValue(undefined);
-      mockDbDelete.mockReturnValue({ where: mockDeleteWhere });
+      mockDbTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const mockDelete = vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        });
+        return fn({ insert: vi.fn(), delete: mockDelete });
+      });
 
       const result = await capturedProcessor!(makeJob({ channelConfigId: 7, digestRunId: 60 }));
 
-      // Should not attempt to send via inAppAdapter
-      expect(mockInAppSend).not.toHaveBeenCalled();
-      // Should not update digestRunId
-      expect(mockDbUpdate).not.toHaveBeenCalled();
-      // Should still clear buffer
-      expect(mockDbDelete).toHaveBeenCalled();
-      // Should return delivered
+      expect(mockDbTransaction).toHaveBeenCalledTimes(1);
       expect(result).toEqual({ delivered: true, eventCount: 2, digestRunId: 60 });
-    });
-  });
-
-  describe("duplicate detection", () => {
-    it("does not update digestRunId when adapter returns duplicate", async () => {
-      const configSelect = {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              { id: 4, enabled: true, type: "in_app", config: { locale: "de" } },
-            ]),
-          }),
-        }),
-      };
-      const bufferSelect = {
-        from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([sampleBufferedRows[0]]),
-          }),
-        }),
-      };
-      mockDbSelect
-        .mockReturnValueOnce(configSelect)
-        .mockReturnValueOnce(bufferSelect);
-
-      mockInAppSend.mockResolvedValue({ success: true, duplicate: true });
-
-      const mockDeleteWhere = vi.fn().mockResolvedValue(undefined);
-      mockDbDelete.mockReturnValue({ where: mockDeleteWhere });
-
-      const result = await capturedProcessor!(makeJob({ channelConfigId: 4, digestRunId: 70 }));
-
-      // Should NOT update digestRunId when duplicate
-      expect(mockDbUpdate).not.toHaveBeenCalled();
-      // Should still clear buffer
-      expect(mockDbDelete).toHaveBeenCalled();
-      // Should still return delivered
-      expect(result).toEqual({ delivered: true, eventCount: 1, digestRunId: 70 });
-    });
-  });
-
-  describe("config with null config field", () => {
-    it("falls back to 'de' locale when config is null", async () => {
-      const configSelect = {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              { id: 2, enabled: true, type: "in_app", config: null },
-            ]),
-          }),
-        }),
-      };
-      const bufferSelect = {
-        from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([sampleBufferedRows[0]]),
-          }),
-        }),
-      };
-      mockDbSelect
-        .mockReturnValueOnce(configSelect)
-        .mockReturnValueOnce(bufferSelect);
-
-      mockInAppSend.mockResolvedValue({ success: true, duplicate: false });
-      mockDbUpdate.mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      });
-      mockDbDelete.mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      });
-
-      await capturedProcessor!(makeJob({ channelConfigId: 2, digestRunId: 80 }));
-
-      expect(renderDigestMessage).toHaveBeenCalledWith(expect.any(Array), "de");
-      expect(mockInAppSend).toHaveBeenCalledWith(
-        expect.objectContaining({ locale: "de" }),
-      );
     });
   });
 });

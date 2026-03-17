@@ -1,18 +1,15 @@
 import { Worker, type Job } from "bullmq";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { digestBuffer, domainEvents, channelConfigs, notificationLog } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { db } from "../config/database";
 import { renderDigestMessage, type DigestItem } from "../services/notifications/templates/digest";
-import { InAppChannelAdapter } from "../services/notifications/channels/in-app";
 
 interface DigestJobData {
   channelConfigId: number;
   digestRunId: number;
 }
-
-const inAppAdapter = new InAppChannelAdapter();
 
 export const digestWorker = new Worker<DigestJobData>(
   "digest",
@@ -75,42 +72,43 @@ export const digestWorker = new Worker<DigestJobData>(
     const locale = (config.config as Record<string, unknown>)?.locale as string ?? "de";
     const message = renderDigestMessage(items, locale);
 
-    // 5. Deliver via the appropriate channel adapter
-    // Create a single summary notification_log entry for the whole digest
-    if (config.type === "in_app") {
-      // Use the first event's ID as the anchor for the digest notification
-      const anchorEventId = bufferedRows[0]!.eventId;
-      const result = await inAppAdapter.send({
-        eventId: anchorEventId,
-        watchRuleId: null,
-        channelConfigId: config.id,
-        recipientId: `digest:${config.id}`,
-        title: message.title,
-        body: message.body,
-        locale,
-      });
+    // 5. Deliver and clear buffer atomically in a transaction.
+    // This prevents a race where two concurrent digest jobs for the same channel
+    // both read the buffer, both send, and both clear — losing data.
+    const bufferIds = bufferedRows.map((r) => r.bufferId);
 
-      if (result.success && !result.duplicate) {
-        // Tag the notification_log entry with the digestRunId
-        await db
-          .update(notificationLog)
-          .set({ digestRunId })
-          .where(
-            and(
-              eq(notificationLog.eventId, anchorEventId),
-              eq(notificationLog.channelConfigId, config.id),
-              eq(notificationLog.recipientId, `digest:${config.id}`),
-            ),
-          );
-      } else if (!result.success) {
-        log.error({ eventId: anchorEventId, error: result.error }, "Failed to deliver digest");
+    await db.transaction(async (tx) => {
+      if (config.type === "in_app") {
+        const anchorEventId = bufferedRows[0]!.eventId;
+
+        // Insert notification_log entry (dedup via unique index)
+        const rows = await tx
+          .insert(notificationLog)
+          .values({
+            eventId: anchorEventId,
+            watchRuleId: null,
+            channelConfigId: config.id,
+            recipientId: `digest:${config.id}`,
+            title: message.title,
+            body: message.body,
+            locale,
+            status: "sent",
+            sentAt: new Date(),
+            digestRunId,
+          })
+          .onConflictDoNothing()
+          .returning({ id: notificationLog.id });
+
+        if (rows.length === 0) {
+          log.info("Digest already sent (duplicate), clearing stale buffer entries");
+        }
+      } else {
+        log.warn({ channelType: config.type }, "Unsupported channel type for digest, skipping delivery");
       }
-    } else {
-      log.warn({ channelType: config.type }, "Unsupported channel type for digest, skipping delivery");
-    }
 
-    // 6. Clear the buffer for this channel (single batch delete)
-    await db.delete(digestBuffer).where(eq(digestBuffer.channelConfigId, channelConfigId));
+      // Clear the buffer for this channel within the same transaction
+      await tx.delete(digestBuffer).where(inArray(digestBuffer.id, bufferIds));
+    });
 
     log.info(
       { eventCount: bufferedRows.length, channelType: config.type },

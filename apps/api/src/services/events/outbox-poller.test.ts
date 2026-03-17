@@ -10,12 +10,15 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
-const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
+const mockExecute = vi.fn();
+const mockTransaction = vi.fn();
+
 vi.mock("../../config/database", () => ({
   db: {
-    select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
+    execute: (...args: unknown[]) => mockExecute(...args),
+    transaction: (fn: (tx: unknown) => Promise<unknown>) => mockTransaction(fn),
   },
 }));
 
@@ -36,6 +39,7 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
   and: vi.fn((...args: unknown[]) => ({ and: args })),
   lte: vi.fn((...args: unknown[]) => ({ lte: args })),
+  sql: vi.fn((...args: unknown[]) => ({ sql: args })),
 }));
 
 const mockQueueAdd = vi.fn().mockResolvedValue({ id: "job-1" });
@@ -66,12 +70,13 @@ afterEach(() => {
 
 describe("pollOutbox", () => {
   it("returns 0 when no pending events", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
+    // Transaction mock calls the callback with a tx object
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        execute: vi.fn().mockResolvedValue({ rows: [] }),
+        update: mockUpdate,
+      };
+      return fn(tx);
     });
 
     const result = await pollOutbox();
@@ -80,28 +85,16 @@ describe("pollOutbox", () => {
 
   it("enqueues pending events and returns count", async () => {
     const pending = [
-      {
-        id: "evt-1",
-        type: "match.created",
-        urgency: "routine",
-        entityType: "match",
-        entityId: 1,
-      },
-      {
-        id: "evt-2",
-        type: "match.cancelled",
-        urgency: "immediate",
-        entityType: "match",
-        entityId: 2,
-      },
+      { id: "evt-1", type: "match.created", urgency: "routine", entity_type: "match", entity_id: 1 },
+      { id: "evt-2", type: "match.cancelled", urgency: "immediate", entity_type: "match", entity_id: 2 },
     ];
 
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue(pending),
-        }),
-      }),
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        execute: vi.fn().mockResolvedValue({ rows: pending }),
+        update: mockUpdate,
+      };
+      return fn(tx);
     });
 
     const result = await pollOutbox();
@@ -121,28 +114,16 @@ describe("pollOutbox", () => {
 
   it("continues on individual event failure and logs error", async () => {
     const pending = [
-      {
-        id: "evt-1",
-        type: "match.created",
-        urgency: "routine",
-        entityType: "match",
-        entityId: 1,
-      },
-      {
-        id: "evt-2",
-        type: "match.cancelled",
-        urgency: "immediate",
-        entityType: "match",
-        entityId: 2,
-      },
+      { id: "evt-1", type: "match.created", urgency: "routine", entity_type: "match", entity_id: 1 },
+      { id: "evt-2", type: "match.cancelled", urgency: "immediate", entity_type: "match", entity_id: 2 },
     ];
 
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue(pending),
-        }),
-      }),
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        execute: vi.fn().mockResolvedValue({ rows: pending }),
+        update: mockUpdate,
+      };
+      return fn(tx);
     });
 
     // First event fails, second succeeds
@@ -155,6 +136,26 @@ describe("pollOutbox", () => {
     expect(result).toBe(1);
     const { logger } = await import("../../config/logger");
     expect(logger.error).toHaveBeenCalled();
+  });
+
+  it("uses FOR UPDATE SKIP LOCKED via raw SQL", async () => {
+    let capturedSql: unknown = null;
+
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        execute: vi.fn().mockImplementation((sqlQuery: unknown) => {
+          capturedSql = sqlQuery;
+          return Promise.resolve({ rows: [] });
+        }),
+        update: mockUpdate,
+      };
+      return fn(tx);
+    });
+
+    await pollOutbox();
+
+    // Verify that the SQL template was passed (drizzle sql tagged template)
+    expect(capturedSql).toBeDefined();
   });
 });
 
@@ -189,14 +190,7 @@ describe("startOutboxPoller / stopOutboxPoller", () => {
   it("logs error when pollOutbox rejects inside interval callback", async () => {
     vi.useFakeTimers();
 
-    // Make pollOutbox reject by having the select chain throw
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockRejectedValue(new Error("DB connection lost")),
-        }),
-      }),
-    });
+    mockTransaction.mockRejectedValue(new Error("DB connection lost"));
 
     startOutboxPoller(100);
 

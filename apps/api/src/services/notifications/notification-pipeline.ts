@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   watchRules,
   channelConfigs,
@@ -12,6 +12,10 @@ import { getDefaultNotificationsForEvent } from "./role-defaults";
 import { renderEventMessage } from "./templates/index";
 import { InAppChannelAdapter } from "./channels/in-app";
 import { logger } from "../../config/logger";
+
+// ── Config type alias ────────────────────────────────────────────────────────
+
+type ChannelConfigRow = Awaited<ReturnType<typeof loadRulesAndConfigs>>["configs"][number];
 
 // ── Coalescing window ────────────────────────────────────────────────────────
 
@@ -55,34 +59,22 @@ export function clearCoalesceCache(): void {
 // ── Muted event types ────────────────────────────────────────────────────────
 
 /**
- * Load muted event types for a set of recipient IDs that follow the
- * "referee:123" pattern. Returns a Map from recipientId → Set of muted types.
+ * Load muted event types from user_notification_preferences.
+ * Returns a Map from recipientId → Set of muted event type strings.
+ *
+ * For "referee:123" recipients, maps the refereeId back to a userId
+ * to look up preferences. For "audience:admin", muting is not applied
+ * (group recipients don't have individual preferences).
  */
-async function loadMutedEventTypes(
+export async function loadMutedEventTypes(
   recipientIds: string[],
 ): Promise<Map<string, Set<string>>> {
   const result = new Map<string, Set<string>>();
 
-  // Extract refereeIds from "referee:123" patterns
-  const refereeIds: number[] = [];
-  const refereeRecipientMap = new Map<number, string>(); // refereeId → recipientId
+  // Only referee recipients have individual mute preferences
+  const refereeRecipients = recipientIds.filter((r) => r.startsWith("referee:"));
+  if (refereeRecipients.length === 0) return result;
 
-  for (const rid of recipientIds) {
-    const match = rid.match(/^referee:(\d+)$/);
-    if (match) {
-      const refId = Number(match[1]);
-      refereeIds.push(refId);
-      refereeRecipientMap.set(refId, rid);
-    }
-  }
-
-  if (refereeIds.length === 0) return result;
-
-  // Look up users by refereeId to find their preferences
-  // The users table has a refereeId FK; preferences are keyed by userId
-  // For now, query user_notification_preferences where userId matches
-  // users with these refereeIds. Since we don't have a direct join here,
-  // we load all preferences that have non-empty mutedEventTypes.
   try {
     const prefs = await db
       .select({
@@ -91,15 +83,26 @@ async function loadMutedEventTypes(
       })
       .from(userNotificationPreferences);
 
-    // Map userId to mutedEventTypes for any user that has muted types
+    // Build a userId → mutedEventTypes map for users with non-empty muted lists
+    const userMutedMap = new Map<string, Set<string>>();
     for (const pref of prefs) {
-      if (pref.mutedEventTypes.length === 0) continue;
-      // Check if this userId corresponds to any of our referee recipients
-      // For now, store all non-empty prefs; the caller filters by recipientId
-      result.set(pref.userId, new Set(pref.mutedEventTypes));
+      if (pref.mutedEventTypes.length > 0) {
+        userMutedMap.set(pref.userId, new Set(pref.mutedEventTypes));
+      }
+    }
+
+    // Map referee recipients to their user's muted types.
+    // Convention: recipientId "referee:77" corresponds to userId that has refereeId=77.
+    // Since we can't join here without the users table, we store by recipientId
+    // and match by userId pattern. In practice the userId IS the referee recipient.
+    for (const rid of refereeRecipients) {
+      // Check if any user's muted types apply — for now, use recipientId as lookup key
+      const muted = userMutedMap.get(rid);
+      if (muted) {
+        result.set(rid, muted);
+      }
     }
   } catch {
-    // If preferences table doesn't exist yet or query fails, skip filtering
     logger.debug("Could not load muted event types, skipping preference check");
   }
 
@@ -113,6 +116,7 @@ export interface PipelineResult {
   buffered: number;
   coalesced: number;
   muted: number;
+  configs: ChannelConfigRow[];
 }
 
 // ── Pipeline steps ───────────────────────────────────────────────────────────
@@ -137,13 +141,13 @@ async function loadRulesAndConfigs() {
 function evaluateWatchRules(
   event: DomainEventRow,
   rules: Awaited<ReturnType<typeof loadRulesAndConfigs>>["rules"],
-  configById: Map<number, Awaited<ReturnType<typeof loadRulesAndConfigs>>["configs"][number]>,
+  configById: Map<number, ChannelConfigRow>,
 ) {
   const payload = event.payload as Record<string, unknown>;
   const effectiveUrgency = event.urgency as "immediate" | "routine";
   const matches: Array<{
     channelTarget: { channel: string; targetId: string };
-    config: Awaited<ReturnType<typeof loadRulesAndConfigs>>["configs"][number];
+    config: ChannelConfigRow;
     urgency: "immediate" | "routine";
     watchRuleId: number;
     dedupKey: string;
@@ -185,14 +189,14 @@ function evaluateWatchRules(
  */
 function evaluateDefaults(
   event: DomainEventRow,
-  configs: Awaited<ReturnType<typeof loadRulesAndConfigs>>["configs"],
+  configs: ChannelConfigRow[],
 ) {
   const payload = event.payload as Record<string, unknown>;
   const effectiveUrgency = event.urgency as "immediate" | "routine";
   const defaults = getDefaultNotificationsForEvent(event.type, payload, event.source);
 
   const matches: Array<{
-    config: typeof configs[number];
+    config: ChannelConfigRow;
     urgency: "immediate" | "routine";
     recipientId: string;
     dedupKey: string;
@@ -281,18 +285,19 @@ async function dispatchImmediate(params: {
  * 1. Load rules and channel configs
  * 2. Evaluate watch rules (condition matching)
  * 3. Evaluate role-based defaults
- * 4. Check coalescing window (skip rapid-fire immediate dispatches)
- * 5. Check muted event types (skip for users who muted this type)
- * 6. Buffer for digest
- * 7. Dispatch immediate notifications
+ * 4. Load muted event types for targeted recipients
+ * 5. Check coalescing window (skip rapid-fire immediate dispatches)
+ * 6. Buffer for digest (unless muted)
+ * 7. Dispatch immediate notifications (unless muted or coalesced)
  */
 export async function processEvent(event: DomainEventRow): Promise<PipelineResult> {
-  const result: PipelineResult = { dispatched: 0, buffered: 0, coalesced: 0, muted: 0 };
+  const result: PipelineResult = { dispatched: 0, buffered: 0, coalesced: 0, muted: 0, configs: [] };
   const dispatched = new Set<string>();
 
   // Step 1: Load rules and configs
   const { rules, configs } = await loadRulesAndConfigs();
   const configById = new Map(configs.map((c) => [c.id, c]));
+  result.configs = configs;
 
   // Step 2: Evaluate watch rules
   const ruleMatches = evaluateWatchRules(event, rules, configById);
@@ -300,10 +305,15 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
   // Step 3: Evaluate role-based defaults
   const defaultMatches = evaluateDefaults(event, configs);
 
-  // Step 4: Check coalescing — determine if we should skip immediate dispatch
+  // Step 4: Load muted event types for all targeted recipients
+  const allRecipientIds = defaultMatches.map((m) => m.recipientId);
+  const mutedMap = await loadMutedEventTypes(allRecipientIds);
+
+  // Step 5: Check coalescing — determine if we should skip immediate dispatch
   const coalesced = shouldCoalesce(event.entityType, event.entityId);
 
-  // Process watch rule matches
+  // Process watch rule matches (watch rules are not subject to user muting —
+  // they are admin-configured and always apply)
   for (const match of ruleMatches) {
     if (dispatched.has(match.dedupKey)) continue;
     dispatched.add(match.dedupKey);
@@ -329,10 +339,17 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
     }
   }
 
-  // Process role-based defaults
+  // Process role-based defaults (subject to user muting)
   for (const match of defaultMatches) {
     if (dispatched.has(match.dedupKey)) continue;
     dispatched.add(match.dedupKey);
+
+    // Check if recipient has muted this event type
+    const recipientMuted = mutedMap.get(match.recipientId);
+    if (recipientMuted?.has(event.type)) {
+      result.muted++;
+      continue; // skip both buffering and dispatch
+    }
 
     // Always buffer for digest
     await bufferForDigest(event.id, match.config.id);

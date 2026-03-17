@@ -5,6 +5,7 @@ import {
   markRead,
   markAllRead,
   getUnreadCount,
+  retryFailedNotification,
 } from "../../services/admin/notification-admin.service";
 import {
   notificationIdParamSchema,
@@ -18,7 +19,7 @@ const notificationRoutes = new Hono();
 notificationRoutes.get(
   "/notifications",
   describeRoute({
-    description: "List notifications for a user",
+    description: "List notifications for a user from the notification log",
     tags: ["Notifications"],
     responses: { 200: { description: "Success" } },
   }),
@@ -82,6 +83,34 @@ notificationRoutes.get(
     const { userId } = notificationUserIdQuerySchema.parse(c.req.query());
     const count = await getUnreadCount(userId);
     return c.json({ count });
+  },
+);
+
+// POST /admin/notifications/:id/retry - Retry a failed notification
+notificationRoutes.post(
+  "/notifications/:id/retry",
+  describeRoute({
+    description: "Retry a failed notification delivery",
+    tags: ["Notifications"],
+    responses: {
+      200: { description: "Retry succeeded" },
+      400: { description: "Cannot retry (not in failed state)" },
+      404: { description: "Notification not found" },
+    },
+  }),
+  async (c) => {
+    const { id } = notificationIdParamSchema.parse({ id: c.req.param("id") });
+    const result = await retryFailedNotification(id);
+
+    if (!result.success && result.error === "Notification not found") {
+      return c.json({ error: result.error, code: "NOT_FOUND" }, 404);
+    }
+
+    if (!result.success) {
+      return c.json({ error: result.error, code: "RETRY_FAILED" }, 400);
+    }
+
+    return c.json({ success: true });
   },
 );
 

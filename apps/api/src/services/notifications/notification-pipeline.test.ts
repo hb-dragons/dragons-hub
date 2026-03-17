@@ -129,20 +129,29 @@ function makeChannelConfig(overrides: Record<string, unknown> = {}) {
 function setupDbMocks(opts: {
   rules?: Record<string, unknown>[];
   configs?: Record<string, unknown>[];
+  prefs?: Record<string, unknown>[];
 }) {
   const rules = opts.rules ?? [];
   const configs = opts.configs ?? [];
+  const prefs = opts.prefs ?? [];
 
-  // db.select() is called for rules and configs (via Promise.all)
+  // db.select() is called for:
+  // 1+2: rules and configs (via Promise.all in loadRulesAndConfigs)
+  // 3: userNotificationPreferences (in loadMutedEventTypes)
   let callIndex = 0;
-  const callSequence = [rules, configs];
+  const callSequence = [rules, configs, prefs];
 
   mockDbSelect.mockImplementation(() => {
     const idx = callIndex++;
     const data = callSequence[idx] ?? [];
+    // Some queries use .where() (rules, configs), others don't (prefs).
+    // Return a mock that resolves via either path.
+    const mockResult = Promise.resolve(data);
     return {
       from: vi.fn().mockReturnValue({
+        ...mockResult,
         where: vi.fn().mockResolvedValue(data),
+        then: mockResult.then.bind(mockResult),
       }),
     };
   });
@@ -174,7 +183,7 @@ describe("processEvent", () => {
 
       const result = await processEvent(makeEvent());
 
-      expect(result).toEqual({ dispatched: 0, buffered: 0, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 0, buffered: 0, coalesced: 0, muted: 0 });
     });
 
     it("returns zero counts when rules do not match", async () => {
@@ -185,7 +194,7 @@ describe("processEvent", () => {
 
       const result = await processEvent(makeEvent());
 
-      expect(result).toEqual({ dispatched: 0, buffered: 0, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 0, buffered: 0, coalesced: 0, muted: 0 });
       expect(mockInAppSend).not.toHaveBeenCalled();
     });
   });
@@ -216,7 +225,7 @@ describe("processEvent", () => {
         }),
       );
       expect(mockDbInsert).toHaveBeenCalled();
-      expect(result).toEqual({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
     });
 
     it("uses urgencyOverride from rule when present", async () => {
@@ -271,7 +280,7 @@ describe("processEvent", () => {
 
       expect(mockInAppSend).not.toHaveBeenCalled();
       expect(mockDbInsert).toHaveBeenCalled();
-      expect(result).toEqual({ dispatched: 0, buffered: 1, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 0, buffered: 1, coalesced: 0, muted: 0 });
     });
   });
 
@@ -292,7 +301,7 @@ describe("processEvent", () => {
       const result = await processEvent(makeEvent());
 
       expect(mockInAppSend).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
     });
 
     it("dispatches to different channel targets from different rules", async () => {
@@ -316,7 +325,7 @@ describe("processEvent", () => {
       const result = await processEvent(makeEvent());
 
       expect(mockInAppSend).toHaveBeenCalledTimes(2);
-      expect(result).toEqual({ dispatched: 2, buffered: 2, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 2, buffered: 2, coalesced: 0, muted: 0 });
     });
   });
 
@@ -334,7 +343,7 @@ describe("processEvent", () => {
       const result = await processEvent(makeEvent());
 
       expect(mockInAppSend).not.toHaveBeenCalled();
-      expect(result).toEqual({ dispatched: 0, buffered: 0, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 0, buffered: 0, coalesced: 0, muted: 0 });
     });
   });
 
@@ -357,7 +366,7 @@ describe("processEvent", () => {
           recipientId: "audience:admin",
         }),
       );
-      expect(result).toEqual({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
     });
 
     it("dispatches referee defaults with refereeId in recipientId", async () => {
@@ -374,7 +383,7 @@ describe("processEvent", () => {
           recipientId: "referee:77",
         }),
       );
-      expect(result).toEqual({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
     });
 
     it("matches configs without audienceRole to all defaults", async () => {
@@ -414,7 +423,7 @@ describe("processEvent", () => {
 
       expect(mockInAppSend).not.toHaveBeenCalled();
       expect(mockDbInsert).toHaveBeenCalled();
-      expect(result).toEqual({ dispatched: 0, buffered: 1, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 0, buffered: 1, coalesced: 0, muted: 0 });
     });
 
     it("deduplicates default dispatches to same config and recipient", async () => {
@@ -428,7 +437,7 @@ describe("processEvent", () => {
       const result = await processEvent(makeEvent());
 
       expect(mockInAppSend).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
+      expect(result).toMatchObject({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
     });
   });
 
@@ -524,6 +533,72 @@ describe("processEvent", () => {
     });
   });
 
+  describe("muted event types", () => {
+    it("skips dispatch and buffer for recipients who muted the event type", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
+      setupDbMocks({
+        rules: [],
+        configs: [config],
+        prefs: [
+          { userId: "referee:77", mutedEventTypes: ["match.cancelled"] },
+        ],
+      });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "referee", channel: "in_app", refereeId: 77 },
+      ]);
+
+      const result = await processEvent(makeEvent());
+
+      expect(mockInAppSend).not.toHaveBeenCalled();
+      expect(result.muted).toBe(1);
+      expect(result.dispatched).toBe(0);
+      expect(result.buffered).toBe(0);
+    });
+
+    it("does not mute when event type is not in muted list", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
+      setupDbMocks({
+        rules: [],
+        configs: [config],
+        prefs: [
+          { userId: "referee:77", mutedEventTypes: ["match.created"] },
+        ],
+      });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "referee", channel: "in_app", refereeId: 77 },
+      ]);
+
+      const result = await processEvent(makeEvent()); // type is match.cancelled, not match.created
+
+      expect(mockInAppSend).toHaveBeenCalledTimes(1);
+      expect(result.muted).toBe(0);
+      expect(result.dispatched).toBe(1);
+    });
+
+    it("does not apply muting to watch rule matches", async () => {
+      const rule = makeRule();
+      const config = makeChannelConfig();
+      setupDbMocks({
+        rules: [rule],
+        configs: [config],
+        prefs: [
+          { userId: "10", mutedEventTypes: ["match.cancelled"] },
+        ],
+      });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "in_app", targetId: "10" }],
+        urgencyOverride: null,
+      });
+
+      const result = await processEvent(makeEvent());
+
+      // Watch rules are admin-configured, not subject to user muting
+      expect(mockInAppSend).toHaveBeenCalledTimes(1);
+      expect(result.muted).toBe(0);
+    });
+  });
+
   describe("digest buffer", () => {
     it("continues processing when buffer insert fails", async () => {
       const rule = makeRule();
@@ -543,6 +618,18 @@ describe("processEvent", () => {
       // Should not throw — bufferForDigest catches errors
       const result = await processEvent(makeEvent());
       expect(result).toBeDefined();
+    });
+  });
+
+  describe("configs passthrough", () => {
+    it("returns loaded configs in the result for reuse", async () => {
+      const config = makeChannelConfig({ id: 10 });
+      setupDbMocks({ rules: [], configs: [config] });
+
+      const result = await processEvent(makeEvent());
+
+      expect(result.configs).toHaveLength(1);
+      expect(result.configs[0]).toMatchObject({ id: 10 });
     });
   });
 });
