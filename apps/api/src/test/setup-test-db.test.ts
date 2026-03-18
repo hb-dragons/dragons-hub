@@ -47,8 +47,8 @@ describe("setupTestDb", () => {
       })
       .returning();
 
-    expect(league.id).toBe(1);
-    expect(league.name).toBe("Regionalliga West");
+    expect(league!.id).toBe(1);
+    expect(league!.name).toBe("Regionalliga West");
   });
 });
 
@@ -84,6 +84,6 @@ describe("resetTestDb", () => {
       })
       .returning();
 
-    expect(first.id).toBe(1);
+    expect(first!.id).toBe(1);
   });
 });
