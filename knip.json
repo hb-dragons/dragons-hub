@@ -5,7 +5,7 @@
     ".": {
       "entry": ["scripts/*.{js,mjs,ts}"],
       "project": ["scripts/**/*.{js,mjs,ts}"],
-      "ignoreDependencies": ["dotenv", "basketball-bund-sdk"]
+      "ignoreDependencies": ["dotenv", "basketball-bund-sdk", "pg"]
     },
     "apps/api": {
       "project": ["src/**/*.ts"],
@@ -27,7 +27,7 @@
       "project": ["src/**/*.ts"]
     },
     "packages/shared": {
-      "project": ["src/**/*.ts"]
+      "project": ["src/**/*.{ts,tsx}"]
     }
   },
   "ignore": [
