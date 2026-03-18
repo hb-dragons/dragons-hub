@@ -239,7 +239,7 @@ describe("rowToDetail", () => {
     // Detail-specific fields
     expect(result.homeHalftimeScore).toBe(40);
     expect(result.guestHalftimeScore).toBe(30);
-    expect(result.periodFormat).toBe("4x10");
+    expect(result.periodFormat).toBe("quarters");
     expect(result.homeQ1).toBe(20);
     expect(result.guestQ1).toBe(15);
     expect(result.homeQ2).toBe(20);
