@@ -14,7 +14,8 @@
     "check:i18n": "pnpm --filter @dragons/web i18n:check",
     "security:audit": "pnpm audit --audit-level=high",
     "knip": "knip",
-    "clean": "turbo clean"
+    "clean": "turbo clean",
+    "seed:extract": "pnpm --filter @dragons/api exec tsx ../../scripts/extract-test-seed.ts"
   },
   "devDependencies": {
     "knip": "^5.86.0",
