@@ -279,6 +279,19 @@ describe("event worker processor", () => {
       expect(mockDigestQueueAdd).not.toHaveBeenCalled();
     });
 
+    it("does not enqueue digest jobs when configs list is empty", async () => {
+      const event = makeEvent({ type: "sync.completed", urgency: "routine" });
+      setupDbMocks({ event });
+      mockProcessEvent.mockResolvedValue({
+        dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
+        configs: [],
+      });
+
+      await capturedProcessor!(makeJob({ type: "sync.completed" }));
+
+      expect(mockDigestQueueAdd).not.toHaveBeenCalled();
+    });
+
     it("does not trigger digests for non-sync.completed events", async () => {
       setupDbMocks({ event: makeEvent() });
 

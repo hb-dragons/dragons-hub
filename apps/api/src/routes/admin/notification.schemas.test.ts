@@ -24,11 +24,11 @@ describe("notificationIdParamSchema", () => {
 });
 
 describe("notificationListQuerySchema", () => {
-  it("requires userId", () => {
-    expect(() => notificationListQuerySchema.parse({})).toThrow();
+  it("accepts empty object (userId is optional)", () => {
+    expect(notificationListQuerySchema.parse({})).toEqual({});
   });
 
-  it("rejects empty userId", () => {
+  it("rejects empty userId string", () => {
     expect(() =>
       notificationListQuerySchema.parse({ userId: "" }),
     ).toThrow();

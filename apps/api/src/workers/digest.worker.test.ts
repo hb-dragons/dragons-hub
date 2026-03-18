@@ -272,6 +272,49 @@ describe("digest worker processor", () => {
       expect(result).toEqual({ delivered: true, eventCount: 2, digestRunId: 100 });
     });
 
+    it("logs duplicate message when insert returns empty rows (dedup)", async () => {
+      const config = { id: 5, enabled: true, type: "in_app", config: { locale: "en" } };
+      const configSelect = {
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([config]),
+          }),
+        }),
+      };
+      const bufferSelect = {
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(sampleBufferedRows),
+          }),
+        }),
+      };
+      mockDbSelect
+        .mockReturnValueOnce(configSelect)
+        .mockReturnValueOnce(bufferSelect);
+
+      // Transaction mock: insert returns empty array (duplicate detected)
+      mockDbTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const mockInsert = vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            onConflictDoNothing: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([]),  // empty = duplicate
+            }),
+          }),
+        });
+        const mockDelete = vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        });
+
+        return fn({ insert: mockInsert, delete: mockDelete });
+      });
+
+      const result = await capturedProcessor!(makeJob({ channelConfigId: 5, digestRunId: 200 }));
+
+      // Still returns delivered since buffer is cleared regardless
+      expect(result).toEqual({ delivered: true, eventCount: 2, digestRunId: 200 });
+      expect(mockDbTransaction).toHaveBeenCalledTimes(1);
+    });
+
     it("uses default locale 'de' when config has no locale", async () => {
       setupSuccessScenario({ config: { id: 5, enabled: true, type: "in_app", config: {} } });
 

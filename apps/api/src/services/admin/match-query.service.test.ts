@@ -221,7 +221,7 @@ describe("rowToDetail", () => {
     const row = makeMatchRow({
       homeHalftimeScore: 40,
       guestHalftimeScore: 30,
-      periodFormat: "4x10",
+      periodFormat: "quarters",
       internalNotes: "Some internal note",
     });
     const overrides: OverrideInfo[] = [

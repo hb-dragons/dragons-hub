@@ -65,6 +65,24 @@ vi.mock("./hash", () => ({
   computeEntityHash: vi.fn(() => "match-hash"),
 }));
 
+const mockPublishDomainEvent = vi.fn().mockResolvedValue(undefined);
+vi.mock("../events/event-publisher", () => ({
+  publishDomainEvent: (...args: unknown[]) => mockPublishDomainEvent(...args),
+}));
+
+vi.mock("@dragons/shared", () => ({
+  EVENT_TYPES: {
+    MATCH_CREATED: "match.created",
+    MATCH_SCHEDULE_CHANGED: "match.schedule.changed",
+    MATCH_VENUE_CHANGED: "match.venue.changed",
+    MATCH_CANCELLED: "match.cancelled",
+    MATCH_FORFEITED: "match.forfeited",
+    MATCH_RESULT_ENTERED: "match.result_entered",
+    MATCH_RESULT_CHANGED: "match.result_changed",
+    OVERRIDE_CONFLICT: "override.conflict",
+  },
+}));
+
 import { syncMatchesFromData, extractPeriodScores, extractOvertimeDeltas, buildMatchEntityName } from "./matches.sync";
 import { computeEntityHash } from "./hash";
 
@@ -1181,5 +1199,215 @@ describe("extractOvertimeDeltas", () => {
     const deltas = extractOvertimeDeltas(game, periodScores);
     expect(deltas.homeOt1).toBeNull();
     expect(deltas.guestOt1).toBeNull();
+  });
+});
+
+describe("extractPeriodScores - V2stand fallback", () => {
+  it("uses V2stand instead of halftime when V2stand is available", () => {
+    const game = makeGameDetails({
+      heimV1stand: 15,
+      gastV1stand: 12,
+      heimV2stand: 30,
+      gastV2stand: 25,
+      heimHalbzeitstand: 30,
+      gastHalbzeitstand: 25,
+      heimV3stand: 50,
+      gastV3stand: 40,
+      heimV4stand: 70,
+      gastV4stand: 55,
+    }).game1;
+
+    const scores = extractPeriodScores(game);
+
+    expect(scores.periodFormat).toBe("quarters");
+    expect(scores.homeQ1).toBe(15);
+    expect(scores.guestQ1).toBe(12);
+    // Q2 uses V2stand (30) - V1stand (15) = 15
+    expect(scores.homeQ2).toBe(15);
+    expect(scores.guestQ2).toBe(13);
+  });
+
+  it("prefers V2stand over halftime when both differ", () => {
+    // If V2stand is present it takes priority over Halbzeitstand
+    const game = makeGameDetails({
+      heimV1stand: 10,
+      gastV1stand: 8,
+      heimV2stand: 22,
+      gastV2stand: 20,
+      heimHalbzeitstand: 25, // different from V2stand
+      gastHalbzeitstand: 22,
+      heimV3stand: 40,
+      gastV3stand: 35,
+      heimV4stand: 60,
+      gastV4stand: 50,
+    }).game1;
+
+    const scores = extractPeriodScores(game);
+
+    // Q2 = V2stand(22) - V1stand(10) = 12 (not 25 - 10 = 15)
+    expect(scores.homeQ2).toBe(12);
+    // Q3 = V3stand(40) - V2stand(22) = 18 (not 40 - 25 = 15)
+    expect(scores.homeQ3).toBe(18);
+  });
+});
+
+describe("classifyMatchChanges via syncMatchesFromData", () => {
+  it("emits MATCH_SCHEDULE_CHANGED when kickoffDate changes", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ kickoffDate: "2025-02-20" })],
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    makeTxMock(makeLockedRow({ kickoffDate: "2025-01-15" }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "match.schedule.changed" }),
+    );
+  });
+
+  it("emits MATCH_SCHEDULE_CHANGED when kickoffTime changes", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ kickoffTime: "20:00" })],
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    makeTxMock(makeLockedRow({ kickoffTime: "18:00" }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "match.schedule.changed" }),
+    );
+  });
+
+  it("emits MATCH_RESULT_ENTERED when score changes from null to value", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ result: "80:70" })],
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    makeTxMock(makeLockedRow({ homeScore: null, guestScore: null }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "match.result_entered" }),
+    );
+  });
+
+  it("emits MATCH_RESULT_CHANGED when score changes from one value to another", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const details = makeGameDetails({
+      heimEndstand: 90,
+      gastEndstand: 85,
+    });
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ result: "90:85" })],
+      gameDetails: new Map([[1000, details]]),
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    makeTxMock(makeLockedRow({ homeScore: 80, guestScore: 70 }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "match.result_changed" }),
+    );
+  });
+
+  it("emits MATCH_CANCELLED when isCancelled changes to true", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ abgesagt: true })],
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    makeTxMock(makeLockedRow({ isCancelled: false }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "match.cancelled" }),
+    );
+  });
+
+  it("emits MATCH_FORFEITED when isForfeited changes to true", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ verzicht: true })],
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    makeTxMock(makeLockedRow({ isForfeited: false }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "match.forfeited" }),
+    );
+  });
+
+  it("does not emit score event when isCancelled is the only change", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ abgesagt: true })],
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    makeTxMock(makeLockedRow({ isCancelled: false }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    const eventTypes = mockPublishDomainEvent.mock.calls.map(
+      (call: unknown[]) => (call[0] as Record<string, unknown>).type,
+    );
+    expect(eventTypes).not.toContain("match.result_entered");
+    expect(eventTypes).not.toContain("match.result_changed");
+  });
+
+  it("emits multiple events when schedule and result change together", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const details = makeGameDetails({
+      heimEndstand: 90,
+      gastEndstand: 85,
+    });
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ kickoffDate: "2025-03-01", result: "90:85" })],
+      gameDetails: new Map([[1000, details]]),
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    makeTxMock(makeLockedRow({
+      kickoffDate: "2025-01-15",
+      homeScore: null,
+      guestScore: null,
+    }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    const eventTypes = mockPublishDomainEvent.mock.calls.map(
+      (call: unknown[]) => (call[0] as Record<string, unknown>).type,
+    );
+    expect(eventTypes).toContain("match.schedule.changed");
+    expect(eventTypes).toContain("match.result_entered");
+  });
+});
+
+describe("computeEffectiveChanges kickoffTime normalization in update", () => {
+  it("treats '10:30:00' and '10:30' as equal in effective changes", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    // Remote sends "10:30", DB has "10:30:00" — should NOT count as a change
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ kickoffTime: "10:30" })],
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    // Locked row has "10:30:00" (DB format) and everything else matches
+    const { txInsert } = makeTxMock(makeLockedRow({ kickoffTime: "10:30:00" }));
+
+    const result = await syncMatchesFromData([data], new Map(), 1);
+
+    // Should be skipped since kickoffTime "10:30:00" == "10:30" after normalization
+    // and no other fields changed
+    expect(result.skipped).toBe(1);
+    // Only matchRemoteVersions insert, NO matchChanges
+    expect(txInsert).toHaveBeenCalledTimes(1);
   });
 });

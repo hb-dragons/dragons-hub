@@ -832,6 +832,189 @@ describe("syncRefereeAssignmentsFromData", () => {
     // Slot 1 exists, slot 2 is new
     expect(result.created).toBe(1);
   });
+
+  it("skips event emission when match info is not found in batch lookup", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    // Batch-load returns no existing assignments
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // referee names batch — has the referee
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 1, firstName: "John", lastName: "Doe" },
+    ]));
+    // match info batch — empty, so matchInfoMap.get(matchId) returns undefined
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // role names batch
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 2, name: "SR1" },
+    ]));
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const result = await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    // Assignment is still created
+    expect(result.created).toBe(1);
+    // But no event is published because matchInfo was not found
+    expect(mockPublishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("uses 'Unknown' fallback when referee not found in batch lookup", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // referee names batch — empty, so refNameMap.get(refereeId) returns undefined -> "Unknown"
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // match info batch — has the match
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
+    ]));
+    // role names batch
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 2, name: "SR1" },
+    ]));
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          refereeName: "Unknown",
+        }),
+      }),
+    );
+  });
+
+  it("uses 'Unknown' fallback when role not found in batch lookup", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // referee names batch
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 1, firstName: "John", lastName: "Doe" },
+    ]));
+    // match info batch
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
+    ]));
+    // role names batch — empty, so roleNameMap.get(roleId) returns undefined -> "Unknown"
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockResolvedValue(undefined),
+    });
+
+    await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          role: "Unknown",
+        }),
+      }),
+    );
+  });
+
+  it("skips reassigned event emission when match info is not found", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    // Existing assignment has different referee
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
+    ]));
+    // referee names batch
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 1, firstName: "John", lastName: "Doe" },
+      { id: 99, firstName: "Old", lastName: "Ref" },
+    ]));
+    // match info batch — empty
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // role names batch
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 2, name: "SR1" },
+    ]));
+    mockUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    const result = await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    // Update still happens
+    expect(mockUpdate).toHaveBeenCalled();
+    // But no event is published because matchInfo was not found
+    expect(mockPublishDomainEvent).not.toHaveBeenCalled();
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("uses 'Unknown' fallbacks for referee names and role in reassigned event", async () => {
+    const assignments: ExtractedRefereeAssignment[] = [
+      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
+    ];
+    // Existing assignment has different referee
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
+    ]));
+    // referee names batch — empty (both old and new referee missing)
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    // match info batch
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
+      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
+    ]));
+    // role names batch — empty
+    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
+    mockUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    await syncRefereeAssignmentsFromData(
+      assignments,
+      refereeIdLookup,
+      roleIdLookup,
+      matchIdLookup,
+    );
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "referee.reassigned",
+        payload: expect.objectContaining({
+          oldRefereeName: "Unknown",
+          newRefereeName: "Unknown",
+          role: "Unknown",
+        }),
+      }),
+    );
+  });
 });
 
 describe("buildMatchIdLookup", () => {

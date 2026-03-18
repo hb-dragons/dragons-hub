@@ -210,4 +210,67 @@ describe("buildCalendarFeed", () => {
     const eventCount = (ics.match(/BEGIN:VEVENT/g) ?? []).length;
     expect(eventCount).toBe(2);
   });
+
+  // --- Branch coverage: partial score ---
+
+  it("omits score from description when only homeScore is set", () => {
+    const ics = buildCalendarFeed(
+      [makeMatch({ homeScore: 65, guestScore: null })],
+      {},
+    );
+    expect(ics).not.toContain("Ergebnis:");
+  });
+
+  it("omits score from description when only guestScore is set", () => {
+    const ics = buildCalendarFeed(
+      [makeMatch({ homeScore: null, guestScore: 48 })],
+      {},
+    );
+    expect(ics).not.toContain("Ergebnis:");
+  });
+
+  // --- Branch coverage: location edge cases ---
+
+  it("omits location when venueName and venueNameOverride are null", () => {
+    const ics = buildCalendarFeed(
+      [makeMatch({ venueName: null, venueNameOverride: null })],
+      {},
+    );
+    expect(ics).not.toMatch(/\r\nLOCATION:/);
+  });
+
+  it("includes street only in address when postalCode and city are null", () => {
+    const ics = unfold(buildCalendarFeed(
+      [makeMatch({ venuePostalCode: null, venueCity: null })],
+      {},
+    ));
+    expect(ics).toContain("Parkstr. 1");
+    expect(ics).not.toContain("null");
+  });
+
+  it("omits address when no street, postalCode or city", () => {
+    const ics = unfold(buildCalendarFeed(
+      [makeMatch({ venueStreet: null, venuePostalCode: null, venueCity: null })],
+      {},
+    ));
+    // Location should have venue name but no address
+    expect(ics).toContain("Sporthalle Am Park");
+  });
+
+  // --- Branch coverage: options and description edge cases ---
+
+  it("uses hostname option in event UID", () => {
+    const ics = buildCalendarFeed([makeMatch({ id: 7 })], {
+      hostname: "my.club",
+    });
+    expect(ics).toContain("match-7@my.club");
+  });
+
+  it("omits league from description when leagueName is null", () => {
+    const ics = unfold(buildCalendarFeed(
+      [makeMatch({ leagueName: null })],
+      {},
+    ));
+    expect(ics).not.toContain("U14 Kreisliga");
+  });
 });

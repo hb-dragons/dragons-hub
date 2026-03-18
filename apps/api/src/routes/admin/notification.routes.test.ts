@@ -74,11 +74,16 @@ describe("GET /notifications", () => {
     });
   });
 
-  it("returns 400 when userId is missing", async () => {
+  it("returns 200 when userId is missing (optional)", async () => {
+    mocks.listNotifications.mockResolvedValue({
+      notifications: [],
+      total: 0,
+    });
+
     const res = await app.request("/notifications");
 
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(res.status).toBe(200);
+    expect(mocks.listNotifications).toHaveBeenCalledWith({});
   });
 
   it("returns 400 for invalid limit", async () => {
@@ -170,13 +175,16 @@ describe("PATCH /notifications/read-all", () => {
     expect(await json(res)).toEqual({ updated: 0 });
   });
 
-  it("returns 400 when userId is missing", async () => {
+  it("returns 200 when userId is missing (marks all)", async () => {
+    mocks.markAllRead.mockResolvedValue(3);
+
     const res = await app.request("/notifications/read-all", {
       method: "PATCH",
     });
 
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ updated: 3 });
+    expect(mocks.markAllRead).toHaveBeenCalledWith(undefined);
   });
 });
 
