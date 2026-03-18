@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
 
 // --- Mock setup ---
 
@@ -17,93 +16,39 @@ vi.mock("../../../config/database", () => ({
 // --- Imports (after mocks) ---
 
 import { InAppChannelAdapter } from "./in-app";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../../test/setup-test-db";
 
 // --- PGlite setup ---
 
-const CREATE_TABLES = `
-  CREATE TABLE sync_runs (
-    id SERIAL PRIMARY KEY
-  );
-
-  CREATE TABLE domain_events (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    source TEXT NOT NULL,
-    urgency TEXT NOT NULL,
-    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    actor TEXT,
-    sync_run_id INTEGER REFERENCES sync_runs(id),
-    entity_type TEXT NOT NULL,
-    entity_id INTEGER NOT NULL,
-    entity_name TEXT NOT NULL,
-    deep_link_path TEXT NOT NULL,
-    enqueued_at TIMESTAMPTZ,
-    payload JSONB NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE watch_rules (
-    id SERIAL PRIMARY KEY
-  );
-
-  CREATE TABLE channel_configs (
-    id SERIAL PRIMARY KEY
-  );
-
-  CREATE TABLE notification_log (
-    id SERIAL PRIMARY KEY,
-    event_id TEXT NOT NULL REFERENCES domain_events(id),
-    watch_rule_id INTEGER REFERENCES watch_rules(id),
-    channel_config_id INTEGER NOT NULL REFERENCES channel_configs(id),
-    recipient_id TEXT,
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    locale TEXT NOT NULL DEFAULT 'de',
-    status TEXT NOT NULL DEFAULT 'pending',
-    sent_at TIMESTAMPTZ,
-    read_at TIMESTAMPTZ,
-    digest_run_id INTEGER,
-    error_message TEXT,
-    retry_count INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE UNIQUE INDEX notification_log_dedup_idx ON notification_log
-    (event_id, channel_config_id, COALESCE(recipient_id, '__group__'));
-`;
-
-let client: PGlite;
+let ctx: TestDbContext;
 
 beforeAll(async () => {
-  const pglite = await import("@electric-sql/pglite");
-  const drizzlePglite = await import("drizzle-orm/pglite");
-
-  client = new pglite.PGlite();
-  dbHolder.ref = drizzlePglite.drizzle(client);
-
-  await client.exec(CREATE_TABLES);
-
-  // Insert prerequisite rows for foreign keys
-  await client.exec(`
-    INSERT INTO domain_events (id, type, source, urgency, entity_type, entity_id, entity_name, deep_link_path, payload)
-    VALUES ('evt-001', 'match.cancelled', 'sync', 'immediate', 'match', 1, 'Test Match', '/matches/1', '{}');
-  `);
-  await client.exec(`INSERT INTO channel_configs (id) VALUES (1);`);
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
+async function insertPrerequisites() {
+  await ctx.client.exec(`
+    INSERT INTO domain_events (id, type, source, urgency, occurred_at, entity_type, entity_id, entity_name, deep_link_path, payload)
+    VALUES ('evt-001', 'match.cancelled', 'sync', 'immediate', NOW(), 'match', 1, 'Test Match', '/matches/1', '{}');
+  `);
+  await ctx.client.exec(`INSERT INTO channel_configs (id, name, type, config) VALUES (1, 'test-channel', 'in_app', '{}');`);
+}
+
 beforeEach(async () => {
-  await client.exec("DELETE FROM notification_log");
-  await client.exec("ALTER SEQUENCE notification_log_id_seq RESTART WITH 1");
+  await resetTestDb(ctx);
+  await insertPrerequisites();
+  vi.clearAllMocks();
 });
 
 afterAll(async () => {
-  await client.close();
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
 
 async function getNotificationLogs() {
-  const result = await client.query("SELECT * FROM notification_log ORDER BY id");
+  const result = await ctx.client.query("SELECT * FROM notification_log ORDER BY id");
   return result.rows as Record<string, unknown>[];
 }
 

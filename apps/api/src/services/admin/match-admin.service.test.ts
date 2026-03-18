@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
 
 // --- Mock setup ---
 
@@ -42,270 +41,22 @@ import {
   releaseOverride,
   computeDiffs,
 } from "./match-admin.service";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
-// --- PGlite setup ---
-
-const CREATE_TABLES = `
-  CREATE TABLE leagues (
-    id SERIAL PRIMARY KEY,
-    api_liga_id INTEGER NOT NULL UNIQUE,
-    liga_nr INTEGER NOT NULL,
-    name VARCHAR(150) NOT NULL,
-    season_id INTEGER NOT NULL,
-    season_name VARCHAR(100) NOT NULL,
-    sk_name VARCHAR(100),
-    ak_name VARCHAR(100),
-    geschlecht VARCHAR(20),
-    verband_id INTEGER,
-    verband_name VARCHAR(100),
-    is_active BOOLEAN DEFAULT TRUE,
-    is_tracked BOOLEAN DEFAULT TRUE,
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE teams (
-    id SERIAL PRIMARY KEY,
-    api_team_permanent_id INTEGER NOT NULL UNIQUE,
-    season_team_id INTEGER NOT NULL,
-    team_competition_id INTEGER NOT NULL,
-    name VARCHAR(150) NOT NULL,
-    name_short VARCHAR(100),
-    custom_name VARCHAR(50),
-    club_id INTEGER NOT NULL,
-    is_own_club BOOLEAN DEFAULT FALSE,
-    verzicht BOOLEAN DEFAULT FALSE,
-    badge_color VARCHAR(20),
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE venues (
-    id SERIAL PRIMARY KEY,
-    api_id INTEGER NOT NULL UNIQUE,
-    name VARCHAR(200) NOT NULL,
-    street VARCHAR(200),
-    postal_code VARCHAR(10),
-    city VARCHAR(100),
-    latitude NUMERIC(10, 7),
-    longitude NUMERIC(10, 7),
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE venue_bookings (
-    id SERIAL PRIMARY KEY,
-    venue_id INTEGER NOT NULL REFERENCES venues(id),
-    date DATE NOT NULL,
-    calculated_start_time TIME NOT NULL,
-    calculated_end_time TIME NOT NULL,
-    override_start_time TIME,
-    override_end_time TIME,
-    override_reason TEXT,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    needs_reconfirmation BOOLEAN NOT NULL DEFAULT FALSE,
-    notes TEXT,
-    confirmed_by TEXT,
-    confirmed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(venue_id, date)
-  );
-
-  CREATE TABLE matches (
-    id SERIAL PRIMARY KEY,
-    api_match_id INTEGER NOT NULL UNIQUE,
-    match_no INTEGER NOT NULL,
-    match_day INTEGER NOT NULL,
-    kickoff_date DATE NOT NULL,
-    kickoff_time TIME NOT NULL,
-    league_id INTEGER REFERENCES leagues(id),
-    home_team_api_id INTEGER NOT NULL REFERENCES teams(api_team_permanent_id),
-    guest_team_api_id INTEGER NOT NULL REFERENCES teams(api_team_permanent_id),
-    venue_id INTEGER REFERENCES venues(id),
-    is_confirmed BOOLEAN DEFAULT FALSE,
-    is_forfeited BOOLEAN DEFAULT FALSE,
-    is_cancelled BOOLEAN DEFAULT FALSE,
-    home_score INTEGER,
-    guest_score INTEGER,
-    home_halftime_score INTEGER,
-    guest_halftime_score INTEGER,
-    period_format VARCHAR(10),
-    home_q1 INTEGER,
-    guest_q1 INTEGER,
-    home_q2 INTEGER,
-    guest_q2 INTEGER,
-    home_q3 INTEGER,
-    guest_q3 INTEGER,
-    home_q4 INTEGER,
-    guest_q4 INTEGER,
-    home_q5 INTEGER,
-    guest_q5 INTEGER,
-    home_q6 INTEGER,
-    guest_q6 INTEGER,
-    home_q7 INTEGER,
-    guest_q7 INTEGER,
-    home_q8 INTEGER,
-    guest_q8 INTEGER,
-    home_ot1 INTEGER,
-    guest_ot1 INTEGER,
-    home_ot2 INTEGER,
-    guest_ot2 INTEGER,
-    sr1_open BOOLEAN NOT NULL DEFAULT FALSE,
-    sr2_open BOOLEAN NOT NULL DEFAULT FALSE,
-    sr3_open BOOLEAN NOT NULL DEFAULT FALSE,
-    venue_name_override VARCHAR(200),
-    anschreiber VARCHAR(100),
-    zeitnehmer VARCHAR(100),
-    shotclock VARCHAR(100),
-    internal_notes TEXT,
-    public_comment TEXT,
-    current_remote_version INTEGER NOT NULL DEFAULT 0,
-    current_local_version INTEGER NOT NULL DEFAULT 0,
-    remote_data_hash VARCHAR(64),
-    last_remote_sync TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE match_overrides (
-    id SERIAL PRIMARY KEY,
-    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    field_name VARCHAR(100) NOT NULL,
-    reason TEXT,
-    changed_by TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(match_id, field_name)
-  );
-
-  CREATE TABLE match_remote_versions (
-    id SERIAL PRIMARY KEY,
-    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    version_number INTEGER NOT NULL,
-    sync_run_id INTEGER,
-    snapshot JSONB NOT NULL,
-    data_hash VARCHAR(64) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(match_id, version_number)
-  );
-
-  CREATE TABLE match_local_versions (
-    id SERIAL PRIMARY KEY,
-    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    version_number INTEGER NOT NULL,
-    changed_by TEXT,
-    change_reason TEXT,
-    snapshot JSONB NOT NULL,
-    data_hash VARCHAR(64) NOT NULL,
-    base_remote_version INTEGER,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(match_id, version_number)
-  );
-
-  CREATE TABLE match_changes (
-    id SERIAL PRIMARY KEY,
-    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    track VARCHAR(10) NOT NULL,
-    version_number INTEGER NOT NULL,
-    field_name VARCHAR(100) NOT NULL,
-    old_value TEXT,
-    new_value TEXT,
-    changed_by TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE venue_booking_matches (
-    id SERIAL PRIMARY KEY,
-    venue_booking_id INTEGER NOT NULL REFERENCES venue_bookings(id) ON DELETE CASCADE,
-    match_id INTEGER NOT NULL REFERENCES matches(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(venue_booking_id, match_id)
-  );
-
-  CREATE TABLE referees (
-    id SERIAL PRIMARY KEY,
-    api_id INTEGER NOT NULL UNIQUE,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    license_number INTEGER,
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE referee_roles (
-    id SERIAL PRIMARY KEY,
-    api_id INTEGER NOT NULL UNIQUE,
-    name VARCHAR(100) NOT NULL,
-    short_name VARCHAR(20),
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE match_referees (
-    id SERIAL PRIMARY KEY,
-    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    referee_id INTEGER NOT NULL REFERENCES referees(id),
-    role_id INTEGER NOT NULL REFERENCES referee_roles(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(match_id, referee_id, role_id)
-  );
-
-  CREATE TABLE referee_assignment_intents (
-    id SERIAL PRIMARY KEY,
-    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    referee_id INTEGER NOT NULL REFERENCES referees(id),
-    slot_number SMALLINT NOT NULL,
-    clicked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    confirmed_by_sync_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(match_id, referee_id, slot_number)
-  );
-`;
-
-let client: PGlite;
+let ctx: TestDbContext;
 
 beforeAll(async () => {
-  const pglite = await import("@electric-sql/pglite");
-  const drizzlePglite = await import("drizzle-orm/pglite");
-
-  client = new pglite.PGlite();
-  dbHolder.ref = drizzlePglite.drizzle(client);
-
-  await client.exec(CREATE_TABLES);
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
 beforeEach(async () => {
-  await client.exec("DELETE FROM venue_booking_matches");
-  await client.exec("DELETE FROM match_changes");
-  await client.exec("DELETE FROM match_local_versions");
-  await client.exec("DELETE FROM match_remote_versions");
-  await client.exec("DELETE FROM match_overrides");
-  await client.exec("DELETE FROM matches");
-  await client.exec("DELETE FROM venue_bookings");
-  await client.exec("DELETE FROM venues");
-  await client.exec("DELETE FROM teams");
-  await client.exec("DELETE FROM leagues");
-  await client.exec("ALTER SEQUENCE matches_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE leagues_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE teams_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venues_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE match_overrides_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE match_local_versions_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE match_remote_versions_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE match_changes_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venue_bookings_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venue_booking_matches_id_seq RESTART WITH 1");
+  await resetTestDb(ctx);
   vi.clearAllMocks();
 });
 
 afterAll(async () => {
-  await client.close();
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
@@ -322,7 +73,7 @@ async function insertLeague(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO leagues (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -342,7 +93,7 @@ async function insertTeam(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO teams (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -359,7 +110,7 @@ async function insertVenue(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO venues (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -380,7 +131,7 @@ async function insertMatch(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO matches (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -397,14 +148,14 @@ async function insertOverride(matchId: number, fieldName: string, overrides: Rec
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  await client.query(
+  await ctx.client.query(
     `INSERT INTO match_overrides (${cols.join(", ")}) VALUES (${placeholders})`,
     vals,
   );
 }
 
 async function insertRemoteVersion(matchId: number, versionNumber: number, snapshot: Record<string, unknown>) {
-  await client.query(
+  await ctx.client.query(
     `INSERT INTO match_remote_versions (match_id, version_number, snapshot, data_hash) VALUES ($1, $2, $3, $4)`,
     [matchId, versionNumber, JSON.stringify(snapshot), "hash"],
   );
@@ -421,7 +172,7 @@ async function seedBasicData() {
 }
 
 async function getLocalVersion(matchId: number): Promise<number> {
-  const row = await client.query(
+  const row = await ctx.client.query(
     "SELECT current_local_version FROM matches WHERE id = $1",
     [matchId],
   );
@@ -878,7 +629,7 @@ describe("updateMatchLocal", () => {
     expect(await getLocalVersion(matchId)).toBe(1);
 
     // Verify override rows were created
-    const overrides = await client.query(
+    const overrides = await ctx.client.query(
       "SELECT * FROM match_overrides WHERE match_id = $1 ORDER BY field_name",
       [matchId],
     );
@@ -890,7 +641,7 @@ describe("updateMatchLocal", () => {
     expect(dateOverride.reason).toBe("Rescheduled by email");
 
     // Verify version record was created
-    const versions = await client.query(
+    const versions = await ctx.client.query(
       "SELECT * FROM match_local_versions WHERE match_id = $1",
       [matchId],
     );
@@ -901,7 +652,7 @@ describe("updateMatchLocal", () => {
     expect(version.change_reason).toBe("Rescheduled by email");
 
     // Verify change records
-    const changes = await client.query(
+    const changes = await ctx.client.query(
       "SELECT * FROM match_changes WHERE match_id = $1 ORDER BY field_name",
       [matchId],
     );
@@ -932,7 +683,7 @@ describe("updateMatchLocal", () => {
     expect(result!.match.kickoffDate).toBe("2025-03-15");
 
     // Override row should be deleted
-    const overrides = await client.query(
+    const overrides = await ctx.client.query(
       "SELECT * FROM match_overrides WHERE match_id = $1",
       [matchId],
     );
@@ -952,7 +703,7 @@ describe("updateMatchLocal", () => {
     expect(result!.match.anschreiber).toBe("Max");
     expect(await getLocalVersion(matchId)).toBe(1);
 
-    const changes = await client.query(
+    const changes = await ctx.client.query(
       "SELECT * FROM match_changes WHERE match_id = $1",
       [matchId],
     );
@@ -982,7 +733,7 @@ describe("updateMatchLocal", () => {
     expect(result).not.toBeNull();
     expect(result!.match.kickoffDate).toBe("2025-03-15");
 
-    const overrides = await client.query(
+    const overrides = await ctx.client.query(
       "SELECT * FROM match_overrides WHERE match_id = $1",
       [matchId],
     );
@@ -1002,7 +753,7 @@ describe("updateMatchLocal", () => {
     expect(result).not.toBeNull();
     expect(await getLocalVersion(matchId)).toBe(0);
 
-    const versions = await client.query(
+    const versions = await ctx.client.query(
       "SELECT * FROM match_local_versions WHERE match_id = $1",
       [matchId],
     );
@@ -1018,7 +769,7 @@ describe("updateMatchLocal", () => {
 
     expect(await getLocalVersion(matchId)).toBe(2);
 
-    const versions = await client.query(
+    const versions = await ctx.client.query(
       "SELECT * FROM match_local_versions WHERE match_id = $1 ORDER BY version_number",
       [matchId],
     );
@@ -1054,7 +805,7 @@ describe("updateMatchLocal", () => {
 
     await updateMatchLocal(matchId, { anschreiber: "Max" }, "admin@test.com");
 
-    const versions = await client.query(
+    const versions = await ctx.client.query(
       "SELECT base_remote_version FROM match_local_versions WHERE match_id = $1",
       [matchId],
     );
@@ -1092,7 +843,7 @@ describe("updateMatchLocal", () => {
     expect(result!.match.anschreiber).toBe("Max");
     expect(result!.match.zeitnehmer).toBe("Moritz");
 
-    const changes = await client.query(
+    const changes = await ctx.client.query(
       "SELECT field_name FROM match_changes WHERE match_id = $1",
       [matchId],
     );
@@ -1137,7 +888,7 @@ describe("updateMatchLocal", () => {
       "admin@test.com",
     );
 
-    const overrides = await client.query(
+    const overrides = await ctx.client.query(
       "SELECT * FROM match_overrides WHERE match_id = $1",
       [matchId],
     );
@@ -1175,14 +926,14 @@ describe("releaseOverride", () => {
     expect(result!.match.kickoffDate).toBe("2025-03-15");
 
     // Override row should be deleted
-    const overrides = await client.query(
+    const overrides = await ctx.client.query(
       "SELECT * FROM match_overrides WHERE match_id = $1",
       [matchId],
     );
     expect(overrides.rows).toHaveLength(0);
 
     // Change should be recorded
-    const changes = await client.query(
+    const changes = await ctx.client.query(
       "SELECT * FROM match_changes WHERE match_id = $1 AND field_name = 'kickoffDate'",
       [matchId],
     );
@@ -1208,7 +959,7 @@ describe("releaseOverride", () => {
     // Field missing in snapshot → remoteValue is null
     expect(result!.match.homeScore).toBeNull();
 
-    const overrides = await client.query(
+    const overrides = await ctx.client.query(
       "SELECT * FROM match_overrides WHERE match_id = $1",
       [matchId],
     );
@@ -1229,7 +980,7 @@ describe("releaseOverride", () => {
     // With no remote version, remoteValue is null → score restored to null
     expect(result!.match.homeScore).toBeNull();
 
-    const overrides = await client.query(
+    const overrides = await ctx.client.query(
       "SELECT * FROM match_overrides WHERE match_id = $1",
       [matchId],
     );

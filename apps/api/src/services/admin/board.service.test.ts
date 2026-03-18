@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- Mock setup ---
 
@@ -30,71 +30,20 @@ import {
 
 // --- PGlite setup ---
 
-const CREATE_TABLES = `
-  CREATE TABLE boards (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    created_by TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE board_columns (
-    id SERIAL PRIMARY KEY,
-    board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
-    position INTEGER NOT NULL DEFAULT 0,
-    color VARCHAR(7),
-    is_done_column BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE tasks (
-    id SERIAL PRIMARY KEY,
-    board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-    column_id INTEGER NOT NULL REFERENCES board_columns(id),
-    title VARCHAR(300) NOT NULL,
-    description TEXT,
-    assignee_id TEXT,
-    priority VARCHAR(10) NOT NULL DEFAULT 'normal',
-    due_date DATE,
-    position INTEGER NOT NULL DEFAULT 0,
-    match_id INTEGER,
-    venue_booking_id INTEGER,
-    source_type VARCHAR(20) NOT NULL DEFAULT 'manual',
-    source_detail TEXT,
-    created_by TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-`;
-
-let client: PGlite;
+let ctx: TestDbContext;
 
 beforeAll(async () => {
-  const pglite = await import("@electric-sql/pglite");
-  const drizzlePglite = await import("drizzle-orm/pglite");
-
-  client = new pglite.PGlite();
-  dbHolder.ref = drizzlePglite.drizzle(client);
-
-  await client.exec(CREATE_TABLES);
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
 beforeEach(async () => {
-  await client.exec("DELETE FROM tasks");
-  await client.exec("DELETE FROM board_columns");
-  await client.exec("DELETE FROM boards");
-  await client.exec("ALTER SEQUENCE boards_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE board_columns_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE tasks_id_seq RESTART WITH 1");
+  await resetTestDb(ctx);
   vi.clearAllMocks();
 });
 
 afterAll(async () => {
-  await client.close();
+  await closeTestDb(ctx);
 });
 
 // --- Tests ---
@@ -106,7 +55,7 @@ describe("listBoards", () => {
   });
 
   it("returns all boards with summary fields", async () => {
-    await client.exec(
+    await ctx.client.exec(
       "INSERT INTO boards (name, description) VALUES ('Board 1', 'Desc 1'), ('Board 2', NULL)",
     );
 
@@ -121,7 +70,7 @@ describe("listBoards", () => {
   });
 
   it("orders boards by id ascending", async () => {
-    await client.exec(
+    await ctx.client.exec(
       "INSERT INTO boards (name) VALUES ('Zebra'), ('Alpha')",
     );
 
@@ -234,7 +183,7 @@ describe("deleteBoard", () => {
     const board = await createBoard("Board");
     await deleteBoard(board.id);
 
-    const cols = await client.query(
+    const cols = await ctx.client.query(
       "SELECT COUNT(*) as cnt FROM board_columns WHERE board_id = $1",
       [board.id],
     );
@@ -274,7 +223,7 @@ describe("addColumn", () => {
   });
 
   it("adds first column at position 0 when board has no columns", async () => {
-    await client.exec("INSERT INTO boards (name) VALUES ('Empty Board')");
+    await ctx.client.exec("INSERT INTO boards (name) VALUES ('Empty Board')");
 
     const result = await addColumn(1, { name: "First" });
 
@@ -363,7 +312,7 @@ describe("deleteColumn", () => {
     const board = await createBoard("Board");
     const colId = board.columns[0]!.id;
 
-    await client.exec(
+    await ctx.client.exec(
       `INSERT INTO tasks (board_id, column_id, title) VALUES (${board.id}, ${colId}, 'Task 1')`,
     );
 

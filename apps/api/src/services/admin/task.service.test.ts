@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
 
 // --- Mock setup ---
 
@@ -30,102 +29,29 @@ import {
   updateComment,
   deleteComment,
 } from "./task.service";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
-// --- PGlite setup ---
-
-const CREATE_TABLES = `
-  CREATE TABLE boards (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    created_by TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE board_columns (
-    id SERIAL PRIMARY KEY,
-    board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
-    position INTEGER NOT NULL DEFAULT 0,
-    color VARCHAR(7),
-    is_done_column BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE tasks (
-    id SERIAL PRIMARY KEY,
-    board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
-    column_id INTEGER NOT NULL REFERENCES board_columns(id),
-    title VARCHAR(300) NOT NULL,
-    description TEXT,
-    assignee_id TEXT,
-    priority VARCHAR(10) NOT NULL DEFAULT 'normal',
-    due_date DATE,
-    position INTEGER NOT NULL DEFAULT 0,
-    created_by TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE task_checklist_items (
-    id SERIAL PRIMARY KEY,
-    task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    label VARCHAR(200) NOT NULL,
-    is_checked BOOLEAN NOT NULL DEFAULT FALSE,
-    checked_by TEXT,
-    checked_at TIMESTAMPTZ,
-    position INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE task_comments (
-    id SERIAL PRIMARY KEY,
-    task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    author_id TEXT NOT NULL,
-    body TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-`;
-
-let client: PGlite;
+let ctx: TestDbContext;
 
 beforeAll(async () => {
-  const pglite = await import("@electric-sql/pglite");
-  const drizzlePglite = await import("drizzle-orm/pglite");
-
-  client = new pglite.PGlite();
-  dbHolder.ref = drizzlePglite.drizzle(client);
-
-  await client.exec(CREATE_TABLES);
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
 beforeEach(async () => {
-  await client.exec("DELETE FROM task_comments");
-  await client.exec("DELETE FROM task_checklist_items");
-  await client.exec("DELETE FROM tasks");
-  await client.exec("DELETE FROM board_columns");
-  await client.exec("DELETE FROM boards");
-  await client.exec("ALTER SEQUENCE boards_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE board_columns_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE tasks_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE task_checklist_items_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE task_comments_id_seq RESTART WITH 1");
+  await resetTestDb(ctx);
   vi.clearAllMocks();
 });
 
 afterAll(async () => {
-  await client.close();
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
 
 async function createBoardWithColumns() {
-  await client.exec("INSERT INTO boards (name) VALUES ('Test Board')");
-  await client.exec(`
+  await ctx.client.exec("INSERT INTO boards (name) VALUES ('Test Board')");
+  await ctx.client.exec(`
     INSERT INTO board_columns (board_id, name, position, is_done_column)
     VALUES (1, 'To Do', 0, false), (1, 'In Progress', 1, false), (1, 'Done', 2, true)
   `);
@@ -143,10 +69,10 @@ describe("listTasks", () => {
 
   it("returns tasks with checklist counts", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await client.exec(
+    await ctx.client.exec(
       `INSERT INTO tasks (board_id, column_id, title) VALUES (${boardId}, ${todoColId}, 'Task 1')`,
     );
-    await client.exec(
+    await ctx.client.exec(
       "INSERT INTO task_checklist_items (task_id, label, is_checked, position) VALUES (1, 'Item A', true, 0), (1, 'Item B', false, 1)",
     );
 
@@ -160,7 +86,7 @@ describe("listTasks", () => {
 
   it("returns zero counts when no checklist items", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await client.exec(
+    await ctx.client.exec(
       `INSERT INTO tasks (board_id, column_id, title) VALUES (${boardId}, ${todoColId}, 'Task')`,
     );
 
@@ -172,7 +98,7 @@ describe("listTasks", () => {
 
   it("filters by columnId", async () => {
     const { boardId, todoColId, inProgressColId } = await createBoardWithColumns();
-    await client.exec(
+    await ctx.client.exec(
       `INSERT INTO tasks (board_id, column_id, title) VALUES (${boardId}, ${todoColId}, 'Todo'), (${boardId}, ${inProgressColId}, 'InProg')`,
     );
 
@@ -184,7 +110,7 @@ describe("listTasks", () => {
 
   it("filters by assigneeId", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await client.exec(
+    await ctx.client.exec(
       `INSERT INTO tasks (board_id, column_id, title, assignee_id) VALUES (${boardId}, ${todoColId}, 'Mine', 'user-1'), (${boardId}, ${todoColId}, 'Theirs', 'user-2')`,
     );
 
@@ -196,7 +122,7 @@ describe("listTasks", () => {
 
   it("filters by priority", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await client.exec(
+    await ctx.client.exec(
       `INSERT INTO tasks (board_id, column_id, title, priority) VALUES (${boardId}, ${todoColId}, 'Normal', 'normal'), (${boardId}, ${todoColId}, 'Urgent', 'urgent')`,
     );
 
@@ -208,7 +134,7 @@ describe("listTasks", () => {
 
   it("orders by position then id", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await client.exec(
+    await ctx.client.exec(
       `INSERT INTO tasks (board_id, column_id, title, position) VALUES (${boardId}, ${todoColId}, 'Second', 1), (${boardId}, ${todoColId}, 'First', 0)`,
     );
 
@@ -278,8 +204,8 @@ describe("createTask", () => {
 
   it("returns null for column belonging to different board", async () => {
     await createBoardWithColumns();
-    await client.exec("INSERT INTO boards (name) VALUES ('Board 2')");
-    await client.exec(
+    await ctx.client.exec("INSERT INTO boards (name) VALUES ('Board 2')");
+    await ctx.client.exec(
       "INSERT INTO board_columns (board_id, name, position) VALUES (2, 'Col', 0)",
     );
 
@@ -294,10 +220,10 @@ describe("getTaskDetail", () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task 1", columnId: todoColId });
 
-    await client.exec(
+    await ctx.client.exec(
       "INSERT INTO task_checklist_items (task_id, label, position) VALUES (1, 'Item 1', 0)",
     );
-    await client.exec(
+    await ctx.client.exec(
       "INSERT INTO task_comments (task_id, author_id, body) VALUES (1, 'user-1', 'Great!')",
     );
 
@@ -417,12 +343,12 @@ describe("deleteTask", () => {
 
     await deleteTask(1);
 
-    const items = await client.query(
+    const items = await ctx.client.query(
       "SELECT COUNT(*) as cnt FROM task_checklist_items WHERE task_id = 1",
     );
     expect((items.rows[0] as { cnt: number }).cnt).toBe(0);
 
-    const comments = await client.query(
+    const comments = await ctx.client.query(
       "SELECT COUNT(*) as cnt FROM task_comments WHERE task_id = 1",
     );
     expect((comments.rows[0] as { cnt: number }).cnt).toBe(0);

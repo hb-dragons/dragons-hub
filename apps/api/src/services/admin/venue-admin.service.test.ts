@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
 
 // --- Mock setup ---
 
@@ -17,45 +16,24 @@ vi.mock("../../config/database", () => ({
 // --- Imports (after mocks) ---
 
 import { searchVenues, getVenues } from "./venue-admin.service";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- PGlite setup ---
 
-const CREATE_TABLES = `
-  CREATE TABLE venues (
-    id SERIAL PRIMARY KEY,
-    api_id INTEGER NOT NULL UNIQUE,
-    name VARCHAR(200) NOT NULL,
-    street VARCHAR(200),
-    postal_code VARCHAR(10),
-    city VARCHAR(100),
-    latitude NUMERIC(10, 7),
-    longitude NUMERIC(10, 7),
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-`;
-
-let client: PGlite;
+let ctx: TestDbContext;
 
 beforeAll(async () => {
-  const pglite = await import("@electric-sql/pglite");
-  const drizzlePglite = await import("drizzle-orm/pglite");
-
-  client = new pglite.PGlite();
-  dbHolder.ref = drizzlePglite.drizzle(client);
-
-  await client.exec(CREATE_TABLES);
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
 beforeEach(async () => {
-  await client.exec("DELETE FROM venues");
-  await client.exec("ALTER SEQUENCE venues_id_seq RESTART WITH 1");
+  await resetTestDb(ctx);
   vi.clearAllMocks();
 });
 
 afterAll(async () => {
-  await client.close();
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
@@ -70,7 +48,7 @@ async function insertVenue(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO venues (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );

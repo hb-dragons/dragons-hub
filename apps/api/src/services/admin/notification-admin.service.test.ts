@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
 
 // --- Mock setup ---
 
@@ -32,72 +31,40 @@ import {
   getUnreadCount,
   retryFailedNotification,
 } from "./notification-admin.service";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
-// --- PGlite setup ---
-
-const CREATE_TABLES = `
-  CREATE TABLE domain_events (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    source TEXT NOT NULL,
-    urgency TEXT NOT NULL,
-    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    actor TEXT,
-    sync_run_id INTEGER,
-    entity_type TEXT NOT NULL,
-    entity_id INTEGER NOT NULL,
-    entity_name TEXT NOT NULL,
-    deep_link_path TEXT NOT NULL,
-    enqueued_at TIMESTAMPTZ,
-    payload JSONB NOT NULL DEFAULT '{}',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE notification_log (
-    id SERIAL PRIMARY KEY,
-    event_id TEXT NOT NULL REFERENCES domain_events(id),
-    watch_rule_id INTEGER,
-    channel_config_id INTEGER NOT NULL,
-    recipient_id TEXT,
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    locale TEXT NOT NULL DEFAULT 'de',
-    status TEXT NOT NULL DEFAULT 'pending',
-    sent_at TIMESTAMPTZ,
-    read_at TIMESTAMPTZ,
-    digest_run_id INTEGER,
-    error_message TEXT,
-    retry_count INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-`;
-
-let client: PGlite;
+let ctx: TestDbContext;
 let eventCounter = 0;
 
 beforeAll(async () => {
-  const pglite = await import("@electric-sql/pglite");
-  const drizzlePglite = await import("drizzle-orm/pglite");
-
-  client = new pglite.PGlite();
-  dbHolder.ref = drizzlePglite.drizzle(client);
-
-  await client.exec(CREATE_TABLES);
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
 beforeEach(async () => {
-  await client.exec("DELETE FROM notification_log");
-  await client.exec("DELETE FROM domain_events");
-  await client.exec("ALTER SEQUENCE notification_log_id_seq RESTART WITH 1");
+  await resetTestDb(ctx);
   eventCounter = 0;
   vi.clearAllMocks();
 });
 
 afterAll(async () => {
-  await client.close();
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
+
+async function ensureChannelConfig(id: number = 1): Promise<void> {
+  const existing = await ctx.client.query(
+    "SELECT id FROM channel_configs WHERE id = $1",
+    [id],
+  );
+  if (existing.rows.length === 0) {
+    await ctx.client.query(
+      "INSERT INTO channel_configs (id, name, type) VALUES ($1, $2, $3)",
+      [id, "test-channel", "in_app"],
+    );
+  }
+}
 
 async function insertEvent(overrides: Record<string, unknown> = {}): Promise<string> {
   eventCounter++;
@@ -107,6 +74,7 @@ async function insertEvent(overrides: Record<string, unknown> = {}): Promise<str
     type: "match.cancelled",
     source: "sync",
     urgency: "immediate",
+    occurred_at: new Date().toISOString(),
     entity_type: "match",
     entity_id: 42,
     entity_name: "Dragons vs. Tigers",
@@ -117,7 +85,7 @@ async function insertEvent(overrides: Record<string, unknown> = {}): Promise<str
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  await client.query(
+  await ctx.client.query(
     `INSERT INTO domain_events (${cols.join(", ")}) VALUES (${placeholders})`,
     vals,
   );
@@ -125,6 +93,8 @@ async function insertEvent(overrides: Record<string, unknown> = {}): Promise<str
 }
 
 async function insertNotification(overrides: Record<string, unknown> = {}) {
+  const channelConfigId = (overrides.channel_config_id as number) ?? 1;
+  await ensureChannelConfig(channelConfigId);
   const eventId = overrides.event_id ?? (await insertEvent());
   const defaults = {
     event_id: eventId,
@@ -140,7 +110,7 @@ async function insertNotification(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO notification_log (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -169,9 +139,10 @@ describe("listNotifications", () => {
   });
 
   it("orders by createdAt descending", async () => {
+    await ensureChannelConfig();
     const e1 = await insertEvent();
     const e2 = await insertEvent();
-    await client.exec(`
+    await ctx.client.exec(`
       INSERT INTO notification_log (event_id, channel_config_id, recipient_id, title, body, status, created_at)
       VALUES ('${e1}', 1, 'user-1', 'Older', 'body', 'sent', '2025-01-01T00:00:00Z'),
              ('${e2}', 1, 'user-1', 'Newer', 'body', 'sent', '2025-06-01T00:00:00Z')
@@ -237,7 +208,7 @@ describe("markRead", () => {
 
     expect(success).toBe(true);
 
-    const result = await client.query(
+    const result = await ctx.client.query(
       "SELECT status, read_at FROM notification_log WHERE id = $1",
       [id],
     );
@@ -269,7 +240,7 @@ describe("markAllRead", () => {
 
     expect(count).toBe(2);
 
-    const result = await client.query(
+    const result = await ctx.client.query(
       "SELECT status FROM notification_log WHERE recipient_id = 'user-1' ORDER BY id",
     );
     const rows = result.rows as { status: string }[];
@@ -293,7 +264,7 @@ describe("markAllRead", () => {
 
     await markAllRead("user-1");
 
-    const result = await client.query(
+    const result = await ctx.client.query(
       "SELECT status FROM notification_log WHERE recipient_id = 'user-2'",
     );
     expect((result.rows[0] as { status: string }).status).toBe("sent");
@@ -349,7 +320,7 @@ describe("retryFailedNotification", () => {
 
     expect(result.success).toBe(true);
 
-    const row = await client.query(
+    const row = await ctx.client.query(
       "SELECT status, retry_count, error_message FROM notification_log WHERE id = $1",
       [id],
     );

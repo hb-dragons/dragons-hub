@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
 
 // --- Mock setup ---
 
@@ -17,91 +16,24 @@ vi.mock("../../config/database", () => ({
 // --- Imports (after mocks) ---
 
 import { getStandings } from "./standings-admin.service";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- PGlite setup ---
 
-const CREATE_TABLES = `
-  CREATE TABLE leagues (
-    id SERIAL PRIMARY KEY,
-    api_liga_id INTEGER NOT NULL UNIQUE,
-    liga_nr INTEGER NOT NULL,
-    name VARCHAR(150) NOT NULL,
-    season_id INTEGER NOT NULL,
-    season_name VARCHAR(100) NOT NULL,
-    sk_name VARCHAR(100),
-    ak_name VARCHAR(100),
-    geschlecht VARCHAR(20),
-    verband_id INTEGER,
-    verband_name VARCHAR(100),
-    is_active BOOLEAN DEFAULT TRUE,
-    is_tracked BOOLEAN DEFAULT TRUE,
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    discovered_at TIMESTAMPTZ,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE teams (
-    id SERIAL PRIMARY KEY,
-    api_team_permanent_id INTEGER NOT NULL UNIQUE,
-    season_team_id INTEGER NOT NULL,
-    team_competition_id INTEGER NOT NULL,
-    name VARCHAR(150) NOT NULL,
-    name_short VARCHAR(100),
-    custom_name VARCHAR(50),
-    club_id INTEGER NOT NULL,
-    is_own_club BOOLEAN DEFAULT FALSE,
-    verzicht BOOLEAN DEFAULT FALSE,
-    badge_color VARCHAR(20),
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE standings (
-    id SERIAL PRIMARY KEY,
-    league_id INTEGER NOT NULL REFERENCES leagues(id),
-    team_api_id INTEGER NOT NULL REFERENCES teams(api_team_permanent_id),
-    position INTEGER NOT NULL,
-    played INTEGER NOT NULL DEFAULT 0,
-    won INTEGER NOT NULL DEFAULT 0,
-    lost INTEGER NOT NULL DEFAULT 0,
-    points_for INTEGER NOT NULL DEFAULT 0,
-    points_against INTEGER NOT NULL DEFAULT 0,
-    points_diff INTEGER NOT NULL DEFAULT 0,
-    league_points INTEGER NOT NULL DEFAULT 0,
-    data_hash VARCHAR(64),
-    last_synced_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (league_id, team_api_id)
-  );
-`;
-
-let client: PGlite;
+let ctx: TestDbContext;
 
 beforeAll(async () => {
-  const pglite = await import("@electric-sql/pglite");
-  const drizzlePglite = await import("drizzle-orm/pglite");
-
-  client = new pglite.PGlite();
-  dbHolder.ref = drizzlePglite.drizzle(client);
-
-  await client.exec(CREATE_TABLES);
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
 beforeEach(async () => {
-  await client.exec("DELETE FROM standings");
-  await client.exec("DELETE FROM teams");
-  await client.exec("DELETE FROM leagues");
-  await client.exec("ALTER SEQUENCE standings_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE teams_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE leagues_id_seq RESTART WITH 1");
+  await resetTestDb(ctx);
   vi.clearAllMocks();
 });
 
 afterAll(async () => {
-  await client.close();
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
@@ -119,7 +51,7 @@ async function insertLeague(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO leagues (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -139,7 +71,7 @@ async function insertTeam(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO teams (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -163,7 +95,7 @@ async function insertStanding(leagueId: number, teamApiId: number, overrides: Re
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  await client.query(
+  await ctx.client.query(
     `INSERT INTO standings (${cols.join(", ")}) VALUES (${placeholders})`,
     vals,
   );

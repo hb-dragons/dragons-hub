@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
 
 // --- Mock setup ---
 
@@ -33,65 +32,30 @@ import {
   notifyBookingNeedsAction,
   notifyTaskComment,
 } from "./notification.service";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- PGlite setup ---
 
-const CREATE_TABLES = `
-  CREATE TABLE notifications (
-    id SERIAL PRIMARY KEY,
-    recipient_id TEXT NOT NULL,
-    channel VARCHAR(20) NOT NULL,
-    title VARCHAR(300) NOT NULL,
-    body TEXT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    sent_at TIMESTAMPTZ,
-    error_message TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE user_notification_preferences (
-    id SERIAL PRIMARY KEY,
-    user_id TEXT NOT NULL UNIQUE,
-    whatsapp_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    whatsapp_number VARCHAR(20),
-    notify_on_task_assigned BOOLEAN NOT NULL DEFAULT TRUE,
-    notify_on_booking_needs_action BOOLEAN NOT NULL DEFAULT TRUE,
-    notify_on_task_comment BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-`;
-
-let client: PGlite;
+let ctx: TestDbContext;
 
 beforeAll(async () => {
-  const pglite = await import("@electric-sql/pglite");
-  const drizzlePglite = await import("drizzle-orm/pglite");
-
-  client = new pglite.PGlite();
-  dbHolder.ref = drizzlePglite.drizzle(client);
-
-  await client.exec(CREATE_TABLES);
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
 beforeEach(async () => {
-  await client.exec("DELETE FROM notifications");
-  await client.exec("DELETE FROM user_notification_preferences");
-  await client.exec("ALTER SEQUENCE notifications_id_seq RESTART WITH 1");
-  await client.exec(
-    "ALTER SEQUENCE user_notification_preferences_id_seq RESTART WITH 1",
-  );
+  await resetTestDb(ctx);
   vi.clearAllMocks();
 });
 
 afterAll(async () => {
-  await client.close();
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
 
 async function getNotifications() {
-  const result = await client.query(
+  const result = await ctx.client.query(
     "SELECT * FROM notifications ORDER BY id",
   );
   return result.rows as Record<string, unknown>[];
@@ -110,7 +74,7 @@ async function insertUserPrefs(
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  await client.query(
+  await ctx.client.query(
     `INSERT INTO user_notification_preferences (${cols.join(", ")}) VALUES (${placeholders})`,
     vals,
   );

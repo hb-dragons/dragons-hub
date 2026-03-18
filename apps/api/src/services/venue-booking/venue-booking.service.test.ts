@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
-import type { PGlite } from "@electric-sql/pglite";
 
 // --- Mock setup ---
 
@@ -22,6 +21,10 @@ vi.mock("../../config/logger", () => ({
       debug: vi.fn(),
       warn: vi.fn(),
     })),
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
@@ -34,171 +37,22 @@ import {
   reconcileMatch,
   previewReconciliation,
 } from "./venue-booking.service";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
-// --- PGlite setup ---
-
-const CREATE_TABLES = `
-  CREATE TABLE app_settings (
-    id SERIAL PRIMARY KEY,
-    key VARCHAR(100) NOT NULL UNIQUE,
-    value VARCHAR(500) NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE teams (
-    id SERIAL PRIMARY KEY,
-    api_team_permanent_id INTEGER NOT NULL UNIQUE,
-    season_team_id INTEGER NOT NULL,
-    team_competition_id INTEGER NOT NULL,
-    name VARCHAR(150) NOT NULL,
-    name_short VARCHAR(100),
-    custom_name VARCHAR(50),
-    club_id INTEGER NOT NULL,
-    is_own_club BOOLEAN DEFAULT FALSE,
-    verzicht BOOLEAN DEFAULT FALSE,
-    estimated_game_duration INTEGER,
-    badge_color VARCHAR(20),
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE venues (
-    id SERIAL PRIMARY KEY,
-    api_id INTEGER NOT NULL UNIQUE,
-    name VARCHAR(200) NOT NULL,
-    street VARCHAR(200),
-    postal_code VARCHAR(10),
-    city VARCHAR(100),
-    latitude NUMERIC(10, 7),
-    longitude NUMERIC(10, 7),
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE leagues (
-    id SERIAL PRIMARY KEY,
-    api_liga_id INTEGER NOT NULL UNIQUE,
-    liga_nr INTEGER NOT NULL,
-    name VARCHAR(150) NOT NULL,
-    season_id INTEGER NOT NULL,
-    season_name VARCHAR(100) NOT NULL,
-    sk_name VARCHAR(100),
-    ak_name VARCHAR(100),
-    geschlecht VARCHAR(20),
-    verband_id INTEGER,
-    verband_name VARCHAR(100),
-    is_active BOOLEAN DEFAULT TRUE,
-    is_tracked BOOLEAN DEFAULT TRUE,
-    data_hash VARCHAR(64),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE matches (
-    id SERIAL PRIMARY KEY,
-    api_match_id INTEGER NOT NULL UNIQUE,
-    match_no INTEGER NOT NULL,
-    match_day INTEGER NOT NULL,
-    kickoff_date DATE NOT NULL,
-    kickoff_time TIME NOT NULL,
-    league_id INTEGER REFERENCES leagues(id),
-    home_team_api_id INTEGER NOT NULL REFERENCES teams(api_team_permanent_id),
-    guest_team_api_id INTEGER NOT NULL REFERENCES teams(api_team_permanent_id),
-    venue_id INTEGER REFERENCES venues(id),
-    is_confirmed BOOLEAN DEFAULT FALSE,
-    is_forfeited BOOLEAN DEFAULT FALSE,
-    is_cancelled BOOLEAN DEFAULT FALSE,
-    home_score INTEGER,
-    guest_score INTEGER,
-    home_halftime_score INTEGER,
-    guest_halftime_score INTEGER,
-    period_format VARCHAR(10),
-    home_q1 INTEGER, guest_q1 INTEGER,
-    home_q2 INTEGER, guest_q2 INTEGER,
-    home_q3 INTEGER, guest_q3 INTEGER,
-    home_q4 INTEGER, guest_q4 INTEGER,
-    home_q5 INTEGER, guest_q5 INTEGER,
-    home_q6 INTEGER, guest_q6 INTEGER,
-    home_q7 INTEGER, guest_q7 INTEGER,
-    home_q8 INTEGER, guest_q8 INTEGER,
-    home_ot1 INTEGER, guest_ot1 INTEGER,
-    home_ot2 INTEGER, guest_ot2 INTEGER,
-    venue_name_override VARCHAR(200),
-    anschreiber VARCHAR(100),
-    zeitnehmer VARCHAR(100),
-    shotclock VARCHAR(100),
-    internal_notes TEXT,
-    public_comment TEXT,
-    current_remote_version INTEGER NOT NULL DEFAULT 0,
-    current_local_version INTEGER NOT NULL DEFAULT 0,
-    remote_data_hash VARCHAR(64),
-    last_remote_sync TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-
-  CREATE TABLE venue_bookings (
-    id SERIAL PRIMARY KEY,
-    venue_id INTEGER NOT NULL REFERENCES venues(id),
-    date DATE NOT NULL,
-    calculated_start_time TIME NOT NULL,
-    calculated_end_time TIME NOT NULL,
-    override_start_time TIME,
-    override_end_time TIME,
-    override_reason TEXT,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    needs_reconfirmation BOOLEAN NOT NULL DEFAULT FALSE,
-    notes TEXT,
-    confirmed_by TEXT,
-    confirmed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-  CREATE UNIQUE INDEX venue_bookings_venue_date_uniq ON venue_bookings (venue_id, date);
-
-  CREATE TABLE venue_booking_matches (
-    id SERIAL PRIMARY KEY,
-    venue_booking_id INTEGER NOT NULL REFERENCES venue_bookings(id) ON DELETE CASCADE,
-    match_id INTEGER NOT NULL REFERENCES matches(id),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-  CREATE UNIQUE INDEX venue_booking_matches_uniq ON venue_booking_matches (venue_booking_id, match_id);
-`;
-
-let client: PGlite;
+let ctx: TestDbContext;
 
 beforeAll(async () => {
-  const pglite = await import("@electric-sql/pglite");
-  const drizzlePglite = await import("drizzle-orm/pglite");
-
-  client = new pglite.PGlite();
-  dbHolder.ref = drizzlePglite.drizzle(client);
-
-  await client.exec(CREATE_TABLES);
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
 beforeEach(async () => {
-  await client.exec("DELETE FROM venue_booking_matches");
-  await client.exec("DELETE FROM venue_bookings");
-  await client.exec("DELETE FROM matches");
-  await client.exec("DELETE FROM venues");
-  await client.exec("DELETE FROM teams");
-  await client.exec("DELETE FROM leagues");
-  await client.exec("DELETE FROM app_settings");
-  await client.exec("ALTER SEQUENCE venue_booking_matches_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venue_bookings_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE matches_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE venues_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE teams_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE leagues_id_seq RESTART WITH 1");
-  await client.exec("ALTER SEQUENCE app_settings_id_seq RESTART WITH 1");
+  await resetTestDb(ctx);
   vi.clearAllMocks();
 });
 
 afterAll(async () => {
-  await client.close();
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
@@ -216,7 +70,7 @@ async function insertTeam(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO teams (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -233,7 +87,7 @@ async function insertVenue(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO venues (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -254,7 +108,7 @@ async function insertMatch(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO matches (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -262,7 +116,7 @@ async function insertMatch(overrides: Record<string, unknown> = {}) {
 }
 
 async function insertSetting(key: string, value: string) {
-  await client.query(
+  await ctx.client.query(
     "INSERT INTO app_settings (key, value) VALUES ($1, $2)",
     [key, value],
   );
@@ -281,7 +135,7 @@ async function insertBooking(overrides: Record<string, unknown> = {}) {
   const cols = Object.keys(data);
   const vals = Object.values(data);
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await client.query(
+  const result = await ctx.client.query(
     `INSERT INTO venue_bookings (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
     vals,
   );
@@ -289,14 +143,14 @@ async function insertBooking(overrides: Record<string, unknown> = {}) {
 }
 
 async function insertBookingMatch(venueBookingId: number, matchId: number) {
-  await client.query(
+  await ctx.client.query(
     "INSERT INTO venue_booking_matches (venue_booking_id, match_id) VALUES ($1, $2)",
     [venueBookingId, matchId],
   );
 }
 
 async function getBookings() {
-  const result = await client.query("SELECT * FROM venue_bookings ORDER BY id");
+  const result = await ctx.client.query("SELECT * FROM venue_bookings ORDER BY id");
   return result.rows as Record<string, unknown>[];
 }
 
@@ -305,7 +159,7 @@ async function getBookingMatches(bookingId?: number) {
     ? "SELECT * FROM venue_booking_matches WHERE venue_booking_id = $1 ORDER BY match_id"
     : "SELECT * FROM venue_booking_matches ORDER BY venue_booking_id, match_id";
   const params = bookingId ? [bookingId] : [];
-  const result = await client.query(query, params);
+  const result = await ctx.client.query(query, params);
   return result.rows as Record<string, unknown>[];
 }
 
@@ -684,7 +538,7 @@ describe("reconcileBookingsForMatches", () => {
     await insertBookingMatch(bookingId, m2);
 
     // Now m2 moves to venue2
-    await client.query("UPDATE matches SET venue_id = $1 WHERE id = $2", [venue2, m2]);
+    await ctx.client.query("UPDATE matches SET venue_id = $1 WHERE id = $2", [venue2, m2]);
 
     await reconcileBookingsForMatches([m1, m2]);
 
@@ -712,7 +566,7 @@ describe("reconcileBookingsForMatches", () => {
     await insertBookingMatch(bookingId, matchId);
 
     // Now change the match to not be a home game (change home team to away team)
-    await client.query(
+    await ctx.client.query(
       "UPDATE matches SET home_team_api_id = $1, guest_team_api_id = $2 WHERE id = $3",
       [2000, 1000, matchId],
     );
@@ -751,7 +605,7 @@ describe("reconcileBookingsForMatches", () => {
     await insertBookingMatch(bookingId, m2);
 
     // Change m1 to no longer be a home game
-    await client.query(
+    await ctx.client.query(
       "UPDATE matches SET home_team_api_id = $1, guest_team_api_id = $2 WHERE id = $3",
       [2000, 1000, m1],
     );
@@ -911,7 +765,7 @@ describe("reconcileMatch", () => {
     await insertBookingMatch(oldBookingId, matchId);
 
     // Now the match date changes
-    await client.query(
+    await ctx.client.query(
       "UPDATE matches SET kickoff_date = '2025-03-22' WHERE id = $1",
       [matchId],
     );
@@ -943,7 +797,7 @@ describe("reconcileMatch", () => {
     await insertBookingMatch(oldBookingId, matchId);
 
     // Now the match moves to venue2
-    await client.query(
+    await ctx.client.query(
       "UPDATE matches SET venue_id = $1 WHERE id = $2",
       [venue2, matchId],
     );
@@ -983,7 +837,7 @@ describe("reconcileMatch", () => {
     await insertBookingMatch(bookingId, m2);
 
     // Move m2 to venue2
-    await client.query(
+    await ctx.client.query(
       "UPDATE matches SET venue_id = $1 WHERE id = $2",
       [venue2, m2],
     );
