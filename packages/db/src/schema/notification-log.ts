@@ -21,7 +21,7 @@ export const notificationLog = pgTable(
     eventId: text("event_id")
       .notNull()
       .references(() => domainEvents.id),
-    watchRuleId: integer("watch_rule_id").references(() => watchRules.id),
+    watchRuleId: integer("watch_rule_id").references(() => watchRules.id, { onDelete: "set null" }),
     channelConfigId: integer("channel_config_id")
       .notNull()
       .references(() => channelConfigs.id),
