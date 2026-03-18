@@ -18,8 +18,8 @@
     "seed:extract": "pnpm --filter @dragons/api exec tsx ../../scripts/extract-test-seed.ts"
   },
   "devDependencies": {
-    "knip": "^5.86.0",
-    "turbo": "^2.8.14",
+    "knip": "^5.88.0",
+    "turbo": "^2.8.17",
     "typescript": "^5.9.3"
   },
   "pnpm": {
