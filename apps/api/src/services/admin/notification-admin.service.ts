@@ -40,13 +40,13 @@ export interface NotificationCenterListResult {
 // ── listNotifications ───────────────────────────────────────────────────────
 
 export async function listNotifications(params: {
-  userId: string;
+  userId?: string;
   limit?: number;
   offset?: number;
 }): Promise<NotificationCenterListResult> {
   const { userId, limit = 20, offset = 0 } = params;
 
-  const where = eq(notificationLog.recipientId, userId);
+  const where = userId ? eq(notificationLog.recipientId, userId) : undefined;
 
   const [totalRow] = await db
     .select({ count: count() })
@@ -110,16 +110,16 @@ export async function markRead(id: number): Promise<boolean> {
 
 // ── markAllRead ─────────────────────────────────────────────────────────────
 
-export async function markAllRead(userId: string): Promise<number> {
+export async function markAllRead(userId?: string): Promise<number> {
+  const conditions = [ne(notificationLog.status, "read")];
+  if (userId) {
+    conditions.push(eq(notificationLog.recipientId, userId));
+  }
+
   const result = await db
     .update(notificationLog)
     .set({ status: "read", readAt: new Date() })
-    .where(
-      and(
-        eq(notificationLog.recipientId, userId),
-        ne(notificationLog.status, "read"),
-      ),
-    )
+    .where(and(...conditions))
     .returning({ id: notificationLog.id });
 
   return result.length;

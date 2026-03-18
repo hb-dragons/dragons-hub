@@ -5,7 +5,7 @@ export const notificationIdParamSchema = z.object({
 });
 
 export const notificationListQuerySchema = z.object({
-  userId: z.string().min(1),
+  userId: z.string().min(1).optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 });

@@ -65,7 +65,8 @@ notificationRoutes.patch(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const { userId } = notificationUserIdQuerySchema.parse(c.req.query());
+    const query = c.req.query();
+    const userId = query.userId || undefined;
     const count = await markAllRead(userId);
     return c.json({ updated: count });
   },

@@ -37,7 +37,6 @@ import type {
   FailedNotificationListResult,
 } from "./types";
 
-const USER_ID = "audience:admin";
 const PAGE_SIZE = 20;
 
 const statusVariantMap: Record<
@@ -73,7 +72,7 @@ export function NotificationCenter() {
   const [failedPage, setFailedPage] = useState(1);
 
   const offset = page * PAGE_SIZE;
-  const inboxKey = SWR_KEYS.notifications(USER_ID, PAGE_SIZE, offset);
+  const inboxKey = SWR_KEYS.notifications(PAGE_SIZE, offset);
   const failedKey = SWR_KEYS.domainEventsFailed(failedPage, PAGE_SIZE);
 
   const { data: inboxData } = useSWR<NotificationListResult>(
@@ -105,7 +104,7 @@ export function NotificationCenter() {
   async function handleMarkAllRead() {
     try {
       await fetchAPI(
-        `/admin/notifications/read-all?userId=${USER_ID}`,
+        "/admin/notifications/read-all",
         { method: "PATCH" },
       );
       await mutate(inboxKey);

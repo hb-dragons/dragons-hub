@@ -19,8 +19,8 @@ export const SWR_KEYS = {
   bookings: "/admin/bookings",
   bookingDetail: (id: number) => `/admin/bookings/${id}`,
   settingsBooking: "/admin/settings/booking",
-  notifications: (userId: string, limit?: number, offset?: number) =>
-    `/admin/notifications?userId=${userId}&limit=${limit ?? 20}&offset=${offset ?? 0}`,
+  notifications: (limit?: number, offset?: number) =>
+    `/admin/notifications?limit=${limit ?? 20}&offset=${offset ?? 0}`,
   notificationsUnread: "/admin/notifications/unread-count",
   domainEvents: (params?: string) =>
     `/admin/events${params ? `?${params}` : ""}`,

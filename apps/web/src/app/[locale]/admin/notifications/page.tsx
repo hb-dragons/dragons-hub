@@ -8,8 +8,6 @@ import type {
   FailedNotificationListResult,
 } from "@/components/admin/notifications/types";
 
-const USER_ID = "audience:admin";
-
 export default async function NotificationsPage() {
   const t = await getTranslations();
   let notifications: NotificationListResult | null = null;
@@ -19,7 +17,7 @@ export default async function NotificationsPage() {
   try {
     [notifications, failed] = await Promise.all([
       fetchAPIServer<NotificationListResult>(
-        `/admin/notifications?userId=${USER_ID}&limit=20&offset=0`,
+        "/admin/notifications?limit=20&offset=0",
       ),
       fetchAPIServer<FailedNotificationListResult>(
         "/admin/events/failed?page=1&limit=20",
@@ -61,7 +59,7 @@ export default async function NotificationsPage() {
       <SWRConfig
         value={{
           fallback: {
-            [SWR_KEYS.notifications(USER_ID, 20, 0)]: notifications,
+            [SWR_KEYS.notifications(20, 0)]: notifications,
             [SWR_KEYS.domainEventsFailed(1, 20)]: failed,
           },
         }}
