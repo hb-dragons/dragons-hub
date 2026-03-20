@@ -10,6 +10,12 @@ const mocks = vi.hoisted(() => ({
   createChannelConfig: vi.fn(),
   updateChannelConfig: vi.fn(),
   deleteChannelConfig: vi.fn(),
+  validateConfigForType: vi.fn(),
+  env: {
+    WHATSAPP_PHONE_NUMBER_ID: "test-id",
+    WHATSAPP_ACCESS_TOKEN: "test-token",
+    // SMTP vars not set — email provider is unconfigured
+  } as Record<string, string | undefined>,
 }));
 
 vi.mock("../../services/admin/channel-config-admin.service", () => ({
@@ -19,6 +25,18 @@ vi.mock("../../services/admin/channel-config-admin.service", () => ({
   updateChannelConfig: mocks.updateChannelConfig,
   deleteChannelConfig: mocks.deleteChannelConfig,
 }));
+
+vi.mock("../../config/env", () => ({
+  env: mocks.env,
+}));
+
+vi.mock("./channel-config.schemas", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./channel-config.schemas")>();
+  return {
+    ...actual,
+    validateConfigForType: mocks.validateConfigForType,
+  };
+});
 
 vi.mock("../../config/logger", () => ({
   logger: { error: vi.fn() },
@@ -282,5 +300,121 @@ describe("DELETE /channel-configs/:id", () => {
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("GET /channel-configs/providers", () => {
+  it("returns all three types with configured status", async () => {
+    const res = await app.request("/channel-configs/providers");
+
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body).toEqual({
+      in_app: { configured: true },
+      whatsapp_group: { configured: true },
+      email: { configured: false },
+    });
+  });
+
+  it("in_app is always configured", async () => {
+    // Even with empty env, in_app should be true
+    const res = await app.request("/channel-configs/providers");
+
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.in_app.configured).toBe(true);
+  });
+});
+
+describe("POST /channel-configs (provider gate)", () => {
+  const validInAppBody = {
+    name: "Admin In-App",
+    type: "in_app",
+    config: { audienceRole: "admin", locale: "de" },
+  };
+
+  it("succeeds for in_app with valid config", async () => {
+    mocks.createChannelConfig.mockResolvedValue(sampleConfig);
+
+    const res = await app.request("/channel-configs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validInAppBody),
+    });
+
+    expect(res.status).toBe(201);
+    expect(mocks.createChannelConfig).toHaveBeenCalled();
+  });
+
+  it("returns 400 PROVIDER_NOT_CONFIGURED when email SMTP is not set", async () => {
+    const res = await app.request("/channel-configs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Email Channel",
+        type: "email",
+        config: { locale: "de" },
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await json(res);
+    expect(body).toMatchObject({
+      error: 'Provider for "email" is not configured',
+      code: "PROVIDER_NOT_CONFIGURED",
+    });
+  });
+});
+
+describe("PATCH /channel-configs/:id (typed config validation)", () => {
+  it("succeeds when config matches existing type", async () => {
+    mocks.getChannelConfig.mockResolvedValue({ ...sampleConfig, type: "in_app" });
+    mocks.validateConfigForType.mockReturnValue({ audienceRole: "admin", locale: "de" });
+    const updated = { ...sampleConfig, config: { audienceRole: "admin", locale: "de" } };
+    mocks.updateChannelConfig.mockResolvedValue(updated);
+
+    const res = await app.request("/channel-configs/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config: { audienceRole: "admin", locale: "de" } }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.validateConfigForType).toHaveBeenCalledWith("in_app", {
+      audienceRole: "admin",
+      locale: "de",
+    });
+  });
+
+  it("returns 400 VALIDATION_ERROR when config does not match existing type", async () => {
+    mocks.getChannelConfig.mockResolvedValue({ ...sampleConfig, type: "in_app" });
+    mocks.validateConfigForType.mockReturnValue(null);
+
+    const res = await app.request("/channel-configs/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config: { groupId: "wrong-field" } }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await json(res);
+    expect(body).toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+  });
+
+  it("succeeds without config validation for name-only update", async () => {
+    const updated = { ...sampleConfig, name: "Renamed" };
+    mocks.updateChannelConfig.mockResolvedValue(updated);
+
+    const res = await app.request("/channel-configs/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Renamed" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.validateConfigForType).not.toHaveBeenCalled();
+    expect(mocks.getChannelConfig).not.toHaveBeenCalled();
   });
 });

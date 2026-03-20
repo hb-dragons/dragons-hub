@@ -13,9 +13,47 @@ import {
   channelConfigListQuerySchema,
   createChannelConfigSchema,
   updateChannelConfigSchema,
+  validateConfigForType,
 } from "./channel-config.schemas";
+import { env } from "../../config/env";
 
 const channelConfigRoutes = new Hono<AppEnv>();
+
+function isProviderConfigured(type: string): boolean {
+  switch (type) {
+    case "in_app":
+      return true;
+    case "whatsapp_group":
+      return !!(env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN);
+    case "email":
+      return !!(
+        env.SMTP_HOST &&
+        env.SMTP_PORT &&
+        env.SMTP_USER &&
+        env.SMTP_PASSWORD &&
+        env.SMTP_FROM
+      );
+    default:
+      return false;
+  }
+}
+
+// GET /admin/channel-configs/providers - Provider availability
+channelConfigRoutes.get(
+  "/channel-configs/providers",
+  describeRoute({
+    description: "List channel types with provider configuration status",
+    tags: ["Channel Configs"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    return c.json({
+      in_app: { configured: isProviderConfigured("in_app") },
+      whatsapp_group: { configured: isProviderConfigured("whatsapp_group") },
+      email: { configured: isProviderConfigured("email") },
+    });
+  },
+);
 
 // GET /admin/channel-configs - List channel configs
 channelConfigRoutes.get(
@@ -68,6 +106,17 @@ channelConfigRoutes.post(
   }),
   async (c) => {
     const body = createChannelConfigSchema.parse(await c.req.json());
+
+    if (!isProviderConfigured(body.type)) {
+      return c.json(
+        {
+          error: `Provider for "${body.type}" is not configured`,
+          code: "PROVIDER_NOT_CONFIGURED",
+        },
+        400,
+      );
+    }
+
     const config = await createChannelConfig(body);
     return c.json(config, 201);
   },
@@ -87,6 +136,28 @@ channelConfigRoutes.patch(
   async (c) => {
     const { id } = channelConfigIdParamSchema.parse({ id: c.req.param("id") });
     const body = updateChannelConfigSchema.parse(await c.req.json());
+
+    if (body.config) {
+      const existing = await getChannelConfig(id);
+      if (!existing) {
+        return c.json(
+          { error: "Channel config not found", code: "NOT_FOUND" },
+          404,
+        );
+      }
+
+      const validated = validateConfigForType(existing.type, body.config);
+      if (!validated) {
+        return c.json(
+          {
+            error: `Config does not match schema for type "${existing.type}"`,
+            code: "VALIDATION_ERROR",
+          },
+          400,
+        );
+      }
+    }
+
     const config = await updateChannelConfig(id, body);
 
     if (!config) {
