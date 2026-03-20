@@ -106,13 +106,30 @@ export interface WatchRuleListResult {
   total: number;
 }
 
+// Channel config shapes
+export interface InAppConfig {
+  audienceRole: "admin" | "referee";
+  locale: "de" | "en";
+}
+
+export interface WhatsAppGroupConfig {
+  groupId: string;
+  locale: "de" | "en";
+}
+
+export interface EmailConfig {
+  locale: "de" | "en";
+}
+
+export type ChannelConfig = InAppConfig | WhatsAppGroupConfig | EmailConfig;
+
 // Channel config from GET /admin/channel-configs
 export interface ChannelConfigItem {
   id: number;
   name: string;
-  type: "in_app" | "whatsapp_group" | "push" | "email";
+  type: "in_app" | "whatsapp_group" | "email";
   enabled: boolean;
-  config: Record<string, unknown>;
+  config: ChannelConfig;
   digestMode: "per_sync" | "scheduled" | "none";
   digestCron: string | null;
   digestTimezone: string;
@@ -124,6 +141,12 @@ export interface ChannelConfigListResult {
   configs: ChannelConfigItem[];
   total: number;
 }
+
+export interface ProviderStatus {
+  configured: boolean;
+}
+
+export type ProviderAvailability = Record<string, ProviderStatus>;
 
 // Trigger event body
 export interface TriggerEventBody {

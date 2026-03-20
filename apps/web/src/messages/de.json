@@ -768,10 +768,22 @@
     "perSync": "Nach Synchronisation",
     "scheduled": "Geplant",
     "none": "Keine",
+    "audienceRole": "Zielgruppe",
+    "audienceRoles": {
+      "admin": "Admins",
+      "referee": "Schiedsrichter"
+    },
+    "locale": "Sprache",
+    "locales": {
+      "de": "Deutsch",
+      "en": "Englisch"
+    },
+    "groupId": "WhatsApp Gruppen-ID",
+    "groupIdHelp": "Gruppen-Chat-ID aus dem Meta Business Dashboard",
+    "providerNotConfigured": "Anbieter nicht konfiguriert — Umgebungsvariablen setzen",
     "typeLabels": {
       "in_app": "In-App",
       "whatsapp_group": "WhatsApp-Gruppe",
-      "push": "Push",
       "email": "E-Mail"
     }
   },
