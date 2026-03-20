@@ -1,7 +1,25 @@
 // ── Channel types ────────────────────────────────────────────────────────────
 
-export type ChannelType = "in_app" | "whatsapp_group" | "push" | "email";
+export type ChannelType = "in_app" | "whatsapp_group" | "email";
 export type DigestMode = "per_sync" | "scheduled" | "none";
+
+// ── Per-channel config shapes ───────────────────────────────────────────────
+
+export interface InAppConfig {
+  audienceRole: "admin" | "referee";
+  locale: "de" | "en";
+}
+
+export interface WhatsAppGroupConfig {
+  groupId: string;
+  locale: "de" | "en";
+}
+
+export interface EmailConfig {
+  locale: "de" | "en";
+}
+
+export type ChannelConfig = InAppConfig | WhatsAppGroupConfig | EmailConfig;
 
 // ── API response types ───────────────────────────────────────────────────────
 
@@ -10,7 +28,7 @@ export interface ChannelConfigItem {
   name: string;
   type: ChannelType;
   enabled: boolean;
-  config: Record<string, unknown>;
+  config: ChannelConfig;
   digestMode: DigestMode;
   digestCron: string | null;
   digestTimezone: string;
@@ -23,13 +41,21 @@ export interface ChannelConfigListResult {
   total: number;
 }
 
+// ── Provider availability ───────────────────────────────────────────────────
+
+export interface ProviderStatus {
+  configured: boolean;
+}
+
+export type ProviderAvailability = Record<ChannelType, ProviderStatus>;
+
 // ── Request body types ───────────────────────────────────────────────────────
 
 export interface CreateChannelConfigBody {
   name: string;
   type: ChannelType;
   enabled?: boolean;
-  config?: Record<string, unknown>;
+  config: ChannelConfig;
   digestMode?: DigestMode;
   digestCron?: string | null;
   digestTimezone?: string;
@@ -38,7 +64,7 @@ export interface CreateChannelConfigBody {
 export interface UpdateChannelConfigBody {
   name?: string;
   enabled?: boolean;
-  config?: Record<string, unknown>;
+  config?: ChannelConfig;
   digestMode?: DigestMode;
   digestCron?: string | null;
   digestTimezone?: string;

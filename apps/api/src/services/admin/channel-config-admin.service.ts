@@ -75,7 +75,7 @@ export async function createChannelConfig(
       name: data.name,
       type: data.type,
       enabled: data.enabled ?? true,
-      config: data.config ?? {},
+      config: data.config,
       digestMode: data.digestMode ?? "per_sync",
       digestCron: data.digestCron ?? null,
       digestTimezone: data.digestTimezone ?? "Europe/Berlin",

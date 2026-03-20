@@ -58,7 +58,7 @@ function makeDbRow(overrides: Record<string, unknown> = {}) {
     name: "WhatsApp Eltern",
     type: "whatsapp_group",
     enabled: true,
-    config: { groupId: "abc" },
+    config: { groupId: "abc", locale: "de" as const },
     digestMode: "per_sync",
     digestCron: null,
     digestTimezone: "Europe/Berlin",
@@ -227,6 +227,7 @@ describe("createChannelConfig", () => {
     const result = await createChannelConfig({
       name: "WhatsApp Eltern",
       type: "whatsapp_group",
+      config: { groupId: "abc", locale: "de" },
     });
 
     expect(result.id).toBe(1);
@@ -238,7 +239,7 @@ describe("createChannelConfig", () => {
     expect(valuesCall.name).toBe("WhatsApp Eltern");
     expect(valuesCall.type).toBe("whatsapp_group");
     expect(valuesCall.enabled).toBe(true);
-    expect(valuesCall.config).toEqual({});
+    expect(valuesCall.config).toEqual({ groupId: "abc", locale: "de" });
     expect(valuesCall.digestMode).toBe("per_sync");
     expect(valuesCall.digestCron).toBeNull();
     expect(valuesCall.digestTimezone).toBe("Europe/Berlin");
@@ -302,7 +303,7 @@ describe("toItem mapping", () => {
       name: "Email Digest",
       type: "email",
       enabled: false,
-      config: { address: "team@example.com" },
+      config: { locale: "en" as const },
       digestMode: "daily",
       digestCron: "0 8 * * *",
       digestTimezone: "America/New_York",
@@ -324,7 +325,7 @@ describe("toItem mapping", () => {
       name: "Email Digest",
       type: "email",
       enabled: false,
-      config: { address: "team@example.com" },
+      config: { locale: "en" as const },
       digestMode: "daily",
       digestCron: "0 8 * * *",
       digestTimezone: "America/New_York",

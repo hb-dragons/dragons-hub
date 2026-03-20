@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import type { ChannelConfig } from "@dragons/shared";
 
 export const channelConfigs = pgTable("channel_configs", {
   id: serial("id").primaryKey(),
@@ -14,8 +15,7 @@ export const channelConfigs = pgTable("channel_configs", {
   enabled: boolean("enabled").notNull().default(true),
   config: jsonb("config")
     .notNull()
-    .$type<Record<string, unknown>>()
-    .default({}),
+    .$type<ChannelConfig>(),
   digestMode: text("digest_mode").notNull().default("per_sync"),
   digestCron: text("digest_cron"),
   digestTimezone: text("digest_timezone").notNull().default("Europe/Berlin"),
