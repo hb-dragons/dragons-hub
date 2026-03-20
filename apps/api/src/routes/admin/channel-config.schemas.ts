@@ -9,15 +9,58 @@ export const channelConfigListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
-export const createChannelConfigSchema = z.object({
-  name: z.string().min(1),
-  type: z.enum(["in_app", "whatsapp_group", "push", "email"]),
-  enabled: z.boolean().optional(),
-  config: z.record(z.string(), z.unknown()).optional(),
-  digestMode: z.enum(["per_sync", "scheduled", "none"]).optional(),
-  digestCron: z.string().nullable().optional(),
-  digestTimezone: z.string().optional(),
+// ── Per-channel config schemas ──────────────────────────────────────────────
+
+const localeSchema = z.enum(["de", "en"]);
+
+const inAppConfigSchema = z.object({
+  audienceRole: z.enum(["admin", "referee"]),
+  locale: localeSchema,
 });
+
+const whatsappGroupConfigSchema = z.object({
+  groupId: z.string().min(1),
+  locale: localeSchema,
+});
+
+const emailConfigSchema = z.object({
+  locale: localeSchema,
+});
+
+const configSchemaByType = {
+  in_app: inAppConfigSchema,
+  whatsapp_group: whatsappGroupConfigSchema,
+  email: emailConfigSchema,
+} as const;
+
+// ── Create schema ───────────────────────────────────────────────────────────
+
+const channelTypeSchema = z.enum(["in_app", "whatsapp_group", "email"]);
+
+export const createChannelConfigSchema = z
+  .object({
+    name: z.string().min(1),
+    type: channelTypeSchema,
+    enabled: z.boolean().optional(),
+    config: z.record(z.string(), z.unknown()),
+    digestMode: z.enum(["per_sync", "scheduled", "none"]).optional(),
+    digestCron: z.string().nullable().optional(),
+    digestTimezone: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const schema = configSchemaByType[data.type];
+    const result = schema.safeParse(data.config);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        ctx.addIssue({
+          ...issue,
+          path: ["config", ...issue.path],
+        });
+      }
+    }
+  });
+
+// ── Update schema ───────────────────────────────────────────────────────────
 
 export const updateChannelConfigSchema = z.object({
   name: z.string().min(1).optional(),
@@ -29,3 +72,15 @@ export const updateChannelConfigSchema = z.object({
   digestCron: z.string().nullable().optional(),
   digestTimezone: z.string().optional(),
 });
+
+// ── Config validation helper (for update route) ─────────────────────────────
+
+export function validateConfigForType(
+  type: string,
+  config: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const schema = configSchemaByType[type as keyof typeof configSchemaByType];
+  if (!schema) return null;
+  const result = schema.safeParse(config);
+  return result.success ? (result.data as Record<string, unknown>) : null;
+}

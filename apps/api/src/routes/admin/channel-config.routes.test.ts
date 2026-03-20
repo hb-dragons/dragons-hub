@@ -133,6 +133,7 @@ describe("POST /channel-configs", () => {
   const validBody = {
     name: "Admin In-App",
     type: "in_app",
+    config: { audienceRole: "admin", locale: "de" },
   };
 
   it("creates a channel config", async () => {
@@ -155,7 +156,7 @@ describe("POST /channel-configs", () => {
     const body = {
       ...validBody,
       enabled: false,
-      config: { locale: "en" },
+      config: { audienceRole: "referee", locale: "en" },
       digestMode: "scheduled",
       digestCron: "0 8 * * *",
       digestTimezone: "America/New_York",
