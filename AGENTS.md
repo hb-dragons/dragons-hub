@@ -342,6 +342,17 @@ Match list and detail responses include associated venue booking data when avail
 | PATCH | `/admin/notifications/:id/read` | Mark notification as read |
 | GET | `/admin/notifications/preferences` | Get notification preferences |
 
+### Admin - Channel Configs
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/channel-configs` | List channel configurations |
+| GET | `/admin/channel-configs/providers` | Check which providers are configured |
+| GET | `/admin/channel-configs/:id` | Get a single channel config |
+| POST | `/admin/channel-configs` | Create channel config (provider must be configured) |
+| PATCH | `/admin/channel-configs/:id` | Update channel config (validates config against type) |
+| DELETE | `/admin/channel-configs/:id` | Delete channel config |
+
 ### Admin - Bull Board
 
 | GET | `/admin/queues/*` | Bull Board web UI for queue monitoring |
