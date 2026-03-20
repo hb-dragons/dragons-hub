@@ -19,6 +19,17 @@ const envSchema = z.object({
   RUN_MODE: z.enum(["api", "worker", "both"]).default("both"),
   GCS_BUCKET_NAME: z.string().min(1).optional(),
   GCS_PROJECT_ID: z.string().min(1).optional(),
+
+  // WhatsApp (Meta Cloud API)
+  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+
+  // Email (SMTP)
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+  SMTP_FROM: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
