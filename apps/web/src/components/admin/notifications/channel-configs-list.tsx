@@ -36,17 +36,13 @@ import { toast } from "sonner";
 import type {
   ChannelConfigItem,
   ChannelConfigListResult,
+  ProviderAvailability,
 } from "./types";
 
 type ChannelType = ChannelConfigItem["type"];
 type DigestMode = ChannelConfigItem["digestMode"];
 
-const CHANNEL_TYPES: ChannelType[] = [
-  "in_app",
-  "whatsapp_group",
-  "push",
-  "email",
-];
+const CHANNEL_TYPES: ChannelType[] = ["in_app", "whatsapp_group", "email"];
 const DIGEST_MODES: DigestMode[] = ["per_sync", "scheduled", "none"];
 
 interface ChannelFormState {
@@ -55,7 +51,9 @@ interface ChannelFormState {
   digestMode: DigestMode;
   digestCron: string;
   digestTimezone: string;
-  config: string;
+  audienceRole: "admin" | "referee";
+  locale: "de" | "en";
+  groupId: string;
 }
 
 function emptyForm(): ChannelFormState {
@@ -65,19 +63,35 @@ function emptyForm(): ChannelFormState {
     digestMode: "none",
     digestCron: "",
     digestTimezone: "Europe/Berlin",
-    config: "{}",
+    audienceRole: "admin",
+    locale: "de",
+    groupId: "",
   };
 }
 
 function channelToForm(ch: ChannelConfigItem): ChannelFormState {
+  const config = ch.config;
   return {
     name: ch.name,
     type: ch.type,
     digestMode: ch.digestMode,
     digestCron: ch.digestCron ?? "",
     digestTimezone: ch.digestTimezone,
-    config: JSON.stringify(ch.config, null, 2),
+    audienceRole: "audienceRole" in config ? config.audienceRole : "admin",
+    locale: config.locale ?? "de",
+    groupId: "groupId" in config ? config.groupId : "",
   };
+}
+
+function buildConfig(form: ChannelFormState): Record<string, unknown> {
+  switch (form.type) {
+    case "in_app":
+      return { audienceRole: form.audienceRole, locale: form.locale };
+    case "whatsapp_group":
+      return { groupId: form.groupId, locale: form.locale };
+    case "email":
+      return { locale: form.locale };
+  }
 }
 
 // next-intl's t() has strict key typing, so we use ReturnType to accept it
@@ -95,7 +109,6 @@ function channelTypeLabel(type: string, t: TranslateFunc): string {
   switch (type) {
     case "in_app": return t("typeLabels.in_app" as never);
     case "whatsapp_group": return t("typeLabels.whatsapp_group" as never);
-    case "push": return t("typeLabels.push" as never);
     case "email": return t("typeLabels.email" as never);
     default: return type;
   }
@@ -108,7 +121,15 @@ export function ChannelConfigsList() {
     SWR_KEYS.channelConfigs,
     apiFetcher,
   );
+  const { data: providers } = useSWR<ProviderAvailability>(
+    SWR_KEYS.channelConfigProviders,
+    apiFetcher,
+  );
   const { mutate } = useSWRConfig();
+
+  const availableTypes = CHANNEL_TYPES.filter(
+    (ct) => providers?.[ct]?.configured !== false,
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingChannel, setEditingChannel] =
@@ -146,14 +167,6 @@ export function ChannelConfigsList() {
     e.preventDefault();
     if (!form.name.trim()) return;
 
-    let parsedConfig: Record<string, unknown>;
-    try {
-      parsedConfig = JSON.parse(form.config) as Record<string, unknown>;
-    } catch {
-      toast.error("Invalid JSON in config");
-      return;
-    }
-
     setSubmitting(true);
     try {
       const body = {
@@ -165,7 +178,7 @@ export function ChannelConfigsList() {
             ? form.digestCron
             : null,
         digestTimezone: form.digestTimezone || "Europe/Berlin",
-        config: parsedConfig,
+        config: buildConfig(form),
       };
 
       if (editingChannel) {
@@ -289,7 +302,11 @@ export function ChannelConfigsList() {
                 value={form.type}
                 onValueChange={(v) =>
                   setForm((prev) => ({
-                    ...prev,
+                    ...emptyForm(),
+                    name: prev.name,
+                    digestMode: prev.digestMode,
+                    digestCron: prev.digestCron,
+                    digestTimezone: prev.digestTimezone,
                     type: v as ChannelType,
                   }))
                 }
@@ -298,7 +315,7 @@ export function ChannelConfigsList() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CHANNEL_TYPES.map((ct) => (
+                  {availableTypes.map((ct) => (
                     <SelectItem key={ct} value={ct}>
                       {channelTypeLabel(ct, t)}
                     </SelectItem>
@@ -367,18 +384,62 @@ export function ChannelConfigsList() {
               />
             </div>
 
-            {/* Config (JSON) */}
+            {/* Config fields based on type */}
+            {form.type === "in_app" && (
+              <div className="space-y-2">
+                <Label>{t("audienceRole")}</Label>
+                <Select
+                  value={form.audienceRole}
+                  onValueChange={(v) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      audienceRole: v as "admin" | "referee",
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">{t("audienceRoles.admin" as never)}</SelectItem>
+                    <SelectItem value="referee">{t("audienceRoles.referee" as never)}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {form.type === "whatsapp_group" && (
+              <div className="space-y-2">
+                <Label htmlFor="channel-group-id">{t("groupId")}</Label>
+                <Input
+                  id="channel-group-id"
+                  value={form.groupId}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, groupId: e.target.value }))
+                  }
+                  required
+                />
+                <p className="text-xs text-muted-foreground">{t("groupIdHelp" as never)}</p>
+              </div>
+            )}
+
+            {/* Locale (shown for all types) */}
             <div className="space-y-2">
-              <Label htmlFor="channel-config">Config (JSON)</Label>
-              <textarea
-                id="channel-config"
-                value={form.config}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, config: e.target.value }))
+              <Label>{t("locale" as never)}</Label>
+              <Select
+                value={form.locale}
+                onValueChange={(v) =>
+                  setForm((prev) => ({ ...prev, locale: v as "de" | "en" }))
                 }
-                rows={4}
-                className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="de">{t("locales.de" as never)}</SelectItem>
+                  <SelectItem value="en">{t("locales.en" as never)}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <DialogFooter>
