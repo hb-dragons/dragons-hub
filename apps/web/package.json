@@ -12,19 +12,19 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@daveyplate/better-auth-ui": "^3.3.15",
+    "@daveyplate/better-auth-ui": "^3.4.0",
     "@dragons/shared": "workspace:*",
     "@dragons/ui": "workspace:*",
     "@hookform/resolvers": "^5.2.2",
     "@tanstack/react-table": "^8.21.3",
-    "better-auth": "^1.5.2",
-    "lucide-react": "^0.576.0",
-    "next": "16.1.6",
+    "better-auth": "^1.5.6",
+    "lucide-react": "^1.0.1",
+    "next": "16.2.1",
     "next-intl": "^4.8.3",
     "next-themes": "^0.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "react-hook-form": "^7.71.2",
+    "react-hook-form": "^7.72.0",
     "react-rnd": "^10.5.3",
     "server-only": "^0.0.1",
     "sonner": "^2.0.7",
@@ -32,16 +32,16 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@lingual/i18n-check": "^0.8.19",
-    "@tailwindcss/postcss": "^4.2.1",
-    "@types/node": "^25.3.3",
+    "@lingual/i18n-check": "^0.9.3",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "babel-plugin-react-compiler": "1.0.0",
-    "eslint": "^9.39.3",
-    "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4.2.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "eslint": "^10.1.0",
+    "eslint-config-next": "16.2.1",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
   }
 }
