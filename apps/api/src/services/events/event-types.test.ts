@@ -306,4 +306,41 @@ describe("classifyUrgency", () => {
       "routine",
     );
   });
+
+  // --- Referee slot events ---
+
+  describe("referee.slots.needed", () => {
+    it("is immediate when kickoff within 7 days", () => {
+      const payload = { kickoffDate: "2026-03-20" };
+      expect(classifyUrgency(EVENT_TYPES.REFEREE_SLOTS_NEEDED, payload)).toBe(
+        "immediate",
+      );
+    });
+
+    it("is routine when kickoff > 7 days away", () => {
+      const payload = { kickoffDate: "2026-06-01" };
+      expect(classifyUrgency(EVENT_TYPES.REFEREE_SLOTS_NEEDED, payload)).toBe(
+        "routine",
+      );
+    });
+
+    it("is routine with no date info", () => {
+      expect(classifyUrgency(EVENT_TYPES.REFEREE_SLOTS_NEEDED, {})).toBe(
+        "routine",
+      );
+    });
+  });
+
+  it("classifies referee.slots.reminder as always immediate", () => {
+    const payload = { kickoffDate: "2099-12-31" };
+    expect(classifyUrgency(EVENT_TYPES.REFEREE_SLOTS_REMINDER, payload)).toBe(
+      "immediate",
+    );
+  });
+
+  it("classifies referee.slots.reminder as immediate with no date info", () => {
+    expect(classifyUrgency(EVENT_TYPES.REFEREE_SLOTS_REMINDER, {})).toBe(
+      "immediate",
+    );
+  });
 });
