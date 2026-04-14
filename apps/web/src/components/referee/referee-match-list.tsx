@@ -33,6 +33,7 @@ import {
   TooltipTrigger,
 } from "@dragons/ui/components/tooltip";
 import { Ban, Calendar, Check, CheckCircle2, CircleOff, Clock, ExternalLink, Loader2, RefreshCw, SearchIcon, SquareActivity, Trash2, X, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import type { DateRange } from "@dragons/ui/components/calendar";
 
 import { DataTable } from "@/components/ui/data-table";
@@ -433,13 +434,13 @@ export function RefereeMatchList() {
         );
         setVerifyResult(result);
         await mutate();
-      } catch {
-        // fetchAPI throws APIError
+      } catch (e) {
+        toast.error(t("slot.verifyFailed"));
       } finally {
         setVerifying(false);
       }
     },
-    [mutate],
+    [mutate, t],
   );
 
   const closeVerifyDialog = useCallback(() => {
@@ -471,13 +472,13 @@ export function RefereeMatchList() {
         }
 
         await mutate();
-      } catch {
-        // Error handling via fetchAPI throwing APIError
+      } catch (e) {
+        toast.error(t("slot.takeFailed"));
       } finally {
         setTakingSlot(null);
       }
     },
-    [mutate, items],
+    [mutate, items, t],
   );
 
   const handleCancel = useCallback(
@@ -493,13 +494,13 @@ export function RefereeMatchList() {
           },
         );
         await mutate();
-      } catch {
-        // Error handling via fetchAPI throwing APIError
+      } catch (e) {
+        toast.error(t("slot.cancelFailed"));
       } finally {
         setTakingSlot(null);
       }
     },
-    [mutate],
+    [mutate, t],
   );
 
   const handleAdminRelease = useCallback(
@@ -515,8 +516,8 @@ export function RefereeMatchList() {
           },
         );
         await mutate();
-      } catch {
-        // Error handling via fetchAPI throwing APIError
+      } catch (e) {
+        toast.error(t("slot.releaseFailed"));
       } finally {
         setTakingSlot(null);
       }

@@ -89,7 +89,11 @@
       "open": "Offen",
       "releaseIntent": "Anfrage freigeben",
       "intentPending": "Anfrage — wartet auf Bestätigung",
-      "intentConfirmed": "Offiziell bestätigt"
+      "intentConfirmed": "Offiziell bestätigt",
+      "takeFailed": "Spiel konnte nicht übernommen werden",
+      "cancelFailed": "Anfrage konnte nicht zurückgezogen werden",
+      "releaseFailed": "Zuweisung konnte nicht freigegeben werden",
+      "verifyFailed": "Registrierung konnte nicht geprüft werden"
     },
     "verify": {
       "title": "Registrierung prüfen",

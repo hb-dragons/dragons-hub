@@ -89,7 +89,11 @@
       "open": "Open",
       "releaseIntent": "Release intent",
       "intentPending": "Intent — awaiting confirmation",
-      "intentConfirmed": "Officially confirmed"
+      "intentConfirmed": "Officially confirmed",
+      "takeFailed": "Failed to take match",
+      "cancelFailed": "Failed to cancel request",
+      "releaseFailed": "Failed to release assignment",
+      "verifyFailed": "Failed to verify registration"
     },
     "verify": {
       "title": "Verify Registration",

@@ -1,5 +1,4 @@
 import { Inter, Space_Grotesk } from "next/font/google";
-import { Toaster } from "sonner";
 import "@dragons/ui/globals.css";
 import "@daveyplate/better-auth-ui/css";
 import "./social-fonts.css";
@@ -30,7 +29,6 @@ export default function RootLayout({
         className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}
       >
         {children}
-        <Toaster />
       </body>
     </html>
   );

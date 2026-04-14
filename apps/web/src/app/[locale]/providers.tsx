@@ -1,11 +1,17 @@
 "use client";
 
 import { AuthUIProvider } from "@daveyplate/better-auth-ui";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider, useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { Toaster } from "sonner";
 import { Link } from "@/lib/navigation";
 import { authClient } from "@/lib/auth-client";
+
+function ThemedToaster() {
+  const { resolvedTheme } = useTheme();
+  return <Toaster theme={resolvedTheme === "dark" ? "dark" : "light"} />;
+}
 
 export function Providers({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -24,6 +30,7 @@ export function Providers({ children }: { children: ReactNode }) {
         Link={Link}
       >
         {children}
+        <ThemedToaster />
       </AuthUIProvider>
     </ThemeProvider>
   );
