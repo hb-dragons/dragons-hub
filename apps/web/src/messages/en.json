@@ -62,53 +62,44 @@
       "syncIdle": "Idle"
     }
   },
-  "refereeMatches": {
-    "title": "Open Referee Assignments",
-    "empty": "No open assignments found",
-    "searchPlaceholder": "Search matches...",
-    "syncButton": "Sync referee games",
-    "syncTriggered": "Referee sync started",
-    "syncFailed": "Referee sync failed",
+  "refereeGames": {
+    "title": "Referee Games",
     "columns": {
       "date": "Date",
       "time": "Time",
       "home": "Home",
       "guest": "Guest",
       "league": "League",
-      "venue": "Venue",
-      "sr1": "SR 1",
-      "sr2": "SR 2"
+      "sr1": "SR1",
+      "sr2": "SR2"
     },
     "status": {
-      "label": "Status",
       "active": "Active",
       "cancelled": "Cancelled",
       "forfeited": "Forfeited"
     },
-    "slot": {
-      "take": "Take",
-      "confirmed": "Confirmed",
-      "requested": "Requested",
+    "srStatus": {
       "open": "Open",
-      "releaseIntent": "Release intent",
-      "intentPending": "Intent — awaiting confirmation",
-      "intentConfirmed": "Officially confirmed",
-      "takeFailed": "Failed to take match",
-      "cancelFailed": "Failed to cancel request",
-      "releaseFailed": "Failed to release assignment",
-      "verifyFailed": "Failed to verify registration"
+      "offered": "Offered",
+      "assigned": "Assigned"
     },
-    "verify": {
-      "title": "Verify Registration",
-      "description": "Did you successfully register for this game on the Basketball-Bund website?",
-      "openLink": "Open Basketball-Bund page",
-      "yes": "Yes, verify now",
-      "no": "Not yet",
-      "retry": "Retry",
-      "close": "Close",
-      "confirmed": "Registration confirmed! You are now assigned to this game.",
-      "notConfirmed": "Registration not yet confirmed. It may take a moment for the external system to update. Try again shortly."
-    }
+    "filters": {
+      "search": "Search teams, leagues...",
+      "status": "Status",
+      "srFilter": "SR Status",
+      "srFilterOurClub": "Our club needs SR",
+      "srFilterAnyOpen": "Any open slot",
+      "srFilterAll": "All",
+      "league": "League",
+      "dateFrom": "From",
+      "dateTo": "To"
+    },
+    "badges": {
+      "untracked": "Untracked"
+    },
+    "syncButton": "Sync referee games",
+    "syncTriggered": "Referee sync started",
+    "syncFailed": "Referee sync failed"
   },
   "common": {
     "save": "Save",
@@ -280,7 +271,9 @@
     "trigger": "Start Sync",
     "tabs": {
       "history": "Sync History",
-      "schedule": "Schedule Settings"
+      "schedule": "Schedule Settings",
+      "mainSync": "Main Sync",
+      "refereeGames": "Referee Games"
     },
     "status": {
       "current": "Current Status",

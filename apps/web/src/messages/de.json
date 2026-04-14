@@ -62,53 +62,44 @@
       "syncIdle": "Inaktiv"
     }
   },
-  "refereeMatches": {
-    "title": "Offene Schiedsrichter-Ansetzungen",
-    "empty": "Keine offenen Ansetzungen gefunden",
-    "searchPlaceholder": "Spiele suchen...",
-    "syncButton": "SR-Spiele synchronisieren",
-    "syncTriggered": "SR-Synchronisation gestartet",
-    "syncFailed": "SR-Synchronisation fehlgeschlagen",
+  "refereeGames": {
+    "title": "SR-Spiele",
     "columns": {
       "date": "Datum",
-      "time": "Uhrzeit",
+      "time": "Zeit",
       "home": "Heim",
       "guest": "Gast",
       "league": "Liga",
-      "venue": "Halle",
-      "sr1": "SR 1",
-      "sr2": "SR 2"
+      "sr1": "SR1",
+      "sr2": "SR2"
     },
     "status": {
-      "label": "Status",
       "active": "Aktiv",
       "cancelled": "Abgesagt",
-      "forfeited": "Kampflos"
+      "forfeited": "Verzicht"
     },
-    "slot": {
-      "take": "Übernehmen",
-      "confirmed": "Bestätigt",
-      "requested": "Beantragt",
+    "srStatus": {
       "open": "Offen",
-      "releaseIntent": "Anfrage freigeben",
-      "intentPending": "Anfrage — wartet auf Bestätigung",
-      "intentConfirmed": "Offiziell bestätigt",
-      "takeFailed": "Spiel konnte nicht übernommen werden",
-      "cancelFailed": "Anfrage konnte nicht zurückgezogen werden",
-      "releaseFailed": "Zuweisung konnte nicht freigegeben werden",
-      "verifyFailed": "Registrierung konnte nicht geprüft werden"
+      "offered": "Angeboten",
+      "assigned": "Besetzt"
     },
-    "verify": {
-      "title": "Registrierung prüfen",
-      "description": "Hast du dich erfolgreich auf der Basketball-Bund-Seite für dieses Spiel eingetragen?",
-      "openLink": "Basketball-Bund-Seite öffnen",
-      "yes": "Ja, jetzt prüfen",
-      "no": "Noch nicht",
-      "retry": "Erneut prüfen",
-      "close": "Schließen",
-      "confirmed": "Registrierung bestätigt! Du bist jetzt für dieses Spiel eingetragen.",
-      "notConfirmed": "Registrierung noch nicht bestätigt. Es kann einen Moment dauern, bis das externe System aktualisiert ist. Versuche es gleich nochmal."
-    }
+    "filters": {
+      "search": "Teams, Ligen suchen...",
+      "status": "Status",
+      "srFilter": "SR-Status",
+      "srFilterOurClub": "Unser Verein stellt SR",
+      "srFilterAnyOpen": "Offene Plätze",
+      "srFilterAll": "Alle",
+      "league": "Liga",
+      "dateFrom": "Von",
+      "dateTo": "Bis"
+    },
+    "badges": {
+      "untracked": "Nicht verfolgt"
+    },
+    "syncButton": "SR-Spiele synchronisieren",
+    "syncTriggered": "SR-Synchronisation gestartet",
+    "syncFailed": "SR-Synchronisation fehlgeschlagen"
   },
   "common": {
     "save": "Speichern",
@@ -280,7 +271,9 @@
     "trigger": "Sync starten",
     "tabs": {
       "history": "Sync-Verlauf",
-      "schedule": "Zeitplan-Einstellungen"
+      "schedule": "Zeitplan-Einstellungen",
+      "mainSync": "Haupt-Sync",
+      "refereeGames": "SR-Spiele"
     },
     "status": {
       "current": "Aktueller Status",
