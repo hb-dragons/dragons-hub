@@ -25,6 +25,10 @@ export const EVENT_TYPES = {
   REFEREE_UNASSIGNED: "referee.unassigned",
   REFEREE_REASSIGNED: "referee.reassigned",
 
+  // Referee slot events
+  REFEREE_SLOTS_NEEDED: "referee.slots.needed",
+  REFEREE_SLOTS_REMINDER: "referee.slots.reminder",
+
   // Booking events
   BOOKING_CREATED: "booking.created",
   BOOKING_STATUS_CHANGED: "booking.status.changed",
@@ -190,6 +194,25 @@ export interface RefereeReassignedPayload {
   teamIds: number[];
 }
 
+export interface RefereeSlotsPayload {
+  matchId: number;
+  matchNo: number;
+  homeTeam: string;
+  guestTeam: string;
+  leagueId: number;
+  leagueName: string;
+  kickoffDate: string;
+  kickoffTime: string;
+  venueId: number | null;
+  venueName: string | null;
+  sr1Open: boolean;
+  sr2Open: boolean;
+  sr1Assigned: string | null;
+  sr2Assigned: string | null;
+  reminderLevel?: number;
+  deepLink: string;
+}
+
 export interface BookingCreatedPayload {
   venueName: string;
   date: string;
@@ -271,6 +294,7 @@ export type DomainEventPayload =
   | RefereeAssignedPayload
   | RefereeUnassignedPayload
   | RefereeReassignedPayload
+  | RefereeSlotsPayload
   | BookingCreatedPayload
   | BookingStatusChangedPayload
   | BookingNeedsReconfirmationPayload
