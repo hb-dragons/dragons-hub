@@ -351,14 +351,14 @@ export function RefereeGamesList() {
     if (srFilter === "all") return allItems;
     if (srFilter === "any-open") {
       return allItems.filter(
-        (m) => m.sr1Status === "open" || m.sr2Status === "open",
+        (m) => m.sr1Status !== "assigned" || m.sr2Status !== "assigned",
       );
     }
-    // our-club-open: at least one open slot belonging to our club
+    // our-club-open: at least one unfilled slot belonging to our club (open or offered)
     return allItems.filter(
       (m) =>
-        (m.sr1Status === "open" && m.sr1OurClub) ||
-        (m.sr2Status === "open" && m.sr2OurClub),
+        (m.sr1Status !== "assigned" && m.sr1OurClub) ||
+        (m.sr2Status !== "assigned" && m.sr2OurClub),
     );
   }, [allItems, srFilter]);
 
@@ -366,8 +366,8 @@ export function RefereeGamesList() {
     (row: Row<RefereeGameListItem>) => {
       const m = row.original;
       return (
-        (m.sr1Status === "open" && m.sr1OurClub) ||
-        (m.sr2Status === "open" && m.sr2OurClub)
+        (m.sr1Status !== "assigned" && m.sr1OurClub) ||
+        (m.sr2Status !== "assigned" && m.sr2OurClub)
       );
     },
     [],
