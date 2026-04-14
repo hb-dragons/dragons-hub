@@ -5,6 +5,7 @@ import { refereeReminderWorker } from "./referee-reminder.worker";
 import { initializeScheduledJobs, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue } from "./queues";
 import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-poller";
 import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
+import { syncRefereeGames } from "../services/sync/referee-games.sync";
 import { db } from "../config/database";
 import { logger } from "../config/logger";
 import {
@@ -76,6 +77,25 @@ export async function initializeWorkers() {
   } catch (error) {
     logger.warn({ err: error }, "Failed to seed referee notification config");
   }
+
+  // Referee games sync — scheduled every 30 minutes
+  await syncQueue.add("referee-games-sync-scheduled", { type: "referee-games" }, {
+    repeat: { every: 30 * 60 * 1000 },
+    removeOnComplete: true,
+    removeOnFail: 100,
+  });
+  logger.info("Referee games sync scheduled (every 30 minutes)");
+
+  // Trigger referee games sync after main sync completes
+  syncWorker.on("completed", async (job) => {
+    if (job?.data?.type !== "referee-games") {
+      try {
+        await syncRefereeGames();
+      } catch (error) {
+        logger.warn({ err: error }, "Failed to run referee games sync after main sync");
+      }
+    }
+  });
 
   // Workers are automatically started when imported
   logger.info("Sync worker started");

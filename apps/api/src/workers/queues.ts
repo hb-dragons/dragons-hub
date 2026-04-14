@@ -49,6 +49,22 @@ export const refereeRemindersQueue = new Queue("referee-reminders", {
   },
 });
 
+export async function triggerRefereeGamesSync(): Promise<void> {
+  const existing = await syncQueue.getJob("referee-games-sync");
+  if (existing) {
+    const state = await existing.getState();
+    if (state === "active" || state === "waiting") {
+      logger.info("Referee games sync already queued, skipping");
+      return;
+    }
+  }
+  await syncQueue.add("referee-games-sync", { type: "referee-games" }, {
+    jobId: "referee-games-sync",
+    removeOnComplete: true,
+    removeOnFail: 100,
+  });
+}
+
 // NOTE: syncRuns and syncRunEntries tables grow unbounded.
 // Consider adding a periodic cleanup job or retention policy for old sync data.
 

@@ -7,7 +7,7 @@ import { db } from "../config/database";
 import { fullSync } from "../services/sync/index";
 
 interface SyncJobData {
-  type: "full" | "leagues" | "matches" | "standings";
+  type: "full" | "leagues" | "matches" | "standings" | "referee-games";
   triggeredBy?: string;
   syncRunId?: number;
 }

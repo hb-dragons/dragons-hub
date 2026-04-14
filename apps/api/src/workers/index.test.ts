@@ -22,9 +22,13 @@ const mockDigestQueueAdd = vi.fn().mockResolvedValue({ id: "digest-job-1" });
 const mockDigestQueueGetRepeatableJobs = vi.fn().mockResolvedValue([]);
 const mockDigestQueueRemoveRepeatableByKey = vi.fn().mockResolvedValue(undefined);
 const mockRefereeRemindersQueueClose = vi.fn().mockResolvedValue(undefined);
+const mockSyncQueueAdd = vi.fn().mockResolvedValue({ id: "sync-job-1" });
 vi.mock("./queues", () => ({
   initializeScheduledJobs: (...args: unknown[]) => mockInitScheduledJobs(...args),
-  syncQueue: { close: (...args: unknown[]) => mockSyncQueueClose(...args) },
+  syncQueue: {
+    close: (...args: unknown[]) => mockSyncQueueClose(...args),
+    add: (...args: unknown[]) => mockSyncQueueAdd(...args),
+  },
   domainEventsQueue: { close: (...args: unknown[]) => mockDomainEventsQueueClose(...args) },
   refereeRemindersQueue: { close: (...args: unknown[]) => mockRefereeRemindersQueueClose(...args) },
   digestQueue: {
@@ -36,8 +40,12 @@ vi.mock("./queues", () => ({
 }));
 
 const mockWorkerClose = vi.fn().mockResolvedValue(undefined);
+const mockWorkerOn = vi.fn();
 vi.mock("./sync.worker", () => ({
-  syncWorker: { close: (...args: unknown[]) => mockWorkerClose(...args) },
+  syncWorker: {
+    close: (...args: unknown[]) => mockWorkerClose(...args),
+    on: (...args: unknown[]) => mockWorkerOn(...args),
+  },
 }));
 
 const mockEventWorkerClose = vi.fn().mockResolvedValue(undefined);
@@ -59,6 +67,10 @@ vi.mock("../services/events/outbox-poller", () => ({
 
 vi.mock("../services/notifications/seed-referee-watch-rule", () => ({
   seedRefereeNotificationConfig: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../services/sync/referee-games.sync", () => ({
+  syncRefereeGames: vi.fn().mockResolvedValue({ created: 0, updated: 0, unchanged: 0 }),
 }));
 
 const mockDbUpdate = vi.fn();
