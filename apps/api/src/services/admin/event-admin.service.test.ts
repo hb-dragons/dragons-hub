@@ -3,21 +3,39 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // --- Mock setup ---
 
 const mockSelect = vi.fn();
+const mockInsert = vi.fn();
 
 vi.mock("../../config/database", () => ({
   db: {
     select: (...args: unknown[]) => mockSelect(...args),
+    insert: (...args: unknown[]) => mockInsert(...args),
   },
 }));
 
 vi.mock("@dragons/db/schema", () => ({
   domainEvents: {
+    id: "de.id",
     type: "de.type",
     entityType: "de.entityType",
     source: "de.source",
     occurredAt: "de.occurredAt",
     entityName: "de.entityName",
   },
+  notificationLog: {
+    id: "nl.id",
+    eventId: "nl.eventId",
+    watchRuleId: "nl.watchRuleId",
+    channelConfigId: "nl.channelConfigId",
+    recipientId: "nl.recipientId",
+    title: "nl.title",
+    body: "nl.body",
+    locale: "nl.locale",
+    status: "nl.status",
+    errorMessage: "nl.errorMessage",
+    retryCount: "nl.retryCount",
+    createdAt: "nl.createdAt",
+  },
+  channelConfigs: {},
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -30,9 +48,31 @@ vi.mock("drizzle-orm", () => ({
   count: vi.fn(() => "count()"),
 }));
 
+const mockBuildDomainEvent = vi.fn();
+const mockInsertDomainEvent = vi.fn();
+const mockEnqueueDomainEvent = vi.fn();
+
+vi.mock("../events/event-publisher", () => ({
+  buildDomainEvent: (...args: unknown[]) => mockBuildDomainEvent(...args),
+  insertDomainEvent: (...args: unknown[]) => mockInsertDomainEvent(...args),
+  enqueueDomainEvent: (...args: unknown[]) => mockEnqueueDomainEvent(...args),
+}));
+
+vi.mock("../notifications/templates/index", () => ({
+  renderEventMessage: vi.fn(),
+}));
+
+vi.mock("../notifications/channels/in-app", () => ({
+  InAppChannelAdapter: vi.fn(),
+}));
+
+vi.mock("../../config/logger", () => ({
+  logger: { child: vi.fn().mockReturnValue({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
+}));
+
 // --- Imports (after mocks) ---
 
-import { listDomainEvents } from "./event-admin.service";
+import { listDomainEvents, triggerManualEvent, listFailedNotifications } from "./event-admin.service";
 import { eq, gte, lte, ilike, and } from "drizzle-orm";
 
 // --- Helpers ---
@@ -269,5 +309,184 @@ describe("listDomainEvents", () => {
       expect.objectContaining({ lte: expect.anything() }),
       expect.objectContaining({ ilike: expect.anything() }),
     );
+  });
+});
+
+describe("triggerManualEvent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockBuildDomainEvent.mockReturnValue({
+      id: "evt-new",
+      type: "match.created",
+      urgency: "routine",
+      entityType: "match",
+      entityId: 1,
+    });
+    mockInsertDomainEvent.mockResolvedValue(undefined);
+    mockEnqueueDomainEvent.mockResolvedValue(undefined);
+  });
+
+  it("builds, inserts, and enqueues a domain event", async () => {
+    const result = await triggerManualEvent({
+      type: "match.created",
+      entityType: "match",
+      entityId: 1,
+      entityName: "Dragons vs Tigers",
+      deepLinkPath: "/matches/1",
+      payload: { matchNo: 100 },
+      actor: "admin",
+    });
+
+    expect(mockBuildDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "match.created",
+        source: "manual",
+        entityId: 1,
+        actor: "admin",
+      }),
+    );
+    expect(mockInsertDomainEvent).toHaveBeenCalledTimes(1);
+    expect(mockEnqueueDomainEvent).toHaveBeenCalledTimes(1);
+    expect(result.eventId).toBe("evt-new");
+    expect(result.type).toBe("match.created");
+  });
+
+  it("applies urgency override before persisting", async () => {
+    const builtEvent = {
+      id: "evt-new",
+      type: "match.created",
+      urgency: "routine",
+      entityType: "match",
+      entityId: 1,
+    };
+    mockBuildDomainEvent.mockReturnValue(builtEvent);
+
+    const result = await triggerManualEvent({
+      type: "match.created",
+      entityType: "match",
+      entityId: 1,
+      entityName: "Test",
+      deepLinkPath: "/test",
+      payload: {},
+      urgencyOverride: "immediate",
+      actor: "admin",
+    });
+
+    expect(builtEvent.urgency).toBe("immediate");
+    expect(result.urgency).toBe("immediate");
+  });
+
+  it("does not override urgency when not specified", async () => {
+    const builtEvent = {
+      id: "evt-new",
+      type: "match.created",
+      urgency: "routine",
+      entityType: "match",
+      entityId: 1,
+    };
+    mockBuildDomainEvent.mockReturnValue(builtEvent);
+
+    const result = await triggerManualEvent({
+      type: "match.created",
+      entityType: "match",
+      entityId: 1,
+      entityName: "Test",
+      deepLinkPath: "/test",
+      payload: {},
+      actor: "admin",
+    });
+
+    expect(builtEvent.urgency).toBe("routine");
+    expect(result.urgency).toBe("routine");
+  });
+});
+
+describe("listFailedNotifications", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function buildNotificationChain(result: unknown) {
+    const chain: Record<string, unknown> = {};
+    const methods = ["from", "innerJoin", "where", "orderBy", "limit", "offset"];
+    for (const m of methods) {
+      chain[m] = vi.fn().mockReturnValue(chain);
+    }
+    chain.then = (resolve: (v: unknown) => void) => {
+      resolve(result);
+      return chain;
+    };
+    return chain;
+  }
+
+  it("returns empty list when no failed notifications", async () => {
+    const countChain = buildNotificationChain([{ count: 0 }]);
+    const dataChain = buildNotificationChain([]);
+
+    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+
+    const result = await listFailedNotifications({});
+
+    expect(result).toEqual({ notifications: [], total: 0 });
+  });
+
+  it("returns failed notifications with correct mapping", async () => {
+    const row = {
+      id: 1,
+      eventId: "evt-1",
+      watchRuleId: 10,
+      channelConfigId: 5,
+      recipientId: "user:1",
+      title: "Match cancelled",
+      body: "Your match was cancelled",
+      locale: "de",
+      status: "failed",
+      errorMessage: "Connection timeout",
+      retryCount: 3,
+      createdAt: { toISOString: () => "2025-06-01T12:00:00.000Z" },
+      eventType: "match.cancelled",
+      entityName: "Dragons vs Tigers",
+      deepLinkPath: "/matches/1",
+    };
+
+    const countChain = buildNotificationChain([{ count: 1 }]);
+    const dataChain = buildNotificationChain([row]);
+
+    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+
+    const result = await listFailedNotifications({ page: 1, limit: 10 });
+
+    expect(result.total).toBe(1);
+    expect(result.notifications).toHaveLength(1);
+    expect(result.notifications[0]).toEqual({
+      id: 1,
+      eventId: "evt-1",
+      watchRuleId: 10,
+      channelConfigId: 5,
+      recipientId: "user:1",
+      title: "Match cancelled",
+      body: "Your match was cancelled",
+      locale: "de",
+      status: "failed",
+      errorMessage: "Connection timeout",
+      retryCount: 3,
+      createdAt: "2025-06-01T12:00:00.000Z",
+      eventType: "match.cancelled",
+      entityName: "Dragons vs Tigers",
+      deepLinkPath: "/matches/1",
+    });
+  });
+
+  it("applies pagination correctly", async () => {
+    const countChain = buildNotificationChain([{ count: 50 }]);
+    const dataChain = buildNotificationChain([]);
+
+    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+
+    const result = await listFailedNotifications({ page: 3, limit: 10 });
+
+    expect(result.total).toBe(50);
+    expect(dataChain.limit).toHaveBeenCalledWith(10);
+    expect(dataChain.offset).toHaveBeenCalledWith(20);
   });
 });

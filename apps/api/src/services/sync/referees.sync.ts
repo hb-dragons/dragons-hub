@@ -212,56 +212,6 @@ export async function buildMatchIdLookup(): Promise<Map<number, number>> {
   return new Map(allMatches.map((m) => [m.apiMatchId, m.id]));
 }
 
-/** Helper to look up referee name by internal ID */
-async function getRefereeNameById(refId: number): Promise<string> {
-  const [ref] = await db
-    .select({ firstName: referees.firstName, lastName: referees.lastName })
-    .from(referees)
-    .where(eq(referees.id, refId))
-    .limit(1);
-  return ref ? `${ref.firstName} ${ref.lastName}`.trim() : "Unknown";
-}
-
-/** Helper to look up match info for referee event payloads */
-async function getMatchInfoForEvent(matchId: number): Promise<{
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  entityName: string;
-  teamIds: number[];
-} | null> {
-  const [match] = await db
-    .select({
-      matchNo: matches.matchNo,
-      homeTeamApiId: matches.homeTeamApiId,
-      guestTeamApiId: matches.guestTeamApiId,
-    })
-    .from(matches)
-    .where(eq(matches.id, matchId))
-    .limit(1);
-
-  if (!match) return null;
-
-  // We don't have team names readily available here, use API IDs as placeholders
-  return {
-    matchNo: match.matchNo,
-    homeTeam: String(match.homeTeamApiId),
-    guestTeam: String(match.guestTeamApiId),
-    entityName: `Match #${match.matchNo}`,
-    teamIds: [match.homeTeamApiId, match.guestTeamApiId],
-  };
-}
-
-/** Helper to look up role name by internal ID */
-async function getRoleNameById(roleId: number): Promise<string> {
-  const [role] = await db
-    .select({ name: refereeRoles.name })
-    .from(refereeRoles)
-    .where(eq(refereeRoles.id, roleId))
-    .limit(1);
-  return role?.name ?? "Unknown";
-}
-
 export async function syncRefereeAssignmentsFromData(
   assignments: ExtractedRefereeAssignment[],
   refereeIdLookup: Map<number, number>,
