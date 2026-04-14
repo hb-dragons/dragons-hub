@@ -39,4 +39,7 @@ export const SWR_KEYS = {
   socialBackgrounds: "/admin/social/backgrounds",
   socialMatches: (type: string, week: number, year: number) =>
     `/admin/social/matches?type=${type}&week=${week}&year=${year}`,
+  refereeSyncStatus: "/admin/sync/status?syncType=referee-games",
+  refereeSyncLogs: (limit: number, offset: number) =>
+    `/admin/sync/logs?limit=${limit}&offset=${offset}&syncType=referee-games`,
 } as const;
