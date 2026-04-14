@@ -20,9 +20,9 @@ const envSchema = z.object({
   GCS_BUCKET_NAME: z.string().min(1).optional(),
   GCS_PROJECT_ID: z.string().min(1).optional(),
 
-  // WhatsApp (Meta Cloud API)
-  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
-  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+  // WAHA (WhatsApp HTTP API - self-hosted)
+  WAHA_BASE_URL: z.string().url().optional(),
+  WAHA_SESSION: z.string().default("default"),
 
   // Email (SMTP)
   SMTP_HOST: z.string().min(1).optional(),
