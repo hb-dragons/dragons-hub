@@ -1,5 +1,5 @@
 import { db } from "../../config/database";
-import { referees, refereeRoles, matchReferees, matches, refereeAssignmentIntents } from "@dragons/db/schema";
+import { referees, refereeRoles, matchReferees, matches, matchChanges, refereeAssignmentIntents } from "@dragons/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import type {
@@ -318,7 +318,7 @@ export async function syncRefereeAssignmentsFromData(
           .from(referees).where(inArray(referees.id, allRefereeIds))
       : Promise.resolve([]),
     matchIdsToCheck.length > 0
-      ? db.select({ id: matches.id, matchNo: matches.matchNo, homeTeamApiId: matches.homeTeamApiId, guestTeamApiId: matches.guestTeamApiId })
+      ? db.select({ id: matches.id, matchNo: matches.matchNo, homeTeamApiId: matches.homeTeamApiId, guestTeamApiId: matches.guestTeamApiId, currentRemoteVersion: matches.currentRemoteVersion })
           .from(matches).where(inArray(matches.id, matchIdsToCheck))
       : Promise.resolve([]),
     allRoleIds.length > 0
@@ -334,6 +334,7 @@ export async function syncRefereeAssignmentsFromData(
     guestTeam: String(m.guestTeamApiId),
     entityName: `Match #${m.matchNo}`,
     teamIds: [m.homeTeamApiId, m.guestTeamApiId],
+    currentRemoteVersion: m.currentRemoteVersion,
   }]));
   const roleNameMap = new Map(roleRows.map((r) => [r.id, r.name]));
 
@@ -357,11 +358,26 @@ export async function syncRefereeAssignmentsFromData(
         });
         created++;
 
+        // Record referee assignment in match change history
+        const refName = refNameMap.get(refereeId) ?? "Unknown";
+        const matchInfo = matchInfoMap.get(matchId);
+        const roleName = roleNameMap.get(roleId) ?? "Unknown";
+
+        try {
+          await db.insert(matchChanges).values({
+            matchId,
+            track: "remote",
+            versionNumber: matchInfo?.currentRemoteVersion ?? 0,
+            fieldName: `referee_slot_${slotNumber}`,
+            oldValue: null,
+            newValue: `${refName} (${roleName})`,
+          });
+        } catch (error) {
+          log.warn({ err: error, matchId, refereeId }, "Failed to record referee assignment in match history");
+        }
+
         // Emit referee.assigned event
         try {
-          const refName = refNameMap.get(refereeId) ?? "Unknown";
-          const matchInfo = matchInfoMap.get(matchId);
-          const roleName = roleNameMap.get(roleId) ?? "Unknown";
           if (matchInfo) {
             await publishDomainEvent({
               type: EVENT_TYPES.REFEREE_ASSIGNED,
@@ -400,13 +416,27 @@ export async function syncRefereeAssignmentsFromData(
           .set({ refereeId, roleId })
           .where(eq(matchReferees.id, existing.id));
 
-        // Emit referee.reassigned event when referee changed
+        // Record reassignment in match change history and emit event
         if (oldRefereeId !== refereeId) {
+          const oldRefName = refNameMap.get(oldRefereeId) ?? "Unknown";
+          const newRefName = refNameMap.get(refereeId) ?? "Unknown";
+          const matchInfo = matchInfoMap.get(matchId);
+          const roleName = roleNameMap.get(roleId) ?? "Unknown";
+
           try {
-            const oldRefName = refNameMap.get(oldRefereeId) ?? "Unknown";
-            const newRefName = refNameMap.get(refereeId) ?? "Unknown";
-            const matchInfo = matchInfoMap.get(matchId);
-            const roleName = roleNameMap.get(roleId) ?? "Unknown";
+            await db.insert(matchChanges).values({
+              matchId,
+              track: "remote",
+              versionNumber: matchInfo?.currentRemoteVersion ?? 0,
+              fieldName: `referee_slot_${slotNumber}`,
+              oldValue: `${oldRefName} (${roleName})`,
+              newValue: `${newRefName} (${roleName})`,
+            });
+          } catch (error) {
+            log.warn({ err: error, matchId, refereeId }, "Failed to record referee reassignment in match history");
+          }
+
+          try {
             if (matchInfo) {
               await publishDomainEvent({
                 type: EVENT_TYPES.REFEREE_REASSIGNED,

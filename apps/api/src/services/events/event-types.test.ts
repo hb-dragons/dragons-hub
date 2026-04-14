@@ -94,6 +94,10 @@ describe("classifyUrgency", () => {
     expect(classifyUrgency(EVENT_TYPES.MATCH_CREATED, {})).toBe("routine");
   });
 
+  it("classifies match.confirmed as routine", () => {
+    expect(classifyUrgency(EVENT_TYPES.MATCH_CONFIRMED, {})).toBe("routine");
+  });
+
   it("classifies match.result_entered as routine", () => {
     expect(classifyUrgency(EVENT_TYPES.MATCH_RESULT_ENTERED, {})).toBe(
       "routine",
@@ -138,8 +142,18 @@ describe("classifyUrgency", () => {
     expect(classifyUrgency(EVENT_TYPES.OVERRIDE_APPLIED, {})).toBe("routine");
   });
 
-  it("classifies override.reverted as routine", () => {
+  it("classifies override.reverted as routine when no date info", () => {
     expect(classifyUrgency(EVENT_TYPES.OVERRIDE_REVERTED, {})).toBe("routine");
+  });
+
+  it("classifies override.reverted as immediate when kickoffDate is near", () => {
+    const payload = { kickoffDate: "2026-03-18" };
+    expect(classifyUrgency(EVENT_TYPES.OVERRIDE_REVERTED, payload)).toBe("immediate");
+  });
+
+  it("classifies override.reverted as routine when kickoffDate is far", () => {
+    const payload = { kickoffDate: "2026-06-01" };
+    expect(classifyUrgency(EVENT_TYPES.OVERRIDE_REVERTED, payload)).toBe("routine");
   });
 
   it("classifies override.conflict as immediate", () => {
@@ -190,6 +204,38 @@ describe("classifyUrgency", () => {
             field: "kickoffDate",
             oldValue: "2026-06-01T18:00:00Z",
             newValue: "2026-06-15T19:00:00Z",
+          },
+        ],
+      };
+      expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
+        "routine",
+      );
+    });
+
+    it("is immediate when top-level kickoffDate is within 7 days (time-only change)", () => {
+      const payload = {
+        kickoffDate: "2026-03-18",
+        changes: [
+          {
+            field: "kickoffTime",
+            oldValue: "19:30:00",
+            newValue: "20:00:00",
+          },
+        ],
+      };
+      expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
+        "immediate",
+      );
+    });
+
+    it("is routine when top-level kickoffDate is far away (time-only change)", () => {
+      const payload = {
+        kickoffDate: "2026-06-01",
+        changes: [
+          {
+            field: "kickoffTime",
+            oldValue: "19:30:00",
+            newValue: "20:00:00",
           },
         ],
       };

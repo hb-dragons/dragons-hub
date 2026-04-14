@@ -158,6 +158,23 @@ const matchRenderers: Record<
         };
   },
 
+  [EVENT_TYPES.MATCH_CONFIRMED]: (payload, _entityName, locale) => {
+    const score =
+      payload.homeScore != null && payload.guestScore != null
+        ? ` (${String(payload.homeScore)}:${String(payload.guestScore)})`
+        : "";
+
+    return locale === "de"
+      ? {
+          title: `\u{2705} Ergebnis best\u{00E4}tigt`,
+          body: `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")} (${String(payload.leagueName ?? "")})${score} wurde offiziell best\u{00E4}tigt.`,
+        }
+      : {
+          title: `\u{2705} Result confirmed`,
+          body: `${String(payload.homeTeam ?? "")} vs ${String(payload.guestTeam ?? "")} (${String(payload.leagueName ?? "")})${score} has been officially confirmed.`,
+        };
+  },
+
   [EVENT_TYPES.MATCH_REMOVED]: (_payload, entityName, locale) => {
     return locale === "de"
       ? {

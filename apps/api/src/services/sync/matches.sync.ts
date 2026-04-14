@@ -461,6 +461,13 @@ function classifyMatchChanges(
     }
   }
 
+  if (changedFields.has("isConfirmed")) {
+    const change = effectiveChanges.find((c) => c.fieldName === "isConfirmed");
+    if (change?.newValue === "true") {
+      eventTypes.push(EVENT_TYPES.MATCH_CONFIRMED);
+    }
+  }
+
   if (changedFields.has("kickoffDate") || changedFields.has("kickoffTime")) {
     eventTypes.push(EVENT_TYPES.MATCH_SCHEDULE_CHANGED);
   }
@@ -602,6 +609,18 @@ export async function syncMatchesFromData(
             const newVersionNumber = locked.currentRemoteVersion + 1;
             const fieldChanges = detectFieldChanges(locked, remoteSnapshot);
 
+            // Venue change detection (venueApiId in snapshot → venueId in DB, not in TRACKED_FIELDS)
+            const resolvedVenueId = details
+              ? internalVenueId
+              : (internalVenueId ?? locked.venueId);
+            if (String(locked.venueId ?? "") !== String(resolvedVenueId ?? "")) {
+              fieldChanges.push({
+                fieldName: "venueId",
+                oldValue: locked.venueId != null ? String(locked.venueId) : null,
+                newValue: resolvedVenueId != null ? String(resolvedVenueId) : null,
+              });
+            }
+
             // Create version snapshot
             await tx.insert(matchRemoteVersions).values({
               matchId: locked.id,
@@ -692,6 +711,15 @@ export async function syncMatchesFromData(
             // Compute effective changes (what actually changes in DB)
             const effective = computeEffectiveChanges(locked, updateSet);
 
+            // Venue change (venueId not in SNAPSHOT_DB_FIELDS, checked separately)
+            if (String(locked.venueId ?? "") !== String(updateSet.venueId ?? "")) {
+              effective.push({
+                fieldName: "venueId",
+                oldValue: locked.venueId != null ? String(locked.venueId) : null,
+                newValue: updateSet.venueId != null ? String(updateSet.venueId as number) : null,
+              });
+            }
+
             // Auto-release or conflict: check each overridden field
             for (const fieldName of overriddenSet) {
               const remoteVal = String(
@@ -776,7 +804,6 @@ export async function syncMatchesFromData(
                   eventPayload.changes = effectiveChanges
                     .filter((c) => c.fieldName === "kickoffDate" || c.fieldName === "kickoffTime")
                     .map((c) => ({ field: c.fieldName, oldValue: c.oldValue, newValue: c.newValue }));
-                /* v8 ignore next 6 */ // venueId not in TRACKED_FIELDS — dead branch until venue tracking is implemented
                 } else if (eventType === EVENT_TYPES.MATCH_VENUE_CHANGED) {
                   const venueChange = effectiveChanges.find((c) => c.fieldName === "venueId");
                   eventPayload.oldVenueId = venueChange?.oldValue ? Number(venueChange.oldValue) : null;
@@ -795,6 +822,11 @@ export async function syncMatchesFromData(
                   eventPayload.oldGuestScore = guestScoreChange?.oldValue ? Number(guestScoreChange.oldValue) : 0;
                   eventPayload.newHomeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : 0;
                   eventPayload.newGuestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : 0;
+                } else if (eventType === EVENT_TYPES.MATCH_CONFIRMED) {
+                  const homeScoreChange = effectiveChanges.find((c) => c.fieldName === "homeScore");
+                  const guestScoreChange = effectiveChanges.find((c) => c.fieldName === "guestScore");
+                  eventPayload.homeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : (remoteSnapshot.homeScore ?? null);
+                  eventPayload.guestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : (remoteSnapshot.guestScore ?? null);
                 }
 
                 await publishDomainEvent({

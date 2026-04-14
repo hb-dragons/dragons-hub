@@ -487,6 +487,57 @@ describe("renderMatchMessage", () => {
     });
   });
 
+  describe("match.confirmed", () => {
+    const payload = {
+      matchNo: 15,
+      homeTeam: "Dragons",
+      guestTeam: "Panthers",
+      leagueName: "Bezirksliga",
+      homeScore: 82,
+      guestScore: 71,
+    };
+
+    it("renders confirmed in German with score", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_CONFIRMED,
+        payload,
+        "Dragons vs Panthers",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("best\u{00E4}tigt");
+      expect(result!.body).toContain("Dragons vs Panthers");
+      expect(result!.body).toContain("82:71");
+      expect(result!.body).toContain("best\u{00E4}tigt");
+    });
+
+    it("renders confirmed in English with score", () => {
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_CONFIRMED,
+        payload,
+        "Dragons vs Panthers",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Result confirmed");
+      expect(result!.body).toContain("82:71");
+      expect(result!.body).toContain("confirmed");
+    });
+
+    it("renders confirmed without score", () => {
+      const noScore = { ...payload, homeScore: null, guestScore: null };
+      const result = renderMatchMessage(
+        EVENT_TYPES.MATCH_CONFIRMED,
+        noScore,
+        "Dragons vs Panthers",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).not.toContain(":");
+      expect(result!.body).toContain("best\u{00E4}tigt");
+    });
+  });
+
   describe("match.removed", () => {
     it("renders removed in German", () => {
       const result = renderMatchMessage(

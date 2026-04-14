@@ -15,6 +15,7 @@ export const EVENT_TYPES = {
   MATCH_FORFEITED: "match.forfeited",
   MATCH_SCORE_CHANGED: "match.score.changed",
   MATCH_REMOVED: "match.removed",
+  MATCH_CONFIRMED: "match.confirmed",
   // Extra match events (not in spec but valid)
   MATCH_RESULT_ENTERED: "match.result_entered",
   MATCH_RESULT_CHANGED: "match.result_changed",
@@ -124,6 +125,17 @@ export interface MatchRemovedPayload {
   leagueName: string;
   leagueId?: number | null;
   teamIds: number[];
+}
+
+export interface MatchConfirmedPayload {
+  matchNo: number;
+  homeTeam: string;
+  guestTeam: string;
+  leagueName: string;
+  leagueId?: number | null;
+  teamIds: number[];
+  homeScore: number | null;
+  guestScore: number | null;
 }
 
 export interface MatchResultEnteredPayload {
@@ -253,6 +265,7 @@ export type DomainEventPayload =
   | MatchForfeitedPayload
   | MatchScoreChangedPayload
   | MatchRemovedPayload
+  | MatchConfirmedPayload
   | MatchResultEnteredPayload
   | MatchResultChangedPayload
   | RefereeAssignedPayload
