@@ -397,6 +397,7 @@ export function RefereeMatchList() {
   const format = useFormatter();
   const { data: session } = authClient.useSession();
   const isAdmin = session?.user?.role === "admin";
+  const [syncingRefereeGames, setSyncingRefereeGames] = useState(false);
   const [takingSlot, setTakingSlot] = useState<string | null>(null);
   const [pendingVerification, setPendingVerification] = useState<PendingVerification | null>(null);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
@@ -448,6 +449,18 @@ export function RefereeMatchList() {
     setPendingVerification(null);
     setVerifyResult(null);
   }, []);
+
+  const handleSyncRefereeGames = useCallback(async () => {
+    setSyncingRefereeGames(true);
+    try {
+      await fetchAPI("/admin/settings/referee-games-sync", { method: "POST" });
+      toast.success(t("syncTriggered"));
+    } catch {
+      toast.error(t("syncFailed"));
+    } finally {
+      setSyncingRefereeGames(false);
+    }
+  }, [t]);
 
   const handleTake = useCallback(
     async (matchId: number, slotNumber: number) => {
@@ -583,6 +596,22 @@ export function RefereeMatchList() {
               column={table.getColumn("kickoffDate")!}
               title={t("columns.date")}
             />
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={handleSyncRefereeGames}
+                disabled={syncingRefereeGames}
+              >
+                {syncingRefereeGames ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                {t("syncButton")}
+              </Button>
+            )}
           </DataTableToolbar>
         )}
       </DataTable>

@@ -66,6 +66,9 @@
     "title": "Offene Schiedsrichter-Ansetzungen",
     "empty": "Keine offenen Ansetzungen gefunden",
     "searchPlaceholder": "Spiele suchen...",
+    "syncButton": "SR-Spiele synchronisieren",
+    "syncTriggered": "SR-Synchronisation gestartet",
+    "syncFailed": "SR-Synchronisation fehlgeschlagen",
     "columns": {
       "date": "Datum",
       "time": "Uhrzeit",

@@ -66,6 +66,9 @@
     "title": "Open Referee Assignments",
     "empty": "No open assignments found",
     "searchPlaceholder": "Search matches...",
+    "syncButton": "Sync referee games",
+    "syncTriggered": "Referee sync started",
+    "syncFailed": "Referee sync failed",
     "columns": {
       "date": "Date",
       "time": "Time",
