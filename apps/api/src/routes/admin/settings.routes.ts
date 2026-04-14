@@ -10,8 +10,9 @@ import {
   upsertSetting,
 } from "../../services/admin/settings.service";
 import { requireAdmin } from "../../middleware/auth";
+import type { AppEnv } from "../../types";
 
-const settingsRoutes = new Hono();
+const settingsRoutes = new Hono<AppEnv>();
 
 // GET /admin/settings/club - Get current club config
 settingsRoutes.get(
@@ -135,8 +136,12 @@ settingsRoutes.post(
   }),
   async (c) => {
     const { triggerRefereeGamesSync } = await import("../../workers/queues");
-    await triggerRefereeGamesSync();
-    return c.json({ success: true, message: "Referee games sync triggered" });
+    const userId = c.get("user")?.id;
+    const result = await triggerRefereeGamesSync(userId);
+    if (result === null) {
+      return c.json({ error: "Referee games sync already in progress or queued" }, 409);
+    }
+    return c.json({ success: true, syncRunId: result.syncRunId, message: "Referee games sync triggered" });
   },
 );
 

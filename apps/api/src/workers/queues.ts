@@ -49,20 +49,37 @@ export const refereeRemindersQueue = new Queue("referee-reminders", {
   },
 });
 
-export async function triggerRefereeGamesSync(): Promise<void> {
-  const existing = await syncQueue.getJob("referee-games-sync");
-  if (existing) {
-    const state = await existing.getState();
-    if (state === "active" || state === "waiting") {
-      logger.info("Referee games sync already queued, skipping");
-      return;
-    }
+export async function triggerRefereeGamesSync(
+  triggeredBy?: string,
+): Promise<{ syncRunId: number; status: string } | null> {
+  const activeJobs = await syncQueue.getJobs(["active", "waiting"], 0, 100, false);
+  const hasPending = activeJobs.some((job) => job.data?.type === "referee-games");
+  if (hasPending) {
+    logger.info("Referee games sync already queued, skipping");
+    return null;
   }
-  await syncQueue.add("referee-games-sync", { type: "referee-games" }, {
-    jobId: "referee-games-sync",
-    removeOnComplete: true,
-    removeOnFail: 100,
-  });
+
+  const [syncRun] = await db
+    .insert(syncRuns)
+    .values({
+      syncType: "referee-games",
+      triggeredBy: triggeredBy ?? "manual",
+      status: "pending",
+      startedAt: new Date(),
+    })
+    .returning();
+
+  await syncQueue.add(
+    "referee-games-sync",
+    { type: "referee-games", syncRunId: syncRun!.id },
+    {
+      jobId: `referee-games-sync-${syncRun!.id}`,
+      removeOnComplete: true,
+      removeOnFail: 100,
+    },
+  );
+
+  return { syncRunId: syncRun!.id, status: "queued" };
 }
 
 // NOTE: syncRuns and syncRunEntries tables grow unbounded.

@@ -32,8 +32,51 @@ export const syncWorker = new Worker<SyncJobData>(
         }
         case "referee-games": {
           const { syncRefereeGames } = await import("../services/sync/referee-games.sync");
-          const result = await syncRefereeGames();
-          return { completed: true, type: job.data.type, ...result };
+          const { createSyncLogger } = await import("../services/sync/sync-logger");
+          const syncRunId = job.data.syncRunId;
+          const syncLogger = syncRunId ? createSyncLogger(syncRunId) : undefined;
+
+          if (syncRunId) {
+            await db
+              .update(syncRuns)
+              .set({ status: "running" })
+              .where(eq(syncRuns.id, syncRunId));
+          }
+
+          const startTime = Date.now();
+          try {
+            const result = await syncRefereeGames(syncLogger);
+            if (syncLogger) await syncLogger.close();
+            if (syncRunId) {
+              await db
+                .update(syncRuns)
+                .set({
+                  status: "completed",
+                  recordsCreated: result.created,
+                  recordsUpdated: result.updated,
+                  recordsSkipped: result.unchanged,
+                  recordsFailed: 0,
+                  durationMs: Date.now() - startTime,
+                  completedAt: new Date(),
+                })
+                .where(eq(syncRuns.id, syncRunId));
+            }
+            return { completed: true, type: job.data.type, ...result };
+          } catch (err) {
+            if (syncLogger) await syncLogger.close();
+            if (syncRunId) {
+              await db
+                .update(syncRuns)
+                .set({
+                  status: "failed",
+                  errorMessage: err instanceof Error ? err.message : String(err),
+                  durationMs: Date.now() - startTime,
+                  completedAt: new Date(),
+                })
+                .where(eq(syncRuns.id, syncRunId));
+            }
+            throw err;
+          }
         }
         default:
           throw new Error(`Unsupported sync type: ${job.data.type}`);

@@ -9,6 +9,7 @@ import { scheduleReminderJobs, cancelReminderJobs } from "../referee/referee-rem
 import { EVENT_TYPES } from "@dragons/shared";
 import type { RefereeSlotsPayload } from "@dragons/shared";
 import type { SdkOffeneSpielResult, SdkSpielleitung } from "@dragons/sdk";
+import type { SyncLogger } from "./sync-logger";
 
 const log = logger.child({ service: "referee-games-sync" });
 
@@ -165,7 +166,7 @@ async function findMatchId(apiMatchId: number): Promise<number | null> {
 
 // --- Main sync ---
 
-export async function syncRefereeGames(): Promise<{
+export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
   created: number;
   updated: number;
   unchanged: number;
@@ -212,6 +213,13 @@ export async function syncRefereeGames(): Promise<{
         }).returning({ id: refereeGames.id, apiMatchId: refereeGames.apiMatchId });
 
         created++;
+        await syncLogger?.log({
+          entityType: "refereeGame",
+          entityId: String(mapped.apiMatchId),
+          entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
+          action: "created",
+          message: hasOpenOurClubSlot(mapped) ? "New game with open our-club slot" : "New game",
+        });
 
         // Emit event + schedule reminders for open our-club slots (not cancelled/forfeited)
         if (!mapped.isCancelled && !mapped.isForfeited && hasOpenOurClubSlot(mapped)) {
@@ -250,6 +258,13 @@ export async function syncRefereeGames(): Promise<{
           .where(eq(refereeGames.id, existing.id));
 
         updated++;
+        await syncLogger?.log({
+          entityType: "refereeGame",
+          entityId: String(mapped.apiMatchId),
+          entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
+          action: "updated",
+          message: "Game data changed",
+        });
 
         // Detect state changes and act accordingly
         const wasCancelledOrForfeited = existing.isCancelled || existing.isForfeited;
@@ -307,9 +322,22 @@ export async function syncRefereeGames(): Promise<{
         }
       } else {
         unchanged++;
+        await syncLogger?.log({
+          entityType: "refereeGame",
+          entityId: String(mapped.apiMatchId),
+          entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
+          action: "skipped",
+        });
       }
     } catch (err) {
       log.error({ err, spielplanId: result.sp.spielplanId }, "Failed to sync referee game");
+      await syncLogger?.log({
+        entityType: "refereeGame",
+        entityId: String(result.sp.spielplanId),
+        entityName: `${result.sp.heimMannschaftLiga.mannschaftName} vs ${result.sp.gastMannschaftLiga.mannschaftName}`,
+        action: "failed",
+        message: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
