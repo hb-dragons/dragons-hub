@@ -53,8 +53,8 @@ describe("computeReminderDelays", () => {
 });
 
 describe("buildReminderJobId", () => {
-  it("builds deterministic job ID", () => {
-    expect(buildReminderJobId(42, 7)).toBe("reminder:42:7");
-    expect(buildReminderJobId(100, 1)).toBe("reminder:100:1");
+  it("builds deterministic job ID from apiMatchId", () => {
+    expect(buildReminderJobId(2675740, 7)).toBe("reminder:2675740:7");
+    expect(buildReminderJobId(2836773, 1)).toBe("reminder:2836773:1");
   });
 });

@@ -195,11 +195,11 @@ export interface RefereeReassignedPayload {
 }
 
 export interface RefereeSlotsPayload {
-  matchId: number;
-  matchNo: number;
+  matchId: number | null;
+  matchNo: number | null;
   homeTeam: string;
   guestTeam: string;
-  leagueId: number;
+  leagueId: number | null;
   leagueName: string;
   kickoffDate: string;
   kickoffTime: string;

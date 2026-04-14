@@ -6,6 +6,7 @@ import {
   matchChanges,
   teams as teamsTable,
   leagues,
+  refereeGames,
 } from "@dragons/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { scheduleReminderJobs, cancelReminderJobs } from "../referee/referee-reminders.service";
@@ -928,11 +929,18 @@ export async function syncMatchesFromData(
                     effectiveChanges.find((c) => c.fieldName === "isForfeited")?.newValue === "true";
 
                   if (cancelled || forfeited) {
-                    await cancelReminderJobs(existing.id);
+                    await cancelReminderJobs(apiMatchId);
                   } else if (changedFields.has("kickoffDate") || changedFields.has("kickoffTime")) {
                     // Reschedule: cancel old, create new
-                    await cancelReminderJobs(existing.id);
-                    await scheduleReminderJobs(existing.id, remoteSnapshot.kickoffDate, remoteSnapshot.kickoffTime);
+                    await cancelReminderJobs(apiMatchId);
+                    const [rgRow] = await db
+                      .select({ id: refereeGames.id })
+                      .from(refereeGames)
+                      .where(eq(refereeGames.apiMatchId, apiMatchId))
+                      .limit(1);
+                    if (rgRow) {
+                      await scheduleReminderJobs(apiMatchId, rgRow.id, remoteSnapshot.kickoffDate, remoteSnapshot.kickoffTime);
+                    }
                   }
                 }
               }
@@ -1078,7 +1086,14 @@ export async function syncMatchesFromData(
                 });
 
                 // Schedule reminder jobs
-                await scheduleReminderJobs(newMatch.id, remoteSnapshot.kickoffDate, remoteSnapshot.kickoffTime);
+                const [newRgRow] = await db
+                  .select({ id: refereeGames.id })
+                  .from(refereeGames)
+                  .where(eq(refereeGames.apiMatchId, apiMatchId))
+                  .limit(1);
+                if (newRgRow) {
+                  await scheduleReminderJobs(apiMatchId, newRgRow.id, remoteSnapshot.kickoffDate, remoteSnapshot.kickoffTime);
+                }
               }
             } catch (error) {
               log.warn({ err: error, matchId: newMatch.id }, "Failed to emit referee.slots.needed or schedule reminders");

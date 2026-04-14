@@ -17,8 +17,8 @@ export interface ReminderDelay {
 /**
  * Build a deterministic BullMQ job ID for deduplication.
  */
-export function buildReminderJobId(matchId: number, days: number): string {
-  return `reminder:${matchId}:${days}`;
+export function buildReminderJobId(apiMatchId: number, days: number): string {
+  return `reminder:${apiMatchId}:${days}`;
 }
 
 /**
@@ -98,7 +98,8 @@ export async function getReminderDays(): Promise<number[]> {
  * Uses deterministic job IDs for dedup.
  */
 export async function scheduleReminderJobs(
-  matchId: number,
+  apiMatchId: number,
+  refereeGameId: number,
   kickoffDate: string,
   kickoffTime: string,
 ): Promise<void> {
@@ -108,30 +109,30 @@ export async function scheduleReminderJobs(
   for (const { days, delayMs } of delays) {
     await refereeRemindersQueue.add(
       "referee-reminder",
-      { matchId, reminderDays: days },
+      { apiMatchId, refereeGameId, reminderDays: days },
       {
         delay: delayMs,
-        jobId: buildReminderJobId(matchId, days),
+        jobId: buildReminderJobId(apiMatchId, days),
       },
     );
   }
 
   if (delays.length > 0) {
-    log.info({ matchId, reminders: delays.map((d) => d.days) }, "Scheduled referee reminder jobs");
+    log.info({ apiMatchId, reminders: delays.map((d) => d.days) }, "Scheduled referee reminder jobs");
   }
 }
 
 /**
  * Cancel all pending reminder jobs for a match.
  */
-export async function cancelReminderJobs(matchId: number): Promise<void> {
+export async function cancelReminderJobs(apiMatchId: number): Promise<void> {
   const reminderDays = await getReminderDays();
   for (const days of reminderDays) {
-    const jobId = buildReminderJobId(matchId, days);
+    const jobId = buildReminderJobId(apiMatchId, days);
     const job = await refereeRemindersQueue.getJob(jobId);
     if (job) {
       await job.remove();
     }
   }
-  log.info({ matchId }, "Cancelled referee reminder jobs");
+  log.info({ apiMatchId }, "Cancelled referee reminder jobs");
 }
