@@ -42,6 +42,7 @@ export type {
   MatchChangesResponse,
   MatchChangeHistoryItem,
   MatchChangeHistoryResponse,
+  RefereeSlotInfo,
 } from "./matches";
 
 export type {

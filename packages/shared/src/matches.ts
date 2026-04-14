@@ -1,5 +1,25 @@
 import type { BookingStatus, DiffStatus } from "./constants";
-import type { RefereeSlotInfo } from "./referee-matches";
+export interface RefereeSlotInfo {
+  slotNumber: number;
+  isOpen: boolean;
+  referee: {
+    id: number;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+  role: {
+    id: number;
+    name: string;
+    shortName: string | null;
+  } | null;
+  intent: {
+    refereeId: number;
+    refereeFirstName: string | null;
+    refereeLastName: string | null;
+    clickedAt: string;
+    confirmedBySyncAt: string | null;
+  } | null;
+}
 
 export interface FieldDiff {
   field: string;

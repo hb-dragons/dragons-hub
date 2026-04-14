@@ -22,7 +22,7 @@ import { deviceRoutes } from "./device.routes";
 import { publicMatchRoutes } from "./public/match.routes";
 import { publicStandingsRoutes } from "./public/standings.routes";
 import { publicTeamRoutes } from "./public/team.routes";
-import { refereeMatchRoutes } from "./referee/match.routes";
+import { refereeGamesRoutes } from "./referee/games.routes";
 
 const routes = new Hono();
 
@@ -49,6 +49,6 @@ routes.route("/api/devices", deviceRoutes);
 routes.route("/public", publicMatchRoutes);
 routes.route("/public", publicStandingsRoutes);
 routes.route("/public", publicTeamRoutes);
-routes.route("/referee", refereeMatchRoutes);
+routes.route("/referee", refereeGamesRoutes);
 
 export { routes };
