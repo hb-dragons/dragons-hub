@@ -106,3 +106,19 @@ export interface MatchFieldChange {
 export interface MatchChangesResponse {
   changes: MatchFieldChange[];
 }
+
+export interface MatchChangeHistoryItem {
+  id: number;
+  track: "remote" | "local";
+  versionNumber: number;
+  fieldName: string;
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: string | null;
+  createdAt: string;
+}
+
+export interface MatchChangeHistoryResponse {
+  changes: MatchChangeHistoryItem[];
+  total: number;
+}

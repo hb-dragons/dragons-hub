@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { PageHeader } from "@/components/admin/shared/page-header";
 import { fetchAPIServer } from "@/lib/api.server"
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -18,7 +19,7 @@ export default async function MatchesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">{t("matches.title")}</h1>
+      <PageHeader title={t("matches.title")} />
 
       {error ? (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">

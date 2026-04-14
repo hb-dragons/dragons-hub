@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { fetchAPIServer } from "@/lib/api.server";
+import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { RefereeMatchList } from "@/components/referee/referee-match-list";
@@ -20,7 +21,7 @@ export default async function RefereeMatchesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{t("title")}</h1>
+      <PageHeader title={t("title")} />
 
       {error ? (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">

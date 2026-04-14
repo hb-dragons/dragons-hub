@@ -481,7 +481,7 @@ export function MatchEditSheet({
                     </dt>
                     <dd className="flex flex-wrap gap-1">
                       {match.isConfirmed && (
-                        <Badge variant="success">
+                        <Badge variant="default">
                           {t("matchDetail.status.confirmed")}
                         </Badge>
                       )}

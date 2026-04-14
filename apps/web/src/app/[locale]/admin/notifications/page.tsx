@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { fetchAPIServer } from "@/lib/api.server";
+import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { NotificationCenter } from "@/components/admin/notifications/notification-center";
@@ -30,14 +31,7 @@ export default async function NotificationsPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {t("notifications.title")}
-          </h1>
-          <p className="text-muted-foreground">
-            {t("notifications.description")}
-          </p>
-        </div>
+        <PageHeader title={t("notifications.title")} subtitle={t("notifications.description")} />
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
         </div>
@@ -47,14 +41,7 @@ export default async function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {t("notifications.title")}
-        </h1>
-        <p className="text-muted-foreground">
-          {t("notifications.description")}
-        </p>
-      </div>
+      <PageHeader title={t("notifications.title")} subtitle={t("notifications.description")} />
 
       <SWRConfig
         value={{

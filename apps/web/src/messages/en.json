@@ -5,6 +5,7 @@
   },
   "nav": {
     "brand": "Dragons Admin",
+    "dashboard": "Dashboard",
     "matches": "Matches",
     "referees": "Referees",
     "teams": "Teams",
@@ -28,6 +29,38 @@
     "channels": "Channels",
     "domainEvents": "Events",
     "groupSystem": "System"
+  },
+  "dashboard": {
+    "title": "Command Center",
+    "subtitle": "Operational Dashboard",
+    "kpi": {
+      "referees": "Active Referees",
+      "upcomingMatches": "Upcoming Games",
+      "leaguePosition": "Best Position",
+      "teamsTracked": "Teams Tracked"
+    },
+    "urgentTasks": {
+      "title": "Urgent Tasks",
+      "noTasks": "All clear — no pending actions",
+      "unreffedMatches": "{count, plural, one {# match} other {# matches}} without referees assigned",
+      "pendingBookings": "{count, plural, one {# booking} other {# bookings}} pending confirmation",
+      "syncError": "Last sync failed — check sync status"
+    },
+    "todaySchedule": {
+      "title": "Today's Schedule",
+      "noMatches": "No matches scheduled for today",
+      "viewAll": "View Full Schedule"
+    },
+    "quickLinks": {
+      "teams": "Teams",
+      "teamsDesc": "{count, plural, one {# team} other {# teams}} tracked",
+      "bookings": "Bookings",
+      "bookingsDesc": "{count, plural, one {# pending} other {# pending}}",
+      "sync": "Sync Status",
+      "syncHealthy": "Healthy",
+      "syncFailed": "Needs Attention",
+      "syncIdle": "Idle"
+    }
   },
   "refereeMatches": {
     "title": "Open Referee Assignments",
@@ -211,7 +244,28 @@
       "confirmed": "Confirmed",
       "requested": "Requested",
       "none": "No referee data available"
-    }
+    },
+    "divergence": {
+      "title": "Divergence",
+      "field": "Field",
+      "remote": "Remote (DBB)",
+      "local": "Local (ours)",
+      "allSynced": "All fields in sync",
+      "count": "{count, plural, =1 {# field diverges} other {# fields diverge}}"
+    },
+    "history": {
+      "title": "Change History",
+      "empty": "No changes recorded",
+      "remote": "Sync",
+      "local": "Manual",
+      "changedBy": "by {name}",
+      "fromSync": "from sync",
+      "fieldChange": "{field}: {oldValue} → {newValue}",
+      "fieldSet": "{field}: set to {newValue}",
+      "fieldCleared": "{field}: cleared (was {oldValue})",
+      "showMore": "Load more"
+    },
+    "edit": "Edit"
   },
   "sync": {
     "title": "Sync Management",

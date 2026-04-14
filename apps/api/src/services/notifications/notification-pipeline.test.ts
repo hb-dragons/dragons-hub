@@ -266,13 +266,32 @@ describe("processEvent", () => {
   });
 
   describe("routine urgency", () => {
-    it("only buffers for digest, does not dispatch immediately", async () => {
+    it("still dispatches in_app channels for routine events", async () => {
       const rule = makeRule();
       const config = makeChannelConfig();
       setupDbMocks({ rules: [rule], configs: [config] });
       mockEvaluateRule.mockReturnValue({
         matched: true,
         channels: [{ channel: "in_app", targetId: "10" }],
+        urgencyOverride: null,
+      });
+
+      const result = await processEvent(makeEvent({ urgency: "routine" }));
+
+      expect(mockInAppSend).toHaveBeenCalledTimes(1);
+      expect(mockDbInsert).toHaveBeenCalled();
+      expect(result).toMatchObject({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
+    });
+
+    it("does not dispatch external channels for routine events", async () => {
+      const rule = makeRule({
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+      });
+      const config = makeChannelConfig({ id: 10, type: "whatsapp_group" });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
         urgencyOverride: null,
       });
 
@@ -412,11 +431,25 @@ describe("processEvent", () => {
       expect(result.dispatched).toBe(0);
     });
 
-    it("does not dispatch defaults for routine urgency events", async () => {
+    it("dispatches in_app defaults even for routine urgency events", async () => {
       const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "admin", locale: "de" } });
       setupDbMocks({ rules: [], configs: [config] });
       mockGetDefaultNotificationsForEvent.mockReturnValue([
         { audience: "admin", channel: "in_app" },
+      ]);
+
+      const result = await processEvent(makeEvent({ urgency: "routine" }));
+
+      expect(mockInAppSend).toHaveBeenCalledTimes(1);
+      expect(mockDbInsert).toHaveBeenCalled();
+      expect(result).toMatchObject({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
+    });
+
+    it("does not dispatch external channel defaults for routine urgency events", async () => {
+      const config = makeChannelConfig({ id: 10, type: "whatsapp_group", config: { groupId: "grp-1", locale: "de" } });
+      setupDbMocks({ rules: [], configs: [config] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "admin", channel: "whatsapp_group" },
       ]);
 
       const result = await processEvent(makeEvent({ urgency: "routine" }));

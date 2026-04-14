@@ -341,7 +341,7 @@ export function MatchListTable() {
 
   function getRowClassName(row: Row<MatchListItem>) {
     return cn(
-      row.original.homeIsOwnClub && "border-l-2 border-l-green-500",
+      row.original.homeIsOwnClub && "border-l-2 border-l-primary/50 bg-primary/5",
       row.original.isCancelled && "line-through text-muted-foreground opacity-60",
       row.original.isForfeited && "line-through text-muted-foreground opacity-40",
     )

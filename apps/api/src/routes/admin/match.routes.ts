@@ -4,12 +4,14 @@ import type { AppEnv } from "../../types";
 import {
   getOwnClubMatches,
   getMatchDetail,
+  getMatchChangeHistory,
   updateMatchLocal,
   releaseOverride,
 } from "../../services/admin/match-admin.service";
 import {
   matchListQuerySchema,
   matchIdParamSchema,
+  matchHistoryQuerySchema,
   matchUpdateBodySchema,
   releaseOverrideParamsSchema,
 } from "./match.schemas";
@@ -59,6 +61,27 @@ matchRoutes.get(
       return c.json({ error: "Match not found", code: "NOT_FOUND" }, 404);
     }
 
+    return c.json(result);
+  },
+);
+
+// GET /admin/matches/:id/history - Match change history
+matchRoutes.get(
+  "/matches/:id/history",
+  describeRoute({
+    description: "Get match change history",
+    tags: ["Matches"],
+    responses: {
+      200: { description: "Success" },
+    },
+  }),
+  async (c) => {
+    const { id } = matchIdParamSchema.parse({ id: c.req.param("id") });
+    const query = matchHistoryQuerySchema.parse({
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset"),
+    });
+    const result = await getMatchChangeHistory(id, query);
     return c.json(result);
   },
 );

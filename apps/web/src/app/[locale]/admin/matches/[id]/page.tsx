@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { fetchAPIServer } from "@/lib/api.server";
 import { APIError } from "@/lib/api";
-import { MatchDetailView } from "@/components/admin/matches/match-detail-view";
-import type { MatchDetailResponse } from "@/components/admin/matches/types";
+import { MatchDetailPage as MatchDetailPageComponent } from "@/components/admin/matches/match-detail-page";
+import type { MatchDetailResponse, MatchChangeHistoryResponse } from "@/components/admin/matches/types";
 
 interface MatchDetailPageProps {
   params: Promise<{ id: string }>;
@@ -10,10 +10,11 @@ interface MatchDetailPageProps {
 
 export default async function MatchDetailPage({ params }: MatchDetailPageProps) {
   const { id } = await params;
+  const matchId = Number(id);
 
-  let data: MatchDetailResponse;
+  let detail: MatchDetailResponse;
   try {
-    data = await fetchAPIServer<MatchDetailResponse>(`/admin/matches/${id}`);
+    detail = await fetchAPIServer<MatchDetailResponse>(`/admin/matches/${id}`);
   } catch (e) {
     if (e instanceof APIError && e.status === 404) {
       notFound();
@@ -21,5 +22,20 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
     throw e;
   }
 
-  return <MatchDetailView initialData={data} />;
+  let history: MatchChangeHistoryResponse = { changes: [], total: 0 };
+  try {
+    history = await fetchAPIServer<MatchChangeHistoryResponse>(
+      `/admin/matches/${id}/history?limit=50&offset=0`,
+    );
+  } catch {
+    // History fetch failure is non-critical — page still renders
+  }
+
+  return (
+    <MatchDetailPageComponent
+      matchId={matchId}
+      initialDetail={detail}
+      initialHistory={history}
+    />
+  );
 }

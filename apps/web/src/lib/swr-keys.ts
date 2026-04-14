@@ -1,10 +1,15 @@
 export const SWR_KEYS = {
   syncStatus: "/admin/sync/status",
+  dashboardTodayMatches: (date: string) =>
+    `/admin/matches?dateFrom=${date}&dateTo=${date}&limit=20&offset=0`,
+  dashboardUpcomingMatches: `/admin/matches?limit=1&offset=0`,
   syncLogs: (limit: number, offset: number) =>
     `/admin/sync/logs?limit=${limit}&offset=${offset}`,
   syncSchedule: "/admin/sync/schedule",
   matches: "/admin/matches",
   matchDetail: (id: number) => `/admin/matches/${id}`,
+  matchHistory: (id: number, limit?: number, offset?: number) =>
+    `/admin/matches/${id}/history?limit=${limit ?? 50}&offset=${offset ?? 0}`,
   teams: "/admin/teams",
   referees: "/admin/referees",
   refereeRules: (refereeId: number) => `/admin/referees/${refereeId}/rules`,

@@ -27,6 +27,7 @@ export type { OverrideInfo, MatchListItem, MatchDetail, MatchDetailResponse } fr
 export {
   getOwnClubMatches,
   getMatchDetail,
+  getMatchChangeHistory,
   queryMatchWithJoins,
   loadOverrides,
   loadRemoteSnapshot,
@@ -204,8 +205,15 @@ export async function updateMatchLocal(
     };
 
     if (changedFieldNames.has("kickoffDate") || changedFieldNames.has("kickoffTime")) {
+      // Include the effective kickoffDate so urgency can be classified
+      // based on how soon the match is, even for time-only changes.
+      const effectiveDate = ("kickoffDate" in updateValues
+        ? String(updateValues.kickoffDate)
+        : String(locked.kickoffDate)) ?? null;
+
       await emitEvent(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, {
         leagueName: "",
+        kickoffDate: effectiveDate,
         changes: fieldChanges
           .filter((c) => c.field === "kickoffDate" || c.field === "kickoffTime")
           .map((c) => ({ field: c.field, oldValue: c.oldValue, newValue: c.newValue })),
@@ -346,6 +354,15 @@ export async function releaseOverride(
     );
 
     // Emit override.reverted event
+    const basePayload = {
+      matchNo: locked.matchNo,
+      homeTeam: String(locked.homeTeamApiId),
+      guestTeam: String(locked.guestTeamApiId),
+      leagueId: locked.leagueId,
+      teamIds: [locked.homeTeamApiId, locked.guestTeamApiId],
+    };
+    const entityName = `Match #${locked.matchNo}`;
+
     try {
       await publishDomainEvent({
         type: EVENT_TYPES.OVERRIDE_REVERTED,
@@ -353,12 +370,11 @@ export async function releaseOverride(
         actor: changedBy,
         entityType: "match",
         entityId: matchId,
-        entityName: `Match #${locked.matchNo}`,
+        entityName,
         deepLinkPath: `/admin/matches/${matchId}`,
         payload: {
-          matchNo: locked.matchNo,
-          homeTeam: String(locked.homeTeamApiId),
-          guestTeam: String(locked.guestTeamApiId),
+          ...basePayload,
+          kickoffDate: String(locked.kickoffDate),
           field: fieldName,
           overrideValue: currentStr,
           revertedBy: changedBy,
@@ -366,6 +382,57 @@ export async function releaseOverride(
       }, tx);
     } catch (error) {
       log.warn({ err: error, matchId, fieldName }, "Failed to emit override.reverted event");
+    }
+
+    // A revert IS a field change — emit the corresponding domain event
+    // so watch rules and urgency classification treat it the same as a manual edit.
+    const isScheduleField = fieldName === "kickoffDate" || fieldName === "kickoffTime";
+    const isVenueField = fieldName === "venueId";
+
+    if (isScheduleField && currentStr !== remoteStr) {
+      try {
+        await publishDomainEvent({
+          type: EVENT_TYPES.MATCH_SCHEDULE_CHANGED as import("@dragons/shared").EventType,
+          source: "manual",
+          actor: changedBy,
+          entityType: "match",
+          entityId: matchId,
+          entityName,
+          deepLinkPath: `/admin/matches/${matchId}`,
+          payload: {
+            ...basePayload,
+            leagueName: "",
+            kickoffDate: String(fieldName === "kickoffDate" ? (remoteValue ?? locked.kickoffDate) : locked.kickoffDate),
+            changes: [{ field: fieldName, oldValue: currentStr, newValue: remoteStr }],
+          },
+        }, tx);
+      } catch (error) {
+        log.warn({ err: error, matchId, fieldName }, "Failed to emit schedule changed on override release");
+      }
+    }
+
+    if (isVenueField && currentStr !== remoteStr) {
+      try {
+        await publishDomainEvent({
+          type: EVENT_TYPES.MATCH_VENUE_CHANGED as import("@dragons/shared").EventType,
+          source: "manual",
+          actor: changedBy,
+          entityType: "match",
+          entityId: matchId,
+          entityName,
+          deepLinkPath: `/admin/matches/${matchId}`,
+          payload: {
+            ...basePayload,
+            leagueName: "",
+            oldVenueId: currentStr ? Number(currentStr) : null,
+            oldVenueName: null,
+            newVenueId: remoteStr ? Number(remoteStr) : null,
+            newVenueName: null,
+          },
+        }, tx);
+      } catch (error) {
+        log.warn({ err: error, matchId, fieldName }, "Failed to emit venue changed on override release");
+      }
     }
 
     // Re-query within transaction for full response

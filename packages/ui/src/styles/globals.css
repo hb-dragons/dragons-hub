@@ -9,111 +9,139 @@
 
 
 :root {
-  --background: oklch(0.9711 0.0074 80.7211);
-  --foreground: oklch(0.3000 0.0358 30.2042);
-  --card: oklch(0.9711 0.0074 80.7211);
-  --card-foreground: oklch(0.3000 0.0358 30.2042);
-  --popover: oklch(0.9711 0.0074 80.7211);
-  --popover-foreground: oklch(0.3000 0.0358 30.2042);
-  --primary: oklch(0.5234 0.1347 144.1672);
-  --primary-foreground: oklch(1.0000 0 0);
-  --secondary: oklch(0.9571 0.0210 147.6360);
-  --secondary-foreground: oklch(0.4254 0.1159 144.3078);
-  --muted: oklch(0.9370 0.0142 74.4218);
-  --muted-foreground: oklch(0.4495 0.0486 39.2110);
-  --accent: oklch(0.8952 0.0504 146.0366);
-  --accent-foreground: oklch(0.4254 0.1159 144.3078);
-  --destructive: oklch(0.5386 0.1937 26.7249);
-  --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.8805 0.0208 74.6428);
-  --input: oklch(0.8805 0.0208 74.6428);
-  --ring: oklch(0.5234 0.1347 144.1672);
-  --chart-1: oklch(0.6731 0.1624 144.2083);
-  --chart-2: oklch(0.5752 0.1446 144.1813);
-  --chart-3: oklch(0.5234 0.1347 144.1672);
-  --chart-4: oklch(0.4254 0.1159 144.3078);
-  --chart-5: oklch(0.2157 0.0453 145.7256);
-  --sidebar: oklch(0.9370 0.0142 74.4218);
-  --sidebar-foreground: oklch(0.3000 0.0358 30.2042);
-  --sidebar-primary: oklch(0.5234 0.1347 144.1672);
-  --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.9100 0.0142 74.4218);
-  --sidebar-accent-foreground: oklch(0.3000 0.0358 30.2042);
-  --sidebar-border: oklch(0.8805 0.0208 74.6428);
-  --sidebar-ring: oklch(0.5234 0.1347 144.1672);
-  --font-sans: IBM Plex Sans, sans-serif;
-  --font-serif: Merriweather, serif;
-  --font-mono: IBM Plex Mono, monospace;
-  --radius: 0.5rem;
-  --shadow-x: 0;
-  --shadow-y: 1px;
-  --shadow-blur: 3px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.1;
-  --shadow-color: oklch(0 0 0);
-  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
-  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
-  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
-  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  /* Dragon's Lair Light — "The Elite Architect" */
+  --background: #f8f9fa;
+  --foreground: #191c1d;
+  --card: #ffffff;
+  --card-foreground: #191c1d;
+  --popover: #ffffff;
+  --popover-foreground: #191c1d;
+  --primary: #004b23;
+  --primary-foreground: #ffffff;
+  --secondary: #c8eccb;
+  --secondary-foreground: #4c6c51;
+  --muted: #edeeef;
+  --muted-foreground: #3f4940;
+  --accent: #e7e8e9;
+  --accent-foreground: #191c1d;
+  --destructive: #ba1a1a;
+  --destructive-foreground: #ffffff;
+  --border: #bfc9bd;
+  --input: #f3f4f5;
+  --ring: #004b23;
+  --chart-1: #004b23;
+  --chart-2: #006631;
+  --chart-3: #46664c;
+  --chart-4: #953d00;
+  --chart-5: #702c00;
+  --sidebar: #e1e3e4;
+  --sidebar-foreground: #191c1d;
+  --sidebar-primary: #004b23;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #edeeef;
+  --sidebar-accent-foreground: #191c1d;
+  --sidebar-border: #bfc9bd;
+  --sidebar-ring: #004b23;
+
+  /* Surface tonal tiers */
+  --surface-lowest: #ffffff;
+  --surface-low: #f3f4f5;
+  --surface-base: #edeeef;
+  --surface-high: #e7e8e9;
+  --surface-highest: #e1e3e4;
+  --surface-bright: #f8f9fa;
+
+  /* Heat accent (orange) */
+  --heat: #953d00;
+  --heat-foreground: #ffffff;
+  --heat-subtle: #ffb692;
+
+  /* Brand depth */
+  --brand: #006631;
+  --brand-foreground: #8be19f;
+
+  /* Typography */
+  --font-sans: Inter, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "Space Grotesk", sans-serif;
+  --radius: 0.25rem;
+  --shadow-2xs: 0 1px 3px 0px rgba(25, 28, 29, 0.03);
+  --shadow-xs: 0 1px 3px 0px rgba(25, 28, 29, 0.03);
+  --shadow-sm: 0 4px 16px rgba(25, 28, 29, 0.04);
+  --shadow: 0 8px 32px rgba(25, 28, 29, 0.06);
+  --shadow-md: 0 12px 40px rgba(25, 28, 29, 0.06);
+  --shadow-lg: 0 20px 50px rgba(25, 28, 29, 0.08);
+  --shadow-xl: 0 24px 60px rgba(25, 28, 29, 0.10);
+  --shadow-2xl: 0 32px 80px rgba(25, 28, 29, 0.12);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
 
 .dark {
-  --background: oklch(0.2683 0.0279 150.7681);
-  --foreground: oklch(0.9423 0.0097 72.6595);
-  --card: oklch(0.3327 0.0271 146.9867);
-  --card-foreground: oklch(0.9423 0.0097 72.6595);
-  --popover: oklch(0.3327 0.0271 146.9867);
-  --popover-foreground: oklch(0.9423 0.0097 72.6595);
-  --primary: oklch(0.6731 0.1624 144.2083);
-  --primary-foreground: oklch(0.2157 0.0453 145.7256);
-  --secondary: oklch(0.3942 0.0265 142.9926);
-  --secondary-foreground: oklch(0.8970 0.0166 142.5518);
-  --muted: oklch(0.2926 0.0212 147.7496);
-  --muted-foreground: oklch(0.8579 0.0174 76.0955);
-  --accent: oklch(0.5752 0.1446 144.1813);
-  --accent-foreground: oklch(0.9423 0.0097 72.6595);
-  --destructive: oklch(0.5386 0.1937 26.7249);
-  --destructive-foreground: oklch(0.9423 0.0097 72.6595);
-  --border: oklch(0.3942 0.0265 142.9926);
-  --input: oklch(0.3942 0.0265 142.9926);
-  --ring: oklch(0.6731 0.1624 144.2083);
-  --chart-1: oklch(0.7660 0.1179 145.2950);
-  --chart-2: oklch(0.7185 0.1417 144.8887);
-  --chart-3: oklch(0.6731 0.1624 144.2083);
-  --chart-4: oklch(0.6291 0.1543 144.2031);
-  --chart-5: oklch(0.5752 0.1446 144.1813);
-  --sidebar: oklch(0.2683 0.0279 150.7681);
-  --sidebar-foreground: oklch(0.9423 0.0097 72.6595);
-  --sidebar-primary: oklch(0.6731 0.1624 144.2083);
-  --sidebar-primary-foreground: oklch(0.2157 0.0453 145.7256);
-  --sidebar-accent: oklch(0.3200 0.0279 150.7681);
-  --sidebar-accent-foreground: oklch(0.9423 0.0097 72.6595);
-  --sidebar-border: oklch(0.3942 0.0265 142.9926);
-  --sidebar-ring: oklch(0.6731 0.1624 144.2083);
-  --font-sans: IBM Plex Sans, sans-serif;
-  --font-serif: Merriweather, serif;
-  --font-mono: IBM Plex Mono, monospace;
-  --radius: 0.5rem;
-  --shadow-x: 0;
-  --shadow-y: 1px;
-  --shadow-blur: 3px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.1;
-  --shadow-color: oklch(0 0 0);
-  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
-  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
-  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
-  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  /* Dragon's Lair Dark — "The Kinetic Vault" */
+  --background: #131313;
+  --foreground: #e2e2e2;
+  --card: #2a2a2a;
+  --card-foreground: #e2e2e2;
+  --popover: #353535;
+  --popover-foreground: #e2e2e2;
+  --primary: #84d997;
+  --primary-foreground: #003919;
+  --secondary: #2a4a30;
+  --secondary-foreground: #c8eccb;
+  --muted: #1f1f1f;
+  --muted-foreground: #bfc9bd;
+  --accent: #2a2a2a;
+  --accent-foreground: #e2e2e2;
+  --destructive: #ffb4ab;
+  --destructive-foreground: #690005;
+  --border: #3f4940;
+  --input: #1f1f1f;
+  --ring: #84d997;
+  --chart-1: #84d997;
+  --chart-2: #9ff6b1;
+  --chart-3: #006631;
+  --chart-4: #ed691f;
+  --chart-5: #ffb695;
+  --sidebar: #0e0e0e;
+  --sidebar-foreground: #e2e2e2;
+  --sidebar-primary: #84d997;
+  --sidebar-primary-foreground: #003919;
+  --sidebar-accent: #2a2a2a;
+  --sidebar-accent-foreground: #e2e2e2;
+  --sidebar-border: #3f4940;
+  --sidebar-ring: #84d997;
+
+  /* Surface tonal tiers */
+  --surface-lowest: #0e0e0e;
+  --surface-low: #1b1b1b;
+  --surface-base: #1f1f1f;
+  --surface-high: #2a2a2a;
+  --surface-highest: #353535;
+  --surface-bright: #393939;
+
+  /* Heat accent (orange) */
+  --heat: #ed691f;
+  --heat-foreground: #4c1a00;
+  --heat-subtle: #ffb695;
+
+  /* Brand depth */
+  --brand: #006631;
+  --brand-foreground: #8be19f;
+
+  /* Typography */
+  --font-sans: Inter, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "Space Grotesk", sans-serif;
+  --radius: 0.25rem;
+  --shadow-2xs: 0 1px 3px 0px rgba(226, 226, 226, 0.03);
+  --shadow-xs: 0 1px 3px 0px rgba(226, 226, 226, 0.03);
+  --shadow-sm: 0 4px 16px rgba(226, 226, 226, 0.04);
+  --shadow: 0 8px 32px rgba(226, 226, 226, 0.06);
+  --shadow-md: 0 12px 40px rgba(226, 226, 226, 0.06);
+  --shadow-lg: 0 20px 50px rgba(226, 226, 226, 0.08);
+  --shadow-xl: 0 24px 60px rgba(226, 226, 226, 0.10);
+  --shadow-2xl: 0 32px 80px rgba(226, 226, 226, 0.12);
 }
 
 @theme inline {
@@ -150,15 +178,35 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* Surface tonal tiers */
+  --color-surface-lowest: var(--surface-lowest);
+  --color-surface-low: var(--surface-low);
+  --color-surface-base: var(--surface-base);
+  --color-surface-high: var(--surface-high);
+  --color-surface-highest: var(--surface-highest);
+  --color-surface-bright: var(--surface-bright);
+
+  /* Heat accent */
+  --color-heat: var(--heat);
+  --color-heat-foreground: var(--heat-foreground);
+  --color-heat-subtle: var(--heat-subtle);
+
+  /* Brand depth */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+
+  /* Typography */
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-serif: var(--font-serif);
+  --font-display: var(--font-display);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
 
+  /* Shadows */
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);

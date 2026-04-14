@@ -149,7 +149,7 @@ function SlotCell({ match, slotNumber, isOpen, slotAllowed, assignedReferee, onT
           className={cn(
             "h-7",
             slotAllowed
-              ? "border-green-500 text-green-700 hover:bg-green-50 hover:text-green-800"
+              ? "border-primary/30 text-primary hover:bg-primary/10 hover:text-primary dark:border-primary/20 dark:text-primary dark:hover:bg-primary/10"
               : "cursor-not-allowed opacity-50",
           )}
           disabled={isTaking || !slotAllowed}
@@ -538,7 +538,7 @@ export function RefereeMatchList() {
   function getRowClassName(row: Row<RefereeMatchListItem>) {
     return cn(
       (row.original.homeIsOwnClub || row.original.guestIsOwnClub) &&
-      "border-l-2 border-l-muted-foreground/30 bg-muted/40",
+      "border-l-2 border-l-primary/50 bg-primary/5",
       (row.original.isCancelled || row.original.isForfeited) && "opacity-60",
     );
   }

@@ -9,6 +9,7 @@ import {
 import { SyncRunProvider } from "@/components/admin/sync/sync-run-provider";
 import { SyncCompletionWatcher } from "@/components/admin/sync/use-sync";
 import { SyncTriggerButton } from "@/components/admin/sync/sync-trigger-button";
+import { PageHeader } from "@/components/admin/shared/page-header";
 import { SyncErrorBanner } from "@/components/admin/sync/sync-error-banner";
 import { SyncStatusCards } from "@/components/admin/sync/sync-status-cards";
 import { SyncLiveLogsContainer } from "@/components/admin/sync/sync-live-logs-container";
@@ -41,14 +42,7 @@ export default async function SyncPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {t("sync.title")}
-            </h1>
-            <p className="text-muted-foreground">{t("sync.description")}</p>
-          </div>
-        </div>
+        <PageHeader title={t("sync.title")} subtitle={t("sync.description")} />
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
         </div>
@@ -65,15 +59,9 @@ export default async function SyncPage() {
       <SyncCompletionWatcher />
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {t("sync.title")}
-            </h1>
-            <p className="text-muted-foreground">{t("sync.description")}</p>
-          </div>
+        <PageHeader title={t("sync.title")} subtitle={t("sync.description")}>
           <SyncTriggerButton />
-        </div>
+        </PageHeader>
 
         {/* Error Banner */}
         <SyncErrorBanner />

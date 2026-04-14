@@ -5,6 +5,7 @@
   },
   "nav": {
     "brand": "Dragons Admin",
+    "dashboard": "Dashboard",
     "matches": "Spiele",
     "referees": "Schiedsrichter",
     "teams": "Teams",
@@ -28,6 +29,38 @@
     "channels": "Kanäle",
     "domainEvents": "Events",
     "groupSystem": "System"
+  },
+  "dashboard": {
+    "title": "Kommandozentrale",
+    "subtitle": "Operatives Dashboard",
+    "kpi": {
+      "referees": "Aktive Schiedsrichter",
+      "upcomingMatches": "Anstehende Spiele",
+      "leaguePosition": "Beste Position",
+      "teamsTracked": "Teams"
+    },
+    "urgentTasks": {
+      "title": "Dringende Aufgaben",
+      "noTasks": "Alles erledigt — keine offenen Aufgaben",
+      "unreffedMatches": "{count, plural, one {# Spiel} other {# Spiele}} ohne Schiedsrichter",
+      "pendingBookings": "{count, plural, one {# Buchung} other {# Buchungen}} zur Bestätigung",
+      "syncError": "Letzte Synchronisation fehlgeschlagen"
+    },
+    "todaySchedule": {
+      "title": "Heutiger Spielplan",
+      "noMatches": "Keine Spiele für heute geplant",
+      "viewAll": "Gesamten Spielplan anzeigen"
+    },
+    "quickLinks": {
+      "teams": "Teams",
+      "teamsDesc": "{count, plural, one {# Team} other {# Teams}} verfolgt",
+      "bookings": "Buchungen",
+      "bookingsDesc": "{count, plural, one {# ausstehend} other {# ausstehend}}",
+      "sync": "Sync-Status",
+      "syncHealthy": "Fehlerfrei",
+      "syncFailed": "Aktion nötig",
+      "syncIdle": "Inaktiv"
+    }
   },
   "refereeMatches": {
     "title": "Offene Schiedsrichter-Ansetzungen",
@@ -211,7 +244,28 @@
       "confirmed": "Bestätigt",
       "requested": "Beantragt",
       "none": "Keine Schiedsrichter-Daten verfügbar"
-    }
+    },
+    "divergence": {
+      "title": "Abweichungen",
+      "field": "Feld",
+      "remote": "Offiziell (DBB)",
+      "local": "Lokal (unsere)",
+      "allSynced": "Alle Felder synchron",
+      "count": "{count, plural, =1 {# Feld weicht ab} other {# Felder weichen ab}}"
+    },
+    "history": {
+      "title": "Änderungsverlauf",
+      "empty": "Keine Änderungen vorhanden",
+      "remote": "Sync",
+      "local": "Manuell",
+      "changedBy": "von {name}",
+      "fromSync": "durch Sync",
+      "fieldChange": "{field}: {oldValue} → {newValue}",
+      "fieldSet": "{field}: gesetzt auf {newValue}",
+      "fieldCleared": "{field}: gelöscht (war {oldValue})",
+      "showMore": "Mehr laden"
+    },
+    "edit": "Bearbeiten"
   },
   "sync": {
     "title": "Synchronisation",

@@ -6,6 +6,7 @@ import {
   Gavel,
   Image,
   KanbanSquare,
+  LayoutDashboard,
   Settings,
   Trophy,
 } from "lucide-react";
@@ -117,7 +118,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <Trophy className="size-4" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-medium">{t("nav.brand")}</span>
+                  <span className="font-display font-bold uppercase tracking-tight">{t("nav.brand")}</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -125,6 +126,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === "/admin" || pathname === "/admin/dashboard"}
+                tooltip={t("nav.dashboard")}
+              >
+                <Link href="/admin" onClick={() => setOpenMobile(false)}>
+                  <LayoutDashboard />
+                  <span>{t("nav.dashboard")}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
         {visibleGroups.map((group) => {
           const groupIsActive = group.items.some((item) =>
             pathname.startsWith(item.href)

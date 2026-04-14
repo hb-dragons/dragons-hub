@@ -28,7 +28,7 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div
-      className="flex h-9 items-center gap-2 border-b px-3"
+      className="flex h-9 items-center gap-2 bg-surface-low px-3"
       cmdk-input-wrapper=""
     >
       <SearchIcon className="size-4 shrink-0 opacity-50" />
@@ -95,7 +95,7 @@ function CommandSeparator({
   return (
     <CommandPrimitive.Separator
       data-slot="command-separator"
-      className={cn("bg-border -mx-1 h-px", className)}
+      className={cn("bg-border/15 -mx-1 h-px", className)}
       {...props}
     />
   )

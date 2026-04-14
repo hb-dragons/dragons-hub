@@ -9,6 +9,8 @@ export {
   type MatchDetailResponse,
   type MatchFieldChange,
   type MatchChangesResponse,
+  type MatchChangeHistoryItem,
+  type MatchChangeHistoryResponse,
   type PaginatedResponse,
 } from "@dragons/shared";
 

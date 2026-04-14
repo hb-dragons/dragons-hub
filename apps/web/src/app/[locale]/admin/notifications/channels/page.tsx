@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { fetchAPIServer } from "@/lib/api.server";
+import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { ChannelConfigsList } from "@/components/admin/notifications/channel-configs-list";
@@ -20,14 +21,7 @@ export default async function ChannelConfigsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {t("channelConfigs.title")}
-        </h1>
-        <p className="text-muted-foreground">
-          {t("channelConfigs.description")}
-        </p>
-      </div>
+      <PageHeader title={t("channelConfigs.title")} subtitle={t("channelConfigs.description")} />
 
       {error ? (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">

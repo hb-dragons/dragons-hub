@@ -13,6 +13,7 @@ import {
   referees,
   refereeRoles,
   refereeAssignmentIntents,
+  matchChanges,
 } from "@dragons/db/schema";
 import { eq, sql, and, or, inArray, gte, lte, asc, desc, isNull, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -23,6 +24,7 @@ import type {
   MatchListItem,
   MatchDetail,
   MatchDetailResponse,
+  MatchChangeHistoryItem,
   RefereeSlotInfo,
 } from "@dragons/shared";
 
@@ -499,4 +501,40 @@ export async function getOwnClubMatches(params: MatchListParams) {
 
 export async function getMatchDetail(id: number): Promise<MatchDetailResponse | null> {
   return buildDetailResponse(db, id);
+}
+
+// ── Match change history ───────────────────────────────────────────────────
+
+export async function getMatchChangeHistory(
+  matchId: number,
+  params: { limit: number; offset: number },
+): Promise<{ changes: MatchChangeHistoryItem[]; total: number }> {
+  const { limit, offset } = params;
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(matchChanges)
+    .where(eq(matchChanges.matchId, matchId));
+
+  const rows = await db
+    .select()
+    .from(matchChanges)
+    .where(eq(matchChanges.matchId, matchId))
+    .orderBy(desc(matchChanges.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return {
+    changes: rows.map((r) => ({
+      id: r.id,
+      track: r.track,
+      versionNumber: r.versionNumber,
+      fieldName: r.fieldName,
+      oldValue: r.oldValue,
+      newValue: r.newValue,
+      changedBy: r.changedBy,
+      createdAt: r.createdAt.toISOString(),
+    })),
+    total: totalRow!.count,
+  };
 }

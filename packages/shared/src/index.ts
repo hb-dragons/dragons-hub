@@ -40,6 +40,8 @@ export type {
   MatchDetailResponse,
   MatchFieldChange,
   MatchChangesResponse,
+  MatchChangeHistoryItem,
+  MatchChangeHistoryResponse,
 } from "./matches";
 
 export type {

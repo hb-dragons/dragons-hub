@@ -322,8 +322,9 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
     await bufferForDigest(event.id, match.config.id);
     result.buffered++;
 
-    // Dispatch immediately if urgent and not coalesced
-    if (match.urgency === "immediate") {
+    // Dispatch immediately if urgent (or in_app, which has no delivery cost) and not coalesced
+    const shouldDispatchRule = match.urgency === "immediate" || match.channelTarget.channel === "in_app";
+    if (shouldDispatchRule) {
       if (coalesced) {
         result.coalesced++;
       } else {
@@ -355,8 +356,9 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
     await bufferForDigest(event.id, match.config.id);
     result.buffered++;
 
-    // Dispatch immediately if urgent and not coalesced
-    if (match.urgency === "immediate") {
+    // Dispatch immediately if urgent (or in_app, which has no delivery cost) and not coalesced
+    const shouldDispatchDefault = match.urgency === "immediate" || match.config.type === "in_app";
+    if (shouldDispatchDefault) {
       if (coalesced) {
         result.coalesced++;
       } else {

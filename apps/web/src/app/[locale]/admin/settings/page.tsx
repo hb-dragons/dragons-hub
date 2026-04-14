@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { PageHeader } from "@/components/admin/shared/page-header";
 import { fetchAPIServer } from "@/lib/api.server";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -43,12 +44,7 @@ export default async function SettingsPage() {
       }}
     >
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("settings.title")}</h1>
-          <p className="text-muted-foreground">
-            {t("settings.description")}
-          </p>
-        </div>
+        <PageHeader title={t("settings.title")} subtitle={t("settings.description")} />
 
         <ThemeSettings />
         <ClubConfig />
