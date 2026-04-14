@@ -4,8 +4,11 @@ import {
   matchOverrides,
   matchRemoteVersions,
   matchChanges,
+  teams as teamsTable,
+  leagues,
 } from "@dragons/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { scheduleReminderJobs, cancelReminderJobs } from "../referee/referee-reminders.service";
 import { parseResult } from "@dragons/sdk";
 import type { SdkSpielplanMatch, SdkGetGameResponse } from "@dragons/sdk";
 import type { LeagueFetchedData } from "./data-fetcher";
@@ -496,6 +499,34 @@ function classifyMatchChanges(
 
 export { buildMatchEntityName };
 
+async function isOwnClubRefsMatch(
+  homeTeamApiId: number,
+  leagueDbId: number | null,
+): Promise<{ isOwnClubHome: boolean; isOwnClubRefsLeague: boolean }> {
+  if (!leagueDbId) return { isOwnClubHome: false, isOwnClubRefsLeague: false };
+
+  const [row] = await db
+    .select({
+      isOwnClub: teamsTable.isOwnClub,
+      ownClubRefs: leagues.ownClubRefs,
+    })
+    .from(teamsTable)
+    .where(eq(teamsTable.apiTeamPermanentId, homeTeamApiId))
+    .limit(1);
+
+  // Separate query for league since there's no FK join between teams and leagues
+  const [leagueRow] = await db
+    .select({ ownClubRefs: leagues.ownClubRefs })
+    .from(leagues)
+    .where(eq(leagues.id, leagueDbId))
+    .limit(1);
+
+  return {
+    isOwnClubHome: row?.isOwnClub ?? false,
+    isOwnClubRefsLeague: leagueRow?.ownClubRefs ?? false,
+  };
+}
+
 export async function syncMatchesFromData(
   leagueData: LeagueFetchedData[],
   venueIdLookup: Map<number, number>,
@@ -844,6 +875,71 @@ export async function syncMatchesFromData(
               }
             }
 
+            // Referee notification triggers on update
+            try {
+              const refCtx = await isOwnClubRefsMatch(
+                remoteSnapshot.homeTeamApiId,
+                data.leagueDbId,
+              );
+
+              if (refCtx.isOwnClubHome) {
+                const changedFields = new Set(effectiveChanges.map((c) => c.fieldName));
+
+                // sr1Open or sr2Open flipped to true → emit referee.slots.needed
+                const sr1Flipped = changedFields.has("sr1Open") &&
+                  effectiveChanges.find((c) => c.fieldName === "sr1Open")?.newValue === "true";
+                const sr2Flipped = changedFields.has("sr2Open") &&
+                  effectiveChanges.find((c) => c.fieldName === "sr2Open")?.newValue === "true";
+
+                if (sr1Flipped || sr2Flipped) {
+                  await publishDomainEvent({
+                    type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+                    source: "sync",
+                    entityType: "match",
+                    entityId: existing.id,
+                    entityName,
+                    deepLinkPath: `/referee/matches?take=${existing.id}`,
+                    payload: {
+                      matchId: existing.id,
+                      matchNo: basicMatch.matchNo,
+                      homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
+                      guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
+                      leagueId: data.leagueDbId!,
+                      leagueName: data.leagueName ?? "",
+                      kickoffDate: remoteSnapshot.kickoffDate,
+                      kickoffTime: remoteSnapshot.kickoffTime,
+                      venueId: internalVenueId,
+                      venueName: null,
+                      sr1Open: remoteSnapshot.sr1Open,
+                      sr2Open: remoteSnapshot.sr2Open,
+                      sr1Assigned: null,
+                      sr2Assigned: null,
+                      deepLink: `/referee/matches?take=${existing.id}`,
+                    },
+                    syncRunId,
+                  });
+                }
+
+                // Schedule changes, cancellation, forfeiture → manage reminder jobs
+                if (refCtx.isOwnClubRefsLeague) {
+                  const cancelled = changedFields.has("isCancelled") &&
+                    effectiveChanges.find((c) => c.fieldName === "isCancelled")?.newValue === "true";
+                  const forfeited = changedFields.has("isForfeited") &&
+                    effectiveChanges.find((c) => c.fieldName === "isForfeited")?.newValue === "true";
+
+                  if (cancelled || forfeited) {
+                    await cancelReminderJobs(existing.id);
+                  } else if (changedFields.has("kickoffDate") || changedFields.has("kickoffTime")) {
+                    // Reschedule: cancel old, create new
+                    await cancelReminderJobs(existing.id);
+                    await scheduleReminderJobs(existing.id, remoteSnapshot.kickoffDate, remoteSnapshot.kickoffTime);
+                  }
+                }
+              }
+            } catch (error) {
+              log.warn({ err: error, matchId: existing.id }, "Failed to handle referee notification triggers on update");
+            }
+
             await logger?.log({
               entityType: "match",
               entityId: String(apiMatchId),
@@ -943,6 +1039,49 @@ export async function syncMatchesFromData(
               });
             } catch (error) {
               log.warn({ err: error, matchId: newMatch.id }, "Failed to emit match.created event");
+            }
+
+            // Check if this is an own-club home game needing referee notifications
+            try {
+              const refCtx = await isOwnClubRefsMatch(
+                remoteSnapshot.homeTeamApiId,
+                data.leagueDbId,
+              );
+
+              if (refCtx.isOwnClubHome && refCtx.isOwnClubRefsLeague) {
+                // Emit referee.slots.needed
+                await publishDomainEvent({
+                  type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+                  source: "sync",
+                  entityType: "match",
+                  entityId: newMatch.id,
+                  entityName,
+                  deepLinkPath: `/referee/matches?take=${newMatch.id}`,
+                  payload: {
+                    matchId: newMatch.id,
+                    matchNo: basicMatch.matchNo,
+                    homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
+                    guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
+                    leagueId: data.leagueDbId!,
+                    leagueName: data.leagueName ?? "",
+                    kickoffDate: remoteSnapshot.kickoffDate,
+                    kickoffTime: remoteSnapshot.kickoffTime,
+                    venueId: internalVenueId,
+                    venueName: null,
+                    sr1Open: true,
+                    sr2Open: true,
+                    sr1Assigned: null,
+                    sr2Assigned: null,
+                    deepLink: `/referee/matches?take=${newMatch.id}`,
+                  },
+                  syncRunId,
+                });
+
+                // Schedule reminder jobs
+                await scheduleReminderJobs(newMatch.id, remoteSnapshot.kickoffDate, remoteSnapshot.kickoffTime);
+              }
+            } catch (error) {
+              log.warn({ err: error, matchId: newMatch.id }, "Failed to emit referee.slots.needed or schedule reminders");
             }
           }
 
