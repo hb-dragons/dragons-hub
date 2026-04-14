@@ -692,4 +692,37 @@ describe("syncRefereeGames", () => {
     expect(counts.updated).toBe(1);
     expect(mockCancelReminderJobs).toHaveBeenCalledWith(1001);
   });
+
+  it("should log entries when SyncLogger is provided", async () => {
+    const mockLogger = {
+      log: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // Use one result that will be inserted (new game)
+    const result = makeApiResult({
+      sr1: null,
+      sr1MeinVerein: true,
+      sr1OffenAngeboten: false,
+    });
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    // No existing row
+    const mockFrom = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue([]),
+      }),
+    });
+    mockSelect.mockReturnValue({ from: mockFrom });
+
+    const mockValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+    });
+    mockInsert.mockReturnValue({ values: mockValues });
+
+    await syncRefereeGames(mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "refereeGame" }),
+    );
+  });
 });
