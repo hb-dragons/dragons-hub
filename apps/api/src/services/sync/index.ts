@@ -207,13 +207,18 @@ export async function fullSync(
         completedAt,
         durationMs,
         recordsProcessed:
-          leaguesResult.total + teamsRes.total + matchesRes.total + standingsRes.total + venuesRes.total,
+          leaguesResult.total + teamsRes.total + matchesRes.total + standingsRes.total + venuesRes.total
+          + refereesRes.total + (rolesRes.created + rolesRes.updated + rolesRes.skipped)
+          + assignmentsRes.created,
         recordsCreated:
-          leaguesResult.created + teamsRes.created + matchesRes.created + standingsRes.created + venuesRes.created + refereesRes.created,
+          leaguesResult.created + teamsRes.created + matchesRes.created + standingsRes.created + venuesRes.created
+          + refereesRes.created + rolesRes.created + assignmentsRes.created,
         recordsUpdated:
-          leaguesResult.updated + teamsRes.updated + matchesRes.updated + standingsRes.updated + venuesRes.updated + refereesRes.updated,
+          leaguesResult.updated + teamsRes.updated + matchesRes.updated + standingsRes.updated + venuesRes.updated
+          + refereesRes.updated + rolesRes.updated,
         recordsSkipped:
-          leaguesResult.skipped + teamsRes.skipped + matchesRes.skipped + standingsRes.skipped + venuesRes.skipped + refereesRes.skipped,
+          leaguesResult.skipped + teamsRes.skipped + matchesRes.skipped + standingsRes.skipped + venuesRes.skipped
+          + refereesRes.skipped + rolesRes.skipped,
         recordsFailed: allErrors.length,
         errorMessage: allErrors.length > 0 ? allErrors.slice(0, 10).join("\n") : null,
         summary,
@@ -263,11 +268,15 @@ export async function fullSync(
     // Emit sync.completed domain event
     try {
       const totalProcessed =
-        leaguesResult.total + teamsRes.total + matchesRes.total + standingsRes.total + venuesRes.total;
+        leaguesResult.total + teamsRes.total + matchesRes.total + standingsRes.total + venuesRes.total
+        + refereesRes.total + (rolesRes.created + rolesRes.updated + rolesRes.skipped)
+        + assignmentsRes.created;
       const totalCreated =
-        leaguesResult.created + teamsRes.created + matchesRes.created + standingsRes.created + venuesRes.created + refereesRes.created;
+        leaguesResult.created + teamsRes.created + matchesRes.created + standingsRes.created + venuesRes.created
+        + refereesRes.created + rolesRes.created + assignmentsRes.created;
       const totalUpdated =
-        leaguesResult.updated + teamsRes.updated + matchesRes.updated + standingsRes.updated + venuesRes.updated + refereesRes.updated;
+        leaguesResult.updated + teamsRes.updated + matchesRes.updated + standingsRes.updated + venuesRes.updated
+        + refereesRes.updated + rolesRes.updated;
 
       await publishDomainEvent({
         type: EVENT_TYPES.SYNC_COMPLETED,
