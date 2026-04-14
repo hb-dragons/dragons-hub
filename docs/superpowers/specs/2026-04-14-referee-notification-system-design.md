@@ -48,7 +48,7 @@ Both events share the same payload:
 ```typescript
 interface RefereeSlotsPayload {
   matchId: number;
-  matchNo: string;
+  matchNo: number;
   homeTeam: string;
   guestTeam: string;
   leagueId: number;

@@ -329,13 +329,9 @@ export function renderRefereeSlotsWhatsApp(
 
   lines.push("");
 
-  // Slot lines
-  if (payload.sr1Open || payload.sr1Assigned) {
-    lines.push(renderSlotLine(1, payload.sr1Open, payload.sr1Assigned, isReminder));
-  }
-  if (payload.sr2Open || payload.sr2Assigned) {
-    lines.push(renderSlotLine(2, payload.sr2Open, payload.sr2Assigned, isReminder));
-  }
+  // Slot lines — always show both SR1 and SR2 since own-club home games need both
+  lines.push(renderSlotLine(1, payload.sr1Open, payload.sr1Assigned, isReminder));
+  lines.push(renderSlotLine(2, payload.sr2Open, payload.sr2Assigned, isReminder));
 
   // Countdown for reminders
   if (isReminder && payload.reminderLevel != null) {
@@ -366,6 +362,8 @@ git commit -m "feat: add WhatsApp message templates for referee slot notificatio
 
 ### Task 4: WhatsApp Group Channel Adapter
 
+**Design decision:** WAHA connection settings (`WAHA_BASE_URL`, `WAHA_SESSION`) are infrastructure concerns — stored in env vars. The WhatsApp group ID is stored in the `channelConfigs` table using the existing `WhatsAppGroupConfig` type from `@dragons/shared` (field: `groupId`). The adapter reads WAHA connection from env, group ID from channel config.
+
 **Files:**
 - Create: `apps/api/src/services/notifications/channels/whatsapp-group.ts`
 - Test: `apps/api/src/services/notifications/channels/whatsapp-group.test.ts`
@@ -373,10 +371,10 @@ git commit -m "feat: add WhatsApp message templates for referee slot notificatio
 
 - [ ] **Step 1: Add WAHA env vars**
 
-In `apps/api/src/config/env.ts`, add to the `envSchema`:
+In `apps/api/src/config/env.ts`, add to the `envSchema` (replace the existing `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_ACCESS_TOKEN` entries since those were for the Meta Cloud API which we're not using):
 
 ```typescript
-  // WAHA (WhatsApp HTTP API)
+  // WAHA (WhatsApp HTTP API - self-hosted)
   WAHA_BASE_URL: z.string().url().optional(),
   WAHA_SESSION: z.string().default("default"),
 ```
@@ -394,6 +392,14 @@ import type { ChannelSendParams } from "./types";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+// Mock env
+vi.mock("../../../config/env", () => ({
+  env: {
+    WAHA_BASE_URL: "http://waha:3000",
+    WAHA_SESSION: "default",
+  },
+}));
+
 describe("WhatsAppGroupAdapter", () => {
   const adapter = new WhatsAppGroupAdapter();
 
@@ -407,11 +413,7 @@ describe("WhatsAppGroupAdapter", () => {
     locale: "de",
   };
 
-  const channelConfig = {
-    wahaBaseUrl: "http://waha:3000",
-    wahaSession: "default",
-    groupChatId: "120363171744447809@g.us",
-  };
+  const groupId = "120363171744447809@g.us";
 
   beforeEach(() => {
     mockFetch.mockReset();
@@ -423,7 +425,7 @@ describe("WhatsAppGroupAdapter", () => {
       json: () => Promise.resolve({ id: "msg-1" }),
     });
 
-    const result = await adapter.send(baseParams, channelConfig);
+    const result = await adapter.send(baseParams, groupId);
 
     expect(result.success).toBe(true);
     expect(mockFetch).toHaveBeenCalledWith(
@@ -447,7 +449,7 @@ describe("WhatsAppGroupAdapter", () => {
       text: () => Promise.resolve("Internal Server Error"),
     });
 
-    const result = await adapter.send(baseParams, channelConfig);
+    const result = await adapter.send(baseParams, groupId);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("500");
@@ -456,10 +458,24 @@ describe("WhatsAppGroupAdapter", () => {
   it("returns error when fetch throws", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Connection refused"));
 
-    const result = await adapter.send(baseParams, channelConfig);
+    const result = await adapter.send(baseParams, groupId);
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Connection refused");
+  });
+
+  it("returns error when WAHA_BASE_URL is not configured", async () => {
+    // Temporarily override env
+    const envMod = await import("../../../config/env");
+    const original = envMod.env.WAHA_BASE_URL;
+    (envMod.env as Record<string, unknown>).WAHA_BASE_URL = undefined;
+
+    const result = await adapter.send(baseParams, groupId);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not configured");
+
+    (envMod.env as Record<string, unknown>).WAHA_BASE_URL = original;
   });
 });
 ```
@@ -471,27 +487,26 @@ Expected: FAIL — module not found
 
 - [ ] **Step 4: Implement the adapter**
 
+The adapter does NOT extend the `ChannelAdapter` interface (which only accepts `ChannelSendParams`). Instead, it has its own `send(params, groupId)` signature. The pipeline dispatches to it directly — no need for interface polymorphism since the pipeline already switches on `channelType`.
+
 Create `apps/api/src/services/notifications/channels/whatsapp-group.ts`:
 
 ```typescript
-import type { ChannelAdapter, ChannelSendParams, DeliveryResult } from "./types";
+import type { ChannelSendParams, DeliveryResult } from "./types";
+import { env } from "../../../config/env";
 import { logger } from "../../../config/logger";
 
 const log = logger.child({ service: "whatsapp-group-adapter" });
 
-export interface WhatsAppGroupConfig {
-  wahaBaseUrl: string;
-  wahaSession: string;
-  groupChatId: string;
-}
+export class WhatsAppGroupAdapter {
+  async send(params: ChannelSendParams, groupChatId: string): Promise<DeliveryResult> {
+    const wahaBaseUrl = env.WAHA_BASE_URL;
+    const wahaSession = env.WAHA_SESSION;
 
-export class WhatsAppGroupAdapter implements ChannelAdapter {
-  async send(params: ChannelSendParams, channelConfig?: WhatsAppGroupConfig): Promise<DeliveryResult> {
-    if (!channelConfig) {
-      return { success: false, error: "Missing WhatsApp group channel config" };
+    if (!wahaBaseUrl) {
+      log.warn("WAHA_BASE_URL not configured, skipping WhatsApp delivery");
+      return { success: false, error: "WAHA not configured" };
     }
-
-    const { wahaBaseUrl, wahaSession, groupChatId } = channelConfig;
 
     try {
       const response = await fetch(`${wahaBaseUrl}/api/sendText`, {
@@ -543,34 +558,11 @@ git commit -m "feat: add WhatsApp group channel adapter using WAHA API"
 **Files:**
 - Modify: `apps/api/src/services/notifications/notification-pipeline.ts`
 - Modify: `apps/api/src/services/notifications/role-defaults.ts`
-- Modify: `apps/api/src/services/notifications/templates/index.ts`
+- Modify: `apps/api/src/services/notifications/templates/referee.ts`
 
-- [ ] **Step 1: Add referee slot events to role defaults**
+- [ ] **Step 1: Add in-app renderers for referee slot events**
 
-In `apps/api/src/services/notifications/role-defaults.ts`, add a new section after the referee reassigned block (before the `return results` line):
-
-```typescript
-  // Referee slot events → WhatsApp group (no individual recipient)
-  if (eventType === "referee.slots.needed" || eventType === "referee.slots.reminder") {
-    results.push({ audience: "admin", channel: "in_app" });
-  }
-```
-
-This ensures admins get an in-app notification for slot events. The WhatsApp group delivery happens via watch rules (configured in DB), not role defaults — since the group is not an individual recipient.
-
-- [ ] **Step 2: Register referee slot template renderer in template index**
-
-In `apps/api/src/services/notifications/templates/index.ts`, add the import and wire it into the router:
-
-```typescript
-import { renderRefereeSlotsMessage } from "./referee-slots";
-```
-
-Wait — the existing template system returns `{ title, body }` for in-app notifications, but the WhatsApp adapter needs the full formatted WhatsApp message from `renderRefereeSlotsWhatsApp`. The pipeline currently calls `renderEventMessage()` which returns `{ title, body }`.
-
-For WhatsApp group delivery, the template rendering happens in the adapter itself (it receives the event payload and renders the WhatsApp-specific format). The in-app template system needs a short renderer for `referee.slots.needed` and `referee.slots.reminder`.
-
-Add a renderer to `apps/api/src/services/notifications/templates/referee.ts` for the new event types. Add to the `refereeRenderers` record:
+In `apps/api/src/services/notifications/templates/referee.ts`, add to the `refereeRenderers` record (after the `REFEREE_REASSIGNED` entry):
 
 ```typescript
   [EVENT_TYPES.REFEREE_SLOTS_NEEDED]: (payload, _entityName, locale) => {
@@ -597,26 +589,42 @@ Add a renderer to `apps/api/src/services/notifications/templates/referee.ts` for
 
     return locale === "de"
       ? {
-          title: `⚠️ Erinnerung: Schiedsrichter benötigt`,
+          title: "⚠️ Erinnerung: Schiedsrichter benötigt",
           body: `${match} in ${days} Tagen braucht noch Schiedsrichter.`,
         }
       : {
-          title: `⚠️ Reminder: Referees needed`,
+          title: "⚠️ Reminder: Referees needed",
           body: `${match} in ${days} days still needs referees.`,
         };
   },
 ```
 
-Also add `REFEREE_SLOTS_NEEDED` and `REFEREE_SLOTS_REMINDER` to the `REFEREE_SELF_EVENTS` set? No — those are for individual referee notifications. The slot events are group-level.
+These are used by the existing `renderEventMessage()` router for in-app notifications.
+
+- [ ] **Step 2: Add referee slot events to role defaults**
+
+In `apps/api/src/services/notifications/role-defaults.ts`, add before the `return results` line:
+
+```typescript
+  // Referee slot events → admin in-app notification
+  if (eventType === "referee.slots.needed" || eventType === "referee.slots.reminder") {
+    results.push({ audience: "admin", channel: "in_app" });
+  }
+```
+
+This ensures admins get an in-app notification for slot events. The WhatsApp group delivery is handled via a watch rule (see Task 5b), not role defaults.
 
 - [ ] **Step 3: Wire WhatsApp adapter into pipeline dispatch**
 
-In `apps/api/src/services/notifications/notification-pipeline.ts`, add the WhatsApp group adapter. Import at the top:
+In `apps/api/src/services/notifications/notification-pipeline.ts`:
+
+Add imports at the top:
 
 ```typescript
 import { WhatsAppGroupAdapter } from "./channels/whatsapp-group";
-import type { WhatsAppGroupConfig } from "./channels/whatsapp-group";
 import { renderRefereeSlotsWhatsApp } from "./templates/referee-slots";
+import { env } from "../../config/env";
+import type { WhatsAppGroupConfig } from "@dragons/shared";
 import type { RefereeSlotsPayload } from "@dragons/shared";
 ```
 
@@ -626,59 +634,47 @@ Add adapter instance next to the existing `inAppAdapter`:
 const whatsAppGroupAdapter = new WhatsAppGroupAdapter();
 ```
 
-In the `dispatchImmediate` function, add a `whatsapp_group` case after the `in_app` case:
+In the `dispatchImmediate` function, add a `whatsapp_group` branch after the `in_app` branch (before `return false`):
 
 ```typescript
   if (channelType === "whatsapp_group") {
-    const configData = config.config as unknown as WhatsAppGroupConfig;
-    // For referee slot events, use the WhatsApp-specific template
-    const isSlotEvent =
-      event.type === "referee.slots.needed" || event.type === "referee.slots.reminder";
+    // Extract groupId from the channel config (WhatsAppGroupConfig from @dragons/shared)
+    const channelCfg = config.config as unknown as WhatsAppGroupConfig;
+    const groupChatId = channelCfg.groupId;
 
-    let text: string;
-    if (isSlotEvent) {
-      const baseUrl = configData.wahaBaseUrl ? "" : "";
-      // Use TRUSTED_ORIGINS first entry as public base URL, or fallback
-      const publicUrl = (process.env.TRUSTED_ORIGINS ?? "http://localhost:3000").split(",")[0]!.trim();
-      text = renderRefereeSlotsWhatsApp(payload as unknown as RefereeSlotsPayload, publicUrl);
-    } else {
-      text = `*${message.title}*\n\n${message.body}`;
+    if (!groupChatId) {
+      logger.warn({ channelConfigId: config.id }, "WhatsApp group config missing groupId");
+      return false;
     }
 
-    const result = await whatsAppGroupAdapter.send(
-      { ...params, body: text },
-      configData,
-    );
-    return result.success;
-  }
-```
-
-Note: `params` here refers to the `ChannelSendParams` already constructed in the function — we override `body` with the WhatsApp-formatted text.
-
-Wait — `dispatchImmediate` doesn't currently pass channel config data to adapters. The `InAppChannelAdapter.send()` doesn't need it, but `WhatsAppGroupAdapter.send()` does. Let me adjust the approach.
-
-Revise `dispatchImmediate` to pass the config data:
-
-In the function signature, `config` already has type `{ id: number; type: string; config: unknown }`. The `config.config` field holds the channel-specific configuration. Update the `whatsapp_group` branch:
-
-```typescript
-  if (channelType === "whatsapp_group") {
-    const channelCfg = config.config as unknown as WhatsAppGroupConfig;
-    const publicUrl = (process.env.TRUSTED_ORIGINS ?? "http://localhost:3000").split(",")[0]!.trim();
-
+    // For referee slot events, use the rich WhatsApp template
     const isSlotEvent =
       event.type === "referee.slots.needed" || event.type === "referee.slots.reminder";
+
+    const publicUrl = env.TRUSTED_ORIGINS[0] ?? "http://localhost:3000";
     const text = isSlotEvent
       ? renderRefereeSlotsWhatsApp(payload as unknown as RefereeSlotsPayload, publicUrl)
       : `*${message.title}*\n\n${message.body}`;
 
     const sendResult = await whatsAppGroupAdapter.send(
-      { eventId: event.id, watchRuleId, channelConfigId: config.id, recipientId, title: message.title, body: text, locale },
-      channelCfg,
+      {
+        eventId: event.id,
+        watchRuleId,
+        channelConfigId: config.id,
+        recipientId,
+        title: message.title,
+        body: text,
+        locale,
+      },
+      groupChatId,
     );
     return sendResult.success;
   }
+
+  logger.warn({ channelType, channelConfigId: config.id }, "Unknown channel type, skipping dispatch");
 ```
+
+Note: The adapter reads WAHA connection from `env.WAHA_BASE_URL`/`env.WAHA_SESSION` internally. The pipeline only passes the `groupId` from the channel config DB row. This matches the `WhatsAppGroupConfig` type from `@dragons/shared` which has `{ groupId, locale }`.
 
 - [ ] **Step 4: Run typecheck**
 
@@ -800,11 +796,25 @@ export function buildReminderJobId(matchId: number, days: number): string {
 }
 
 /**
- * Parse a kickoff date + time into a Date in Europe/Berlin timezone.
+ * Parse a kickoff date + time into a UTC Date, correctly handling
+ * Europe/Berlin timezone (CET/CEST transitions).
  */
 function parseKickoff(kickoffDate: string, kickoffTime: string): Date {
-  // Build an ISO string and parse — kickoff times are in Europe/Berlin
-  return new Date(`${kickoffDate}T${kickoffTime}:00+02:00`);
+  // Use Intl to resolve the correct UTC offset for this specific date in Europe/Berlin.
+  // This handles CET (+01:00) vs CEST (+02:00) automatically.
+  const naive = new Date(`${kickoffDate}T${kickoffTime}:00`);
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Berlin",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  });
+  // Get what Europe/Berlin thinks this UTC instant shows as
+  const berlinStr = formatter.format(naive);
+  const berlinDate = new Date(berlinStr);
+  // The difference tells us the offset
+  const offsetMs = naive.getTime() - berlinDate.getTime();
+  return new Date(naive.getTime() - offsetMs);
 }
 
 /**
@@ -1076,6 +1086,9 @@ export const refereeReminderWorker = new Worker<ReminderJobData>(
       return { skipped: true, reason: "not_needed" };
     }
 
+    // For reminders about own-club home games, "open" means "not assigned" —
+    // the club needs to fill the slot regardless of the federation's sr*Open flag.
+    // We pass both: sr1Open reflects "needs someone", sr1Assigned shows who's there.
     const payload: RefereeSlotsPayload = {
       matchId: match.id,
       matchNo: match.matchNo,
@@ -1087,8 +1100,8 @@ export const refereeReminderWorker = new Worker<ReminderJobData>(
       kickoffTime: match.kickoffTime,
       venueId: match.venueId,
       venueName: match.venueName,
-      sr1Open: !match.sr1Assigned,
-      sr2Open: !match.sr2Assigned,
+      sr1Open: match.sr1Open || !match.sr1Assigned,
+      sr2Open: match.sr2Open || !match.sr2Assigned,
       sr1Assigned: match.sr1Assigned,
       sr2Assigned: match.sr2Assigned,
       reminderLevel: reminderDays,
@@ -1304,7 +1317,7 @@ In the new-match creation block (after the existing `publishDomainEvent` for `MA
                     matchNo: basicMatch.matchNo,
                     homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
                     guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
-                    leagueId: data.leagueDbId,
+                    leagueId: data.leagueDbId!,
                     leagueName: data.leagueName ?? "",
                     kickoffDate: remoteSnapshot.kickoffDate,
                     kickoffTime: remoteSnapshot.kickoffTime,
@@ -1362,7 +1375,7 @@ In the match update event emission block (after the `for (const eventType of mat
                       matchNo: basicMatch.matchNo,
                       homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
                       guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
-                      leagueId: data.leagueDbId,
+                      leagueId: data.leagueDbId!,
                       leagueName: data.leagueName ?? "",
                       kickoffDate: remoteSnapshot.kickoffDate,
                       kickoffTime: remoteSnapshot.kickoffTime,
@@ -1463,30 +1476,9 @@ After the assignment upsert loop in `syncRefereeAssignmentsFromData`, add a chec
         }
 ```
 
-- [ ] **Step 4: Handle referee unassignment (slot re-opens)**
+**Known limitation — referee unassignment:** The current `syncRefereeAssignmentsFromData` only processes assignments present in the API response. It does NOT detect or remove `matchReferees` rows when a referee is removed on the federation side. This means if a referee is unassigned in the federation, the local row persists and reminder jobs stay cancelled.
 
-In the same function, find where assignments are removed or detect when a referee is unassigned. If a previously-filled match now has an empty slot again, re-create reminder jobs. After the removal/unassignment handling, add:
-
-```typescript
-        // If a referee was removed and the match is an own-club home game,
-        // re-create reminders for thresholds that haven't passed yet
-        if (isRemoval && refCtx.isOwnClubHome && refCtx.isOwnClubRefsLeague) {
-          try {
-            const match = await db.select({
-              kickoffDate: matches.kickoffDate,
-              kickoffTime: matches.kickoffTime,
-            }).from(matches).where(eq(matches.id, dbMatchId)).limit(1);
-
-            if (match[0]) {
-              await scheduleReminderJobs(dbMatchId, match[0].kickoffDate, match[0].kickoffTime);
-            }
-          } catch (error) {
-            log.warn({ err: error, matchId: dbMatchId }, "Failed to re-schedule reminders after unassignment");
-          }
-        }
-```
-
-Note: The exact hook point depends on how unassignment is detected in the existing `syncRefereeAssignmentsFromData`. The implementing engineer should find where referee removals are processed and add this logic there. Import `scheduleReminderJobs` from `matches.sync.ts` or extract it to the reminders service.
+This is acceptable for now: referee unassignment from federation is rare, and the referee coordinator can manually trigger a notification if needed. A proper fix (comparing current assignments against API response and cleaning stale rows) is a separate sync improvement task.
 
 - [ ] **Step 5: Run typecheck**
 
@@ -1555,7 +1547,137 @@ git commit -m "feat: add WAHA Docker service for WhatsApp group notifications"
 
 ---
 
-### Task 11: Admin Setting for Reminder Days
+### Task 11: Seed WhatsApp Channel Config and Watch Rule
+
+Without a `channelConfigs` row and a `watchRules` row in the database, the notification pipeline has no route for `referee.slots.*` events to reach the WhatsApp group. This task creates the seed data.
+
+**Files:**
+- Create: `apps/api/src/services/notifications/seed-referee-watch-rule.ts`
+- Modify: `apps/api/src/workers/index.ts` (call seed on startup)
+
+- [ ] **Step 1: Create the seed function**
+
+Create `apps/api/src/services/notifications/seed-referee-watch-rule.ts`:
+
+```typescript
+import { db } from "../../config/database";
+import { channelConfigs, watchRules } from "@dragons/db/schema";
+import { eq, and } from "drizzle-orm";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "referee-notification-seed" });
+
+const CHANNEL_CONFIG_NAME = "Referee WhatsApp Group";
+const WATCH_RULE_NAME = "Referee slots → WhatsApp group";
+
+/**
+ * Ensure the WhatsApp group channel config and watch rule exist.
+ * Idempotent: skips if already present (matched by name).
+ *
+ * The channelConfig stores the groupId (to be set by admin).
+ * The watchRule routes referee.slots.* events to that channel.
+ */
+export async function seedRefereeNotificationConfig(): Promise<void> {
+  // 1. Ensure channel config exists
+  const [existingConfig] = await db
+    .select({ id: channelConfigs.id })
+    .from(channelConfigs)
+    .where(
+      and(
+        eq(channelConfigs.name, CHANNEL_CONFIG_NAME),
+        eq(channelConfigs.type, "whatsapp_group"),
+      ),
+    )
+    .limit(1);
+
+  let channelConfigId: number;
+
+  if (existingConfig) {
+    channelConfigId = existingConfig.id;
+    log.debug("Referee WhatsApp channel config already exists");
+  } else {
+    const [created] = await db
+      .insert(channelConfigs)
+      .values({
+        name: CHANNEL_CONFIG_NAME,
+        type: "whatsapp_group",
+        enabled: false, // disabled until admin sets the groupId
+        config: { groupId: "", locale: "de" },
+        digestMode: "none",
+      })
+      .returning({ id: channelConfigs.id });
+
+    channelConfigId = created!.id;
+    log.info({ channelConfigId }, "Created referee WhatsApp channel config (disabled — admin must set groupId)");
+  }
+
+  // 2. Ensure watch rule exists
+  const [existingRule] = await db
+    .select({ id: watchRules.id })
+    .from(watchRules)
+    .where(eq(watchRules.name, WATCH_RULE_NAME))
+    .limit(1);
+
+  if (existingRule) {
+    log.debug("Referee slots watch rule already exists");
+    return;
+  }
+
+  await db.insert(watchRules).values({
+    name: WATCH_RULE_NAME,
+    enabled: true,
+    createdBy: "system",
+    eventTypes: ["referee.slots.needed", "referee.slots.reminder"],
+    filters: [],
+    channels: [
+      { channel: "whatsapp_group", targetId: String(channelConfigId) },
+    ],
+    urgencyOverride: "immediate",
+  });
+
+  log.info({ channelConfigId }, "Created referee slots watch rule");
+}
+```
+
+- [ ] **Step 2: Call seed on worker initialization**
+
+In `apps/api/src/workers/index.ts`, add import:
+
+```typescript
+import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
+```
+
+In `initializeWorkers()`, add after `initializeScheduledDigests()`:
+
+```typescript
+  // Seed referee notification channel config + watch rule (idempotent)
+  try {
+    await seedRefereeNotificationConfig();
+  } catch (error) {
+    logger.warn({ err: error }, "Failed to seed referee notification config");
+  }
+```
+
+- [ ] **Step 3: Run typecheck**
+
+Run: `pnpm --filter @dragons/api typecheck`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add apps/api/src/services/notifications/seed-referee-watch-rule.ts apps/api/src/workers/index.ts
+git commit -m "feat: seed WhatsApp channel config and watch rule for referee slot notifications"
+```
+
+**Post-deployment note:** The channel config is created `enabled: false` with an empty `groupId`. After deploying, the admin must:
+1. Start WAHA, scan QR code
+2. Find the WhatsApp group ID (via WAHA's `GET /api/{session}/chats` endpoint)
+3. Update the channel config via `PATCH /admin/channel-configs/:id` with `{ config: { groupId: "<actual-group-id>@g.us", locale: "de" } }` and `{ enabled: true }`
+
+---
+
+### Task 12: Admin Setting for Reminder Days (renumbered from 11)
 
 **Files:**
 - Modify: `apps/api/src/routes/admin/settings.routes.ts` (or create a new route)
@@ -1607,7 +1729,7 @@ git commit -m "feat: add admin endpoints for referee reminder days configuration
 
 ---
 
-### Task 12: Full Integration Test
+### Task 13: Full Integration Test
 
 **Files:**
 - Run all tests, check coverage, lint
