@@ -34,17 +34,22 @@ function addTriggeredByName(
   };
 }
 
-export async function getSyncStatus() {
+export async function getSyncStatus(syncType?: string) {
   const [lastSync] = await db
     .select()
     .from(syncRuns)
+    .where(syncType ? eq(syncRuns.syncType, syncType) : undefined)
     .orderBy(desc(syncRuns.startedAt))
     .limit(1);
 
   const [runningSync] = await db
     .select()
     .from(syncRuns)
-    .where(eq(syncRuns.status, "running"))
+    .where(
+      syncType
+        ? and(eq(syncRuns.status, "running"), eq(syncRuns.syncType, syncType))
+        : eq(syncRuns.status, "running"),
+    )
     .limit(1);
 
   const runs = [lastSync, runningSync].filter(Boolean) as (typeof syncRuns.$inferSelect)[];
@@ -57,7 +62,7 @@ export async function getSyncStatus() {
 }
 
 export async function getSyncLogs(params: SyncLogsQuery) {
-  const { limit, offset, status } = params;
+  const { limit, offset, status, syncType } = params;
 
   let query = db.select().from(syncRuns).$dynamic();
   let countQuery = db
@@ -65,9 +70,17 @@ export async function getSyncLogs(params: SyncLogsQuery) {
     .from(syncRuns)
     .$dynamic();
 
+  const conditions = [];
   if (status) {
-    query = query.where(eq(syncRuns.status, status));
-    countQuery = countQuery.where(eq(syncRuns.status, status));
+    conditions.push(eq(syncRuns.status, status));
+  }
+  if (syncType) {
+    conditions.push(eq(syncRuns.syncType, syncType));
+  }
+  if (conditions.length > 0) {
+    const whereClause = conditions.length === 1 ? conditions[0]! : and(...conditions)!;
+    query = query.where(whereClause);
+    countQuery = countQuery.where(whereClause);
   }
 
   const [logs, countResult] = await Promise.all([

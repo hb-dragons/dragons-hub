@@ -10,6 +10,7 @@ const syncRunStatusEnum = z.enum(["running", "completed", "failed"]);
 
 export const syncLogsQuerySchema = paginationSchema.extend({
   status: syncRunStatusEnum.optional(),
+  syncType: z.string().optional(),
 });
 
 export const syncEntryIdParamSchema = z.object({

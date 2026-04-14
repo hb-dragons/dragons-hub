@@ -53,7 +53,8 @@ syncRoutes.get(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const result = await getSyncStatus();
+    const syncType = c.req.query("syncType");
+    const result = await getSyncStatus(syncType);
     return c.json(result);
   },
 );
@@ -209,6 +210,7 @@ syncRoutes.get(
       limit: c.req.query("limit"),
       offset: c.req.query("offset"),
       status: c.req.query("status"),
+      syncType: c.req.query("syncType"),
     });
     const result = await getSyncLogs(query);
     return c.json(result);
