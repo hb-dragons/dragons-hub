@@ -12,8 +12,7 @@ const mocks = vi.hoisted(() => ({
   deleteChannelConfig: vi.fn(),
   validateConfigForType: vi.fn(),
   env: {
-    WHATSAPP_PHONE_NUMBER_ID: "test-id",
-    WHATSAPP_ACCESS_TOKEN: "test-token",
+    WAHA_BASE_URL: "http://waha:3000",
     // SMTP vars not set — email provider is unconfigured
   } as Record<string, string | undefined>,
 }));

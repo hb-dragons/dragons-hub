@@ -25,7 +25,7 @@ function isProviderConfigured(type: string): boolean {
     case "in_app":
       return true;
     case "whatsapp_group":
-      return !!(env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN);
+      return !!env.WAHA_BASE_URL;
     case "email":
       return !!(
         env.SMTP_HOST &&
