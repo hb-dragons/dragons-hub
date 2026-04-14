@@ -216,7 +216,7 @@ export function SyncHistoryTable() {
                           {formatRecords(run)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{run.triggeredBy}</Badge>
+                          <Badge variant="outline">{run.triggeredByName ?? run.triggeredBy}</Badge>
                         </TableCell>
                         <TableCell>
                           <ChevronDown

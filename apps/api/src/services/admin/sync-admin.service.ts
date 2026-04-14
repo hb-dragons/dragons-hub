@@ -1,8 +1,38 @@
 import { db } from "../../config/database";
-import { syncRuns, syncRunEntries, syncSchedule, matches, matchRemoteVersions, matchChanges } from "@dragons/db/schema";
-import { desc, eq, sql, and, or, ilike } from "drizzle-orm";
+import { syncRuns, syncRunEntries, syncSchedule, matches, matchRemoteVersions, matchChanges, user } from "@dragons/db/schema";
+import { desc, eq, sql, and, or, ilike, inArray } from "drizzle-orm";
 import { updateSyncSchedule } from "../../workers/queues";
 import type { SyncLogsQuery, SyncEntriesQuery, UpdateScheduleBody } from "../../routes/admin/sync.schemas";
+
+/**
+ * Resolve triggeredBy user IDs to display names.
+ * Values like "cron" or "manual" pass through as-is.
+ */
+async function resolveTriggeredByNames(
+  runs: (typeof syncRuns.$inferSelect)[],
+): Promise<Map<string, string>> {
+  const userIds = [...new Set(
+    runs.map((r) => r.triggeredBy).filter((v) => v !== "cron" && v !== "manual"),
+  )];
+  if (userIds.length === 0) return new Map();
+
+  const users = await db
+    .select({ id: user.id, name: user.name })
+    .from(user)
+    .where(inArray(user.id, userIds));
+
+  return new Map(users.map((u) => [u.id, u.name]));
+}
+
+function addTriggeredByName(
+  run: typeof syncRuns.$inferSelect,
+  nameMap: Map<string, string>,
+) {
+  return {
+    ...run,
+    triggeredByName: nameMap.get(run.triggeredBy) ?? null,
+  };
+}
 
 export async function getSyncStatus() {
   const [lastSync] = await db
@@ -17,8 +47,11 @@ export async function getSyncStatus() {
     .where(eq(syncRuns.status, "running"))
     .limit(1);
 
+  const runs = [lastSync, runningSync].filter(Boolean) as (typeof syncRuns.$inferSelect)[];
+  const nameMap = await resolveTriggeredByNames(runs);
+
   return {
-    lastSync: lastSync || null,
+    lastSync: lastSync ? addTriggeredByName(lastSync, nameMap) : null,
     isRunning: !!runningSync,
   };
 }
@@ -43,9 +76,10 @@ export async function getSyncLogs(params: SyncLogsQuery) {
   ]);
 
   const total = countResult[0]?.count ?? 0;
+  const nameMap = await resolveTriggeredByNames(logs);
 
   return {
-    items: logs,
+    items: logs.map((r) => addTriggeredByName(r, nameMap)),
     total,
     limit,
     offset,

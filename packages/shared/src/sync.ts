@@ -31,6 +31,7 @@ export interface SyncRun {
   syncType: string;
   status: SyncStatus;
   triggeredBy: string;
+  triggeredByName: string | null;
   recordsProcessed: number | null;
   recordsCreated: number | null;
   recordsUpdated: number | null;
