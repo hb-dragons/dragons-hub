@@ -80,11 +80,8 @@ export type {
 } from "./sync";
 
 export type {
-  RefereeSlotInfo,
-  RefereeMatchListItem,
-  TakeMatchResponse,
-  VerifyMatchResponse,
-} from "./referee-matches";
+  RefereeGameListItem,
+} from "./referee-games";
 export type { RefereeListItem, RefereeRule, RefereeRulesResponse, UpdateRefereeRulesBody } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";
