@@ -8,6 +8,7 @@ import {
   updateChannelConfig,
   deleteChannelConfig,
 } from "../../services/admin/channel-config-admin.service";
+import type { CreateChannelConfigBody, UpdateChannelConfigBody } from "@dragons/shared";
 import {
   channelConfigIdParamSchema,
   channelConfigListQuerySchema,
@@ -117,7 +118,7 @@ channelConfigRoutes.post(
       );
     }
 
-    const config = await createChannelConfig(body);
+    const config = await createChannelConfig(body as unknown as CreateChannelConfigBody);
     return c.json(config, 201);
   },
 );
@@ -158,7 +159,7 @@ channelConfigRoutes.patch(
       }
     }
 
-    const config = await updateChannelConfig(id, body);
+    const config = await updateChannelConfig(id, body as UpdateChannelConfigBody);
 
     if (!config) {
       return c.json(

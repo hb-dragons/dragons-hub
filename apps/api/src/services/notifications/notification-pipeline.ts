@@ -205,7 +205,7 @@ function evaluateDefaults(
   for (const defaultNotif of defaults) {
     const matchingConfigs = configs.filter((c) => {
       if (c.type !== defaultNotif.channel) return false;
-      const configData = c.config as Record<string, unknown> | null;
+      const configData = c.config as unknown as Record<string, unknown> | null;
       const audienceRole = configData?.audienceRole as string | undefined;
       if (!audienceRole) return true;
       return audienceRole === defaultNotif.audience;

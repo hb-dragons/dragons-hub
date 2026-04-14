@@ -112,6 +112,7 @@ export function useTriggerSync() {
         syncType: "full",
         status: "running",
         triggeredBy: "manual",
+        triggeredByName: null,
         recordsProcessed: null,
         recordsCreated: null,
         recordsUpdated: null,

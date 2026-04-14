@@ -69,7 +69,7 @@ export const digestWorker = new Worker<DigestJobData>(
     }));
 
     // 4. Render digest message — read locale from channel config, fall back to German
-    const locale = (config.config as Record<string, unknown>)?.locale as string ?? "de";
+    const locale = (config.config as unknown as Record<string, unknown>)?.locale as string ?? "de";
     const message = renderDigestMessage(items, locale);
 
     // 5. Deliver and clear buffer atomically in a transaction.
