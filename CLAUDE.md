@@ -97,6 +97,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 - UI components imported from `@dragons/ui`
 - API calls via `apps/web/src/lib/api.ts`
 - Admin pages under `app/admin/`
+- **Design System:** Read `packages/ui/DESIGN-SYSTEM.md` before building any UI
 
 ### SDK Types
 - Type definitions in `packages/sdk/src/types/`
