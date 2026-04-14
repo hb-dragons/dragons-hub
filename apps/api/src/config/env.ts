@@ -24,6 +24,10 @@ const envSchema = z.object({
   WAHA_BASE_URL: z.string().url().optional(),
   WAHA_SESSION: z.string().default("default"),
 
+  // Referee SDK (separate federation account for offenespiele sync)
+  REFEREE_SDK_USERNAME: z.string().min(1).optional(),
+  REFEREE_SDK_PASSWORD: z.string().min(1).optional(),
+
   // Email (SMTP)
   SMTP_HOST: z.string().min(1).optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
