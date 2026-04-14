@@ -2,13 +2,17 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // --- Mock setup ---
 
-vi.mock("../config/logger", () => ({
-  logger: {
+vi.mock("../config/logger", () => {
+  const log = {
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
-  },
-}));
+    debug: vi.fn(),
+    child: vi.fn(),
+  };
+  log.child.mockReturnValue(log);
+  return { logger: log };
+});
 
 const mockInitScheduledJobs = vi.fn().mockResolvedValue(undefined);
 const mockSyncQueueClose = vi.fn().mockResolvedValue(undefined);
@@ -51,6 +55,10 @@ const mockStopOutboxPoller = vi.fn();
 vi.mock("../services/events/outbox-poller", () => ({
   startOutboxPoller: (...args: unknown[]) => mockStartOutboxPoller(...args),
   stopOutboxPoller: (...args: unknown[]) => mockStopOutboxPoller(...args),
+}));
+
+vi.mock("../services/notifications/seed-referee-watch-rule", () => ({
+  seedRefereeNotificationConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockDbUpdate = vi.fn();
