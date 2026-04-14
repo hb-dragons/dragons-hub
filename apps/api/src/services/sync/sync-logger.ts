@@ -8,7 +8,7 @@ import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "sync-logger" });
 
-export type EntityType = "league" | "match" | "standing" | "team" | "venue" | "referee" | "refereeRole";
+export type EntityType = "league" | "match" | "standing" | "team" | "venue" | "referee" | "refereeRole" | "refereeGame";
 export type ActionType = "created" | "updated" | "skipped" | "failed";
 
 export interface LogEntry {

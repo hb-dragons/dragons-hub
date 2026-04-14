@@ -27,6 +27,7 @@ export const ENTITY_TYPES = [
   "venue",
   "referee",
   "refereeRole",
+  "refereeGame",
 ] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
