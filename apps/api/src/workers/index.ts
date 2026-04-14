@@ -4,6 +4,7 @@ import { digestWorker } from "./digest.worker";
 import { refereeReminderWorker } from "./referee-reminder.worker";
 import { initializeScheduledJobs, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue } from "./queues";
 import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-poller";
+import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
 import { db } from "../config/database";
 import { logger } from "../config/logger";
 import {
@@ -67,6 +68,13 @@ export async function initializeWorkers() {
     await initializeScheduledDigests();
   } catch (error) {
     logger.warn({ err: error }, "Failed to initialize scheduled digests");
+  }
+
+  // Seed referee notification channel config + watch rule (idempotent)
+  try {
+    await seedRefereeNotificationConfig();
+  } catch (error) {
+    logger.warn({ err: error }, "Failed to seed referee notification config");
   }
 
   // Workers are automatically started when imported
