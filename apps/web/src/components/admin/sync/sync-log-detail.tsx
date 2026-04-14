@@ -49,7 +49,7 @@ interface SyncLogDetailProps {
 
 const ENTITY_CONFIG: Record<
   EntityType,
-  { icon: React.ElementType; labelKey: "league" | "match" | "team" | "standing" | "venue" | "referee" | "refereeRole"; color: string }
+  { icon: React.ElementType; labelKey: "league" | "match" | "team" | "standing" | "venue" | "referee" | "refereeRole" | "refereeGame"; color: string }
 > = {
   league: { icon: Trophy, labelKey: "league", color: "text-yellow-600" },
   match: { icon: Gamepad2, labelKey: "match", color: "text-purple-600" },
@@ -61,6 +61,11 @@ const ENTITY_CONFIG: Record<
     icon: ClipboardList,
     labelKey: "refereeRole",
     color: "text-indigo-600",
+  },
+  refereeGame: {
+    icon: ClipboardList,
+    labelKey: "refereeGame",
+    color: "text-cyan-600",
   },
 };
 

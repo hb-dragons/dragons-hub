@@ -43,6 +43,7 @@ const ENTITY_ICONS: Record<EntityType, React.ElementType> = {
   venue: MapPin,
   referee: Shield,
   refereeRole: ClipboardList,
+  refereeGame: ClipboardList,
 };
 
 const ENTITY_COLORS: Record<EntityType, string> = {
@@ -53,6 +54,7 @@ const ENTITY_COLORS: Record<EntityType, string> = {
   venue: "text-orange-600",
   referee: "text-teal-600",
   refereeRole: "text-indigo-600",
+  refereeGame: "text-cyan-600",
 };
 
 const ACTION_ICONS: Record<EntryAction, React.ElementType> = {

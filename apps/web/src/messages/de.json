@@ -357,7 +357,8 @@
         "standing": "Tabelle",
         "venue": "Halle",
         "referee": "Schiedsrichter",
-        "refereeRole": "Schiedsrichter-Rolle"
+        "refereeRole": "Schiedsrichter-Rolle",
+        "refereeGame": "SR-Spiel"
       },
       "action": {
         "created": "Erstellt",

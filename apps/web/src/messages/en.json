@@ -357,7 +357,8 @@
         "standing": "Standing",
         "venue": "Venue",
         "referee": "Referee",
-        "refereeRole": "Referee Role"
+        "refereeRole": "Referee Role",
+        "refereeGame": "Referee Game"
       },
       "action": {
         "created": "Created",

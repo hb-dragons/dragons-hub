@@ -34,7 +34,7 @@ export const SWR_KEYS = {
   watchRules: "/admin/watch-rules",
   channelConfigs: "/admin/channel-configs",
   channelConfigProviders: "/admin/channel-configs/providers",
-  refereeMatches: "/referee/matches?limit=500&offset=0",
+  refereeGames: "/referee/games?limit=500&offset=0",
   socialPlayerPhotos: "/admin/social/player-photos",
   socialBackgrounds: "/admin/social/backgrounds",
   socialMatches: (type: string, week: number, year: number) =>
