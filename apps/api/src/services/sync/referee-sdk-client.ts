@@ -108,7 +108,7 @@ export function createRefereeSdkClient(): RefereeSdkClient {
   async function fetchPage(pageFrom: number): Promise<SdkOffeneSpieleResponse> {
     const payload: SdkOpenGamesSearchParams = {
       ...SEARCH_PAYLOAD_BASE,
-      datum: new Date().toISOString(),
+      datum: "2000-01-01T00:00:00.000Z",
       pageFrom,
     };
 
