@@ -22,6 +22,7 @@ import {
 } from "./use-sync";
 import { RefereeSyncStatusCards } from "./referee-sync-status-cards";
 import { SyncLiveLogs } from "./sync-live-logs";
+import { RefereeSyncHistoryTable } from "./sync-history-table";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type { SyncStatusResponse, PaginatedResponse, SyncRun } from "./types";
 
@@ -150,7 +151,7 @@ export function RefereeSyncTab({
         </div>
         <RefereeSyncStatusCards />
         <RefereeSyncLiveLogsContainer />
-        {/* TODO: SyncHistoryTable will be added in Task 10 */}
+        <RefereeSyncHistoryTable />
       </div>
     </RefereeSyncRunProvider>
   );

@@ -31,7 +31,7 @@ import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
 import type { SyncRun, PaginatedResponse } from "./types";
 import { SyncLogDetail } from "./sync-log-detail";
-import { useSyncLogs } from "./use-sync";
+import { useSyncLogs, useRefereeSyncLogs } from "./use-sync";
 import { formatDuration } from "./utils";
 
 const STATUS_CONFIG: Record<
@@ -88,13 +88,22 @@ function formatRecords(run: SyncRun): React.ReactNode {
   );
 }
 
-export function SyncHistoryTable() {
+interface SyncHistoryTableInnerProps {
+  firstPageLogs: SyncRun[];
+  firstPageHasMore: boolean;
+  loadMoreUrl: (offset: number) => string;
+}
+
+function SyncHistoryTableInner({
+  firstPageLogs,
+  firstPageHasMore,
+  loadMoreUrl,
+}: SyncHistoryTableInnerProps) {
   const t = useTranslations("sync.history");
   const tStatus = useTranslations("sync.history.status");
   const tToast = useTranslations("sync.toast");
   const tCommon = useTranslations("common");
   const format = useFormatter();
-  const { logs: firstPageLogs, hasMore: firstPageHasMore } = useSyncLogs();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [extraLogs, setExtraLogs] = useState<SyncRun[]>([]);
   const [extraHasMore, setExtraHasMore] = useState(false);
@@ -118,7 +127,7 @@ export function SyncHistoryTable() {
       setLoadingMore(true);
       const currentTotal = firstPageLogs.length + extraLogs.length;
       const data = await fetchAPI<PaginatedResponse<SyncRun>>(
-        `/admin/sync/logs?limit=20&offset=${currentTotal}`,
+        loadMoreUrl(currentTotal),
       );
       setExtraLogs((prev) => {
         const existingIds = new Set([
@@ -136,7 +145,7 @@ export function SyncHistoryTable() {
     } finally {
       setLoadingMore(false);
     }
-  }, [firstPageLogs, extraLogs.length, tToast]);
+  }, [firstPageLogs, extraLogs.length, tToast, loadMoreUrl]);
 
   // Deduplicate by id to prevent React key warnings from race conditions
   // between optimistic updates and polling refreshes
@@ -257,5 +266,29 @@ export function SyncHistoryTable() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+export function SyncHistoryTable() {
+  const { logs, hasMore } = useSyncLogs();
+  return (
+    <SyncHistoryTableInner
+      firstPageLogs={logs}
+      firstPageHasMore={hasMore}
+      loadMoreUrl={(offset) => `/admin/sync/logs?limit=20&offset=${offset}`}
+    />
+  );
+}
+
+export function RefereeSyncHistoryTable() {
+  const { logs, hasMore } = useRefereeSyncLogs();
+  return (
+    <SyncHistoryTableInner
+      firstPageLogs={logs}
+      firstPageHasMore={hasMore}
+      loadMoreUrl={(offset) =>
+        `/admin/sync/logs?limit=20&offset=${offset}&syncType=referee-games`
+      }
+    />
   );
 }
