@@ -148,6 +148,13 @@
       "when": 1773828617339,
       "tag": "0020_bumpy_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1776199953814,
+      "tag": "0021_secret_the_phantom",
+      "breakpoints": true
     }
   ]
 }

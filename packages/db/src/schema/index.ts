@@ -23,3 +23,4 @@ export * from "./watch-rules";
 export * from "./channel-configs";
 export * from "./notification-log";
 export * from "./digest-buffer";
+export * from "./referee-games";
