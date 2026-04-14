@@ -17,10 +17,12 @@ const mockDomainEventsQueueClose = vi.fn().mockResolvedValue(undefined);
 const mockDigestQueueAdd = vi.fn().mockResolvedValue({ id: "digest-job-1" });
 const mockDigestQueueGetRepeatableJobs = vi.fn().mockResolvedValue([]);
 const mockDigestQueueRemoveRepeatableByKey = vi.fn().mockResolvedValue(undefined);
+const mockRefereeRemindersQueueClose = vi.fn().mockResolvedValue(undefined);
 vi.mock("./queues", () => ({
   initializeScheduledJobs: (...args: unknown[]) => mockInitScheduledJobs(...args),
   syncQueue: { close: (...args: unknown[]) => mockSyncQueueClose(...args) },
   domainEventsQueue: { close: (...args: unknown[]) => mockDomainEventsQueueClose(...args) },
+  refereeRemindersQueue: { close: (...args: unknown[]) => mockRefereeRemindersQueueClose(...args) },
   digestQueue: {
     close: (...args: unknown[]) => mockDigestQueueClose(...args),
     add: (...args: unknown[]) => mockDigestQueueAdd(...args),
@@ -37,6 +39,11 @@ vi.mock("./sync.worker", () => ({
 const mockEventWorkerClose = vi.fn().mockResolvedValue(undefined);
 vi.mock("./event.worker", () => ({
   eventWorker: { close: (...args: unknown[]) => mockEventWorkerClose(...args) },
+}));
+
+const mockRefereeReminderWorkerClose = vi.fn().mockResolvedValue(undefined);
+vi.mock("./referee-reminder.worker", () => ({
+  refereeReminderWorker: { close: (...args: unknown[]) => mockRefereeReminderWorkerClose(...args) },
 }));
 
 const mockStartOutboxPoller = vi.fn();

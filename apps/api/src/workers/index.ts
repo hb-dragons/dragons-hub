@@ -1,7 +1,8 @@
 import { syncWorker } from "./sync.worker";
 import { eventWorker } from "./event.worker";
 import { digestWorker } from "./digest.worker";
-import { initializeScheduledJobs, syncQueue, digestQueue, domainEventsQueue } from "./queues";
+import { refereeReminderWorker } from "./referee-reminder.worker";
+import { initializeScheduledJobs, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue } from "./queues";
 import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-poller";
 import { db } from "../config/database";
 import { logger } from "../config/logger";
@@ -72,6 +73,7 @@ export async function initializeWorkers() {
   logger.info("Sync worker started");
   logger.info("Event worker started");
   logger.info("Digest worker started");
+  logger.info("Referee reminder worker started");
   logger.info("Workers initialized");
 }
 
@@ -228,6 +230,8 @@ export async function shutdownWorkers() {
   }
 
   stopOutboxPoller();
+  await refereeReminderWorker.close();
+  await refereeRemindersQueue.close();
   await digestWorker.close();
   await eventWorker.close();
   await syncWorker.close();
@@ -241,4 +245,5 @@ export async function shutdownWorkers() {
 export { syncWorker };
 export { eventWorker };
 export { digestWorker };
+export { refereeReminderWorker };
 export * from "./queues";

@@ -39,6 +39,16 @@ export const syncQueue = new Queue("sync", {
   },
 });
 
+export const refereeRemindersQueue = new Queue("referee-reminders", {
+  prefix: "{bull}",
+  connection: { url: env.REDIS_URL },
+  defaultJobOptions: {
+    attempts: 1,
+    removeOnComplete: { count: 500 },
+    removeOnFail: { count: 500 },
+  },
+});
+
 // NOTE: syncRuns and syncRunEntries tables grow unbounded.
 // Consider adding a periodic cleanup job or retention policy for old sync data.
 

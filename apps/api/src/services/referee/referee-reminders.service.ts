@@ -2,6 +2,7 @@ import { db } from "../../config/database";
 import { appSettings } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import { logger } from "../../config/logger";
+import { refereeRemindersQueue } from "../../workers/queues";
 
 const log = logger.child({ service: "referee-reminders" });
 
@@ -90,4 +91,47 @@ export async function getReminderDays(): Promise<number[]> {
   }
 
   return DEFAULT_REMINDER_DAYS;
+}
+
+/**
+ * Schedule delayed reminder jobs for a match.
+ * Uses deterministic job IDs for dedup.
+ */
+export async function scheduleReminderJobs(
+  matchId: number,
+  kickoffDate: string,
+  kickoffTime: string,
+): Promise<void> {
+  const reminderDays = await getReminderDays();
+  const delays = computeReminderDelays(kickoffDate, kickoffTime, reminderDays);
+
+  for (const { days, delayMs } of delays) {
+    await refereeRemindersQueue.add(
+      "referee-reminder",
+      { matchId, reminderDays: days },
+      {
+        delay: delayMs,
+        jobId: buildReminderJobId(matchId, days),
+      },
+    );
+  }
+
+  if (delays.length > 0) {
+    log.info({ matchId, reminders: delays.map((d) => d.days) }, "Scheduled referee reminder jobs");
+  }
+}
+
+/**
+ * Cancel all pending reminder jobs for a match.
+ */
+export async function cancelReminderJobs(matchId: number): Promise<void> {
+  const reminderDays = await getReminderDays();
+  for (const days of reminderDays) {
+    const jobId = buildReminderJobId(matchId, days);
+    const job = await refereeRemindersQueue.getJob(jobId);
+    if (job) {
+      await job.remove();
+    }
+  }
+  log.info({ matchId }, "Cancelled referee reminder jobs");
 }
