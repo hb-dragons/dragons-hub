@@ -11,6 +11,11 @@ import { evaluateRule, type RuleInput } from "./rule-engine";
 import { getDefaultNotificationsForEvent } from "./role-defaults";
 import { renderEventMessage } from "./templates/index";
 import { InAppChannelAdapter } from "./channels/in-app";
+import { WhatsAppGroupAdapter } from "./channels/whatsapp-group";
+import { renderRefereeSlotsWhatsApp } from "./templates/referee-slots";
+import { env } from "../../config/env";
+import type { WhatsAppGroupConfig } from "@dragons/shared";
+import type { RefereeSlotsPayload } from "@dragons/shared";
 import { logger } from "../../config/logger";
 
 // ── Config type alias ────────────────────────────────────────────────────────
@@ -122,6 +127,7 @@ export interface PipelineResult {
 // ── Pipeline steps ───────────────────────────────────────────────────────────
 
 const inAppAdapter = new InAppChannelAdapter();
+const whatsAppGroupAdapter = new WhatsAppGroupAdapter();
 
 /**
  * Step 1: Load watch rules and channel configs from DB.
@@ -273,6 +279,41 @@ async function dispatchImmediate(params: {
     return true;
   }
 
+  if (channelType === "whatsapp_group") {
+    // Extract groupId from the channel config (WhatsAppGroupConfig from @dragons/shared)
+    const channelCfg = config.config as unknown as WhatsAppGroupConfig;
+    const groupChatId = channelCfg.groupId;
+
+    if (!groupChatId) {
+      logger.warn({ channelConfigId: config.id }, "WhatsApp group config missing groupId");
+      return false;
+    }
+
+    // For referee slot events, use the rich WhatsApp template
+    const isSlotEvent =
+      event.type === "referee.slots.needed" || event.type === "referee.slots.reminder";
+
+    const publicUrl = env.TRUSTED_ORIGINS[0] ?? "http://localhost:3000";
+    const text = isSlotEvent
+      ? renderRefereeSlotsWhatsApp(payload as unknown as RefereeSlotsPayload, publicUrl)
+      : `*${message.title}*\n\n${message.body}`;
+
+    const sendResult = await whatsAppGroupAdapter.send(
+      {
+        eventId: event.id,
+        watchRuleId,
+        channelConfigId: config.id,
+        recipientId,
+        title: message.title,
+        body: text,
+        locale,
+      },
+      groupChatId,
+    );
+    return sendResult.success;
+  }
+
+  logger.warn({ channelType, channelConfigId: config.id }, "Unknown channel type, skipping dispatch");
   return false;
 }
 

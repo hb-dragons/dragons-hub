@@ -73,6 +73,11 @@ export function getDefaultNotificationsForEvent(
     }
   }
 
+  // Referee slot events → admin in-app notification
+  if (eventType === "referee.slots.needed" || eventType === "referee.slots.reminder") {
+    results.push({ audience: "admin", channel: "in_app" });
+  }
+
   return results;
 }
 

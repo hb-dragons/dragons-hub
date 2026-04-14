@@ -57,6 +57,39 @@ const refereeRenderers: Record<
           body: `${match}: ${newRef} replaces ${oldRef} (${role}).`,
         };
   },
+
+  [EVENT_TYPES.REFEREE_SLOTS_NEEDED]: (payload, _entityName, locale) => {
+    const home = String(payload.homeTeam ?? "");
+    const guest = String(payload.guestTeam ?? "");
+    const match = `${home} vs ${guest}`;
+
+    return locale === "de"
+      ? {
+          title: "🏀 Schiedsrichter gesucht",
+          body: `${match} braucht noch Schiedsrichter.`,
+        }
+      : {
+          title: "🏀 Referees needed",
+          body: `${match} still needs referees.`,
+        };
+  },
+
+  [EVENT_TYPES.REFEREE_SLOTS_REMINDER]: (payload, _entityName, locale) => {
+    const home = String(payload.homeTeam ?? "");
+    const guest = String(payload.guestTeam ?? "");
+    const match = `${home} vs ${guest}`;
+    const days = Number(payload.reminderLevel ?? 0);
+
+    return locale === "de"
+      ? {
+          title: "⚠️ Erinnerung: Schiedsrichter benötigt",
+          body: `${match} in ${days} Tagen braucht noch Schiedsrichter.`,
+        }
+      : {
+          title: "⚠️ Reminder: Referees needed",
+          body: `${match} in ${days} days still needs referees.`,
+        };
+  },
 };
 
 export function renderRefereeMessage(
