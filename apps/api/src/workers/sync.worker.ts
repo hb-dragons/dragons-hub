@@ -30,6 +30,11 @@ export const syncWorker = new Worker<SyncJobData>(
           const fullResult = await fullSync(triggeredBy, jobLogger, job.data.syncRunId);
           return { completed: true, type: job.data.type, result: fullResult };
         }
+        case "referee-games": {
+          const { syncRefereeGames } = await import("../services/sync/referee-games.sync");
+          const result = await syncRefereeGames();
+          return { completed: true, type: job.data.type, ...result };
+        }
         default:
           throw new Error(`Unsupported sync type: ${job.data.type}`);
       }

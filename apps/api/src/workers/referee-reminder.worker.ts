@@ -103,7 +103,7 @@ export const refereeReminderWorker = new Worker<ReminderJobData>(
       entityId: game.apiMatchId,
       entityName: `${game.homeTeamName} vs ${game.guestTeamName}`,
       deepLinkPath: deepLink,
-      payload: payload as unknown as Record<string, unknown>,
+      payload: { ...payload },
     });
 
     jobLog.info("Referee slots reminder event published");

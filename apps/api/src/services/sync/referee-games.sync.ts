@@ -7,6 +7,7 @@ import { createRefereeSdkClient } from "./referee-sdk-client";
 import { publishDomainEvent } from "../events/event-publisher";
 import { scheduleReminderJobs, cancelReminderJobs } from "../referee/referee-reminders.service";
 import { EVENT_TYPES } from "@dragons/shared";
+import type { RefereeSlotsPayload } from "@dragons/shared";
 import type { SdkOffeneSpielResult, SdkSpielleitung } from "@dragons/sdk";
 
 const log = logger.child({ service: "referee-games-sync" });
@@ -91,7 +92,7 @@ export function mapApiResultToRow(result: SdkOffeneSpielResult) {
     homeTeamName: sp.heimMannschaftLiga.mannschaftName,
     guestTeamName: sp.gastMannschaftLiga.mannschaftName,
     leagueName: sp.liga.liganame,
-    leagueShort: sp.liga.ligaKurzname,
+    leagueShort: sp.liga.srKurzname ?? sp.liga.ligaKurzname,
     venueName: sp.spielfeld?.bezeichnung ?? null,
     venueCity: sp.spielfeld?.ort ?? null,
     sr1OurClub: sr1MeinVerein,
@@ -128,7 +129,12 @@ function bothSlotsFilled(row: {
   return row.sr1Status === "assigned" && row.sr2Status === "assigned";
 }
 
-function buildPayload(row: ReturnType<typeof mapApiResultToRow> & { matchId?: number | null }) {
+function buildPayload(row: ReturnType<typeof mapApiResultToRow> & { matchId?: number | null }): RefereeSlotsPayload {
+  const sr1Open = row.sr1OurClub === true && row.sr1Status !== "assigned";
+  const sr2Open = row.sr2OurClub === true && row.sr2Status !== "assigned";
+  const deepLink = row.matchId
+    ? `/referee/matches?take=${row.matchId}`
+    : `/referee/games?apiMatchId=${row.apiMatchId}`;
   return {
     matchId: row.matchId ?? null,
     matchNo: row.matchNo,
@@ -140,11 +146,11 @@ function buildPayload(row: ReturnType<typeof mapApiResultToRow> & { matchId?: nu
     kickoffTime: row.kickoffTime,
     venueId: null,
     venueName: row.venueName,
-    sr1Open: row.sr1Status !== "assigned",
-    sr2Open: row.sr2Status !== "assigned",
+    sr1Open,
+    sr2Open,
     sr1Assigned: row.sr1Status === "assigned" ? row.sr1Name : null,
     sr2Assigned: row.sr2Status === "assigned" ? row.sr2Name : null,
-    deepLink: `/admin/referee-games`,
+    deepLink,
   };
 }
 
@@ -217,7 +223,7 @@ export async function syncRefereeGames(): Promise<{
               entityId: inserted!.id,
               entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
               deepLinkPath: `/admin/referee-games`,
-              payload: buildPayload({ ...mapped, matchId }),
+              payload: { ...buildPayload({ ...mapped, matchId }) },
             });
           } catch (err) {
             log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to emit REFEREE_SLOTS_NEEDED event");
@@ -278,7 +284,7 @@ export async function syncRefereeGames(): Promise<{
                 entityId: existing.id,
                 entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
                 deepLinkPath: `/admin/referee-games`,
-                payload: buildPayload({ ...mapped, matchId }),
+                payload: { ...buildPayload({ ...mapped, matchId }) },
               });
             } catch (err) {
               log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to emit REFEREE_SLOTS_NEEDED event on slot open");

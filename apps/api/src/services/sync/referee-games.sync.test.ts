@@ -282,7 +282,7 @@ describe("mapApiResultToRow", () => {
     expect(row.homeTeamName).toBe("Dragons 1");
     expect(row.guestTeamName).toBe("Titans 1");
     expect(row.leagueName).toBe("Kreisliga Nord");
-    expect(row.leagueShort).toBe("KLN");
+    expect(row.leagueShort).toBe("SR-KLN");
     expect(row.venueName).toBe("Sporthalle West");
     expect(row.venueCity).toBe("Berlin");
     expect(row.sr1OurClub).toBe(true);
