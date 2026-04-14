@@ -25,8 +25,10 @@ export type {
   SdkGameDetails,
   SdkGetGameResponse,
   SdkOpenGamesSearchParams,
-  SdkOpenGame,
-  SdkOpenGamesResponse,
+  SdkOffeneSpieleLiga,
+  SdkOffeneSpieleSp,
+  SdkOffeneSpielResult,
+  SdkOffeneSpieleResponse,
   SdkUserContext,
   SdkUserContextResponse,
 } from "./types/game-details";

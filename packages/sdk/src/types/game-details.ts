@@ -1,4 +1,4 @@
-import type { SdkSpielfeld, SdkMannschaftLiga } from "./common";
+import type { SdkSpielfeld, SdkMannschaftLiga, SdkVerein } from "./common";
 
 export interface SdkSchirirolle {
   schirirolleId: number;
@@ -100,38 +100,64 @@ export interface SdkGetGameResponse {
 }
 
 export interface SdkOpenGamesSearchParams {
-  srName: string | null;
-  ligaKurz: string | null;
-  spielStatus: "ALLE" | "OFFEN" | "BESETZT";
-  vereinsDelegation: "STANDARD" | "AUSSCHLIESSLICH" | "EINSCHLIESSLICH";
-  vereinsSpiele: "STANDARD" | "AUSSCHLIESSLICH" | "EINSCHLIESSLICH";
+  ats: null;
   datum: string;
-  zeitraum: "all" | "w1" | "w3";
-  sortBy: string;
-  sortOrder: "asc" | "desc";
-  ats: string | null;
+  ligaKurz: string | null;
   pageFrom: number;
   pageSize: number;
+  sortBy: string;
+  sortOrder: "asc" | "desc";
+  spielStatus: "ALLE" | "OFFEN" | "BESETZT";
+  srName: string | null;
+  vereinsDelegation: "ALLE";
+  vereinsSpiele: "VEREIN" | "STANDARD" | "ALLE" | "NUR_HM" | "NUR_AM";
+  zeitraum: "all" | "heute" | "woche" | "monat";
 }
 
-export interface SdkOpenGame {
+export interface SdkOffeneSpieleLiga {
+  ligaId: number;
+  liganr: number;
+  liganame: string;
+  ligaKurzname: string | null;
+  srKurzname: string | null;
+  sr1modus: string | null;
+  sr2modus: string | null;
+}
+
+export interface SdkOffeneSpieleSp {
   spielplanId: number;
-  spielnummer: string;
-  spieldatum: string;
-  spielzeit: string;
-  ligaKurz: string;
-  heimMannschaft: string;
-  gastMannschaft: string;
-  spielfeld: string;
-  sr1Name?: string;
-  sr2Name?: string;
-  status: string;
+  spielnr: number;
+  spieltag: number;
+  spieldatum: number;
+  spielfeldId: number | null;
+  liga: SdkOffeneSpieleLiga;
+  heimMannschaftLiga: SdkMannschaftLiga;
+  gastMannschaftLiga: SdkMannschaftLiga;
+  spielfeld: SdkSpielfeld | null;
+  sr1Verein: SdkVerein | null;
+  sr2Verein: SdkVerein | null;
+  sr1VereinInformiert: boolean | null;
+  sr2VereinInformiert: boolean | null;
+  ergebnisbestaetigt: boolean;
+  verzicht: boolean;
+  abgesagt: boolean;
+  spielortGeandert: boolean;
+  spielzeitGeandert: boolean;
 }
 
-export interface SdkOpenGamesResponse {
-  data: SdkOpenGame[];
-  totalCount: number;
-  hasMore: boolean;
+export interface SdkOffeneSpielResult {
+  sp: SdkOffeneSpieleSp;
+  sr1: SdkSpielleitung | null;
+  sr2: SdkSpielleitung | null;
+  sr1MeinVerein: boolean;
+  sr2MeinVerein: boolean;
+  sr1OffenAngeboten: boolean;
+  sr2OffenAngeboten: boolean;
+}
+
+export interface SdkOffeneSpieleResponse {
+  total: number;
+  results: SdkOffeneSpielResult[];
 }
 
 export interface SdkUserContext {
