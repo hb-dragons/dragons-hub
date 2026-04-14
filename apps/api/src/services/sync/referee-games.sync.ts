@@ -214,7 +214,7 @@ export async function syncRefereeGames(): Promise<{
               type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
               source: "sync",
               entityType: "referee",
-              entityId: inserted.id,
+              entityId: inserted!.id,
               entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
               deepLinkPath: `/admin/referee-games`,
               payload: buildPayload({ ...mapped, matchId }),
@@ -224,7 +224,7 @@ export async function syncRefereeGames(): Promise<{
           }
 
           try {
-            await scheduleReminderJobs(mapped.apiMatchId, inserted.id, mapped.kickoffDate, mapped.kickoffTime);
+            await scheduleReminderJobs(mapped.apiMatchId, inserted!.id, mapped.kickoffDate, mapped.kickoffTime);
           } catch (err) {
             log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to schedule reminder jobs");
           }

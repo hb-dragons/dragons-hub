@@ -124,4 +124,19 @@ settingsRoutes.put(
   },
 );
 
+// POST /admin/settings/referee-games-sync — trigger manual referee games sync
+settingsRoutes.post(
+  "/settings/referee-games-sync",
+  describeRoute({
+    description: "Trigger a manual referee games sync",
+    tags: ["Settings"],
+    responses: { 200: { description: "Sync triggered" } },
+  }),
+  async (c) => {
+    const { triggerRefereeGamesSync } = await import("../../workers/queues");
+    await triggerRefereeGamesSync();
+    return c.json({ success: true, message: "Referee games sync triggered" });
+  },
+);
+
 export { settingsRoutes };
