@@ -208,7 +208,8 @@ export async function fullSync(
         durationMs,
         recordsProcessed:
           leaguesResult.total + teamsRes.total + matchesRes.total + standingsRes.total + venuesRes.total
-          + refereesRes.total + (rolesRes.created + rolesRes.updated + rolesRes.skipped)
+          + (refereesRes.created + refereesRes.updated + refereesRes.skipped)
+          + (rolesRes.created + rolesRes.updated + rolesRes.skipped)
           + assignmentsRes.created,
         recordsCreated:
           leaguesResult.created + teamsRes.created + matchesRes.created + standingsRes.created + venuesRes.created
@@ -269,7 +270,8 @@ export async function fullSync(
     try {
       const totalProcessed =
         leaguesResult.total + teamsRes.total + matchesRes.total + standingsRes.total + venuesRes.total
-        + refereesRes.total + (rolesRes.created + rolesRes.updated + rolesRes.skipped)
+        + (refereesRes.created + refereesRes.updated + refereesRes.skipped)
+        + (rolesRes.created + rolesRes.updated + rolesRes.skipped)
         + assignmentsRes.created;
       const totalCreated =
         leaguesResult.created + teamsRes.created + matchesRes.created + standingsRes.created + venuesRes.created
