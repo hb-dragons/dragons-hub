@@ -827,8 +827,8 @@ describe("syncRefereeAssignmentsFromData", () => {
       matchIdLookup,
     );
 
-    // 1 existing assignments + 3 batch lookups (referees, matches, roles) + 1 slot-fill check
-    expect(mockSelect).toHaveBeenCalledTimes(5);
+    // 1 existing assignments + 3 batch lookups (referees, matches, roles)
+    expect(mockSelect).toHaveBeenCalledTimes(4);
     // Slot 1 exists, slot 2 is new
     expect(result.created).toBe(1);
   });

@@ -11,8 +11,6 @@ import { batchAction, type SyncLogger } from "./sync-logger";
 import { logger } from "../../config/logger";
 import { publishDomainEvent } from "../events/event-publisher";
 import { EVENT_TYPES } from "@dragons/shared";
-import { refereeRemindersQueue } from "../../workers/queues";
-import { buildReminderJobId, getReminderDays } from "../referee/referee-reminders.service";
 
 const log = logger.child({ service: "referees-sync" });
 
@@ -309,27 +307,6 @@ export async function syncRefereeAssignmentsFromData(
           createdAt: now,
         });
         created++;
-
-        // Check if both slots are now filled → cancel reminders
-        try {
-          const slotsForMatch = await db
-            .select({ slotNumber: matchReferees.slotNumber })
-            .from(matchReferees)
-            .where(eq(matchReferees.matchId, matchId));
-
-          const filledSlots = new Set(slotsForMatch.map((s) => s.slotNumber));
-          if (filledSlots.has(1) && filledSlots.has(2)) {
-            const reminderDays = await getReminderDays();
-            for (const days of reminderDays) {
-              const jobId = buildReminderJobId(matchId, days);
-              const job = await refereeRemindersQueue.getJob(jobId);
-              if (job) await job.remove();
-            }
-            log.info({ matchId }, "Both referee slots filled, cancelled reminder jobs");
-          }
-        } catch (error) {
-          log.warn({ err: error, matchId }, "Failed to check/cancel reminder jobs after assignment");
-        }
 
         // Record referee assignment in match change history
         const refName = refNameMap.get(refereeId) ?? "Unknown";
