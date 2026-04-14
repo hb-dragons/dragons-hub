@@ -6,7 +6,10 @@ import {
   setClubConfig,
   getBookingSettings,
   setBookingSettings,
+  getSetting,
+  upsertSetting,
 } from "../../services/admin/settings.service";
+import { requireAdmin } from "../../middleware/auth";
 
 const settingsRoutes = new Hono();
 
@@ -77,6 +80,47 @@ settingsRoutes.put(
     const body = bookingConfigSchema.parse(await c.req.json());
     await setBookingSettings(body);
     return c.json(body);
+  },
+);
+
+// GET /admin/settings/referee-reminders - Get referee reminder days
+settingsRoutes.get(
+  "/settings/referee-reminders",
+  requireAdmin,
+  describeRoute({
+    description: "Get referee reminder days configuration",
+    tags: ["Settings"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const value = await getSetting("referee_reminder_days");
+    const days = value ? JSON.parse(value) : [7, 3, 1];
+    return c.json({ days });
+  },
+);
+
+const refereeReminderSchema = z.object({
+  days: z.array(z.number().int().positive()).min(1).max(10),
+});
+
+// PUT /admin/settings/referee-reminders - Set referee reminder days
+settingsRoutes.put(
+  "/settings/referee-reminders",
+  requireAdmin,
+  describeRoute({
+    description: "Set referee reminder days configuration",
+    tags: ["Settings"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = refereeReminderSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: parsed.error.flatten() }, 400);
+    }
+    const sorted = parsed.data.days.sort((a, b) => b - a);
+    await upsertSetting("referee_reminder_days", JSON.stringify(sorted));
+    return c.json({ days: sorted });
   },
 );
 
