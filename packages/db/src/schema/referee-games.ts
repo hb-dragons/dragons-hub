@@ -38,6 +38,8 @@ export const refereeGames = pgTable(
     isForfeited: boolean("is_forfeited").notNull().default(false),
     homeClubId: integer("home_club_id"),
     guestClubId: integer("guest_club_id"),
+    isHomeGame: boolean("is_home_game").notNull().default(false),
+    isGuestGame: boolean("is_guest_game").notNull().default(false),
     leagueApiId: integer("league_api_id"),
     ownClubRefs: boolean("own_club_refs").notNull().default(false),
     dataHash: varchar("data_hash", { length: 64 }),
