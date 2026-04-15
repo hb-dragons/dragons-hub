@@ -32,6 +32,16 @@ export type {
   SdkUserContext,
   SdkUserContextResponse,
 } from "./types/game-details";
+export type {
+  SdkRefCandidateMeta,
+  SdkRefCandidate,
+  SdkGetRefsPayload,
+  SdkGetRefsResponse,
+  SdkAufheben,
+  SdkSubmitSlotPayload,
+  SdkSubmitPayload,
+  SdkSubmitResponse,
+} from "./types/referee-assignment";
 
 // Helpers
 export { parseResult } from "./helpers/parse-result";
