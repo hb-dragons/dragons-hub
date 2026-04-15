@@ -18,7 +18,9 @@ export const syncWorker = new Worker<SyncJobData>(
     const log = logger.child({ jobId: job.id });
     log.info({ jobName: job.name }, "Starting sync job");
 
-    const triggeredBy = job.name === "daily-sync" ? "cron" : ("manual" as const);
+    const triggeredBy = (job.name === "daily-sync" || job.name === "referee-games-sync-scheduled")
+      ? "cron"
+      : ("manual" as const);
 
     try {
       const jobLogger = async (msg: string) => {
@@ -33,48 +35,57 @@ export const syncWorker = new Worker<SyncJobData>(
         case "referee-games": {
           const { syncRefereeGames } = await import("../services/sync/referee-games.sync");
           const { createSyncLogger } = await import("../services/sync/sync-logger");
-          const syncRunId = job.data.syncRunId;
-          const syncLogger = syncRunId ? createSyncLogger(syncRunId) : undefined;
 
-          if (syncRunId) {
-            await db
-              .update(syncRuns)
-              .set({ status: "running" })
-              .where(eq(syncRuns.id, syncRunId));
+          // For scheduled jobs, create a syncRun record so the UI can track history
+          let syncRunId = job.data.syncRunId;
+          if (!syncRunId) {
+            const [created] = await db
+              .insert(syncRuns)
+              .values({
+                syncType: "referee-games",
+                triggeredBy,
+                status: "pending",
+                startedAt: new Date(),
+              })
+              .returning();
+            syncRunId = created!.id;
           }
+
+          const syncLogger = createSyncLogger(syncRunId);
+
+          await db
+            .update(syncRuns)
+            .set({ status: "running" })
+            .where(eq(syncRuns.id, syncRunId));
 
           const startTime = Date.now();
           try {
-            const result = await syncRefereeGames(syncLogger);
-            if (syncLogger) await syncLogger.close();
-            if (syncRunId) {
-              await db
-                .update(syncRuns)
-                .set({
-                  status: "completed",
-                  recordsCreated: result.created,
-                  recordsUpdated: result.updated,
-                  recordsSkipped: result.unchanged,
-                  recordsFailed: 0,
-                  durationMs: Date.now() - startTime,
-                  completedAt: new Date(),
-                })
-                .where(eq(syncRuns.id, syncRunId));
-            }
+            const result = await syncRefereeGames(syncLogger, syncRunId);
+            await syncLogger.close();
+            await db
+              .update(syncRuns)
+              .set({
+                status: "completed",
+                recordsCreated: result.created,
+                recordsUpdated: result.updated,
+                recordsSkipped: result.unchanged,
+                recordsFailed: 0,
+                durationMs: Date.now() - startTime,
+                completedAt: new Date(),
+              })
+              .where(eq(syncRuns.id, syncRunId));
             return { completed: true, type: job.data.type, ...result };
           } catch (err) {
-            if (syncLogger) await syncLogger.close();
-            if (syncRunId) {
-              await db
-                .update(syncRuns)
-                .set({
-                  status: "failed",
-                  errorMessage: err instanceof Error ? err.message : String(err),
-                  durationMs: Date.now() - startTime,
-                  completedAt: new Date(),
-                })
-                .where(eq(syncRuns.id, syncRunId));
-            }
+            await syncLogger.close();
+            await db
+              .update(syncRuns)
+              .set({
+                status: "failed",
+                errorMessage: err instanceof Error ? err.message : String(err),
+                durationMs: Date.now() - startTime,
+                completedAt: new Date(),
+              })
+              .where(eq(syncRuns.id, syncRunId));
             throw err;
           }
         }

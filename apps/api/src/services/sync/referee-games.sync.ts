@@ -168,7 +168,7 @@ async function findMatchId(apiMatchId: number): Promise<number | null> {
 
 // --- Main sync ---
 
-export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
+export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: number | null): Promise<{
   created: number;
   updated: number;
   unchanged: number;
@@ -251,6 +251,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
             await publishDomainEvent({
               type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
               source: "sync",
+              syncRunId,
               entityType: "referee",
               entityId: inserted!.id,
               entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
@@ -322,6 +323,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
               await publishDomainEvent({
                 type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
                 source: "sync",
+                syncRunId,
                 entityType: "referee",
                 entityId: existing.id,
                 entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
@@ -369,5 +371,31 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
   }
 
   log.info({ created, updated, unchanged }, "Referee games sync completed");
+
+  // Emit SYNC_COMPLETED domain event (mirrors full sync behavior)
+  if (syncRunId) {
+    try {
+      await publishDomainEvent({
+        type: EVENT_TYPES.SYNC_COMPLETED,
+        source: "sync",
+        syncRunId,
+        entityType: "referee",
+        entityId: 0,
+        entityName: "Referee Games Sync",
+        deepLinkPath: `/admin/sync/logs/${syncRunId}`,
+        payload: {
+          syncRunId,
+          syncType: "referee-games",
+          recordsProcessed: created + updated + unchanged,
+          recordsCreated: created,
+          recordsUpdated: updated,
+          recordsFailed: 0,
+        },
+      });
+    } catch (err) {
+      log.warn({ err }, "Failed to emit sync.completed event for referee-games");
+    }
+  }
+
   return { created, updated, unchanged };
 }
