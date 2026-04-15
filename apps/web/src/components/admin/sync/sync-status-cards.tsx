@@ -29,13 +29,13 @@ export function SyncStatusCards() {
     return () => clearInterval(timer);
   }, []);
 
-  const cronHour = (cron: string) => cron.split(" ")[1]?.padStart(2, "0") ?? "04";
+  const cronHour = (cron: string | null) => (cron ?? "0 4 * * *").split(" ")[1]?.padStart(2, "0") ?? "04";
 
   function getNextRunLabel(sched: SyncScheduleData | null): string {
     if (!sched?.enabled) return t("sync.status.disabled");
 
     try {
-      const parts = sched.cronExpression.split(" ");
+      const parts = (sched.cronExpression ?? "0 4 * * *").split(" ");
       const hour = parseInt(parts[1] ?? "4", 10);
 
       const now = new Date();
