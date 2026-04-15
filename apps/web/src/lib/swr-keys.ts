@@ -35,6 +35,10 @@ export const SWR_KEYS = {
   channelConfigs: "/admin/channel-configs",
   channelConfigProviders: "/admin/channel-configs/providers",
   refereeMatches: "/referee/matches?limit=500&offset=0",
+  refereeSyncStatus: "/admin/sync/status?syncType=referee-games",
+  refereeSyncLogs: (limit: number, offset: number) =>
+    `/admin/sync/logs?limit=${limit}&offset=${offset}&syncType=referee-games`,
+  refereeSyncSchedule: "/admin/sync/schedule?syncType=referee-games",
   socialPlayerPhotos: "/admin/social/player-photos",
   socialBackgrounds: "/admin/social/backgrounds",
   socialMatches: (type: string, week: number, year: number) =>
