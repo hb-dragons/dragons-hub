@@ -101,8 +101,10 @@ export interface JobsResponse {
 
 export interface SyncScheduleData {
   id: number | null;
+  syncType: string;
   enabled: boolean;
-  cronExpression: string;
+  cronExpression: string | null;
+  intervalMinutes: number | null;
   timezone: string;
   lastUpdatedAt: string | null;
   lastUpdatedBy: string | null;
