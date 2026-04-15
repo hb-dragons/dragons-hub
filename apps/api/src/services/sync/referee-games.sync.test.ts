@@ -673,7 +673,7 @@ describe("syncRefereeGames", () => {
     await syncRefereeGames();
 
     // Verify insert was called with isHomeGame/isGuestGame
-    const insertedValues = mockValues.mock.calls[0][0];
+    const insertedValues = mockValues.mock.calls[0]![0];
     expect(insertedValues).toHaveProperty("isHomeGame", true);
     expect(insertedValues).toHaveProperty("isGuestGame", false);
   });
