@@ -15,7 +15,8 @@ import { SyncStatusCards } from "@/components/admin/sync/sync-status-cards";
 import { SyncLiveLogsContainer } from "@/components/admin/sync/sync-live-logs-container";
 import { SyncHistoryTable } from "@/components/admin/sync/sync-history-table";
 import { SyncScheduleConfig } from "@/components/admin/sync/sync-schedule-config";
-import { RefereeSyncTab } from "@/components/admin/sync/referee-sync-tab";
+import { RefereeSyncTab, RefereeSyncRunProvider } from "@/components/admin/sync/referee-sync-tab";
+import { RefereeSyncCompletionWatcher } from "@/components/admin/sync/use-sync";
 import type {
   SyncStatusResponse,
   PaginatedResponse,
@@ -30,10 +31,11 @@ export default async function SyncPage() {
   let schedule: SyncScheduleData | null = null;
   let refereeStatus: SyncStatusResponse | null = null;
   let refereeLogs: PaginatedResponse<SyncRun> | null = null;
+  let refereeSchedule: SyncScheduleData | null = null;
   let error: string | null = null;
 
   try {
-    [status, logs, schedule, refereeStatus, refereeLogs] = await Promise.all([
+    [status, logs, schedule, refereeStatus, refereeLogs, refereeSchedule] = await Promise.all([
       fetchAPIServer<SyncStatusResponse>("/admin/sync/status"),
       fetchAPIServer<PaginatedResponse<SyncRun>>("/admin/sync/logs?limit=20&offset=0"),
       fetchAPIServer<SyncScheduleData>("/admin/sync/schedule"),
@@ -41,6 +43,7 @@ export default async function SyncPage() {
       fetchAPIServer<PaginatedResponse<SyncRun>>(
         "/admin/sync/logs?limit=20&offset=0&syncType=referee-games",
       ),
+      fetchAPIServer<SyncScheduleData>("/admin/sync/schedule?syncType=referee-games"),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";
@@ -98,10 +101,14 @@ export default async function SyncPage() {
         </TabsContent>
 
         <TabsContent value="referee" className="mt-4">
-          <RefereeSyncTab
+          <RefereeSyncRunProvider
             initialStatus={refereeStatus}
             initialLogs={refereeLogs}
-          />
+            initialSchedule={refereeSchedule}
+          >
+            <RefereeSyncCompletionWatcher />
+            <RefereeSyncTab />
+          </RefereeSyncRunProvider>
         </TabsContent>
       </Tabs>
     </div>
