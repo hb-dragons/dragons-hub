@@ -109,3 +109,11 @@ export * from "./channel-configs";
 // Team colors
 export { COLOR_PRESETS, COLOR_PRESET_KEYS, getColorPreset } from "./team-colors";
 export type { ColorPreset, ColorPresetMode } from "./team-colors";
+
+// Referee assignment
+export type {
+  AssignRefereeBody,
+  AssignRefereeResponse,
+  UnassignRefereeResponse,
+  CandidateSearchResponse,
+} from "./referee-assignment";

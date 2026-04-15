@@ -15,6 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@dragons/sdk": "workspace:*",
     "zod": "^4.3.6"
   },
   "peerDependencies": {
