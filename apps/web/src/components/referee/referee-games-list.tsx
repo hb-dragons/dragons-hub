@@ -110,7 +110,7 @@ function SrSlotBadge({ status, ourClub, name, t }: SrSlotBadgeProps) {
 }
 
 // ------------------------------------------------------------------
-// FacetChips — SR-status filter
+// FacetChips — game filter tabs
 // ------------------------------------------------------------------
 
 type GameFilterValue = "available" | "assigned" | "all";
@@ -122,7 +122,6 @@ interface FacetChipsProps {
 }
 
 function FacetChips({ value, onChange, options }: FacetChipsProps) {
-
   return (
     <div className="flex gap-1">
       {options.map((opt) => (
@@ -142,6 +141,45 @@ function FacetChips({ value, onChange, options }: FacetChipsProps) {
       ))}
     </div>
   );
+}
+
+// ------------------------------------------------------------------
+// Filtering helpers
+// ------------------------------------------------------------------
+
+function isAvailable(m: RefereeGameListItem): boolean {
+  return (
+    (m.sr1OurClub && m.sr1Status !== "assigned") ||
+    (m.sr2OurClub && m.sr2Status !== "assigned") ||
+    m.sr1Status === "offered" ||
+    m.sr2Status === "offered"
+  );
+}
+
+function isAssigned(m: RefereeGameListItem): boolean {
+  return (
+    (m.sr1OurClub || m.sr2OurClub) &&
+    (m.sr1Status === "assigned" || m.sr2Status === "assigned")
+  );
+}
+
+// ------------------------------------------------------------------
+// Row styling helpers
+// ------------------------------------------------------------------
+
+function hasUnfilledDuty(m: RefereeGameListItem): boolean {
+  return (
+    (m.sr1OurClub && m.sr1Status !== "assigned") ||
+    (m.sr2OurClub && m.sr2Status !== "assigned")
+  );
+}
+
+function hasAllDutyFilled(m: RefereeGameListItem): boolean {
+  const hasDuty = m.sr1OurClub || m.sr2OurClub;
+  if (!hasDuty) return false;
+  const sr1Ok = !m.sr1OurClub || m.sr1Status === "assigned";
+  const sr2Ok = !m.sr2OurClub || m.sr2Status === "assigned";
+  return sr1Ok && sr2Ok;
 }
 
 // ------------------------------------------------------------------
@@ -208,16 +246,9 @@ function getColumns(
         const m = row.original;
         const inactive = m.isCancelled || m.isForfeited;
         return (
-          <div className="flex items-center gap-1.5">
-            <span className={cn("text-sm", inactive && "line-through")}>
-              {m.homeTeamName}
-            </span>
-            {m.isHomeGame && (
-              <Badge variant="outline" className="rounded-4xl text-xs text-primary border-primary/20 bg-primary/5">
-                {t("badges.home")}
-              </Badge>
-            )}
-          </div>
+          <span className={cn("text-sm", inactive && "line-through", m.isHomeGame && "font-medium text-primary")}>
+            {m.homeTeamName}
+          </span>
         );
       },
       meta: { label: t("columns.home") },
@@ -231,16 +262,9 @@ function getColumns(
         const m = row.original;
         const inactive = m.isCancelled || m.isForfeited;
         return (
-          <div className="flex items-center gap-1.5">
-            <span className={cn("text-sm", inactive && "line-through")}>
-              {m.guestTeamName}
-            </span>
-            {!m.isHomeGame && (
-              <Badge variant="outline" className="rounded-4xl text-xs text-muted-foreground border-border">
-                {t("badges.away")}
-              </Badge>
-            )}
-          </div>
+          <span className={cn("text-sm", inactive && "line-through", m.isGuestGame && "font-medium text-primary")}>
+            {m.guestTeamName}
+          </span>
         );
       },
       meta: { label: t("columns.guest") },
@@ -360,49 +384,26 @@ export function RefereeGamesList() {
   // Apply game filter
   const items = useMemo(() => {
     if (gameFilter === "all") return allItems;
-
-    if (gameFilter === "available") {
-      // Games our referees can take:
-      // 1. Publicly offered slots (any club can take)
-      // 2. Our home games in ownClubRefs leagues with unfilled slots
-      return allItems.filter((m) => {
-        const hasOfferedSlot = m.sr1Status === "offered" || m.sr2Status === "offered";
-        const homeOwnClubDuty =
-          m.isHomeGame &&
-          m.ownClubRefs &&
-          (m.sr1Status !== "assigned" || m.sr2Status !== "assigned");
-        return hasOfferedSlot || homeOwnClubDuty;
-      });
-    }
-
-    // assigned: games with referees, focused on our club's relevant games
-    return allItems.filter((m) => {
-      const isOurGame =
-        (m.sr1OurClub || m.sr2OurClub) ||
-        (m.isHomeGame && m.ownClubRefs);
-      const hasAssignment = m.sr1Status === "assigned" || m.sr2Status === "assigned";
-      return isOurGame && hasAssignment;
-    });
+    if (gameFilter === "available") return allItems.filter(isAvailable);
+    return allItems.filter(isAssigned);
   }, [allItems, gameFilter]);
 
-  const needsAttention = useCallback(
-    (row: Row<RefereeGameListItem>) => {
-      const m = row.original;
-      // Our club has unfilled duty OR home game in ownClubRefs league with unfilled slots
-      return (
-        (m.sr1OurClub && m.sr1Status !== "assigned") ||
-        (m.sr2OurClub && m.sr2Status !== "assigned") ||
-        (m.isHomeGame && m.ownClubRefs && (m.sr1Status !== "assigned" || m.sr2Status !== "assigned"))
-      );
-    },
-    [],
-  );
-
   function getRowClassName(row: Row<RefereeGameListItem>) {
-    return cn(
-      needsAttention(row) && "border-l-2 border-l-primary/50 bg-primary/5",
-      (row.original.isCancelled || row.original.isForfeited) && "opacity-60",
-    );
+    const m = row.original;
+    const inactive = m.isCancelled || m.isForfeited;
+
+    // Layer 1: Home game background
+    const homeBg = m.isHomeGame && "bg-primary/5";
+
+    // Layer 2: Left border for duty status
+    let dutyBorder: string | false = false;
+    if (hasUnfilledDuty(m)) {
+      dutyBorder = "border-l-2 border-l-destructive/50";
+    } else if (hasAllDutyFilled(m)) {
+      dutyBorder = "border-l-2 border-l-primary/50";
+    }
+
+    return cn(homeBg, dutyBorder, inactive && "opacity-60");
   }
 
   const handleSync = useCallback(async () => {
