@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import {
   Card,
@@ -45,6 +45,14 @@ export function RefereeSyncScheduleConfig() {
   const [saveState, setSaveState] = useState<"idle" | "success" | "error">(
     "idle",
   );
+
+  // Sync local state when SWR data arrives (e.g. after initial fetch)
+  useEffect(() => {
+    if (schedule) {
+      setEnabled(schedule.enabled);
+      setInterval(String(schedule.intervalMinutes ?? 30));
+    }
+  }, [schedule]);
 
   const hasChanges =
     enabled !== (schedule?.enabled ?? true) ||
