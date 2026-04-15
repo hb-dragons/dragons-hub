@@ -35,10 +35,15 @@ vi.mock("@dragons/db/schema", () => ({
     apiMatchId: "apiMatchId",
     id: "id",
   },
+  leagues: {
+    apiLigaId: "apiLigaId",
+    ownClubRefs: "ownClubRefs",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
+  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
 }));
 
 const mockPublishDomainEvent = vi.fn().mockResolvedValue(undefined);
@@ -64,6 +69,11 @@ vi.mock("./referee-sdk-client", () => ({
   createRefereeSdkClient: () => ({
     fetchOffeneSpiele: () => mockFetchOffeneSpiele(),
   }),
+}));
+
+const mockGetClubConfig = vi.fn().mockResolvedValue({ clubId: 300, clubName: "SC Dragons" });
+vi.mock("../admin/settings.service", () => ({
+  getClubConfig: () => mockGetClubConfig(),
 }));
 
 import {
@@ -342,6 +352,36 @@ describe("mapApiResultToRow", () => {
 });
 
 describe("syncRefereeGames", () => {
+  /**
+   * Helper: sets up mockSelect to handle the league lookup (first call)
+   * followed by per-game referee_games + matches lookups.
+   * `perGameFn` receives the per-game select call index (0-based) and returns the resolved rows.
+   */
+  function setupSelectMock(perGameFn: (callIndex: number) => Promise<unknown[]>) {
+    let selectCallIndex = 0;
+    mockSelect.mockImplementation(() => {
+      const currentCall = selectCallIndex++;
+      if (currentCall === 0) {
+        // League lookup: select({...}).from(leagues).where(inArray(...))
+        // Returns thenable (no .limit())
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([]),
+          }),
+        };
+      }
+      // Per-game queries: select().from(table).where(eq(...)).limit(1)
+      const perGameIndex = currentCall - 1;
+      return {
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockImplementation(() => perGameFn(perGameIndex)),
+          }),
+        }),
+      };
+    });
+  }
+
   it("returns zeros when API returns empty results", async () => {
     mockFetchOffeneSpiele.mockResolvedValue({ total: 0, results: [] });
     const counts = await syncRefereeGames();
@@ -357,13 +397,8 @@ describe("syncRefereeGames", () => {
     });
     mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
 
-    // No existing row
-    const mockFrom = vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([]),
-      }),
-    });
-    mockSelect.mockReturnValue({ from: mockFrom });
+    // No existing row, no matches row
+    setupSelectMock(async () => []);
 
     // Insert returns the new row
     const mockValues = vi.fn().mockReturnValue({
@@ -390,56 +425,24 @@ describe("syncRefereeGames", () => {
     const result = makeApiResult({ sr1 });
     mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
 
-    // We need to compute the actual hash the implementation will compute
-    // Existing row has matching hash — mock the select to return it
-    const mockFrom = vi.fn();
-    const mockWhere = vi.fn();
-    const mockLimit = vi.fn();
-
-    // First select: referee_games by apiMatchId - return existing with matching hash
-    // Second select: matches by apiMatchId - return match
-    let selectCallCount = 0;
-    mockLimit.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        // Return existing referee_games row — we need to calculate the actual hash
-        // The row from mapApiResultToRow with sr1 assigned will have specific values
-        // We'll use a placeholder and verify it's compared
-        return Promise.resolve([{
-          id: 1,
-          apiMatchId: 1001,
-          dataHash: "will-be-set-below",
-          sr1Status: "assigned",
-          sr2Status: "offered",
-        }]);
-      }
-      // matches lookup
-      return Promise.resolve([{ id: 50 }]);
-    });
-    mockWhere.mockReturnValue({ limit: mockLimit });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockSelect.mockReturnValue({ from: mockFrom });
-
-    // To make it "unchanged", we need the hash to match.
-    // Let's compute it by calling computeRefereeGameHash with the mapped row values.
-    // Instead, let's use the real function to get the hash.
+    // Compute the actual hash to match
     const mapped = mapApiResultToRow(result);
     const hash = computeRefereeGameHash(mapped);
 
-    // Reset and re-setup with correct hash
-    selectCallCount = 0;
-    mockLimit.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        return Promise.resolve([{
+    // Per-game: first call returns existing with matching hash, second returns match
+    let perGameCall = 0;
+    setupSelectMock(async () => {
+      perGameCall++;
+      if (perGameCall === 1) {
+        return [{
           id: 1,
           apiMatchId: 1001,
           dataHash: hash,
           sr1Status: "assigned",
           sr2Status: "offered",
-        }]);
+        }];
       }
-      return Promise.resolve([{ id: 50 }]);
+      return [{ id: 50 }];
     });
 
     const counts = await syncRefereeGames();
@@ -471,16 +474,11 @@ describe("syncRefereeGames", () => {
     const result = makeApiResult({ sr1, sr2 });
     mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
 
-    // Existing row with different hash (previously had open slots)
-    const mockFrom = vi.fn();
-    const mockWhere = vi.fn();
-    const mockLimit = vi.fn();
-
-    let selectCallCount = 0;
-    mockLimit.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        return Promise.resolve([{
+    let perGameCall = 0;
+    setupSelectMock(async () => {
+      perGameCall++;
+      if (perGameCall === 1) {
+        return [{
           id: 1,
           apiMatchId: 1001,
           dataHash: "old-hash",
@@ -488,13 +486,10 @@ describe("syncRefereeGames", () => {
           sr2Status: "open",
           sr1OurClub: true,
           sr2OurClub: false,
-        }]);
+        }];
       }
-      return Promise.resolve([{ id: 50 }]);
+      return [{ id: 50 }];
     });
-    mockWhere.mockReturnValue({ limit: mockLimit });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockSelect.mockReturnValue({ from: mockFrom });
 
     // Update returns
     const mockSet = vi.fn().mockReturnValue({
@@ -516,26 +511,16 @@ describe("syncRefereeGames", () => {
     result2.sp.spielnr = 99;
     mockFetchOffeneSpiele.mockResolvedValue({ total: 2, results: [result1, result2] });
 
-    // First game: select throws
-    // Second game: works fine
-    let selectCallCount = 0;
-    const mockFrom = vi.fn();
-    const mockWhere = vi.fn();
-    const mockLimit = vi.fn();
-
-    mockLimit.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        return Promise.reject(new Error("DB connection lost"));
+    // First game: referee_games select throws
+    // Second game: works fine (no existing row, no matches row)
+    let perGameCall = 0;
+    setupSelectMock(async () => {
+      perGameCall++;
+      if (perGameCall === 1) {
+        throw new Error("DB connection lost");
       }
-      if (selectCallCount === 2) {
-        return Promise.resolve([]); // no existing referee_games row
-      }
-      return Promise.resolve([]); // no matches row
+      return []; // no existing referee_games row / no matches row
     });
-    mockWhere.mockReturnValue({ limit: mockLimit });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockSelect.mockReturnValue({ from: mockFrom });
 
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 2, apiMatchId: 2002 }]),
@@ -556,15 +541,11 @@ describe("syncRefereeGames", () => {
     });
     mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
 
-    const mockFrom = vi.fn();
-    const mockWhere = vi.fn();
-    const mockLimit = vi.fn();
-
-    let selectCallCount = 0;
-    mockLimit.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        return Promise.resolve([{
+    let perGameCall = 0;
+    setupSelectMock(async () => {
+      perGameCall++;
+      if (perGameCall === 1) {
+        return [{
           id: 1,
           apiMatchId: 1001,
           dataHash: "old-hash",
@@ -576,13 +557,10 @@ describe("syncRefereeGames", () => {
           kickoffTime: "14:00",
           isCancelled: false,
           isForfeited: false,
-        }]);
+        }];
       }
-      return Promise.resolve([{ id: 50 }]);
+      return [{ id: 50 }];
     });
-    mockWhere.mockReturnValue({ limit: mockLimit });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockSelect.mockReturnValue({ from: mockFrom });
 
     const mockSet = vi.fn().mockReturnValue({
       where: vi.fn().mockResolvedValue(undefined),
@@ -606,15 +584,11 @@ describe("syncRefereeGames", () => {
     });
     mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
 
-    const mockFrom = vi.fn();
-    const mockWhere = vi.fn();
-    const mockLimit = vi.fn();
-
-    let selectCallCount = 0;
-    mockLimit.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        return Promise.resolve([{
+    let perGameCall = 0;
+    setupSelectMock(async () => {
+      perGameCall++;
+      if (perGameCall === 1) {
+        return [{
           id: 1,
           apiMatchId: 1001,
           dataHash: "old-hash",
@@ -626,13 +600,10 @@ describe("syncRefereeGames", () => {
           kickoffTime: "14:00",
           isCancelled: false,
           isForfeited: false,
-        }]);
+        }];
       }
-      return Promise.resolve([{ id: 50 }]);
+      return [{ id: 50 }];
     });
-    mockWhere.mockReturnValue({ limit: mockLimit });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockSelect.mockReturnValue({ from: mockFrom });
 
     const mockSet = vi.fn().mockReturnValue({
       where: vi.fn().mockResolvedValue(undefined),
@@ -654,15 +625,11 @@ describe("syncRefereeGames", () => {
     result.sp.abgesagt = true;
     mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
 
-    const mockFrom = vi.fn();
-    const mockWhere = vi.fn();
-    const mockLimit = vi.fn();
-
-    let selectCallCount = 0;
-    mockLimit.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        return Promise.resolve([{
+    let perGameCall = 0;
+    setupSelectMock(async () => {
+      perGameCall++;
+      if (perGameCall === 1) {
+        return [{
           id: 1,
           apiMatchId: 1001,
           dataHash: "old-hash",
@@ -674,13 +641,10 @@ describe("syncRefereeGames", () => {
           kickoffTime: "12:00",
           isCancelled: false,
           isForfeited: false,
-        }]);
+        }];
       }
-      return Promise.resolve([{ id: 50 }]);
+      return [{ id: 50 }];
     });
-    mockWhere.mockReturnValue({ limit: mockLimit });
-    mockFrom.mockReturnValue({ where: mockWhere });
-    mockSelect.mockReturnValue({ from: mockFrom });
 
     const mockSet = vi.fn().mockReturnValue({
       where: vi.fn().mockResolvedValue(undefined),
@@ -691,6 +655,27 @@ describe("syncRefereeGames", () => {
 
     expect(counts.updated).toBe(1);
     expect(mockCancelReminderJobs).toHaveBeenCalledWith(1001);
+  });
+
+  it("sets isHomeGame when homeClubId matches club config", async () => {
+    const result = makeApiResult();
+    // homeClubId = 300 (from makeApiResult)
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    // No existing row, no matches row
+    setupSelectMock(async () => []);
+
+    const mockValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+    });
+    mockInsert.mockReturnValue({ values: mockValues });
+
+    await syncRefereeGames();
+
+    // Verify insert was called with isHomeGame/isGuestGame
+    const insertedValues = mockValues.mock.calls[0][0];
+    expect(insertedValues).toHaveProperty("isHomeGame", true);
+    expect(insertedValues).toHaveProperty("isGuestGame", false);
   });
 
   it("should log entries when SyncLogger is provided", async () => {
@@ -706,13 +691,8 @@ describe("syncRefereeGames", () => {
     });
     mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
 
-    // No existing row
-    const mockFrom = vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([]),
-      }),
-    });
-    mockSelect.mockReturnValue({ from: mockFrom });
+    // No existing row, no matches row
+    setupSelectMock(async () => []);
 
     const mockValues = vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),

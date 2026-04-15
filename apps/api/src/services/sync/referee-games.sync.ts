@@ -4,6 +4,7 @@ import { refereeGames, matches, leagues } from "@dragons/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { logger } from "../../config/logger";
 import { createRefereeSdkClient } from "./referee-sdk-client";
+import { getClubConfig } from "../admin/settings.service";
 import { publishDomainEvent } from "../events/event-publisher";
 import { scheduleReminderJobs, cancelReminderJobs } from "../referee/referee-reminders.service";
 import { EVENT_TYPES } from "@dragons/shared";
@@ -194,6 +195,10 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
     leagueRows.map((r) => [r.apiLigaId, r.ownClubRefs ?? false]),
   );
 
+  // Fetch club config once for isHomeGame/isGuestGame computation
+  const clubConfig = await getClubConfig();
+  const clubId = clubConfig?.clubId ?? null;
+
   let created = 0;
   let updated = 0;
   let unchanged = 0;
@@ -202,6 +207,8 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
     try {
       const mapped = mapApiResultToRow(result);
       const ownClubRefs = ownClubRefsMap.get(mapped.leagueApiId) ?? false;
+      const isHomeGame = clubId !== null && mapped.homeClubId === clubId;
+      const isGuestGame = clubId !== null && mapped.guestClubId === clubId;
       const hash = computeRefereeGameHash(mapped);
 
       // Look up existing referee_games row
@@ -221,6 +228,8 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
           ...mapped,
           matchId,
           ownClubRefs,
+          isHomeGame,
+          isGuestGame,
           dataHash: hash,
           lastSyncedAt: now,
           createdAt: now,
@@ -267,6 +276,8 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
             ...mapped,
             matchId,
             ownClubRefs,
+            isHomeGame,
+            isGuestGame,
             dataHash: hash,
             lastSyncedAt: now,
             updatedAt: now,
