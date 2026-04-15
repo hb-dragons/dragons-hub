@@ -1,7 +1,7 @@
 import { db } from "../../config/database";
 import { syncRuns, syncRunEntries, syncSchedule, matches, matchRemoteVersions, matchChanges, user } from "@dragons/db/schema";
 import { desc, eq, sql, and, or, ilike, inArray } from "drizzle-orm";
-import { updateSyncSchedule } from "../../workers/queues";
+import { updateSyncSchedule, updateRefereeSyncSchedule } from "../../workers/queues";
 import type { SyncLogsQuery, SyncEntriesQuery, UpdateScheduleBody } from "../../routes/admin/sync.schemas";
 
 /**
@@ -167,14 +167,32 @@ export async function getSyncRunEntries(syncRunId: number, params: SyncEntriesQu
   };
 }
 
-export async function getSchedule() {
-  const [schedule] = await db.select().from(syncSchedule).limit(1);
+export async function getSchedule(syncType: string = "full") {
+  const [schedule] = await db
+    .select()
+    .from(syncSchedule)
+    .where(eq(syncSchedule.syncType, syncType))
+    .limit(1);
 
   if (!schedule) {
+    if (syncType === "referee-games") {
+      return {
+        id: null,
+        syncType: "referee-games",
+        enabled: true,
+        cronExpression: null,
+        intervalMinutes: 30,
+        timezone: "Europe/Berlin",
+        lastUpdatedAt: null,
+        lastUpdatedBy: null,
+      };
+    }
     return {
       id: null,
+      syncType: "full",
       enabled: true,
       cronExpression: "0 4 * * *",
+      intervalMinutes: null,
       timezone: "Europe/Berlin",
       lastUpdatedAt: null,
       lastUpdatedBy: null,
@@ -185,27 +203,35 @@ export async function getSchedule() {
 }
 
 export async function upsertSchedule(data: UpdateScheduleBody) {
-  const [existingSchedule] = await db.select().from(syncSchedule).limit(1);
+  const syncType = data.syncType ?? "full";
+  const [existing] = await db
+    .select()
+    .from(syncSchedule)
+    .where(eq(syncSchedule.syncType, syncType))
+    .limit(1);
 
   let schedule;
-  if (existingSchedule) {
+  if (existing) {
     [schedule] = await db
       .update(syncSchedule)
       .set({
-        enabled: data.enabled ?? existingSchedule.enabled,
-        cronExpression: data.cronExpression ?? existingSchedule.cronExpression,
-        timezone: data.timezone ?? existingSchedule.timezone,
+        enabled: data.enabled ?? existing.enabled,
+        cronExpression: data.cronExpression !== undefined ? data.cronExpression : existing.cronExpression,
+        intervalMinutes: data.intervalMinutes ?? existing.intervalMinutes,
+        timezone: data.timezone ?? existing.timezone,
         lastUpdatedAt: new Date(),
         lastUpdatedBy: data.updatedBy ?? null,
       })
-      .where(eq(syncSchedule.id, existingSchedule.id))
+      .where(eq(syncSchedule.id, existing.id))
       .returning();
   } else {
     [schedule] = await db
       .insert(syncSchedule)
       .values({
+        syncType,
         enabled: data.enabled ?? true,
-        cronExpression: data.cronExpression ?? "0 4 * * *",
+        cronExpression: data.cronExpression ?? (syncType === "full" ? "0 4 * * *" : null),
+        intervalMinutes: data.intervalMinutes ?? (syncType === "referee-games" ? 30 : null),
         timezone: data.timezone ?? "Europe/Berlin",
         lastUpdatedAt: new Date(),
         lastUpdatedBy: data.updatedBy ?? null,
@@ -214,7 +240,11 @@ export async function upsertSchedule(data: UpdateScheduleBody) {
   }
 
   if (schedule) {
-    await updateSyncSchedule(schedule.enabled, schedule.cronExpression, schedule.timezone);
+    if (syncType === "referee-games") {
+      await updateRefereeSyncSchedule(schedule.enabled, schedule.intervalMinutes ?? 30);
+    } else {
+      await updateSyncSchedule(schedule.enabled, schedule.cronExpression ?? "0 4 * * *", schedule.timezone);
+    }
   }
 
   return schedule;
