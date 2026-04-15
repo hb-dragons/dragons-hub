@@ -78,14 +78,6 @@ export async function initializeWorkers() {
     logger.warn({ err: error }, "Failed to seed referee notification config");
   }
 
-  // Referee games sync — scheduled every 30 minutes
-  await syncQueue.add("referee-games-sync-scheduled", { type: "referee-games" }, {
-    repeat: { every: 30 * 60 * 1000 },
-    removeOnComplete: true,
-    removeOnFail: 100,
-  });
-  logger.info("Referee games sync scheduled (every 30 minutes)");
-
   // Trigger referee games sync after main sync completes
   syncWorker.on("completed", async (job) => {
     if (job?.data?.type !== "referee-games") {
