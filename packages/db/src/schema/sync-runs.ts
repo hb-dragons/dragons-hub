@@ -72,8 +72,10 @@ export const syncRunEntries = pgTable(
 
 export const syncSchedule = pgTable("sync_schedule", {
   id: serial("id").primaryKey(),
+  syncType: varchar("sync_type", { length: 50 }).notNull().default("full").unique(),
   enabled: boolean("enabled").notNull().default(true),
-  cronExpression: varchar("cron_expression", { length: 100 }).notNull().default("0 4 * * *"),
+  cronExpression: varchar("cron_expression", { length: 100 }),
+  intervalMinutes: integer("interval_minutes"),
   timezone: varchar("timezone", { length: 100 }).notNull().default("Europe/Berlin"),
   lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true }),
   lastUpdatedBy: varchar("last_updated_by", { length: 255 }),

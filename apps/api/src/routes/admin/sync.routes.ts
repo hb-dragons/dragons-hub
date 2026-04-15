@@ -379,7 +379,8 @@ syncRoutes.get(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const schedule = await getSchedule();
+    const syncType = c.req.query("syncType") ?? "full";
+    const schedule = await getSchedule(syncType);
     return c.json(schedule);
   },
 );

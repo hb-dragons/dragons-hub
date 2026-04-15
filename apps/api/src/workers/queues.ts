@@ -1,4 +1,5 @@
 import { Queue } from "bullmq";
+import { eq } from "drizzle-orm";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { db } from "../config/database";
@@ -98,9 +99,13 @@ export async function initializeScheduledJobs() {
   let enabled = true;
 
   try {
-    const [schedule] = await db.select().from(syncSchedule).limit(1);
+    const [schedule] = await db
+      .select()
+      .from(syncSchedule)
+      .where(eq(syncSchedule.syncType, "full"))
+      .limit(1);
     if (schedule) {
-      cronExpression = schedule.cronExpression;
+      cronExpression = schedule.cronExpression ?? cronExpression;
       timezone = schedule.timezone;
       enabled = schedule.enabled;
     }
@@ -122,6 +127,44 @@ export async function initializeScheduledJobs() {
     logger.info({ cronExpression, timezone }, "Scheduled jobs initialized");
   } else {
     logger.info("Sync schedule is disabled");
+  }
+
+  // Referee games sync — interval-based
+  try {
+    const [refereeSchedule] = await db
+      .select()
+      .from(syncSchedule)
+      .where(eq(syncSchedule.syncType, "referee-games"))
+      .limit(1);
+
+    const refInterval = refereeSchedule?.intervalMinutes ?? 30;
+    const refEnabled = refereeSchedule?.enabled ?? true;
+
+    if (refEnabled) {
+      await syncQueue.add(
+        "referee-games-sync-scheduled",
+        { type: "referee-games" },
+        {
+          repeat: { every: refInterval * 60 * 1000 },
+          removeOnComplete: true,
+          removeOnFail: 100,
+        },
+      );
+      logger.info({ intervalMinutes: refInterval }, "Referee games sync scheduled");
+    } else {
+      logger.info("Referee games sync schedule is disabled");
+    }
+  } catch {
+    logger.warn("Could not read referee schedule from DB, using 30-min default");
+    await syncQueue.add(
+      "referee-games-sync-scheduled",
+      { type: "referee-games" },
+      {
+        repeat: { every: 30 * 60 * 1000 },
+        removeOnComplete: true,
+        removeOnFail: 100,
+      },
+    );
   }
 }
 
@@ -201,5 +244,32 @@ export async function updateSyncSchedule(
     logger.info({ cronExpression, timezone }, "Sync schedule updated");
   } else {
     logger.info("Sync schedule disabled");
+  }
+}
+
+export async function updateRefereeSyncSchedule(
+  enabled: boolean,
+  intervalMinutes: number,
+) {
+  const repeatableJobs = await syncQueue.getRepeatableJobs();
+  for (const job of repeatableJobs) {
+    if (job.name === "referee-games-sync-scheduled") {
+      await syncQueue.removeRepeatableByKey(job.key);
+    }
+  }
+
+  if (enabled) {
+    await syncQueue.add(
+      "referee-games-sync-scheduled",
+      { type: "referee-games" },
+      {
+        repeat: { every: intervalMinutes * 60 * 1000 },
+        removeOnComplete: true,
+        removeOnFail: 100,
+      },
+    );
+    logger.info({ intervalMinutes }, "Referee sync schedule updated");
+  } else {
+    logger.info("Referee sync schedule disabled");
   }
 }

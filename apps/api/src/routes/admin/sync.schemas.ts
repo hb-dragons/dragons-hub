@@ -47,11 +47,14 @@ export const jobStatusesQuerySchema = z.object({
 });
 
 export const updateScheduleBodySchema = z.object({
+  syncType: z.string().optional(),
   enabled: z.boolean().optional(),
   cronExpression: z
     .string()
     .regex(/^[\d*,\-/]+\s[\d*,\-/]+\s[\d*,\-/]+\s[\d*,\-/]+\s[\d*,\-/]+$/, "Invalid cron expression")
-    .optional(),
+    .optional()
+    .nullable(),
+  intervalMinutes: z.number().int().min(5).max(120).optional(),
   timezone: z.string().min(1).optional(),
   updatedBy: z.string().optional(),
 });

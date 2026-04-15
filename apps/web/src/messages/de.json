@@ -380,6 +380,14 @@
       "connectionLost": "Verbindung zur API verloren",
       "connectionLostDescription": "Daten können veraltet sein. Wiederverbindung im Hintergrund.",
       "loadMoreFailed": "Weitere Logs konnten nicht geladen werden"
+    },
+    "refereeSchedule": {
+      "title": "SR-Spiele Sync-Zeitplan",
+      "description": "Konfigurieren, wie oft SR-Spiele vom Verband synchronisiert werden",
+      "intervalLabel": "Sync-Intervall",
+      "intervalDescription": "Wie oft nach Änderungen bei SR-Spielen geprüft wird",
+      "everyNMinutes": "Alle {minutes} Min.",
+      "startingSoon": "startet bald"
     }
   },
   "referees": {

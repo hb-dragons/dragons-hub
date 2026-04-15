@@ -8,26 +8,46 @@ import {
   CardHeader,
   CardTitle,
 } from "@dragons/ui/components/card";
-import { Activity, Clock } from "lucide-react";
+import { Activity, Clock, Timer, Calendar } from "lucide-react";
 import { cn } from "@dragons/ui/lib/utils";
-import { useRefereeSyncStatus } from "./use-sync";
+import type { SyncScheduleData, SyncRun } from "./types";
+import { useRefereeSyncStatus, useRefereeSyncSchedule } from "./use-sync";
 import { formatDuration } from "./utils";
 
 export function RefereeSyncStatusCards() {
   const t = useTranslations();
   const format = useFormatter();
+
+  function getNextRunLabel(
+    lastSync: Pick<SyncRun, "completedAt" | "status"> | null,
+    sched: SyncScheduleData | null,
+  ): string {
+    if (!sched?.enabled) return t("sync.status.disabled");
+    if (!sched.intervalMinutes) return t("sync.status.disabled");
+    if (!lastSync?.completedAt) return t("sync.refereeSchedule.startingSoon");
+
+    const lastCompleted = new Date(lastSync.completedAt).getTime();
+    const nextRun = lastCompleted + sched.intervalMinutes * 60 * 1000;
+    const now = Date.now();
+    const diffMs = nextRun - now;
+
+    if (diffMs <= 0) return t("sync.refereeSchedule.startingSoon");
+    const diffMinutes = Math.ceil(diffMs / (1000 * 60));
+    return t("sync.status.inMinutes", { minutes: String(diffMinutes) });
+  }
   const { status, isRunning } = useRefereeSyncStatus();
+  const { schedule } = useRefereeSyncSchedule();
   const lastSync = status?.lastSync;
 
   // Tick relative times every 30s so they stay fresh
   const [, setTick] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setTick((v) => v + 1), 30_000);
+    const timer = setInterval(() => setTick((t) => t + 1), 30_000);
     return () => clearInterval(timer);
   }, []);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {/* Current Status */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -84,27 +104,57 @@ export function RefereeSyncStatusCards() {
                 {format.dateTime(new Date(lastSync.startedAt), "full")} &middot;{" "}
                 {formatDuration(lastSync.durationMs)}
               </p>
-              {(lastSync.recordsCreated != null ||
-                lastSync.recordsUpdated != null ||
-                lastSync.recordsSkipped != null) && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {[
-                    lastSync.recordsCreated != null &&
-                      t("sync.live.created", { count: String(lastSync.recordsCreated) }),
-                    lastSync.recordsUpdated != null &&
-                      t("sync.live.updated", { count: String(lastSync.recordsUpdated) }),
-                    lastSync.recordsSkipped != null &&
-                      t("sync.live.skipped", { count: String(lastSync.recordsSkipped) }),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              )}
             </>
           ) : (
             <div className="text-2xl font-bold text-muted-foreground">
               {t("sync.status.never")}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Next Sync */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium">{t("sync.status.nextSync")}</CardTitle>
+          <Timer className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div
+            className={cn(
+              "text-2xl font-bold",
+              schedule?.enabled ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {getNextRunLabel(lastSync ?? null, schedule)}
+          </div>
+          {schedule?.enabled && schedule.intervalMinutes && (
+            <p className="text-xs text-muted-foreground">
+              {t("sync.refereeSchedule.everyNMinutes", { minutes: String(schedule.intervalMinutes) })}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Schedule */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium">{t("sync.status.schedule")}</CardTitle>
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div
+            className={cn(
+              "text-2xl font-bold",
+              schedule?.enabled ? "text-green-600" : "text-muted-foreground",
+            )}
+          >
+            {schedule?.enabled ? t("sync.status.enabled") : t("sync.status.disabled")}
+          </div>
+          {schedule?.intervalMinutes && (
+            <p className="text-xs text-muted-foreground">
+              {t("sync.refereeSchedule.everyNMinutes", { minutes: String(schedule.intervalMinutes) })}
+            </p>
           )}
         </CardContent>
       </Card>

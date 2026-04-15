@@ -15,6 +15,9 @@ vi.mock("../config/database", () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: mockLimit,
+        }),
         limit: vi.fn().mockResolvedValue([]),
       }),
     }),
@@ -33,12 +36,14 @@ const {
   mockRemoveRepeatableByKey,
   mockGetJobs,
   mockGetJob,
+  mockLimit,
 } = vi.hoisted(() => ({
   mockAdd: vi.fn().mockResolvedValue({ id: "job-1" }),
   mockGetRepeatableJobs: vi.fn().mockResolvedValue([]),
   mockRemoveRepeatableByKey: vi.fn().mockResolvedValue(undefined),
   mockGetJobs: vi.fn().mockResolvedValue([]),
   mockGetJob: vi.fn(),
+  mockLimit: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("bullmq", () => ({
@@ -61,10 +66,12 @@ import {
   triggerManualSync,
   getJobStatus,
   updateSyncSchedule,
+  updateRefereeSyncSchedule,
 } from "./queues";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockLimit.mockResolvedValue([]);
   mockInsert.mockReturnValue({
     values: vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 42 }]),
@@ -97,16 +104,14 @@ describe("initializeScheduledJobs", () => {
   });
 
   it("reads schedule from DB", async () => {
-    const { db } = await import("../config/database");
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([{
-          cronExpression: "0 6 * * *",
-          timezone: "UTC",
-          enabled: true,
-        }]),
-      }),
-    } as never);
+    // First call: full sync schedule, second call: referee schedule
+    mockLimit
+      .mockResolvedValueOnce([{
+        cronExpression: "0 6 * * *",
+        timezone: "UTC",
+        enabled: true,
+      }])
+      .mockResolvedValueOnce([]);
 
     await initializeScheduledJobs();
 
@@ -119,30 +124,73 @@ describe("initializeScheduledJobs", () => {
     );
   });
 
-  it("does not add job when schedule is disabled", async () => {
-    const { db } = await import("../config/database");
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([{
-          cronExpression: "0 4 * * *",
-          timezone: "Europe/Berlin",
-          enabled: false,
-        }]),
-      }),
-    } as never);
+  it("does not add daily-sync job when schedule is disabled", async () => {
+    // First call: full sync disabled, second call: referee schedule (default)
+    mockLimit
+      .mockResolvedValueOnce([{
+        cronExpression: "0 4 * * *",
+        timezone: "Europe/Berlin",
+        enabled: false,
+      }])
+      .mockResolvedValueOnce([]);
 
     await initializeScheduledJobs();
 
-    expect(mockAdd).not.toHaveBeenCalled();
+    // daily-sync should not be added, but referee-games-sync-scheduled should be
+    expect(mockAdd).not.toHaveBeenCalledWith(
+      "daily-sync",
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(mockAdd).toHaveBeenCalledWith(
+      "referee-games-sync-scheduled",
+      { type: "referee-games" },
+      expect.objectContaining({
+        repeat: { every: 30 * 60 * 1000 },
+      }),
+    );
+  });
+
+  it("also schedules referee-games sync", async () => {
+    // First call: full sync default, second call: referee with custom interval
+    mockLimit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        intervalMinutes: 15,
+        enabled: true,
+      }]);
+
+    await initializeScheduledJobs();
+
+    expect(mockAdd).toHaveBeenCalledWith(
+      "referee-games-sync-scheduled",
+      { type: "referee-games" },
+      expect.objectContaining({
+        repeat: { every: 15 * 60 * 1000 },
+      }),
+    );
+  });
+
+  it("does not schedule referee sync when disabled", async () => {
+    // First call: full sync default, second call: referee disabled
+    mockLimit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        intervalMinutes: 30,
+        enabled: false,
+      }]);
+
+    await initializeScheduledJobs();
+
+    expect(mockAdd).not.toHaveBeenCalledWith(
+      "referee-games-sync-scheduled",
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it("uses defaults on DB read error", async () => {
-    const { db } = await import("../config/database");
-    vi.mocked(db.select).mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        limit: vi.fn().mockRejectedValue(new Error("DB error")),
-      }),
-    } as never);
+    mockLimit.mockRejectedValue(new Error("DB error"));
 
     await initializeScheduledJobs();
 
@@ -256,6 +304,38 @@ describe("updateSyncSchedule", () => {
   it("does not add job when disabled", async () => {
     await updateSyncSchedule(false, "0 5 * * *", "UTC");
 
+    expect(mockAdd).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateRefereeSyncSchedule", () => {
+  it("removes existing referee jobs and adds new one", async () => {
+    mockGetRepeatableJobs.mockResolvedValue([
+      { name: "referee-games-sync-scheduled", key: "ref-key-1" },
+      { name: "daily-sync", key: "daily-key-1" },
+    ]);
+
+    await updateRefereeSyncSchedule(true, 15);
+
+    expect(mockRemoveRepeatableByKey).toHaveBeenCalledWith("ref-key-1");
+    expect(mockRemoveRepeatableByKey).not.toHaveBeenCalledWith("daily-key-1");
+    expect(mockAdd).toHaveBeenCalledWith(
+      "referee-games-sync-scheduled",
+      { type: "referee-games" },
+      expect.objectContaining({
+        repeat: { every: 15 * 60 * 1000 },
+      }),
+    );
+  });
+
+  it("only removes jobs when disabled", async () => {
+    mockGetRepeatableJobs.mockResolvedValue([
+      { name: "referee-games-sync-scheduled", key: "ref-key-1" },
+    ]);
+
+    await updateRefereeSyncSchedule(false, 30);
+
+    expect(mockRemoveRepeatableByKey).toHaveBeenCalledWith("ref-key-1");
     expect(mockAdd).not.toHaveBeenCalled();
   });
 });

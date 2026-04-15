@@ -15,6 +15,7 @@ vi.mock("../../config/database", () => ({
 
 vi.mock("../../workers/queues", () => ({
   updateSyncSchedule: vi.fn(),
+  updateRefereeSyncSchedule: vi.fn(),
 }));
 
 // --- Imports (after mocks) ---
@@ -28,7 +29,7 @@ import {
   upsertSchedule,
   getMatchChangesForEntry,
 } from "./sync-admin.service";
-import { updateSyncSchedule } from "../../workers/queues";
+import { updateSyncSchedule, updateRefereeSyncSchedule } from "../../workers/queues";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- PGlite setup ---
@@ -315,8 +316,10 @@ describe("getSchedule", () => {
 
     expect(result).toEqual({
       id: null,
+      syncType: "full",
       enabled: true,
       cronExpression: "0 4 * * *",
+      intervalMinutes: null,
       timezone: "Europe/Berlin",
       lastUpdatedAt: null,
       lastUpdatedBy: null,
@@ -325,8 +328,8 @@ describe("getSchedule", () => {
 
   it("returns existing schedule", async () => {
     await ctx.client.exec(`
-      INSERT INTO sync_schedule (enabled, cron_expression, timezone, last_updated_by)
-      VALUES (false, '0 6 * * *', 'UTC', 'admin')
+      INSERT INTO sync_schedule (sync_type, enabled, cron_expression, timezone, last_updated_by)
+      VALUES ('full', false, '0 6 * * *', 'UTC', 'admin')
     `);
 
     const result = await getSchedule();
@@ -335,6 +338,34 @@ describe("getSchedule", () => {
     expect(result.cronExpression).toBe("0 6 * * *");
     expect(result.timezone).toBe("UTC");
   });
+
+  it("returns referee-games defaults when no schedule exists", async () => {
+    const result = await getSchedule("referee-games");
+
+    expect(result).toEqual({
+      id: null,
+      syncType: "referee-games",
+      enabled: true,
+      cronExpression: null,
+      intervalMinutes: 30,
+      timezone: "Europe/Berlin",
+      lastUpdatedAt: null,
+      lastUpdatedBy: null,
+    });
+  });
+
+  it("returns referee-games schedule from DB", async () => {
+    await ctx.client.exec(`
+      INSERT INTO sync_schedule (sync_type, enabled, interval_minutes, timezone)
+      VALUES ('referee-games', true, 15, 'Europe/Berlin')
+    `);
+
+    const result = await getSchedule("referee-games");
+
+    expect(result.syncType).toBe("referee-games");
+    expect(result.intervalMinutes).toBe(15);
+    expect(result.cronExpression).toBeNull();
+  });
 });
 
 describe("upsertSchedule", () => {
@@ -342,15 +373,18 @@ describe("upsertSchedule", () => {
     const result = await upsertSchedule({});
 
     expect(result).toBeDefined();
+    expect(result!.syncType).toBe("full");
     expect(result!.enabled).toBe(true);
     expect(result!.cronExpression).toBe("0 4 * * *");
     expect(result!.timezone).toBe("Europe/Berlin");
     expect(result!.lastUpdatedAt).toBeInstanceOf(Date);
     expect(updateSyncSchedule).toHaveBeenCalledWith(true, "0 4 * * *", "Europe/Berlin");
+    expect(updateRefereeSyncSchedule).not.toHaveBeenCalled();
   });
 
   it("inserts with provided values", async () => {
     const result = await upsertSchedule({
+      syncType: "full",
       enabled: false,
       cronExpression: "*/30 * * * *",
       timezone: "UTC",
@@ -386,6 +420,30 @@ describe("upsertSchedule", () => {
     expect(result!.enabled).toBe(false);
     expect(result!.cronExpression).toBe("*/5 * * * *");
     expect(result!.timezone).toBe("America/New_York");
+  });
+
+  it("inserts a referee-games schedule", async () => {
+    const result = await upsertSchedule({
+      syncType: "referee-games",
+      enabled: true,
+      intervalMinutes: 15,
+    });
+
+    expect(result!.syncType).toBe("referee-games");
+    expect(result!.intervalMinutes).toBe(15);
+    expect(result!.cronExpression).toBeNull();
+    expect(updateRefereeSyncSchedule).toHaveBeenCalledWith(true, 15);
+    expect(updateSyncSchedule).not.toHaveBeenCalled();
+  });
+
+  it("updates referee-games schedule", async () => {
+    await upsertSchedule({ syncType: "referee-games", intervalMinutes: 30 });
+    vi.clearAllMocks();
+
+    const result = await upsertSchedule({ syncType: "referee-games", intervalMinutes: 15 });
+
+    expect(result!.intervalMinutes).toBe(15);
+    expect(updateRefereeSyncSchedule).toHaveBeenCalledWith(true, 15);
   });
 });
 
