@@ -382,6 +382,14 @@
       "connectionLost": "Lost connection to API",
       "connectionLostDescription": "Data may be stale. Retrying in the background.",
       "loadMoreFailed": "Failed to load more logs"
+    },
+    "refereeSchedule": {
+      "title": "Referee Sync Schedule",
+      "description": "Configure how often referee games are synced from the federation",
+      "intervalLabel": "Sync Interval",
+      "intervalDescription": "How often to check for referee game updates",
+      "everyNMinutes": "Every {minutes} min",
+      "startingSoon": "starting soon"
     }
   },
   "referees": {
