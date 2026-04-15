@@ -1,6 +1,6 @@
 {
-  "id": "b4913480-4592-4043-a6e3-8e7c1731db9a",
-  "prevId": "4f9707d3-de71-4bde-9648-4f5692ece42d",
+  "id": "a3c7e291-5f84-4d1b-9a2e-6b8f3c0d7e4a",
+  "prevId": "79b7d0e1-77a2-438b-ba6a-fcd855713b84",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2175,13 +2175,6 @@
           "primaryKey": true,
           "notNull": true
         },
-        "sync_type": {
-          "name": "sync_type",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'full'"
-        },
         "enabled": {
           "name": "enabled",
           "type": "boolean",
@@ -2192,12 +2185,6 @@
         "cron_expression": {
           "name": "cron_expression",
           "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "interval_minutes": {
-          "name": "interval_minutes",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -2217,6 +2204,19 @@
         "last_updated_by": {
           "name": "last_updated_by",
           "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sync_type": {
+          "name": "sync_type",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'full'"
+        },
+        "interval_minutes": {
+          "name": "interval_minutes",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         }
@@ -4057,8 +4057,7 @@
           "name": "config",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
+          "notNull": true
         },
         "digest_mode": {
           "name": "digest_mode",
@@ -4379,6 +4378,273 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.referee_games": {
+      "name": "referee_games",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "api_match_id": {
+          "name": "api_match_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "match_id": {
+          "name": "match_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "match_no": {
+          "name": "match_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kickoff_date": {
+          "name": "kickoff_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kickoff_time": {
+          "name": "kickoff_time",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "home_team_name": {
+          "name": "home_team_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "guest_team_name": {
+          "name": "guest_team_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "league_name": {
+          "name": "league_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "league_short": {
+          "name": "league_short",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "venue_name": {
+          "name": "venue_name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "venue_city": {
+          "name": "venue_city",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sr1_our_club": {
+          "name": "sr1_our_club",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sr2_our_club": {
+          "name": "sr2_our_club",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sr1_name": {
+          "name": "sr1_name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sr2_name": {
+          "name": "sr2_name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sr1_referee_api_id": {
+          "name": "sr1_referee_api_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sr2_referee_api_id": {
+          "name": "sr2_referee_api_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sr1_status": {
+          "name": "sr1_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "sr2_status": {
+          "name": "sr2_status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "is_cancelled": {
+          "name": "is_cancelled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_forfeited": {
+          "name": "is_forfeited",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "home_club_id": {
+          "name": "home_club_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "guest_club_id": {
+          "name": "guest_club_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_home_game": {
+          "name": "is_home_game",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "is_guest_game": {
+          "name": "is_guest_game",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "league_api_id": {
+          "name": "league_api_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "own_club_refs": {
+          "name": "own_club_refs",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "data_hash": {
+          "name": "data_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "referee_games_match_id_idx": {
+          "name": "referee_games_match_id_idx",
+          "columns": [
+            {
+              "expression": "match_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "referee_games_kickoff_date_idx": {
+          "name": "referee_games_kickoff_date_idx",
+          "columns": [
+            {
+              "expression": "kickoff_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "referee_games_match_id_matches_id_fk": {
+          "name": "referee_games_match_id_matches_id_fk",
+          "tableFrom": "referee_games",
+          "tableTo": "matches",
+          "columnsFrom": [
+            "match_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "referee_games_api_match_id_unique": {
+          "name": "referee_games_api_match_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "api_match_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
