@@ -113,7 +113,7 @@ function SrSlotBadge({ status, ourClub, name, t }: SrSlotBadgeProps) {
 // FacetChips — SR-status filter
 // ------------------------------------------------------------------
 
-type GameFilterValue = "our-club" | "home" | "away" | "any-open" | "all";
+type GameFilterValue = "our-duty" | "open-slots" | "all";
 
 interface FacetChipsProps {
   value: GameFilterValue;
@@ -347,7 +347,7 @@ export function RefereeGamesList() {
   const isAdmin = session?.user?.role === "admin";
 
   const [syncing, setSyncing] = useState(false);
-  const [gameFilter, setGameFilter] = useState<GameFilterValue>("our-club");
+  const [gameFilter, setGameFilter] = useState<GameFilterValue>("our-duty");
   const [search, setSearch] = useState("");
 
   const { data } = useSWR<PaginatedResponse<RefereeGameListItem>>(
@@ -357,24 +357,18 @@ export function RefereeGamesList() {
 
   const allItems = useMemo(() => data?.items ?? [], [data?.items]);
 
-  // Apply combined game filter
+  // Apply game filter
   const items = useMemo(() => {
     if (gameFilter === "all") return allItems;
-
-    const hasOurClubUnfilled = (m: RefereeGameListItem) =>
-      (m.sr1Status !== "assigned" && m.sr1OurClub) ||
-      (m.sr2Status !== "assigned" && m.sr2OurClub);
-
-    if (gameFilter === "our-club") {
-      return allItems.filter(hasOurClubUnfilled);
+    if (gameFilter === "our-duty") {
+      // Games where our club has at least one unfilled slot
+      return allItems.filter(
+        (m) =>
+          (m.sr1OurClub && m.sr1Status !== "assigned") ||
+          (m.sr2OurClub && m.sr2Status !== "assigned"),
+      );
     }
-    if (gameFilter === "home") {
-      return allItems.filter((m) => m.isHomeGame && hasOurClubUnfilled(m));
-    }
-    if (gameFilter === "away") {
-      return allItems.filter((m) => !m.isHomeGame && hasOurClubUnfilled(m));
-    }
-    // any-open
+    // open-slots: any game with at least one unfilled slot
     return allItems.filter(
       (m) => m.sr1Status !== "assigned" || m.sr2Status !== "assigned",
     );
@@ -456,10 +450,8 @@ export function RefereeGamesList() {
             value={gameFilter}
             onChange={setGameFilter}
             options={[
-              { label: t("filters.srFilterOurClub"), value: "our-club" },
-              { label: t("filters.gameTypeHome"), value: "home" },
-              { label: t("filters.gameTypeAway"), value: "away" },
-              { label: t("filters.srFilterAnyOpen"), value: "any-open" },
+              { label: t("filters.srFilterOurClub"), value: "our-duty" },
+              { label: t("filters.srFilterAnyOpen"), value: "open-slots" },
               { label: t("filters.srFilterAll"), value: "all" },
             ]}
           />
