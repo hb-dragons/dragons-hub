@@ -113,16 +113,15 @@ function SrSlotBadge({ status, ourClub, name, t }: SrSlotBadgeProps) {
 // FacetChips — SR-status filter
 // ------------------------------------------------------------------
 
-type SrFilterValue = "our-club-open" | "any-open" | "all";
-type GameTypeFilterValue = "home" | "away" | "all";
+type GameFilterValue = "our-club" | "home" | "away" | "any-open" | "all";
 
-interface FacetChipsProps<T extends string> {
-  value: T;
-  onChange: (v: T) => void;
-  options: { label: string; value: T }[];
+interface FacetChipsProps {
+  value: GameFilterValue;
+  onChange: (v: GameFilterValue) => void;
+  options: { label: string; value: GameFilterValue }[];
 }
 
-function FacetChips<T extends string>({ value, onChange, options }: FacetChipsProps<T>) {
+function FacetChips({ value, onChange, options }: FacetChipsProps) {
 
   return (
     <div className="flex gap-1">
@@ -348,8 +347,7 @@ export function RefereeGamesList() {
   const isAdmin = session?.user?.role === "admin";
 
   const [syncing, setSyncing] = useState(false);
-  const [srFilter, setSrFilter] = useState<SrFilterValue>("our-club-open");
-  const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilterValue>("all");
+  const [gameFilter, setGameFilter] = useState<GameFilterValue>("our-club");
   const [search, setSearch] = useState("");
 
   const { data } = useSWR<PaginatedResponse<RefereeGameListItem>>(
@@ -359,32 +357,28 @@ export function RefereeGamesList() {
 
   const allItems = useMemo(() => data?.items ?? [], [data?.items]);
 
-  // Apply client-side filters before passing to table
+  // Apply combined game filter
   const items = useMemo(() => {
-    let result = allItems;
+    if (gameFilter === "all") return allItems;
 
-    // SR filter
-    if (srFilter === "any-open") {
-      result = result.filter(
-        (m) => m.sr1Status !== "assigned" || m.sr2Status !== "assigned",
-      );
-    } else if (srFilter === "our-club-open") {
-      result = result.filter(
-        (m) =>
-          (m.sr1Status !== "assigned" && m.sr1OurClub) ||
-          (m.sr2Status !== "assigned" && m.sr2OurClub),
-      );
+    const hasOurClubUnfilled = (m: RefereeGameListItem) =>
+      (m.sr1Status !== "assigned" && m.sr1OurClub) ||
+      (m.sr2Status !== "assigned" && m.sr2OurClub);
+
+    if (gameFilter === "our-club") {
+      return allItems.filter(hasOurClubUnfilled);
     }
-
-    // Game type filter
-    if (gameTypeFilter === "home") {
-      result = result.filter((m) => m.isHomeGame);
-    } else if (gameTypeFilter === "away") {
-      result = result.filter((m) => !m.isHomeGame);
+    if (gameFilter === "home") {
+      return allItems.filter((m) => m.isHomeGame && hasOurClubUnfilled(m));
     }
-
-    return result;
-  }, [allItems, srFilter, gameTypeFilter]);
+    if (gameFilter === "away") {
+      return allItems.filter((m) => !m.isHomeGame && hasOurClubUnfilled(m));
+    }
+    // any-open
+    return allItems.filter(
+      (m) => m.sr1Status !== "assigned" || m.sr2Status !== "assigned",
+    );
+  }, [allItems, gameFilter]);
 
   const hasOurClubOpenSlot = useCallback(
     (row: Row<RefereeGameListItem>) => {
@@ -459,21 +453,14 @@ export function RefereeGamesList() {
             options={statusFilterOptions}
           />
           <FacetChips
-            value={srFilter}
-            onChange={setSrFilter}
+            value={gameFilter}
+            onChange={setGameFilter}
             options={[
-              { label: t("filters.srFilterOurClub"), value: "our-club-open" as SrFilterValue },
-              { label: t("filters.srFilterAnyOpen"), value: "any-open" as SrFilterValue },
-              { label: t("filters.srFilterAll"), value: "all" as SrFilterValue },
-            ]}
-          />
-          <FacetChips
-            value={gameTypeFilter}
-            onChange={setGameTypeFilter}
-            options={[
-              { label: t("filters.gameTypeAll"), value: "all" as GameTypeFilterValue },
-              { label: t("filters.gameTypeHome"), value: "home" as GameTypeFilterValue },
-              { label: t("filters.gameTypeAway"), value: "away" as GameTypeFilterValue },
+              { label: t("filters.srFilterOurClub"), value: "our-club" },
+              { label: t("filters.gameTypeHome"), value: "home" },
+              { label: t("filters.gameTypeAway"), value: "away" },
+              { label: t("filters.srFilterAnyOpen"), value: "any-open" },
+              { label: t("filters.srFilterAll"), value: "all" },
             ]}
           />
           {isAdmin && (
