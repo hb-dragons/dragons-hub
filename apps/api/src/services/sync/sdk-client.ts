@@ -14,6 +14,12 @@ import type {
   SdkGetGameResponse,
   SdkClubSearchResult,
   SdkClubMatchesResponse,
+  SdkGetRefsPayload,
+  SdkGetRefsResponse,
+  SdkRefCandidate,
+  SdkSubmitPayload,
+  SdkSubmitSlotPayload,
+  SdkSubmitResponse,
 } from "@dragons/sdk";
 
 const BASE_URL = "https://www.basketball-bund.net";
@@ -180,6 +186,35 @@ export class SdkClient {
   public sdk = new BasketballBundSDK();
   private rateLimiter = new TokenBucket(15, 10);
   private static readonly SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
+  private static readonly NOOP_SLOT: SdkSubmitSlotPayload = {
+    ansetzen: null,
+    aufheben: null,
+    ansetzenFix: false,
+    ansetzenVerein: null,
+    aufhebenVerein: null,
+    ansetzenFuerSpiel: 0,
+  };
+
+  private static readonly SLOT_KEY_MAP = {
+    1: "sr1",
+    2: "sr2",
+    3: "sr3",
+  } as const;
+
+  private static buildSubmitPayload(
+    slotNumber: 1 | 2 | 3,
+    slot: SdkSubmitSlotPayload,
+  ): SdkSubmitPayload {
+    const slotKey = SdkClient.SLOT_KEY_MAP[slotNumber];
+    return {
+      sr1: slotKey === "sr1" ? slot : SdkClient.NOOP_SLOT,
+      sr2: slotKey === "sr2" ? slot : SdkClient.NOOP_SLOT,
+      sr3: slotKey === "sr3" ? slot : SdkClient.NOOP_SLOT,
+      coa: SdkClient.NOOP_SLOT,
+      kom: SdkClient.NOOP_SLOT,
+    };
+  }
 
   async ensureAuthenticated(): Promise<void> {
     const sessionAge = Date.now() - this.authClient.authenticatedAt;
@@ -378,6 +413,164 @@ export class SdkClient {
     }
 
     return detailsMap;
+  }
+
+  async searchRefereesForGame(
+    spielplanId: number,
+    options: {
+      textSearch?: string | null;
+      pageFrom?: number;
+      pageSize?: number;
+    } = {},
+  ): Promise<SdkGetRefsResponse> {
+    await this.ensureAuthenticated();
+    await this.rateLimiter.acquire();
+
+    const payload: SdkGetRefsPayload = {
+      spielId: spielplanId,
+      textSearch: options.textSearch ?? null,
+      maxDistanz: null,
+      qmaxIds: [],
+      mode: "EINSETZBAR",
+      globalerEinsatz: false,
+      rollenIds: [1, 2, 3, 4, 5],
+      gruppenIds: [],
+      sortBy: "distance",
+      pageFrom: options.pageFrom ?? 0,
+      pageSize: options.pageSize ?? 15,
+    };
+
+    return withRetry(
+      async () => {
+        const res = await this.authClient.authenticatedFetch(
+          `/rest/assignschiri/getRefs/${spielplanId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        );
+        if (res.status === 401 || res.status === 403) {
+          await this.authClient.login();
+          const retry = await this.authClient.authenticatedFetch(
+            `/rest/assignschiri/getRefs/${spielplanId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            },
+          );
+          if (!retry.ok)
+            throw new Error(`getRefs failed: ${retry.status}`);
+          return retry.json() as Promise<SdkGetRefsResponse>;
+        }
+        if (!res.ok) throw new Error(`getRefs failed: ${res.status}`);
+        return res.json() as Promise<SdkGetRefsResponse>;
+      },
+      3,
+      `searchRefereesForGame(${spielplanId})`,
+    );
+  }
+
+  async submitRefereeAssignment(
+    spielplanId: number,
+    slotNumber: 1 | 2 | 3,
+    candidate: SdkRefCandidate,
+  ): Promise<SdkSubmitResponse> {
+    await this.ensureAuthenticated();
+    await this.rateLimiter.acquire();
+
+    const slotPayload: SdkSubmitSlotPayload = {
+      ansetzen: candidate,
+      aufheben: null,
+      ansetzenFix: true,
+      ansetzenVerein: null,
+      aufhebenVerein: null,
+      ansetzenFuerSpiel: 0,
+    };
+    const body = SdkClient.buildSubmitPayload(slotNumber, slotPayload);
+
+    return withRetry(
+      async () => {
+        const res = await this.authClient.authenticatedFetch(
+          `/rest/assignschiri/submit/${spielplanId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
+        if (res.status === 401 || res.status === 403) {
+          await this.authClient.login();
+          const retry = await this.authClient.authenticatedFetch(
+            `/rest/assignschiri/submit/${spielplanId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          );
+          if (!retry.ok)
+            throw new Error(`submit assignment failed: ${retry.status}`);
+          return retry.json() as Promise<SdkSubmitResponse>;
+        }
+        if (!res.ok)
+          throw new Error(`submit assignment failed: ${res.status}`);
+        return res.json() as Promise<SdkSubmitResponse>;
+      },
+      3,
+      `submitRefereeAssignment(${spielplanId}, slot=${slotNumber})`,
+    );
+  }
+
+  async submitRefereeUnassignment(
+    spielplanId: number,
+    slotNumber: 1 | 2 | 3,
+  ): Promise<SdkSubmitResponse> {
+    await this.ensureAuthenticated();
+    await this.rateLimiter.acquire();
+
+    const slotPayload: SdkSubmitSlotPayload = {
+      ansetzen: null,
+      aufheben: { typ: "AUFHEBEN", grund: null },
+      ansetzenFix: false,
+      ansetzenVerein: null,
+      aufhebenVerein: null,
+      ansetzenFuerSpiel: 0,
+    };
+    const body = SdkClient.buildSubmitPayload(slotNumber, slotPayload);
+
+    return withRetry(
+      async () => {
+        const res = await this.authClient.authenticatedFetch(
+          `/rest/assignschiri/submit/${spielplanId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        );
+        if (res.status === 401 || res.status === 403) {
+          await this.authClient.login();
+          const retry = await this.authClient.authenticatedFetch(
+            `/rest/assignschiri/submit/${spielplanId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          );
+          if (!retry.ok)
+            throw new Error(`submit unassignment failed: ${retry.status}`);
+          return retry.json() as Promise<SdkSubmitResponse>;
+        }
+        if (!res.ok)
+          throw new Error(`submit unassignment failed: ${res.status}`);
+        return res.json() as Promise<SdkSubmitResponse>;
+      },
+      3,
+      `submitRefereeUnassignment(${spielplanId}, slot=${slotNumber})`,
+    );
   }
 
   logout(): void {

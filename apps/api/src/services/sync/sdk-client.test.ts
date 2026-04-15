@@ -752,4 +752,421 @@ describe("SdkClient", () => {
       expect(mockFetch).toHaveBeenCalledTimes(4); // 2 login + 2 re-login
     });
   });
+
+  // Helper: sets up a successful login sequence (2 fetch calls)
+  function setupLogin(session = "SESSION=abc; Path=/") {
+    mockFetch
+      .mockResolvedValueOnce({
+        text: vi.fn().mockResolvedValue("OK"),
+        headers: { getSetCookie: () => [session] },
+      })
+      .mockResolvedValueOnce({
+        json: vi.fn().mockResolvedValue({ data: { loginName: "user" } }),
+      });
+  }
+
+  describe("searchRefereesForGame", () => {
+    it("returns referee list on happy path", async () => {
+      setupLogin();
+      const mockRefs = { refs: [{ personId: 1, name: "Ref One" }], total: 1 };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue(mockRefs),
+      });
+
+      const result = await client.searchRefereesForGame(999);
+
+      expect(result).toEqual(mockRefs);
+    });
+
+    it("sends correct POST payload to federation", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ refs: [], total: 0 }),
+      });
+
+      await client.searchRefereesForGame(42, { textSearch: "Smith", pageFrom: 5, pageSize: 20 });
+
+      const postCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("/getRefs/"),
+      );
+      expect(postCall).toBeDefined();
+      const body = JSON.parse((postCall![1] as RequestInit).body as string);
+      expect(body.spielId).toBe(42);
+      expect(body.textSearch).toBe("Smith");
+      expect(body.pageFrom).toBe(5);
+      expect(body.pageSize).toBe(20);
+      expect(body.mode).toBe("EINSETZBAR");
+    });
+
+    it("uses default options when none provided", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ refs: [], total: 0 }),
+      });
+
+      await client.searchRefereesForGame(77);
+
+      const postCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("/getRefs/"),
+      );
+      const body = JSON.parse((postCall![1] as RequestInit).body as string);
+      expect(body.textSearch).toBeNull();
+      expect(body.pageFrom).toBe(0);
+      expect(body.pageSize).toBe(15);
+    });
+
+    it("re-authenticates on 401 and returns result", async () => {
+      setupLogin();
+      // First attempt: 401
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+      // Re-login
+      setupLogin("SESSION=new; Path=/");
+      // Retry succeeds
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ refs: [], total: 0 }),
+      });
+
+      const result = await client.searchRefereesForGame(999);
+
+      expect(result).toEqual({ refs: [], total: 0 });
+    });
+
+    it("re-authenticates on 403 and returns result", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+      setupLogin("SESSION=new; Path=/");
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ refs: [], total: 0 }),
+      });
+
+      const result = await client.searchRefereesForGame(999);
+
+      expect(result).toBeDefined();
+    });
+
+    it("throws when retry after re-auth fails", async () => {
+      // ensureAuthenticated: initial login
+      setupLogin();
+      // 3 withRetry attempts, each: fetch 401 + re-login (2 fetches) + retry fetch 500
+      for (let i = 0; i < 3; i++) {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+        setupLogin("SESSION=new; Path=/");
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+      }
+
+      await expect(client.searchRefereesForGame(999)).rejects.toThrow("getRefs failed: 500");
+    });
+
+    it("throws on non-ok response (no re-auth path)", async () => {
+      // ensureAuthenticated: initial login
+      setupLogin();
+      // 3 withRetry attempts, each with a direct non-ok response
+      for (let i = 0; i < 3; i++) {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 503 });
+      }
+
+      await expect(client.searchRefereesForGame(999)).rejects.toThrow("getRefs failed: 503");
+    });
+  });
+
+  describe("submitRefereeAssignment", () => {
+    const candidate = {
+      srId: 7,
+      vorname: "Jane",
+      nachName: "Ref",
+      email: "jane@example.com",
+      lizenznr: 12345,
+      strasse: "Teststr. 1",
+      plz: "12345",
+      ort: "Teststadt",
+      distanceKm: "10",
+      qmaxSr1: "A",
+      qmaxSr2: null,
+      warning: [],
+      meta: {
+        schiedsrichterId: 7,
+        lizenzNr: 12345,
+        heimTotal: 0,
+        gastTotal: 0,
+        total: 0,
+        va: 0,
+        eh: 0,
+        qmaxSr1: null,
+        qmaxSr2: null,
+        tnaCount: 0,
+        sperrvereinCount: 0,
+        sperrzeitenCount: 0,
+        qualiSr1: 0,
+        qualiSr2: 0,
+        qualiSr3: 0,
+        qualiCoa: 0,
+        qualiKom: 0,
+        entfernung: 10,
+        maxDatumBefore: null,
+        minDatumAfter: null,
+        anzAmTag: 0,
+        anzInWoche: 0,
+        anzImMonat: 0,
+      },
+      qualiSr1: true,
+      qualiSr2: false,
+      qualiSr3: false,
+      qualiCoa: false,
+      qualiKom: false,
+      srModusMismatchSr1: false,
+      srModusMismatchSr2: false,
+      ansetzungAmTag: false,
+      blocktermin: false,
+      zeitraumBlockiert: null,
+      srGruppen: [],
+    };
+
+    it("returns submit response on happy path", async () => {
+      setupLogin();
+      const mockResponse = { success: true };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue(mockResponse),
+      });
+
+      const result = await client.submitRefereeAssignment(100, 1, candidate);
+
+      expect(result).toEqual(mockResponse);
+    });
+
+    it("sends correct payload for slot 1 assignment via buildSubmitPayload", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      await client.submitRefereeAssignment(100, 1, candidate);
+
+      const postCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("/submit/"),
+      );
+      const body = JSON.parse((postCall![1] as RequestInit).body as string);
+      // slot 1 should have the candidate, others should be NOOP
+      expect(body.sr1.ansetzen).toEqual(candidate);
+      expect(body.sr1.ansetzenFix).toBe(true);
+      expect(body.sr2.ansetzen).toBeNull();
+      expect(body.sr3.ansetzen).toBeNull();
+      expect(body.coa.ansetzen).toBeNull();
+      expect(body.kom.ansetzen).toBeNull();
+    });
+
+    it("sends correct payload for slot 2 assignment", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      await client.submitRefereeAssignment(100, 2, candidate);
+
+      const postCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("/submit/"),
+      );
+      const body = JSON.parse((postCall![1] as RequestInit).body as string);
+      expect(body.sr1.ansetzen).toBeNull();
+      expect(body.sr2.ansetzen).toEqual(candidate);
+      expect(body.sr3.ansetzen).toBeNull();
+    });
+
+    it("sends correct payload for slot 3 assignment", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      await client.submitRefereeAssignment(100, 3, candidate);
+
+      const postCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("/submit/"),
+      );
+      const body = JSON.parse((postCall![1] as RequestInit).body as string);
+      expect(body.sr1.ansetzen).toBeNull();
+      expect(body.sr2.ansetzen).toBeNull();
+      expect(body.sr3.ansetzen).toEqual(candidate);
+    });
+
+    it("re-authenticates on 401 and returns result", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+      setupLogin("SESSION=new; Path=/");
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      const result = await client.submitRefereeAssignment(100, 1, candidate);
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it("re-authenticates on 403 and returns result", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+      setupLogin("SESSION=new; Path=/");
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      const result = await client.submitRefereeAssignment(100, 1, candidate);
+
+      expect(result).toBeDefined();
+    });
+
+    it("throws when retry after re-auth fails", async () => {
+      setupLogin();
+      for (let i = 0; i < 3; i++) {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+        setupLogin("SESSION=new; Path=/");
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+      }
+
+      await expect(client.submitRefereeAssignment(100, 1, candidate)).rejects.toThrow(
+        "submit assignment failed: 500",
+      );
+    });
+
+    it("throws on non-ok response", async () => {
+      setupLogin();
+      for (let i = 0; i < 3; i++) {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 422 });
+      }
+
+      await expect(client.submitRefereeAssignment(100, 1, candidate)).rejects.toThrow(
+        "submit assignment failed: 422",
+      );
+    });
+  });
+
+  describe("submitRefereeUnassignment", () => {
+    it("returns submit response on happy path", async () => {
+      setupLogin();
+      const mockResponse = { success: true };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue(mockResponse),
+      });
+
+      const result = await client.submitRefereeUnassignment(200, 2);
+
+      expect(result).toEqual(mockResponse);
+    });
+
+    it("sends correct unassignment payload for slot 2 via buildSubmitPayload", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      await client.submitRefereeUnassignment(200, 2);
+
+      const postCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("/submit/"),
+      );
+      const body = JSON.parse((postCall![1] as RequestInit).body as string);
+      expect(body.sr1.aufheben).toBeNull();
+      expect(body.sr2.aufheben).toEqual({ typ: "AUFHEBEN", grund: null });
+      expect(body.sr3.aufheben).toBeNull();
+      expect(body.coa.aufheben).toBeNull();
+      expect(body.kom.aufheben).toBeNull();
+    });
+
+    it("sends correct unassignment payload for slot 3", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      await client.submitRefereeUnassignment(200, 3);
+
+      const postCall = mockFetch.mock.calls.find(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("/submit/"),
+      );
+      const body = JSON.parse((postCall![1] as RequestInit).body as string);
+      expect(body.sr2.aufheben).toBeNull();
+      expect(body.sr3.aufheben).toEqual({ typ: "AUFHEBEN", grund: null });
+    });
+
+    it("re-authenticates on 401 and returns result", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+      setupLogin("SESSION=new; Path=/");
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      const result = await client.submitRefereeUnassignment(200, 1);
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it("re-authenticates on 403 and returns result", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+      setupLogin("SESSION=new; Path=/");
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      const result = await client.submitRefereeUnassignment(200, 1);
+
+      expect(result).toBeDefined();
+    });
+
+    it("throws when retry after re-auth fails", async () => {
+      setupLogin();
+      for (let i = 0; i < 3; i++) {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+        setupLogin("SESSION=new; Path=/");
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+      }
+
+      await expect(client.submitRefereeUnassignment(200, 1)).rejects.toThrow(
+        "submit unassignment failed: 500",
+      );
+    });
+
+    it("throws on non-ok response", async () => {
+      setupLogin();
+      for (let i = 0; i < 3; i++) {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+      }
+
+      await expect(client.submitRefereeUnassignment(200, 1)).rejects.toThrow(
+        "submit unassignment failed: 500",
+      );
+    });
+  });
 });
