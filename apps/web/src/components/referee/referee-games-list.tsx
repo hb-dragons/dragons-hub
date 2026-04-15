@@ -1,28 +1,22 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import useSWR from "swr";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
-import { fetchAPI } from "@/lib/api";
-import { authClient } from "@/lib/auth-client";
 import type { RefereeGameListItem, PaginatedResponse } from "@dragons/shared";
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table";
 import { Badge } from "@dragons/ui/components/badge";
-import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
 import { cn } from "@dragons/ui/lib/utils";
 import {
   Ban,
   Calendar,
   CircleOff,
-  Loader2,
-  RefreshCw,
   SearchIcon,
   SquareActivity,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { DataTable } from "@/components/ui/data-table";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
@@ -367,10 +361,6 @@ function getColumns(
 export function RefereeGamesList() {
   const t = useTranslations("refereeGames");
   const format = useFormatter();
-  const { data: session } = authClient.useSession();
-  const isAdmin = session?.user?.role === "admin";
-
-  const [syncing, setSyncing] = useState(false);
   const [gameFilter, setGameFilter] = useState<GameFilterValue>("available");
   const [search, setSearch] = useState("");
 
@@ -405,18 +395,6 @@ export function RefereeGamesList() {
 
     return cn(homeBg, dutyBorder, inactive && "opacity-60");
   }
-
-  const handleSync = useCallback(async () => {
-    setSyncing(true);
-    try {
-      await fetchAPI("/admin/settings/referee-games-sync", { method: "POST" });
-      toast.success(t("syncTriggered"));
-    } catch {
-      toast.error(t("syncFailed"));
-    } finally {
-      setSyncing(false);
-    }
-  }, [t]);
 
   const columns = useMemo(() => getColumns(t, format), [t, format]);
 
@@ -469,22 +447,6 @@ export function RefereeGamesList() {
               { label: t("filters.all"), value: "all" },
             ]}
           />
-          {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={handleSync}
-              disabled={syncing}
-            >
-              {syncing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              {t("syncButton")}
-            </Button>
-          )}
         </DataTableToolbar>
       )}
     </DataTable>

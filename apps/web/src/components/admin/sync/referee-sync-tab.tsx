@@ -7,6 +7,7 @@ import { SWR_KEYS } from "@/lib/swr-keys";
 import { RefereeSyncStatusCards } from "./referee-sync-status-cards";
 import { RefereeSyncHistoryTable } from "./sync-history-table";
 import { RefereeSyncScheduleConfig } from "./referee-sync-schedule-config";
+import { RefereeSyncTriggerButton } from "./referee-sync-trigger-button";
 import type {
   SyncStatusResponse,
   PaginatedResponse,
@@ -68,6 +69,9 @@ export function RefereeSyncRunProvider({
 export function RefereeSyncTab() {
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        <RefereeSyncTriggerButton />
+      </div>
       <RefereeSyncStatusCards />
       <RefereeSyncHistoryTable />
       <RefereeSyncScheduleConfig />
