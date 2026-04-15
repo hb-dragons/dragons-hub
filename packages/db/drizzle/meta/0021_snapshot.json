@@ -4057,7 +4057,8 @@
           "name": "config",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "'{}'::jsonb"
         },
         "digest_mode": {
           "name": "digest_mode",
