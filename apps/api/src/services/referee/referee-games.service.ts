@@ -98,6 +98,7 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
       lastSyncedAt: refereeGames.lastSyncedAt,
       isTrackedLeague,
       isHomeGame,
+      ownClubRefs: refereeGames.ownClubRefs,
     })
     .from(refereeGames)
     .where(whereClause)

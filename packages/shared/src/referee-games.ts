@@ -21,5 +21,6 @@ export interface RefereeGameListItem {
   isForfeited: boolean;
   isTrackedLeague: boolean;
   isHomeGame: boolean;
+  ownClubRefs: boolean;
   lastSyncedAt: string | null;
 }

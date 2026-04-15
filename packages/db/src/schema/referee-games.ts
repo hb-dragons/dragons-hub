@@ -38,6 +38,8 @@ export const refereeGames = pgTable(
     isForfeited: boolean("is_forfeited").notNull().default(false),
     homeClubId: integer("home_club_id"),
     guestClubId: integer("guest_club_id"),
+    leagueApiId: integer("league_api_id"),
+    ownClubRefs: boolean("own_club_refs").notNull().default(false),
     dataHash: varchar("data_hash", { length: 64 }),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

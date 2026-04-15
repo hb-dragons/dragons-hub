@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { db } from "../../config/database";
-import { refereeGames, matches } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
+import { refereeGames, matches, leagues } from "@dragons/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { logger } from "../../config/logger";
 import { createRefereeSdkClient } from "./referee-sdk-client";
 import { publishDomainEvent } from "../events/event-publisher";
@@ -88,6 +88,7 @@ export function mapApiResultToRow(result: SdkOffeneSpielResult) {
   return {
     apiMatchId: sp.spielplanId,
     matchNo: sp.spielnr,
+    leagueApiId: sp.liga.ligaId,
     kickoffDate,
     kickoffTime,
     homeTeamName: sp.heimMannschaftLiga.mannschaftName,
@@ -181,6 +182,18 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
 
   log.info({ count: response.results.length }, "Processing referee games from API");
 
+  // Build ownClubRefs lookup from leagues table
+  const leagueApiIds = [...new Set(response.results.map((r) => r.sp.liga.ligaId))];
+  const leagueRows = leagueApiIds.length > 0
+    ? await db
+        .select({ apiLigaId: leagues.apiLigaId, ownClubRefs: leagues.ownClubRefs })
+        .from(leagues)
+        .where(inArray(leagues.apiLigaId, leagueApiIds))
+    : [];
+  const ownClubRefsMap = new Map(
+    leagueRows.map((r) => [r.apiLigaId, r.ownClubRefs ?? false]),
+  );
+
   let created = 0;
   let updated = 0;
   let unchanged = 0;
@@ -188,6 +201,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
   for (const result of response.results) {
     try {
       const mapped = mapApiResultToRow(result);
+      const ownClubRefs = ownClubRefsMap.get(mapped.leagueApiId) ?? false;
       const hash = computeRefereeGameHash(mapped);
 
       // Look up existing referee_games row
@@ -206,6 +220,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
         const [inserted] = await db.insert(refereeGames).values({
           ...mapped,
           matchId,
+          ownClubRefs,
           dataHash: hash,
           lastSyncedAt: now,
           createdAt: now,
@@ -251,6 +266,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger): Promise<{
           .set({
             ...mapped,
             matchId,
+            ownClubRefs,
             dataHash: hash,
             lastSyncedAt: now,
             updatedAt: now,

@@ -86,14 +86,9 @@
     "filters": {
       "search": "Teams, Ligen suchen...",
       "status": "Status",
-      "srFilter": "SR-Status",
-      "srFilterOurClub": "Unser Verein stellt SR",
-      "srFilterAnyOpen": "Offene Plätze",
-      "srFilterAll": "Alle",
-      "gameType": "Spieltyp",
-      "gameTypeHome": "Heim (wir stellen SR)",
-      "gameTypeAway": "Auswärts (wir stellen SR)",
-      "gameTypeAll": "Alle",
+      "available": "Verfügbare Spiele",
+      "assigned": "Besetzt",
+      "all": "Alle Spiele",
       "league": "Liga",
       "dateFrom": "Von",
       "dateTo": "Bis"

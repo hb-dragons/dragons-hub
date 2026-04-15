@@ -113,7 +113,7 @@ function SrSlotBadge({ status, ourClub, name, t }: SrSlotBadgeProps) {
 // FacetChips — SR-status filter
 // ------------------------------------------------------------------
 
-type GameFilterValue = "our-duty" | "open-slots" | "all";
+type GameFilterValue = "available" | "assigned" | "all";
 
 interface FacetChipsProps {
   value: GameFilterValue;
@@ -347,7 +347,7 @@ export function RefereeGamesList() {
   const isAdmin = session?.user?.role === "admin";
 
   const [syncing, setSyncing] = useState(false);
-  const [gameFilter, setGameFilter] = useState<GameFilterValue>("our-duty");
+  const [gameFilter, setGameFilter] = useState<GameFilterValue>("available");
   const [search, setSearch] = useState("");
 
   const { data } = useSWR<PaginatedResponse<RefereeGameListItem>>(
@@ -360,26 +360,39 @@ export function RefereeGamesList() {
   // Apply game filter
   const items = useMemo(() => {
     if (gameFilter === "all") return allItems;
-    if (gameFilter === "our-duty") {
-      // Games where our club has at least one unfilled slot
-      return allItems.filter(
-        (m) =>
-          (m.sr1OurClub && m.sr1Status !== "assigned") ||
-          (m.sr2OurClub && m.sr2Status !== "assigned"),
-      );
+
+    if (gameFilter === "available") {
+      // Games our referees can take:
+      // 1. Publicly offered slots (any club can take)
+      // 2. Our home games in ownClubRefs leagues with unfilled slots
+      return allItems.filter((m) => {
+        const hasOfferedSlot = m.sr1Status === "offered" || m.sr2Status === "offered";
+        const homeOwnClubDuty =
+          m.isHomeGame &&
+          m.ownClubRefs &&
+          (m.sr1Status !== "assigned" || m.sr2Status !== "assigned");
+        return hasOfferedSlot || homeOwnClubDuty;
+      });
     }
-    // open-slots: any game with at least one unfilled slot
-    return allItems.filter(
-      (m) => m.sr1Status !== "assigned" || m.sr2Status !== "assigned",
-    );
+
+    // assigned: games with referees, focused on our club's relevant games
+    return allItems.filter((m) => {
+      const isOurGame =
+        (m.sr1OurClub || m.sr2OurClub) ||
+        (m.isHomeGame && m.ownClubRefs);
+      const hasAssignment = m.sr1Status === "assigned" || m.sr2Status === "assigned";
+      return isOurGame && hasAssignment;
+    });
   }, [allItems, gameFilter]);
 
-  const hasOurClubOpenSlot = useCallback(
+  const needsAttention = useCallback(
     (row: Row<RefereeGameListItem>) => {
       const m = row.original;
+      // Our club has unfilled duty OR home game in ownClubRefs league with unfilled slots
       return (
-        (m.sr1Status !== "assigned" && m.sr1OurClub) ||
-        (m.sr2Status !== "assigned" && m.sr2OurClub)
+        (m.sr1OurClub && m.sr1Status !== "assigned") ||
+        (m.sr2OurClub && m.sr2Status !== "assigned") ||
+        (m.isHomeGame && m.ownClubRefs && (m.sr1Status !== "assigned" || m.sr2Status !== "assigned"))
       );
     },
     [],
@@ -387,7 +400,7 @@ export function RefereeGamesList() {
 
   function getRowClassName(row: Row<RefereeGameListItem>) {
     return cn(
-      hasOurClubOpenSlot(row) && "border-l-2 border-l-primary/50 bg-primary/5",
+      needsAttention(row) && "border-l-2 border-l-primary/50 bg-primary/5",
       (row.original.isCancelled || row.original.isForfeited) && "opacity-60",
     );
   }
@@ -423,7 +436,7 @@ export function RefereeGamesList() {
       emptyState={
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Calendar className="mb-2 h-8 w-8" />
-          <p>{t("filters.srFilterAll")}</p>
+          <p>{t("filters.all")}</p>
         </div>
       }
     >
@@ -450,9 +463,9 @@ export function RefereeGamesList() {
             value={gameFilter}
             onChange={setGameFilter}
             options={[
-              { label: t("filters.srFilterOurClub"), value: "our-duty" },
-              { label: t("filters.srFilterAnyOpen"), value: "open-slots" },
-              { label: t("filters.srFilterAll"), value: "all" },
+              { label: t("filters.available"), value: "available" },
+              { label: t("filters.assigned"), value: "assigned" },
+              { label: t("filters.all"), value: "all" },
             ]}
           />
           {isAdmin && (

@@ -86,14 +86,9 @@
     "filters": {
       "search": "Search teams, leagues...",
       "status": "Status",
-      "srFilter": "SR Status",
-      "srFilterOurClub": "Our club needs SR",
-      "srFilterAnyOpen": "Any open slot",
-      "srFilterAll": "All",
-      "gameType": "Game Type",
-      "gameTypeHome": "Home (we provide SR)",
-      "gameTypeAway": "Away (we provide SR)",
-      "gameTypeAll": "All",
+      "available": "Available to take",
+      "assigned": "Assigned",
+      "all": "All games",
       "league": "League",
       "dateFrom": "From",
       "dateTo": "To"
