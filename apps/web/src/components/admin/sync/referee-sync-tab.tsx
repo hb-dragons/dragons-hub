@@ -5,7 +5,7 @@ import { SWRConfig } from "swr";
 import { RefereeSyncRunContext } from "./use-sync";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { RefereeSyncStatusCards } from "./referee-sync-status-cards";
-import { SyncHistoryTable } from "./sync-history-table";
+import { RefereeSyncHistoryTable } from "./sync-history-table";
 import { RefereeSyncScheduleConfig } from "./referee-sync-schedule-config";
 import type {
   SyncStatusResponse,
@@ -69,7 +69,7 @@ export function RefereeSyncTab() {
   return (
     <div className="space-y-6">
       <RefereeSyncStatusCards />
-      <SyncHistoryTable />
+      <RefereeSyncHistoryTable />
       <RefereeSyncScheduleConfig />
     </div>
   );
