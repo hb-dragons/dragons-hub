@@ -90,12 +90,18 @@
       "srFilterOurClub": "Our club needs SR",
       "srFilterAnyOpen": "Any open slot",
       "srFilterAll": "All",
+      "gameType": "Game Type",
+      "gameTypeHome": "Home (we provide SR)",
+      "gameTypeAway": "Away (we provide SR)",
+      "gameTypeAll": "All",
       "league": "League",
       "dateFrom": "From",
       "dateTo": "To"
     },
     "badges": {
-      "untracked": "Untracked"
+      "untracked": "Untracked",
+      "home": "Home",
+      "away": "Away"
     },
     "syncButton": "Sync referee games",
     "syncTriggered": "Referee sync started",

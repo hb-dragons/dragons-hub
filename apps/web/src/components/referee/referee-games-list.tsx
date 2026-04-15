@@ -114,19 +114,15 @@ function SrSlotBadge({ status, ourClub, name, t }: SrSlotBadgeProps) {
 // ------------------------------------------------------------------
 
 type SrFilterValue = "our-club-open" | "any-open" | "all";
+type GameTypeFilterValue = "home" | "away" | "all";
 
-interface FacetChipsProps {
-  value: SrFilterValue;
-  onChange: (v: SrFilterValue) => void;
-  t: ReturnType<typeof useTranslations<"refereeGames">>;
+interface FacetChipsProps<T extends string> {
+  value: T;
+  onChange: (v: T) => void;
+  options: { label: string; value: T }[];
 }
 
-function FacetChips({ value, onChange, t }: FacetChipsProps) {
-  const options: { label: string; value: SrFilterValue }[] = [
-    { label: t("filters.srFilterOurClub"), value: "our-club-open" },
-    { label: t("filters.srFilterAnyOpen"), value: "any-open" },
-    { label: t("filters.srFilterAll"), value: "all" },
-  ];
+function FacetChips<T extends string>({ value, onChange, options }: FacetChipsProps<T>) {
 
   return (
     <div className="flex gap-1">
@@ -210,11 +206,19 @@ function getColumns(
         <DataTableColumnHeader column={column} title={t("columns.home")} />
       ),
       cell: ({ row }) => {
-        const inactive = row.original.isCancelled || row.original.isForfeited;
+        const m = row.original;
+        const inactive = m.isCancelled || m.isForfeited;
         return (
-          <span className={cn("text-sm", inactive && "line-through")}>
-            {row.original.homeTeamName}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className={cn("text-sm", inactive && "line-through")}>
+              {m.homeTeamName}
+            </span>
+            {m.isHomeGame && (
+              <Badge variant="outline" className="rounded-4xl text-xs text-primary border-primary/20 bg-primary/5">
+                {t("badges.home")}
+              </Badge>
+            )}
+          </div>
         );
       },
       meta: { label: t("columns.home") },
@@ -225,11 +229,19 @@ function getColumns(
         <DataTableColumnHeader column={column} title={t("columns.guest")} />
       ),
       cell: ({ row }) => {
-        const inactive = row.original.isCancelled || row.original.isForfeited;
+        const m = row.original;
+        const inactive = m.isCancelled || m.isForfeited;
         return (
-          <span className={cn("text-sm", inactive && "line-through")}>
-            {row.original.guestTeamName}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className={cn("text-sm", inactive && "line-through")}>
+              {m.guestTeamName}
+            </span>
+            {!m.isHomeGame && (
+              <Badge variant="outline" className="rounded-4xl text-xs text-muted-foreground border-border">
+                {t("badges.away")}
+              </Badge>
+            )}
+          </div>
         );
       },
       meta: { label: t("columns.guest") },
@@ -337,6 +349,7 @@ export function RefereeGamesList() {
 
   const [syncing, setSyncing] = useState(false);
   const [srFilter, setSrFilter] = useState<SrFilterValue>("our-club-open");
+  const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilterValue>("all");
   const [search, setSearch] = useState("");
 
   const { data } = useSWR<PaginatedResponse<RefereeGameListItem>>(
@@ -346,21 +359,32 @@ export function RefereeGamesList() {
 
   const allItems = useMemo(() => data?.items ?? [], [data?.items]);
 
-  // Apply SR-status client-side filter before passing to table
+  // Apply client-side filters before passing to table
   const items = useMemo(() => {
-    if (srFilter === "all") return allItems;
+    let result = allItems;
+
+    // SR filter
     if (srFilter === "any-open") {
-      return allItems.filter(
+      result = result.filter(
         (m) => m.sr1Status !== "assigned" || m.sr2Status !== "assigned",
       );
+    } else if (srFilter === "our-club-open") {
+      result = result.filter(
+        (m) =>
+          (m.sr1Status !== "assigned" && m.sr1OurClub) ||
+          (m.sr2Status !== "assigned" && m.sr2OurClub),
+      );
     }
-    // our-club-open: at least one unfilled slot belonging to our club (open or offered)
-    return allItems.filter(
-      (m) =>
-        (m.sr1Status !== "assigned" && m.sr1OurClub) ||
-        (m.sr2Status !== "assigned" && m.sr2OurClub),
-    );
-  }, [allItems, srFilter]);
+
+    // Game type filter
+    if (gameTypeFilter === "home") {
+      result = result.filter((m) => m.isHomeGame);
+    } else if (gameTypeFilter === "away") {
+      result = result.filter((m) => !m.isHomeGame);
+    }
+
+    return result;
+  }, [allItems, srFilter, gameTypeFilter]);
 
   const hasOurClubOpenSlot = useCallback(
     (row: Row<RefereeGameListItem>) => {
@@ -434,7 +458,24 @@ export function RefereeGamesList() {
             title={t("filters.status")}
             options={statusFilterOptions}
           />
-          <FacetChips value={srFilter} onChange={setSrFilter} t={t} />
+          <FacetChips
+            value={srFilter}
+            onChange={setSrFilter}
+            options={[
+              { label: t("filters.srFilterOurClub"), value: "our-club-open" as SrFilterValue },
+              { label: t("filters.srFilterAnyOpen"), value: "any-open" as SrFilterValue },
+              { label: t("filters.srFilterAll"), value: "all" as SrFilterValue },
+            ]}
+          />
+          <FacetChips
+            value={gameTypeFilter}
+            onChange={setGameTypeFilter}
+            options={[
+              { label: t("filters.gameTypeAll"), value: "all" as GameTypeFilterValue },
+              { label: t("filters.gameTypeHome"), value: "home" as GameTypeFilterValue },
+              { label: t("filters.gameTypeAway"), value: "away" as GameTypeFilterValue },
+            ]}
+          />
           {isAdmin && (
             <Button
               variant="outline"

@@ -2,6 +2,7 @@ import { db } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
 import { and, eq, gte, lte, or, ilike, sql, asc, ne } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
+import { getSetting } from "../admin/settings.service";
 
 interface GetRefereeGamesParams {
   limit: number;
@@ -65,6 +66,13 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
 
   const isTrackedLeague = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
 
+  // Derive isHomeGame by comparing homeClubId to configured club
+  const clubIdStr = await getSetting("club_id");
+  const clubId = clubIdStr ? parseInt(clubIdStr, 10) : null;
+  const isHomeGame = clubId
+    ? sql<boolean>`${refereeGames.homeClubId} = ${clubId}`.as("is_home_game")
+    : sql<boolean>`false`.as("is_home_game");
+
   const [items, countResult] = await Promise.all([
     db.select({
       id: refereeGames.id,
@@ -89,6 +97,7 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
       isForfeited: refereeGames.isForfeited,
       lastSyncedAt: refereeGames.lastSyncedAt,
       isTrackedLeague,
+      isHomeGame,
     })
     .from(refereeGames)
     .where(whereClause)
