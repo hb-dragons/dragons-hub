@@ -33,12 +33,13 @@ vi.mock("@dragons/db/schema", () => ({
     isCancelled: "rg.isCancelled",
     isForfeited: "rg.isForfeited",
     lastSyncedAt: "rg.lastSyncedAt",
+    isHomeGame: "rg.isHomeGame",
+    isGuestGame: "rg.isGuestGame",
   },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  ne: vi.fn((...args: unknown[]) => ({ ne: args })),
   and: vi.fn((...args: unknown[]) => ({ and: args })),
   or: vi.fn((...args: unknown[]) => ({ or: args })),
   gte: vi.fn((...args: unknown[]) => ({ gte: args })),
@@ -93,6 +94,8 @@ function makeGameRow(overrides: Record<string, unknown> = {}) {
     sr2Status: "offered",
     isCancelled: false,
     isForfeited: false,
+    isHomeGame: true,
+    isGuestGame: false,
     lastSyncedAt: new Date("2026-04-14T10:00:00Z"),
     ...overrides,
   };
@@ -157,19 +160,6 @@ describe("getRefereeGames", () => {
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.isCancelled).toBe(true);
-  });
-
-  it("filters by srFilter 'our-club-open'", async () => {
-    const row = makeGameRow({ sr1OurClub: true, sr1Status: "open" });
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
-
-    const result = await getRefereeGames({ limit: 20, offset: 0, srFilter: "our-club-open" });
-
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.sr1OurClub).toBe(true);
-    expect(result.items[0]?.sr1Status).toBe("open");
   });
 
   it("filters by league", async () => {

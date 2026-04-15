@@ -11,12 +11,11 @@ refereeGamesRoutes.get("/games", async (c) => {
   const offset = Number(c.req.query("offset") || 0);
   const search = c.req.query("search") || undefined;
   const status = (c.req.query("status") || "active") as "active" | "cancelled" | "forfeited" | "all";
-  const srFilter = (c.req.query("srFilter") || "all") as "our-club-open" | "any-open" | "all";
   const league = c.req.query("league") || undefined;
   const dateFrom = c.req.query("dateFrom") || undefined;
   const dateTo = c.req.query("dateTo") || undefined;
 
-  const result = await getRefereeGames({ limit, offset, search, status, srFilter, league, dateFrom, dateTo });
+  const result = await getRefereeGames({ limit, offset, search, status, league, dateFrom, dateTo });
   return c.json(result);
 });
 

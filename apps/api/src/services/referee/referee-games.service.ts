@@ -1,22 +1,20 @@
 import { db } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
-import { and, eq, gte, lte, or, ilike, sql, asc, ne } from "drizzle-orm";
+import { and, eq, gte, lte, or, ilike, sql, asc } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
-import { getSetting } from "../admin/settings.service";
 
 interface GetRefereeGamesParams {
   limit: number;
   offset: number;
   search?: string;
   status?: "active" | "cancelled" | "forfeited" | "all";
-  srFilter?: "our-club-open" | "any-open" | "all";
   league?: string;
   dateFrom?: string;
   dateTo?: string;
 }
 
 export async function getRefereeGames(params: GetRefereeGamesParams) {
-  const { limit, offset, search, status, srFilter, league, dateFrom, dateTo } = params;
+  const { limit, offset, search, status, league, dateFrom, dateTo } = params;
   const conditions = [];
 
   // Status
@@ -25,19 +23,6 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
   else if (status !== "all") {
     conditions.push(eq(refereeGames.isCancelled, false));
     conditions.push(eq(refereeGames.isForfeited, false));
-  }
-
-  // SR filter
-  if (srFilter === "our-club-open") {
-    conditions.push(or(
-      and(eq(refereeGames.sr1OurClub, true), ne(refereeGames.sr1Status, "assigned")),
-      and(eq(refereeGames.sr2OurClub, true), ne(refereeGames.sr2Status, "assigned")),
-    )!);
-  } else if (srFilter === "any-open") {
-    conditions.push(or(
-      ne(refereeGames.sr1Status, "assigned"),
-      ne(refereeGames.sr2Status, "assigned"),
-    )!);
   }
 
   // League
@@ -66,13 +51,6 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
 
   const isTrackedLeague = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
 
-  // Derive isHomeGame by comparing homeClubId to configured club
-  const clubIdStr = await getSetting("club_id");
-  const clubId = clubIdStr ? parseInt(clubIdStr, 10) : null;
-  const isHomeGame = clubId
-    ? sql<boolean>`${refereeGames.homeClubId} = ${clubId}`.as("is_home_game")
-    : sql<boolean>`false`.as("is_home_game");
-
   const [items, countResult] = await Promise.all([
     db.select({
       id: refereeGames.id,
@@ -97,8 +75,8 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
       isForfeited: refereeGames.isForfeited,
       lastSyncedAt: refereeGames.lastSyncedAt,
       isTrackedLeague,
-      isHomeGame,
-      ownClubRefs: refereeGames.ownClubRefs,
+      isHomeGame: refereeGames.isHomeGame,
+      isGuestGame: refereeGames.isGuestGame,
     })
     .from(refereeGames)
     .where(whereClause)
