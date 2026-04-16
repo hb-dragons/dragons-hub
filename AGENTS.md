@@ -366,10 +366,13 @@ Match list and detail responses include associated venue booking data when avail
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/public/matches` | List own club matches (no auth) |
+| GET | `/public/matches` | List own club matches, supports `opponentApiId` filter (no auth) |
+| GET | `/public/matches/:id` | Single match with quarter scores (no auth) |
+| GET | `/public/matches/:id/context` | H2H record and form for both teams (no auth) |
 | GET | `/public/standings` | League standings (no auth) |
 | GET | `/public/teams` | List teams (no auth) |
 | GET | `/public/teams/:id/stats` | Season stats and recent form for a team (no auth) |
+| GET | `/public/home/dashboard` | Aggregated home screen data (no auth) |
 
 ### Device
 
