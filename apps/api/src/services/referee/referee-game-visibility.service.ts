@@ -223,14 +223,14 @@ function buildHomeVisibility(
       eq(refereeGames.homeTeamId, rule.teamId),
       slotMatch,
     );
-  }).filter(Boolean);
+  }).filter((c): c is NonNullable<typeof c> => c != null);
 
   if (ruleConditions.length === 0) return null;
 
-  // Home game AND (homeTeamId is not null) AND (matches one of the allow rules)
+  // Home game AND (matches one of the allow rules)
   return and(
     eq(refereeGames.isHomeGame, true),
-    or(...ruleConditions),
+    or(...ruleConditions)!,
   );
 }
 
