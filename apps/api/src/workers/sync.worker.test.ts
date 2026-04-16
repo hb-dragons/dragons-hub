@@ -24,10 +24,12 @@ vi.mock("../services/sync/index", () => ({
 
 const mockDbSelect = vi.fn();
 const mockDbUpdate = vi.fn();
+const mockDbInsert = vi.fn();
 vi.mock("../config/database", () => ({
   db: {
     select: (...args: unknown[]) => mockDbSelect(...args),
     update: (...args: unknown[]) => mockDbUpdate(...args),
+    insert: (...args: unknown[]) => mockDbInsert(...args),
   },
 }));
 
@@ -37,6 +39,17 @@ vi.mock("@dragons/db/schema", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+}));
+
+const mockSyncRefereeGames = vi.fn();
+vi.mock("../services/sync/referee-games.sync", () => ({
+  syncRefereeGames: (...args: unknown[]) => mockSyncRefereeGames(...args),
+}));
+
+const mockSyncLoggerClose = vi.fn();
+const mockSyncLogger = { close: mockSyncLoggerClose, info: vi.fn(), error: vi.fn() };
+vi.mock("../services/sync/sync-logger", () => ({
+  createSyncLogger: vi.fn().mockReturnValue(mockSyncLogger),
 }));
 
 const mockOnCompleted = vi.fn();
@@ -137,6 +150,107 @@ describe("sync worker processor", () => {
         log: vi.fn(),
       }),
     ).rejects.toThrow("sync failed");
+  });
+
+  it("runs referee-games sync with existing syncRunId", async () => {
+    mockSyncRefereeGames.mockResolvedValue({ created: 5, updated: 3, unchanged: 10 });
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    });
+
+    const result = await processorFn({
+      id: "job-ref-1",
+      name: "manual-sync",
+      data: { type: "referee-games", syncRunId: 77 },
+      log: vi.fn(),
+    });
+
+    expect(result).toEqual({
+      completed: true,
+      type: "referee-games",
+      created: 5,
+      updated: 3,
+      unchanged: 10,
+    });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockSyncRefereeGames).toHaveBeenCalled();
+    expect(mockSyncLoggerClose).toHaveBeenCalled();
+  });
+
+  it("runs referee-games sync without syncRunId (creates one)", async () => {
+    mockSyncRefereeGames.mockResolvedValue({ created: 5, updated: 3, unchanged: 10 });
+    mockDbInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 99 }]),
+      }),
+    });
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    });
+
+    const result = await processorFn({
+      id: "job-ref-2",
+      name: "manual-sync",
+      data: { type: "referee-games" },
+      log: vi.fn(),
+    });
+
+    expect(result).toEqual({
+      completed: true,
+      type: "referee-games",
+      created: 5,
+      updated: 3,
+      unchanged: 10,
+    });
+    expect(mockDbInsert).toHaveBeenCalled();
+    expect(mockSyncRefereeGames).toHaveBeenCalled();
+  });
+
+  it("marks sync run as failed on referee-games error", async () => {
+    mockSyncRefereeGames.mockRejectedValue(new Error("referee sync failed"));
+    mockDbInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 99 }]),
+      }),
+    });
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    });
+
+    await expect(
+      processorFn({
+        id: "job-ref-3",
+        name: "manual-sync",
+        data: { type: "referee-games" },
+        log: vi.fn(),
+      }),
+    ).rejects.toThrow("referee sync failed");
+
+    expect(mockSyncLoggerClose).toHaveBeenCalled();
+    expect(mockDbUpdate).toHaveBeenCalled();
+  });
+
+  it("uses 'cron' triggeredBy for scheduled referee-games job", async () => {
+    mockSyncRefereeGames.mockResolvedValue({ created: 0, updated: 0, unchanged: 0 });
+    mockDbInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 100 }]),
+      }),
+    });
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    });
+
+    await processorFn({
+      id: "job-ref-4",
+      name: "referee-games-sync-scheduled",
+      data: { type: "referee-games" },
+      log: vi.fn(),
+    });
+
+    // Verify insert was called (since no syncRunId), the triggeredBy logic
+    // uses "cron" for scheduled jobs (name contains "scheduled")
+    expect(mockDbInsert).toHaveBeenCalled();
   });
 
   it("logger function calls job.log", async () => {

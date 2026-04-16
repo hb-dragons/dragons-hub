@@ -169,6 +169,33 @@ describe("createRefereeSdkClient", () => {
       );
     });
 
+    it("throws when no session cookie received", async () => {
+      mockFetch.mockResolvedValueOnce({
+        text: vi.fn().mockResolvedValue("OK"),
+        headers: {
+          getSetCookie: () => ["OTHER_COOKIE=abc; Path=/"],
+        },
+      });
+
+      const client = createRefereeSdkClient();
+      await expect(client.fetchOffeneSpiele()).rejects.toThrow(
+        "No session cookie received",
+      );
+    });
+
+    it("throws when login session does not persist", async () => {
+      mockFetch
+        .mockResolvedValueOnce(makeLoginResponse())
+        .mockResolvedValueOnce({
+          json: vi.fn().mockResolvedValue({ data: {} }),
+        });
+
+      const client = createRefereeSdkClient();
+      await expect(client.fetchOffeneSpiele()).rejects.toThrow(
+        "Login did not persist",
+      );
+    });
+
     it("paginates when total exceeds page size", async () => {
       mockFetch
         .mockResolvedValueOnce(makeLoginResponse())

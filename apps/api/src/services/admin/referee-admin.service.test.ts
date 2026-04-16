@@ -315,6 +315,62 @@ describe("getReferees", () => {
     expect(result.total).toBe(0);
   });
 
+  it("defaults total to 0 when count property is undefined", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: undefined }]);
+
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    const result = await getReferees({ limit: 10, offset: 0 });
+
+    expect(result.total).toBe(0);
+  });
+
+  it("handles multiple referees where only some have roles", async () => {
+    const rows = [
+      {
+        id: 20,
+        apiId: "a20",
+        firstName: "Karl",
+        lastName: "Adams",
+        licenseNumber: "L020",
+        matchCount: 4,
+        createdAt: makeDate("2025-05-01T00:00:00.000Z"),
+        updatedAt: makeDate("2025-05-02T00:00:00.000Z"),
+      },
+      {
+        id: 21,
+        apiId: "a21",
+        firstName: "Petra",
+        lastName: "Berg",
+        licenseNumber: "L021",
+        matchCount: 1,
+        createdAt: makeDate("2025-05-03T00:00:00.000Z"),
+        updatedAt: makeDate("2025-05-04T00:00:00.000Z"),
+      },
+    ];
+    const countResult = [{ count: 2 }];
+    // Only referee 20 has roles; referee 21 has none
+    const roleRows = [{ refereeId: 20, roleName: "Schiedsrichter" }];
+
+    const dataChain = buildChain(rows);
+    const countChain = buildChain(countResult);
+
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    const roleChain = buildChain(roleRows);
+    mockSelectDistinct.mockReturnValueOnce(roleChain);
+
+    const result = await getReferees({ limit: 20, offset: 0 });
+
+    expect(result.items[0]?.roles).toEqual(["Schiedsrichter"]);
+    expect(result.items[1]?.roles).toEqual([]);
+  });
+
   it("returns empty roles array for referee with no roles", async () => {
     const rows = [
       {

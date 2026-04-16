@@ -130,6 +130,24 @@ describe("errorHandler", () => {
     expect(body.code).toBe("INTERNAL_ERROR");
   });
 
+  it("handles non-Error values passed directly to handler", async () => {
+    const mockContext = {
+      get: vi.fn().mockReturnValue(undefined),
+      json: vi.fn().mockReturnValue(new Response("{}", { status: 500 })),
+    };
+
+    errorHandler("string error" as never, mockContext as never);
+
+    expect(mockContext.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: "Unknown error" }),
+      500,
+    );
+    expect(mocks.rootLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: "string error", stack: undefined }),
+      "Unknown error",
+    );
+  });
+
   it("logs error using root logger when no context logger is set", async () => {
     const app = createBareApp();
     await app.request("/throw-error");

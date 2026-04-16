@@ -64,6 +64,7 @@ vi.mock("bullmq", () => ({
 import {
   initializeScheduledJobs,
   triggerManualSync,
+  triggerRefereeGamesSync,
   getJobStatus,
   updateSyncSchedule,
   updateRefereeSyncSchedule,
@@ -337,5 +338,51 @@ describe("updateRefereeSyncSchedule", () => {
 
     expect(mockRemoveRepeatableByKey).toHaveBeenCalledWith("ref-key-1");
     expect(mockAdd).not.toHaveBeenCalled();
+  });
+});
+
+describe("triggerRefereeGamesSync", () => {
+  it("adds referee-games sync job and returns syncRunId", async () => {
+    mockGetJobs.mockResolvedValue([]);
+
+    const result = await triggerRefereeGamesSync("admin-user");
+
+    expect(result).toEqual({ syncRunId: 42, status: "queued" });
+    expect(mockInsert).toHaveBeenCalled();
+    expect(mockAdd).toHaveBeenCalledWith(
+      "referee-games-sync",
+      { type: "referee-games", syncRunId: 42 },
+      expect.objectContaining({
+        jobId: "referee-games-sync-42",
+        removeOnComplete: true,
+        removeOnFail: 100,
+      }),
+    );
+  });
+
+  it("returns null when referee-games job already pending", async () => {
+    mockGetJobs.mockResolvedValue([{ data: { type: "referee-games" } }]);
+
+    const result = await triggerRefereeGamesSync();
+
+    expect(result).toBeNull();
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockAdd).not.toHaveBeenCalled();
+  });
+
+  it("uses 'manual' as default triggeredBy", async () => {
+    mockGetJobs.mockResolvedValue([]);
+
+    await triggerRefereeGamesSync();
+
+    expect(mockInsert).toHaveBeenCalled();
+  });
+
+  it("passes triggeredBy param when provided", async () => {
+    mockGetJobs.mockResolvedValue([]);
+
+    await triggerRefereeGamesSync("cron");
+
+    expect(mockInsert).toHaveBeenCalled();
   });
 });

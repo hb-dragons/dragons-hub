@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   markRead: vi.fn(),
   markAllRead: vi.fn(),
   getUnreadCount: vi.fn(),
+  retryFailedNotification: vi.fn(),
 }));
 
 vi.mock("../../services/admin/notification-admin.service", () => ({
@@ -16,6 +17,7 @@ vi.mock("../../services/admin/notification-admin.service", () => ({
   markRead: mocks.markRead,
   markAllRead: mocks.markAllRead,
   getUnreadCount: mocks.getUnreadCount,
+  retryFailedNotification: mocks.retryFailedNotification,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -214,6 +216,66 @@ describe("GET /notifications/unread-count", () => {
 
   it("returns 400 when userId is missing", async () => {
     const res = await app.request("/notifications/unread-count");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("POST /notifications/:id/retry", () => {
+  it("returns 200 on successful retry", async () => {
+    mocks.retryFailedNotification.mockResolvedValue({ success: true });
+
+    const res = await app.request("/notifications/1/retry", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ success: true });
+    expect(mocks.retryFailedNotification).toHaveBeenCalledWith(1);
+  });
+
+  it("returns 404 when notification not found", async () => {
+    mocks.retryFailedNotification.mockResolvedValue({
+      success: false,
+      error: "Notification not found",
+    });
+
+    const res = await app.request("/notifications/999/retry", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("returns 400 when retry fails", async () => {
+    mocks.retryFailedNotification.mockResolvedValue({
+      success: false,
+      error: "Notification is not in failed state",
+    });
+
+    const res = await app.request("/notifications/1/retry", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "RETRY_FAILED" });
+  });
+
+  it("returns 400 for invalid id (zero)", async () => {
+    const res = await app.request("/notifications/0/retry", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for non-numeric id", async () => {
+    const res = await app.request("/notifications/abc/retry", {
+      method: "POST",
+    });
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });

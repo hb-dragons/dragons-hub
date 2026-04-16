@@ -232,4 +232,69 @@ describe("getRefereeGames", () => {
 
     expect(result.total).toBe(0);
   });
+
+  it("filters by status 'forfeited'", async () => {
+    const row = makeGameRow({ isForfeited: true });
+    mockSelect
+      .mockReturnValueOnce(buildChain([row]))
+      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+
+    const result = await getRefereeGames({ limit: 20, offset: 0, status: "forfeited" });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.isForfeited).toBe(true);
+  });
+
+  it("returns all games when status is 'all'", async () => {
+    const rows = [
+      makeGameRow(),
+      makeGameRow({ id: 2, isCancelled: true }),
+    ];
+    mockSelect
+      .mockReturnValueOnce(buildChain(rows))
+      .mockReturnValueOnce(buildChain([{ count: 2 }]));
+
+    const result = await getRefereeGames({ limit: 20, offset: 0, status: "all" });
+
+    expect(result.items).toHaveLength(2);
+  });
+
+  it("filters by dateFrom", async () => {
+    const row = makeGameRow({ kickoffDate: "2026-05-01" });
+    mockSelect
+      .mockReturnValueOnce(buildChain([row]))
+      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+
+    const result = await getRefereeGames({ limit: 20, offset: 0, dateFrom: "2026-04-01" });
+
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("filters by dateTo", async () => {
+    const row = makeGameRow({ kickoffDate: "2026-04-15" });
+    mockSelect
+      .mockReturnValueOnce(buildChain([row]))
+      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+
+    const result = await getRefereeGames({ limit: 20, offset: 0, dateTo: "2026-05-01" });
+
+    expect(result.items).toHaveLength(1);
+  });
+
+  it("combines dateFrom and dateTo with status filter", async () => {
+    const row = makeGameRow();
+    mockSelect
+      .mockReturnValueOnce(buildChain([row]))
+      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+
+    const result = await getRefereeGames({
+      limit: 20,
+      offset: 0,
+      status: "active",
+      dateFrom: "2026-04-01",
+      dateTo: "2026-05-01",
+    });
+
+    expect(result.items).toHaveLength(1);
+  });
 });

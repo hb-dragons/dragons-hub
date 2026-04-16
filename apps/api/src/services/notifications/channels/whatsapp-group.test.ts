@@ -27,6 +27,7 @@ vi.mock("../../../config/logger", () => ({
 
 // Import AFTER mocks are set up
 const { WhatsAppGroupAdapter } = await import("./whatsapp-group");
+import { env } from "../../../config/env";
 
 describe("WhatsAppGroupAdapter", () => {
   const adapter = new WhatsAppGroupAdapter();
@@ -90,5 +91,18 @@ describe("WhatsAppGroupAdapter", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Connection refused");
+  });
+
+  it("returns error when WAHA_BASE_URL is not configured", async () => {
+    const originalUrl = env.WAHA_BASE_URL;
+    (env as Record<string, unknown>).WAHA_BASE_URL = "";
+
+    const result = await adapter.send(baseParams, groupId);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("WAHA not configured");
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    (env as Record<string, unknown>).WAHA_BASE_URL = originalUrl;
   });
 });

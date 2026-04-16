@@ -9,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   setClubConfig: vi.fn(),
   getBookingSettings: vi.fn(),
   setBookingSettings: vi.fn(),
+  getSetting: vi.fn(),
+  upsertSetting: vi.fn(),
+  triggerRefereeGamesSync: vi.fn(),
 }));
 
 vi.mock("../../services/admin/settings.service", () => ({
@@ -16,6 +19,16 @@ vi.mock("../../services/admin/settings.service", () => ({
   setClubConfig: mocks.setClubConfig,
   getBookingSettings: mocks.getBookingSettings,
   setBookingSettings: mocks.setBookingSettings,
+  getSetting: mocks.getSetting,
+  upsertSetting: mocks.upsertSetting,
+}));
+
+vi.mock("../../workers/queues", () => ({
+  triggerRefereeGamesSync: mocks.triggerRefereeGamesSync,
+}));
+
+vi.mock("../../middleware/auth", () => ({
+  requireAdmin: vi.fn(async (_c: unknown, next: () => Promise<void>) => next()),
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -28,6 +41,10 @@ import { settingsRoutes } from "./settings.routes";
 import { errorHandler } from "../../middleware/error";
 
 const app = new Hono<AppEnv>();
+app.use("/*", async (c, next) => {
+  c.set("user", { id: "test-admin" });
+  await next();
+});
 app.onError(errorHandler);
 app.route("/", settingsRoutes);
 
@@ -193,5 +210,96 @@ describe("PUT /settings/booking", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(body);
+  });
+});
+
+describe("GET /settings/referee-reminders", () => {
+  it("returns stored reminder days", async () => {
+    mocks.getSetting.mockResolvedValue(JSON.stringify([7, 3, 1]));
+
+    const res = await app.request("/settings/referee-reminders");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ days: [7, 3, 1] });
+    expect(mocks.getSetting).toHaveBeenCalledWith("referee_reminder_days");
+  });
+
+  it("returns default [7, 3, 1] when not configured", async () => {
+    mocks.getSetting.mockResolvedValue(null);
+
+    const res = await app.request("/settings/referee-reminders");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ days: [7, 3, 1] });
+  });
+});
+
+describe("PUT /settings/referee-reminders", () => {
+  it("saves and returns reminder days", async () => {
+    mocks.upsertSetting.mockResolvedValue(undefined);
+
+    const res = await app.request("/settings/referee-reminders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ days: [1, 3, 7] }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.days).toEqual([7, 3, 1]);
+    expect(mocks.upsertSetting).toHaveBeenCalledWith(
+      "referee_reminder_days",
+      JSON.stringify([7, 3, 1]),
+    );
+  });
+
+  it("sorts days in descending order", async () => {
+    mocks.upsertSetting.mockResolvedValue(undefined);
+
+    const res = await app.request("/settings/referee-reminders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ days: [2, 14, 5] }),
+    });
+
+    expect(res.status).toBe(200);
+    expect((await json(res)).days).toEqual([14, 5, 2]);
+  });
+
+  it("returns 400 for invalid body", async () => {
+    const res = await app.request("/settings/referee-reminders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ days: "not-an-array" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /settings/referee-games-sync", () => {
+  it("triggers sync and returns syncRunId", async () => {
+    mocks.triggerRefereeGamesSync.mockResolvedValue({ syncRunId: 42 });
+
+    const res = await app.request("/settings/referee-games-sync", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    expect(body.success).toBe(true);
+    expect(body.syncRunId).toBe(42);
+    expect(mocks.triggerRefereeGamesSync).toHaveBeenCalledWith("test-admin");
+  });
+
+  it("returns 409 when sync already in progress", async () => {
+    mocks.triggerRefereeGamesSync.mockResolvedValue(null);
+
+    const res = await app.request("/settings/referee-games-sync", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(409);
+    expect(await json(res)).toMatchObject({ error: "Referee games sync already in progress or queued" });
   });
 });

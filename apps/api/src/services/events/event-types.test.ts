@@ -307,6 +307,43 @@ describe("classifyUrgency", () => {
     );
   });
 
+  it("extracts top-level date field from payload", () => {
+    const payload = { date: "2026-03-20" };
+    expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
+      "immediate",
+    );
+  });
+
+  it("handles date field changes with non-string oldValue", () => {
+    const payload = {
+      changes: [
+        {
+          field: "kickoffDate",
+          oldValue: null,
+          newValue: "2026-03-20",
+        },
+      ],
+    };
+    expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
+      "immediate",
+    );
+  });
+
+  it("handles date field changes with non-string newValue", () => {
+    const payload = {
+      changes: [
+        {
+          field: "kickoffDate",
+          oldValue: "2026-03-20",
+          newValue: null,
+        },
+      ],
+    };
+    expect(classifyUrgency(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload)).toBe(
+      "immediate",
+    );
+  });
+
   // --- Referee slot events ---
 
   describe("referee.slots.needed", () => {

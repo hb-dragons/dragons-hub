@@ -52,6 +52,26 @@ vi.mock("./channels/in-app", () => ({
   },
 }));
 
+const mockWhatsAppSend = vi.fn().mockResolvedValue({ success: true });
+vi.mock("./channels/whatsapp-group", () => ({
+  WhatsAppGroupAdapter: class {
+    send(...args: unknown[]) {
+      return mockWhatsAppSend(...args);
+    }
+  },
+}));
+
+const mockRenderRefereeSlotsWhatsApp = vi.fn().mockReturnValue("*Referee slots message*");
+vi.mock("./templates/referee-slots", () => ({
+  renderRefereeSlotsWhatsApp: (...args: unknown[]) => mockRenderRefereeSlotsWhatsApp(...args),
+}));
+
+vi.mock("../../config/env", () => ({
+  env: {
+    TRUSTED_ORIGINS: ["http://localhost:3000"],
+  },
+}));
+
 vi.mock("../../config/logger", () => ({
   logger: {
     info: vi.fn(),
@@ -543,6 +563,36 @@ describe("processEvent", () => {
     });
   });
 
+  describe("defaults coalescing", () => {
+    it("coalesces rapid-fire default dispatches for the same entity", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "admin", locale: "de" } });
+
+      // First event — dispatches normally via defaults
+      setupDbMocks({ rules: [], configs: [config] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "admin", channel: "in_app" },
+      ]);
+      const result1 = await processEvent(makeEvent());
+      expect(result1.dispatched).toBe(1);
+      expect(result1.coalesced).toBe(0);
+
+      // Second event for same entity — should be coalesced
+      vi.clearAllMocks();
+      mockRenderEventMessage.mockReturnValue({
+        title: "Match Cancelled",
+        body: "The match has been cancelled.",
+      });
+      setupDbMocks({ rules: [], configs: [config] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "admin", channel: "in_app" },
+      ]);
+      const result2 = await processEvent(makeEvent({ id: "evt-2" }));
+      expect(result2.coalesced).toBe(1);
+      expect(result2.dispatched).toBe(0);
+      expect(result2.buffered).toBe(1);
+    });
+  });
+
   describe("combined rule + default flow", () => {
     it("processes both watch rules and role-based defaults", async () => {
       const rule = makeRule({ id: 1 });
@@ -632,6 +682,56 @@ describe("processEvent", () => {
     });
   });
 
+  describe("loadMutedEventTypes error handling", () => {
+    it("continues processing when preferences query fails", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
+      const rules: Record<string, unknown>[] = [];
+      const configs = [config];
+
+      // Override select to make the prefs query (3rd call) throw
+      let callIndex = 0;
+      mockDbSelect.mockImplementation(() => {
+        const idx = callIndex++;
+        if (idx < 2) {
+          // rules and configs queries
+          const data = idx === 0 ? rules : configs;
+          const mockResult = Promise.resolve(data);
+          return {
+            from: vi.fn().mockReturnValue({
+              ...mockResult,
+              where: vi.fn().mockResolvedValue(data),
+              then: mockResult.then.bind(mockResult),
+            }),
+          };
+        }
+        // Prefs query — throw
+        const rejected = Promise.reject(new Error("DB error"));
+        return {
+          from: vi.fn().mockReturnValue({
+            ...rejected,
+            then: rejected.then.bind(rejected),
+            catch: rejected.catch.bind(rejected),
+          }),
+        };
+      });
+
+      mockDbInsert.mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
+
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "referee", channel: "in_app", refereeId: 77 },
+      ]);
+
+      // Should not throw — loadMutedEventTypes catches errors
+      const result = await processEvent(makeEvent());
+      expect(result.dispatched).toBe(1);
+      expect(result.muted).toBe(0); // no muting applied due to error
+    });
+  });
+
   describe("digest buffer", () => {
     it("continues processing when buffer insert fails", async () => {
       const rule = makeRule();
@@ -663,6 +763,184 @@ describe("processEvent", () => {
 
       expect(result.configs).toHaveLength(1);
       expect(result.configs[0]).toMatchObject({ id: 10 });
+    });
+  });
+
+  describe("whatsapp group dispatch", () => {
+    it("dispatches via whatsapp adapter with valid groupId", async () => {
+      const rule = makeRule({
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "whatsapp_group",
+        config: { groupId: "120363@g.us", locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+
+      const result = await processEvent(makeEvent());
+
+      expect(mockWhatsAppSend).toHaveBeenCalledTimes(1);
+      expect(mockWhatsAppSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventId: "evt-1",
+          channelConfigId: 10,
+        }),
+        "120363@g.us",
+      );
+      expect(result.dispatched).toBe(1);
+      expect(result.buffered).toBe(1);
+    });
+
+    it("uses rich template for referee.slots.needed events", async () => {
+      const rule = makeRule({
+        eventTypes: ["referee.slots.needed"],
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "whatsapp_group",
+        config: { groupId: "120363@g.us", locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+
+      await processEvent(makeEvent({ type: "referee.slots.needed" }));
+
+      expect(mockRenderRefereeSlotsWhatsApp).toHaveBeenCalled();
+      expect(mockWhatsAppSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: "*Referee slots message*",
+        }),
+        "120363@g.us",
+      );
+    });
+
+    it("uses rich template for referee.slots.reminder events", async () => {
+      const rule = makeRule({
+        eventTypes: ["referee.slots.reminder"],
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "whatsapp_group",
+        config: { groupId: "120363@g.us", locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+
+      await processEvent(makeEvent({ type: "referee.slots.reminder" }));
+
+      expect(mockRenderRefereeSlotsWhatsApp).toHaveBeenCalled();
+    });
+
+    it("uses generic text for non-slot whatsapp events", async () => {
+      const rule = makeRule({
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "whatsapp_group",
+        config: { groupId: "120363@g.us", locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+
+      await processEvent(makeEvent({ type: "match.cancelled" }));
+
+      expect(mockRenderRefereeSlotsWhatsApp).not.toHaveBeenCalled();
+      expect(mockWhatsAppSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining("Match Cancelled"),
+        }),
+        "120363@g.us",
+      );
+    });
+
+    it("skips dispatch when groupId is missing", async () => {
+      const rule = makeRule({
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "whatsapp_group",
+        config: { groupId: "", locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+
+      const result = await processEvent(makeEvent());
+
+      expect(mockWhatsAppSend).not.toHaveBeenCalled();
+      expect(result.dispatched).toBe(0);
+    });
+
+    it("returns false for unknown channel type", async () => {
+      const rule = makeRule({
+        channels: [{ channel: "sms", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "sms",
+        config: { locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "sms", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+
+      const result = await processEvent(makeEvent());
+
+      expect(mockInAppSend).not.toHaveBeenCalled();
+      expect(mockWhatsAppSend).not.toHaveBeenCalled();
+      expect(result.dispatched).toBe(0);
+      expect(result.buffered).toBe(1);
+    });
+
+    it("counts failed whatsapp send as not dispatched", async () => {
+      mockWhatsAppSend.mockResolvedValueOnce({ success: false, error: "WAHA error" });
+      const rule = makeRule({
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "whatsapp_group",
+        config: { groupId: "120363@g.us", locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+
+      const result = await processEvent(makeEvent());
+
+      expect(result.dispatched).toBe(0);
+      expect(result.buffered).toBe(1);
     });
   });
 });

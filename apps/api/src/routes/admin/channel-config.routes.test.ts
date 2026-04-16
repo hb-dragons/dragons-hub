@@ -402,6 +402,19 @@ describe("PATCH /channel-configs/:id (typed config validation)", () => {
     });
   });
 
+  it("returns 404 when config is provided but channel config not found", async () => {
+    mocks.getChannelConfig.mockResolvedValue(null);
+
+    const res = await app.request("/channel-configs/999", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config: { locale: "en" } }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("succeeds without config validation for name-only update", async () => {
     const updated = { ...sampleConfig, name: "Renamed" };
     mocks.updateChannelConfig.mockResolvedValue(updated);

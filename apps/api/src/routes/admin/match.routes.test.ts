@@ -7,6 +7,7 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   getOwnClubMatches: vi.fn(),
   getMatchDetail: vi.fn(),
+  getMatchChangeHistory: vi.fn(),
   updateMatchLocal: vi.fn(),
   releaseOverride: vi.fn(),
   reconcileMatch: vi.fn(),
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../services/admin/match-admin.service", () => ({
   getOwnClubMatches: mocks.getOwnClubMatches,
   getMatchDetail: mocks.getMatchDetail,
+  getMatchChangeHistory: mocks.getMatchChangeHistory,
   updateMatchLocal: mocks.updateMatchLocal,
   releaseOverride: mocks.releaseOverride,
 }));
@@ -135,6 +137,37 @@ describe("GET /matches/:id", () => {
 
   it("returns 400 for non-numeric id", async () => {
     const res = await app.request("/matches/abc");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("GET /matches/:id/history", () => {
+  it("returns match change history", async () => {
+    const history = {
+      items: [{ id: 1, field: "kickoffDate", oldValue: "2025-03-01", newValue: "2025-04-01" }],
+      total: 1,
+    };
+    mocks.getMatchChangeHistory.mockResolvedValue(history);
+
+    const res = await app.request("/matches/1/history");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(history);
+    expect(mocks.getMatchChangeHistory).toHaveBeenCalledWith(1, { limit: 50, offset: 0 });
+  });
+
+  it("passes limit and offset to service", async () => {
+    mocks.getMatchChangeHistory.mockResolvedValue({ items: [], total: 0 });
+
+    await app.request("/matches/1/history?limit=10&offset=5");
+
+    expect(mocks.getMatchChangeHistory).toHaveBeenCalledWith(1, { limit: 10, offset: 5 });
+  });
+
+  it("returns 400 for invalid id", async () => {
+    const res = await app.request("/matches/abc/history");
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });

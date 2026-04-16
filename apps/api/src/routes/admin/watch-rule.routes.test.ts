@@ -159,6 +159,21 @@ describe("POST /watch-rules", () => {
     );
   });
 
+  it("uses 'system' as createdBy when user is not set", async () => {
+    mocks.createWatchRule.mockResolvedValue(sampleRule);
+    const bareApp = new Hono<AppEnv>();
+    bareApp.onError(errorHandler);
+    bareApp.route("/", watchRuleRoutes);
+
+    await bareApp.request("/watch-rules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validBody),
+    });
+
+    expect(mocks.createWatchRule).toHaveBeenCalledWith(validBody, "system");
+  });
+
   it("passes optional fields", async () => {
     mocks.createWatchRule.mockResolvedValue(sampleRule);
 

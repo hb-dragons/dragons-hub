@@ -196,6 +196,99 @@ describe("renderRefereeMessage", () => {
     });
   });
 
+  describe(EVENT_TYPES.REFEREE_SLOTS_NEEDED, () => {
+    const payload = {
+      homeTeam: "Dragons",
+      guestTeam: "Tigers",
+    };
+
+    it("renders slots needed in German", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+        payload,
+        "Dragons vs Tigers",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Schiedsrichter gesucht");
+      expect(result!.body).toContain("Dragons vs Tigers");
+      expect(result!.body).toContain("braucht noch Schiedsrichter");
+    });
+
+    it("renders slots needed in English", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+        payload,
+        "Dragons vs Tigers",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Referees needed");
+      expect(result!.body).toContain("Dragons vs Tigers");
+      expect(result!.body).toContain("still needs referees");
+    });
+
+    it("handles missing homeTeam and guestTeam", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+        {},
+        "Game",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain(" vs ");
+      expect(result!.body).not.toContain("undefined");
+    });
+  });
+
+  describe(EVENT_TYPES.REFEREE_SLOTS_REMINDER, () => {
+    const payload = {
+      homeTeam: "Dragons",
+      guestTeam: "Bears",
+      reminderLevel: 3,
+    };
+
+    it("renders slots reminder in German", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_SLOTS_REMINDER,
+        payload,
+        "Dragons vs Bears",
+        "de",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Erinnerung");
+      expect(result!.body).toContain("Dragons vs Bears");
+      expect(result!.body).toContain("3 Tagen");
+      expect(result!.body).toContain("braucht noch Schiedsrichter");
+    });
+
+    it("renders slots reminder in English", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_SLOTS_REMINDER,
+        payload,
+        "Dragons vs Bears",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.title).toContain("Reminder");
+      expect(result!.body).toContain("Dragons vs Bears");
+      expect(result!.body).toContain("3 days");
+      expect(result!.body).toContain("still needs referees");
+    });
+
+    it("handles missing fields with fallback to 0 days", () => {
+      const result = renderRefereeMessage(
+        EVENT_TYPES.REFEREE_SLOTS_REMINDER,
+        {},
+        "Game",
+        "en",
+      );
+      expect(result).not.toBeNull();
+      expect(result!.body).toContain("0 days");
+      expect(result!.body).not.toContain("undefined");
+    });
+  });
+
   describe("unknown event type", () => {
     it("returns null for non-referee events", () => {
       const result = renderRefereeMessage(
