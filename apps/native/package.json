@@ -14,7 +14,7 @@
     "@better-auth/expo": "^1.6.4",
     "@dragons/api-client": "workspace:*",
     "@dragons/shared": "workspace:*",
-    "better-auth": "^1.6.2",
+    "better-auth": "^1.6.5",
     "expo": "~55.0.0",
     "expo-camera": "~55.0.0",
     "expo-constants": "~55.0.0",
@@ -30,9 +30,9 @@
     "expo-web-browser": "~55.0.0",
     "i18n-js": "^4.5.1",
     "react": "19.2.5",
-    "react-native": "0.83.2",
-    "react-native-safe-area-context": "~5.4.0",
-    "react-native-screens": "~4.10.0",
+    "react-native": "0.83.5",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.24.0",
     "swr": "^2.4.1"
   },
   "devDependencies": {
