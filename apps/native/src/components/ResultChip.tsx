@@ -11,7 +11,9 @@ interface ResultChipProps {
 }
 
 function getOpponentName(match: MatchListItem): string {
-  return match.homeIsOwnClub ? match.guestTeamName : match.homeTeamName;
+  return match.homeIsOwnClub
+    ? (match.guestTeamNameShort || match.guestTeamName)
+    : (match.homeTeamNameShort || match.homeTeamName);
 }
 
 function getResultBadge(match: MatchListItem): { label: string; isWin: boolean | null } {
