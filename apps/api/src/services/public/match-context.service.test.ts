@@ -212,6 +212,36 @@ describe("getMatchContext", () => {
     expect(result!.headToHead.previousMeetings[0]!.isWin).toBe(false);
     expect(result!.headToHead.previousMeetings[0]!.homeIsOwnClub).toBe(false);
   });
+
+  it("resolves team names correctly when home/guest are swapped in previous meetings", async () => {
+    // Current match: Dragons(10) home vs Rivals(20) guest
+    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
+
+    setupH2HQuery([
+      // Same order as current match
+      { id: 101, kickoffDate: "2026-03-01", homeTeamApiId: 10, guestTeamApiId: 20, homeScore: 80, guestScore: 70 },
+      // Swapped: Rivals at home, Dragons as guest
+      { id: 102, kickoffDate: "2026-02-01", homeTeamApiId: 20, guestTeamApiId: 10, homeScore: 75, guestScore: 85 },
+    ]);
+
+    setupTeamRow([{ isOwnClub: true, name: "Dragons" }]);
+    setupTeamRow([{ isOwnClub: false, name: "Rivals" }]);
+    setupFormQuery([]);
+    setupFormQuery([]);
+
+    const result = await getMatchContext(1);
+    const meetings = result!.headToHead.previousMeetings;
+
+    // Match 101: same order — home=Dragons, guest=Rivals
+    expect(meetings[0]!.homeTeamName).toBe("Dragons");
+    expect(meetings[0]!.guestTeamName).toBe("Rivals");
+    expect(meetings[0]!.homeIsOwnClub).toBe(true);
+
+    // Match 102: swapped — home=Rivals, guest=Dragons
+    expect(meetings[1]!.homeTeamName).toBe("Rivals");
+    expect(meetings[1]!.guestTeamName).toBe("Dragons");
+    expect(meetings[1]!.homeIsOwnClub).toBe(false);
+  });
 });
 
 describe("getTeamForm (via getMatchContext)", () => {

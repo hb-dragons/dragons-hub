@@ -60,11 +60,13 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
     pointsFor += ourScore;
     pointsAgainst += theirScore;
     if (previousMeetings.length < 5) {
+      // Resolve names based on actual positions in THIS meeting, not the current match
+      const sameOrder = m.homeTeamApiId === homeTeamApiId;
       previousMeetings.push({
         matchId: m.id,
         date: m.kickoffDate,
-        homeTeamName: homeTeamRow?.name ?? "",
-        guestTeamName: guestTeamRow?.name ?? "",
+        homeTeamName: sameOrder ? (homeTeamRow?.name ?? "") : (guestTeamRow?.name ?? ""),
+        guestTeamName: sameOrder ? (guestTeamRow?.name ?? "") : (homeTeamRow?.name ?? ""),
         homeScore: m.homeScore!,
         guestScore: m.guestScore!,
         isWin,
