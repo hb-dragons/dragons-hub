@@ -11,7 +11,7 @@ interface TeamCardProps {
 export function TeamCard({ team, featured = false, onPress }: TeamCardProps) {
   const { colors, radius, textStyles, spacing } = useTheme();
 
-  const displayName = team.shortName || team.name;
+  const displayName = team.customName || team.nameShort || team.name;
   const height = featured ? 200 : 120;
   const titleStyle = featured ? textStyles.screenTitle : textStyles.cardTitle;
 
@@ -38,7 +38,7 @@ export function TeamCard({ team, featured = false, onPress }: TeamCardProps) {
         ]}
         numberOfLines={1}
       >
-        {team.leagueName}
+        {team.name}
       </Text>
     </View>
   );

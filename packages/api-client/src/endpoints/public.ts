@@ -4,18 +4,24 @@ import type { ApiClient } from "../client.js";
 export interface MatchQueryParams {
   limit?: number;
   offset?: number;
-  from?: string;
-  to?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  sort?: string;
+  hasScore?: boolean;
   leagueId?: number;
-  teamId?: number;
+  teamApiId?: number;
 }
 
 export interface PublicTeam {
   id: number;
+  apiTeamPermanentId: number;
+  seasonTeamId: number;
   name: string;
-  shortName?: string;
-  leagueId: number;
-  leagueName: string;
+  nameShort: string | null;
+  customName: string | null;
+  clubId: number;
+  isOwnClub: boolean | null;
+  badgeColor: string | null;
 }
 
 export function publicEndpoints(client: ApiClient) {

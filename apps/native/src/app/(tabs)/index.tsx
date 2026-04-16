@@ -1,13 +1,13 @@
 import { View, Text, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
-import type { PaginatedResponse, MatchListItem, LeagueStandings } from "@dragons/shared";
+import type { LeagueStandings } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { StatStrip } from "@/components/StatStrip";
-import { apiClient, publicApi } from "@/lib/api";
+import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 
 function todayISO(): string {
@@ -21,7 +21,7 @@ export default function HomeScreen() {
   const { data: nextGameData, isLoading: nextLoading } = useSWR(
     "home:nextGame",
     () =>
-      apiClient.get<PaginatedResponse<MatchListItem>>("/public/matches", {
+      publicApi.getMatches({
         limit: 1,
         dateFrom: todayISO(),
         hasScore: false,
@@ -32,7 +32,7 @@ export default function HomeScreen() {
   const { data: lastResultData, isLoading: lastLoading } = useSWR(
     "home:lastResult",
     () =>
-      apiClient.get<PaginatedResponse<MatchListItem>>("/public/matches", {
+      publicApi.getMatches({
         limit: 1,
         dateTo: todayISO(),
         hasScore: true,
