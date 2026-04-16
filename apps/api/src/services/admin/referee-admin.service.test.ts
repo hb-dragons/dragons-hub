@@ -103,7 +103,7 @@ describe("getReferees", () => {
     const roleChain = buildChain(roleRows);
     mockSelectDistinct.mockReturnValueOnce(roleChain);
 
-    const result = await getReferees({ limit: 20, offset: 0 });
+    const result = await getReferees({ limit: 20, offset: 0, ownClub: true });
 
     expect(result).toEqual({
       items: [
@@ -162,6 +162,7 @@ describe("getReferees", () => {
       limit: 20,
       offset: 0,
       search: "Schmidt",
+      ownClub: true,
     });
 
     expect(result.items).toHaveLength(1);
@@ -177,7 +178,7 @@ describe("getReferees", () => {
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain);
 
-    const result = await getReferees({ limit: 20, offset: 0 });
+    const result = await getReferees({ limit: 20, offset: 0, ownClub: true });
 
     expect(result).toEqual({
       items: [],
@@ -233,7 +234,7 @@ describe("getReferees", () => {
     const roleChain = buildChain(roleRows);
     mockSelectDistinct.mockReturnValueOnce(roleChain);
 
-    const result = await getReferees({ limit: 20, offset: 0 });
+    const result = await getReferees({ limit: 20, offset: 0, ownClub: true });
 
     expect(result.items[0]?.roles).toEqual([
       "Schiedsrichter",
@@ -250,7 +251,7 @@ describe("getReferees", () => {
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain);
 
-    await getReferees({ limit: 10, offset: 0 });
+    await getReferees({ limit: 10, offset: 0, ownClub: true });
 
     expect(mockSelectDistinct).not.toHaveBeenCalled();
   });
@@ -282,7 +283,7 @@ describe("getReferees", () => {
     const roleChain = buildChain([]);
     mockSelectDistinct.mockReturnValueOnce(roleChain);
 
-    const result = await getReferees({ limit: 1, offset: 0 });
+    const result = await getReferees({ limit: 1, offset: 0, ownClub: true });
 
     expect(result.hasMore).toBe(true);
     expect(result.total).toBe(5);
@@ -315,7 +316,7 @@ describe("getReferees", () => {
     const roleChain = buildChain([]);
     mockSelectDistinct.mockReturnValueOnce(roleChain);
 
-    const result = await getReferees({ limit: 2, offset: 4 });
+    const result = await getReferees({ limit: 2, offset: 4, ownClub: true });
 
     expect(result.hasMore).toBe(false);
   });
@@ -328,7 +329,7 @@ describe("getReferees", () => {
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain);
 
-    const result = await getReferees({ limit: 10, offset: 0 });
+    const result = await getReferees({ limit: 10, offset: 0, ownClub: true });
 
     expect(result.total).toBe(0);
   });
@@ -341,7 +342,7 @@ describe("getReferees", () => {
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain);
 
-    const result = await getReferees({ limit: 10, offset: 0 });
+    const result = await getReferees({ limit: 10, offset: 0, ownClub: true });
 
     expect(result.total).toBe(0);
   });
@@ -387,7 +388,7 @@ describe("getReferees", () => {
     const roleChain = buildChain(roleRows);
     mockSelectDistinct.mockReturnValueOnce(roleChain);
 
-    const result = await getReferees({ limit: 20, offset: 0 });
+    const result = await getReferees({ limit: 20, offset: 0, ownClub: true });
 
     expect(result.items[0]?.roles).toEqual(["Schiedsrichter"]);
     expect(result.items[1]?.roles).toEqual([]);
@@ -420,7 +421,7 @@ describe("getReferees", () => {
     const roleChain = buildChain([]);
     mockSelectDistinct.mockReturnValueOnce(roleChain);
 
-    const result = await getReferees({ limit: 10, offset: 0 });
+    const result = await getReferees({ limit: 10, offset: 0, ownClub: true });
 
     expect(result.items[0]?.roles).toEqual([]);
   });
