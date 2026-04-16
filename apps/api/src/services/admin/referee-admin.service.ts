@@ -1,7 +1,11 @@
 import { db } from "../../config/database";
 import { referees, refereeRoles, matchReferees } from "@dragons/db/schema";
 import { sql, asc, ilike, and, or, eq } from "drizzle-orm";
-import type { RefereeListItem, PaginatedResponse } from "@dragons/shared";
+import type {
+  RefereeListItem,
+  PaginatedResponse,
+  UpdateRefereeVisibilityBody,
+} from "@dragons/shared";
 
 export interface RefereeListParams {
   limit: number;
@@ -35,6 +39,8 @@ export async function getReferees(
         firstName: referees.firstName,
         lastName: referees.lastName,
         licenseNumber: referees.licenseNumber,
+        allowAllHomeGames: referees.allowAllHomeGames,
+        allowAwayGames: referees.allowAwayGames,
         matchCount: sql<number>`count(distinct ${matchReferees.matchId})::int`,
         createdAt: referees.createdAt,
         updatedAt: referees.updatedAt,
@@ -83,6 +89,8 @@ export async function getReferees(
     firstName: row.firstName,
     lastName: row.lastName,
     licenseNumber: row.licenseNumber,
+    allowAllHomeGames: row.allowAllHomeGames,
+    allowAwayGames: row.allowAwayGames,
     matchCount: row.matchCount,
     roles: rolesByReferee.get(row.id) ?? [],
     createdAt: row.createdAt.toISOString(),
@@ -90,4 +98,29 @@ export async function getReferees(
   }));
 
   return { items, total, limit, offset, hasMore: offset + items.length < total };
+}
+
+export async function updateRefereeVisibility(
+  refereeId: number,
+  body: UpdateRefereeVisibilityBody,
+) {
+  const [updated] = await db
+    .update(referees)
+    .set({
+      allowAllHomeGames: body.allowAllHomeGames,
+      allowAwayGames: body.allowAwayGames,
+      updatedAt: new Date(),
+    })
+    .where(eq(referees.id, refereeId))
+    .returning({
+      id: referees.id,
+      allowAllHomeGames: referees.allowAllHomeGames,
+      allowAwayGames: referees.allowAwayGames,
+    });
+
+  if (!updated) {
+    throw new Error(`Referee ${refereeId} not found`);
+  }
+
+  return updated;
 }

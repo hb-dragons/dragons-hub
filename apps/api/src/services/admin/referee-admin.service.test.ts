@@ -2,11 +2,13 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockSelect = vi.fn();
 const mockSelectDistinct = vi.fn();
+const mockUpdate = vi.fn();
 
 vi.mock("../../config/database", () => ({
   db: {
     select: (...args: unknown[]) => mockSelect(...args),
     selectDistinct: (...args: unknown[]) => mockSelectDistinct(...args),
+    update: (...args: unknown[]) => mockUpdate(...args),
   },
 }));
 
@@ -17,6 +19,8 @@ vi.mock("@dragons/db/schema", () => ({
     firstName: "r.fn",
     lastName: "r.ln",
     licenseNumber: "r.lic",
+    allowAllHomeGames: "r.aahg",
+    allowAwayGames: "r.aag",
     createdAt: "r.ca",
     updatedAt: "r.ua",
   },
@@ -37,7 +41,7 @@ vi.mock("drizzle-orm", () => ({
   sql: vi.fn((...args: unknown[]) => ({ sql: args })),
 }));
 
-import { getReferees } from "./referee-admin.service";
+import { getReferees, updateRefereeVisibility } from "./referee-admin.service";
 
 function makeDate(iso: string) {
   return { toISOString: () => iso };
@@ -79,6 +83,8 @@ describe("getReferees", () => {
         firstName: "Max",
         lastName: "Mustermann",
         licenseNumber: "L001",
+        allowAllHomeGames: false,
+        allowAwayGames: false,
         matchCount: 5,
         createdAt: makeDate("2025-01-01T00:00:00.000Z"),
         updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
@@ -107,6 +113,8 @@ describe("getReferees", () => {
           firstName: "Max",
           lastName: "Mustermann",
           licenseNumber: "L001",
+          allowAllHomeGames: false,
+          allowAwayGames: false,
           matchCount: 5,
           roles: ["Schiedsrichter"],
           createdAt: "2025-01-01T00:00:00.000Z",
@@ -130,6 +138,8 @@ describe("getReferees", () => {
         firstName: "Anna",
         lastName: "Schmidt",
         licenseNumber: "L002",
+        allowAllHomeGames: false,
+        allowAwayGames: false,
         matchCount: 3,
         createdAt: makeDate("2025-02-01T00:00:00.000Z"),
         updatedAt: makeDate("2025-02-02T00:00:00.000Z"),
@@ -187,6 +197,8 @@ describe("getReferees", () => {
         firstName: "Tom",
         lastName: "Bauer",
         licenseNumber: "L010",
+        allowAllHomeGames: true,
+        allowAwayGames: false,
         matchCount: 7,
         createdAt: makeDate("2025-03-01T00:00:00.000Z"),
         updatedAt: makeDate("2025-03-02T00:00:00.000Z"),
@@ -197,6 +209,8 @@ describe("getReferees", () => {
         firstName: "Lisa",
         lastName: "Klein",
         licenseNumber: "L011",
+        allowAllHomeGames: false,
+        allowAwayGames: true,
         matchCount: 2,
         createdAt: makeDate("2025-03-03T00:00:00.000Z"),
         updatedAt: makeDate("2025-03-04T00:00:00.000Z"),
@@ -249,6 +263,8 @@ describe("getReferees", () => {
         firstName: "Max",
         lastName: "Mustermann",
         licenseNumber: "L001",
+        allowAllHomeGames: false,
+        allowAwayGames: false,
         matchCount: 1,
         createdAt: makeDate("2025-01-01T00:00:00.000Z"),
         updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
@@ -280,6 +296,8 @@ describe("getReferees", () => {
         firstName: "Max",
         lastName: "Mustermann",
         licenseNumber: "L001",
+        allowAllHomeGames: false,
+        allowAwayGames: false,
         matchCount: 1,
         createdAt: makeDate("2025-01-01T00:00:00.000Z"),
         updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
@@ -336,6 +354,8 @@ describe("getReferees", () => {
         firstName: "Karl",
         lastName: "Adams",
         licenseNumber: "L020",
+        allowAllHomeGames: false,
+        allowAwayGames: false,
         matchCount: 4,
         createdAt: makeDate("2025-05-01T00:00:00.000Z"),
         updatedAt: makeDate("2025-05-02T00:00:00.000Z"),
@@ -346,6 +366,8 @@ describe("getReferees", () => {
         firstName: "Petra",
         lastName: "Berg",
         licenseNumber: "L021",
+        allowAllHomeGames: false,
+        allowAwayGames: false,
         matchCount: 1,
         createdAt: makeDate("2025-05-03T00:00:00.000Z"),
         updatedAt: makeDate("2025-05-04T00:00:00.000Z"),
@@ -379,6 +401,8 @@ describe("getReferees", () => {
         firstName: "Jan",
         lastName: "Weber",
         licenseNumber: "L005",
+        allowAllHomeGames: false,
+        allowAwayGames: false,
         matchCount: 0,
         createdAt: makeDate("2025-04-01T00:00:00.000Z"),
         updatedAt: makeDate("2025-04-02T00:00:00.000Z"),
@@ -399,5 +423,66 @@ describe("getReferees", () => {
     const result = await getReferees({ limit: 10, offset: 0 });
 
     expect(result.items[0]?.roles).toEqual([]);
+  });
+});
+
+function buildUpdateChain(result: unknown[]) {
+  const chain: Record<string, unknown> = {};
+  const methods = ["set", "where"];
+  for (const m of methods) {
+    chain[m] = vi.fn().mockReturnValue(chain);
+  }
+  chain.returning = vi.fn().mockResolvedValue(result);
+  return chain;
+}
+
+describe("updateRefereeVisibility", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("updates visibility flags and returns the result", async () => {
+    const updated = { id: 1, allowAllHomeGames: true, allowAwayGames: false };
+    const chain = buildUpdateChain([updated]);
+    mockUpdate.mockReturnValueOnce(chain);
+
+    const result = await updateRefereeVisibility(1, {
+      allowAllHomeGames: true,
+      allowAwayGames: false,
+    });
+
+    expect(result).toEqual(updated);
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowAllHomeGames: true,
+        allowAwayGames: false,
+      }),
+    );
+  });
+
+  it("returns updated values when both flags are true", async () => {
+    const updated = { id: 2, allowAllHomeGames: true, allowAwayGames: true };
+    const chain = buildUpdateChain([updated]);
+    mockUpdate.mockReturnValueOnce(chain);
+
+    const result = await updateRefereeVisibility(2, {
+      allowAllHomeGames: true,
+      allowAwayGames: true,
+    });
+
+    expect(result).toEqual(updated);
+  });
+
+  it("throws for non-existent referee", async () => {
+    const chain = buildUpdateChain([]);
+    mockUpdate.mockReturnValueOnce(chain);
+
+    await expect(
+      updateRefereeVisibility(999, {
+        allowAllHomeGames: true,
+        allowAwayGames: false,
+      }),
+    ).rejects.toThrow("Referee 999 not found");
   });
 });
