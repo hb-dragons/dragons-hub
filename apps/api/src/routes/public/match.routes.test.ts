@@ -7,10 +7,20 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   getOwnClubMatches: vi.fn(),
   buildCalendarFeed: vi.fn(),
+  getPublicMatchDetail: vi.fn(),
+  getMatchContext: vi.fn(),
 }));
 
 vi.mock("../../services/admin/match-admin.service", () => ({
   getOwnClubMatches: mocks.getOwnClubMatches,
+}));
+
+vi.mock("../../services/admin/match-query.service", () => ({
+  getPublicMatchDetail: mocks.getPublicMatchDetail,
+}));
+
+vi.mock("../../services/public/match-context.service", () => ({
+  getMatchContext: mocks.getMatchContext,
 }));
 
 vi.mock("../../services/public/calendar.service", () => ({
@@ -243,5 +253,67 @@ describe("GET /schedule.ics", () => {
   it("returns 400 for invalid date format", async () => {
     const res = await app.request("/schedule.ics?dateFrom=bad");
     expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /matches/:id", () => {
+  it("returns 200 with match detail", async () => {
+    const match = { id: 1, homeTeamName: "Dragons", guestTeamName: "Rivals" };
+    mocks.getPublicMatchDetail.mockResolvedValue(match);
+
+    const res = await app.request("/matches/1");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(match);
+    expect(mocks.getPublicMatchDetail).toHaveBeenCalledWith(1);
+  });
+
+  it("returns 404 when match not found", async () => {
+    mocks.getPublicMatchDetail.mockResolvedValue(null);
+
+    const res = await app.request("/matches/999");
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toEqual({ error: "Not found" });
+  });
+
+  it("returns 400 for non-numeric id", async () => {
+    const res = await app.request("/matches/abc");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toEqual({ error: "Invalid ID" });
+  });
+});
+
+describe("GET /matches/:id/context", () => {
+  it("returns 200 with match context", async () => {
+    const context = {
+      headToHead: { wins: 2, losses: 1, pointsFor: 200, pointsAgainst: 180, previousMeetings: [] },
+      homeForm: [{ result: "W", matchId: 1 }],
+      guestForm: [{ result: "L", matchId: 2 }],
+    };
+    mocks.getMatchContext.mockResolvedValue(context);
+
+    const res = await app.request("/matches/1/context");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(context);
+    expect(mocks.getMatchContext).toHaveBeenCalledWith(1);
+  });
+
+  it("returns 404 when context not found", async () => {
+    mocks.getMatchContext.mockResolvedValue(null);
+
+    const res = await app.request("/matches/999/context");
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toEqual({ error: "Not found" });
+  });
+
+  it("returns 400 for non-numeric id", async () => {
+    const res = await app.request("/matches/abc/context");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toEqual({ error: "Invalid ID" });
   });
 });
