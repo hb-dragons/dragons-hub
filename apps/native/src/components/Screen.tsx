@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ScrollView, View, StyleSheet } from "react-native";
+import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -7,9 +8,11 @@ interface ScreenProps {
   children: ReactNode;
   /** Wrap children in a ScrollView (default: true) */
   scroll?: boolean;
+  /** SafeAreaView edges (default: ["top"]). Use [] for screens with a Stack header. */
+  edges?: Edge[];
 }
 
-export function Screen({ children, scroll = true }: ScreenProps) {
+export function Screen({ children, scroll = true, edges = ["top"] }: ScreenProps) {
   const { colors, spacing } = useTheme();
 
   const containerStyle = {
@@ -23,7 +26,7 @@ export function Screen({ children, scroll = true }: ScreenProps) {
   };
 
   return (
-    <SafeAreaView style={containerStyle} edges={["top"]}>
+    <SafeAreaView style={containerStyle} edges={edges}>
       {scroll ? (
         <ScrollView
           style={styles.scrollView}

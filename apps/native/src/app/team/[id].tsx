@@ -129,7 +129,7 @@ export default function TeamDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: teamName || "..." }} />
-        <Screen>
+        <Screen edges={[]}>
           <View
             style={{
               flex: 1,
@@ -154,7 +154,7 @@ export default function TeamDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: teamName }} />
-      <Screen>
+      <Screen edges={[]}>
         {/* 1. Team Header */}
         <View style={{ marginBottom: spacing.lg }}>
           <Text

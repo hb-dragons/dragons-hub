@@ -25,7 +25,7 @@ export default function H2HScreen() {
   return (
     <>
       <Stack.Screen options={{ title: opponentName ? i18n.t("h2h.title", { opponent: opponentName }) : "" }} />
-      <Screen scroll={false}>
+      <Screen scroll={false} edges={[]}>
         {isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
         ) : (

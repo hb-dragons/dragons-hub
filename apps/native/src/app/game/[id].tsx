@@ -40,7 +40,7 @@ export default function GameDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ title: headerTitle }} />
-        <Screen>
+        <Screen edges={[]}>
           <View
             style={{
               flex: 1,
@@ -106,7 +106,7 @@ export default function GameDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: headerTitle }} />
-      <Screen>
+      <Screen edges={[]}>
         {/* ── 1. Score Header ── */}
         <Card
           style={{
