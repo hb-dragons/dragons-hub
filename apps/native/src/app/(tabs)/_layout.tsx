@@ -1,16 +1,19 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
+import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 
 export default function TabLayout() {
+  const { colors } = useTheme();
+
   return (
-    <NativeTabs>
+    <NativeTabs tintColor={colors.primary}>
         <NativeTabs.Trigger name="index">
           <NativeTabs.Trigger.Label>
             {i18n.t("tabs.home")}
           </NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon
-            sf={{ default: "house", selected: "house.fill" }}
-            md="home"
+            sf={{ default: "basketball", selected: "basketball.fill" }}
+            md="sports_basketball"
           />
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="schedule">
@@ -18,7 +21,7 @@ export default function TabLayout() {
             {i18n.t("tabs.schedule")}
           </NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon
-            sf={{ default: "calendar", selected: "calendar.circle.fill" }}
+            sf={{ default: "calendar", selected: "calendar" }}
             md="event"
           />
         </NativeTabs.Trigger>
@@ -27,8 +30,8 @@ export default function TabLayout() {
             {i18n.t("tabs.standings")}
           </NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon
-            sf={{ default: "trophy", selected: "trophy.fill" }}
-            md="emoji_events"
+            sf={{ default: "chart.bar", selected: "chart.bar.fill" }}
+            md="leaderboard"
           />
         </NativeTabs.Trigger>
         <NativeTabs.Trigger name="teams">
@@ -36,7 +39,7 @@ export default function TabLayout() {
             {i18n.t("tabs.teams")}
           </NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon
-            sf={{ default: "person.2", selected: "person.2.fill" }}
+            sf={{ default: "person.3", selected: "person.3.fill" }}
             md="groups"
           />
         </NativeTabs.Trigger>
