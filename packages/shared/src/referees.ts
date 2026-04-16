@@ -6,6 +6,8 @@ export interface RefereeListItem {
   licenseNumber: number | null;
   matchCount: number;
   roles: string[];
+  allowAllHomeGames: boolean;
+  allowAwayGames: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +23,11 @@ export interface RefereeRule {
 
 export interface RefereeRulesResponse {
   rules: RefereeRule[];
+}
+
+export interface UpdateRefereeVisibilityBody {
+  allowAllHomeGames: boolean;
+  allowAwayGames: boolean;
 }
 
 export interface UpdateRefereeRulesBody {
