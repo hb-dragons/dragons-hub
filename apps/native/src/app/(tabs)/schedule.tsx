@@ -51,34 +51,28 @@ export default function ScheduleScreen() {
     }));
   }, [filtered]);
 
-  // Find the section index of the first upcoming game (no score yet)
+  // Find the section index of the first upcoming date
   const firstUpcomingSectionIndex = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
     for (let i = 0; i < sections.length; i++) {
-      const section = sections[i]!;
-      // Section date is today or in the future
-      if (section.title >= today) return i;
+      if (sections[i]!.title >= today) return i;
     }
-    // All games in the past — stay at the end
-    return sections.length - 1;
+    return -1;
   }, [sections]);
 
-  const handleLayout = useCallback(() => {
+  // Scroll once after content is laid out
+  const handleContentSizeChange = useCallback(() => {
     if (hasScrolled.current || sections.length === 0 || firstUpcomingSectionIndex < 0) return;
     hasScrolled.current = true;
 
-    // Small delay to let SectionList finish layout
-    setTimeout(() => {
-      listRef.current?.scrollToLocation({
-        sectionIndex: firstUpcomingSectionIndex,
-        itemIndex: 0,
-        animated: false,
-        viewOffset: 0,
-      });
-    }, 100);
+    listRef.current?.scrollToLocation({
+      sectionIndex: firstUpcomingSectionIndex,
+      itemIndex: 0,
+      animated: false,
+      viewOffset: 0,
+    });
   }, [sections, firstUpcomingSectionIndex]);
 
-  // Reset scroll flag when filter changes
   const handleFilterChange = useCallback((f: Filter) => {
     hasScrolled.current = false;
     setFilter(f);
@@ -132,7 +126,7 @@ export default function ScheduleScreen() {
           ref={listRef}
           sections={sections}
           keyExtractor={(item) => String(item.id)}
-          onLayout={handleLayout}
+          onContentSizeChange={handleContentSizeChange}
           renderSectionHeader={({ section }) => (
             <Text
               style={[
@@ -157,12 +151,8 @@ export default function ScheduleScreen() {
           )}
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
-          // Required for scrollToLocation to work reliably
-          getItemLayout={(_data, index) => ({
-            length: 110,
-            offset: 110 * index,
-            index,
-          })}
+          // Render enough items so scrollToLocation target exists on first pass
+          initialNumToRender={filtered.length}
         />
       )}
     </Screen>
