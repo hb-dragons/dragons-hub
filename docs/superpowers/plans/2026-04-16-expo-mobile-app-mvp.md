@@ -6,7 +6,16 @@
 
 **Architecture:** New `apps/native` Expo project and `packages/api-client` shared package in the existing pnpm monorepo. Dragon's Lair design system tokens ported from CSS custom properties to React Native theme objects. File-based navigation via Expo Router with 4-tab layout. Better Auth Expo plugin for authentication with SecureStore token storage.
 
-**Tech Stack:** Expo SDK 55, React Native 0.83, Expo Router v4, Better Auth with `@better-auth/expo`, SWR for data fetching, `expo-font` (Space Grotesk + Inter), `expo-secure-store`, `expo-notifications`, `expo-local-authentication`, `i18n-js` + `expo-localization`.
+**Tech Stack:** Expo SDK 55 (all expo-* packages use `^55.0.0` unified versioning), React Native 0.83, Expo Router v5 with NativeTabs (`expo-router/unstable-native-tabs`) for platform-native tab bar, Better Auth with `@better-auth/expo`, SWR for data fetching, `expo-font` (Space Grotesk + Inter), `expo-secure-store`, `expo-notifications`, `expo-local-authentication`, `i18n-js` + `expo-localization`.
+
+**SDK 55 Key Facts (verified April 2026):**
+- `expo@55.0.15` (latest stable), React Native 0.83, React 19.2
+- All expo-* packages use `^55.0.0` version (unified scheme since SDK 55)
+- New Architecture is mandatory (`newArchEnabled` config option removed)
+- Default template uses `/src/app` folder structure
+- NativeTabs API renders platform-native tab bar (UITabBarController on iOS, Material BottomNavigation on Android) with SF Symbols + Material Icons — no `@expo/vector-icons` needed for tabs
+- Router v5: `Stack.Protected`/`Tabs.Protected` for auth guards, `anchor` replaces `initialRouteName`
+- `subscription.remove()` pattern replaces deprecated `removeSubscription()`
 
 **Spec:** `docs/superpowers/specs/2026-04-16-expo-mobile-app-mvp-design.md`
 
@@ -649,27 +658,26 @@ node-linker=hoisted
   "dependencies": {
     "@dragons/api-client": "workspace:*",
     "@dragons/shared": "workspace:*",
-    "@better-auth/expo": "^1.6.2",
-    "@expo/vector-icons": "^14.0.0",
+    "@better-auth/expo": "^1.6.4",
     "better-auth": "^1.6.2",
     "expo": "~55.0.0",
-    "expo-camera": "~16.0.0",
-    "expo-constants": "~17.0.0",
-    "expo-font": "~13.0.0",
-    "expo-linking": "~7.0.0",
-    "expo-local-authentication": "~15.0.0",
-    "expo-localization": "~16.0.0",
-    "expo-notifications": "~0.31.0",
-    "expo-router": "~4.0.0",
-    "expo-secure-store": "~14.0.0",
-    "expo-splash-screen": "~0.30.0",
-    "expo-status-bar": "~2.0.0",
-    "expo-web-browser": "~14.0.0",
+    "expo-camera": "~55.0.0",
+    "expo-constants": "~55.0.0",
+    "expo-font": "~55.0.0",
+    "expo-linking": "~55.0.0",
+    "expo-local-authentication": "~55.0.0",
+    "expo-localization": "~55.0.0",
+    "expo-notifications": "~55.0.0",
+    "expo-router": "~55.0.0",
+    "expo-secure-store": "~55.0.0",
+    "expo-splash-screen": "~55.0.0",
+    "expo-status-bar": "~55.0.0",
+    "expo-web-browser": "~55.0.0",
     "i18n-js": "^4.5.1",
     "react": "19.2.5",
     "react-native": "0.83.2",
-    "react-native-safe-area-context": "~5.0.0",
-    "react-native-screens": "~4.0.0",
+    "react-native-safe-area-context": "~5.4.0",
+    "react-native-screens": "~4.10.0",
     "swr": "^2.4.1"
   },
   "devDependencies": {
@@ -680,7 +688,7 @@ node-linker=hoisted
 }
 ```
 
-Note: Exact Expo SDK 55 sub-versions should be resolved by `pnpm install`. The `~` ranges align with the SDK release.
+Note: SDK 55 uses unified versioning — all `expo-*` packages use `^55.0.0`. The `~` tilde ranges ensure patch-level compat. `@expo/vector-icons` is NOT needed — NativeTabs uses platform-native SF Symbols (iOS) and Material Icons (Android).
 
 - [ ] **Step 3: Create app.json**
 
@@ -694,7 +702,6 @@ Note: Exact Expo SDK 55 sub-versions should be resolved by `pnpm install`. The `
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -1782,7 +1789,6 @@ export function TeamCard({ team, featured, onPress }: TeamCardProps) {
 // apps/native/src/components/Header.tsx
 import { View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -1810,11 +1816,21 @@ export function Header() {
         onPress={() => router.push("/profile")}
         hitSlop={8}
       >
-        <Ionicons
-          name="person-circle-outline"
-          size={28}
-          color={colors.mutedForeground}
-        />
+        {/* Simple avatar circle — avoids @expo/vector-icons dependency */}
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: colors.surfaceHigh,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ color: colors.mutedForeground, fontSize: 16 }}>
+            👤
+          </Text>
+        </View>
       </Pressable>
     </View>
   );
@@ -2188,77 +2204,50 @@ export default function RootLayout() {
 }
 ```
 
-- [ ] **Step 4: Create tab layout**
+- [ ] **Step 4: Create tab layout using NativeTabs (SDK 55)**
+
+NativeTabs renders the platform's built-in tab bar — UITabBarController on iOS, Material BottomNavigation on Android. Uses SF Symbols (iOS) and Material Icons (Android) natively — no icon library needed.
 
 ```tsx
 // apps/native/src/app/(tabs)/_layout.tsx
-import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useTheme } from "@/hooks/useTheme";
+import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { Header } from "@/components/Header";
 import { i18n } from "@/lib/i18n";
 
 export default function TabLayout() {
-  const { colors, textStyles } = useTheme();
-
   return (
     <>
       <Header />
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: colors.surfaceLow,
-            borderTopWidth: 0, // No-line rule
-            elevation: 0,
-          },
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.mutedForeground,
-          tabBarLabelStyle: {
-            fontFamily: textStyles.tabLabel.fontFamily,
-            fontSize: textStyles.tabLabel.fontSize,
-            letterSpacing: textStyles.tabLabel.letterSpacing,
-            textTransform: "uppercase",
-          },
-        }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: i18n.t("tabs.home"),
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="schedule"
-          options={{
-            title: i18n.t("tabs.schedule"),
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="calendar" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="standings"
-          options={{
-            title: i18n.t("tabs.standings"),
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="trophy" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="teams"
-          options={{
-            title: i18n.t("tabs.teams"),
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="people" size={size} color={color} />
-            ),
-          }}
-        />
-      </Tabs>
+      <NativeTabs>
+        <NativeTabs.Trigger name="index">
+          <NativeTabs.Trigger.Label>{i18n.t("tabs.home")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "house", selected: "house.fill" }}
+            md="home"
+          />
+        </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="schedule">
+          <NativeTabs.Trigger.Label>{i18n.t("tabs.schedule")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "calendar", selected: "calendar.circle.fill" }}
+            md="event"
+          />
+        </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="standings">
+          <NativeTabs.Trigger.Label>{i18n.t("tabs.standings")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "trophy", selected: "trophy.fill" }}
+            md="emoji_events"
+          />
+        </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="teams">
+          <NativeTabs.Trigger.Label>{i18n.t("tabs.teams")}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: "person.2", selected: "person.2.fill" }}
+            md="groups"
+          />
+        </NativeTabs.Trigger>
+      </NativeTabs>
     </>
   );
 }
@@ -3750,11 +3739,8 @@ export function usePushNotifications() {
       });
 
     return () => {
-      if (notificationResponseListener.current) {
-        Notifications.removeNotificationSubscription(
-          notificationResponseListener.current,
-        );
-      }
+      // SDK 55: use subscription.remove() instead of deprecated removeNotificationSubscription()
+      notificationResponseListener.current?.remove();
     };
   }, [router]);
 }
