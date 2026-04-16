@@ -60,8 +60,8 @@ async function ensureChannelConfig(id: number = 1): Promise<void> {
   );
   if (existing.rows.length === 0) {
     await ctx.client.query(
-      "INSERT INTO channel_configs (id, name, type) VALUES ($1, $2, $3)",
-      [id, "test-channel", "in_app"],
+      "INSERT INTO channel_configs (id, name, type, config) VALUES ($1, $2, $3, $4)",
+      [id, "test-channel", "in_app", JSON.stringify({ audienceRole: "admin", locale: "de" })],
     );
   }
 }
