@@ -58,6 +58,10 @@ export default function GameDetailScreen() {
 
   const hasScore = match.homeScore !== null && match.guestScore !== null;
 
+  // Full names for the score card (own-club uses display name, opponent uses full federation name)
+  const homeScoreName = match.homeIsOwnClub ? homeName : match.homeTeamName;
+  const guestScoreName = match.guestIsOwnClub ? guestName : match.guestTeamName;
+
   const homeLabel = homeName;
   const guestLabel = guestName;
 
@@ -147,7 +151,7 @@ export default function GameDetailScreen() {
                   ]}
                   numberOfLines={2}
                 >
-                  {homeName}
+                  {homeScoreName}
                 </Text>
               </View>
 
@@ -216,7 +220,7 @@ export default function GameDetailScreen() {
                   ]}
                   numberOfLines={2}
                 >
-                  {guestName}
+                  {guestScoreName}
                 </Text>
               </View>
             </View>
