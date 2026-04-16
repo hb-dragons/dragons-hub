@@ -18,6 +18,14 @@ export function RefereeSyncStatusCards() {
   const t = useTranslations();
   const format = useFormatter();
 
+  const [now, setNow] = useState(() => Date.now());
+
+  // Tick relative times every 30s so they stay fresh
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
   function getNextRunLabel(
     lastSync: Pick<SyncRun, "completedAt" | "status"> | null,
     sched: SyncScheduleData | null,
@@ -28,7 +36,6 @@ export function RefereeSyncStatusCards() {
 
     const lastCompleted = new Date(lastSync.completedAt).getTime();
     const nextRun = lastCompleted + sched.intervalMinutes * 60 * 1000;
-    const now = Date.now();
     const diffMs = nextRun - now;
 
     if (diffMs <= 0) return t("sync.refereeSchedule.startingSoon");
@@ -39,12 +46,6 @@ export function RefereeSyncStatusCards() {
   const { schedule } = useRefereeSyncSchedule();
   const lastSync = status?.lastSync;
 
-  // Tick relative times every 30s so they stay fresh
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => setTick((t) => t + 1), 30_000);
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

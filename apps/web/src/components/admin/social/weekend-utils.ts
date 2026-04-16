@@ -3,7 +3,6 @@ import {
   getSunday,
   previousSaturday,
   nextSaturday,
-  toDateString,
 } from "@/lib/weekend-utils";
 
 /**

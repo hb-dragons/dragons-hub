@@ -42,7 +42,7 @@ import { errorHandler } from "../../middleware/error";
 
 const app = new Hono<AppEnv>();
 app.use("/*", async (c, next) => {
-  c.set("user", { id: "test-admin" });
+  c.set("user", { id: "test-admin" } as never);
   await next();
 });
 app.onError(errorHandler);
