@@ -379,6 +379,20 @@ Match list and detail responses include associated venue booking data when avail
 | GET | `/referee/matches` | referee/admin | List matches with open referee slots |
 | POST | `/referee/matches/:id/take` | referee/admin | Record take-intent, returns deep-link URL |
 
+### Referee Assignment (role: referee | admin)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/referee/games/:spielplanId/assign` | referee/admin | Assign self to a game slot. Body: `{ slotNumber: 1\|2, refereeApiId: number }`. Returns: `{ success, slot, status, refereeName }` |
+
+### Admin Referee Assignment (role: admin)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/admin/referee/games/:spielplanId/candidates` | admin | Search qualified candidates. Query: `?search=&pageFrom=0&pageSize=15` |
+| POST | `/admin/referee/games/:spielplanId/assign` | admin | Assign referee to slot. Body: `{ slotNumber: 1\|2, refereeApiId: number }` |
+| DELETE | `/admin/referee/games/:spielplanId/assignment/:slotNumber` | admin | Remove referee from slot |
+
 ### Admin - Social Post Generator
 
 | Method | Path | Description |

@@ -23,6 +23,8 @@ import { publicMatchRoutes } from "./public/match.routes";
 import { publicStandingsRoutes } from "./public/standings.routes";
 import { publicTeamRoutes } from "./public/team.routes";
 import { refereeGamesRoutes } from "./referee/games.routes";
+import { refereeAssignmentRoutes } from "./referee/assignment.routes";
+import { adminRefereeAssignmentRoutes } from "./admin/referee-assignment.routes";
 
 const routes = new Hono();
 
@@ -50,5 +52,7 @@ routes.route("/public", publicMatchRoutes);
 routes.route("/public", publicStandingsRoutes);
 routes.route("/public", publicTeamRoutes);
 routes.route("/referee", refereeGamesRoutes);
+routes.route("/referee", refereeAssignmentRoutes);
+routes.route("/admin", adminRefereeAssignmentRoutes);
 
 export { routes };
