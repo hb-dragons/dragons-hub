@@ -6,7 +6,8 @@ import useSWR from "swr"
 import { apiFetcher } from "@/lib/swr"
 import { SWR_KEYS } from "@/lib/swr-keys"
 import type { ColumnDef, FilterFn } from "@tanstack/react-table"
-import { SearchIcon, Settings2, Users } from "lucide-react"
+import { Check, SearchIcon, Settings2, Users } from "lucide-react"
+import { cn } from "@dragons/ui/lib/utils"
 import { Button } from "@dragons/ui/components/button"
 import { Input } from "@dragons/ui/components/input"
 import { Badge } from "@dragons/ui/components/badge"
@@ -91,6 +92,17 @@ function getColumns(
       meta: { label: t("columns.apiId") },
     },
     {
+      accessorKey: "isOwnClub",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t("columns.isOwnClub")} />
+      ),
+      cell: ({ row }) =>
+        row.original.isOwnClub ? (
+          <Check className="h-4 w-4 text-emerald-600" />
+        ) : null,
+      meta: { label: t("columns.isOwnClub") },
+    },
+    {
       id: "actions",
       header: "",
       cell: ({ row }) => (
@@ -131,7 +143,11 @@ const refereeGlobalFilterFn: FilterFn<RefereeListItem> = (
 
 export function RefereeListTable() {
   const t = useTranslations("referees")
-  const { data: response } = useSWR<PaginatedResponse<RefereeListItem>>(SWR_KEYS.referees, apiFetcher)
+  const [showOwnClub, setShowOwnClub] = useState(true)
+  const { data: response } = useSWR<PaginatedResponse<RefereeListItem>>(
+    SWR_KEYS.referees(showOwnClub ? undefined : false),
+    apiFetcher,
+  )
   const [rulesReferee, setRulesReferee] = useState<RefereeListItem | null>(null)
   const columns = useMemo(() => getColumns(t, setRulesReferee), [t])
 
@@ -143,7 +159,7 @@ export function RefereeListTable() {
         columns={columns}
         data={allItems}
         globalFilterFn={refereeGlobalFilterFn}
-        initialColumnVisibility={{ apiId: false }}
+        initialColumnVisibility={{ apiId: false, isOwnClub: false }}
         emptyState={
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Users className="mb-2 h-8 w-8" />
@@ -161,6 +177,26 @@ export function RefereeListTable() {
                 onChange={(event) => table.setGlobalFilter(event.target.value)}
                 className="h-8 w-[150px] pl-8 lg:w-[250px]"
               />
+            </div>
+            <div className="flex gap-1">
+              {([
+                { label: t("filter.ownClub"), value: true },
+                { label: t("filter.all"), value: false },
+              ] as const).map((opt) => (
+                <button
+                  key={String(opt.value)}
+                  type="button"
+                  onClick={() => setShowOwnClub(opt.value)}
+                  className={cn(
+                    "rounded-4xl border px-3 py-1 text-xs transition-colors",
+                    showOwnClub === opt.value
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </DataTableToolbar>
         )}

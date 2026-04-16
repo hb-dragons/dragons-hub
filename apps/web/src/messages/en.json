@@ -400,7 +400,8 @@
       "licenseNumber": "License #",
       "matchCount": "Matches",
       "roles": "Roles",
-      "apiId": "API ID"
+      "apiId": "API ID",
+      "isOwnClub": "Own Club"
     },
     "rules": {
       "title": "Assignment Rules for {name}",
@@ -415,6 +416,10 @@
       "allow": "Allow",
       "saved": "Rules saved successfully",
       "saveFailed": "Failed to save rules"
+    },
+    "filter": {
+      "ownClub": "Own Club",
+      "all": "All"
     }
   },
   "standings": {
@@ -585,7 +590,11 @@
     "emptyColumn": "No tasks",
     "emptyBoard": "No board found. Create one to get started.",
     "createBoard": "Create Board",
-    "filters": { "assignee": "Assignee", "priority": "Priority", "all": "All" },
+    "filters": {
+      "assignee": "Assignee",
+      "priority": "Priority",
+      "all": "All"
+    },
     "task": {
       "title": "Title",
       "description": "Description",
@@ -601,16 +610,37 @@
       "linkedMatches": "Linked Matches",
       "source": "Source"
     },
-    "priority": { "low": "Low", "normal": "Normal", "high": "High", "urgent": "Urgent" },
-    "toast": { "created": "Task created", "updated": "Task updated", "deleted": "Task deleted", "moved": "Task moved" }
+    "priority": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High",
+      "urgent": "Urgent"
+    },
+    "toast": {
+      "created": "Task created",
+      "updated": "Task updated",
+      "deleted": "Task deleted",
+      "moved": "Task moved"
+    }
   },
   "bookings": {
     "title": "Venue Bookings",
     "description": "Track venue booking status for home games",
     "empty": "No venue bookings found",
-    "status": { "pending": "Pending", "requested": "Requested", "confirmed": "Confirmed", "cancelled": "Cancelled" },
+    "status": {
+      "pending": "Pending",
+      "requested": "Requested",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled"
+    },
     "needsReconfirmation": "Needs re-confirmation — match times have changed since this was confirmed",
-    "columns": { "date": "Date", "venue": "Venue", "timeWindow": "Time Window", "matches": "Matches", "status": "Status" },
+    "columns": {
+      "date": "Date",
+      "venue": "Venue",
+      "timeWindow": "Time Window",
+      "matches": "Matches",
+      "status": "Status"
+    },
     "create": {
       "title": "New Booking",
       "venue": "Venue",
@@ -622,8 +652,17 @@
       "notesPlaceholder": "Optional notes...",
       "submit": "Create Booking"
     },
-    "override": { "label": "Override Time", "reason": "Reason" },
-    "toast": { "updated": "Booking updated", "statusChanged": "Status updated", "deleted": "Booking deleted", "created": "Booking created", "reconciled": "Bookings synchronized" },
+    "override": {
+      "label": "Override Time",
+      "reason": "Reason"
+    },
+    "toast": {
+      "updated": "Booking updated",
+      "statusChanged": "Status updated",
+      "deleted": "Booking deleted",
+      "created": "Booking created",
+      "reconciled": "Bookings synchronized"
+    },
     "reconcile": {
       "button": "Sync from Matches",
       "title": "Synchronize Bookings",

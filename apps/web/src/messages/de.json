@@ -400,7 +400,8 @@
       "licenseNumber": "Lizenz-Nr.",
       "matchCount": "Spiele",
       "roles": "Rollen",
-      "apiId": "API-ID"
+      "apiId": "API-ID",
+      "isOwnClub": "Eigener Verein"
     },
     "rules": {
       "title": "Einsatzregeln für {name}",
@@ -415,6 +416,10 @@
       "allow": "Erlauben",
       "saved": "Regeln erfolgreich gespeichert",
       "saveFailed": "Fehler beim Speichern der Regeln"
+    },
+    "filter": {
+      "ownClub": "Eigener Verein",
+      "all": "Alle"
     }
   },
   "standings": {
@@ -585,7 +590,11 @@
     "emptyColumn": "Keine Aufgaben",
     "emptyBoard": "Kein Board gefunden. Erstelle eines, um zu beginnen.",
     "createBoard": "Board erstellen",
-    "filters": { "assignee": "Zuständig", "priority": "Priorität", "all": "Alle" },
+    "filters": {
+      "assignee": "Zuständig",
+      "priority": "Priorität",
+      "all": "Alle"
+    },
     "task": {
       "title": "Titel",
       "description": "Beschreibung",
@@ -601,16 +610,37 @@
       "linkedMatches": "Verknüpfte Spiele",
       "source": "Quelle"
     },
-    "priority": { "low": "Niedrig", "normal": "Normal", "high": "Hoch", "urgent": "Dringend" },
-    "toast": { "created": "Aufgabe erstellt", "updated": "Aufgabe aktualisiert", "deleted": "Aufgabe gelöscht", "moved": "Aufgabe verschoben" }
+    "priority": {
+      "low": "Niedrig",
+      "normal": "Normal",
+      "high": "Hoch",
+      "urgent": "Dringend"
+    },
+    "toast": {
+      "created": "Aufgabe erstellt",
+      "updated": "Aufgabe aktualisiert",
+      "deleted": "Aufgabe gelöscht",
+      "moved": "Aufgabe verschoben"
+    }
   },
   "bookings": {
     "title": "Hallenbuchungen",
     "description": "Buchungsstatus für Heimspiele verwalten",
     "empty": "Keine Hallenbuchungen gefunden",
-    "status": { "pending": "Ausstehend", "requested": "Angefragt", "confirmed": "Bestätigt", "cancelled": "Storniert" },
+    "status": {
+      "pending": "Ausstehend",
+      "requested": "Angefragt",
+      "confirmed": "Bestätigt",
+      "cancelled": "Storniert"
+    },
     "needsReconfirmation": "Erneute Bestätigung erforderlich — Spielzeiten haben sich seit der Bestätigung geändert",
-    "columns": { "date": "Datum", "venue": "Halle", "timeWindow": "Zeitfenster", "matches": "Spiele", "status": "Status" },
+    "columns": {
+      "date": "Datum",
+      "venue": "Halle",
+      "timeWindow": "Zeitfenster",
+      "matches": "Spiele",
+      "status": "Status"
+    },
     "create": {
       "title": "Neue Buchung",
       "venue": "Halle",
@@ -622,8 +652,17 @@
       "notesPlaceholder": "Optionale Notizen...",
       "submit": "Buchung erstellen"
     },
-    "override": { "label": "Zeitfenster überschreiben", "reason": "Grund" },
-    "toast": { "updated": "Buchung aktualisiert", "statusChanged": "Status aktualisiert", "deleted": "Buchung gelöscht", "created": "Buchung erstellt", "reconciled": "Buchungen synchronisiert" },
+    "override": {
+      "label": "Zeitfenster überschreiben",
+      "reason": "Grund"
+    },
+    "toast": {
+      "updated": "Buchung aktualisiert",
+      "statusChanged": "Status aktualisiert",
+      "deleted": "Buchung gelöscht",
+      "created": "Buchung erstellt",
+      "reconciled": "Buchungen synchronisiert"
+    },
     "reconcile": {
       "button": "Aus Spielplan synchronisieren",
       "title": "Buchungen synchronisieren",

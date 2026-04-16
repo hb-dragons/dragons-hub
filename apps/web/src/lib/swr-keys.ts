@@ -11,7 +11,8 @@ export const SWR_KEYS = {
   matchHistory: (id: number, limit?: number, offset?: number) =>
     `/admin/matches/${id}/history?limit=${limit ?? 50}&offset=${offset ?? 0}`,
   teams: "/admin/teams",
-  referees: "/admin/referees",
+  referees: (ownClub?: boolean) =>
+    `/admin/referees${ownClub === false ? "?ownClub=false" : ""}`,
   refereeRules: (refereeId: number) => `/admin/referees/${refereeId}/rules`,
   standings: "/admin/standings",
   venues: "/admin/venues",
