@@ -4,6 +4,7 @@ import { useTheme } from "@/hooks/useTheme";
 interface StatItem {
   label: string;
   value: string;
+  valueColor?: string;
 }
 
 interface StatStripProps {
@@ -39,7 +40,7 @@ export function StatStrip({ items }: StatStripProps) {
             },
           ]}
         >
-          <Text style={[textStyles.stat, { color: colors.foreground }]}>
+          <Text style={[textStyles.stat, { color: item.valueColor ?? colors.foreground }]}>
             {item.value}
           </Text>
           <Text
