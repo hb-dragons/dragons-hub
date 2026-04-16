@@ -181,13 +181,13 @@ module "secrets" {
     "auth-secret-production",
   ]
   secret_values = {
-    "database-url-production" = module.database.database_url
-    "redis-url-production"    = module.valkey.connection_url
-    "sdk-username-production"          = var.sdk_username
-    "sdk-password-production"          = var.sdk_password
-    "referee-sdk-username-production"  = var.referee_sdk_username
-    "referee-sdk-password-production"  = var.referee_sdk_password
-    "auth-secret-production"           = random_password.auth_secret.result
+    "database-url-production"         = module.database.database_url
+    "redis-url-production"            = module.valkey.connection_url
+    "sdk-username-production"         = var.sdk_username
+    "sdk-password-production"         = var.sdk_password
+    "referee-sdk-username-production" = var.referee_sdk_username
+    "referee-sdk-password-production" = var.referee_sdk_password
+    "auth-secret-production"          = random_password.auth_secret.result
   }
 
   depends_on = [google_project_service.apis]

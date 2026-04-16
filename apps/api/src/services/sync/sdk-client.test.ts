@@ -49,17 +49,29 @@ let client: SdkClient;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.useFakeTimers();
   client = new SdkClient();
 });
 
 afterEach(() => {
+  vi.clearAllTimers();
   vi.useRealTimers();
 });
 
 // Mock fetch globally
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
+
+/** Flush fake timers so retry backoff delays resolve instantly. */
+async function withTimers<T>(promise: Promise<T>): Promise<T> {
+  // Prevent unhandled-rejection noise — caller's rejects.toThrow() handles the real rejection
+  promise.catch(() => {});
+  // Advance enough for 3 retry attempts of exponential backoff (1s + 2s + 4s + jitter)
+  for (let i = 0; i < 10; i++) {
+    await vi.advanceTimersByTimeAsync(5_000);
+  }
+  return promise;
+}
 
 describe("SdkClient", () => {
   describe("ensureAuthenticated", () => {
@@ -391,7 +403,7 @@ describe("SdkClient", () => {
           status: 500,
         });
 
-      await expect(client.getGameDetails(1000)).rejects.toThrow(
+      await expect(withTimers(client.getGameDetails(1000))).rejects.toThrow(
         "Failed to fetch game details: 500",
       );
     });
@@ -440,7 +452,7 @@ describe("SdkClient", () => {
         })
         .mockResolvedValueOnce({ ok: false, status: 500 });
 
-      await expect(client.getGameDetails(1000)).rejects.toThrow();
+      await expect(withTimers(client.getGameDetails(1000))).rejects.toThrow();
     });
   });
 
@@ -462,9 +474,9 @@ describe("SdkClient", () => {
       }
 
       // First 15 calls should use the burst capacity
-      for (let i = 0; i < 16; i++) {
-        await client.getSpielplan(i);
-      }
+      const promises = Array.from({ length: 16 }, (_, i) => client.getSpielplan(i));
+      await vi.runAllTimersAsync();
+      await Promise.all(promises);
     });
   });
 
@@ -490,7 +502,7 @@ describe("SdkClient", () => {
           json: vi.fn().mockResolvedValue({ game1: { spielplanId: 2 } }),
         });
 
-      const result = await client.getGameDetailsBatch([1, 2]);
+      const result = await withTimers(client.getGameDetailsBatch([1, 2]));
 
       expect(result.size).toBe(2);
     });
@@ -511,7 +523,7 @@ describe("SdkClient", () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
       }
 
-      const result = await client.getGameDetailsBatch([1, 2, 3, 4]);
+      const result = await withTimers(client.getGameDetailsBatch([1, 2, 3, 4]));
 
       expect(result.size).toBe(0);
     });
@@ -536,7 +548,7 @@ describe("SdkClient", () => {
         .mockResolvedValueOnce({ ok: false, status: 500 })
         .mockResolvedValueOnce({ ok: false, status: 500 });
 
-      const result = await client.getGameDetailsBatch([1, 2]);
+      const result = await withTimers(client.getGameDetailsBatch([1, 2]));
 
       expect(result.size).toBe(1);
     });
@@ -639,7 +651,7 @@ describe("SdkClient", () => {
         .mockResolvedValueOnce(invalidResponse())
         .mockResolvedValueOnce(invalidResponse());
 
-      await expect(client.ensureAuthenticated()).rejects.toThrow(
+      await expect(withTimers(client.ensureAuthenticated())).rejects.toThrow(
         "Invalid username or password",
       );
     });
@@ -654,7 +666,7 @@ describe("SdkClient", () => {
         .mockResolvedValueOnce(noCookieResponse())
         .mockResolvedValueOnce(noCookieResponse());
 
-      await expect(client.ensureAuthenticated()).rejects.toThrow(
+      await expect(withTimers(client.ensureAuthenticated())).rejects.toThrow(
         "No session cookie received",
       );
     });
@@ -669,7 +681,7 @@ describe("SdkClient", () => {
         .mockResolvedValueOnce(noSessionCookie())
         .mockResolvedValueOnce(noSessionCookie());
 
-      await expect(client.ensureAuthenticated()).rejects.toThrow(
+      await expect(withTimers(client.ensureAuthenticated())).rejects.toThrow(
         "No session cookie received",
       );
     });
@@ -690,7 +702,7 @@ describe("SdkClient", () => {
       failedVerifyPair();
       failedVerifyPair();
 
-      await expect(client.ensureAuthenticated()).rejects.toThrow(
+      await expect(withTimers(client.ensureAuthenticated())).rejects.toThrow(
         "Login did not persist",
       );
     });
@@ -702,7 +714,7 @@ describe("SdkClient", () => {
       // But ensureAuthenticated will try to login
       mockFetch.mockRejectedValue(new Error("Network error"));
 
-      await expect(client.getGameDetails(1)).rejects.toThrow();
+      await expect(withTimers(client.getGameDetails(1))).rejects.toThrow();
     });
   });
 
@@ -715,9 +727,11 @@ describe("SdkClient", () => {
       }
 
       // Fire 20 calls concurrently
-      await Promise.all(
+      const promises = Promise.all(
         Array.from({ length: 20 }, (_, i) => testClient.getSpielplan(i)),
       );
+      await vi.runAllTimersAsync();
+      await promises;
 
       expect(mockGetSpielplan).toHaveBeenCalledTimes(20);
     });
@@ -864,7 +878,7 @@ describe("SdkClient", () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
       }
 
-      await expect(client.searchRefereesForGame(999)).rejects.toThrow("getRefs failed: 500");
+      await expect(withTimers(client.searchRefereesForGame(999))).rejects.toThrow("getRefs failed: 500");
     });
 
     it("throws on non-ok response (no re-auth path)", async () => {
@@ -875,7 +889,7 @@ describe("SdkClient", () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 503 });
       }
 
-      await expect(client.searchRefereesForGame(999)).rejects.toThrow("getRefs failed: 503");
+      await expect(withTimers(client.searchRefereesForGame(999))).rejects.toThrow("getRefs failed: 503");
     });
   });
 
@@ -1044,7 +1058,7 @@ describe("SdkClient", () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
       }
 
-      await expect(client.submitRefereeAssignment(100, 1, candidate)).rejects.toThrow(
+      await expect(withTimers(client.submitRefereeAssignment(100, 1, candidate))).rejects.toThrow(
         "submit assignment failed: 500",
       );
     });
@@ -1055,7 +1069,7 @@ describe("SdkClient", () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 422 });
       }
 
-      await expect(client.submitRefereeAssignment(100, 1, candidate)).rejects.toThrow(
+      await expect(withTimers(client.submitRefereeAssignment(100, 1, candidate))).rejects.toThrow(
         "submit assignment failed: 422",
       );
     });
@@ -1153,7 +1167,7 @@ describe("SdkClient", () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
       }
 
-      await expect(client.submitRefereeUnassignment(200, 1)).rejects.toThrow(
+      await expect(withTimers(client.submitRefereeUnassignment(200, 1))).rejects.toThrow(
         "submit unassignment failed: 500",
       );
     });
@@ -1164,7 +1178,7 @@ describe("SdkClient", () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
       }
 
-      await expect(client.submitRefereeUnassignment(200, 1)).rejects.toThrow(
+      await expect(withTimers(client.submitRefereeUnassignment(200, 1))).rejects.toThrow(
         "submit unassignment failed: 500",
       );
     });
