@@ -18,10 +18,12 @@ import {
   SquareActivity,
 } from "lucide-react";
 
+import { Button } from "@dragons/ui/components/button";
 import { DataTable } from "@/components/ui/data-table";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
+import { AssignGameDialog } from "./assign-game-dialog";
 
 // ------------------------------------------------------------------
 // SrSlotBadge
@@ -199,6 +201,7 @@ const globalFilterFn: FilterFn<RefereeGameListItem> = (row, _columnId, filterVal
 function getColumns(
   t: ReturnType<typeof useTranslations<"refereeGames">>,
   format: ReturnType<typeof useFormatter>,
+  onTakeSlot?: (game: RefereeGameListItem, slotNumber: 1 | 2) => void,
 ): ColumnDef<RefereeGameListItem, unknown>[] {
   return [
     {
@@ -301,12 +304,14 @@ function getColumns(
         const m = row.original;
         if (m.isCancelled || m.isForfeited) return <span className="text-muted-foreground">—</span>;
         return (
-          <SrSlotBadge
-            status={m.sr1Status}
-            ourClub={m.sr1OurClub}
-            name={m.sr1Name}
-            t={t}
-          />
+          <div className="flex items-center gap-2">
+            <SrSlotBadge status={m.sr1Status} ourClub={m.sr1OurClub} name={m.sr1Name} t={t} />
+            {onTakeSlot && m.sr1OurClub && m.sr1Status === "open" && (
+              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => onTakeSlot(m, 1)}>
+                Take
+              </Button>
+            )}
+          </div>
         );
       },
       enableSorting: false,
@@ -322,12 +327,14 @@ function getColumns(
         const m = row.original;
         if (m.isCancelled || m.isForfeited) return <span className="text-muted-foreground">—</span>;
         return (
-          <SrSlotBadge
-            status={m.sr2Status}
-            ourClub={m.sr2OurClub}
-            name={m.sr2Name}
-            t={t}
-          />
+          <div className="flex items-center gap-2">
+            <SrSlotBadge status={m.sr2Status} ourClub={m.sr2OurClub} name={m.sr2Name} t={t} />
+            {onTakeSlot && m.sr2OurClub && m.sr2Status === "open" && (
+              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => onTakeSlot(m, 2)}>
+                Take
+              </Button>
+            )}
+          </div>
         );
       },
       enableSorting: false,
@@ -358,13 +365,21 @@ function getColumns(
 // Main component
 // ------------------------------------------------------------------
 
-export function RefereeGamesList() {
+interface RefereeGamesListProps {
+  refereeApiId?: number;
+}
+
+export function RefereeGamesList({ refereeApiId }: RefereeGamesListProps = {}) {
   const t = useTranslations("refereeGames");
   const format = useFormatter();
   const [gameFilter, setGameFilter] = useState<GameFilterValue>("available");
   const [search, setSearch] = useState("");
+  const [assignDialog, setAssignDialog] = useState<{
+    game: RefereeGameListItem;
+    slotNumber: 1 | 2;
+  } | null>(null);
 
-  const { data } = useSWR<PaginatedResponse<RefereeGameListItem>>(
+  const { data, mutate } = useSWR<PaginatedResponse<RefereeGameListItem>>(
     SWR_KEYS.refereeGames,
     apiFetcher,
   );
@@ -396,7 +411,10 @@ export function RefereeGamesList() {
     return cn(homeBg, dutyBorder, inactive && "opacity-60");
   }
 
-  const columns = useMemo(() => getColumns(t, format), [t, format]);
+  const columns = useMemo(
+    () => getColumns(t, format, refereeApiId ? (game, slot) => setAssignDialog({ game, slotNumber: slot }) : undefined),
+    [t, format, refereeApiId],
+  );
 
   const statusFilterOptions = [
     { label: t("status.active"), value: "active", icon: SquareActivity },
@@ -405,50 +423,62 @@ export function RefereeGamesList() {
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={items}
-      rowClassName={getRowClassName}
-      globalFilterFn={globalFilterFn}
-      initialColumnVisibility={{ status: false }}
-      initialColumnFilters={[{ id: "status", value: ["active"] }]}
-      emptyState={
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-          <Calendar className="mb-2 h-8 w-8" />
-          <p>{t("filters.all")}</p>
-        </div>
-      }
-    >
-      {(table) => (
-        <DataTableToolbar table={table}>
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder={t("filters.search")}
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                table.setGlobalFilter(e.target.value);
-              }}
-              className="h-8 w-[150px] pl-8 lg:w-[250px]"
-            />
+    <>
+      <DataTable
+        columns={columns}
+        data={items}
+        rowClassName={getRowClassName}
+        globalFilterFn={globalFilterFn}
+        initialColumnVisibility={{ status: false }}
+        initialColumnFilters={[{ id: "status", value: ["active"] }]}
+        emptyState={
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Calendar className="mb-2 h-8 w-8" />
+            <p>{t("filters.all")}</p>
           </div>
-          <DataTableFacetedFilter
-            column={table.getColumn("status")!}
-            title={t("filters.status")}
-            options={statusFilterOptions}
-          />
-          <FacetChips
-            value={gameFilter}
-            onChange={setGameFilter}
-            options={[
-              { label: t("filters.available"), value: "available" },
-              { label: t("filters.assigned"), value: "assigned" },
-              { label: t("filters.all"), value: "all" },
-            ]}
-          />
-        </DataTableToolbar>
+        }
+      >
+        {(table) => (
+          <DataTableToolbar table={table}>
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={t("filters.search")}
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  table.setGlobalFilter(e.target.value);
+                }}
+                className="h-8 w-[150px] pl-8 lg:w-[250px]"
+              />
+            </div>
+            <DataTableFacetedFilter
+              column={table.getColumn("status")!}
+              title={t("filters.status")}
+              options={statusFilterOptions}
+            />
+            <FacetChips
+              value={gameFilter}
+              onChange={setGameFilter}
+              options={[
+                { label: t("filters.available"), value: "available" },
+                { label: t("filters.assigned"), value: "assigned" },
+                { label: t("filters.all"), value: "all" },
+              ]}
+            />
+          </DataTableToolbar>
+        )}
+      </DataTable>
+      {assignDialog && refereeApiId && (
+        <AssignGameDialog
+          open
+          game={assignDialog.game}
+          slotNumber={assignDialog.slotNumber}
+          refereeApiId={refereeApiId}
+          onClose={() => setAssignDialog(null)}
+          onSuccess={() => { void mutate(); }}
+        />
       )}
-    </DataTable>
+    </>
   );
 }
