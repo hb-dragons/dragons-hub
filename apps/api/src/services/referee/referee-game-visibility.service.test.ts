@@ -48,6 +48,7 @@ vi.mock("@dragons/db/schema", () => ({
     id: "ref.id",
     allowAllHomeGames: "ref.allowAllHomeGames",
     allowAwayGames: "ref.allowAwayGames",
+    isOwnClub: "ref.isOwnClub",
   },
   refereeAssignmentRules: {
     refereeId: "rar.refereeId",
@@ -134,7 +135,7 @@ function makeGameRow(overrides: Record<string, unknown> = {}) {
  * 4. Count query (only if visibility produces conditions)
  */
 function setupMocks(
-  referee: { allowAllHomeGames: boolean; allowAwayGames: boolean } | null,
+  referee: { allowAllHomeGames: boolean; allowAwayGames: boolean; isOwnClub: boolean } | null,
   rules: Array<{ teamId: number; deny: boolean; allowSr1: boolean; allowSr2: boolean }>,
   items: unknown[] = [],
   count = 0,
@@ -142,7 +143,7 @@ function setupMocks(
   selectReturnValues.length = 0;
   // 1. Referee lookup
   selectReturnValues.push(referee ? [referee] : []);
-  if (referee) {
+  if (referee && referee.isOwnClub) {
     // 2. Rules lookup
     selectReturnValues.push(rules);
     // 3 & 4. Items + count
@@ -174,8 +175,22 @@ describe("getVisibleRefereeGames", () => {
     });
   });
 
+  it("returns empty when referee is not own club", async () => {
+    setupMocks({ allowAllHomeGames: true, allowAwayGames: true, isOwnClub: false }, []);
+
+    const result = await getVisibleRefereeGames(1, defaultParams);
+
+    expect(result).toEqual({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+      hasMore: false,
+    });
+  });
+
   it("returns empty when both flags false and no rules", async () => {
-    setupMocks({ allowAllHomeGames: false, allowAwayGames: false }, []);
+    setupMocks({ allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true }, []);
 
     const result = await getVisibleRefereeGames(1, defaultParams);
 
@@ -193,7 +208,7 @@ describe("getVisibleRefereeGames", () => {
   it("allowAllHomeGames=true returns all home games with open our-club slots", async () => {
     const row = makeGameRow();
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [row],
       1,
@@ -208,7 +223,7 @@ describe("getVisibleRefereeGames", () => {
 
   it("allowAllHomeGames=true with deny rule excludes denied team home games", async () => {
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [{ teamId: 10, deny: true, allowSr1: false, allowSr2: false }],
       [],
       0,
@@ -223,7 +238,7 @@ describe("getVisibleRefereeGames", () => {
   it("allowAllHomeGames=true with deny rule still shows games with null homeTeamId", async () => {
     const row = makeGameRow({ homeTeamId: null });
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [{ teamId: 10, deny: true, allowSr1: false, allowSr2: false }],
       [row],
       1,
@@ -237,7 +252,7 @@ describe("getVisibleRefereeGames", () => {
   it("allowlist mode returns only home games for allowed teams", async () => {
     const row = makeGameRow({ homeTeamId: 10 });
     setupMocks(
-      { allowAllHomeGames: false, allowAwayGames: false },
+      { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true },
       [{ teamId: 10, deny: false, allowSr1: true, allowSr2: true }],
       [row],
       1,
@@ -252,7 +267,7 @@ describe("getVisibleRefereeGames", () => {
   it("allowlist mode: hides game when open slot does not match allowed slots", async () => {
     // Rule only allows SR1, but only SR2 is open — DB query returns nothing
     setupMocks(
-      { allowAllHomeGames: false, allowAwayGames: false },
+      { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true },
       [{ teamId: 10, deny: false, allowSr1: true, allowSr2: false }],
       [],
       0,
@@ -269,7 +284,7 @@ describe("getVisibleRefereeGames", () => {
       sr2OurClub: true, sr2Status: "assigned",
     });
     setupMocks(
-      { allowAllHomeGames: false, allowAwayGames: false },
+      { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true },
       [{ teamId: 10, deny: false, allowSr1: true, allowSr2: false }],
       [row],
       1,
@@ -282,7 +297,7 @@ describe("getVisibleRefereeGames", () => {
 
   it("allowlist mode with rule allowing neither slot returns empty (early return)", async () => {
     setupMocks(
-      { allowAllHomeGames: false, allowAwayGames: false },
+      { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true },
       [{ teamId: 10, deny: false, allowSr1: false, allowSr2: false }],
     );
 
@@ -302,7 +317,7 @@ describe("getVisibleRefereeGames", () => {
   it("allowAwayGames=true shows away games", async () => {
     const row = makeGameRow({ isHomeGame: false, isGuestGame: true });
     setupMocks(
-      { allowAllHomeGames: false, allowAwayGames: true },
+      { allowAllHomeGames: false, allowAwayGames: true, isOwnClub: true },
       [],
       [row],
       1,
@@ -318,7 +333,7 @@ describe("getVisibleRefereeGames", () => {
     // allowAllHomeGames=true so home games are visible,
     // but away games hidden because allowAwayGames=false
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [],
       0,
@@ -332,7 +347,7 @@ describe("getVisibleRefereeGames", () => {
   it("excludes cancelled games by default (active status filter)", async () => {
     const row = makeGameRow({ isCancelled: false, isForfeited: false });
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: true },
+      { allowAllHomeGames: true, allowAwayGames: true, isOwnClub: true },
       [],
       [row],
       1,
@@ -347,7 +362,7 @@ describe("getVisibleRefereeGames", () => {
   it("excludes games with no open our-club slots", async () => {
     // The openOurClubSlot filter is in the WHERE; DB returns nothing
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: true },
+      { allowAllHomeGames: true, allowAwayGames: true, isOwnClub: true },
       [],
       [],
       0,
@@ -361,7 +376,7 @@ describe("getVisibleRefereeGames", () => {
   it("applies search filter on top of visibility", async () => {
     const row = makeGameRow({ homeTeamName: "Dragons U16" });
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [row],
       1,
@@ -379,7 +394,7 @@ describe("getVisibleRefereeGames", () => {
   it("applies league filter on top of visibility", async () => {
     const row = makeGameRow({ leagueShort: "BL" });
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [row],
       1,
@@ -397,7 +412,7 @@ describe("getVisibleRefereeGames", () => {
   it("applies date range filters", async () => {
     const row = makeGameRow({ kickoffDate: "2026-05-01" });
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [row],
       1,
@@ -415,7 +430,7 @@ describe("getVisibleRefereeGames", () => {
   it("returns paginated results with hasMore", async () => {
     const row = makeGameRow();
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [row],
       5,
@@ -433,7 +448,7 @@ describe("getVisibleRefereeGames", () => {
   it("returns hasMore=false when on last page", async () => {
     const row = makeGameRow();
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [row],
       1,
@@ -448,7 +463,7 @@ describe("getVisibleRefereeGames", () => {
     const homeRow = makeGameRow({ isHomeGame: true });
     const awayRow = makeGameRow({ id: 2, isHomeGame: false, isGuestGame: true });
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: true },
+      { allowAllHomeGames: true, allowAwayGames: true, isOwnClub: true },
       [],
       [homeRow, awayRow],
       2,
@@ -463,7 +478,7 @@ describe("getVisibleRefereeGames", () => {
   it("filters by cancelled status", async () => {
     const row = makeGameRow({ isCancelled: true });
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [row],
       1,
@@ -481,7 +496,7 @@ describe("getVisibleRefereeGames", () => {
   it("filters by forfeited status", async () => {
     const row = makeGameRow({ isForfeited: true });
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [row],
       1,
@@ -502,7 +517,7 @@ describe("getVisibleRefereeGames", () => {
       makeGameRow({ id: 2, isCancelled: true }),
     ];
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       rows,
       2,
@@ -518,7 +533,7 @@ describe("getVisibleRefereeGames", () => {
 
   it("defaults total to 0 when count result is empty", async () => {
     selectReturnValues.push(
-      [{ allowAllHomeGames: true, allowAwayGames: false }],
+      [{ allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }],
       [],     // rules
       [],     // items
       [],     // empty count
@@ -533,7 +548,7 @@ describe("getVisibleRefereeGames", () => {
     const row1 = makeGameRow({ homeTeamId: 10 });
     const row2 = makeGameRow({ id: 2, homeTeamId: 20 });
     setupMocks(
-      { allowAllHomeGames: false, allowAwayGames: false },
+      { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true },
       [
         { teamId: 10, deny: false, allowSr1: true, allowSr2: false },
         { teamId: 20, deny: false, allowSr1: false, allowSr2: true },
@@ -550,7 +565,7 @@ describe("getVisibleRefereeGames", () => {
   it("multi-word search splits into separate conditions", async () => {
     const row = makeGameRow({ homeTeamName: "Dragons U16", leagueName: "Kreisliga" });
     setupMocks(
-      { allowAllHomeGames: true, allowAwayGames: false },
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
       [row],
       1,

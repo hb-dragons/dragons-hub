@@ -43,11 +43,16 @@ export async function getVisibleRefereeGames(
     .select({
       allowAllHomeGames: referees.allowAllHomeGames,
       allowAwayGames: referees.allowAwayGames,
+      isOwnClub: referees.isOwnClub,
     })
     .from(referees)
     .where(eq(referees.id, refereeId));
 
   if (!referee) {
+    return { items: [], total: 0, limit, offset, hasMore: false };
+  }
+
+  if (!referee.isOwnClub) {
     return { items: [], total: 0, limit, offset, hasMore: false };
   }
 
