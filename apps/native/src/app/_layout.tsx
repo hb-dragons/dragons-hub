@@ -26,9 +26,10 @@ function RootNavigator() {
     headerShown: true,
     headerTransparent: true,
     headerTitle: "",
-    headerBackTitle: " ",
+    headerBackTitle: "",
     headerShadowVisible: false,
     headerTintColor: colors.foreground,
+    headerBackTitleStyle: { fontSize: 0 },
   } as const;
 
   return (
