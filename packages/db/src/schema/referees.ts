@@ -19,6 +19,7 @@ export const referees = pgTable("referees", {
   licenseNumber: integer("license_number"),
   allowAllHomeGames: boolean("allow_all_home_games").notNull().default(false),
   allowAwayGames: boolean("allow_away_games").notNull().default(false),
+  isOwnClub: boolean("is_own_club").notNull().default(false),
   dataHash: varchar("data_hash", { length: 64 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

@@ -31,6 +31,7 @@ refereeRoutes.get(
 const visibilityBodySchema = z.object({
   allowAllHomeGames: z.boolean(),
   allowAwayGames: z.boolean(),
+  isOwnClub: z.boolean(),
 });
 
 // PATCH /admin/referees/:id/visibility - Update referee game visibility flags

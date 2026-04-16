@@ -449,6 +449,7 @@ describe("updateRefereeVisibility", () => {
     const result = await updateRefereeVisibility(1, {
       allowAllHomeGames: true,
       allowAwayGames: false,
+      isOwnClub: false,
     });
 
     expect(result).toEqual(updated);
@@ -457,6 +458,7 @@ describe("updateRefereeVisibility", () => {
       expect.objectContaining({
         allowAllHomeGames: true,
         allowAwayGames: false,
+        isOwnClub: false,
       }),
     );
   });
@@ -469,6 +471,7 @@ describe("updateRefereeVisibility", () => {
     const result = await updateRefereeVisibility(2, {
       allowAllHomeGames: true,
       allowAwayGames: true,
+      isOwnClub: false,
     });
 
     expect(result).toEqual(updated);
@@ -482,6 +485,7 @@ describe("updateRefereeVisibility", () => {
       updateRefereeVisibility(999, {
         allowAllHomeGames: true,
         allowAwayGames: false,
+        isOwnClub: false,
       }),
     ).rejects.toThrow("Referee 999 not found");
   });

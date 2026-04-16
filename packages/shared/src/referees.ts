@@ -8,6 +8,7 @@ export interface RefereeListItem {
   roles: string[];
   allowAllHomeGames: boolean;
   allowAwayGames: boolean;
+  isOwnClub: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +29,7 @@ export interface RefereeRulesResponse {
 export interface UpdateRefereeVisibilityBody {
   allowAllHomeGames: boolean;
   allowAwayGames: boolean;
+  isOwnClub: boolean;
 }
 
 export interface UpdateRefereeRulesBody {

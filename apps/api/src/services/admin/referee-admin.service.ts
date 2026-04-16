@@ -41,6 +41,7 @@ export async function getReferees(
         licenseNumber: referees.licenseNumber,
         allowAllHomeGames: referees.allowAllHomeGames,
         allowAwayGames: referees.allowAwayGames,
+        isOwnClub: referees.isOwnClub,
         matchCount: sql<number>`count(distinct ${matchReferees.matchId})::int`,
         createdAt: referees.createdAt,
         updatedAt: referees.updatedAt,
@@ -91,6 +92,7 @@ export async function getReferees(
     licenseNumber: row.licenseNumber,
     allowAllHomeGames: row.allowAllHomeGames,
     allowAwayGames: row.allowAwayGames,
+    isOwnClub: row.isOwnClub,
     matchCount: row.matchCount,
     roles: rolesByReferee.get(row.id) ?? [],
     createdAt: row.createdAt.toISOString(),
@@ -109,6 +111,7 @@ export async function updateRefereeVisibility(
     .set({
       allowAllHomeGames: body.allowAllHomeGames,
       allowAwayGames: body.allowAwayGames,
+      isOwnClub: body.isOwnClub,
       updatedAt: new Date(),
     })
     .where(eq(referees.id, refereeId))
@@ -116,6 +119,7 @@ export async function updateRefereeVisibility(
       id: referees.id,
       allowAllHomeGames: referees.allowAllHomeGames,
       allowAwayGames: referees.allowAwayGames,
+      isOwnClub: referees.isOwnClub,
     });
 
   if (!updated) {

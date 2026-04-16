@@ -1,0 +1,1 @@
+ALTER TABLE "referees" ADD COLUMN "is_own_club" boolean DEFAULT false NOT NULL;
