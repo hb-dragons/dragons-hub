@@ -6,10 +6,12 @@ import type { AppEnv } from "../../types";
 
 const mocks = vi.hoisted(() => ({
   getReferees: vi.fn(),
+  updateRefereeVisibility: vi.fn(),
 }));
 
 vi.mock("../../services/admin/referee-admin.service", () => ({
   getReferees: mocks.getReferees,
+  updateRefereeVisibility: mocks.updateRefereeVisibility,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -129,5 +131,87 @@ describe("GET /referees", () => {
     await app.request("/referees");
 
     expect(mocks.getReferees).toHaveBeenCalledWith({ limit: 1000, offset: 0 });
+  });
+});
+
+describe("PATCH /referees/:id/visibility", () => {
+  it("returns 200 and updates visibility flags", async () => {
+    const updated = { id: 1, allowAllHomeGames: true, allowAwayGames: false };
+    mocks.updateRefereeVisibility.mockResolvedValue(updated);
+
+    const res = await app.request("/referees/1/visibility", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(updated);
+    expect(mocks.updateRefereeVisibility).toHaveBeenCalledWith(1, {
+      allowAllHomeGames: true,
+      allowAwayGames: false,
+    });
+  });
+
+  it("returns 400 for invalid referee ID", async () => {
+    const res = await app.request("/referees/abc/visibility", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for negative referee ID", async () => {
+    const res = await app.request("/referees/-1/visibility", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 400 for invalid body", async () => {
+    const res = await app.request("/referees/1/visibility", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowAllHomeGames: "yes" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("returns 404 for non-existent referee", async () => {
+    mocks.updateRefereeVisibility.mockRejectedValue(
+      new Error("Referee 999 not found"),
+    );
+
+    const res = await app.request("/referees/999/visibility", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rethrows unexpected errors", async () => {
+    mocks.updateRefereeVisibility.mockRejectedValue(
+      new Error("database connection lost"),
+    );
+
+    const res = await app.request("/referees/1/visibility", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+    });
+
+    expect(res.status).toBe(500);
   });
 });
