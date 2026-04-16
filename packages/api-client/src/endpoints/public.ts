@@ -1,5 +1,5 @@
 import type { MatchListItem, LeagueStandings, PaginatedResponse } from "@dragons/shared";
-import type { ApiClient } from "../client.js";
+import type { ApiClient } from "../client";
 
 export interface MatchQueryParams {
   limit?: number;

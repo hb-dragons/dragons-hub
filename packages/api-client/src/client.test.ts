@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { ApiClient } from "./client.js";
-import type { AuthStrategy } from "./client.js";
-import { APIError } from "./errors.js";
+import { ApiClient } from "./client";
+import type { AuthStrategy } from "./client";
+import { APIError } from "./errors";
 
 function mockFetch(status: number, body: unknown) {
   return vi.fn<typeof fetch>().mockResolvedValue({

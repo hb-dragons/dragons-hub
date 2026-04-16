@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQueryString } from "./query-string.js";
+import { buildQueryString } from "./query-string";
 
 describe("buildQueryString", () => {
   it("returns empty string for empty params", () => {

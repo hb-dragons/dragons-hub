@@ -1,4 +1,4 @@
-import type { ApiClient } from "../client.js";
+import type { ApiClient } from "../client";
 
 export interface RegisterDeviceResponse {
   success: boolean;

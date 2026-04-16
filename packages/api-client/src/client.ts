@@ -1,5 +1,5 @@
-import { APIError } from "./errors.js";
-import { buildQueryString } from "./query-string.js";
+import { APIError } from "./errors";
+import { buildQueryString } from "./query-string";
 
 export interface AuthStrategy {
   getHeaders(): Record<string, string> | Promise<Record<string, string>>;

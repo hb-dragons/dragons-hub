@@ -1,17 +1,17 @@
-export { ApiClient } from "./client.js";
-export type { AuthStrategy, ApiClientOptions } from "./client.js";
+export { ApiClient } from "./client";
+export type { AuthStrategy, ApiClientOptions } from "./client";
 
-export { APIError } from "./errors.js";
+export { APIError } from "./errors";
 
-export { buildQueryString } from "./query-string.js";
+export { buildQueryString } from "./query-string";
 
 export {
   publicEndpoints,
   deviceEndpoints,
-} from "./endpoints/index.js";
+} from "./endpoints";
 export type {
   MatchQueryParams,
   PublicTeam,
   RegisterDeviceResponse,
   UnregisterDeviceResponse,
-} from "./endpoints/index.js";
+} from "./endpoints";

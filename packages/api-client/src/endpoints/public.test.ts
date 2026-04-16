@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { publicEndpoints } from "./public.js";
-import type { ApiClient } from "../client.js";
+import { publicEndpoints } from "./public";
+import type { ApiClient } from "../client";
 
 function mockClient() {
   return {
