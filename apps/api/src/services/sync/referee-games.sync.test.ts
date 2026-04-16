@@ -39,6 +39,11 @@ vi.mock("@dragons/db/schema", () => ({
     apiLigaId: "apiLigaId",
     ownClubRefs: "ownClubRefs",
   },
+  teams: {
+    id: "id",
+    clubId: "clubId",
+    isOwnClub: "isOwnClub",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -353,11 +358,15 @@ describe("mapApiResultToRow", () => {
 
 describe("syncRefereeGames", () => {
   /**
-   * Helper: sets up mockSelect to handle the league lookup (first call)
-   * followed by per-game referee_games + matches lookups.
+   * Helper: sets up mockSelect to handle the league lookup (first call),
+   * team lookup (second call), then per-game referee_games + matches lookups.
    * `perGameFn` receives the per-game select call index (0-based) and returns the resolved rows.
+   * `teamRows` provides the result for the teams batch lookup (default: empty).
    */
-  function setupSelectMock(perGameFn: (callIndex: number) => Promise<unknown[]>) {
+  function setupSelectMock(
+    perGameFn: (callIndex: number) => Promise<unknown[]>,
+    teamRows: Array<{ id: number; clubId: number; isOwnClub: boolean }> = [],
+  ) {
     let selectCallIndex = 0;
     mockSelect.mockImplementation(() => {
       const currentCall = selectCallIndex++;
@@ -370,8 +379,16 @@ describe("syncRefereeGames", () => {
           }),
         };
       }
+      if (currentCall === 1) {
+        // Teams lookup: select({...}).from(teams).where(inArray(...))
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(teamRows),
+          }),
+        };
+      }
       // Per-game queries: select().from(table).where(eq(...)).limit(1)
-      const perGameIndex = currentCall - 1;
+      const perGameIndex = currentCall - 2;
       return {
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
@@ -676,6 +693,114 @@ describe("syncRefereeGames", () => {
     const insertedValues = mockValues.mock.calls[0]![0];
     expect(insertedValues).toHaveProperty("isHomeGame", true);
     expect(insertedValues).toHaveProperty("isGuestGame", false);
+  });
+
+  it("resolves homeTeamId and guestTeamId from teams table when club IDs match", async () => {
+    const result = makeApiResult();
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    // No existing row, no matches row
+    setupSelectMock(async () => [], [
+      { id: 10, clubId: 300, isOwnClub: true },
+      { id: 20, clubId: 301, isOwnClub: false },
+    ]);
+
+    const mockValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+    });
+    mockInsert.mockReturnValue({ values: mockValues });
+
+    await syncRefereeGames();
+
+    const insertedValues = mockValues.mock.calls[0]![0];
+    expect(insertedValues).toHaveProperty("homeTeamId", 10);
+    expect(insertedValues).toHaveProperty("guestTeamId", 20);
+  });
+
+  it("sets homeTeamId/guestTeamId to null when no matching team exists", async () => {
+    const result = makeApiResult();
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    // No teams in DB, no existing row, no matches row
+    setupSelectMock(async () => [], []);
+
+    const mockValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+    });
+    mockInsert.mockReturnValue({ values: mockValues });
+
+    await syncRefereeGames();
+
+    const insertedValues = mockValues.mock.calls[0]![0];
+    expect(insertedValues).toHaveProperty("homeTeamId", null);
+    expect(insertedValues).toHaveProperty("guestTeamId", null);
+  });
+
+  it("prefers isOwnClub=true team when multiple teams share a clubId", async () => {
+    const result = makeApiResult();
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    // Two teams for clubId 300: non-own first, then own-club
+    setupSelectMock(async () => [], [
+      { id: 10, clubId: 300, isOwnClub: false },
+      { id: 11, clubId: 300, isOwnClub: true },
+      { id: 20, clubId: 301, isOwnClub: false },
+    ]);
+
+    const mockValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+    });
+    mockInsert.mockReturnValue({ values: mockValues });
+
+    await syncRefereeGames();
+
+    const insertedValues = mockValues.mock.calls[0]![0];
+    // Should pick id=11 (isOwnClub=true) over id=10
+    expect(insertedValues).toHaveProperty("homeTeamId", 11);
+    expect(insertedValues).toHaveProperty("guestTeamId", 20);
+  });
+
+  it("passes homeTeamId/guestTeamId in update when data hash changes", async () => {
+    const result = makeApiResult({ sr1: makeSr() });
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    let perGameCall = 0;
+    setupSelectMock(
+      async () => {
+        perGameCall++;
+        if (perGameCall === 1) {
+          return [{
+            id: 1,
+            apiMatchId: 1001,
+            dataHash: "old-hash",
+            sr1Status: "open",
+            sr2Status: "offered",
+            sr1OurClub: true,
+            sr2OurClub: false,
+            kickoffDate: "2026-04-25",
+            kickoffTime: "14:00",
+            isCancelled: false,
+            isForfeited: false,
+          }];
+        }
+        return [{ id: 50 }];
+      },
+      [
+        { id: 10, clubId: 300, isOwnClub: true },
+        { id: 20, clubId: 301, isOwnClub: false },
+      ],
+    );
+
+    const mockSet = vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    });
+    mockUpdate.mockReturnValue({ set: mockSet });
+
+    await syncRefereeGames();
+
+    const updatedValues = mockSet.mock.calls[0]![0];
+    expect(updatedValues).toHaveProperty("homeTeamId", 10);
+    expect(updatedValues).toHaveProperty("guestTeamId", 20);
   });
 
   it("should log entries when SyncLogger is provided", async () => {

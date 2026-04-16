@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { db } from "../../config/database";
-import { refereeGames, matches, leagues } from "@dragons/db/schema";
+import { refereeGames, matches, leagues, teams } from "@dragons/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { logger } from "../../config/logger";
 import { createRefereeSdkClient } from "./referee-sdk-client";
@@ -199,6 +199,32 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
   const clubConfig = await getClubConfig();
   const clubId = clubConfig?.clubId ?? null;
 
+  // Build clubId → team ID lookup for homeTeamId/guestTeamId resolution
+  const allClubIds = [
+    ...new Set(
+      response.results.flatMap((r) => [
+        r.sp.heimMannschaftLiga.mannschaft.verein.vereinId,
+        r.sp.gastMannschaftLiga.mannschaft.verein.vereinId,
+      ]),
+    ),
+  ];
+
+  const teamRows = allClubIds.length > 0
+    ? await db
+        .select({ id: teams.id, clubId: teams.clubId, isOwnClub: teams.isOwnClub })
+        .from(teams)
+        .where(inArray(teams.clubId, allClubIds))
+    : [];
+
+  // For each clubId, prefer isOwnClub=true team, otherwise take first
+  const teamByClubId = new Map<number, number>();
+  for (const row of teamRows) {
+    const existing = teamByClubId.get(row.clubId);
+    if (!existing || row.isOwnClub) {
+      teamByClubId.set(row.clubId, row.id);
+    }
+  }
+
   let created = 0;
   let updated = 0;
   let unchanged = 0;
@@ -209,6 +235,8 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
       const ownClubRefs = ownClubRefsMap.get(mapped.leagueApiId) ?? false;
       const isHomeGame = clubId !== null && mapped.homeClubId === clubId;
       const isGuestGame = clubId !== null && mapped.guestClubId === clubId;
+      const homeTeamId = teamByClubId.get(mapped.homeClubId) ?? null;
+      const guestTeamId = teamByClubId.get(mapped.guestClubId) ?? null;
       const hash = computeRefereeGameHash(mapped);
 
       // Look up existing referee_games row
@@ -227,6 +255,8 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
         const [inserted] = await db.insert(refereeGames).values({
           ...mapped,
           matchId,
+          homeTeamId,
+          guestTeamId,
           ownClubRefs,
           isHomeGame,
           isGuestGame,
@@ -276,6 +306,8 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
           .set({
             ...mapped,
             matchId,
+            homeTeamId,
+            guestTeamId,
             ownClubRefs,
             isHomeGame,
             isGuestGame,
