@@ -9,6 +9,7 @@ import { apiFetcher } from "@/lib/swr"
 import { SWR_KEYS } from "@/lib/swr-keys"
 
 import { Button } from "@dragons/ui/components/button"
+import { Label } from "@dragons/ui/components/label"
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,11 @@ export function RefereeRulesDialog({
 }: RefereeRulesDialogProps) {
   const t = useTranslations("referees")
   const [rules, setRules] = useState<RuleRow[]>([])
+  const [visibility, setVisibility] = useState({
+    isOwnClub: false,
+    allowAllHomeGames: false,
+    allowAwayGames: false,
+  })
   const [submitting, setSubmitting] = useState(false)
 
   const { data: ownClubTeams = [] } = useSWR<Team[]>(
@@ -87,6 +93,16 @@ export function RefereeRulesDialog({
       setRules([])
     }
   }, [rulesData, open])
+
+  useEffect(() => {
+    if (referee && open) {
+      setVisibility({
+        isOwnClub: referee.isOwnClub,
+        allowAllHomeGames: referee.allowAllHomeGames,
+        allowAwayGames: referee.allowAwayGames,
+      })
+    }
+  }, [referee, open])
 
   function addRule() {
     setRules([...rules, { teamId: null, deny: false, allowSr1: false, allowSr2: true }])
@@ -118,20 +134,33 @@ export function RefereeRulesDialog({
 
     setSubmitting(true)
     try {
-      await fetchAPI(`/admin/referees/${referee.id}/rules`, {
-        method: "PUT",
-        body: JSON.stringify({
-          rules: validRules.map((r) => ({
-            teamId: r.teamId,
-            deny: r.deny,
-            allowSr1: r.deny ? false : r.allowSr1,
-            allowSr2: r.deny ? false : r.allowSr2,
-          })),
+      await Promise.all([
+        fetchAPI(`/admin/referees/${referee.id}/rules`, {
+          method: "PUT",
+          body: JSON.stringify({
+            rules: validRules.map((r) => ({
+              teamId: r.teamId,
+              deny: r.deny,
+              allowSr1: r.deny ? false : r.allowSr1,
+              allowSr2: r.deny ? false : r.allowSr2,
+            })),
+          }),
         }),
-      })
+        fetchAPI(`/admin/referees/${referee.id}/visibility`, {
+          method: "PATCH",
+          body: JSON.stringify(visibility),
+        }),
+      ])
 
       toast.success(t("rules.saved"))
-      await mutate(SWR_KEYS.refereeRules(referee.id))
+      await Promise.all([
+        mutate(SWR_KEYS.refereeRules(referee.id)),
+        mutate(
+          (key: unknown) => typeof key === "string" && key.startsWith("/admin/referees"),
+          undefined,
+          { revalidate: true },
+        ),
+      ])
       onOpenChange(false)
     } catch {
       toast.error(t("rules.saveFailed"))
@@ -153,6 +182,43 @@ export function RefereeRulesDialog({
             {t("rules.description")}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="space-y-4 border-b pb-4">
+          <h4 className="text-sm font-medium">{t("rules.visibility.title")}</h4>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label className="text-sm">{t("rules.visibility.ownClub")}</Label>
+              <p className="text-xs text-muted-foreground">{t("rules.visibility.ownClubDescription")}</p>
+            </div>
+            <Switch
+              checked={visibility.isOwnClub}
+              onCheckedChange={(checked) => setVisibility((v) => ({ ...v, isOwnClub: checked }))}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label className="text-sm">{t("rules.visibility.allHomeGames")}</Label>
+              <p className="text-xs text-muted-foreground">{t("rules.visibility.allHomeGamesDescription")}</p>
+            </div>
+            <Switch
+              checked={visibility.allowAllHomeGames}
+              onCheckedChange={(checked) => setVisibility((v) => ({ ...v, allowAllHomeGames: checked }))}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label className="text-sm">{t("rules.visibility.awayGames")}</Label>
+              <p className="text-xs text-muted-foreground">{t("rules.visibility.awayGamesDescription")}</p>
+            </div>
+            <Switch
+              checked={visibility.allowAwayGames}
+              onCheckedChange={(checked) => setVisibility((v) => ({ ...v, allowAwayGames: checked }))}
+            />
+          </div>
+        </div>
 
         <div className="space-y-3">
           {rules.map((rule, index) => {

@@ -415,7 +415,16 @@
       "deny": "Deny",
       "allow": "Allow",
       "saved": "Rules saved successfully",
-      "saveFailed": "Failed to save rules"
+      "saveFailed": "Failed to save rules",
+      "visibility": {
+        "title": "Settings",
+        "ownClub": "Own Club Referee",
+        "ownClubDescription": "This referee belongs to our club",
+        "allHomeGames": "All Home Games",
+        "allHomeGamesDescription": "Show all home games (except denied teams)",
+        "awayGames": "Away Games",
+        "awayGamesDescription": "Show away games"
+      }
     },
     "filter": {
       "ownClub": "Own Club",

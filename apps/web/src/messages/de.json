@@ -415,7 +415,16 @@
       "deny": "Sperren",
       "allow": "Erlauben",
       "saved": "Regeln erfolgreich gespeichert",
-      "saveFailed": "Fehler beim Speichern der Regeln"
+      "saveFailed": "Fehler beim Speichern der Regeln",
+      "visibility": {
+        "title": "Einstellungen",
+        "ownClub": "Eigener Vereins-Schiedsrichter",
+        "ownClubDescription": "Dieser Schiedsrichter gehört zu unserem Verein",
+        "allHomeGames": "Alle Heimspiele",
+        "allHomeGamesDescription": "Alle Heimspiele anzeigen (außer gesperrte Teams)",
+        "awayGames": "Auswärtsspiele",
+        "awayGamesDescription": "Auswärtsspiele anzeigen"
+      }
     },
     "filter": {
       "ownClub": "Eigener Verein",
