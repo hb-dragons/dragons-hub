@@ -73,6 +73,11 @@ export default function ScheduleScreen() {
     });
   }, [sections, firstUpcomingSectionIndex]);
 
+  const handleScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
+    const offset = info.index * info.averageItemLength;
+    listRef.current?.getScrollResponder()?.scrollTo({ y: offset, animated: false });
+  }, []);
+
   const handleFilterChange = useCallback((f: Filter) => {
     hasScrolled.current = false;
     setFilter(f);
@@ -127,6 +132,7 @@ export default function ScheduleScreen() {
           sections={sections}
           keyExtractor={(item) => String(item.id)}
           onContentSizeChange={handleContentSizeChange}
+          onScrollToIndexFailed={handleScrollToIndexFailed}
           renderSectionHeader={({ section }) => (
             <Text
               style={[
