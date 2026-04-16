@@ -34,7 +34,7 @@ importers:
     dependencies:
       '@better-auth/expo':
         specifier: ^1.6.5
-        version: 1.6.5(0d720f6d50316d29450f449c530f1846)
+        version: 1.6.5(53ab272daa793397fb31bd49bc71897a)
       '@bull-board/api':
         specifier: ^6.21.2
         version: 6.21.2(@bull-board/ui@6.21.2)
@@ -201,7 +201,7 @@ importers:
     dependencies:
       '@better-auth/expo':
         specifier: ^1.6.4
-        version: 1.6.5(1c9ede2e64ae95ddf88854da63b1ab3a)
+        version: 1.6.5(4109ab586880d26c168db7f9112dfe23)
       '@dragons/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -231,6 +231,9 @@ importers:
         version: 55.0.13(expo@55.0.15)
       expo-localization:
         specifier: ~55.0.0
+        version: 55.0.13(expo@55.0.15)(react@19.2.5)
+      expo-network:
+        specifier: ~55.0.13
         version: 55.0.13(expo@55.0.15)(react@19.2.5)
       expo-notifications:
         specifier: ~55.0.0
@@ -6741,6 +6744,12 @@ packages:
       react-native-worklets:
         optional: true
 
+  expo-network@55.0.13:
+    resolution: {integrity: sha512-7u+npCmCPRpVrjkUlQtUetPnTN1gRyj7z13bBM5w9w1AHMb4PfoxtIys5EB9ukzNYBg/gaZ/y5dtxomGpc6BKw==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+
   expo-notifications@55.0.19:
     resolution: {integrity: sha512-t1DPN9xwSh5kN5T8k0lER/NbcuhMIxj/ukfDWzFOJb2WdfB+VBWaiBUj4K26agsX7tQFMz2wsCXpkYXLdfzSdw==}
     peerDependencies:
@@ -11234,19 +11243,7 @@ snapshots:
     optionalDependencies:
       drizzle-orm: 0.45.2(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.1)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2))(typescript@6.0.2))(@types/pg@8.20.0)(kysely@0.28.16)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.7)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2))
 
-  '@better-auth/expo@1.6.5(0d720f6d50316d29450f449c530f1846)':
-    dependencies:
-      '@better-auth/core': 1.6.5(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(@opentelemetry/api@1.9.1)(better-call@1.3.5(zod@4.3.6))(jose@6.2.2)(kysely@0.28.16)(nanostores@1.2.0)
-      '@better-fetch/fetch': 1.1.21
-      better-auth: 1.6.2(@opentelemetry/api@1.9.1)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2))(typescript@6.0.2))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@electric-sql/pglite@0.4.4)(@opentelemetry/api@1.9.1)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2))(typescript@6.0.2))(@types/pg@8.20.0)(kysely@0.28.16)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.7)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.2.3(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(pg@8.20.0)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.4)
-      better-call: 1.3.5(zod@4.3.6)
-      zod: 4.3.6
-    optionalDependencies:
-      expo-constants: 55.0.14(expo@55.0.15)(react-native@0.85.1(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))(typescript@6.0.2)
-      expo-linking: 55.0.13(expo@55.0.15)(react-native@0.85.1(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))(react@19.2.5)(typescript@6.0.2)
-      expo-web-browser: 55.0.14(expo@55.0.15)(react-native@0.85.1(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))
-
-  '@better-auth/expo@1.6.5(1c9ede2e64ae95ddf88854da63b1ab3a)':
+  '@better-auth/expo@1.6.5(4109ab586880d26c168db7f9112dfe23)':
     dependencies:
       '@better-auth/core': 1.6.5(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(@opentelemetry/api@1.9.1)(better-call@1.3.5(zod@4.3.6))(jose@6.2.2)(kysely@0.28.16)(nanostores@1.2.0)
       '@better-fetch/fetch': 1.1.21
@@ -11256,7 +11253,21 @@ snapshots:
     optionalDependencies:
       expo-constants: 55.0.14(expo@55.0.15)(react-native@0.83.5(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))(typescript@6.0.2)
       expo-linking: 55.0.13(expo@55.0.15)(react-native@0.83.5(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))(react@19.2.5)(typescript@6.0.2)
+      expo-network: 55.0.13(expo@55.0.15)(react@19.2.5)
       expo-web-browser: 55.0.14(expo@55.0.15)(react-native@0.83.5(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))
+
+  '@better-auth/expo@1.6.5(53ab272daa793397fb31bd49bc71897a)':
+    dependencies:
+      '@better-auth/core': 1.6.5(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(@opentelemetry/api@1.9.1)(better-call@1.3.5(zod@4.3.6))(jose@6.2.2)(kysely@0.28.16)(nanostores@1.2.0)
+      '@better-fetch/fetch': 1.1.21
+      better-auth: 1.6.2(@opentelemetry/api@1.9.1)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2))(typescript@6.0.2))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@electric-sql/pglite@0.4.4)(@opentelemetry/api@1.9.1)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2))(typescript@6.0.2))(@types/pg@8.20.0)(kysely@0.28.16)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.7)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.2.3(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(pg@8.20.0)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@6.0.2))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.4)
+      better-call: 1.3.5(zod@4.3.6)
+      zod: 4.3.6
+    optionalDependencies:
+      expo-constants: 55.0.14(expo@55.0.15)(react-native@0.85.1(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))(typescript@6.0.2)
+      expo-linking: 55.0.13(expo@55.0.15)(react-native@0.85.1(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))(react@19.2.5)(typescript@6.0.2)
+      expo-network: 55.0.13(expo@55.0.15)(react@19.2.5)
+      expo-web-browser: 55.0.14(expo@55.0.15)(react-native@0.85.1(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))
 
   '@better-auth/kysely-adapter@1.6.2(@better-auth/core@1.6.2(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(@opentelemetry/api@1.9.1)(better-call@1.3.5(zod@4.3.6))(jose@6.2.2)(kysely@0.28.16)(nanostores@1.2.0))(@better-auth/utils@0.4.0)(kysely@0.28.16)':
     dependencies:
@@ -17324,6 +17335,11 @@ snapshots:
       react: 19.2.5
       react-native: 0.85.1(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5)
     optional: true
+
+  expo-network@55.0.13(expo@55.0.15)(react@19.2.5):
+    dependencies:
+      expo: 55.0.15(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@55.0.9)(expo-router@55.0.12)(react-dom@19.2.5(react@19.2.5))(react-native@0.83.5(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))(react@19.2.5)(typescript@6.0.2)
+      react: 19.2.5
 
   expo-notifications@55.0.19(expo@55.0.15)(react-native@0.83.5(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.2.5))(react@19.2.5)(typescript@6.0.2):
     dependencies:
