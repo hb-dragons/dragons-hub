@@ -11,14 +11,18 @@ export interface RefereeListParams {
   limit: number;
   offset: number;
   search?: string;
+  ownClub: boolean;
 }
 
 export async function getReferees(
   params: RefereeListParams,
 ): Promise<PaginatedResponse<RefereeListItem>> {
-  const { limit, offset, search } = params;
+  const { limit, offset, search, ownClub } = params;
 
   const conditions = [];
+  if (ownClub) {
+    conditions.push(eq(referees.isOwnClub, true));
+  }
   if (search) {
     conditions.push(
       or(

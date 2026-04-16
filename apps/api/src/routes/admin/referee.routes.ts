@@ -22,6 +22,7 @@ refereeRoutes.get(
       limit: c.req.query("limit"),
       offset: c.req.query("offset"),
       search: c.req.query("search"),
+      ownClub: c.req.query("ownClub"),
     });
     const result = await getReferees(query);
     return c.json(result);

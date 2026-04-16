@@ -47,7 +47,7 @@ describe("GET /referees", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(listResult);
-    expect(mocks.getReferees).toHaveBeenCalledWith({ limit: 1000, offset: 0 });
+    expect(mocks.getReferees).toHaveBeenCalledWith({ limit: 1000, offset: 0, ownClub: true });
   });
 
   it("passes query params to service", async () => {
@@ -59,6 +59,7 @@ describe("GET /referees", () => {
       limit: 10,
       offset: 5,
       search: "Mueller",
+      ownClub: true,
     });
   });
 
@@ -130,19 +131,31 @@ describe("GET /referees", () => {
 
     await app.request("/referees");
 
-    expect(mocks.getReferees).toHaveBeenCalledWith({ limit: 1000, offset: 0 });
+    expect(mocks.getReferees).toHaveBeenCalledWith({ limit: 1000, offset: 0, ownClub: true });
+  });
+
+  it("defaults ownClub to true and passes to service", async () => {
+    mocks.getReferees.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+    await app.request("/referees");
+    expect(mocks.getReferees).toHaveBeenCalledWith({ limit: 1000, offset: 0, ownClub: true });
+  });
+
+  it("passes ownClub=false when specified", async () => {
+    mocks.getReferees.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+    await app.request("/referees?ownClub=false");
+    expect(mocks.getReferees).toHaveBeenCalledWith({ limit: 1000, offset: 0, ownClub: false });
   });
 });
 
 describe("PATCH /referees/:id/visibility", () => {
   it("returns 200 and updates visibility flags", async () => {
-    const updated = { id: 1, allowAllHomeGames: true, allowAwayGames: false };
+    const updated = { id: 1, allowAllHomeGames: true, allowAwayGames: false, isOwnClub: false };
     mocks.updateRefereeVisibility.mockResolvedValue(updated);
 
     const res = await app.request("/referees/1/visibility", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false, isOwnClub: false }),
     });
 
     expect(res.status).toBe(200);
@@ -150,6 +163,7 @@ describe("PATCH /referees/:id/visibility", () => {
     expect(mocks.updateRefereeVisibility).toHaveBeenCalledWith(1, {
       allowAllHomeGames: true,
       allowAwayGames: false,
+      isOwnClub: false,
     });
   });
 
@@ -194,7 +208,7 @@ describe("PATCH /referees/:id/visibility", () => {
     const res = await app.request("/referees/999/visibility", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false, isOwnClub: false }),
     });
 
     expect(res.status).toBe(404);
@@ -209,9 +223,24 @@ describe("PATCH /referees/:id/visibility", () => {
     const res = await app.request("/referees/1/visibility", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false, isOwnClub: false }),
     });
 
     expect(res.status).toBe(500);
+  });
+
+  it("passes isOwnClub in visibility update", async () => {
+    const updated = { id: 1, allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true };
+    mocks.updateRefereeVisibility.mockResolvedValue(updated);
+    const res = await app.request("/referees/1/visibility", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }),
+    });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(updated);
+    expect(mocks.updateRefereeVisibility).toHaveBeenCalledWith(1, {
+      allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true,
+    });
   });
 });
