@@ -25,7 +25,7 @@ export default async function AdminDashboardPage() {
   const fallback: Record<string, unknown> = {};
 
   if (referees.status === "fulfilled") {
-    fallback[SWR_KEYS.referees] = referees.value;
+    fallback[SWR_KEYS.referees()] = referees.value;
   }
   if (standings.status === "fulfilled") {
     fallback[SWR_KEYS.standings] = standings.value;

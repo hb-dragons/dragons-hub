@@ -36,7 +36,7 @@ export function DashboardView() {
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: referees } = useSWR<PaginatedResponse<RefereeListItem>>(
-    SWR_KEYS.referees,
+    SWR_KEYS.referees(),
     apiFetcher,
   );
   const { data: upcoming } = useSWR<PaginatedResponse<MatchListItem>>(

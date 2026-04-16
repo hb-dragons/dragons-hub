@@ -26,7 +26,7 @@ export default async function RefereesPage() {
           {error}
         </div>
       ) : (
-        <SWRConfig value={{ fallback: { [SWR_KEYS.referees]: data } }}>
+        <SWRConfig value={{ fallback: { [SWR_KEYS.referees()]: data } }}>
           <RefereeListTable />
         </SWRConfig>
       )}
