@@ -183,6 +183,13 @@
       "when": 1776336354237,
       "tag": "0025_regular_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776336448638,
+      "tag": "0026_graceful_whiplash",
+      "breakpoints": true
     }
   ]
 }

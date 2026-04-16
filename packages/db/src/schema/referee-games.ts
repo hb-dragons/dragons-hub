@@ -10,6 +10,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { matches } from "./matches";
+import { teams } from "./teams";
 
 export const refereeGames = pgTable(
   "referee_games",
@@ -40,6 +41,8 @@ export const refereeGames = pgTable(
     guestClubId: integer("guest_club_id"),
     isHomeGame: boolean("is_home_game").notNull().default(false),
     isGuestGame: boolean("is_guest_game").notNull().default(false),
+    homeTeamId: integer("home_team_id").references(() => teams.id),
+    guestTeamId: integer("guest_team_id").references(() => teams.id),
     leagueApiId: integer("league_api_id"),
     ownClubRefs: boolean("own_club_refs").notNull().default(false),
     dataHash: varchar("data_hash", { length: 64 }),
@@ -50,5 +53,7 @@ export const refereeGames = pgTable(
   (table) => [
     index("referee_games_match_id_idx").on(table.matchId),
     index("referee_games_kickoff_date_idx").on(table.kickoffDate),
+    index("referee_games_home_team_id_idx").on(table.homeTeamId),
+    index("referee_games_guest_team_id_idx").on(table.guestTeamId),
   ],
 );
