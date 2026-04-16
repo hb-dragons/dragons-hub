@@ -27,17 +27,20 @@ function RootNavigator() {
       <StatusBar style={isDark ? "light" : "dark"} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.background },
           headerTintColor: colors.foreground,
           contentStyle: { backgroundColor: colors.background },
+          headerTransparent: true,
+          headerBlurEffect: isDark ? "systemChromeMaterialDark" : "systemChromeMaterial",
+          headerShadowVisible: false,
+          headerTitle: "",
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="team/[id]" options={{ headerShown: true, title: "" }} />
-        <Stack.Screen name="game/[id]" options={{ headerShown: true, title: "" }} />
-        <Stack.Screen name="h2h/[teamApiId]" options={{ title: "" }} />
+        <Stack.Screen name="team/[id]" />
+        <Stack.Screen name="game/[id]" />
+        <Stack.Screen name="h2h/[teamApiId]" />
         <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false }} />
-        <Stack.Screen name="profile" options={{ headerShown: true, title: i18n.t("profile.title") }} />
+        <Stack.Screen name="profile" options={{ headerTitle: i18n.t("profile.title") }} />
       </Stack>
     </>
   );

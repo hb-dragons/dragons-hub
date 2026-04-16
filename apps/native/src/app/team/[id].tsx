@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { View, Text, ActivityIndicator } from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
@@ -127,21 +127,18 @@ export default function TeamDetailScreen() {
 
   if (isLoading || !team) {
     return (
-      <>
-        <Stack.Screen options={{ title: teamName || "..." }} />
-        <Screen edges={[]}>
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              paddingTop: spacing.xl,
-            }}
-          >
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </Screen>
-      </>
+      <Screen edges={[]}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingTop: spacing.xl,
+          }}
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </Screen>
     );
   }
 
@@ -152,9 +149,7 @@ export default function TeamDetailScreen() {
   const diff = teamStats?.pointsDiff ?? 0;
 
   return (
-    <>
-      <Stack.Screen options={{ title: teamName }} />
-      <Screen edges={[]}>
+    <Screen edges={[]}>
         {/* 1. Team Header */}
         <View style={{ marginBottom: spacing.lg }}>
           <Text
@@ -365,7 +360,6 @@ export default function TeamDetailScreen() {
           </View>
         )}
       </Screen>
-    </>
   );
 }
 

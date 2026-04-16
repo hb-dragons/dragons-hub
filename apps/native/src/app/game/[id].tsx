@@ -1,5 +1,5 @@
 import { View, Text, ActivityIndicator } from "react-native";
-import { useLocalSearchParams, Stack, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import useSWR from "swr";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
@@ -34,25 +34,20 @@ export default function GameDetailScreen() {
     ? (match.guestTeamCustomName ?? match.guestTeamNameShort ?? match.guestTeamName)
     : "";
 
-  const headerTitle = match ? `${homeName} vs ${guestName}` : "...";
-
   if (matchLoading || !match) {
     return (
-      <>
-        <Stack.Screen options={{ title: headerTitle }} />
-        <Screen edges={[]}>
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              paddingTop: spacing.xl,
-            }}
-          >
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </Screen>
-      </>
+      <Screen edges={[]}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingTop: spacing.xl,
+          }}
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </Screen>
     );
   }
 
@@ -104,10 +99,8 @@ export default function GameDetailScreen() {
   };
 
   return (
-    <>
-      <Stack.Screen options={{ title: headerTitle }} />
-      <Screen edges={[]}>
-        {/* ── 1. Score Header ── */}
+    <Screen edges={[]}>
+      {/* ── 1. Score Header ── */}
         <Card
           style={{
             marginBottom: spacing.md,
@@ -431,6 +424,5 @@ export default function GameDetailScreen() {
           </View>
         </View>
       </Screen>
-    </>
   );
 }

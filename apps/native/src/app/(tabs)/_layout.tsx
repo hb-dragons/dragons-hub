@@ -1,12 +1,9 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { Header } from "@/components/Header";
 import { i18n } from "@/lib/i18n";
 
 export default function TabLayout() {
   return (
-    <>
-      <Header />
-      <NativeTabs>
+    <NativeTabs>
         <NativeTabs.Trigger name="index">
           <NativeTabs.Trigger.Label>
             {i18n.t("tabs.home")}
@@ -44,6 +41,5 @@ export default function TabLayout() {
           />
         </NativeTabs.Trigger>
       </NativeTabs>
-    </>
   );
 }
