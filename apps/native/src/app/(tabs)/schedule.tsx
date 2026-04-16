@@ -1,8 +1,7 @@
-import { useState, useMemo, useRef, useCallback } from "react";
-import { View, Text, SectionList, ScrollView, ActivityIndicator } from "react-native";
-import type { SectionList as SectionListType } from "react-native";
+import { useState, useMemo, useCallback } from "react";
+import { View, Text, FlatList, ScrollView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import useSWR from "swr";
+import useSWRInfinite from "swr/infinite";
 import type { MatchListItem } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
@@ -14,76 +13,48 @@ import { i18n } from "@/lib/i18n";
 
 type Filter = "all" | "home" | "away";
 
+const PAGE_SIZE = 20;
+const today = new Date().toISOString().split("T")[0];
+
 export default function ScheduleScreen() {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
-  const listRef = useRef<SectionListType<MatchListItem>>(null);
-  const hasScrolled = useRef(false);
 
-  const { data, isLoading } = useSWR(
-    "schedule:matches:all",
-    () => publicApi.getMatches({ limit: 1000, sort: "asc" }),
+  const { data, size, setSize, isLoading, isValidating } = useSWRInfinite(
+    (pageIndex: number) => `schedule:${filter}:${String(pageIndex)}`,
+    (key: string) => {
+      const pageIndex = Number(key.split(":")[2]);
+      return publicApi.getMatches({
+        limit: PAGE_SIZE,
+        offset: pageIndex * PAGE_SIZE,
+        dateFrom: today,
+        sort: "asc",
+      });
+    },
   );
 
-  const matches = data?.items ?? [];
+  const allMatches = useMemo(() => {
+    if (!data) return [];
+    return data.flatMap((page) => page.items);
+  }, [data]);
 
   const filtered = useMemo(() => {
-    if (filter === "home") return matches.filter((m) => m.homeIsOwnClub);
-    if (filter === "away") return matches.filter((m) => m.guestIsOwnClub);
-    return matches;
-  }, [matches, filter]);
+    if (filter === "home") return allMatches.filter((m) => m.homeIsOwnClub);
+    if (filter === "away") return allMatches.filter((m) => m.guestIsOwnClub);
+    return allMatches;
+  }, [allMatches, filter]);
 
-  const sections = useMemo(() => {
-    const grouped = new Map<string, MatchListItem[]>();
-    for (const match of filtered) {
-      const key = match.kickoffDate;
-      const list = grouped.get(key);
-      if (list) {
-        list.push(match);
-      } else {
-        grouped.set(key, [match]);
-      }
+  const hasMore = data ? data[data.length - 1]?.hasMore ?? false : false;
+  const isLoadingMore = isValidating && !isLoading;
+
+  const handleEndReached = useCallback(() => {
+    if (!isValidating && hasMore) {
+      void setSize(size + 1);
     }
-    return Array.from(grouped.entries()).map(([date, items]) => ({
-      title: date,
-      data: items,
-    }));
-  }, [filtered]);
+  }, [isValidating, hasMore, setSize, size]);
 
-  // Find the section index of the first upcoming date
-  const firstUpcomingSectionIndex = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
-    for (let i = 0; i < sections.length; i++) {
-      if (sections[i]!.title >= today) return i;
-    }
-    return -1;
-  }, [sections]);
-
-  // Scroll once after content is laid out
-  const handleContentSizeChange = useCallback(() => {
-    if (hasScrolled.current || sections.length === 0 || firstUpcomingSectionIndex < 0) return;
-    hasScrolled.current = true;
-
-    listRef.current?.scrollToLocation({
-      sectionIndex: firstUpcomingSectionIndex,
-      itemIndex: 0,
-      animated: false,
-      viewOffset: 0,
-    });
-  }, [sections, firstUpcomingSectionIndex]);
-
-  const handleScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
-    const offset = info.index * info.averageItemLength;
-    listRef.current?.getScrollResponder()?.scrollTo({ y: offset, animated: false });
-  }, []);
-
-  const handleFilterChange = useCallback((f: Filter) => {
-    hasScrolled.current = false;
-    setFilter(f);
-  }, []);
-
-  if (isLoading && matches.length === 0) {
+  if (isLoading) {
     return (
       <Screen>
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xl }}>
@@ -106,61 +77,47 @@ export default function ScheduleScreen() {
         <FilterPill
           label={i18n.t("schedule.allGames")}
           active={filter === "all"}
-          onPress={() => handleFilterChange("all")}
+          onPress={() => setFilter("all")}
         />
         <FilterPill
           label={i18n.t("schedule.homeOnly")}
           active={filter === "home"}
-          onPress={() => handleFilterChange("home")}
+          onPress={() => setFilter("home")}
         />
         <FilterPill
           label={i18n.t("schedule.away")}
           active={filter === "away"}
-          onPress={() => handleFilterChange("away")}
+          onPress={() => setFilter("away")}
         />
       </ScrollView>
 
-      {sections.length === 0 ? (
-        <View style={{ paddingTop: spacing.xl, alignItems: "center" }}>
-          <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
-            {i18n.t("schedule.noMatches")}
-          </Text>
-        </View>
-      ) : (
-        <SectionList
-          ref={listRef}
-          sections={sections}
-          keyExtractor={(item) => String(item.id)}
-          onContentSizeChange={handleContentSizeChange}
-          onScrollToIndexFailed={handleScrollToIndexFailed}
-          renderSectionHeader={({ section }) => (
-            <Text
-              style={[
-                textStyles.label,
-                {
-                  color: colors.mutedForeground,
-                  paddingVertical: spacing.sm,
-                  backgroundColor: colors.background,
-                },
-              ]}
-            >
-              {section.title}
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item }) => (
+          <View style={{ marginBottom: spacing.sm }}>
+            <MatchCardFull
+              match={item}
+              onPress={() => router.push(`/game/${String(item.id)}`)}
+            />
+          </View>
+        )}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          isLoadingMore ? (
+            <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.lg }} />
+          ) : null
+        }
+        ListEmptyComponent={
+          <View style={{ paddingTop: spacing.xl, alignItems: "center" }}>
+            <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
+              {i18n.t("schedule.noMatches")}
             </Text>
-          )}
-          renderItem={({ item }) => (
-            <View style={{ marginBottom: spacing.sm }}>
-              <MatchCardFull
-                match={item}
-                onPress={() => router.push(`/game/${String(item.id)}`)}
-              />
-            </View>
-          )}
-          showsVerticalScrollIndicator={false}
-          stickySectionHeadersEnabled={false}
-          // Render enough items so scrollToLocation target exists on first pass
-          initialNumToRender={filtered.length}
-        />
-      )}
+          </View>
+        }
+        showsVerticalScrollIndicator={false}
+      />
     </Screen>
   );
 }
