@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { View, Text, FlatList, ScrollView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
@@ -13,19 +13,36 @@ import { i18n } from "@/lib/i18n";
 
 type LocationFilter = "all" | "home" | "away";
 
+function getToday(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
 export default function ScheduleScreen() {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
-  const listRef = useRef<FlatList<MatchListItem>>(null);
-  const hasScrolled = useRef(false);
+  const [showPast, setShowPast] = useState(false);
 
-  const { data, isLoading } = useSWR(
-    "schedule:all",
-    () => publicApi.getMatches({ limit: 1000, sort: "asc" }),
+  // Upcoming games (from today, ascending)
+  const { data: upcomingData, isLoading: upcomingLoading } = useSWR(
+    "schedule:upcoming",
+    () => publicApi.getMatches({ limit: 1000, sort: "asc", dateFrom: getToday() }),
   );
 
-  const allMatches = data?.items ?? [];
+  // Past games (before today, descending) — only fetched when user scrolls up
+  const { data: pastData, isLoading: pastLoading } = useSWR(
+    showPast ? "schedule:past" : null,
+    () => publicApi.getMatches({ limit: 1000, sort: "desc", dateTo: getToday(), hasScore: true }),
+  );
+
+  const upcoming = upcomingData?.items ?? [];
+  const past = pastData?.items ?? [];
+
+  // Combine: past (reversed back to chronological asc) + upcoming
+  const allMatches = useMemo(() => {
+    const pastAsc = [...past].reverse();
+    return [...pastAsc, ...upcoming];
+  }, [past, upcoming]);
 
   const filtered = useMemo(() => {
     if (locationFilter === "home") return allMatches.filter((m) => m.homeIsOwnClub);
@@ -33,38 +50,11 @@ export default function ScheduleScreen() {
     return allMatches;
   }, [allMatches, locationFilter]);
 
-  // Index of the first upcoming game (no score yet, or date >= today)
-  const firstUpcomingIndex = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
-    const idx = filtered.findIndex((m) => m.kickoffDate >= today);
-    return idx >= 0 ? idx : filtered.length - 1;
-  }, [filtered]);
+  const handleRefresh = useCallback(() => {
+    if (!showPast) setShowPast(true);
+  }, [showPast]);
 
-  const handleContentSizeChange = useCallback(() => {
-    if (hasScrolled.current || filtered.length === 0 || firstUpcomingIndex <= 0) return;
-    hasScrolled.current = true;
-
-    listRef.current?.scrollToIndex({
-      index: firstUpcomingIndex,
-      animated: false,
-      viewPosition: 0,
-    });
-  }, [filtered.length, firstUpcomingIndex]);
-
-  const handleScrollToIndexFailed = useCallback((info: { index: number; averageItemLength: number }) => {
-    // Fallback: estimate offset and scroll there
-    listRef.current?.scrollToOffset({
-      offset: info.index * info.averageItemLength,
-      animated: false,
-    });
-  }, []);
-
-  const handleFilterChange = useCallback((f: LocationFilter) => {
-    hasScrolled.current = false;
-    setLocationFilter(f);
-  }, []);
-
-  if (isLoading) {
+  if (upcomingLoading) {
     return (
       <Screen>
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xl }}>
@@ -87,17 +77,16 @@ export default function ScheduleScreen() {
         <FilterPill
           label={i18n.t("schedule.homeOnly")}
           active={locationFilter === "home"}
-          onPress={() => handleFilterChange(locationFilter === "home" ? "all" : "home")}
+          onPress={() => setLocationFilter(locationFilter === "home" ? "all" : "home")}
         />
         <FilterPill
           label={i18n.t("schedule.away")}
           active={locationFilter === "away"}
-          onPress={() => handleFilterChange(locationFilter === "away" ? "all" : "away")}
+          onPress={() => setLocationFilter(locationFilter === "away" ? "all" : "away")}
         />
       </ScrollView>
 
       <FlatList
-        ref={listRef}
         data={filtered}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => (
@@ -108,10 +97,10 @@ export default function ScheduleScreen() {
             />
           </View>
         )}
-        onContentSizeChange={handleContentSizeChange}
-        onScrollToIndexFailed={handleScrollToIndexFailed}
+        // Pull-to-refresh loads past games
+        onRefresh={handleRefresh}
+        refreshing={pastLoading}
         contentContainerStyle={{ paddingBottom: 100 }}
-        initialNumToRender={filtered.length}
         ListEmptyComponent={
           <View style={{ paddingTop: spacing.xl, alignItems: "center" }}>
             <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
