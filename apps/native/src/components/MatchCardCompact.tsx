@@ -66,10 +66,10 @@ export function MatchCardCompact({ match, onPress, highlighted }: MatchCardCompa
   const ownTeamRawName = isHomeGame ? match.homeTeamName : match.guestTeamName;
   const ownLabel = ownName;
 
-  // Opponent info
+  // Opponent info — use full federation name
   const opponentName = isHomeGame
-    ? resolveName(match.guestTeamCustomName, match.guestTeamNameShort, match.guestTeamName)
-    : resolveName(match.homeTeamCustomName, match.homeTeamNameShort, match.homeTeamName);
+    ? match.guestTeamName
+    : match.homeTeamName;
 
   const ownColor = getNativeTeamColor(ownBadgeColor, ownTeamRawName, isDark);
 

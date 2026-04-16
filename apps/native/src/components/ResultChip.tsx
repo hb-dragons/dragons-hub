@@ -10,10 +10,7 @@ interface ResultChipProps {
 }
 
 function getOpponentName(match: MatchListItem): string {
-  const isHome = match.homeIsOwnClub;
-  return isHome
-    ? match.guestTeamCustomName || match.guestTeamNameShort || match.guestTeamName
-    : match.homeTeamCustomName || match.homeTeamNameShort || match.homeTeamName;
+  return match.homeIsOwnClub ? match.guestTeamName : match.homeTeamName;
 }
 
 function getResultBadge(match: MatchListItem): { label: string; isWin: boolean | null } {

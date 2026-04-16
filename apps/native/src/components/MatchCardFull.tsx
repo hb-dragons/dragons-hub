@@ -60,16 +60,12 @@ export function MatchCardFull({ match, onPress }: MatchCardFullProps) {
       : "rgba(0,75,35,0.06)"
     : colors.surfaceLowest;
 
-  const homeName = resolveName(
-    match.homeTeamCustomName,
-    match.homeTeamNameShort,
-    match.homeTeamName,
-  );
-  const guestName = resolveName(
-    match.guestTeamCustomName,
-    match.guestTeamNameShort,
-    match.guestTeamName,
-  );
+  const homeName = match.homeIsOwnClub
+    ? resolveName(match.homeTeamCustomName, match.homeTeamNameShort, match.homeTeamName)
+    : match.homeTeamName;
+  const guestName = match.guestIsOwnClub
+    ? resolveName(match.guestTeamCustomName, match.guestTeamNameShort, match.guestTeamName)
+    : match.guestTeamName;
 
   // Team colors via getNativeTeamColor
   const homeTeamColor = getNativeTeamColor(match.homeBadgeColor, match.homeTeamName, isDark);

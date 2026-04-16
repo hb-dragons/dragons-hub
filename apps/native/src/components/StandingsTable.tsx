@@ -178,7 +178,7 @@ export function StandingsTable({
                 }}
                 numberOfLines={1}
               >
-                {item.teamNameShort || item.teamName}
+                {isOwn ? (item.teamNameShort || item.teamName) : item.teamName}
               </Text>
 
               {/* Played */}
