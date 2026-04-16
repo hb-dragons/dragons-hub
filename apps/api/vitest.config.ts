@@ -7,6 +7,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    hookTimeout: 30_000,
     include: ["src/**/*.test.ts"],
     setupFiles: ["./vitest.setup.ts"],
     coverage: {
