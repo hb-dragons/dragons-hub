@@ -13,7 +13,7 @@ import { textStyles } from "@/theme/typography";
 import { spacing, radius } from "@/theme/spacing";
 import type { ColorScheme, ColorToken } from "@/theme/colors";
 
-type Mode = "system" | ColorScheme;
+export type Mode = "system" | ColorScheme;
 
 /** Resolved color map — values are hex strings from either light or dark palette */
 type ResolvedColors = Record<ColorToken, string>;
