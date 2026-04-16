@@ -15,7 +15,6 @@
     "ios": {
       "bundleIdentifier": "de.hbdragons.app",
       "supportsTablet": true,
-      "associatedDomains": ["applinks:app.hbdragons.de"],
       "infoPlist": {
         "NSFaceIDUsageDescription": "Use Face ID to unlock the Dragons app",
         "NSCameraUsageDescription": "Allow Dragons to access your camera for team photos"
@@ -40,7 +39,7 @@
       "expo-secure-store",
       "expo-local-authentication",
       ["expo-camera", { "cameraPermission": "Allow Dragons to access your camera for team photos." }],
-      ["expo-notifications", { "color": "#004b23" }]
+      "./plugins/remove-push-entitlement"
     ],
     "experiments": {
       "typedRoutes": true
