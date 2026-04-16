@@ -1,11 +1,13 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, Switch, StyleSheet } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
+import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Screen } from "@/components/Screen";
+import { i18n } from "@/lib/i18n";
 import type { Mode } from "@/hooks/useTheme";
 
 const THEME_OPTIONS: { label: string; value: Mode }[] = [
@@ -16,6 +18,7 @@ const THEME_OPTIONS: { label: string; value: Mode }[] = [
 
 export default function ProfileScreen() {
   const { colors, textStyles, spacing, radius, mode, setMode } = useTheme();
+  const { isSupported, isEnabled, toggle } = useBiometricLock();
   const router = useRouter();
   const { data: session } = authClient.useSession();
 
@@ -89,6 +92,30 @@ export default function ProfileScreen() {
               variant="secondary"
             />
           </Card>
+
+          {/* Biometric lock section */}
+          {isSupported && (
+            <View>
+              <SectionHeader title={i18n.t("profile.biometricLock")} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: spacing.sm,
+                }}
+              >
+                <Text style={[textStyles.body, { color: colors.foreground }]}>
+                  {i18n.t("profile.biometricLock")}
+                </Text>
+                <Switch
+                  value={isEnabled}
+                  onValueChange={() => void toggle()}
+                  trackColor={{ true: colors.primary, false: undefined }}
+                />
+              </View>
+            </View>
+          )}
 
           {/* Theme section */}
           <View>
