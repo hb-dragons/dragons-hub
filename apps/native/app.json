@@ -13,7 +13,7 @@
       "backgroundColor": "#131313"
     },
     "ios": {
-      "bundleIdentifier": "com.dragons.app",
+      "bundleIdentifier": "de.hbdragons.app",
       "supportsTablet": true,
       "associatedDomains": ["applinks:app.hbdragons.de"],
       "infoPlist": {
@@ -22,7 +22,7 @@
       }
     },
     "android": {
-      "package": "com.dragons.app",
+      "package": "de.hbdragons.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#131313"
