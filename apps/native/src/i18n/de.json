@@ -51,6 +51,22 @@
     "themeDark": "Dunkel",
     "signOut": "Abmelden"
   },
+  "teamDetail": {
+    "league": "Liga",
+    "lastGame": "Letztes Spiel",
+    "nextGame": "Nächstes Spiel",
+    "upcoming": "Kommende Spiele",
+    "noMatches": "Keine Spiele gefunden",
+    "position": "Platzierung"
+  },
+  "gameDetail": {
+    "venue": "Halle",
+    "date": "Datum",
+    "time": "Uhrzeit",
+    "confirmed": "Bestätigt",
+    "cancelled": "Abgesagt",
+    "forfeited": "Kampflos"
+  },
   "common": {
     "home": "Heim",
     "away": "Auswärts",

@@ -51,6 +51,22 @@
     "themeDark": "Dark",
     "signOut": "Sign Out"
   },
+  "teamDetail": {
+    "league": "League",
+    "lastGame": "Last Game",
+    "nextGame": "Next Game",
+    "upcoming": "Upcoming",
+    "noMatches": "No matches found",
+    "position": "Position"
+  },
+  "gameDetail": {
+    "venue": "Venue",
+    "date": "Date",
+    "time": "Time",
+    "confirmed": "Confirmed",
+    "cancelled": "Cancelled",
+    "forfeited": "Forfeited"
+  },
   "common": {
     "home": "Home",
     "away": "Away",
