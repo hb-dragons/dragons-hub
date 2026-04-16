@@ -7,7 +7,7 @@ import { fontFamilies } from "../theme/typography";
 interface HeadToHeadProps {
   data: HeadToHeadData;
   opponentName: string;
-  ownAbbrev: string;
+  ownLabel: string;
   ownColor: string;
   onMatchPress?: (matchId: number) => void;
 }
@@ -23,7 +23,7 @@ function formatDate(dateStr: string): string {
 export function HeadToHead({
   data,
   opponentName,
-  ownAbbrev,
+  ownLabel,
   ownColor,
   onMatchPress,
 }: HeadToHeadProps) {
@@ -168,7 +168,7 @@ export function HeadToHead({
                   }}
                   numberOfLines={1}
                 >
-                  {meeting.homeIsOwnClub ? ownAbbrev : meeting.homeTeamName}
+                  {meeting.homeIsOwnClub ? ownLabel : meeting.homeTeamName}
                 </Text>
 
                 {/* Score */}
@@ -214,7 +214,7 @@ export function HeadToHead({
                   }}
                   numberOfLines={1}
                 >
-                  {!meeting.homeIsOwnClub ? ownAbbrev : meeting.guestTeamName}
+                  {!meeting.homeIsOwnClub ? ownLabel : meeting.guestTeamName}
                 </Text>
 
                 {/* S/N badge */}

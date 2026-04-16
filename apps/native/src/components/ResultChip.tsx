@@ -9,14 +9,11 @@ interface ResultChipProps {
   onPress?: () => void;
 }
 
-function getAbbreviation(match: MatchListItem): string {
+function getOpponentName(match: MatchListItem): string {
   const isHome = match.homeIsOwnClub;
-  const opponentName = isHome
+  return isHome
     ? match.guestTeamCustomName || match.guestTeamNameShort || match.guestTeamName
     : match.homeTeamCustomName || match.homeTeamNameShort || match.homeTeamName;
-
-  const stripped = opponentName.replace(/^Dragons\s+/i, "");
-  return stripped.slice(0, 3).toUpperCase();
 }
 
 function getResultBadge(match: MatchListItem): { label: string; isWin: boolean | null } {
@@ -38,7 +35,7 @@ function getResultBadge(match: MatchListItem): { label: string; isWin: boolean |
 export function ResultChip({ match, onPress }: ResultChipProps) {
   const { colors, radius, spacing } = useTheme();
 
-  const abbrev = getAbbreviation(match);
+  const opponentLabel = getOpponentName(match);
   const hasScore = match.homeScore !== null && match.guestScore !== null;
   const ownScore = match.homeIsOwnClub ? match.homeScore : match.guestScore;
   const oppScore = match.homeIsOwnClub ? match.guestScore : match.homeScore;
@@ -52,20 +49,20 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
         paddingHorizontal: spacing.sm,
         paddingVertical: spacing.xs,
         alignItems: "center",
-        minWidth: 48,
+        minWidth: 60,
+        maxWidth: 80,
       }}
     >
-      {/* Opponent abbreviation */}
+      {/* Opponent name */}
       <Text
         style={{
           fontSize: 10,
           fontFamily: fontFamilies.displayMedium,
           color: colors.mutedForeground,
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
         }}
+        numberOfLines={1}
       >
-        {abbrev}
+        {opponentLabel}
       </Text>
 
       {/* Own score */}

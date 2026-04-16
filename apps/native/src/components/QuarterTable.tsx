@@ -6,8 +6,8 @@ import { fontFamilies } from "../theme/typography";
 
 interface QuarterTableProps {
   match: PublicMatchDetail;
-  homeAbbrev: string;
-  guestAbbrev: string;
+  homeLabel: string;
+  guestLabel: string;
   homeColor: string;
 }
 
@@ -84,7 +84,7 @@ function hasQuarterData(match: PublicMatchDetail): boolean {
   );
 }
 
-export function QuarterTable({ match, homeAbbrev, guestAbbrev, homeColor }: QuarterTableProps) {
+export function QuarterTable({ match, homeLabel, guestLabel, homeColor }: QuarterTableProps) {
   const { colors, spacing } = useTheme();
 
   if (!hasQuarterData(match)) return null;
@@ -150,7 +150,7 @@ export function QuarterTable({ match, homeAbbrev, guestAbbrev, homeColor }: Quar
       >
         {/* Header row */}
         <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.sm }}>
-          <View style={{ width: 48 }} />
+          <View style={{ width: 72 }} />
           {columns.map((col) => (
             <Text key={col.label} style={headerCellStyle}>
               {col.label}
@@ -168,14 +168,14 @@ export function QuarterTable({ match, homeAbbrev, guestAbbrev, homeColor }: Quar
         >
           <Text
             style={{
-              width: 48,
+              width: 72,
               fontSize: 13,
               fontFamily: fontFamilies.bodySemiBold,
               color: homeColor,
             }}
             numberOfLines={1}
           >
-            {homeAbbrev}
+            {homeLabel}
           </Text>
           {columns.map((col) =>
             renderScoreCell(col.homeValue, col.guestValue, `home-${col.label}`),
@@ -192,14 +192,14 @@ export function QuarterTable({ match, homeAbbrev, guestAbbrev, homeColor }: Quar
         >
           <Text
             style={{
-              width: 48,
+              width: 72,
               fontSize: 13,
               fontFamily: fontFamilies.body,
               color: colors.mutedForeground,
             }}
             numberOfLines={1}
           >
-            {guestAbbrev}
+            {guestLabel}
           </Text>
           {columns.map((col) =>
             renderScoreCell(col.guestValue, col.homeValue, `guest-${col.label}`),

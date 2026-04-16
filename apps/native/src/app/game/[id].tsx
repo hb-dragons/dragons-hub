@@ -58,8 +58,8 @@ export default function GameDetailScreen() {
 
   const hasScore = match.homeScore !== null && match.guestScore !== null;
 
-  const homeAbbrev = homeName.slice(0, 3).toUpperCase();
-  const guestAbbrev = guestName.slice(0, 3).toUpperCase();
+  const homeLabel = homeName;
+  const guestLabel = guestName;
 
   const homeColor = match.homeIsOwnClub
     ? getNativeTeamColor(match.homeBadgeColor, match.homeTeamName, isDark).name
@@ -82,7 +82,7 @@ export default function GameDetailScreen() {
 
   // Opponent name for H2H section label
   const opponentName = match.homeIsOwnClub ? guestName : homeName;
-  const ownAbbrev = match.homeIsOwnClub ? homeAbbrev : guestAbbrev;
+  const ownLabel = match.homeIsOwnClub ? homeLabel : guestLabel;
   const ownColor = match.homeIsOwnClub ? homeColor : guestColor;
 
   const sectionLabelStyle = {
@@ -235,8 +235,8 @@ export default function GameDetailScreen() {
         <View style={{ marginBottom: spacing.md }}>
           <QuarterTable
             match={match}
-            homeAbbrev={homeAbbrev}
-            guestAbbrev={guestAbbrev}
+            homeLabel={homeLabel}
+            guestLabel={guestLabel}
             homeColor={homeColor}
           />
         </View>
@@ -247,7 +247,7 @@ export default function GameDetailScreen() {
             <HeadToHead
               data={context.headToHead}
               opponentName={opponentName}
-              ownAbbrev={ownAbbrev}
+              ownLabel={ownLabel}
               ownColor={ownColor}
               onMatchPress={(matchId) => router.push(`/game/${matchId}`)}
             />
@@ -272,14 +272,14 @@ export default function GameDetailScreen() {
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                 <Text
                   style={{
-                    width: 40,
+                    width: 72,
                     fontSize: 13,
                     fontFamily: fontFamilies.bodySemiBold,
                     color: match.homeIsOwnClub ? homeColor : guestColor,
                   }}
                   numberOfLines={1}
                 >
-                  {match.homeIsOwnClub ? homeAbbrev : guestAbbrev}
+                  {match.homeIsOwnClub ? homeLabel : guestLabel}
                 </Text>
                 <FormStrip
                   form={match.homeIsOwnClub ? context.homeForm : context.guestForm}
@@ -289,14 +289,14 @@ export default function GameDetailScreen() {
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                 <Text
                   style={{
-                    width: 40,
+                    width: 72,
                     fontSize: 13,
                     fontFamily: fontFamilies.body,
                     color: colors.mutedForeground,
                   }}
                   numberOfLines={1}
                 >
-                  {match.homeIsOwnClub ? guestAbbrev : homeAbbrev}
+                  {match.homeIsOwnClub ? guestLabel : homeLabel}
                 </Text>
                 <FormStrip
                   form={match.homeIsOwnClub ? context.guestForm : context.homeForm}

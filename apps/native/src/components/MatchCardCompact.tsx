@@ -24,11 +24,6 @@ function formatCompactDate(kickoffDate: string, kickoffTime: string): string {
   return `${weekday} ${day}.${month}. ${time}`;
 }
 
-function getAbbreviation(name: string): string {
-  const stripped = name.replace(/^Dragons\s+/i, "");
-  return stripped.slice(0, 3).toUpperCase();
-}
-
 function resolveName(
   customName: string | null,
   nameShort: string | null,
@@ -69,7 +64,7 @@ export function MatchCardCompact({ match, onPress, highlighted }: MatchCardCompa
     : resolveName(match.guestTeamCustomName, match.guestTeamNameShort, match.guestTeamName);
   const ownBadgeColor = isHomeGame ? match.homeBadgeColor : match.guestBadgeColor;
   const ownTeamRawName = isHomeGame ? match.homeTeamName : match.guestTeamName;
-  const ownAbbrev = getAbbreviation(ownName);
+  const ownLabel = ownName;
 
   // Opponent info
   const opponentName = isHomeGame
@@ -126,7 +121,7 @@ export function MatchCardCompact({ match, onPress, highlighted }: MatchCardCompa
               color: ownColor.name,
             }}
           >
-            {ownAbbrev}
+            {ownLabel}
           </Text>
           <Text
             style={{
