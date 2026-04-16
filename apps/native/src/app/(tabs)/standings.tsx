@@ -1,18 +1,40 @@
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator } from "react-native";
+import { useRouter } from "expo-router";
 import useSWR from "swr";
+import type { PublicTeam } from "@dragons/api-client";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
-import { StandingsRow } from "@/components/StandingsRow";
+import { StandingsTable } from "@/components/StandingsTable";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 
-export default function StandingsScreen() {
-  const { colors, textStyles, spacing, radius } = useTheme();
+/** Build a lookup map from team name / nameShort → team record */
+function buildTeamLookup(teams: PublicTeam[]): Map<string, PublicTeam> {
+  const map = new Map<string, PublicTeam>();
+  for (const team of teams) {
+    map.set(team.name, team);
+    if (team.nameShort) map.set(team.nameShort, team);
+    if (team.customName) map.set(team.customName, team);
+  }
+  return map;
+}
 
-  const { data, isLoading } = useSWR("standings:all", () =>
-    publicApi.getStandings(),
+export default function StandingsScreen() {
+  const { colors, spacing } = useTheme();
+  const router = useRouter();
+
+  const { data: standings, isLoading: standingsLoading } = useSWR(
+    "standings:all",
+    () => publicApi.getStandings(),
   );
+
+  const { data: teams, isLoading: teamsLoading } = useSWR(
+    "teams:all",
+    () => publicApi.getTeams(),
+  );
+
+  const isLoading = standingsLoading || teamsLoading;
 
   if (isLoading) {
     return (
@@ -24,89 +46,36 @@ export default function StandingsScreen() {
     );
   }
 
-  const leagues = data ?? [];
+  const leagues = standings ?? [];
+  const teamLookup = buildTeamLookup(teams ?? []);
+
+  const handleOwnClubPress = (teamName: string) => {
+    const team = teamLookup.get(teamName);
+    if (team) {
+      router.push(`/team/${String(team.id)}`);
+    }
+  };
+
+  const handleOpponentPress = (teamName: string) => {
+    const team = teamLookup.get(teamName);
+    if (team) {
+      router.push(`/h2h/${String(team.apiTeamPermanentId)}`);
+    }
+  };
 
   return (
     <Screen>
       <SectionHeader title={i18n.t("standings.title")} />
 
       {leagues.map((league) => (
-        <View
-          key={league.leagueId}
-          style={{
-            backgroundColor: colors.surfaceLowest,
-            borderRadius: radius.md,
-            marginBottom: spacing.md,
-            overflow: "hidden",
-          }}
-        >
-          {/* League name */}
-          <View style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
-            <Text style={[textStyles.cardTitle, { color: colors.foreground }]}>
-              {league.leagueName}
-            </Text>
-          </View>
-
-          {/* Table header */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.md,
-              backgroundColor: colors.surfaceLow,
-            }}
-          >
-            <Text
-              style={[
-                textStyles.tableHeader,
-                { color: colors.mutedForeground, width: 32, textAlign: "center" },
-              ]}
-            >
-              {i18n.t("standings.pos")}
-            </Text>
-            <Text
-              style={[
-                textStyles.tableHeader,
-                { color: colors.mutedForeground, flex: 1, marginLeft: spacing.sm },
-              ]}
-            >
-              {i18n.t("standings.team")}
-            </Text>
-            <Text
-              style={[
-                textStyles.tableHeader,
-                { color: colors.mutedForeground, width: 32, textAlign: "center" },
-              ]}
-            >
-              {i18n.t("standings.won")}
-            </Text>
-            <Text
-              style={[
-                textStyles.tableHeader,
-                { color: colors.mutedForeground, width: 32, textAlign: "center" },
-              ]}
-            >
-              {i18n.t("standings.lost")}
-            </Text>
-            <Text
-              style={[
-                textStyles.tableHeader,
-                { color: colors.mutedForeground, width: 40, textAlign: "center" },
-              ]}
-            >
-              {i18n.t("standings.points")}
-            </Text>
-          </View>
-
-          {/* Rows */}
-          {league.standings.map((item) => (
-            <StandingsRow
-              key={`${String(league.leagueId)}-${String(item.position)}`}
-              item={item}
-              isOwnClub={item.isOwnClub}
-            />
-          ))}
+        <View key={league.leagueId} style={{ marginBottom: spacing.lg }}>
+          <StandingsTable
+            standings={league.standings}
+            leagueName={league.leagueName}
+            seasonName={league.seasonName}
+            onOwnClubPress={handleOwnClubPress}
+            onOpponentPress={handleOpponentPress}
+          />
         </View>
       ))}
     </Screen>

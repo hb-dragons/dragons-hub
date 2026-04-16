@@ -1,5 +1,6 @@
 import { View, Text, Pressable } from "react-native";
 import type { PublicTeam } from "@dragons/api-client";
+import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 
 interface TeamCardProps {
@@ -9,11 +10,12 @@ interface TeamCardProps {
 }
 
 export function TeamCard({ team, featured = false, onPress }: TeamCardProps) {
-  const { colors, radius, textStyles, spacing } = useTheme();
+  const { colors, radius, textStyles, spacing, isDark } = useTheme();
 
   const displayName = team.customName || team.nameShort || team.name;
   const height = featured ? 200 : 120;
   const titleStyle = featured ? textStyles.screenTitle : textStyles.cardTitle;
+  const nameColor = getNativeTeamColor(team.badgeColor, team.name, isDark).name;
 
   const cardContent = (
     <View
@@ -26,7 +28,7 @@ export function TeamCard({ team, featured = false, onPress }: TeamCardProps) {
       }}
     >
       <Text
-        style={[titleStyle, { color: colors.foreground }]}
+        style={[titleStyle, { color: nameColor }]}
         numberOfLines={2}
       >
         {displayName}

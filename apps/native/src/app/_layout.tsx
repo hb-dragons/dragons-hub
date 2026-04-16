@@ -35,6 +35,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="team/[id]" options={{ headerShown: true, title: "" }} />
         <Stack.Screen name="game/[id]" options={{ headerShown: true, title: "" }} />
+        <Stack.Screen name="h2h/[teamApiId]" options={{ title: "" }} />
         <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false }} />
         <Stack.Screen name="profile" options={{ headerShown: true, title: i18n.t("profile.title") }} />
       </Stack>
