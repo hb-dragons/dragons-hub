@@ -3,6 +3,8 @@ import { z } from "zod";
 import { describeRoute } from "hono-openapi";
 import { dateSchema } from "@dragons/shared";
 import { getOwnClubMatches } from "../../services/admin/match-admin.service";
+import { getPublicMatchDetail } from "../../services/admin/match-query.service";
+import { getMatchContext } from "../../services/public/match-context.service";
 import { buildCalendarFeed } from "../../services/public/calendar.service";
 import { matchListQuerySchema } from "../admin/match.schemas";
 
@@ -28,7 +30,12 @@ publicMatchRoutes.get(
       hasScore: c.req.query("hasScore"),
       teamApiId: c.req.query("teamApiId"),
     });
-    const result = await getOwnClubMatches({ ...query, excludeInactive: true });
+    const opponentApiId = c.req.query("opponentApiId");
+    const result = await getOwnClubMatches({
+      ...query,
+      opponentApiId: opponentApiId ? Number(opponentApiId) : undefined,
+      excludeInactive: true,
+    });
     return c.json(result);
   },
 );
@@ -98,6 +105,40 @@ publicMatchRoutes.get(
       "Content-Type": "text/calendar; charset=utf-8",
       "Cache-Control": "public, max-age=900",
     });
+  },
+);
+
+// GET /public/matches/:id - Get a single own-club match with quarter scores
+publicMatchRoutes.get(
+  "/matches/:id",
+  describeRoute({
+    description: "Get a single own-club match with quarter scores",
+    tags: ["Public"],
+    responses: { 200: { description: "Match detail" }, 404: { description: "Not found" } },
+  }),
+  async (c) => {
+    const id = Number(c.req.param("id"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+    const match = await getPublicMatchDetail(id);
+    if (!match) return c.json({ error: "Not found" }, 404);
+    return c.json(match);
+  },
+);
+
+// GET /public/matches/:id/context - Get H2H record and form for both teams
+publicMatchRoutes.get(
+  "/matches/:id/context",
+  describeRoute({
+    description: "Get H2H record and form for both teams in a match",
+    tags: ["Public"],
+    responses: { 200: { description: "Match context" }, 404: { description: "Not found" } },
+  }),
+  async (c) => {
+    const id = Number(c.req.param("id"));
+    if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+    const context = await getMatchContext(id);
+    if (!context) return c.json({ error: "Not found" }, 404);
+    return c.json(context);
   },
 );
 
