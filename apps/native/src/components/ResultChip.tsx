@@ -1,5 +1,6 @@
 import { View, Text, Pressable } from "react-native";
 import type { MatchListItem } from "@dragons/shared";
+import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { fontFamilies } from "../theme/typography";
@@ -30,7 +31,15 @@ function getResultBadge(match: MatchListItem): { label: string; isWin: boolean |
 }
 
 export function ResultChip({ match, onPress }: ResultChipProps) {
-  const { colors, radius, spacing } = useTheme();
+  const { colors, radius, spacing, isDark } = useTheme();
+
+  // Own-club team info
+  const ownName = match.homeIsOwnClub
+    ? (match.homeTeamCustomName ?? match.homeTeamNameShort ?? match.homeTeamName)
+    : (match.guestTeamCustomName ?? match.guestTeamNameShort ?? match.guestTeamName);
+  const ownBadgeColor = match.homeIsOwnClub ? match.homeBadgeColor : match.guestBadgeColor;
+  const ownRawName = match.homeIsOwnClub ? match.homeTeamName : match.guestTeamName;
+  const ownColor = getNativeTeamColor(ownBadgeColor, ownRawName, isDark).name;
 
   const opponentLabel = getOpponentName(match);
   const hasScore = match.homeScore !== null && match.guestScore !== null;
@@ -50,11 +59,23 @@ export function ResultChip({ match, onPress }: ResultChipProps) {
         maxWidth: 80,
       }}
     >
+      {/* Own team */}
+      <Text
+        style={{
+          fontSize: 10,
+          fontFamily: fontFamilies.bodySemiBold,
+          color: ownColor,
+        }}
+        numberOfLines={1}
+      >
+        {ownName}
+      </Text>
+
       {/* Opponent name */}
       <Text
         style={{
           fontSize: 10,
-          fontFamily: fontFamilies.displayMedium,
+          fontFamily: fontFamilies.body,
           color: colors.mutedForeground,
         }}
         numberOfLines={1}
