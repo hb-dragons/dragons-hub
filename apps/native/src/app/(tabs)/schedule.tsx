@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { View, Text, SectionList, ScrollView, ActivityIndicator } from "react-native";
+import type { SectionList as SectionListType } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
@@ -13,21 +14,19 @@ import { i18n } from "@/lib/i18n";
 
 type Filter = "all" | "home" | "away";
 
-const PAGE_SIZE = 40;
-
 export default function ScheduleScreen() {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
-  const [limit, setLimit] = useState(PAGE_SIZE);
+  const listRef = useRef<SectionListType<MatchListItem>>(null);
+  const hasScrolled = useRef(false);
 
   const { data, isLoading } = useSWR(
-    `schedule:matches:${String(limit)}`,
-    () => publicApi.getMatches({ limit, sort: "asc" }),
+    "schedule:matches:all",
+    () => publicApi.getMatches({ limit: 1000, sort: "asc" }),
   );
 
   const matches = data?.items ?? [];
-  const hasMore = data?.hasMore ?? false;
 
   const filtered = useMemo(() => {
     if (filter === "home") return matches.filter((m) => m.homeIsOwnClub);
@@ -52,8 +51,37 @@ export default function ScheduleScreen() {
     }));
   }, [filtered]);
 
-  const handleLoadMore = useCallback(() => {
-    setLimit((prev) => prev + PAGE_SIZE);
+  // Find the section index of the first upcoming game (no score yet)
+  const firstUpcomingSectionIndex = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i]!;
+      // Section date is today or in the future
+      if (section.title >= today) return i;
+    }
+    // All games in the past — stay at the end
+    return sections.length - 1;
+  }, [sections]);
+
+  const handleLayout = useCallback(() => {
+    if (hasScrolled.current || sections.length === 0 || firstUpcomingSectionIndex < 0) return;
+    hasScrolled.current = true;
+
+    // Small delay to let SectionList finish layout
+    setTimeout(() => {
+      listRef.current?.scrollToLocation({
+        sectionIndex: firstUpcomingSectionIndex,
+        itemIndex: 0,
+        animated: false,
+        viewOffset: 0,
+      });
+    }, 100);
+  }, [sections, firstUpcomingSectionIndex]);
+
+  // Reset scroll flag when filter changes
+  const handleFilterChange = useCallback((f: Filter) => {
+    hasScrolled.current = false;
+    setFilter(f);
   }, []);
 
   if (isLoading && matches.length === 0) {
@@ -79,17 +107,17 @@ export default function ScheduleScreen() {
         <FilterPill
           label={i18n.t("schedule.allGames")}
           active={filter === "all"}
-          onPress={() => setFilter("all")}
+          onPress={() => handleFilterChange("all")}
         />
         <FilterPill
           label={i18n.t("schedule.homeOnly")}
           active={filter === "home"}
-          onPress={() => setFilter("home")}
+          onPress={() => handleFilterChange("home")}
         />
         <FilterPill
           label={i18n.t("schedule.away")}
           active={filter === "away"}
-          onPress={() => setFilter("away")}
+          onPress={() => handleFilterChange("away")}
         />
       </ScrollView>
 
@@ -101,8 +129,10 @@ export default function ScheduleScreen() {
         </View>
       ) : (
         <SectionList
+          ref={listRef}
           sections={sections}
           keyExtractor={(item) => String(item.id)}
+          onLayout={handleLayout}
           renderSectionHeader={({ section }) => (
             <Text
               style={[
@@ -125,19 +155,14 @@ export default function ScheduleScreen() {
               />
             </View>
           )}
-          ListFooterComponent={
-            hasMore ? (
-              <View style={{ alignItems: "center", paddingVertical: spacing.lg }}>
-                <FilterPill
-                  label={i18n.t("schedule.loadMore")}
-                  active={false}
-                  onPress={handleLoadMore}
-                />
-              </View>
-            ) : null
-          }
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
+          // Required for scrollToLocation to work reliably
+          getItemLayout={(_data, index) => ({
+            length: 110,
+            offset: 110 * index,
+            index,
+          })}
         />
       )}
     </Screen>
