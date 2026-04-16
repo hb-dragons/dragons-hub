@@ -41,7 +41,7 @@ function RootNavigator() {
           headerShown: false,
         }}
       >
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(tabs)" options={{ title: "" }} />
         <Stack.Screen name="team/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="game/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="h2h/[teamApiId]" options={detailHeaderOptions} />
