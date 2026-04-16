@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback, useRef } from "react";
-import { View, Text, SectionList, ScrollView, ActivityIndicator, Pressable, StyleSheet } from "react-native";
-import type { SectionList as SectionListType } from "react-native";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { View, Text, SectionList, ScrollView, ActivityIndicator, Pressable, Animated, StyleSheet } from "react-native";
+import type { SectionList as SectionListType, NativeSyntheticEvent, NativeScrollEvent } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
@@ -40,8 +40,11 @@ export default function ScheduleScreen() {
   const router = useRouter();
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
   const [showPast, setShowPast] = useState(false);
-  const [showJumpButton, setShowJumpButton] = useState(false);
+  const [buttonVisible, setButtonVisible] = useState(false);
+  const buttonOpacity = useRef(new Animated.Value(0)).current;
   const listRef = useRef<SectionListType<MatchListItem, Section>>(null);
+  // Track the Y offset where upcoming games start (measured during layout)
+  const upcomingOffsetRef = useRef(0);
 
   const { data: upcomingData, isLoading: upcomingLoading } = useSWR(
     "schedule:upcoming",
@@ -55,6 +58,7 @@ export default function ScheduleScreen() {
 
   const upcoming = upcomingData?.items ?? [];
   const past = pastData?.items ?? [];
+  const pastCount = past.length;
 
   const allMatches = useMemo(() => {
     const pastAsc = [...past].reverse();
@@ -82,38 +86,42 @@ export default function ScheduleScreen() {
     }));
   }, [filtered]);
 
-  // Index of first upcoming section
-  const firstUpcomingSectionIndex = useMemo(() => {
+  // Count items before the first upcoming section to estimate offset
+  const pastItemCount = useMemo(() => {
     const today = getToday();
-    for (let i = 0; i < sections.length; i++) {
-      if (sections[i]!.title >= today) return i;
+    let count = 0;
+    for (const section of sections) {
+      if (section.title >= today) break;
+      count += section.data.length + 1; // +1 for section header
     }
-    return 0;
+    return count;
   }, [sections]);
 
   const handleRefresh = useCallback(() => {
     if (!showPast) setShowPast(true);
   }, [showPast]);
 
+  // Animate button visibility
+  useEffect(() => {
+    Animated.timing(buttonOpacity, {
+      toValue: buttonVisible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [buttonVisible, buttonOpacity]);
+
   const handleJumpToToday = useCallback(() => {
-    if (sections.length === 0) return;
-    listRef.current?.scrollToLocation({
-      sectionIndex: firstUpcomingSectionIndex,
-      itemIndex: 0,
-      animated: true,
-      viewOffset: 0,
-    });
-  }, [sections, firstUpcomingSectionIndex]);
+    // Use estimated offset: each item ~120px (card + margin + section headers)
+    const estimatedItemHeight = 120;
+    const offset = pastItemCount * estimatedItemHeight;
+    listRef.current?.getScrollResponder()?.scrollTo({ y: offset, animated: true });
+  }, [pastItemCount]);
 
-  const handleScrollToIndexFailed = useCallback(() => {
-    // Silently ignore — user can manually scroll
-  }, []);
-
-  // Show jump button when user has scrolled into past games
-  const handleScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
-    // Show button when scrolled more than 200px (likely viewing past games)
-    setShowJumpButton(e.nativeEvent.contentOffset.y > 200 && showPast);
-  }, [showPast]);
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y;
+    // Show button when past games are loaded and user is in the past section
+    setButtonVisible(pastCount > 0 && y < pastItemCount * 80);
+  }, [pastCount, pastItemCount]);
 
   if (upcomingLoading) {
     return (
@@ -129,7 +137,6 @@ export default function ScheduleScreen() {
     <Screen scroll={false}>
       <SectionHeader title={i18n.t("schedule.title")} />
 
-      {/* Filter pills */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -184,25 +191,26 @@ export default function ScheduleScreen() {
           onRefresh={handleRefresh}
           refreshing={pastLoading}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          onScrollToIndexFailed={handleScrollToIndexFailed}
           onScroll={handleScroll}
-          scrollEventThrottle={100}
+          scrollEventThrottle={64}
           contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
         />
       )}
 
-      {/* Jump to today button */}
-      {showJumpButton ? (
+      {/* Jump to today — animated fade */}
+      <Animated.View
+        pointerEvents={buttonVisible ? "auto" : "none"}
+        style={[styles.jumpContainer, { opacity: buttonOpacity, bottom: spacing.xl + 80 }]}
+      >
         <Pressable
           onPress={handleJumpToToday}
           style={({ pressed }) => [
             styles.jumpButton,
             {
               backgroundColor: colors.primary,
-              opacity: pressed ? 0.85 : 1,
-              bottom: spacing.xl + 80,
+              transform: [{ scale: pressed ? 0.95 : 1 }],
             },
           ]}
         >
@@ -210,15 +218,17 @@ export default function ScheduleScreen() {
             ↓ {i18n.locale === "de" ? "Heute" : "Today"}
           </Text>
         </Pressable>
-      ) : null}
+      </Animated.View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  jumpButton: {
+  jumpContainer: {
     position: "absolute",
     alignSelf: "center",
+  },
+  jumpButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
