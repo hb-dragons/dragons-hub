@@ -24,6 +24,8 @@ import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter";
 import { AssignGameDialog } from "./assign-game-dialog";
+import { AssignRefereeDialog } from "@/components/admin/referees/assign-referee-dialog";
+import { UnassignRefereeButton } from "@/components/admin/referees/unassign-referee-button";
 
 // ------------------------------------------------------------------
 // SrSlotBadge
@@ -202,6 +204,8 @@ function getColumns(
   t: ReturnType<typeof useTranslations<"refereeGames">>,
   format: ReturnType<typeof useFormatter>,
   onTakeSlot?: (game: RefereeGameListItem, slotNumber: 1 | 2) => void,
+  onAdminAssign?: (game: RefereeGameListItem, slotNumber: 1 | 2) => void,
+  onAdminUnassign?: () => void,
 ): ColumnDef<RefereeGameListItem, unknown>[] {
   return [
     {
@@ -304,12 +308,25 @@ function getColumns(
         const m = row.original;
         if (m.isCancelled || m.isForfeited) return <span className="text-muted-foreground">—</span>;
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <SrSlotBadge status={m.sr1Status} ourClub={m.sr1OurClub} name={m.sr1Name} t={t} />
             {onTakeSlot && m.sr1OurClub && m.sr1Status === "open" && (
               <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => onTakeSlot(m, 1)}>
                 Take
               </Button>
+            )}
+            {onAdminAssign && m.sr1Status === "open" && (
+              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => onAdminAssign(m, 1)}>
+                Assign
+              </Button>
+            )}
+            {onAdminUnassign && m.sr1Status === "assigned" && m.sr1Name && (
+              <UnassignRefereeButton
+                spielplanId={m.apiMatchId} // apiMatchId is the federation spielplanId
+                slotNumber={1}
+                refereeName={m.sr1Name}
+                onSuccess={onAdminUnassign}
+              />
             )}
           </div>
         );
@@ -327,12 +344,25 @@ function getColumns(
         const m = row.original;
         if (m.isCancelled || m.isForfeited) return <span className="text-muted-foreground">—</span>;
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <SrSlotBadge status={m.sr2Status} ourClub={m.sr2OurClub} name={m.sr2Name} t={t} />
             {onTakeSlot && m.sr2OurClub && m.sr2Status === "open" && (
               <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => onTakeSlot(m, 2)}>
                 Take
               </Button>
+            )}
+            {onAdminAssign && m.sr2Status === "open" && (
+              <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => onAdminAssign(m, 2)}>
+                Assign
+              </Button>
+            )}
+            {onAdminUnassign && m.sr2Status === "assigned" && m.sr2Name && (
+              <UnassignRefereeButton
+                spielplanId={m.apiMatchId} // apiMatchId is the federation spielplanId
+                slotNumber={2}
+                refereeName={m.sr2Name}
+                onSuccess={onAdminUnassign}
+              />
             )}
           </div>
         );
@@ -367,14 +397,19 @@ function getColumns(
 
 interface RefereeGamesListProps {
   refereeApiId?: number;
+  isAdmin?: boolean;
 }
 
-export function RefereeGamesList({ refereeApiId }: RefereeGamesListProps = {}) {
+export function RefereeGamesList({ refereeApiId, isAdmin = false }: RefereeGamesListProps = {}) {
   const t = useTranslations("refereeGames");
   const format = useFormatter();
   const [gameFilter, setGameFilter] = useState<GameFilterValue>("available");
   const [search, setSearch] = useState("");
   const [assignDialog, setAssignDialog] = useState<{
+    game: RefereeGameListItem;
+    slotNumber: 1 | 2;
+  } | null>(null);
+  const [adminAssignDialog, setAdminAssignDialog] = useState<{
     game: RefereeGameListItem;
     slotNumber: 1 | 2;
   } | null>(null);
@@ -412,8 +447,14 @@ export function RefereeGamesList({ refereeApiId }: RefereeGamesListProps = {}) {
   }
 
   const columns = useMemo(
-    () => getColumns(t, format, refereeApiId ? (game, slot) => setAssignDialog({ game, slotNumber: slot }) : undefined),
-    [t, format, refereeApiId],
+    () => getColumns(
+      t,
+      format,
+      refereeApiId ? (game, slot) => setAssignDialog({ game, slotNumber: slot }) : undefined,
+      isAdmin ? (game: RefereeGameListItem, slot: 1 | 2) => setAdminAssignDialog({ game, slotNumber: slot }) : undefined,
+      isAdmin ? () => { void mutate(); } : undefined,
+    ),
+    [t, format, refereeApiId, isAdmin, mutate],
   );
 
   const statusFilterOptions = [
@@ -476,6 +517,15 @@ export function RefereeGamesList({ refereeApiId }: RefereeGamesListProps = {}) {
           slotNumber={assignDialog.slotNumber}
           refereeApiId={refereeApiId}
           onClose={() => setAssignDialog(null)}
+          onSuccess={() => { void mutate(); }}
+        />
+      )}
+      {adminAssignDialog && (
+        <AssignRefereeDialog
+          open
+          game={adminAssignDialog.game}
+          slotNumber={adminAssignDialog.slotNumber}
+          onClose={() => setAdminAssignDialog(null)}
           onSuccess={() => { void mutate(); }}
         />
       )}

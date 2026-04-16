@@ -28,7 +28,7 @@ export default async function RefereeMatchesPage() {
         </div>
       ) : (
         <SWRConfig value={{ fallback: { [SWR_KEYS.refereeGames]: data } }}>
-          <RefereeGamesList />
+          <RefereeGamesList isAdmin />
         </SWRConfig>
       )}
     </div>
