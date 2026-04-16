@@ -33,10 +33,10 @@
   },
   "schedule": {
     "title": "Schedule",
-    "allGames": "All Games",
-    "homeOnly": "Home Only",
+    "upcoming": "Upcoming",
+    "results": "Results",
+    "homeOnly": "Home",
     "away": "Away",
-    "loadMore": "Load More",
     "noMatches": "No matches found"
   },
   "standings": {

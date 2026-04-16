@@ -33,10 +33,10 @@
   },
   "schedule": {
     "title": "Spielplan",
-    "allGames": "Alle Spiele",
-    "homeOnly": "Nur Heimspiele",
+    "upcoming": "Anstehend",
+    "results": "Ergebnisse",
+    "homeOnly": "Heim",
     "away": "Auswärts",
-    "loadMore": "Mehr laden",
     "noMatches": "Keine Spiele gefunden"
   },
   "standings": {

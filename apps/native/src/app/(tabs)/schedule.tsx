@@ -11,25 +11,32 @@ import { MatchCardFull } from "@/components/MatchCardFull";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 
-type Filter = "all" | "home" | "away";
+type Mode = "upcoming" | "results";
+type LocationFilter = "all" | "home" | "away";
 
 const PAGE_SIZE = 20;
-const today = new Date().toISOString().split("T")[0];
+
+function getToday(): string {
+  return new Date().toISOString().split("T")[0];
+}
 
 export default function ScheduleScreen() {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
-  const [filter, setFilter] = useState<Filter>("all");
+  const [mode, setMode] = useState<Mode>("upcoming");
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
+
+  const isUpcoming = mode === "upcoming";
 
   const { data, size, setSize, isLoading, isValidating } = useSWRInfinite(
-    (pageIndex: number) => `schedule:${filter}:${String(pageIndex)}`,
+    (pageIndex: number) => `schedule:${mode}:${locationFilter}:${String(pageIndex)}`,
     (key: string) => {
-      const pageIndex = Number(key.split(":")[2]);
+      const pageIndex = Number(key.split(":")[3]);
+      const today = getToday();
       return publicApi.getMatches({
         limit: PAGE_SIZE,
         offset: pageIndex * PAGE_SIZE,
-        dateFrom: today,
-        sort: "asc",
+        ...(isUpcoming ? { dateFrom: today, sort: "asc" as const } : { dateTo: today, sort: "desc" as const, hasScore: true }),
       });
     },
   );
@@ -40,10 +47,10 @@ export default function ScheduleScreen() {
   }, [data]);
 
   const filtered = useMemo(() => {
-    if (filter === "home") return allMatches.filter((m) => m.homeIsOwnClub);
-    if (filter === "away") return allMatches.filter((m) => m.guestIsOwnClub);
+    if (locationFilter === "home") return allMatches.filter((m) => m.homeIsOwnClub);
+    if (locationFilter === "away") return allMatches.filter((m) => m.guestIsOwnClub);
     return allMatches;
-  }, [allMatches, filter]);
+  }, [allMatches, locationFilter]);
 
   const hasMore = data ? data[data.length - 1]?.hasMore ?? false : false;
   const isLoadingMore = isValidating && !isLoading;
@@ -75,19 +82,25 @@ export default function ScheduleScreen() {
         style={{ flexGrow: 0, marginBottom: spacing.md }}
       >
         <FilterPill
-          label={i18n.t("schedule.allGames")}
-          active={filter === "all"}
-          onPress={() => setFilter("all")}
+          label={i18n.t("schedule.upcoming")}
+          active={mode === "upcoming"}
+          onPress={() => setMode("upcoming")}
         />
         <FilterPill
+          label={i18n.t("schedule.results")}
+          active={mode === "results"}
+          onPress={() => setMode("results")}
+        />
+        <View style={{ width: spacing.md }} />
+        <FilterPill
           label={i18n.t("schedule.homeOnly")}
-          active={filter === "home"}
-          onPress={() => setFilter("home")}
+          active={locationFilter === "home"}
+          onPress={() => setLocationFilter(locationFilter === "home" ? "all" : "home")}
         />
         <FilterPill
           label={i18n.t("schedule.away")}
-          active={filter === "away"}
-          onPress={() => setFilter("away")}
+          active={locationFilter === "away"}
+          onPress={() => setLocationFilter(locationFilter === "away" ? "all" : "away")}
         />
       </ScrollView>
 
@@ -104,6 +117,7 @@ export default function ScheduleScreen() {
         )}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
+        contentContainerStyle={{ paddingBottom: spacing.xl }}
         ListFooterComponent={
           isLoadingMore ? (
             <ActivityIndicator color={colors.primary} style={{ paddingVertical: spacing.lg }} />
