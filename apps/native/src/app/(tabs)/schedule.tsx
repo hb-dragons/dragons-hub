@@ -100,6 +100,8 @@ export default function ScheduleScreen() {
         // Pull-to-refresh loads past games
         onRefresh={handleRefresh}
         refreshing={pastLoading}
+        // Keep scroll position when past games prepend above
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         contentContainerStyle={{ paddingBottom: 100 }}
         ListEmptyComponent={
           <View style={{ paddingTop: spacing.xl, alignItems: "center" }}>
