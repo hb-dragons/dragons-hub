@@ -369,6 +369,7 @@ Match list and detail responses include associated venue booking data when avail
 | GET | `/public/matches` | List own club matches (no auth) |
 | GET | `/public/standings` | League standings (no auth) |
 | GET | `/public/teams` | List teams (no auth) |
+| GET | `/public/teams/:id/stats` | Season stats and recent form for a team (no auth) |
 
 ### Device
 
