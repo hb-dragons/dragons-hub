@@ -1,0 +1,62 @@
+{
+  "tabs": {
+    "home": "Start",
+    "schedule": "Spielplan",
+    "standings": "Tabelle",
+    "teams": "Teams"
+  },
+  "home": {
+    "nextGame": "Nächstes Spiel",
+    "lastResult": "Letztes Ergebnis",
+    "vs": "vs",
+    "noUpcoming": "Keine anstehenden Spiele"
+  },
+  "schedule": {
+    "title": "Spielplan",
+    "allGames": "Alle Spiele",
+    "homeOnly": "Nur Heimspiele",
+    "away": "Auswärts",
+    "loadMore": "Mehr laden",
+    "noMatches": "Keine Spiele gefunden"
+  },
+  "standings": {
+    "title": "Tabelle",
+    "pos": "Pl.",
+    "team": "Team",
+    "won": "S",
+    "lost": "N",
+    "points": "Pkt."
+  },
+  "teams": {
+    "title": "Mannschaften",
+    "subtitle": "Alle Teams im Überblick",
+    "senior": "Senioren",
+    "youth": "Jugend"
+  },
+  "auth": {
+    "signIn": "Anmelden",
+    "signUp": "Registrieren",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "name": "Name",
+    "noAccount": "Noch kein Konto?",
+    "hasAccount": "Bereits ein Konto?"
+  },
+  "profile": {
+    "title": "Profil",
+    "biometricLock": "Biometrische Sperre",
+    "theme": "Darstellung",
+    "themeSystem": "System",
+    "themeLight": "Hell",
+    "themeDark": "Dunkel",
+    "signOut": "Abmelden"
+  },
+  "common": {
+    "home": "Heim",
+    "away": "Auswärts",
+    "details": "Details",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "loading": "Laden…"
+  }
+}
