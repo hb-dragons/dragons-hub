@@ -62,13 +62,17 @@ refereeAssignmentRoutes.post("/games/:spielplanId/assign", async (c) => {
     }
 
     const [refereeRow] = await db
-      .select({ apiId: referees.apiId })
+      .select({ apiId: referees.apiId, isOwnClub: referees.isOwnClub })
       .from(referees)
       .where(eq(referees.id, userRow.refereeId))
       .limit(1);
 
     if (!refereeRow || refereeRow.apiId !== refereeApiId) {
       return c.json({ error: "Cannot assign another referee", code: "FORBIDDEN" }, 403);
+    }
+
+    if (!refereeRow.isOwnClub) {
+      return c.json({ error: "Referee is not an own-club referee", code: "NOT_OWN_CLUB" }, 403);
     }
   }
 

@@ -32,7 +32,7 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@dragons/db/schema", () => ({
-  referees: { id: "r.id", apiId: "r.apiId" },
+  referees: { id: "r.id", apiId: "r.apiId", isOwnClub: "r.isOwnClub" },
   user: { id: "u.id", refereeId: "u.refereeId" },
 }));
 
@@ -137,6 +137,24 @@ describe("POST /games/:spielplanId/assign", () => {
     expect(mocks.assignReferee).not.toHaveBeenCalled();
   });
 
+  it("returns 403 when referee is not own club", async () => {
+    mocks.getSession.mockResolvedValue({
+      user: { id: "user1", role: "referee" },
+    });
+    mocks.dbSelect
+      .mockResolvedValueOnce([{ refereeId: 10 }])
+      .mockResolvedValueOnce([{ apiId: 555, isOwnClub: false }]);
+
+    const res = await app.request("/games/123/assign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 1, refereeApiId: 555 }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await json(res)).toMatchObject({ code: "NOT_OWN_CLUB" });
+  });
+
   it("allows admin to assign any referee without DB lookup", async () => {
     mocks.getSession.mockResolvedValue({
       user: { id: "user-2", role: "admin" },
@@ -168,7 +186,7 @@ describe("POST /games/:spielplanId/assign", () => {
     // First DB call: user table lookup returns refereeId 7
     mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     // Second DB call: referees lookup for id=7 returns apiId 9001 (matches body)
-    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001 }]);
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001, isOwnClub: true }]);
     mocks.assignReferee.mockResolvedValue({
       success: true,
       slot: "sr2",
