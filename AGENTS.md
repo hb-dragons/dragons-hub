@@ -67,10 +67,12 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `venues` | `packages/db/src/schema/venues.ts` | apiId (unique), name, street, postalCode, city, lat/lng, dataHash |
 | `matches` | `packages/db/src/schema/matches.ts` | apiMatchId (unique), leagueId FK, venueId FK, scores, sr1Open, sr2Open, sr3Open, JSONB fields, versioning |
 | `standings` | `packages/db/src/schema/standings.ts` | leagueId FK + teamApiId (unique), position, won, lost, points |
-| `referees` | `packages/db/src/schema/referees.ts` | apiId (unique), firstName, lastName, licenseNumber, dataHash |
+| `referees` | `packages/db/src/schema/referees.ts` | apiId (unique), firstName, lastName, licenseNumber, allowAllHomeGames, allowAwayGames, dataHash |
 | `refereeRoles` | `packages/db/src/schema/referees.ts` | apiId (unique), name, shortName |
 | `matchReferees` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, roleId FK |
 | `refereeAssignmentIntents` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, slotNumber, clickedAt, confirmedBySyncAt |
+| `refereeAssignmentRules` | `packages/db/src/schema/referee-assignment-rules.ts` | refereeId FK (cascade), teamId FK (cascade), deny, allowSr1, allowSr2 — unique(refereeId, teamId) |
+| `refereeGames` | `packages/db/src/schema/referee-games.ts` | apiMatchId (unique), matchId FK, homeTeamId FK, guestTeamId FK, homeClubId, guestClubId, isHomeGame, sr1/sr2OurClub, sr1/sr2Status, sr1/sr2Name, leagueName, kickoffDate/Time, dataHash |
 | `matchRemoteVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, snapshot JSONB, dataHash |
 | `matchLocalVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, changedBy, snapshot JSONB |
 | `matchChanges` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), track (remote/local), fieldName, oldValue, newValue |
@@ -325,7 +327,8 @@ Match list and detail responses include associated venue booking data when avail
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/referees` | List referees |
+| GET | `/admin/referees` | List referees (includes allowAllHomeGames, allowAwayGames flags) |
+| PATCH | `/admin/referees/:id/visibility` | Update referee visibility flags. Body: `{ allowAllHomeGames: boolean, allowAwayGames: boolean }` |
 
 ### Admin - Standings
 
@@ -379,10 +382,11 @@ Match list and detail responses include associated venue booking data when avail
 | GET | `/referee/matches` | referee/admin | List matches with open referee slots |
 | POST | `/referee/matches/:id/take` | referee/admin | Record take-intent, returns deep-link URL |
 
-### Referee Assignment (role: referee | admin)
+### Referee Games & Assignment (role: referee | admin)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| GET | `/referee/games` | referee/admin | List games. Admin sees all; referee sees only games matching their visibility rules (allowAllHomeGames, allowAwayGames, per-team allowlist). Query: `?search=&league=&status=active&dateFrom=&dateTo=&limit=100&offset=0` |
 | POST | `/referee/games/:spielplanId/assign` | referee/admin | Assign self to a game slot. Body: `{ slotNumber: 1\|2, refereeApiId: number }`. Returns: `{ success, slot, status, refereeName }` |
 
 ### Admin Referee Assignment (role: admin)
