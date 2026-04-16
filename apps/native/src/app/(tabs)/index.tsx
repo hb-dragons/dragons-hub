@@ -9,10 +9,7 @@ import { Badge } from "@/components/Badge";
 import { StatStrip } from "@/components/StatStrip";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
-
-function todayISO(): string {
-  return new Date().toISOString().split("T")[0]!;
-}
+import { todayISO } from "@/lib/date-utils";
 
 export default function HomeScreen() {
   const { colors, textStyles, spacing } = useTheme();

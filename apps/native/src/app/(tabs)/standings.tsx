@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator } from "react-native";
 import useSWR from "swr";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";

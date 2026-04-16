@@ -10,10 +10,7 @@ import { Badge } from "@/components/Badge";
 import { MatchCard } from "@/components/MatchCard";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
-
-function todayISO(): string {
-  return new Date().toISOString().split("T")[0]!;
-}
+import { todayISO } from "@/lib/date-utils";
 
 export default function TeamDetailScreen() {
   const { colors, textStyles, spacing } = useTheme();

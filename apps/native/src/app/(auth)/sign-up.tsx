@@ -13,6 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
 import { authClient } from "@/lib/auth-client";
+import { i18n } from "@/lib/i18n";
 
 export default function SignUpScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
@@ -25,7 +26,7 @@ export default function SignUpScreen() {
 
   async function handleSignUp() {
     if (!name || !email || !password) {
-      Alert.alert("Error", "Please fill in all fields.");
+      Alert.alert(i18n.t("auth.error"), i18n.t("auth.fillAllFields"));
       return;
     }
 
@@ -38,7 +39,7 @@ export default function SignUpScreen() {
       });
 
       if (error) {
-        Alert.alert("Sign Up Failed", error.message ?? "Unknown error");
+        Alert.alert(i18n.t("auth.signUpFailed"), error.message ?? i18n.t("auth.unknownError"));
         return;
       }
 
@@ -46,8 +47,8 @@ export default function SignUpScreen() {
       router.replace("/");
     } catch (err) {
       Alert.alert(
-        "Sign Up Failed",
-        err instanceof Error ? err.message : "An unexpected error occurred",
+        i18n.t("auth.signUpFailed"),
+        err instanceof Error ? err.message : i18n.t("auth.unexpectedError"),
       );
     } finally {
       setLoading(false);
@@ -83,7 +84,7 @@ export default function SignUpScreen() {
 
         <TextInput
           style={inputStyle}
-          placeholder="Name"
+          placeholder={i18n.t("auth.name")}
           placeholderTextColor={colors.mutedForeground}
           autoCapitalize="words"
           value={name}
@@ -93,7 +94,7 @@ export default function SignUpScreen() {
 
         <TextInput
           style={inputStyle}
-          placeholder="Email"
+          placeholder={i18n.t("auth.email")}
           placeholderTextColor={colors.mutedForeground}
           keyboardType="email-address"
           autoCapitalize="none"
@@ -105,7 +106,7 @@ export default function SignUpScreen() {
 
         <TextInput
           style={inputStyle}
-          placeholder="Password"
+          placeholder={i18n.t("auth.password")}
           placeholderTextColor={colors.mutedForeground}
           secureTextEntry
           value={password}
@@ -131,7 +132,7 @@ export default function SignUpScreen() {
             <ActivityIndicator color={colors.primaryForeground} />
           ) : (
             <Text style={[textStyles.button, { color: colors.primaryForeground }]}>
-              Sign Up
+              {i18n.t("auth.signUp")}
             </Text>
           )}
         </Pressable>
@@ -142,8 +143,8 @@ export default function SignUpScreen() {
           disabled={loading}
         >
           <Text style={[textStyles.body, { color: colors.primary }]}>
-            Already have an account?{" "}
-            <Text style={{ fontWeight: "600" }}>Sign In</Text>
+            {i18n.t("auth.hasAccount")}{" "}
+            <Text style={{ fontWeight: "600" }}>{i18n.t("auth.signIn")}</Text>
           </Text>
         </Pressable>
       </View>

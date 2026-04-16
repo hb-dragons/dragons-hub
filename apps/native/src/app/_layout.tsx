@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { View, Text, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -8,6 +9,8 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { fontAssets } from "@/theme/typography";
 import { i18n } from "@/lib/i18n";
+import { colors as themeColors } from "@/theme/colors";
+import { spacing } from "@/theme/spacing";
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -39,22 +42,83 @@ function RootNavigator() {
   );
 }
 
+/** Minimal unlock screen shown when biometric authentication fails or is cancelled. */
+function UnlockScreen({ onRetry }: { onRetry: () => void }) {
+  const dark = themeColors.dark;
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: dark.background,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: spacing.xl,
+      }}
+    >
+      <Text
+        style={{
+          color: dark.foreground,
+          fontSize: 28,
+          fontWeight: "700",
+          letterSpacing: 2,
+        }}
+      >
+        DRAGONS
+      </Text>
+      <Pressable
+        onPress={onRetry}
+        style={{
+          backgroundColor: dark.primary,
+          paddingHorizontal: spacing.xl,
+          paddingVertical: spacing.md,
+          borderRadius: 12,
+        }}
+      >
+        <Text style={{ color: dark.primaryForeground, fontSize: 16, fontWeight: "600" }}>
+          {i18n.t("auth.tapToUnlock")}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(fontAssets);
   const { isLocked, authenticate } = useBiometricLock();
+  const [authFailed, setAuthFailed] = useState(false);
 
   useEffect(() => {
     if (!fontsLoaded) return;
 
     if (isLocked) {
-      void authenticate().then(() => SplashScreen.hideAsync());
+      void authenticate().then((success) => {
+        if (success) {
+          void SplashScreen.hideAsync();
+        } else {
+          setAuthFailed(true);
+          void SplashScreen.hideAsync();
+        }
+      });
     } else {
       void SplashScreen.hideAsync();
     }
   }, [fontsLoaded, isLocked, authenticate]);
 
-  if (!fontsLoaded || isLocked) {
+  if (!fontsLoaded) {
     return null;
+  }
+
+  if (isLocked) {
+    if (!authFailed) return null; // still showing splash
+    return (
+      <UnlockScreen
+        onRetry={() => {
+          void authenticate().then((success) => {
+            if (!success) setAuthFailed(true);
+          });
+        }}
+      />
+    );
   }
 
   return (

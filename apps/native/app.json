@@ -15,6 +15,7 @@
     "ios": {
       "bundleIdentifier": "com.dragons.app",
       "supportsTablet": true,
+      "associatedDomains": ["applinks:app.hbdragons.de"],
       "infoPlist": {
         "NSFaceIDUsageDescription": "Use Face ID to unlock the Dragons app",
         "NSCameraUsageDescription": "Allow Dragons to access your camera for team photos"
@@ -25,7 +26,13 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#131313"
-      }
+      },
+      "intentFilters": [{
+        "action": "VIEW",
+        "autoVerify": true,
+        "data": [{ "scheme": "https", "host": "app.hbdragons.de" }],
+        "category": ["BROWSABLE", "DEFAULT"]
+      }]
     },
     "plugins": [
       "expo-router",

@@ -10,10 +10,10 @@ import { Screen } from "@/components/Screen";
 import { i18n } from "@/lib/i18n";
 import type { Mode } from "@/hooks/useTheme";
 
-const THEME_OPTIONS: { label: string; value: Mode }[] = [
-  { label: "System", value: "system" },
-  { label: "Light", value: "light" },
-  { label: "Dark", value: "dark" },
+const THEME_OPTIONS: { labelKey: string; value: Mode }[] = [
+  { labelKey: "profile.themeSystem", value: "system" },
+  { labelKey: "profile.themeLight", value: "light" },
+  { labelKey: "profile.themeDark", value: "dark" },
 ];
 
 export default function ProfileScreen() {
@@ -30,7 +30,7 @@ export default function ProfileScreen() {
   if (!session) {
     return (
       <>
-        <Stack.Screen options={{ title: "Profile" }} />
+        <Stack.Screen options={{ title: i18n.t("profile.title") }} />
         <Screen scroll={false}>
           <View style={styles.centeredContainer}>
             <Text
@@ -39,7 +39,7 @@ export default function ProfileScreen() {
                 { color: colors.foreground, marginBottom: spacing.md },
               ]}
             >
-              Sign in to view your profile
+              {i18n.t("auth.signInPrompt")}
             </Text>
             <Pressable
               onPress={() => router.push("/(auth)/sign-in")}
@@ -51,7 +51,7 @@ export default function ProfileScreen() {
               }}
             >
               <Text style={[textStyles.button, { color: colors.primaryForeground }]}>
-                Sign In
+                {i18n.t("auth.signIn")}
               </Text>
             </Pressable>
           </View>
@@ -62,7 +62,7 @@ export default function ProfileScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Profile" }} />
+      <Stack.Screen options={{ title: i18n.t("profile.title") }} />
       <Screen>
         <View style={{ marginTop: spacing.lg, gap: spacing.xl }}>
           {/* User info card */}
@@ -119,7 +119,7 @@ export default function ProfileScreen() {
 
           {/* Theme section */}
           <View>
-            <SectionHeader title="Appearance" />
+            <SectionHeader title={i18n.t("profile.theme")} />
             <View style={styles.themeRow}>
               {THEME_OPTIONS.map((option) => {
                 const isActive = mode === option.value;
@@ -149,7 +149,7 @@ export default function ProfileScreen() {
                         },
                       ]}
                     >
-                      {option.label}
+                      {i18n.t(option.labelKey)}
                     </Text>
                   </Pressable>
                 );
@@ -168,7 +168,7 @@ export default function ProfileScreen() {
             }}
           >
             <Text style={[textStyles.button, { color: colors.destructive }]}>
-              Sign Out
+              {i18n.t("profile.signOut")}
             </Text>
           </Pressable>
         </View>

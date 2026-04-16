@@ -33,15 +33,6 @@
     "senior": "Senioren",
     "youth": "Jugend"
   },
-  "auth": {
-    "signIn": "Anmelden",
-    "signUp": "Registrieren",
-    "email": "E-Mail",
-    "password": "Passwort",
-    "name": "Name",
-    "noAccount": "Noch kein Konto?",
-    "hasAccount": "Bereits ein Konto?"
-  },
   "profile": {
     "title": "Profil",
     "biometricLock": "Biometrische Sperre",
@@ -66,6 +57,24 @@
     "confirmed": "Bestätigt",
     "cancelled": "Abgesagt",
     "forfeited": "Kampflos"
+  },
+  "auth": {
+    "signIn": "Anmelden",
+    "signUp": "Registrieren",
+    "signOut": "Abmelden",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "name": "Name",
+    "noAccount": "Noch kein Konto?",
+    "hasAccount": "Bereits ein Konto?",
+    "error": "Fehler",
+    "fillAllFields": "Bitte alle Felder ausfüllen.",
+    "signInFailed": "Anmeldung fehlgeschlagen",
+    "signUpFailed": "Registrierung fehlgeschlagen",
+    "unknownError": "Unbekannter Fehler",
+    "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten",
+    "signInPrompt": "Melden Sie sich an, um Ihr Profil zu sehen",
+    "tapToUnlock": "Tippen zum Entsperren"
   },
   "common": {
     "home": "Heim",

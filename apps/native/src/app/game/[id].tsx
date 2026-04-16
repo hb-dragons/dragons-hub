@@ -12,8 +12,11 @@ export default function GameDetailScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const { data, isLoading } = useSWR(`game:${id ?? ""}`, () =>
-    publicApi.getMatches({ limit: 200 }),
+  // TODO: Add a /public/matches/:id endpoint to avoid fetching a list.
+  // For now, use the same SWR key as the schedule screen so cached data is reused.
+  // Falls back to a limited fetch when no cache is available.
+  const { data, isLoading } = useSWR("matches:schedule", () =>
+    publicApi.getMatches({ limit: 100 }),
   );
 
   const match = data?.items.find((m) => String(m.id) === id) ?? null;
