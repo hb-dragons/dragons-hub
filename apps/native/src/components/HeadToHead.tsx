@@ -168,7 +168,7 @@ export function HeadToHead({
                   }}
                   numberOfLines={1}
                 >
-                  {meeting.homeIsOwnClub ? ownLabel : meeting.homeTeamName}
+                  {meeting.homeIsOwnClub ? ownLabel : opponentName}
                 </Text>
 
                 {/* Score */}
@@ -214,7 +214,7 @@ export function HeadToHead({
                   }}
                   numberOfLines={1}
                 >
-                  {!meeting.homeIsOwnClub ? ownLabel : meeting.guestTeamName}
+                  {!meeting.homeIsOwnClub ? ownLabel : opponentName}
                 </Text>
 
                 {/* S/N badge */}

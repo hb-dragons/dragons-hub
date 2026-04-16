@@ -104,7 +104,14 @@ export default function GameDetailScreen() {
       <Stack.Screen options={{ title: headerTitle }} />
       <Screen>
         {/* ── 1. Score Header ── */}
-        <Card style={{ marginBottom: spacing.md }}>
+        <Card
+          style={{
+            marginBottom: spacing.md,
+            backgroundColor: match.homeIsOwnClub
+              ? isDark ? "rgba(0,75,35,0.12)" : "rgba(0,75,35,0.06)"
+              : undefined,
+          }}
+        >
           <View style={{ alignItems: "center" }}>
             {/* Date / time / venue meta */}
             <Text
@@ -142,9 +149,6 @@ export default function GameDetailScreen() {
                 >
                   {homeName}
                 </Text>
-                {match.homeIsOwnClub ? (
-                  <Badge label={i18n.t("gameDetail.home")} variant="secondary" />
-                ) : null}
               </View>
 
               {/* Score or VS */}
