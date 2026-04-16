@@ -110,6 +110,22 @@ export * from "./channel-configs";
 export { COLOR_PRESETS, COLOR_PRESET_KEYS, getColorPreset } from "./team-colors";
 export type { ColorPreset, ColorPresetMode } from "./team-colors";
 
+// Native team colors
+export { getNativeTeamColor } from "./native-team-colors";
+export type { NativeTeamColor } from "./native-team-colors";
+
+// Match context & dashboard types
+export type {
+  PreviousMeeting,
+  HeadToHead,
+  FormEntry,
+  MatchContext,
+  TeamStats,
+  ClubStats,
+  HomeDashboard,
+  PublicMatchDetail,
+} from "./match-context";
+
 // Referee assignment
 export type {
   AssignRefereeBody,
