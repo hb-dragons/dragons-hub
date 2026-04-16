@@ -31,7 +31,7 @@ export default function ProfileScreen() {
     return (
       <>
         <Stack.Screen options={{ title: i18n.t("profile.title") }} />
-        <Screen scroll={false}>
+        <Screen scroll={false} edges={[]}>
           <View style={styles.centeredContainer}>
             <Text
               style={[
@@ -63,7 +63,7 @@ export default function ProfileScreen() {
   return (
     <>
       <Stack.Screen options={{ title: i18n.t("profile.title") }} />
-      <Screen>
+      <Screen edges={[]}>
         <View style={{ marginTop: spacing.lg, gap: spacing.xl }}>
           {/* User info card */}
           <Card>

@@ -36,7 +36,7 @@ export default function GameDetailScreen() {
 
   if (matchLoading || !match) {
     return (
-      <Screen edges={[]}>
+      <Screen backButton>
         <View
           style={{
             flex: 1,
@@ -99,7 +99,7 @@ export default function GameDetailScreen() {
   };
 
   return (
-    <Screen edges={[]}>
+    <Screen backButton>
       {/* ── 1. Score Header ── */}
         <Card
           style={{
