@@ -25,7 +25,7 @@ export function Screen({ children, scroll = true, edges = ["top"], headerOffset 
   const contentStyle = {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
-    ...(headerOffset ? { paddingTop: headerOffset } : {}),
+    ...(headerOffset ? { paddingTop: headerOffset + 8 } : {}),
   };
 
   return (
