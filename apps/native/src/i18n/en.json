@@ -33,8 +33,6 @@
   },
   "schedule": {
     "title": "Schedule",
-    "upcoming": "Upcoming",
-    "results": "Results",
     "homeOnly": "Home",
     "away": "Away",
     "noMatches": "No matches found"
