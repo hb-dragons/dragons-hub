@@ -60,4 +60,48 @@ describe("publicEndpoints", () => {
       expect(client.get).toHaveBeenCalledWith("/public/teams");
     });
   });
+
+  describe("getMatch", () => {
+    it("calls /public/matches/:id", async () => {
+      const client = mockClient();
+      const endpoints = publicEndpoints(client);
+
+      await endpoints.getMatch(1);
+
+      expect(client.get).toHaveBeenCalledWith("/public/matches/1");
+    });
+  });
+
+  describe("getMatchContext", () => {
+    it("calls /public/matches/:id/context", async () => {
+      const client = mockClient();
+      const endpoints = publicEndpoints(client);
+
+      await endpoints.getMatchContext(1);
+
+      expect(client.get).toHaveBeenCalledWith("/public/matches/1/context");
+    });
+  });
+
+  describe("getTeamStats", () => {
+    it("calls /public/teams/:id/stats", async () => {
+      const client = mockClient();
+      const endpoints = publicEndpoints(client);
+
+      await endpoints.getTeamStats(1);
+
+      expect(client.get).toHaveBeenCalledWith("/public/teams/1/stats");
+    });
+  });
+
+  describe("getHomeDashboard", () => {
+    it("calls /public/home/dashboard", async () => {
+      const client = mockClient();
+      const endpoints = publicEndpoints(client);
+
+      await endpoints.getHomeDashboard();
+
+      expect(client.get).toHaveBeenCalledWith("/public/home/dashboard");
+    });
+  });
 });

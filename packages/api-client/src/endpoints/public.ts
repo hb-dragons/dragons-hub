@@ -1,4 +1,4 @@
-import type { MatchListItem, LeagueStandings, PaginatedResponse } from "@dragons/shared";
+import type { MatchListItem, LeagueStandings, PaginatedResponse, PublicMatchDetail, MatchContext, TeamStats, HomeDashboard } from "@dragons/shared";
 import type { ApiClient } from "../client";
 
 export interface MatchQueryParams {
@@ -10,6 +10,7 @@ export interface MatchQueryParams {
   hasScore?: boolean;
   leagueId?: number;
   teamApiId?: number;
+  opponentApiId?: number;
 }
 
 export interface PublicTeam {
@@ -36,6 +37,22 @@ export function publicEndpoints(client: ApiClient) {
 
     getTeams(): Promise<PublicTeam[]> {
       return client.get("/public/teams");
+    },
+
+    getMatch(id: number): Promise<PublicMatchDetail> {
+      return client.get(`/public/matches/${id}`);
+    },
+
+    getMatchContext(id: number): Promise<MatchContext> {
+      return client.get(`/public/matches/${id}/context`);
+    },
+
+    getTeamStats(id: number): Promise<TeamStats> {
+      return client.get(`/public/teams/${id}/stats`);
+    },
+
+    getHomeDashboard(): Promise<HomeDashboard> {
+      return client.get("/public/home/dashboard");
     },
   };
 }
