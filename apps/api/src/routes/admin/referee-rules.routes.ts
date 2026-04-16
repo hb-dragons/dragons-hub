@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { db } from "../../config/database";
-import { teams } from "@dragons/db/schema";
+import { teams, referees } from "@dragons/db/schema";
 import { inArray, eq, and } from "drizzle-orm";
 import {
   getRulesForReferee,
@@ -10,8 +10,26 @@ import { refereeRulesParamSchema, updateRefereeRulesBodySchema } from "./referee
 
 const refereeRulesRoutes = new Hono();
 
+async function requireOwnClubReferee(id: number) {
+  const [referee] = await db
+    .select({ isOwnClub: referees.isOwnClub })
+    .from(referees)
+    .where(eq(referees.id, id))
+    .limit(1);
+  return referee ?? null;
+}
+
 refereeRulesRoutes.get("/referees/:id/rules", async (c) => {
   const { id } = refereeRulesParamSchema.parse({ id: c.req.param("id") });
+
+  const referee = await requireOwnClubReferee(id);
+  if (!referee) {
+    return c.json({ error: "Referee not found", code: "NOT_FOUND" }, 404);
+  }
+  if (!referee.isOwnClub) {
+    return c.json({ error: "Referee is not an own-club referee", code: "NOT_OWN_CLUB" }, 400);
+  }
+
   const result = await getRulesForReferee(id);
   return c.json(result);
 });
@@ -19,6 +37,14 @@ refereeRulesRoutes.get("/referees/:id/rules", async (c) => {
 refereeRulesRoutes.put("/referees/:id/rules", async (c) => {
   const { id } = refereeRulesParamSchema.parse({ id: c.req.param("id") });
   const body = updateRefereeRulesBodySchema.parse(await c.req.json());
+
+  const referee = await requireOwnClubReferee(id);
+  if (!referee) {
+    return c.json({ error: "Referee not found", code: "NOT_FOUND" }, 404);
+  }
+  if (!referee.isOwnClub) {
+    return c.json({ error: "Referee is not an own-club referee", code: "NOT_OWN_CLUB" }, 400);
+  }
 
   // Validate all teamIds exist and are own-club teams
   if (body.rules.length > 0) {
