@@ -1,0 +1,87 @@
+{
+  "tabs": {
+    "home": "Home",
+    "schedule": "Schedule",
+    "standings": "Standings",
+    "teams": "Teams"
+  },
+  "home": {
+    "nextGame": "Next Game",
+    "lastResult": "Last Result",
+    "vs": "vs",
+    "noUpcoming": "No upcoming games"
+  },
+  "schedule": {
+    "title": "Schedule",
+    "allGames": "All Games",
+    "homeOnly": "Home Only",
+    "away": "Away",
+    "loadMore": "Load More",
+    "noMatches": "No matches found"
+  },
+  "standings": {
+    "title": "Standings",
+    "pos": "Pos",
+    "team": "Team",
+    "won": "W",
+    "lost": "L",
+    "points": "Pts"
+  },
+  "teams": {
+    "title": "Teams",
+    "subtitle": "All teams at a glance",
+    "senior": "Senior",
+    "youth": "Youth"
+  },
+  "profile": {
+    "title": "Profile",
+    "biometricLock": "Biometric Lock",
+    "theme": "Appearance",
+    "themeSystem": "System",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "signOut": "Sign Out"
+  },
+  "teamDetail": {
+    "league": "League",
+    "lastGame": "Last Game",
+    "nextGame": "Next Game",
+    "upcoming": "Upcoming",
+    "noMatches": "No matches found",
+    "position": "Position"
+  },
+  "gameDetail": {
+    "venue": "Venue",
+    "date": "Date",
+    "time": "Time",
+    "confirmed": "Confirmed",
+    "cancelled": "Cancelled",
+    "forfeited": "Forfeited"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Sign Out",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "error": "Error",
+    "fillAllFields": "Please fill in all fields.",
+    "signInFailed": "Sign In Failed",
+    "signUpFailed": "Sign Up Failed",
+    "unknownError": "Unknown error",
+    "unexpectedError": "An unexpected error occurred",
+    "signInPrompt": "Sign in to view your profile",
+    "tapToUnlock": "Tap to unlock"
+  },
+  "common": {
+    "home": "Home",
+    "away": "Away",
+    "details": "Details",
+    "cancel": "Cancel",
+    "save": "Save",
+    "loading": "Loading…"
+  }
+}

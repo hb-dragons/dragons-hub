@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Dragons",
+    "slug": "dragons",
+    "scheme": "dragons",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#131313"
+    },
+    "ios": {
+      "bundleIdentifier": "de.hbdragons.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID to unlock the Dragons app",
+        "NSCameraUsageDescription": "Allow Dragons to access your camera for team photos"
+      }
+    },
+    "android": {
+      "package": "de.hbdragons.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#131313"
+      },
+      "intentFilters": [{
+        "action": "VIEW",
+        "autoVerify": true,
+        "data": [{ "scheme": "https", "host": "app.hbdragons.de" }],
+        "category": ["BROWSABLE", "DEFAULT"]
+      }]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      "expo-local-authentication",
+      ["expo-camera", { "cameraPermission": "Allow Dragons to access your camera for team photos." }],
+      "./plugins/remove-push-entitlement"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

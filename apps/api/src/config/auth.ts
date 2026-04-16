@@ -1,3 +1,4 @@
+import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins/admin";
@@ -8,7 +9,12 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
-  trustedOrigins: env.TRUSTED_ORIGINS,
+  trustedOrigins: [
+    ...env.TRUSTED_ORIGINS,
+    "dragons://",
+    "dragons://*",
+    ...(env.NODE_ENV === "development" ? ["exp://*"] : []),
+  ],
   emailAndPassword: {
     enabled: true,
   },
@@ -37,5 +43,6 @@ export const auth = betterAuth({
       defaultRole: "user",
       adminRoles: ["admin"],
     }),
+    expo(),
   ],
 });

@@ -1,0 +1,194 @@
+import { View, Text, Pressable, Switch, StyleSheet } from "react-native";
+import { Stack, useRouter } from "expo-router";
+import { useTheme } from "@/hooks/useTheme";
+import { useBiometricLock } from "@/hooks/useBiometricLock";
+import { authClient } from "@/lib/auth-client";
+import { Card } from "@/components/Card";
+import { Badge } from "@/components/Badge";
+import { SectionHeader } from "@/components/SectionHeader";
+import { Screen } from "@/components/Screen";
+import { i18n } from "@/lib/i18n";
+import type { Mode } from "@/hooks/useTheme";
+
+const THEME_OPTIONS: { labelKey: string; value: Mode }[] = [
+  { labelKey: "profile.themeSystem", value: "system" },
+  { labelKey: "profile.themeLight", value: "light" },
+  { labelKey: "profile.themeDark", value: "dark" },
+];
+
+export default function ProfileScreen() {
+  const { colors, textStyles, spacing, radius, mode, setMode } = useTheme();
+  const { isSupported, isEnabled, toggle } = useBiometricLock();
+  const router = useRouter();
+  const { data: session } = authClient.useSession();
+
+  async function handleSignOut() {
+    await authClient.signOut();
+    router.replace("/");
+  }
+
+  if (!session) {
+    return (
+      <>
+        <Stack.Screen options={{ title: i18n.t("profile.title") }} />
+        <Screen scroll={false}>
+          <View style={styles.centeredContainer}>
+            <Text
+              style={[
+                textStyles.sectionTitle,
+                { color: colors.foreground, marginBottom: spacing.md },
+              ]}
+            >
+              {i18n.t("auth.signInPrompt")}
+            </Text>
+            <Pressable
+              onPress={() => router.push("/(auth)/sign-in")}
+              style={{
+                backgroundColor: colors.primary,
+                borderRadius: radius.md,
+                paddingHorizontal: spacing.xl,
+                paddingVertical: spacing.md,
+              }}
+            >
+              <Text style={[textStyles.button, { color: colors.primaryForeground }]}>
+                {i18n.t("auth.signIn")}
+              </Text>
+            </Pressable>
+          </View>
+        </Screen>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Stack.Screen options={{ title: i18n.t("profile.title") }} />
+      <Screen>
+        <View style={{ marginTop: spacing.lg, gap: spacing.xl }}>
+          {/* User info card */}
+          <Card>
+            <Text
+              style={[
+                textStyles.cardTitle,
+                { color: colors.foreground, marginBottom: spacing.xs },
+              ]}
+            >
+              {session.user.name}
+            </Text>
+            <Text
+              style={[
+                textStyles.body,
+                { color: colors.mutedForeground, marginBottom: spacing.md },
+              ]}
+            >
+              {session.user.email}
+            </Text>
+            <Badge
+              label={
+                "role" in session.user && typeof session.user.role === "string"
+                  ? session.user.role
+                  : "member"
+              }
+              variant="secondary"
+            />
+          </Card>
+
+          {/* Biometric lock section */}
+          {isSupported && (
+            <View>
+              <SectionHeader title={i18n.t("profile.biometricLock")} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: spacing.sm,
+                }}
+              >
+                <Text style={[textStyles.body, { color: colors.foreground }]}>
+                  {i18n.t("profile.biometricLock")}
+                </Text>
+                <Switch
+                  value={isEnabled}
+                  onValueChange={() => void toggle()}
+                  trackColor={{ true: colors.primary, false: undefined }}
+                />
+              </View>
+            </View>
+          )}
+
+          {/* Theme section */}
+          <View>
+            <SectionHeader title={i18n.t("profile.theme")} />
+            <View style={styles.themeRow}>
+              {THEME_OPTIONS.map((option) => {
+                const isActive = mode === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setMode(option.value)}
+                    style={[
+                      styles.themeButton,
+                      {
+                        backgroundColor: isActive
+                          ? colors.primary
+                          : colors.surfaceHigh,
+                        borderRadius: radius.md,
+                        paddingVertical: spacing.sm,
+                        paddingHorizontal: spacing.md,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        textStyles.label,
+                        {
+                          color: isActive
+                            ? colors.primaryForeground
+                            : colors.foreground,
+                        },
+                      ]}
+                    >
+                      {i18n.t(option.labelKey)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Sign Out */}
+          <Pressable
+            onPress={handleSignOut}
+            style={{
+              backgroundColor: colors.destructive + "1A",
+              borderRadius: radius.md,
+              padding: spacing.md,
+              alignItems: "center",
+            }}
+          >
+            <Text style={[textStyles.button, { color: colors.destructive }]}>
+              {i18n.t("profile.signOut")}
+            </Text>
+          </Pressable>
+        </View>
+      </Screen>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  centeredContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  themeRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  themeButton: {
+    flex: 1,
+    alignItems: "center",
+  },
+});
