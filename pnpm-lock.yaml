@@ -32,6 +32,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@better-auth/expo':
+        specifier: ^1.6.5
+        version: 1.6.5(a336fabfe0541fdde4ff694ac5dc45f6)
       '@bull-board/api':
         specifier: ^6.21.2
         version: 6.21.2(@bull-board/ui@6.21.2)
