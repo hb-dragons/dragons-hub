@@ -8,8 +8,28 @@
   "home": {
     "nextGame": "Nächstes Spiel",
     "lastResult": "Letztes Ergebnis",
+    "recentResults": "Letzte Ergebnisse",
+    "upcomingGames": "Kommende Spiele",
     "vs": "vs",
-    "noUpcoming": "Keine anstehenden Spiele"
+    "noUpcoming": "Keine anstehenden Spiele",
+    "countdown": {
+      "today": "Heute",
+      "tomorrow": "Morgen",
+      "inDays": "In %{count} Tagen"
+    },
+    "stats": {
+      "teams": "Teams",
+      "wins": "Siege",
+      "losses": "Niederlagen",
+      "winRate": "Siegquote"
+    }
+  },
+  "match": {
+    "win": "S",
+    "loss": "N",
+    "upcoming": "Anst.",
+    "cancelled": "Abg.",
+    "forfeited": "Wert."
   },
   "schedule": {
     "title": "Spielplan",
@@ -20,12 +40,14 @@
     "noMatches": "Keine Spiele gefunden"
   },
   "standings": {
-    "title": "Tabelle",
+    "title": "Tabellen",
     "pos": "Pl.",
     "team": "Team",
+    "played": "Sp",
     "won": "S",
     "lost": "N",
-    "points": "Pkt."
+    "diff": "Diff",
+    "points": "Pkt"
   },
   "teams": {
     "title": "Mannschaften",
@@ -48,15 +70,40 @@
     "nextGame": "Nächstes Spiel",
     "upcoming": "Kommende Spiele",
     "noMatches": "Keine Spiele gefunden",
-    "position": "Platzierung"
+    "position": "Platz",
+    "season": "Saison",
+    "games": "Spiele",
+    "wins": "Siege",
+    "losses": "Niederl.",
+    "diff": "Diff",
+    "standings": "Tabelle",
+    "allGames": "Alle Spiele"
   },
   "gameDetail": {
     "venue": "Halle",
+    "address": "Adresse",
     "date": "Datum",
     "time": "Uhrzeit",
+    "final": "Endstand",
+    "quarters": "Viertel",
+    "halftime": "HZ",
+    "total": "Ges",
+    "record": "Bilanz vs %{opponent}",
+    "form": "Form (letzte 5)",
+    "details": "Details",
+    "scorer": "Anschreiber",
+    "timekeeper": "Zeitnehmer",
+    "status": "Status",
     "confirmed": "Bestätigt",
     "cancelled": "Abgesagt",
-    "forfeited": "Kampflos"
+    "forfeited": "Kampflos",
+    "previousMeetings": "Letzte Begegnungen",
+    "pointsFor": "Punkte für",
+    "pointsAgainst": "Punkte gegen",
+    "home": "Heim"
+  },
+  "h2h": {
+    "title": "Bilanz vs %{opponent}"
   },
   "auth": {
     "signIn": "Anmelden",
@@ -82,6 +129,8 @@
     "details": "Details",
     "cancel": "Abbrechen",
     "save": "Speichern",
-    "loading": "Laden…"
+    "loading": "Laden…",
+    "vs": "vs",
+    "at": "@"
   }
 }

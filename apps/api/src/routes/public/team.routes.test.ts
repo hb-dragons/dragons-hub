@@ -10,6 +10,7 @@ const mockFrom = vi.fn();
 const mocks = vi.hoisted(() => ({
   select: vi.fn(),
   from: vi.fn(),
+  getTeamStats: vi.fn(),
 }));
 
 vi.mock("../../config/database", () => ({
@@ -22,6 +23,10 @@ vi.mock("../../config/database", () => ({
       }};
     },
   },
+}));
+
+vi.mock("../../services/public/team-stats.service", () => ({
+  getTeamStats: mocks.getTeamStats,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -69,5 +74,65 @@ describe("GET /teams (public)", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual([]);
+  });
+});
+
+describe("GET /teams/:id/stats (public)", () => {
+  const statsFixture = {
+    teamId: 1,
+    leagueName: "Kreisliga A",
+    position: 3,
+    played: 10,
+    wins: 7,
+    losses: 3,
+    pointsFor: 820,
+    pointsAgainst: 750,
+    pointsDiff: 70,
+    form: [
+      { result: "W", matchId: 101 },
+      { result: "L", matchId: 100 },
+    ],
+  };
+
+  it("returns 200 with stats when team exists", async () => {
+    mocks.getTeamStats.mockResolvedValue(statsFixture);
+
+    const res = await app.request("/teams/1/stats");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(statsFixture);
+    expect(mocks.getTeamStats).toHaveBeenCalledWith(1);
+  });
+
+  it("returns 404 when team not found", async () => {
+    mocks.getTeamStats.mockResolvedValue(null);
+
+    const res = await app.request("/teams/99/stats");
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ error: "Team not found" });
+  });
+
+  it("returns 400 for non-numeric id", async () => {
+    const res = await app.request("/teams/abc/stats");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ error: "Invalid team id" });
+    expect(mocks.getTeamStats).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for id of zero", async () => {
+    const res = await app.request("/teams/0/stats");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ error: "Invalid team id" });
+    expect(mocks.getTeamStats).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for negative id", async () => {
+    const res = await app.request("/teams/-5/stats");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ error: "Invalid team id" });
   });
 });

@@ -3,25 +3,34 @@ import { View, Text, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
+import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
-import { Card } from "@/components/Card";
-import { Badge } from "@/components/Badge";
-import { MatchCard } from "@/components/MatchCard";
+import { MatchCardFull } from "@/components/MatchCardFull";
+import { MatchCardCompact } from "@/components/MatchCardCompact";
+import { FormStrip } from "@/components/FormStrip";
+import { StandingsTable } from "@/components/StandingsTable";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
-import { todayISO } from "@/lib/date-utils";
+import { fontFamilies } from "@/theme/typography";
 
 export default function TeamDetailScreen() {
-  const { colors, textStyles, spacing } = useTheme();
+  const { colors, textStyles, spacing, radius, isDark } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+
+  // --- Data fetching ---
 
   const { data: teams, isLoading: teamsLoading } = useSWR("teams:all", () =>
     publicApi.getTeams(),
   );
 
   const team = teams?.find((t) => String(t.id) === id) ?? null;
+
+  const { data: teamStats, isLoading: statsLoading } = useSWR(
+    team ? `team:${String(team.id)}:stats` : null,
+    () => publicApi.getTeamStats(Number(id)),
+  );
 
   const { data: matchesData, isLoading: matchesLoading } = useSWR(
     team ? `team:${String(team.id)}:matches` : null,
@@ -37,14 +46,15 @@ export default function TeamDetailScreen() {
     publicApi.getStandings(),
   );
 
-  const matches = matchesData?.items ?? [];
-  const today = todayISO();
+  // --- Derived data ---
 
-  const { lastGame, nextGame, upcoming } = useMemo(() => {
+  const allMatches = matchesData?.items ?? [];
+
+  const { pastMatches, lastGame, nextGame } = useMemo(() => {
     const past: MatchListItem[] = [];
     const future: MatchListItem[] = [];
 
-    for (const m of matches) {
+    for (const m of allMatches) {
       if (m.homeScore !== null && m.guestScore !== null) {
         past.push(m);
       } else {
@@ -53,14 +63,14 @@ export default function TeamDetailScreen() {
     }
 
     return {
+      pastMatches: past,
       lastGame: past.length > 0 ? past[past.length - 1]! : null,
       nextGame: future.length > 0 ? future[0]! : null,
-      upcoming: future.slice(1),
     };
-  }, [matches]);
+  }, [allMatches]);
 
-  // Find league position for this team
-  const leagueInfo = useMemo(() => {
+  // Find league standings for this team
+  const leagueStandings = useMemo(() => {
     if (!standingsData || !team) return null;
     for (const league of standingsData) {
       for (const standing of league.standings) {
@@ -68,24 +78,66 @@ export default function TeamDetailScreen() {
           standing.teamName.includes(team.name) ||
           (team.nameShort && standing.teamName.includes(team.nameShort))
         ) {
-          return { leagueName: league.leagueName, position: standing.position };
+          return league;
         }
       }
     }
     return null;
   }, [standingsData, team]);
 
-  const isLoading = teamsLoading || matchesLoading;
+  const teamColor = getNativeTeamColor(
+    team?.badgeColor,
+    team?.name ?? "",
+    isDark,
+  );
+
+  const teamColorMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const t of teams ?? []) {
+      map[t.name] = t.badgeColor;
+      if (t.nameShort) map[t.nameShort] = t.badgeColor;
+      if (t.customName) map[t.customName] = t.badgeColor;
+    }
+    return map;
+  }, [teams]);
+
+  const isLoading = teamsLoading || matchesLoading || statsLoading;
   const teamName = team
     ? team.customName || team.nameShort || team.name
     : "";
+
+  // Last completed match id for highlighting in "All Games"
+  const lastCompletedId = lastGame?.id ?? null;
+
+  // Resolve opponent team API ID from standings team name
+  const handleOpponentPress = (teamName: string) => {
+    if (!teams) return;
+    const matched = teams.find(
+      (t) =>
+        t.name === teamName ||
+        t.nameShort === teamName ||
+        t.customName === teamName,
+    );
+    if (matched) {
+      router.push(`/h2h/${String(matched.apiTeamPermanentId)}`);
+    }
+  };
+
+  // --- Loading state ---
 
   if (isLoading || !team) {
     return (
       <>
         <Stack.Screen options={{ title: teamName || "..." }} />
         <Screen>
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xl }}>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              paddingTop: spacing.xl,
+            }}
+          >
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
         </Screen>
@@ -93,119 +145,266 @@ export default function TeamDetailScreen() {
     );
   }
 
+  // --- Season stats values ---
+  const played = teamStats?.played ?? 0;
+  const wins = teamStats?.wins ?? 0;
+  const losses = teamStats?.losses ?? 0;
+  const diff = teamStats?.pointsDiff ?? 0;
+
   return (
     <>
       <Stack.Screen options={{ title: teamName }} />
       <Screen>
-        {/* Hero */}
+        {/* 1. Team Header */}
         <View style={{ marginBottom: spacing.lg }}>
-          <Text style={[textStyles.screenTitle, { color: colors.foreground }]}>
+          <Text
+            style={[
+              textStyles.screenTitle,
+              { color: teamColor.name, textTransform: "none" },
+            ]}
+          >
             {teamName}
           </Text>
-          {leagueInfo ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.sm }}>
-              <Badge label={leagueInfo.leagueName} />
-              <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                {i18n.t("teamDetail.position")}: #{String(leagueInfo.position)}
-              </Text>
-            </View>
+          {teamStats?.leagueName ? (
+            <Text
+              style={{
+                fontSize: 14,
+                fontFamily: fontFamilies.body,
+                color: colors.mutedForeground,
+                marginTop: spacing.xs,
+              }}
+            >
+              {teamStats.leagueName}
+            </Text>
           ) : null}
         </View>
 
-        {/* Last Game */}
+        {/* 2. Form + Position Row */}
+        {teamStats ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: spacing.lg,
+            }}
+          >
+            <FormStrip form={teamStats.form} />
+            {teamStats.position !== null ? (
+              <View style={{ alignItems: "center" }}>
+                <Text
+                  style={{
+                    fontSize: 28,
+                    fontFamily: fontFamilies.display,
+                    color: colors.foreground,
+                  }}
+                >
+                  #{teamStats.position}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontFamily: fontFamilies.body,
+                    color: colors.mutedForeground,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {i18n.t("teamDetail.position")}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* 3. Last Game */}
         {lastGame ? (
-          <View style={{ marginBottom: spacing.md }}>
+          <View style={{ marginBottom: spacing.lg }}>
             <Text
-              style={[
-                textStyles.label,
-                { color: colors.mutedForeground, marginBottom: spacing.sm },
-              ]}
+              style={{
+                fontSize: 11,
+                fontFamily: fontFamilies.displayMedium,
+                color: colors.mutedForeground,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: spacing.sm,
+              }}
             >
               {i18n.t("teamDetail.lastGame")}
             </Text>
-            <Card onPress={() => router.push(`/game/${String(lastGame.id)}`)}>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[textStyles.body, { color: colors.foreground }]}>
-                    {lastGame.homeTeamCustomName || lastGame.homeTeamNameShort || lastGame.homeTeamName}
-                  </Text>
-                  <Text style={[textStyles.body, { color: colors.foreground, marginTop: spacing.xs }]}>
-                    {lastGame.guestTeamCustomName || lastGame.guestTeamNameShort || lastGame.guestTeamName}
-                  </Text>
-                </View>
-                <View style={{ alignItems: "flex-end" }}>
-                  <Text style={[textStyles.score, { color: colors.foreground }]}>
-                    {lastGame.homeScore} : {lastGame.guestScore}
-                  </Text>
-                </View>
-              </View>
-            </Card>
+            <MatchCardFull
+              match={lastGame}
+              onPress={() => router.push(`/game/${String(lastGame.id)}`)}
+            />
           </View>
         ) : null}
 
-        {/* Next Game */}
+        {/* 4. Next Game */}
         {nextGame ? (
-          <View style={{ marginBottom: spacing.md }}>
+          <View style={{ marginBottom: spacing.lg }}>
             <Text
-              style={[
-                textStyles.label,
-                { color: colors.mutedForeground, marginBottom: spacing.sm },
-              ]}
+              style={{
+                fontSize: 11,
+                fontFamily: fontFamilies.displayMedium,
+                color: colors.mutedForeground,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: spacing.sm,
+              }}
             >
               {i18n.t("teamDetail.nextGame")}
             </Text>
-            <Card onPress={() => router.push(`/game/${String(nextGame.id)}`)}>
-              <Badge label={nextGame.homeIsOwnClub ? "HOME" : "AWAY"} variant="heat" />
-              <View style={{ alignItems: "center", marginTop: spacing.md }}>
-                <Text style={[textStyles.cardTitle, { color: colors.foreground, textAlign: "center" }]}>
-                  {nextGame.homeTeamCustomName || nextGame.homeTeamNameShort || nextGame.homeTeamName}
-                </Text>
-                <Text style={[textStyles.caption, { color: colors.mutedForeground, marginVertical: spacing.xs }]}>
-                  vs
-                </Text>
-                <Text style={[textStyles.cardTitle, { color: colors.foreground, textAlign: "center" }]}>
-                  {nextGame.guestTeamCustomName || nextGame.guestTeamNameShort || nextGame.guestTeamName}
-                </Text>
-              </View>
-              <View style={{ alignItems: "center", marginTop: spacing.md }}>
-                <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-                  {nextGame.kickoffDate} · {nextGame.kickoffTime.slice(0, 5)}
-                </Text>
-              </View>
-            </Card>
+            <MatchCardFull
+              match={nextGame}
+              onPress={() => router.push(`/game/${String(nextGame.id)}`)}
+            />
           </View>
         ) : null}
 
-        {/* Upcoming matches */}
-        {upcoming.length > 0 ? (
-          <View>
+        {/* 5. Season Stats */}
+        {teamStats ? (
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: colors.surfaceLow,
+              borderRadius: radius.md,
+              padding: spacing.md,
+              marginBottom: spacing.lg,
+            }}
+          >
+            <StatCell
+              label={i18n.t("teamDetail.games")}
+              value={String(played)}
+              color={colors.foreground}
+              mutedColor={colors.mutedForeground}
+            />
+            <StatCell
+              label={i18n.t("teamDetail.wins")}
+              value={String(wins)}
+              color={colors.chart1}
+              mutedColor={colors.mutedForeground}
+            />
+            <StatCell
+              label={i18n.t("teamDetail.losses")}
+              value={String(losses)}
+              color={colors.destructive}
+              mutedColor={colors.mutedForeground}
+            />
+            <StatCell
+              label={i18n.t("teamDetail.diff")}
+              value={`${diff > 0 ? "+" : ""}${diff}`}
+              color={
+                diff > 0
+                  ? colors.chart1
+                  : diff < 0
+                    ? colors.destructive
+                    : colors.mutedForeground
+              }
+              mutedColor={colors.mutedForeground}
+            />
+          </View>
+        ) : null}
+
+        {/* 6. Standings */}
+        {leagueStandings ? (
+          <View style={{ marginBottom: spacing.lg }}>
             <Text
-              style={[
-                textStyles.label,
-                { color: colors.mutedForeground, marginBottom: spacing.sm },
-              ]}
+              style={{
+                fontSize: 11,
+                fontFamily: fontFamilies.displayMedium,
+                color: colors.mutedForeground,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: spacing.sm,
+              }}
             >
-              {i18n.t("teamDetail.upcoming")}
+              {i18n.t("teamDetail.standings")} — {leagueStandings.leagueName}
             </Text>
-            {upcoming.map((match) => (
+            <StandingsTable
+              standings={leagueStandings.standings}
+              leagueName={leagueStandings.leagueName}
+              seasonName={leagueStandings.seasonName}
+              teamColors={teamColorMap}
+              onOpponentPress={handleOpponentPress}
+            />
+          </View>
+        ) : null}
+
+        {/* 7. All Games */}
+        {allMatches.length > 0 ? (
+          <View style={{ marginBottom: spacing.lg }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontFamily: fontFamilies.displayMedium,
+                color: colors.mutedForeground,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: spacing.sm,
+              }}
+            >
+              {i18n.t("teamDetail.allGames")}
+            </Text>
+            {allMatches.map((match) => (
               <View key={match.id} style={{ marginBottom: spacing.sm }}>
-                <MatchCard
+                <MatchCardCompact
                   match={match}
+                  highlighted={match.id === lastCompletedId}
                   onPress={() => router.push(`/game/${String(match.id)}`)}
                 />
               </View>
             ))}
           </View>
-        ) : null}
-
-        {matches.length === 0 ? (
+        ) : (
           <View style={{ paddingTop: spacing.xl, alignItems: "center" }}>
-            <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
+            <Text
+              style={[textStyles.body, { color: colors.mutedForeground }]}
+            >
               {i18n.t("teamDetail.noMatches")}
             </Text>
           </View>
-        ) : null}
+        )}
       </Screen>
     </>
+  );
+}
+
+// --- Internal component ---
+
+function StatCell({
+  label,
+  value,
+  color,
+  mutedColor,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  mutedColor: string;
+}) {
+  return (
+    <View style={{ flex: 1, alignItems: "center" }}>
+      <Text
+        style={{
+          fontSize: 18,
+          fontFamily: fontFamilies.display,
+          color,
+        }}
+      >
+        {value}
+      </Text>
+      <Text
+        style={{
+          fontSize: 10,
+          fontFamily: fontFamilies.body,
+          color: mutedColor,
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+          marginTop: 2,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }

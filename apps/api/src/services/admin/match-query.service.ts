@@ -26,6 +26,7 @@ import type {
   MatchDetailResponse,
   MatchChangeHistoryItem,
   RefereeSlotInfo,
+  PublicMatchDetail,
 } from "@dragons/shared";
 
 export type TransactionClient = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -39,6 +40,7 @@ export interface MatchListParams {
   sort?: "asc" | "desc";
   hasScore?: boolean;
   teamApiId?: number;
+  opponentApiId?: number;
   excludeInactive?: boolean;
 }
 
@@ -275,6 +277,34 @@ export function rowToDetail(
   };
 }
 
+export function rowToPublicDetail(row: MatchRow): PublicMatchDetail {
+  return {
+    ...rowToListItem(row, []),
+    homeHalftimeScore: row.homeHalftimeScore,
+    guestHalftimeScore: row.guestHalftimeScore,
+    periodFormat: row.periodFormat,
+    homeQ1: row.homeQ1, guestQ1: row.guestQ1,
+    homeQ2: row.homeQ2, guestQ2: row.guestQ2,
+    homeQ3: row.homeQ3, guestQ3: row.guestQ3,
+    homeQ4: row.homeQ4, guestQ4: row.guestQ4,
+    homeQ5: row.homeQ5, guestQ5: row.guestQ5,
+    homeQ6: row.homeQ6, guestQ6: row.guestQ6,
+    homeQ7: row.homeQ7, guestQ7: row.guestQ7,
+    homeQ8: row.homeQ8, guestQ8: row.guestQ8,
+    homeOt1: row.homeOt1, guestOt1: row.guestOt1,
+    homeOt2: row.homeOt2, guestOt2: row.guestOt2,
+  };
+}
+
+export async function getPublicMatchDetail(id: number): Promise<PublicMatchDetail | null> {
+  const [row] = await queryMatchWithJoins()
+    .where(eq(matches.id, id))
+    .limit(1);
+  if (!row) return null;
+  if (!row.homeIsOwnClub && !row.guestIsOwnClub) return null;
+  return rowToPublicDetail(row);
+}
+
 /**
  * Shared tail pattern for building a MatchDetailResponse from a match ID.
  * Used by both updateMatchLocal and releaseOverride after their mutations.
@@ -381,7 +411,7 @@ export async function buildDetailResponse(
 }
 
 export async function getOwnClubMatches(params: MatchListParams) {
-  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId, excludeInactive } = params;
+  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId, opponentApiId, excludeInactive } = params;
 
   const ownTeams = await db
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId })
@@ -415,6 +445,14 @@ export async function getOwnClubMatches(params: MatchListParams) {
       or(
         eq(matches.homeTeamApiId, teamApiId),
         eq(matches.guestTeamApiId, teamApiId),
+      )!,
+    );
+  }
+  if (opponentApiId) {
+    conditions.push(
+      or(
+        eq(matches.homeTeamApiId, opponentApiId),
+        eq(matches.guestTeamApiId, opponentApiId),
       )!,
     );
   }

@@ -7,7 +7,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
 import { FilterPill } from "@/components/FilterPill";
-import { MatchCard } from "@/components/MatchCard";
+import { MatchCardFull } from "@/components/MatchCardFull";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 
@@ -119,7 +119,7 @@ export default function ScheduleScreen() {
           )}
           renderItem={({ item }) => (
             <View style={{ marginBottom: spacing.sm }}>
-              <MatchCard
+              <MatchCardFull
                 match={item}
                 onPress={() => router.push(`/game/${String(item.id)}`)}
               />
