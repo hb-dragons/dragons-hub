@@ -4,6 +4,8 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { fontAssets } from "@/theme/typography";
 import { i18n } from "@/lib/i18n";
 
@@ -15,6 +17,7 @@ void i18n;
 
 function RootNavigator() {
   const { colors, isDark } = useTheme();
+  usePushNotifications();
 
   return (
     <>
@@ -38,14 +41,19 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(fontAssets);
+  const { isLocked, authenticate } = useBiometricLock();
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded]);
+    if (!fontsLoaded) return;
 
-  if (!fontsLoaded) {
+    if (isLocked) {
+      void authenticate().then(() => SplashScreen.hideAsync());
+    } else {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, isLocked, authenticate]);
+
+  if (!fontsLoaded || isLocked) {
     return null;
   }
 
