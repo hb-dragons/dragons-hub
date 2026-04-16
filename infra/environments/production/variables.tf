@@ -52,3 +52,15 @@ variable "sdk_password" {
   type        = string
   sensitive   = true
 }
+
+variable "referee_sdk_username" {
+  description = "Basketball-Bund SDK username for referee assignment account"
+  type        = string
+  sensitive   = true
+}
+
+variable "referee_sdk_password" {
+  description = "Basketball-Bund SDK password for referee assignment account"
+  type        = string
+  sensitive   = true
+}

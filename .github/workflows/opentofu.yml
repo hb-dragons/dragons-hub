@@ -68,6 +68,8 @@ jobs:
       TF_VAR_api_domain: ${{ vars.API_DOMAIN }}
       TF_VAR_sdk_username: ${{ secrets.SDK_USERNAME }}
       TF_VAR_sdk_password: ${{ secrets.SDK_PASSWORD }}
+      TF_VAR_referee_sdk_username: ${{ secrets.REFEREE_SDK_USERNAME }}
+      TF_VAR_referee_sdk_password: ${{ secrets.REFEREE_SDK_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

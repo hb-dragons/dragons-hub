@@ -16,3 +16,7 @@ api_domain = "api.dragons.example.com"
 # Basketball-Bund SDK credentials
 sdk_username = "your-sdk-username"
 sdk_password = "your-sdk-password"
+
+# Referee assignment SDK credentials (separate federation account)
+referee_sdk_username = "your-referee-sdk-username"
+referee_sdk_password = "your-referee-sdk-password"
