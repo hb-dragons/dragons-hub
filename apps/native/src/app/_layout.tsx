@@ -32,9 +32,36 @@ function RootNavigator() {
         }}
       >
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="team/[id]" />
-        <Stack.Screen name="game/[id]" />
-        <Stack.Screen name="h2h/[teamApiId]" />
+        <Stack.Screen
+          name="team/[id]"
+          options={{
+            headerShown: true,
+            headerTransparent: true,
+            headerTitle: "",
+            headerShadowVisible: false,
+            headerTintColor: colors.foreground,
+          }}
+        />
+        <Stack.Screen
+          name="game/[id]"
+          options={{
+            headerShown: true,
+            headerTransparent: true,
+            headerTitle: "",
+            headerShadowVisible: false,
+            headerTintColor: colors.foreground,
+          }}
+        />
+        <Stack.Screen
+          name="h2h/[teamApiId]"
+          options={{
+            headerShown: true,
+            headerTransparent: true,
+            headerTitle: "",
+            headerShadowVisible: false,
+            headerTintColor: colors.foreground,
+          }}
+        />
         <Stack.Screen name="(auth)" options={{ presentation: "modal" }} />
         <Stack.Screen
           name="profile"
