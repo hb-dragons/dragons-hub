@@ -37,6 +37,18 @@ export default function StandingsScreen() {
 
   const isLoading = standingsLoading || teamsLoading;
 
+  const teamColorMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const t of teams ?? []) {
+      map[t.name] = t.badgeColor;
+      if (t.nameShort) map[t.nameShort] = t.badgeColor;
+      if (t.customName) map[t.customName] = t.badgeColor;
+    }
+    return map;
+  }, [teams]);
+
+  const teamLookup = useMemo(() => buildTeamLookup(teams ?? []), [teams]);
+
   if (isLoading) {
     return (
       <Screen>
@@ -48,17 +60,6 @@ export default function StandingsScreen() {
   }
 
   const leagues = standings ?? [];
-  const teamLookup = buildTeamLookup(teams ?? []);
-
-  const teamColorMap = useMemo(() => {
-    const map: Record<string, string | null> = {};
-    for (const t of teams ?? []) {
-      map[t.name] = t.badgeColor;
-      if (t.nameShort) map[t.nameShort] = t.badgeColor;
-      if (t.customName) map[t.customName] = t.badgeColor;
-    }
-    return map;
-  }, [teams]);
 
   const handleOwnClubPress = (teamName: string) => {
     const team = teamLookup.get(teamName);
