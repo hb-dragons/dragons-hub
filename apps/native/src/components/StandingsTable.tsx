@@ -9,6 +9,7 @@ interface StandingsTableProps {
   standings: StandingItem[];
   leagueName: string;
   seasonName?: string;
+  teamColors?: Record<string, string | null>;
   onOwnClubPress?: (teamName: string) => void;
   onOpponentPress?: (teamName: string) => void;
 }
@@ -17,6 +18,7 @@ export function StandingsTable({
   standings,
   leagueName,
   seasonName,
+  teamColors,
   onOwnClubPress,
   onOpponentPress,
 }: StandingsTableProps) {
@@ -135,8 +137,9 @@ export function StandingsTable({
           const diffPrefix = item.pointsDiff > 0 ? "+" : "";
 
           // Team name color: own = badge color (primary), opponent = neutral
+          const badgeColor = teamColors?.[item.teamName] ?? null;
           const teamColor = isOwn
-            ? getNativeTeamColor(null, item.teamName, isDark).name
+            ? getNativeTeamColor(badgeColor, item.teamName, isDark).name
             : colors.foreground;
 
           const row = (

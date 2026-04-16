@@ -10,11 +10,13 @@ interface MatchCardFullProps {
   onPress?: () => void;
 }
 
-const WEEKDAYS_DE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+function getDateLocale(): string {
+  return i18n.locale === "de" ? "de-DE" : "en-US";
+}
 
 function formatHeaderDate(kickoffDate: string, kickoffTime: string): string {
-  const d = new Date(kickoffDate);
-  const weekday = WEEKDAYS_DE[d.getDay()];
+  const d = new Date(kickoffDate + "T00:00:00");
+  const weekday = d.toLocaleDateString(getDateLocale(), { weekday: "short" });
   const day = d.getDate().toString().padStart(2, "0");
   const month = (d.getMonth() + 1).toString().padStart(2, "0");
   const time = kickoffTime.slice(0, 5);

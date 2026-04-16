@@ -131,7 +131,7 @@ export default function GameDetailScreen() {
                   style={[
                     textStyles.cardTitle,
                     {
-                      color: match.homeIsOwnClub ? homeColor : colors.foreground,
+                      color: match.homeIsOwnClub ? homeColor : colors.mutedForeground,
                       fontFamily: match.homeIsOwnClub
                         ? fontFamilies.bodySemiBold
                         : fontFamilies.body,
@@ -203,7 +203,7 @@ export default function GameDetailScreen() {
                   style={[
                     textStyles.cardTitle,
                     {
-                      color: match.guestIsOwnClub ? guestColor : colors.foreground,
+                      color: match.guestIsOwnClub ? guestColor : colors.mutedForeground,
                       fontFamily: match.guestIsOwnClub
                         ? fontFamilies.bodySemiBold
                         : fontFamilies.body,

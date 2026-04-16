@@ -91,6 +91,16 @@ export default function TeamDetailScreen() {
     isDark,
   );
 
+  const teamColorMap = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const t of teams ?? []) {
+      map[t.name] = t.badgeColor;
+      if (t.nameShort) map[t.nameShort] = t.badgeColor;
+      if (t.customName) map[t.customName] = t.badgeColor;
+    }
+    return map;
+  }, [teams]);
+
   const isLoading = teamsLoading || matchesLoading || statsLoading;
   const teamName = team
     ? team.customName || team.nameShort || team.name
@@ -314,6 +324,7 @@ export default function TeamDetailScreen() {
               standings={leagueStandings.standings}
               leagueName={leagueStandings.leagueName}
               seasonName={leagueStandings.seasonName}
+              teamColors={teamColorMap}
               onOpponentPress={handleOpponentPress}
             />
           </View>
