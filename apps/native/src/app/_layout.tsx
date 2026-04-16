@@ -22,6 +22,15 @@ function RootNavigator() {
   const { colors, isDark } = useTheme();
   usePushNotifications();
 
+  const detailHeaderOptions = {
+    headerShown: true,
+    headerTransparent: true,
+    headerTitle: "",
+    headerBackTitle: " ",
+    headerShadowVisible: false,
+    headerTintColor: colors.foreground,
+  } as const;
+
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -32,36 +41,9 @@ function RootNavigator() {
         }}
       >
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="team/[id]"
-          options={{
-            headerShown: true,
-            headerTransparent: true,
-            headerTitle: "",
-            headerShadowVisible: false,
-            headerTintColor: colors.foreground,
-          }}
-        />
-        <Stack.Screen
-          name="game/[id]"
-          options={{
-            headerShown: true,
-            headerTransparent: true,
-            headerTitle: "",
-            headerShadowVisible: false,
-            headerTintColor: colors.foreground,
-          }}
-        />
-        <Stack.Screen
-          name="h2h/[teamApiId]"
-          options={{
-            headerShown: true,
-            headerTransparent: true,
-            headerTitle: "",
-            headerShadowVisible: false,
-            headerTintColor: colors.foreground,
-          }}
-        />
+        <Stack.Screen name="team/[id]" options={detailHeaderOptions} />
+        <Stack.Screen name="game/[id]" options={detailHeaderOptions} />
+        <Stack.Screen name="h2h/[teamApiId]" options={detailHeaderOptions} />
         <Stack.Screen name="(auth)" options={{ presentation: "modal" }} />
         <Stack.Screen
           name="profile"

@@ -127,7 +127,7 @@ export default function TeamDetailScreen() {
 
   if (isLoading || !team) {
     return (
-      <Screen edges={[]} headerOffset={44}>
+      <Screen headerOffset={44}>
         <View
           style={{
             flex: 1,
@@ -149,7 +149,7 @@ export default function TeamDetailScreen() {
   const diff = teamStats?.pointsDiff ?? 0;
 
   return (
-    <Screen edges={[]} headerOffset={44}>
+    <Screen headerOffset={44}>
         {/* 1. Team Header */}
         <View style={{ marginBottom: spacing.lg }}>
           <Text

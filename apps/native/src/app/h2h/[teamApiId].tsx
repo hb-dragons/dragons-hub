@@ -17,7 +17,7 @@ export default function H2HScreen() {
   );
 
   return (
-    <Screen scroll={false} edges={[]} headerOffset={44}>
+    <Screen scroll={false} headerOffset={44}>
       {isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
       ) : (
