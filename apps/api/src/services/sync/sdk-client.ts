@@ -93,12 +93,24 @@ class AuthenticatedClient {
   private sessionCookie: string | null = null;
   private isAuthenticated = false;
   private lastAuthenticatedAt: number = 0;
+  private readonly username: string;
+  private readonly password: string;
+  private readonly label: string;
+
+  constructor(
+    credentials?: { username: string; password: string },
+    label = "sdk",
+  ) {
+    this.username = credentials?.username ?? env.SDK_USERNAME;
+    this.password = credentials?.password ?? env.SDK_PASSWORD;
+    this.label = label;
+  }
 
   async login(): Promise<boolean> {
     const loginUrl = `${BASE_URL}/login.do?reqCode=login`;
     const body = new URLSearchParams({
-      username: env.SDK_USERNAME,
-      password: env.SDK_PASSWORD,
+      username: this.username,
+      password: this.password,
     }).toString();
 
     const res = await fetch(loginUrl, {
@@ -128,7 +140,7 @@ class AuthenticatedClient {
     await this.verifyLogin();
     this.isAuthenticated = true;
     this.lastAuthenticatedAt = Date.now();
-    log.info("Successfully authenticated with basketball-bund.net");
+    log.info(`Successfully authenticated with basketball-bund.net (${this.label})`);
     return true;
   }
 
@@ -183,6 +195,12 @@ class AuthenticatedClient {
 
 export class SdkClient {
   private authClient = new AuthenticatedClient();
+  private refereeAuthClient = new AuthenticatedClient(
+    env.REFEREE_SDK_USERNAME && env.REFEREE_SDK_PASSWORD
+      ? { username: env.REFEREE_SDK_USERNAME, password: env.REFEREE_SDK_PASSWORD }
+      : undefined,
+    "referee",
+  );
   public sdk = new BasketballBundSDK();
   private rateLimiter = new TokenBucket(15, 10);
   private static readonly SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
@@ -223,6 +241,16 @@ export class SdkClient {
         log.info({ sessionAgeMs: sessionAge }, "Session expired, re-authenticating");
       }
       await withRetry(() => this.authClient.login(), 3, "login");
+    }
+  }
+
+  private async ensureRefereeAuthenticated(): Promise<void> {
+    const sessionAge = Date.now() - this.refereeAuthClient.authenticatedAt;
+    if (!this.refereeAuthClient.authenticated || sessionAge > SdkClient.SESSION_MAX_AGE_MS) {
+      if (this.refereeAuthClient.authenticated) {
+        log.info({ sessionAgeMs: sessionAge }, "Referee session expired, re-authenticating");
+      }
+      await withRetry(() => this.refereeAuthClient.login(), 3, "login(referee)");
     }
   }
 
@@ -423,7 +451,7 @@ export class SdkClient {
       pageSize?: number;
     } = {},
   ): Promise<SdkGetRefsResponse> {
-    await this.ensureAuthenticated();
+    await this.ensureRefereeAuthenticated();
     await this.rateLimiter.acquire();
 
     const payload: SdkGetRefsPayload = {
@@ -442,7 +470,7 @@ export class SdkClient {
 
     return withRetry(
       async () => {
-        const res = await this.authClient.authenticatedFetch(
+        const res = await this.refereeAuthClient.authenticatedFetch(
           `/rest/assignschiri/getRefs/${spielplanId}`,
           {
             method: "POST",
@@ -451,8 +479,8 @@ export class SdkClient {
           },
         );
         if (res.status === 401 || res.status === 403) {
-          await this.authClient.login();
-          const retry = await this.authClient.authenticatedFetch(
+          await this.refereeAuthClient.login();
+          const retry = await this.refereeAuthClient.authenticatedFetch(
             `/rest/assignschiri/getRefs/${spielplanId}`,
             {
               method: "POST",
@@ -477,7 +505,7 @@ export class SdkClient {
     slotNumber: 1 | 2 | 3,
     candidate: SdkRefCandidate,
   ): Promise<SdkSubmitResponse> {
-    await this.ensureAuthenticated();
+    await this.ensureRefereeAuthenticated();
     await this.rateLimiter.acquire();
 
     const slotPayload: SdkSubmitSlotPayload = {
@@ -492,7 +520,7 @@ export class SdkClient {
 
     return withRetry(
       async () => {
-        const res = await this.authClient.authenticatedFetch(
+        const res = await this.refereeAuthClient.authenticatedFetch(
           `/rest/assignschiri/submit/${spielplanId}`,
           {
             method: "POST",
@@ -501,8 +529,8 @@ export class SdkClient {
           },
         );
         if (res.status === 401 || res.status === 403) {
-          await this.authClient.login();
-          const retry = await this.authClient.authenticatedFetch(
+          await this.refereeAuthClient.login();
+          const retry = await this.refereeAuthClient.authenticatedFetch(
             `/rest/assignschiri/submit/${spielplanId}`,
             {
               method: "POST",
@@ -514,8 +542,11 @@ export class SdkClient {
             throw new Error(`submit assignment failed: ${retry.status}`);
           return retry.json() as Promise<SdkSubmitResponse>;
         }
-        if (!res.ok)
+        if (!res.ok) {
+          const errorBody = typeof res.text === "function" ? await res.text() : "";
+          log.error({ status: res.status, errorBody, payload: body }, "submit assignment failed");
           throw new Error(`submit assignment failed: ${res.status}`);
+        }
         return res.json() as Promise<SdkSubmitResponse>;
       },
       3,
@@ -527,7 +558,7 @@ export class SdkClient {
     spielplanId: number,
     slotNumber: 1 | 2 | 3,
   ): Promise<SdkSubmitResponse> {
-    await this.ensureAuthenticated();
+    await this.ensureRefereeAuthenticated();
     await this.rateLimiter.acquire();
 
     const slotPayload: SdkSubmitSlotPayload = {
@@ -542,7 +573,7 @@ export class SdkClient {
 
     return withRetry(
       async () => {
-        const res = await this.authClient.authenticatedFetch(
+        const res = await this.refereeAuthClient.authenticatedFetch(
           `/rest/assignschiri/submit/${spielplanId}`,
           {
             method: "POST",
@@ -551,8 +582,8 @@ export class SdkClient {
           },
         );
         if (res.status === 401 || res.status === 403) {
-          await this.authClient.login();
-          const retry = await this.authClient.authenticatedFetch(
+          await this.refereeAuthClient.login();
+          const retry = await this.refereeAuthClient.authenticatedFetch(
             `/rest/assignschiri/submit/${spielplanId}`,
             {
               method: "POST",
