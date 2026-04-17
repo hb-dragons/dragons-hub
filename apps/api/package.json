@@ -26,7 +26,7 @@
     "@scalar/hono-api-reference": "^0.10.7",
     "@touch4it/ical-timezones": "^1.9.0",
     "basketball-bund-sdk": "github:dirkdrutschmann/basketball-bund-sdk",
-    "better-auth": "^1.6.2",
+    "better-auth": "^1.6.5",
     "bullmq": "^5.73.5",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.2",
