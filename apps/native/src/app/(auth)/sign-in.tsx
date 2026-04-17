@@ -35,8 +35,7 @@ export default function SignInScreen() {
       const { error } = await authClient.signIn.email({ email, password });
 
       if (error) {
-        const code = (error as { code?: string }).code;
-        if (code === "INVALID_EMAIL_OR_PASSWORD" || code === "INVALID_CREDENTIALS") {
+        if (error.code === "INVALID_EMAIL_OR_PASSWORD" || error.code === "INVALID_CREDENTIALS") {
           setErrorText(i18n.t("auth.invalidCredentials"));
         } else {
           setErrorText(error.message ?? i18n.t("auth.unknownError"));
@@ -73,10 +72,13 @@ export default function SignInScreen() {
     >
       <Pressable
         accessibilityLabel={i18n.t("auth.close")}
+        accessibilityRole="button"
+        disabled={loading}
+        hitSlop={12}
         onPress={() => router.dismissAll()}
         style={[
           styles.closeButton,
-          { top: spacing.xl, left: spacing.lg, padding: spacing.xs },
+          { top: spacing.xl, left: spacing.lg, padding: spacing.md },
         ]}
       >
         <Text style={{ color: colors.foreground, fontSize: 22 }}>×</Text>
@@ -123,7 +125,11 @@ export default function SignInScreen() {
         />
 
         {errorText ? (
-          <Text style={[textStyles.body, { color: colors.destructive }]}>
+          <Text
+            style={[textStyles.body, { color: colors.destructive }]}
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+          >
             {errorText}
           </Text>
         ) : null}
