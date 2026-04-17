@@ -36,10 +36,23 @@ export default function ProfileScreen() {
             <Text
               style={[
                 textStyles.sectionTitle,
-                { color: colors.foreground, marginBottom: spacing.md },
+                { color: colors.foreground, marginBottom: spacing.sm, textAlign: "center" },
               ]}
             >
-              {i18n.t("auth.signInPrompt")}
+              {i18n.t("auth.staffSignInPrompt")}
+            </Text>
+            <Text
+              style={[
+                textStyles.body,
+                {
+                  color: colors.mutedForeground,
+                  marginBottom: spacing.xl,
+                  textAlign: "center",
+                  paddingHorizontal: spacing.lg,
+                },
+              ]}
+            >
+              {i18n.t("auth.staffSignInHint")}
             </Text>
             <Pressable
               onPress={() => router.push("/(auth)/sign-in")}
@@ -83,14 +96,14 @@ export default function ProfileScreen() {
             >
               {session.user.email}
             </Text>
-            <Badge
-              label={
+            {(() => {
+              const role =
                 "role" in session.user && typeof session.user.role === "string"
                   ? session.user.role
-                  : "member"
-              }
-              variant="secondary"
-            />
+                  : null;
+              if (role !== "referee" && role !== "admin") return null;
+              return <Badge label={role} variant="secondary" />;
+            })()}
           </Card>
 
           {/* Biometric lock section */}
