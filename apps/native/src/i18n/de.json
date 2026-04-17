@@ -3,7 +3,8 @@
     "home": "Start",
     "schedule": "Spielplan",
     "standings": "Tabelle",
-    "teams": "Teams"
+    "teams": "Teams",
+    "referee": "Schiri"
   },
   "home": {
     "nextGame": "Nächstes Spiel",
@@ -105,23 +106,26 @@
   "h2h": {
     "title": "Bilanz vs %{opponent}"
   },
+  "refereeTab": {
+    "title": "Meine Einsätze",
+    "empty": "Keine bevorstehenden Einsätze",
+    "error": "Einsätze konnten nicht geladen werden",
+    "retry": "Erneut versuchen"
+  },
   "auth": {
     "signIn": "Anmelden",
-    "signUp": "Registrieren",
     "signOut": "Abmelden",
     "email": "E-Mail",
     "password": "Passwort",
-    "name": "Name",
-    "noAccount": "Noch kein Konto?",
-    "hasAccount": "Bereits ein Konto?",
     "error": "Fehler",
-    "fillAllFields": "Bitte alle Felder ausfüllen.",
     "signInFailed": "Anmeldung fehlgeschlagen",
-    "signUpFailed": "Registrierung fehlgeschlagen",
     "unknownError": "Unbekannter Fehler",
     "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten",
-    "signInPrompt": "Melden Sie sich an, um Ihr Profil zu sehen",
-    "tapToUnlock": "Tippen zum Entsperren"
+    "invalidCredentials": "Ungültige E-Mail oder Passwort",
+    "staffSignInPrompt": "Als Schiedsrichter oder Admin anmelden",
+    "staffSignInHint": "Als Fan brauchst du kein Konto.",
+    "tapToUnlock": "Tippen zum Entsperren",
+    "close": "Schließen"
   },
   "common": {
     "home": "Heim",

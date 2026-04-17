@@ -3,7 +3,8 @@
     "home": "Home",
     "schedule": "Schedule",
     "standings": "Standings",
-    "teams": "Teams"
+    "teams": "Teams",
+    "referee": "Referee"
   },
   "home": {
     "nextGame": "Next Game",
@@ -105,23 +106,26 @@
   "h2h": {
     "title": "Record vs %{opponent}"
   },
+  "refereeTab": {
+    "title": "My Assignments",
+    "empty": "No upcoming assignments",
+    "error": "Couldn't load assignments",
+    "retry": "Retry"
+  },
   "auth": {
     "signIn": "Sign In",
-    "signUp": "Sign Up",
     "signOut": "Sign Out",
     "email": "Email",
     "password": "Password",
-    "name": "Name",
-    "noAccount": "Don't have an account?",
-    "hasAccount": "Already have an account?",
     "error": "Error",
-    "fillAllFields": "Please fill in all fields.",
     "signInFailed": "Sign In Failed",
-    "signUpFailed": "Sign Up Failed",
     "unknownError": "Unknown error",
     "unexpectedError": "An unexpected error occurred",
-    "signInPrompt": "Sign in to view your profile",
-    "tapToUnlock": "Tap to unlock"
+    "invalidCredentials": "Invalid email or password",
+    "staffSignInPrompt": "Sign in as referee or admin",
+    "staffSignInHint": "Fans don't need an account to use the app.",
+    "tapToUnlock": "Tap to unlock",
+    "close": "Close"
   },
   "common": {
     "home": "Home",
