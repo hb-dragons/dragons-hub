@@ -10,6 +10,11 @@ export interface ApiClientOptions {
   auth?: AuthStrategy;
   fetchFn?: typeof fetch;
   credentials?: RequestCredentials;
+  /**
+   * Called for every response before the client parses the body.
+   * Errors thrown from the hook are not caught — keep it defensive.
+   */
+  onResponse?: (response: Response) => void | Promise<void>;
 }
 
 export class ApiClient {
@@ -17,12 +22,14 @@ export class ApiClient {
   private readonly auth?: AuthStrategy;
   private readonly fetchFn: typeof fetch;
   private readonly credentials?: RequestCredentials;
+  private readonly onResponse?: (response: Response) => void | Promise<void>;
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.auth = options.auth;
     this.fetchFn = options.fetchFn ?? globalThis.fetch;
     this.credentials = options.credentials;
+    this.onResponse = options.onResponse;
   }
 
   async get<T>(
@@ -72,6 +79,10 @@ export class ApiClient {
       init.credentials = this.credentials;
     }
     const response = await this.fetchFn(url, init);
+
+    if (this.onResponse) {
+      await this.onResponse(response);
+    }
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));

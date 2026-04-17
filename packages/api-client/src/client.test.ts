@@ -175,4 +175,67 @@ describe("ApiClient", () => {
     const callOptions = fetchFn.mock.calls[0]![1]!;
     expect(callOptions).not.toHaveProperty("credentials");
   });
+
+  it("invokes onResponse for every response", async () => {
+    const seen: number[] = [];
+    const mockFetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const client = new ApiClient({
+      baseUrl: "https://example.test",
+      fetchFn: mockFetchFn as unknown as typeof fetch,
+      onResponse: (res) => {
+        seen.push(res.status);
+      },
+    });
+
+    await client.get("/ping");
+
+    expect(seen).toEqual([200]);
+  });
+
+  it("invokes onResponse even on error responses", async () => {
+    const seen: number[] = [];
+    const mockFetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ code: "UNAUTHORIZED", message: "no" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const client = new ApiClient({
+      baseUrl: "https://example.test",
+      fetchFn: mockFetchFn as unknown as typeof fetch,
+      onResponse: (res) => {
+        seen.push(res.status);
+      },
+    });
+
+    await expect(client.get("/ping")).rejects.toThrow();
+    expect(seen).toEqual([401]);
+  });
+
+  it("awaits async onResponse before returning", async () => {
+    const events: string[] = [];
+    const mockFetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const client = new ApiClient({
+      baseUrl: "https://example.test",
+      fetchFn: mockFetchFn as unknown as typeof fetch,
+      onResponse: async () => {
+        await new Promise((r) => setTimeout(r, 5));
+        events.push("hook");
+      },
+    });
+
+    await client.get("/ping");
+    events.push("after-get");
+    expect(events).toEqual(["hook", "after-get"]);
+  });
 });
