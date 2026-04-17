@@ -1,9 +1,8 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { View, Text, SectionList, ScrollView, ActivityIndicator, Pressable, Animated, StyleSheet } from "react-native";
-import type { SectionList as SectionListType, NativeSyntheticEvent, NativeScrollEvent } from "react-native";
+import { useState, useMemo, useCallback } from "react";
+import { View, Text, SectionList, ScrollView, ActivityIndicator, Pressable } from "react-native";
+import type { MatchListItem } from "@dragons/shared";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
-import type { MatchListItem } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -13,6 +12,7 @@ import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { fontFamilies } from "@/theme/typography";
 
+type Segment = "upcoming" | "results";
 type LocationFilter = "all" | "home" | "away";
 
 function getToday(): string {
@@ -35,112 +35,219 @@ interface Section {
   data: MatchListItem[];
 }
 
-export default function ScheduleScreen() {
+function groupByDate(matches: MatchListItem[]): Section[] {
+  const grouped = new Map<string, MatchListItem[]>();
+  for (const match of matches) {
+    const key = match.kickoffDate;
+    const list = grouped.get(key);
+    if (list) list.push(match);
+    else grouped.set(key, [match]);
+  }
+  return Array.from(grouped.entries()).map(([date, items]): Section => ({
+    title: date,
+    formattedTitle: formatSectionDate(date),
+    data: items,
+  }));
+}
+
+/* ── Segmented Control ── */
+function SegmentedControl({
+  segments,
+  selected,
+  onSelect,
+}: {
+  segments: { key: Segment; label: string }[];
+  selected: Segment;
+  onSelect: (key: Segment) => void;
+}) {
+  const { colors, spacing, radius } = useTheme();
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        backgroundColor: colors.surfaceHigh,
+        borderRadius: radius.md + 4,
+        padding: 3,
+        marginBottom: spacing.md,
+      }}
+    >
+      {segments.map((seg) => {
+        const active = seg.key === selected;
+        return (
+          <Pressable
+            key={seg.key}
+            onPress={() => onSelect(seg.key)}
+            style={{
+              flex: 1,
+              paddingVertical: spacing.sm,
+              borderRadius: radius.md + 2,
+              backgroundColor: active ? colors.background : "transparent",
+              alignItems: "center",
+              // Subtle shadow on active segment
+              ...(active
+                ? {
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 2,
+                    elevation: 1,
+                  }
+                : {}),
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontFamily: active ? fontFamilies.bodySemiBold : fontFamilies.body,
+                color: active ? colors.foreground : colors.mutedForeground,
+              }}
+            >
+              {seg.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/* ── Match List (reusable for both segments) ── */
+function MatchList({
+  sections,
+  isLoading,
+  onRefresh,
+  refreshing,
+}: {
+  sections: Section[];
+  isLoading: boolean;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
-  const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
-  const [showPast, setShowPast] = useState(false);
-  const [buttonVisible, setButtonVisible] = useState(false);
-  const buttonOpacity = useRef(new Animated.Value(0)).current;
-  const listRef = useRef<SectionListType<MatchListItem, Section>>(null);
-  // Track the Y offset where upcoming games start (measured during layout)
-  const upcomingOffsetRef = useRef(0);
 
-  const { data: upcomingData, isLoading: upcomingLoading } = useSWR(
-    "schedule:upcoming",
-    () => publicApi.getMatches({ limit: 1000, sort: "asc", dateFrom: getToday() }),
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xl }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (sections.length === 0) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing["2xl"] }}>
+        <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
+          {i18n.t("schedule.noMatches")}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <SectionList
+      sections={sections}
+      keyExtractor={(item) => String(item.id)}
+      renderSectionHeader={({ section }) => (
+        <View
+          style={{
+            backgroundColor: colors.background,
+            paddingVertical: spacing.xs,
+            paddingTop: spacing.md,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontFamily: fontFamilies.bodySemiBold,
+              color: colors.mutedForeground,
+            }}
+          >
+            {section.formattedTitle}
+          </Text>
+        </View>
+      )}
+      renderItem={({ item }) => (
+        <View style={{ marginBottom: spacing.sm }}>
+          <MatchCardFull
+            match={item}
+            onPress={() => router.push(`/game/${String(item.id)}`)}
+          />
+        </View>
+      )}
+      onRefresh={onRefresh}
+      refreshing={refreshing ?? false}
+      contentContainerStyle={{ paddingBottom: 100 }}
+      showsVerticalScrollIndicator={false}
+      stickySectionHeadersEnabled={false}
+    />
+  );
+}
+
+/* ── Main Screen ── */
+export default function ScheduleScreen() {
+  const { colors, spacing } = useTheme();
+  const [segment, setSegment] = useState<Segment>("upcoming");
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
+
+  // Upcoming: from today, ascending
+  const {
+    data: upcomingData,
+    isLoading: upcomingLoading,
+    mutate: mutateUpcoming,
+  } = useSWR("schedule:upcoming", () =>
+    publicApi.getMatches({ limit: 1000, sort: "asc", dateFrom: getToday() }),
   );
 
-  const { data: pastData, isLoading: pastLoading } = useSWR(
-    showPast ? "schedule:past" : null,
-    () => publicApi.getMatches({ limit: 1000, sort: "desc", dateTo: getToday(), hasScore: true }),
+  // Results: up to today, descending (most recent first)
+  const {
+    data: resultsData,
+    isLoading: resultsLoading,
+    mutate: mutateResults,
+  } = useSWR("schedule:results", () =>
+    publicApi.getMatches({ limit: 1000, sort: "desc", dateTo: getToday(), hasScore: true }),
   );
 
   const upcoming = upcomingData?.items ?? [];
-  const past = pastData?.items ?? [];
-  const pastCount = past.length;
+  const results = resultsData?.items ?? [];
 
-  const allMatches = useMemo(() => {
-    const pastAsc = [...past].reverse();
-    return [...pastAsc, ...upcoming];
-  }, [past, upcoming]);
+  // Apply location filter
+  const applyFilter = useCallback(
+    (matches: MatchListItem[]) => {
+      if (locationFilter === "home") return matches.filter((m) => m.homeIsOwnClub);
+      if (locationFilter === "away") return matches.filter((m) => m.guestIsOwnClub);
+      return matches;
+    },
+    [locationFilter],
+  );
 
-  const filtered = useMemo(() => {
-    if (locationFilter === "home") return allMatches.filter((m) => m.homeIsOwnClub);
-    if (locationFilter === "away") return allMatches.filter((m) => m.guestIsOwnClub);
-    return allMatches;
-  }, [allMatches, locationFilter]);
+  const upcomingSections = useMemo(
+    () => groupByDate(applyFilter(upcoming)),
+    [upcoming, applyFilter],
+  );
 
-  const sections = useMemo(() => {
-    const grouped = new Map<string, MatchListItem[]>();
-    for (const match of filtered) {
-      const key = match.kickoffDate;
-      const list = grouped.get(key);
-      if (list) list.push(match);
-      else grouped.set(key, [match]);
-    }
-    return Array.from(grouped.entries()).map(([date, items]): Section => ({
-      title: date,
-      formattedTitle: formatSectionDate(date),
-      data: items,
-    }));
-  }, [filtered]);
+  const resultsSections = useMemo(
+    () => groupByDate(applyFilter(results)),
+    [results, applyFilter],
+  );
 
-  // Count items before the first upcoming section to estimate offset
-  const pastItemCount = useMemo(() => {
-    const today = getToday();
-    let count = 0;
-    for (const section of sections) {
-      if (section.title >= today) break;
-      count += section.data.length + 1; // +1 for section header
-    }
-    return count;
-  }, [sections]);
-
-  const handleRefresh = useCallback(() => {
-    if (!showPast) setShowPast(true);
-  }, [showPast]);
-
-  // Animate button visibility
-  useEffect(() => {
-    Animated.timing(buttonOpacity, {
-      toValue: buttonVisible ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [buttonVisible, buttonOpacity]);
-
-  const handleJumpToToday = useCallback(() => {
-    // Use estimated offset: each item ~120px (card + margin + section headers)
-    const estimatedItemHeight = 120;
-    const offset = pastItemCount * estimatedItemHeight;
-    listRef.current?.getScrollResponder()?.scrollTo({ y: offset, animated: true });
-  }, [pastItemCount]);
-
-  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    // Show button when past games are loaded and user is in the past section
-    setButtonVisible(pastCount > 0 && y < pastItemCount * 80);
-  }, [pastCount, pastItemCount]);
-
-  if (upcomingLoading) {
-    return (
-      <Screen>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xl }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </Screen>
-    );
-  }
+  const segments: { key: Segment; label: string }[] = [
+    { key: "upcoming", label: i18n.t("schedule.upcoming") },
+    { key: "results", label: i18n.t("schedule.results") },
+  ];
 
   return (
     <Screen scroll={false}>
       <SectionHeader title={i18n.t("schedule.title")} />
 
+      <SegmentedControl segments={segments} selected={segment} onSelect={setSegment} />
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, marginBottom: spacing.md }}
+        contentContainerStyle={{ alignItems: "center" }}
+        style={{ flexGrow: 0, flexShrink: 0, marginBottom: spacing.md, overflow: "visible" }}
       >
         <FilterPill
           label={i18n.t("schedule.homeOnly")}
@@ -154,92 +261,21 @@ export default function ScheduleScreen() {
         />
       </ScrollView>
 
-      {sections.length === 0 ? (
-        <View style={{ paddingTop: spacing.xl, alignItems: "center" }}>
-          <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
-            {i18n.t("schedule.noMatches")}
-          </Text>
-        </View>
+      {segment === "upcoming" ? (
+        <MatchList
+          sections={upcomingSections}
+          isLoading={upcomingLoading}
+          onRefresh={() => { mutateUpcoming(); }}
+          refreshing={false}
+        />
       ) : (
-        <SectionList
-          ref={listRef}
-          sections={sections}
-          keyExtractor={(item) => String(item.id)}
-          renderSectionHeader={({ section }) => (
-            <View style={{
-              backgroundColor: colors.background,
-              paddingVertical: spacing.xs,
-              paddingTop: spacing.md,
-            }}>
-              <Text style={{
-                fontSize: 13,
-                fontFamily: fontFamilies.bodySemiBold,
-                color: colors.mutedForeground,
-              }}>
-                {section.formattedTitle}
-              </Text>
-            </View>
-          )}
-          renderItem={({ item }) => (
-            <View style={{ marginBottom: spacing.sm }}>
-              <MatchCardFull
-                match={item}
-                onPress={() => router.push(`/game/${String(item.id)}`)}
-              />
-            </View>
-          )}
-          onRefresh={handleRefresh}
-          refreshing={pastLoading}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          onScroll={handleScroll}
-          scrollEventThrottle={64}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-          stickySectionHeadersEnabled={false}
+        <MatchList
+          sections={resultsSections}
+          isLoading={resultsLoading}
+          onRefresh={() => { mutateResults(); }}
+          refreshing={false}
         />
       )}
-
-      {/* Jump to today — animated fade */}
-      <Animated.View
-        pointerEvents={buttonVisible ? "auto" : "none"}
-        style={[styles.jumpContainer, { opacity: buttonOpacity, bottom: spacing.xl + 80 }]}
-      >
-        <Pressable
-          onPress={handleJumpToToday}
-          style={({ pressed }) => [
-            styles.jumpButton,
-            {
-              backgroundColor: colors.primary,
-              transform: [{ scale: pressed ? 0.95 : 1 }],
-            },
-          ]}
-        >
-          <Text style={[styles.jumpText, { color: colors.primaryForeground }]}>
-            ↓ {i18n.locale === "de" ? "Heute" : "Today"}
-          </Text>
-        </Pressable>
-      </Animated.View>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  jumpContainer: {
-    position: "absolute",
-    alignSelf: "center",
-  },
-  jumpButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  jumpText: {
-    fontSize: 13,
-    fontFamily: fontFamilies.bodySemiBold,
-  },
-});

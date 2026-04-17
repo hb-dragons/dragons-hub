@@ -33,7 +33,6 @@ interface SchedulePageClientProps {
     instructionGoogle: string;
     instructionOutlook: string;
   };
-  apiBaseUrl: string;
 }
 
 export function SchedulePageClient({
@@ -43,7 +42,6 @@ export function SchedulePageClient({
   initialSaturday,
   initialMonth,
   translations,
-  apiBaseUrl,
 }: SchedulePageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,7 +78,6 @@ export function SchedulePageClient({
           />
         </div>
         <SubscribeButton
-          apiBaseUrl={apiBaseUrl}
           teamApiId={selectedTeamApiId}
           translations={{
             subscribe: translations.subscribe,
@@ -110,7 +107,6 @@ export function SchedulePageClient({
             matchForfeited: translations.matchForfeited,
             noMatchesThisWeekend: translations.noMatchesThisWeekend,
           }}
-          apiBaseUrl={apiBaseUrl}
         />
       ) : (
         <CalendarView
@@ -123,7 +119,6 @@ export function SchedulePageClient({
             matchForfeited: translations.matchForfeited,
             noMatchesOnDay: translations.noMatchesOnDay,
           }}
-          apiBaseUrl={apiBaseUrl}
         />
       )}
     </div>

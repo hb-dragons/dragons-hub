@@ -1,13 +1,11 @@
-import { fetchAPI } from "@/lib/api";
+import { getPublicApi } from "@/lib/api-client.server";
 import { getTranslations } from "next-intl/server";
 import type { LeagueStandings, StandingItem } from "@dragons/shared";
 import { cn } from "@dragons/ui/lib/utils";
 
 export default async function StandingsPage() {
   const t = await getTranslations();
-  const standings = await fetchAPI<LeagueStandings[]>(
-    "/public/standings",
-  ).catch(() => []);
+  const standings = await getPublicApi().getStandings().catch(() => []);
 
   if (standings.length === 0) {
     return (

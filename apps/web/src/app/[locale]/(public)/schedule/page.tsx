@@ -1,7 +1,6 @@
-import { fetchAPI } from "@/lib/api";
+import { getPublicApi } from "@/lib/api-client.server";
 import { getTranslations } from "next-intl/server";
-import type { MatchListItem } from "@dragons/shared";
-import type { PublicTeamWithClubFlag } from "@/components/public/schedule/types";
+import type { MatchQueryParams } from "@dragons/api-client";
 import {
   getSaturday,
   getSunday,
@@ -22,32 +21,23 @@ export default async function SchedulePage({
   const teamParam = typeof params.team === "string" ? params.team : undefined;
   const view = params.view === "calendar" ? "calendar" : "weekend";
 
-  const allTeams = await fetchAPI<PublicTeamWithClubFlag[]>(
-    "/public/teams",
-  ).catch(() => []);
+  const allTeams = await getPublicApi().getTeams().catch(() => []);
   const ownClubTeams = allTeams.filter((team) => team.isOwnClub);
-
-  const queryParams = new URLSearchParams();
-  if (teamParam) {
-    queryParams.set("teamApiId", teamParam);
-  }
 
   const saturday = getSaturday(new Date());
   const monthStart = getMonthStart(new Date());
 
+  const matchParams: MatchQueryParams = {};
+  if (teamParam) matchParams.teamApiId = Number(teamParam);
   if (view === "calendar") {
-    queryParams.set("dateFrom", toDateString(monthStart));
-    queryParams.set("dateTo", toDateString(getMonthEnd(new Date())));
+    matchParams.dateFrom = toDateString(monthStart);
+    matchParams.dateTo = toDateString(getMonthEnd(new Date()));
   } else {
-    queryParams.set("dateFrom", toDateString(saturday));
-    queryParams.set("dateTo", toDateString(getSunday(saturday)));
+    matchParams.dateFrom = toDateString(saturday);
+    matchParams.dateTo = toDateString(getSunday(saturday));
   }
 
-  const matchData = await fetchAPI<{ items: MatchListItem[] }>(
-    `/public/matches?${queryParams}`,
-  ).catch(() => ({ items: [] }));
-
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const matchData = await getPublicApi().getMatches(matchParams).catch(() => ({ items: [] }));
 
   return (
     <div className="space-y-4">
@@ -75,7 +65,6 @@ export default async function SchedulePage({
           instructionGoogle: t("instructionGoogle"),
           instructionOutlook: t("instructionOutlook"),
         }}
-        apiBaseUrl={apiBaseUrl}
       />
     </div>
   );

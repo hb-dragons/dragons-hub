@@ -4,8 +4,10 @@ import { useState } from "react";
 import { Button } from "@dragons/ui";
 import { Popover, PopoverTrigger, PopoverContent } from "@dragons/ui";
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 interface SubscribeButtonProps {
-  apiBaseUrl: string;
   teamApiId: number | null;
   translations: {
     subscribe: string;
@@ -18,22 +20,18 @@ interface SubscribeButtonProps {
   };
 }
 
-function buildIcsUrl(
-  apiBaseUrl: string,
-  teamApiId: number | null,
-): string {
-  const url = new URL(`${apiBaseUrl}/public/schedule.ics`);
+function buildIcsUrl(teamApiId: number | null): string {
+  const url = new URL(`${API_BASE_URL}/public/schedule.ics`);
   if (teamApiId) url.searchParams.set("teamApiId", teamApiId.toString());
   return url.toString();
 }
 
 export function SubscribeButton({
-  apiBaseUrl,
   teamApiId,
   translations: t,
 }: SubscribeButtonProps) {
   const [copied, setCopied] = useState(false);
-  const icsUrl = buildIcsUrl(apiBaseUrl, teamApiId);
+  const icsUrl = buildIcsUrl(teamApiId);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(icsUrl);

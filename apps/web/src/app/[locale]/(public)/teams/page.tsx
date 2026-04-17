@@ -1,17 +1,10 @@
-import { fetchAPI } from "@/lib/api";
+import { getPublicApi } from "@/lib/api-client.server";
 import { getTranslations } from "next-intl/server";
-
-interface PublicTeam {
-  id: number;
-  name: string;
-  nameShort: string | null;
-  customName: string | null;
-  isOwnClub: boolean | null;
-}
+import type { PublicTeam } from "@dragons/api-client";
 
 export default async function TeamsPage() {
   const t = await getTranslations("public");
-  const teams = await fetchAPI<PublicTeam[]>("/public/teams").catch(() => []);
+  const teams = await getPublicApi().getTeams().catch(() => []);
 
   const ownTeams = teams.filter((team) => team.isOwnClub);
   const otherTeams = teams.filter((team) => !team.isOwnClub);

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useFormatter } from "next-intl";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { MatchListItem } from "@dragons/shared";
+import { publicApi } from "@/lib/api-client";
 import { getColorPreset } from "@dragons/shared";
 import { Calendar } from "@dragons/ui/components/calendar";
 import { Button } from "@dragons/ui/components/button";
@@ -23,7 +24,6 @@ interface CalendarViewProps {
     matchForfeited: string;
     noMatchesOnDay: string;
   };
-  apiBaseUrl: string;
 }
 
 /** Map of date string (YYYY-MM-DD) to matches on that day */
@@ -120,7 +120,6 @@ export function CalendarView({
   initialMatches,
   initialMonth,
   translations,
-  apiBaseUrl,
 }: CalendarViewProps) {
   const searchParams = useSearchParams();
   const format = useFormatter();
@@ -171,14 +170,12 @@ export function CalendarView({
     async (monthDate: Date) => {
       const start = getMonthStart(monthDate);
       const end = getMonthEnd(monthDate);
-      const params = new URLSearchParams({
-        dateFrom: toDateString(start),
-        dateTo: toDateString(end),
-      });
       setLoading(true);
       try {
-        const res = await fetch(`${apiBaseUrl}/public/matches?${params}`);
-        const data = (await res.json()) as { items?: MatchListItem[] };
+        const data = await publicApi.getMatches({
+          dateFrom: toDateString(start),
+          dateTo: toDateString(end),
+        });
         setMatches(data.items ?? []);
       } catch {
         setMatches([]);
@@ -186,7 +183,7 @@ export function CalendarView({
         setLoading(false);
       }
     },
-    [apiBaseUrl],
+    [],
   );
 
   const handleMonthChange = useCallback(

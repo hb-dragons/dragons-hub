@@ -33,6 +33,8 @@
   },
   "schedule": {
     "title": "Spielplan",
+    "upcoming": "Anstehend",
+    "results": "Ergebnisse",
     "homeOnly": "Heim",
     "away": "Auswärts",
     "noMatches": "Keine Spiele gefunden"

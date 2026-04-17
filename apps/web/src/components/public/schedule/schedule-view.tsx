@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useFormatter } from "next-intl";
 import type { MatchListItem } from "@dragons/shared";
+import { publicApi } from "@/lib/api-client";
 import { WeekendPicker } from "./weekend-picker";
 import { MatchList } from "./match-list";
 import type { PublicTeam } from "./types";
@@ -24,14 +25,12 @@ interface ScheduleViewProps {
     matchForfeited: string;
     noMatchesThisWeekend: string;
   };
-  apiBaseUrl: string;
 }
 
 export function ScheduleView({
   initialMatches,
   initialSaturday,
   translations,
-  apiBaseUrl,
 }: ScheduleViewProps) {
   const searchParams = useSearchParams();
   const format = useFormatter();
@@ -70,17 +69,13 @@ export function ScheduleView({
   const fetchMatches = useCallback(
     async (sat: Date, teamApiId: number | null) => {
       const sun = getSunday(sat);
-      const params = new URLSearchParams({
-        dateFrom: toDateString(sat),
-        dateTo: toDateString(sun),
-      });
-      if (teamApiId) {
-        params.set("teamApiId", teamApiId.toString());
-      }
       setLoading(true);
       try {
-        const res = await fetch(`${apiBaseUrl}/public/matches?${params}`);
-        const data = await res.json();
+        const data = await publicApi.getMatches({
+          dateFrom: toDateString(sat),
+          dateTo: toDateString(sun),
+          ...(teamApiId ? { teamApiId } : {}),
+        });
         setMatches(data.items ?? []);
       } catch {
         setMatches([]);
@@ -88,7 +83,7 @@ export function ScheduleView({
         setLoading(false);
       }
     },
-    [apiBaseUrl],
+    [],
   );
 
   // Re-fetch when the team filter changes at the page level
