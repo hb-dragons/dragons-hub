@@ -28,6 +28,8 @@ vi.mock("@dragons/db/schema", () => ({
     sr2OurClub: "rg.sr2OurClub",
     sr1Name: "rg.sr1Name",
     sr2Name: "rg.sr2Name",
+    sr1RefereeApiId: "rg.sr1RefereeApiId",
+    sr2RefereeApiId: "rg.sr2RefereeApiId",
     sr1Status: "rg.sr1Status",
     sr2Status: "rg.sr2Status",
     isCancelled: "rg.isCancelled",
@@ -54,7 +56,11 @@ vi.mock("drizzle-orm", () => ({
 
 // --- Imports (after mocks) ---
 
-import { getRefereeGames } from "./referee-games.service";
+import {
+  getRefereeGames,
+  getRefereeGameById,
+  computeMySlot,
+} from "./referee-games.service";
 
 // --- Helpers ---
 
@@ -90,6 +96,8 @@ function makeGameRow(overrides: Record<string, unknown> = {}) {
     sr2OurClub: false,
     sr1Name: null,
     sr2Name: null,
+    sr1RefereeApiId: null,
+    sr2RefereeApiId: null,
     sr1Status: "open",
     sr2Status: "offered",
     isCancelled: false,
@@ -296,5 +304,64 @@ describe("getRefereeGames", () => {
     });
 
     expect(result.items).toHaveLength(1);
+  });
+});
+
+describe("computeMySlot", () => {
+  it("returns null when refereeApiId is null", () => {
+    expect(
+      computeMySlot({ sr1RefereeApiId: 100, sr2RefereeApiId: 200 }, null),
+    ).toBeNull();
+  });
+
+  it("returns 1 when refereeApiId matches sr1", () => {
+    expect(
+      computeMySlot({ sr1RefereeApiId: 100, sr2RefereeApiId: null }, 100),
+    ).toBe(1);
+  });
+
+  it("returns 2 when refereeApiId matches sr2", () => {
+    expect(
+      computeMySlot({ sr1RefereeApiId: null, sr2RefereeApiId: 200 }, 200),
+    ).toBe(2);
+  });
+
+  it("returns null when refereeApiId does not match either slot", () => {
+    expect(
+      computeMySlot({ sr1RefereeApiId: 100, sr2RefereeApiId: 200 }, 300),
+    ).toBeNull();
+  });
+});
+
+describe("getRefereeGameById", () => {
+  function buildSingleRowChain(result: unknown) {
+    const chain: Record<string, unknown> = {};
+    const methods = ["from", "where", "limit"];
+    for (const m of methods) {
+      chain[m] = vi.fn().mockReturnValue(chain);
+    }
+    chain.then = (resolve: (v: unknown) => void) => {
+      resolve(result);
+      return chain;
+    };
+    return chain;
+  }
+
+  it("returns the row when found", async () => {
+    const row = makeGameRow({ id: 7 });
+    mockSelect.mockReturnValueOnce(buildSingleRowChain([row]));
+
+    const result = await getRefereeGameById(7);
+
+    expect(result).not.toBeNull();
+    expect(result?.id).toBe(7);
+  });
+
+  it("returns null when no row matches", async () => {
+    mockSelect.mockReturnValueOnce(buildSingleRowChain([]));
+
+    const result = await getRefereeGameById(999);
+
+    expect(result).toBeNull();
   });
 });

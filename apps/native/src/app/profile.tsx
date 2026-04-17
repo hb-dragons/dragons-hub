@@ -1,6 +1,8 @@
 import { View, Text, Pressable, Switch, StyleSheet } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
+import { useLocale } from "@/hooks/useLocale";
+import type { LocalePref } from "@/hooks/useLocale";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
 import { Card } from "@/components/Card";
@@ -16,8 +18,15 @@ const THEME_OPTIONS: { labelKey: string; value: Mode }[] = [
   { labelKey: "profile.themeDark", value: "dark" },
 ];
 
+const LOCALE_OPTIONS: { labelKey: string; value: LocalePref }[] = [
+  { labelKey: "profile.languageSystem", value: "system" },
+  { labelKey: "profile.languageDe", value: "de" },
+  { labelKey: "profile.languageEn", value: "en" },
+];
+
 export default function ProfileScreen() {
   const { colors, textStyles, spacing, radius, mode, setMode } = useTheme();
+  const { pref: localePref, setPref: setLocalePref } = useLocale();
   const { isSupported, isEnabled, toggle } = useBiometricLock();
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -31,8 +40,8 @@ export default function ProfileScreen() {
     return (
       <>
         <Stack.Screen options={{ title: i18n.t("profile.title") }} />
-        <Screen scroll={false} edges={[]}>
-          <View style={styles.centeredContainer}>
+        <Screen edges={[]}>
+          <View style={{ marginTop: spacing.xl, alignItems: "center" }}>
             <Text
               style={[
                 textStyles.sectionTitle,
@@ -67,6 +76,45 @@ export default function ProfileScreen() {
                 {i18n.t("auth.signIn")}
               </Text>
             </Pressable>
+          </View>
+
+          <View style={{ marginTop: spacing.xl * 2 }}>
+            <SectionHeader title={i18n.t("profile.language")} />
+            <View style={styles.segmentedRow}>
+              {LOCALE_OPTIONS.map((option) => {
+                const isActive = localePref === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setLocalePref(option.value)}
+                    style={[
+                      styles.segmentedButton,
+                      {
+                        backgroundColor: isActive
+                          ? colors.primary
+                          : colors.surfaceHigh,
+                        borderRadius: radius.md,
+                        paddingVertical: spacing.sm,
+                        paddingHorizontal: spacing.md,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        textStyles.label,
+                        {
+                          color: isActive
+                            ? colors.primaryForeground
+                            : colors.foreground,
+                        },
+                      ]}
+                    >
+                      {i18n.t(option.labelKey)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </Screen>
       </>
@@ -133,7 +181,7 @@ export default function ProfileScreen() {
           {/* Theme section */}
           <View>
             <SectionHeader title={i18n.t("profile.theme")} />
-            <View style={styles.themeRow}>
+            <View style={styles.segmentedRow}>
               {THEME_OPTIONS.map((option) => {
                 const isActive = mode === option.value;
                 return (
@@ -141,7 +189,47 @@ export default function ProfileScreen() {
                     key={option.value}
                     onPress={() => setMode(option.value)}
                     style={[
-                      styles.themeButton,
+                      styles.segmentedButton,
+                      {
+                        backgroundColor: isActive
+                          ? colors.primary
+                          : colors.surfaceHigh,
+                        borderRadius: radius.md,
+                        paddingVertical: spacing.sm,
+                        paddingHorizontal: spacing.md,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        textStyles.label,
+                        {
+                          color: isActive
+                            ? colors.primaryForeground
+                            : colors.foreground,
+                        },
+                      ]}
+                    >
+                      {i18n.t(option.labelKey)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Language section */}
+          <View>
+            <SectionHeader title={i18n.t("profile.language")} />
+            <View style={styles.segmentedRow}>
+              {LOCALE_OPTIONS.map((option) => {
+                const isActive = localePref === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setLocalePref(option.value)}
+                    style={[
+                      styles.segmentedButton,
                       {
                         backgroundColor: isActive
                           ? colors.primary
@@ -191,16 +279,11 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  centeredContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  themeRow: {
+  segmentedRow: {
     flexDirection: "row",
     gap: 8,
   },
-  themeButton: {
+  segmentedButton: {
     flex: 1,
     alignItems: "center",
   },

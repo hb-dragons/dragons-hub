@@ -10,6 +10,7 @@ export const authClient = createAuthClient({
     expoClient({
       scheme: "dragons",
       storagePrefix: "dragons",
+      cookiePrefix: "dragons",
       storage: SecureStore,
     }),
   ],

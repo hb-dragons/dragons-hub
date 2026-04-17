@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
 import { useTheme } from "@/hooks/useTheme";
@@ -7,6 +7,7 @@ import { StatStrip } from "@/components/StatStrip";
 import { MatchCardFull } from "@/components/MatchCardFull";
 import { MatchCardCompact } from "@/components/MatchCardCompact";
 import { ResultChip } from "@/components/ResultChip";
+import { authClient } from "@/lib/auth-client";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { fontFamilies } from "@/theme/typography";
@@ -25,6 +26,10 @@ function getCountdown(kickoffDate: string): string {
 export default function HomeScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
   const router = useRouter();
+  const { data: session } = authClient.useSession();
+
+  const initial = session?.user.name?.trim().charAt(0).toUpperCase() ?? "";
+  const isSignedIn = Boolean(session);
 
   const { data: dashboard, isLoading } = useSWR("home:dashboard", () =>
     publicApi.getHomeDashboard(),
@@ -51,6 +56,42 @@ export default function HomeScreen() {
 
   return (
     <Screen>
+      {/* Profile / Sign-In affordance */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "flex-end",
+          marginTop: spacing.sm,
+        }}
+      >
+        <Pressable
+          onPress={() => router.push("/profile")}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isSignedIn ? i18n.t("profile.title") : i18n.t("auth.signIn")
+          }
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: isSignedIn ? colors.primary : colors.surfaceHigh,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text
+            style={{
+              color: isSignedIn ? colors.primaryForeground : colors.mutedForeground,
+              fontSize: 16,
+              fontFamily: fontFamilies.bodySemiBold,
+            }}
+          >
+            {isSignedIn ? initial : "?"}
+          </Text>
+        </Pressable>
+      </View>
+
       {/* Section: Next Game */}
       <View style={{ marginTop: spacing.lg }}>
         <View

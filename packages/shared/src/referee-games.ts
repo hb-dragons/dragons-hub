@@ -15,6 +15,8 @@ export interface RefereeGameListItem {
   sr2OurClub: boolean;
   sr1Name: string | null;
   sr2Name: string | null;
+  sr1RefereeApiId: number | null;
+  sr2RefereeApiId: number | null;
   sr1Status: "open" | "offered" | "assigned";
   sr2Status: "open" | "offered" | "assigned";
   isCancelled: boolean;
@@ -23,4 +25,6 @@ export interface RefereeGameListItem {
   isHomeGame: boolean;
   isGuestGame: boolean;
   lastSyncedAt: string | null;
+  /** 1 or 2 if the currently authenticated referee is assigned to that slot, else null. */
+  mySlot: 1 | 2 | null;
 }

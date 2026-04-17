@@ -15,6 +15,15 @@ import {
   not,
 } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
+import { refereeGameColumns, computeMySlot } from "./referee-games.service";
+
+function buildAssignedToMe(refereeApiId: number | null) {
+  if (refereeApiId == null) return null;
+  return or(
+    eq(refereeGames.sr1RefereeApiId, refereeApiId),
+    eq(refereeGames.sr2RefereeApiId, refereeApiId),
+  )!;
+}
 
 interface GetVisibleRefereeGamesParams {
   limit: number;
@@ -38,9 +47,10 @@ export async function getVisibleRefereeGames(
 }> {
   const { limit, offset, search, status, league, dateFrom, dateTo } = params;
 
-  // 1. Load referee flags
+  // 1. Load referee flags + federation apiId
   const [referee] = await db
     .select({
+      apiId: referees.apiId,
       allowAllHomeGames: referees.allowAllHomeGames,
       allowAwayGames: referees.allowAwayGames,
       isOwnClub: referees.isOwnClub,
@@ -85,17 +95,33 @@ export async function getVisibleRefereeGames(
   if (homeVisibility) visibilityParts.push(homeVisibility);
   if (awayVisibility) visibilityParts.push(awayVisibility);
 
-  // If neither home nor away visibility, return empty
-  if (visibilityParts.length === 0) {
+  const visibilityCondition = visibilityParts.length === 0
+    ? null
+    : visibilityParts.length === 1
+      ? visibilityParts[0]!
+      : or(...visibilityParts)!;
+
+  const openForMe = visibilityCondition
+    ? and(openOurClubSlot, visibilityCondition)!
+    : null;
+
+  const assignedToMe = buildAssignedToMe(referee.apiId);
+
+  const baseParts = [openForMe, assignedToMe].filter(
+    (p): p is NonNullable<typeof p> => p != null,
+  );
+
+  // No visibility rules and no federation apiId → nothing to show
+  if (baseParts.length === 0) {
     return { items: [], total: 0, limit, offset, hasMore: false };
   }
 
-  const visibilityCondition = visibilityParts.length === 1
-    ? visibilityParts[0]!
-    : or(...visibilityParts)!;
+  const baseCondition = baseParts.length === 1
+    ? baseParts[0]!
+    : or(...baseParts)!;
 
   // 4. Standard filters
-  const conditions = [openOurClubSlot, visibilityCondition];
+  const conditions = [baseCondition];
 
   // Status
   if (status === "cancelled") conditions.push(eq(refereeGames.isCancelled, true));
@@ -127,35 +153,8 @@ export async function getVisibleRefereeGames(
 
   const whereClause = and(...conditions)!;
 
-  const isTrackedLeague = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
-
   const [items, countResult] = await Promise.all([
-    db.select({
-      id: refereeGames.id,
-      apiMatchId: refereeGames.apiMatchId,
-      matchId: refereeGames.matchId,
-      matchNo: refereeGames.matchNo,
-      kickoffDate: refereeGames.kickoffDate,
-      kickoffTime: refereeGames.kickoffTime,
-      homeTeamName: refereeGames.homeTeamName,
-      guestTeamName: refereeGames.guestTeamName,
-      leagueName: refereeGames.leagueName,
-      leagueShort: refereeGames.leagueShort,
-      venueName: refereeGames.venueName,
-      venueCity: refereeGames.venueCity,
-      sr1OurClub: refereeGames.sr1OurClub,
-      sr2OurClub: refereeGames.sr2OurClub,
-      sr1Name: refereeGames.sr1Name,
-      sr2Name: refereeGames.sr2Name,
-      sr1Status: refereeGames.sr1Status,
-      sr2Status: refereeGames.sr2Status,
-      isCancelled: refereeGames.isCancelled,
-      isForfeited: refereeGames.isForfeited,
-      lastSyncedAt: refereeGames.lastSyncedAt,
-      isTrackedLeague,
-      isHomeGame: refereeGames.isHomeGame,
-      isGuestGame: refereeGames.isGuestGame,
-    })
+    db.select(refereeGameColumns)
     .from(refereeGames)
     .where(whereClause)
     .orderBy(asc(refereeGames.kickoffDate), asc(refereeGames.kickoffTime))
@@ -167,8 +166,12 @@ export async function getVisibleRefereeGames(
   ]);
 
   const total = countResult[0]?.count ?? 0;
+  const decorated = items.map((row) => ({
+    ...row,
+    mySlot: computeMySlot(row, referee.apiId ?? null),
+  })) as RefereeGameListItem[];
   return {
-    items: items as RefereeGameListItem[],
+    items: decorated,
     total, limit, offset,
     hasMore: offset + items.length < total,
   };
@@ -244,4 +247,70 @@ function buildAwayVisibility(
 ) {
   if (!referee.allowAwayGames) return null;
   return eq(refereeGames.isHomeGame, false);
+}
+
+/**
+ * Fetch a single referee game by id if it matches the referee's visibility rules.
+ * Returns null when the game does not exist or the referee cannot see it.
+ */
+export async function getVisibleRefereeGameById(
+  refereeId: number,
+  id: number,
+): Promise<RefereeGameListItem | null> {
+  const [referee] = await db
+    .select({
+      apiId: referees.apiId,
+      allowAllHomeGames: referees.allowAllHomeGames,
+      allowAwayGames: referees.allowAwayGames,
+      isOwnClub: referees.isOwnClub,
+    })
+    .from(referees)
+    .where(eq(referees.id, refereeId));
+
+  if (!referee || !referee.isOwnClub) return null;
+
+  const rules = await db
+    .select({
+      teamId: refereeAssignmentRules.teamId,
+      deny: refereeAssignmentRules.deny,
+      allowSr1: refereeAssignmentRules.allowSr1,
+      allowSr2: refereeAssignmentRules.allowSr2,
+    })
+    .from(refereeAssignmentRules)
+    .where(eq(refereeAssignmentRules.refereeId, refereeId));
+
+  const homeVisibility = buildHomeVisibility(referee, rules);
+  const awayVisibility = buildAwayVisibility(referee);
+
+  const visibilityParts = [homeVisibility, awayVisibility].filter(
+    (p): p is NonNullable<typeof p> => p != null,
+  );
+  const visibilityCondition = visibilityParts.length === 0
+    ? null
+    : visibilityParts.length === 1
+      ? visibilityParts[0]!
+      : or(...visibilityParts)!;
+
+  const assignedToMe = buildAssignedToMe(referee.apiId ?? null);
+
+  const accessParts = [visibilityCondition, assignedToMe].filter(
+    (p): p is NonNullable<typeof p> => p != null,
+  );
+  if (accessParts.length === 0) return null;
+
+  const accessCondition = accessParts.length === 1
+    ? accessParts[0]!
+    : or(...accessParts)!;
+
+  const [row] = await db
+    .select(refereeGameColumns)
+    .from(refereeGames)
+    .where(and(eq(refereeGames.id, id), accessCondition)!)
+    .limit(1);
+
+  if (!row) return null;
+  return {
+    ...row,
+    mySlot: computeMySlot(row, referee.apiId ?? null),
+  } as RefereeGameListItem;
 }

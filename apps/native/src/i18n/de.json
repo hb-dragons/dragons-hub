@@ -63,6 +63,10 @@
     "themeSystem": "System",
     "themeLight": "Hell",
     "themeDark": "Dunkel",
+    "language": "Sprache",
+    "languageSystem": "System",
+    "languageDe": "Deutsch",
+    "languageEn": "English",
     "signOut": "Abmelden"
   },
   "teamDetail": {
@@ -101,7 +105,10 @@
     "previousMeetings": "Letzte Begegnungen",
     "pointsFor": "Punkte für",
     "pointsAgainst": "Punkte gegen",
-    "home": "Heim"
+    "home": "Heim",
+    "error": "Spiel konnte nicht geladen werden",
+    "notFound": "Spiel nicht gefunden",
+    "retry": "Erneut versuchen"
   },
   "h2h": {
     "title": "Bilanz vs %{opponent}"
@@ -111,6 +118,20 @@
     "empty": "Keine bevorstehenden Einsätze",
     "error": "Einsätze konnten nicht geladen werden",
     "retry": "Erneut versuchen"
+  },
+  "refereeGame": {
+    "officials": "Schiedsrichter",
+    "sr1": "Schiedsrichter 1",
+    "sr2": "Schiedsrichter 2",
+    "sr1Short": "SR1",
+    "sr2Short": "SR2",
+    "unassigned": "Noch nicht zugewiesen",
+    "mine": "Du",
+    "status": {
+      "open": "Offen",
+      "offered": "Angeboten",
+      "assigned": "Zugewiesen"
+    }
   },
   "auth": {
     "signIn": "Anmelden",

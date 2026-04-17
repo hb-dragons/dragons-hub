@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
+import { LocaleProvider } from "@/hooks/useLocale";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
@@ -43,6 +44,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" options={{ title: "" }} />
         <Stack.Screen name="team/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="game/[id]" options={detailHeaderOptions} />
+        <Stack.Screen name="referee-game/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="h2h/[teamApiId]" options={detailHeaderOptions} />
         <Stack.Screen name="(auth)" options={{ presentation: "modal" }} />
         <Stack.Screen
@@ -139,8 +141,10 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <RootNavigator />
-    </ThemeProvider>
+    <LocaleProvider>
+      <ThemeProvider>
+        <RootNavigator />
+      </ThemeProvider>
+    </LocaleProvider>
   );
 }

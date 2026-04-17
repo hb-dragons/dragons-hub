@@ -301,7 +301,6 @@ export async function getPublicMatchDetail(id: number): Promise<PublicMatchDetai
     .where(eq(matches.id, id))
     .limit(1);
   if (!row) return null;
-  if (!row.homeIsOwnClub && !row.guestIsOwnClub) return null;
   return rowToPublicDetail(row);
 }
 

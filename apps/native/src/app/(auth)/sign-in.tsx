@@ -43,7 +43,7 @@ export default function SignInScreen() {
         return;
       }
 
-      router.dismissAll();
+      router.back();
     } catch (err) {
       setErrorText(
         err instanceof Error ? err.message : i18n.t("auth.unexpectedError"),
@@ -75,7 +75,7 @@ export default function SignInScreen() {
         accessibilityRole="button"
         disabled={loading}
         hitSlop={12}
-        onPress={() => router.dismissAll()}
+        onPress={() => router.back()}
         style={[
           styles.closeButton,
           { top: spacing.xl, left: spacing.lg, padding: spacing.md },

@@ -2,8 +2,14 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { AppEnv } from "../../types";
 import { requireReferee } from "../../middleware/auth";
-import { getRefereeGames } from "../../services/referee/referee-games.service";
-import { getVisibleRefereeGames } from "../../services/referee/referee-game-visibility.service";
+import {
+  getRefereeGames,
+  getRefereeGameById,
+} from "../../services/referee/referee-games.service";
+import {
+  getVisibleRefereeGames,
+  getVisibleRefereeGameById,
+} from "../../services/referee/referee-game-visibility.service";
 import { db } from "../../config/database";
 import { user as userTable } from "@dragons/db/schema";
 
@@ -40,6 +46,35 @@ refereeGamesRoutes.get("/games", async (c) => {
 
   const result = await getVisibleRefereeGames(userRow.refereeId, params);
   return c.json(result);
+});
+
+refereeGamesRoutes.get("/games/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0) {
+    return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
+  }
+
+  const sessionUser = c.get("user");
+
+  if (sessionUser.role === "admin") {
+    const row = await getRefereeGameById(id);
+    if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    return c.json(row);
+  }
+
+  const [userRow] = await db
+    .select({ refereeId: userTable.refereeId })
+    .from(userTable)
+    .where(eq(userTable.id, sessionUser.id))
+    .limit(1);
+
+  if (!userRow?.refereeId) {
+    return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
+  }
+
+  const row = await getVisibleRefereeGameById(userRow.refereeId, id);
+  if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+  return c.json(row);
 });
 
 export { refereeGamesRoutes };

@@ -1,7 +1,8 @@
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import useSWR from "swr";
 import { getNativeTeamColor } from "@dragons/shared";
+import { APIError } from "@dragons/api-client";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { Card } from "@/components/Card";
@@ -28,13 +29,21 @@ export default function GameDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const { data: match, isLoading: matchLoading } = useSWR(
-    `match:${id}`,
-    () => publicApi.getMatch(Number(id)),
+  const numericId = Number(id);
+  const hasValidId = Number.isFinite(numericId) && numericId > 0;
+
+  const {
+    data: match,
+    isLoading: matchLoading,
+    error: matchError,
+    mutate: mutateMatch,
+  } = useSWR(
+    hasValidId ? `match:${id}` : null,
+    () => publicApi.getMatch(numericId),
   );
   const { data: context } = useSWR(
-    `match:${id}:context`,
-    () => publicApi.getMatchContext(Number(id)),
+    hasValidId && match ? `match:${id}:context` : null,
+    () => publicApi.getMatchContext(numericId),
   );
 
   const homeName = match
@@ -44,7 +53,7 @@ export default function GameDetailScreen() {
     ? (match.guestTeamCustomName ?? match.guestTeamNameShort ?? match.guestTeamName)
     : "";
 
-  if (matchLoading || !match) {
+  if (matchLoading) {
     return (
       <Screen headerOffset={44}>
         <View
@@ -56,6 +65,55 @@ export default function GameDetailScreen() {
           }}
         >
           <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </Screen>
+    );
+  }
+
+  if (matchError || !match) {
+    const isNotFound =
+      !hasValidId ||
+      (matchError instanceof APIError && matchError.status === 404);
+    const message = isNotFound
+      ? i18n.t("gameDetail.notFound")
+      : i18n.t("gameDetail.error");
+    return (
+      <Screen headerOffset={44}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: spacing.xl,
+            paddingTop: spacing.xl,
+            gap: spacing.md,
+          }}
+        >
+          <Text
+            style={[
+              textStyles.body,
+              { color: colors.mutedForeground, textAlign: "center" },
+            ]}
+          >
+            {message}
+          </Text>
+          {!isNotFound ? (
+            <Pressable
+              onPress={() => {
+                void mutateMatch();
+              }}
+              style={{
+                backgroundColor: colors.primary,
+                borderRadius: radius.md,
+                paddingHorizontal: spacing.xl,
+                paddingVertical: spacing.md,
+              }}
+            >
+              <Text style={[textStyles.button, { color: colors.primaryForeground }]}>
+                {i18n.t("gameDetail.retry")}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </Screen>
     );

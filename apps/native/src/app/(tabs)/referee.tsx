@@ -9,11 +9,11 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
-import type { RefereeGameListItem, MatchListItem } from "@dragons/shared";
+import type { RefereeGameListItem } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
-import { MatchCardCompact } from "@/components/MatchCardCompact";
+import { RefereeGameCard } from "@/components/RefereeGameCard";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { fontFamilies } from "@/theme/typography";
@@ -49,54 +49,6 @@ function groupByDate(games: RefereeGameListItem[]): Section[] {
       formattedTitle: formatSectionDate(date),
       data: items,
     }));
-}
-
-/**
- * Adapter from referee-game row → MatchListItem so we can reuse MatchCardCompact.
- * Uses `homeIsOwnClub: true` to render the home-team-prominent layout; the referee
- * has no own-club affiliation but this orientation looks less weird than the "away" variant.
- */
-function toMatchListItem(game: RefereeGameListItem): MatchListItem {
-  return {
-    id: game.matchId ?? game.id,
-    apiMatchId: game.apiMatchId,
-    matchNo: game.matchNo,
-    matchDay: 0,
-    kickoffDate: game.kickoffDate,
-    kickoffTime: game.kickoffTime,
-    homeTeamApiId: 0,
-    homeTeamName: game.homeTeamName,
-    homeTeamNameShort: null,
-    homeTeamCustomName: null,
-    guestTeamApiId: 0,
-    guestTeamName: game.guestTeamName,
-    guestTeamNameShort: null,
-    guestTeamCustomName: null,
-    homeIsOwnClub: true,
-    guestIsOwnClub: false,
-    homeBadgeColor: null,
-    guestBadgeColor: null,
-    homeScore: null,
-    guestScore: null,
-    leagueId: null,
-    leagueName: game.leagueName,
-    venueId: null,
-    venueName: game.venueName,
-    venueStreet: null,
-    venuePostalCode: null,
-    venueCity: game.venueCity,
-    venueNameOverride: null,
-    isConfirmed: null,
-    isForfeited: game.isForfeited,
-    isCancelled: game.isCancelled,
-    anschreiber: null,
-    zeitnehmer: null,
-    shotclock: null,
-    publicComment: null,
-    hasLocalChanges: false,
-    overriddenFields: [],
-    booking: null,
-  };
 }
 
 export default function RefereeScreen() {
@@ -216,11 +168,14 @@ export default function RefereeScreen() {
         )}
         renderItem={({ item }) => (
           <View style={{ marginBottom: spacing.sm }}>
-            <MatchCardCompact
-              match={toMatchListItem(item)}
+            <RefereeGameCard
+              game={item}
               onPress={() => {
-                if (item.matchId !== null) {
+                const isOwnClubGame = item.isHomeGame || item.isGuestGame;
+                if (isOwnClubGame && item.matchId !== null) {
                   router.push(`/game/${String(item.matchId)}`);
+                } else {
+                  router.push(`/referee-game/${String(item.id)}`);
                 }
               }}
             />

@@ -63,6 +63,10 @@
     "themeSystem": "System",
     "themeLight": "Light",
     "themeDark": "Dark",
+    "language": "Language",
+    "languageSystem": "System",
+    "languageDe": "Deutsch",
+    "languageEn": "English",
     "signOut": "Sign Out"
   },
   "teamDetail": {
@@ -101,7 +105,10 @@
     "previousMeetings": "Previous Meetings",
     "pointsFor": "Points for",
     "pointsAgainst": "Points against",
-    "home": "Home"
+    "home": "Home",
+    "error": "Couldn't load game",
+    "notFound": "Game not found",
+    "retry": "Retry"
   },
   "h2h": {
     "title": "Record vs %{opponent}"
@@ -111,6 +118,20 @@
     "empty": "No upcoming assignments",
     "error": "Couldn't load assignments",
     "retry": "Retry"
+  },
+  "refereeGame": {
+    "officials": "Officials",
+    "sr1": "Referee 1",
+    "sr2": "Referee 2",
+    "sr1Short": "R1",
+    "sr2Short": "R2",
+    "unassigned": "Not yet assigned",
+    "mine": "You",
+    "status": {
+      "open": "Open",
+      "offered": "Offered",
+      "assigned": "Assigned"
+    }
   },
   "auth": {
     "signIn": "Sign In",

@@ -21,5 +21,8 @@ export function refereeEndpoints(client: ApiClient) {
         params as Record<string, string | number | boolean | undefined>,
       );
     },
+    getGame(id: number): Promise<RefereeGameListItem> {
+      return client.get(`/referee/games/${id}`);
+    },
   };
 }

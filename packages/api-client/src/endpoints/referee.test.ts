@@ -25,6 +25,27 @@ describe("refereeEndpoints", () => {
     expect(result.total).toBe(0);
   });
 
+  it("GETs /referee/games/:id", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ id: 42, apiMatchId: 1000, matchId: null }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const client = new ApiClient({
+      baseUrl: "https://example.test",
+      fetchFn: mockFetch as unknown as typeof fetch,
+    });
+    const api = refereeEndpoints(client);
+
+    const result = await api.getGame(42);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const url = mockFetch.mock.calls[0]![0] as string;
+    expect(url).toBe("https://example.test/referee/games/42");
+    expect(result.id).toBe(42);
+  });
+
   it("passes query params when supplied", async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       new Response(
