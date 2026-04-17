@@ -27,76 +27,76 @@ export function MatchCard({ match, translations }: MatchCardProps) {
 
   return (
     <Link href={`/game/${match.id}`} className="block">
-    <div
-      className={`rounded-md bg-card p-4 transition-colors hover:bg-surface-high ${isCancelledOrForfeited ? "opacity-60" : ""}`}
-    >
-      {/* Top row: league + kickoff time */}
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-muted-foreground truncate">
-          {match.leagueName ?? ""}
-        </p>
-        <p className="text-xs font-medium text-muted-foreground tabular-nums">
-          {match.kickoffTime?.slice(0, 5) ?? ""}
-        </p>
-      </div>
-
-      {/* Center: teams + score */}
-      <div className="flex items-center gap-3">
-        <div className="flex-1 text-right">
-          <p
-            className={`text-sm font-semibold leading-tight ${isOwnHome ? "text-mint-shade" : ""}`}
-          >
-            {getTeamName(match, "home")}
+      <div
+        className={`rounded-md bg-card p-4 transition-colors hover:bg-surface-high ${isCancelledOrForfeited ? "opacity-60" : ""}`}
+      >
+        {/* Top row: league + kickoff time */}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs text-muted-foreground truncate">
+            {match.leagueName ?? ""}
+          </p>
+          <p className="text-xs font-medium text-muted-foreground tabular-nums">
+            {match.kickoffTime?.slice(0, 5) ?? ""}
           </p>
         </div>
-        <div className="flex flex-col items-center min-w-[56px]">
-          {hasScore ? (
-            <span className="text-lg font-bold tabular-nums">
-              {match.homeScore} : {match.guestScore}
-            </span>
-          ) : (
-            <span className="text-sm font-medium text-muted-foreground">
-              {translations.vs}
-            </span>
-          )}
+
+        {/* Center: teams + score */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 text-right">
+            <p
+              className={`text-sm font-semibold leading-tight ${isOwnHome ? "text-mint-shade" : ""}`}
+            >
+              {getTeamName(match, "home")}
+            </p>
+          </div>
+          <div className="flex flex-col items-center min-w-[56px]">
+            {hasScore ? (
+              <span className="text-lg font-bold tabular-nums">
+                {match.homeScore} : {match.guestScore}
+              </span>
+            ) : (
+              <span className="text-sm font-medium text-muted-foreground">
+                {translations.vs}
+              </span>
+            )}
+          </div>
+          <div className="flex-1">
+            <p
+              className={`text-sm font-semibold leading-tight ${isOwnGuest ? "text-mint-shade" : ""}`}
+            >
+              {getTeamName(match, "guest")}
+            </p>
+          </div>
         </div>
-        <div className="flex-1">
-          <p
-            className={`text-sm font-semibold leading-tight ${isOwnGuest ? "text-mint-shade" : ""}`}
-          >
-            {getTeamName(match, "guest")}
+
+        {/* Bottom: venue + badges */}
+        <div className="flex items-center justify-between mt-3">
+          <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+            {isOwnHome && <Home className="h-3 w-3 shrink-0" />}
+            {match.venueNameOverride ?? match.venueName ?? ""}
+            {match.venueCity ? `, ${match.venueCity}` : ""}
           </p>
+          <div className="flex gap-1.5">
+            {match.isCancelled && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                {translations.matchCancelled}
+              </Badge>
+            )}
+            {match.isForfeited && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                {translations.matchForfeited}
+              </Badge>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Bottom: venue + badges */}
-      <div className="flex items-center justify-between mt-3">
-        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-          {isOwnHome && <Home className="h-3 w-3 shrink-0" />}
-          {match.venueNameOverride ?? match.venueName ?? ""}
-          {match.venueCity ? `, ${match.venueCity}` : ""}
-        </p>
-        <div className="flex gap-1.5">
-          {match.isCancelled && (
-            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-              {translations.matchCancelled}
-            </Badge>
-          )}
-          {match.isForfeited && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-              {translations.matchForfeited}
-            </Badge>
-          )}
-        </div>
+        {/* Public comment */}
+        {match.publicComment && (
+          <p className="text-xs text-muted-foreground mt-2 italic">
+            {match.publicComment}
+          </p>
+        )}
       </div>
-
-      {/* Public comment */}
-      {match.publicComment && (
-        <p className="text-xs text-muted-foreground mt-2 italic">
-          {match.publicComment}
-        </p>
-      )}
-    </div>
     </Link>
   );
 }
