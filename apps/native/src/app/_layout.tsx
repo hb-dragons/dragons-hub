@@ -7,15 +7,14 @@ import { useFonts } from "expo-font";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
+import { authClient } from "@/lib/auth-client";
 import { fontAssets } from "@/theme/typography";
 import { i18n } from "@/lib/i18n";
 import { colors as themeColors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
 
-// Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
 
-// Initialize i18n (side-effect import)
 void i18n;
 
 function RootNavigator() {
@@ -60,7 +59,6 @@ function RootNavigator() {
   );
 }
 
-/** Minimal unlock screen shown when biometric authentication fails or is cancelled. */
 function UnlockScreen({ onRetry }: { onRetry: () => void }) {
   const dark = themeColors.dark;
   return (
@@ -103,10 +101,11 @@ function UnlockScreen({ onRetry }: { onRetry: () => void }) {
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(fontAssets);
   const { isLocked, authenticate } = useBiometricLock();
+  const { isPending: sessionPending } = authClient.useSession();
   const [authFailed, setAuthFailed] = useState(false);
 
   useEffect(() => {
-    if (!fontsLoaded) return;
+    if (!fontsLoaded || sessionPending) return;
 
     if (isLocked) {
       void authenticate().then((success) => {
@@ -120,14 +119,14 @@ export default function RootLayout() {
     } else {
       void SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, isLocked, authenticate]);
+  }, [fontsLoaded, sessionPending, isLocked, authenticate]);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || sessionPending) {
     return null;
   }
 
   if (isLocked) {
-    if (!authFailed) return null; // still showing splash
+    if (!authFailed) return null;
     return (
       <UnlockScreen
         onRetry={() => {
