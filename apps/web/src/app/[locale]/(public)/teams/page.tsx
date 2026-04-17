@@ -1,5 +1,6 @@
 import { getPublicApi } from "@/lib/api-client.server";
 import { getTranslations } from "next-intl/server";
+import { Link } from "@/lib/navigation";
 import type { PublicTeam } from "@dragons/api-client";
 
 export default async function TeamsPage() {
@@ -25,19 +26,18 @@ export default async function TeamsPage() {
       {ownTeams.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
           {ownTeams.map((team) => (
-            <div
-              key={team.id}
-              className="rounded-xl border-2 border-mint-shade/30 bg-mint-tint/5 p-4"
-            >
-              <p className="font-semibold text-mint-shade">
-                {team.customName ?? team.nameShort ?? team.name}
-              </p>
-              {team.customName && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {team.name}
+            <Link key={team.id} href={`/team/${team.id}`}>
+              <div className="rounded-md bg-primary/5 p-4 transition-colors hover:bg-surface-high border-l-2 border-l-primary/50">
+                <p className="font-semibold text-primary">
+                  {team.customName ?? team.nameShort ?? team.name}
                 </p>
-              )}
-            </div>
+                {team.customName && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {team.name}
+                  </p>
+                )}
+              </div>
+            </Link>
           ))}
         </div>
       )}
@@ -48,7 +48,7 @@ export default async function TeamsPage() {
           {otherTeams.map((team) => (
             <div
               key={team.id}
-              className="rounded-xl border p-3"
+              className="rounded-md bg-card p-3"
             >
               <p className="text-sm font-medium">
                 {team.nameShort ?? team.name}

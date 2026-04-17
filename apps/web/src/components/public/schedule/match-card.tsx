@@ -1,6 +1,7 @@
 import type { MatchListItem } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 import { Home } from "lucide-react";
+import { Link } from "@/lib/navigation";
 import { resolveTeamName } from "./types";
 
 interface MatchCardProps {
@@ -25,8 +26,9 @@ export function MatchCard({ match, translations }: MatchCardProps) {
   };
 
   return (
+    <Link href={`/game/${match.id}`} className="block">
     <div
-      className={`rounded-xl border bg-card p-4 ${isCancelledOrForfeited ? "opacity-60" : ""}`}
+      className={`rounded-md bg-card p-4 transition-colors hover:bg-surface-high ${isCancelledOrForfeited ? "opacity-60" : ""}`}
     >
       {/* Top row: league + kickoff time */}
       <div className="flex items-center justify-between mb-3">
@@ -95,5 +97,6 @@ export function MatchCard({ match, translations }: MatchCardProps) {
         </p>
       )}
     </div>
+    </Link>
   );
 }
