@@ -1,7 +1,6 @@
 import { getPublicApi } from "@/lib/api-client.server";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/lib/navigation";
-import type { PublicTeam } from "@dragons/api-client";
 
 export default async function TeamsPage() {
   const t = await getTranslations("public");

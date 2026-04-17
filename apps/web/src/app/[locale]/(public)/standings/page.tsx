@@ -1,6 +1,6 @@
 import { getPublicApi } from "@/lib/api-client.server";
 import { getTranslations } from "next-intl/server";
-import type { LeagueStandings, StandingItem } from "@dragons/shared";
+import type { StandingItem } from "@dragons/shared";
 import { cn } from "@dragons/ui/lib/utils";
 
 export default async function StandingsPage() {
