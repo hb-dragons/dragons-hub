@@ -8,10 +8,12 @@ export { buildQueryString } from "./query-string";
 export {
   publicEndpoints,
   deviceEndpoints,
+  refereeEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
   PublicTeam,
   RegisterDeviceResponse,
   UnregisterDeviceResponse,
+  RefereeGamesQueryParams,
 } from "./endpoints";
