@@ -807,7 +807,59 @@
     "copied": "Kopiert!",
     "instructionApple": "Kalender → Ablage → Neues Kalenderabo",
     "instructionGoogle": "Einstellungen → Weitere Kalender → Per URL",
-    "instructionOutlook": "Kalender hinzufügen → Aus dem Internet"
+    "instructionOutlook": "Kalender hinzufügen → Aus dem Internet",
+    "countdown": {
+      "today": "Heute",
+      "tomorrow": "Morgen",
+      "inDays": "In {count} Tagen"
+    },
+    "stats": {
+      "teams": "Teams",
+      "wins": "Siege",
+      "losses": "Niederl.",
+      "winRate": "Quote"
+    },
+    "gameDetail": {
+      "final": "Endergebnis",
+      "quarters": "Viertel",
+      "halftime": "HZ",
+      "overtime": "VL",
+      "total": "Gesamt",
+      "headToHead": "Direkter Vergleich",
+      "viewAllH2H": "Alle Begegnungen",
+      "form": "Form",
+      "details": "Details",
+      "venue": "Halle",
+      "address": "Adresse",
+      "scorer": "Anschreiber",
+      "timekeeper": "Zeitnehmer",
+      "status": "Status",
+      "confirmed": "Bestätigt",
+      "cancelled": "Abgesagt",
+      "forfeited": "Kampflos",
+      "win": "S",
+      "loss": "N",
+      "record": "Bilanz",
+      "ptsFor": "Pkt. dafür",
+      "ptsAgainst": "Pkt. dagegen",
+      "noData": "Keine Spieldaten verfügbar"
+    },
+    "teamDetail": {
+      "form": "Form",
+      "seasonStats": "Saison-Statistik",
+      "gamesPlayed": "Sp",
+      "wins": "S",
+      "losses": "N",
+      "pointsDiff": "+/-",
+      "leaguePosition": "Tabellenplatz",
+      "standings": "Tabelle",
+      "recentGames": "Letzte Spiele",
+      "noTeam": "Team nicht gefunden"
+    },
+    "h2h": {
+      "title": "Direkter Vergleich vs {opponent}",
+      "noMatches": "Keine Spiele gefunden"
+    }
   },
   "notifications": {
     "title": "Benachrichtigungen",

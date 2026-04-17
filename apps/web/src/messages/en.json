@@ -807,7 +807,59 @@
     "copied": "Copied!",
     "instructionApple": "Calendar → File → New Calendar Subscription",
     "instructionGoogle": "Settings → Add calendar → From URL",
-    "instructionOutlook": "Add calendar → From the internet"
+    "instructionOutlook": "Add calendar → From the internet",
+    "countdown": {
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "inDays": "In {count} days"
+    },
+    "stats": {
+      "teams": "Teams",
+      "wins": "Wins",
+      "losses": "Losses",
+      "winRate": "Win %"
+    },
+    "gameDetail": {
+      "final": "Final",
+      "quarters": "Quarters",
+      "halftime": "HT",
+      "overtime": "OT",
+      "total": "Total",
+      "headToHead": "Head to Head",
+      "viewAllH2H": "View all meetings",
+      "form": "Form",
+      "details": "Details",
+      "venue": "Venue",
+      "address": "Address",
+      "scorer": "Scorer",
+      "timekeeper": "Timekeeper",
+      "status": "Status",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "forfeited": "Forfeited",
+      "win": "W",
+      "loss": "L",
+      "record": "Record",
+      "ptsFor": "Pts For",
+      "ptsAgainst": "Pts Against",
+      "noData": "No match data available"
+    },
+    "teamDetail": {
+      "form": "Form",
+      "seasonStats": "Season Stats",
+      "gamesPlayed": "GP",
+      "wins": "W",
+      "losses": "L",
+      "pointsDiff": "+/-",
+      "leaguePosition": "League Position",
+      "standings": "Standings",
+      "recentGames": "Recent Games",
+      "noTeam": "Team not found"
+    },
+    "h2h": {
+      "title": "Head to Head vs {opponent}",
+      "noMatches": "No matches found"
+    }
   },
   "notifications": {
     "title": "Notifications",
