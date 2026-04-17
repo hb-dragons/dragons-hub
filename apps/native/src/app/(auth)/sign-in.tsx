@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
   TextInput,
   Pressable,
-  Alert,
   ActivityIndicator,
   StyleSheet,
   KeyboardAvoidingView,
@@ -22,30 +21,32 @@ export default function SignInScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+
+  const canSubmit = useMemo(
+    () => email.trim() !== "" && password !== "" && !loading,
+    [email, password, loading],
+  );
 
   async function handleSignIn() {
-    if (!email || !password) {
-      Alert.alert(i18n.t("auth.error"), i18n.t("auth.fillAllFields"));
-      return;
-    }
-
+    setErrorText(null);
     setLoading(true);
     try {
-      const { error } = await authClient.signIn.email({
-        email,
-        password,
-      });
+      const { error } = await authClient.signIn.email({ email, password });
 
       if (error) {
-        Alert.alert(i18n.t("auth.signInFailed"), error.message ?? i18n.t("auth.unknownError"));
+        const code = (error as { code?: string }).code;
+        if (code === "INVALID_EMAIL_OR_PASSWORD" || code === "INVALID_CREDENTIALS") {
+          setErrorText(i18n.t("auth.invalidCredentials"));
+        } else {
+          setErrorText(error.message ?? i18n.t("auth.unknownError"));
+        }
         return;
       }
 
       router.dismissAll();
-      router.replace("/");
     } catch (err) {
-      Alert.alert(
-        i18n.t("auth.signInFailed"),
+      setErrorText(
         err instanceof Error ? err.message : i18n.t("auth.unexpectedError"),
       );
     } finally {
@@ -53,33 +54,50 @@ export default function SignInScreen() {
     }
   }
 
+  const inputStyle = [
+    textStyles.body,
+    {
+      backgroundColor: colors.input,
+      borderWidth: 1 as const,
+      borderColor: colors.border + "33",
+      borderRadius: radius.md,
+      padding: spacing.md,
+      color: colors.foreground,
+    },
+  ];
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      <Pressable
+        accessibilityLabel={i18n.t("auth.close")}
+        onPress={() => router.dismissAll()}
+        style={[
+          styles.closeButton,
+          { top: spacing.xl, left: spacing.lg, padding: spacing.xs },
+        ]}
+      >
+        <Text style={{ color: colors.foreground, fontSize: 22 }}>×</Text>
+      </Pressable>
+
       <View style={[styles.content, { gap: spacing.lg }]}>
         <Text
           style={[
             textStyles.screenTitle,
-            { color: colors.foreground, textAlign: "center", marginBottom: spacing.xl },
+            {
+              color: colors.foreground,
+              textAlign: "center",
+              marginBottom: spacing.xl,
+            },
           ]}
         >
           DRAGONS
         </Text>
 
         <TextInput
-          style={[
-            textStyles.body,
-            {
-              backgroundColor: colors.input,
-              borderWidth: 1,
-              borderColor: colors.border + "33",
-              borderRadius: radius.md,
-              padding: spacing.md,
-              color: colors.foreground,
-            },
-          ]}
+          style={inputStyle}
           placeholder={i18n.t("auth.email")}
           placeholderTextColor={colors.mutedForeground}
           keyboardType="email-address"
@@ -88,31 +106,31 @@ export default function SignInScreen() {
           value={email}
           onChangeText={setEmail}
           editable={!loading}
+          textContentType="emailAddress"
+          autoComplete="email"
         />
 
         <TextInput
-          style={[
-            textStyles.body,
-            {
-              backgroundColor: colors.input,
-              borderWidth: 1,
-              borderColor: colors.border + "33",
-              borderRadius: radius.md,
-              padding: spacing.md,
-              color: colors.foreground,
-            },
-          ]}
+          style={inputStyle}
           placeholder={i18n.t("auth.password")}
           placeholderTextColor={colors.mutedForeground}
           secureTextEntry
           value={password}
           onChangeText={setPassword}
           editable={!loading}
+          textContentType="password"
+          autoComplete="current-password"
         />
+
+        {errorText ? (
+          <Text style={[textStyles.body, { color: colors.destructive }]}>
+            {errorText}
+          </Text>
+        ) : null}
 
         <Pressable
           onPress={handleSignIn}
-          disabled={loading}
+          disabled={!canSubmit}
           style={[
             {
               backgroundColor: colors.primary,
@@ -121,7 +139,7 @@ export default function SignInScreen() {
               alignItems: "center",
               marginTop: spacing.sm,
             },
-            loading && { opacity: 0.6 },
+            !canSubmit && { opacity: 0.4 },
           ]}
         >
           {loading ? (
@@ -131,17 +149,6 @@ export default function SignInScreen() {
               {i18n.t("auth.signIn")}
             </Text>
           )}
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.push("/(auth)/sign-up")}
-          style={{ alignItems: "center", marginTop: spacing.sm }}
-          disabled={loading}
-        >
-          <Text style={[textStyles.body, { color: colors.primary }]}>
-            {i18n.t("auth.noAccount")}{" "}
-            <Text style={{ fontWeight: "600" }}>{i18n.t("auth.signUp")}</Text>
-          </Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -155,5 +162,9 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 24,
+  },
+  closeButton: {
+    position: "absolute",
+    zIndex: 1,
   },
 });
