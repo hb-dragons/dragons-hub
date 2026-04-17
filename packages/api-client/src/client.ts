@@ -9,17 +9,20 @@ export interface ApiClientOptions {
   baseUrl: string;
   auth?: AuthStrategy;
   fetchFn?: typeof fetch;
+  credentials?: RequestCredentials;
 }
 
 export class ApiClient {
   private readonly baseUrl: string;
   private readonly auth?: AuthStrategy;
   private readonly fetchFn: typeof fetch;
+  private readonly credentials?: RequestCredentials;
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.auth = options.auth;
     this.fetchFn = options.fetchFn ?? globalThis.fetch;
+    this.credentials = options.credentials;
   }
 
   async get<T>(
@@ -60,11 +63,15 @@ export class ApiClient {
       Object.assign(headers, authHeaders);
     }
 
-    const response = await this.fetchFn(url, {
+    const init: RequestInit = {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    };
+    if (this.credentials) {
+      init.credentials = this.credentials;
+    }
+    const response = await this.fetchFn(url, init);
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));

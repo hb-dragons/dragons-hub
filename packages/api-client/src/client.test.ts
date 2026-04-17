@@ -153,4 +153,26 @@ describe("ApiClient", () => {
       expect.anything(),
     );
   });
+
+  it("passes credentials option to fetch when set", async () => {
+    const fetchFn = mockFetch(200, {});
+    const client = new ApiClient({ baseUrl, fetchFn, credentials: "include" });
+
+    await client.get("/items");
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ credentials: "include" }),
+    );
+  });
+
+  it("omits credentials from fetch when not set", async () => {
+    const fetchFn = mockFetch(200, {});
+    const client = new ApiClient({ baseUrl, fetchFn });
+
+    await client.get("/items");
+
+    const callOptions = fetchFn.mock.calls[0]![1]!;
+    expect(callOptions).not.toHaveProperty("credentials");
+  });
 });
