@@ -10,7 +10,9 @@ import { Badge } from "@/components/Badge";
 import { QuarterTable } from "@/components/QuarterTable";
 import { HeadToHead } from "@/components/HeadToHead";
 import { FormStrip } from "@/components/FormStrip";
-import { publicApi } from "@/lib/api";
+import { ClaimGameButton } from "@/components/ClaimGameButton";
+import { authClient } from "@/lib/auth-client";
+import { publicApi, refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { fontFamilies } from "@/theme/typography";
 
@@ -44,6 +46,19 @@ export default function GameDetailScreen() {
   const { data: context } = useSWR(
     hasValidId && match ? `match:${id}:context` : null,
     () => publicApi.getMatchContext(numericId),
+  );
+
+  const { data: session } = authClient.useSession();
+  const isReferee = Boolean(
+    session?.user &&
+      "role" in session.user &&
+      session.user.role === "referee",
+  );
+
+  const { data: refereeGame, mutate: mutateRefereeGame } = useSWR(
+    hasValidId && isReferee ? `referee-match:${id}` : null,
+    () => refereeApi.getGameByMatchId(numericId),
+    { shouldRetryOnError: false },
   );
 
   const homeName = match
@@ -299,6 +314,19 @@ export default function GameDetailScreen() {
             ) : null}
           </View>
         </Card>
+
+        {/* ── 1b. Claim action (referees only) ── */}
+        {refereeGame ? (
+          <View style={{ marginBottom: spacing.md }}>
+            <ClaimGameButton
+              game={refereeGame}
+              revalidateKeys={["referee:games"]}
+              onChanged={async () => {
+                await mutateRefereeGame();
+              }}
+            />
+          </View>
+        ) : null}
 
         {/* ── 2. Quarter Breakdown ── */}
         <View style={{ marginBottom: spacing.md }}>

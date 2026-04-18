@@ -117,7 +117,13 @@
     "title": "My Assignments",
     "empty": "No upcoming assignments",
     "error": "Couldn't load assignments",
-    "retry": "Retry"
+    "retry": "Retry",
+    "segmentMine": "My games",
+    "segmentOpen": "Open",
+    "segmentPast": "Past",
+    "emptyMine": "No games assigned to you",
+    "emptyOpen": "No open games right now",
+    "emptyPast": "No past games yet"
   },
   "refereeGame": {
     "officials": "Officials",
@@ -131,7 +137,26 @@
       "open": "Open",
       "offered": "Offered",
       "assigned": "Assigned"
-    }
+    },
+    "take": "Take this game",
+    "takeSr1": "Take SR1",
+    "takeSr2": "Take SR2",
+    "takeConfirmTitle": "Take this game?",
+    "takeConfirmMessage": "You'll be assigned to this game with the federation.",
+    "takeSuccess": "You're assigned",
+    "takeFailed": "Couldn't take this game",
+    "takeFailedSlotTaken": "This slot was just taken by someone else.",
+    "takeFailedNotQualified": "You're not eligible for this game.",
+    "takeFailedFederation": "Federation rejected the assignment. Try again later.",
+    "taking": "Taking…",
+    "drop": "Drop this game",
+    "dropConfirmTitle": "Drop this game?",
+    "dropConfirmMessage": "You'll be removed from this game with the federation.",
+    "dropConfirmAction": "Drop",
+    "dropSuccess": "You've been removed",
+    "dropFailed": "Couldn't drop this game",
+    "dropFailedNotAssigned": "You're no longer assigned to this game.",
+    "dropFailedFederation": "Federation rejected the change. Try again later."
   },
   "auth": {
     "signIn": "Sign In",

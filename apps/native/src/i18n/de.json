@@ -117,7 +117,13 @@
     "title": "Meine Einsätze",
     "empty": "Keine bevorstehenden Einsätze",
     "error": "Einsätze konnten nicht geladen werden",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "segmentMine": "Meine Spiele",
+    "segmentOpen": "Offen",
+    "segmentPast": "Vergangen",
+    "emptyMine": "Keine Spiele zugeteilt",
+    "emptyOpen": "Aktuell keine offenen Spiele",
+    "emptyPast": "Noch keine vergangenen Spiele"
   },
   "refereeGame": {
     "officials": "Schiedsrichter",
@@ -131,7 +137,26 @@
       "open": "Offen",
       "offered": "Angeboten",
       "assigned": "Zugewiesen"
-    }
+    },
+    "take": "Spiel übernehmen",
+    "takeSr1": "SR1 übernehmen",
+    "takeSr2": "SR2 übernehmen",
+    "takeConfirmTitle": "Spiel übernehmen?",
+    "takeConfirmMessage": "Du wirst beim Verband für dieses Spiel eingeteilt.",
+    "takeSuccess": "Du bist eingeteilt",
+    "takeFailed": "Spiel konnte nicht übernommen werden",
+    "takeFailedSlotTaken": "Dieser Platz wurde gerade von jemand anderem übernommen.",
+    "takeFailedNotQualified": "Du bist für dieses Spiel nicht berechtigt.",
+    "takeFailedFederation": "Der Verband hat die Einteilung abgelehnt. Bitte später erneut versuchen.",
+    "taking": "Übernehme…",
+    "drop": "Spiel abgeben",
+    "dropConfirmTitle": "Spiel abgeben?",
+    "dropConfirmMessage": "Du wirst beim Verband aus der Einteilung entfernt.",
+    "dropConfirmAction": "Abgeben",
+    "dropSuccess": "Du wurdest entfernt",
+    "dropFailed": "Spiel konnte nicht abgegeben werden",
+    "dropFailedNotAssigned": "Du bist nicht mehr für dieses Spiel eingeteilt.",
+    "dropFailedFederation": "Der Verband hat die Änderung abgelehnt. Bitte später erneut versuchen."
   },
   "auth": {
     "signIn": "Anmelden",

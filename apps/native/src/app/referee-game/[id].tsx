@@ -7,6 +7,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
+import { ClaimGameButton } from "@/components/ClaimGameButton";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { fontFamilies } from "@/theme/typography";
@@ -27,6 +28,42 @@ function slotStatusVariant(
   if (status === "assigned") return "default";
   if (status === "offered") return "heat";
   return "secondary";
+}
+
+interface OfficialSlotProps {
+  label: string;
+  name: string | null;
+  status: RefereeGameListItem["sr1Status"];
+}
+
+function OfficialSlot({ label, name, status }: OfficialSlotProps) {
+  const { colors, textStyles, spacing } = useTheme();
+  const displayName = name ?? i18n.t("refereeGame.unassigned");
+  const nameColor = name ? colors.foreground : colors.mutedForeground;
+
+  return (
+    <View style={{ gap: spacing.xs }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: spacing.sm,
+        }}
+      >
+        <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
+          {label}
+        </Text>
+        <Badge
+          label={i18n.t(`refereeGame.status.${status}`)}
+          variant={slotStatusVariant(status)}
+        />
+      </View>
+      <Text style={[textStyles.body, { color: nameColor }]}>
+        {displayName}
+      </Text>
+    </View>
+  );
 }
 
 export default function RefereeGameDetailScreen() {
@@ -211,70 +248,40 @@ export default function RefereeGameDetailScreen() {
             backgroundColor: colors.surfaceLowest,
             borderRadius: radius.md,
             padding: spacing.lg,
-            gap: spacing.sm,
+            gap: spacing.md,
           }}
         >
-          <View style={[detailRowStyle, { alignItems: "center" }]}>
-            <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-              {i18n.t("refereeGame.sr1")}
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.sm,
-                flex: 1,
-                justifyContent: "flex-end",
-              }}
-            >
-              <Text
-                style={[textStyles.body, { color: colors.foreground }]}
-                numberOfLines={1}
-              >
-                {game.sr1Name ?? i18n.t("refereeGame.unassigned")}
-              </Text>
-              <Badge
-                label={i18n.t(`refereeGame.status.${game.sr1Status}`)}
-                variant={slotStatusVariant(game.sr1Status)}
-              />
-            </View>
-          </View>
+          <OfficialSlot
+            label={i18n.t("refereeGame.sr1")}
+            name={game.sr1Name}
+            status={game.sr1Status}
+          />
 
           <View
             style={{
               height: 1,
               backgroundColor: colors.border,
               opacity: 0.25,
-              marginVertical: spacing.xs,
             }}
           />
 
-          <View style={[detailRowStyle, { alignItems: "center" }]}>
-            <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>
-              {i18n.t("refereeGame.sr2")}
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.sm,
-                flex: 1,
-                justifyContent: "flex-end",
-              }}
-            >
-              <Text
-                style={[textStyles.body, { color: colors.foreground }]}
-                numberOfLines={1}
-              >
-                {game.sr2Name ?? i18n.t("refereeGame.unassigned")}
-              </Text>
-              <Badge
-                label={i18n.t(`refereeGame.status.${game.sr2Status}`)}
-                variant={slotStatusVariant(game.sr2Status)}
-              />
-            </View>
-          </View>
+          <OfficialSlot
+            label={i18n.t("refereeGame.sr2")}
+            name={game.sr2Name}
+            status={game.sr2Status}
+          />
         </View>
+      </View>
+
+      {/* ── 2b. Claim action ── */}
+      <View style={{ marginBottom: spacing.md }}>
+        <ClaimGameButton
+          game={game}
+          revalidateKeys={["referee:games"]}
+          onChanged={async () => {
+            await mutate();
+          }}
+        />
       </View>
 
       {/* ── 3. Details ── */}
