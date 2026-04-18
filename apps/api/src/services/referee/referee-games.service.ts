@@ -18,6 +18,7 @@ const refereeGameColumns = {
   leagueShort: refereeGames.leagueShort,
   venueName: refereeGames.venueName,
   venueCity: refereeGames.venueCity,
+  homeTeamId: refereeGames.homeTeamId,
   sr1OurClub: refereeGames.sr1OurClub,
   sr2OurClub: refereeGames.sr2OurClub,
   sr1Name: refereeGames.sr1Name,
@@ -57,7 +58,7 @@ export async function getRefereeGameById(id: number): Promise<RefereeGameListIte
     .where(eq(refereeGames.id, id))
     .limit(1);
   if (!row) return null;
-  return { ...row, mySlot: null } as RefereeGameListItem;
+  return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
 }
 
 interface GetRefereeGamesParams {
@@ -119,7 +120,11 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
   ]);
 
   const total = countResult[0]?.count ?? 0;
-  const decorated = items.map((row) => ({ ...row, mySlot: null as null })) as RefereeGameListItem[];
+  const decorated = items.map((row) => ({
+    ...row,
+    mySlot: null as null,
+    claimableSlots: [] as (1 | 2)[],
+  })) as RefereeGameListItem[];
   return {
     items: decorated,
     total, limit, offset,

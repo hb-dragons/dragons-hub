@@ -16,6 +16,7 @@ import {
 } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
 import { refereeGameColumns, computeMySlot } from "./referee-games.service";
+import { resolveClaimableSlots } from "./referee-slot-resolver";
 
 function buildAssignedToMe(refereeApiId: number | null) {
   if (refereeApiId == null) return null;
@@ -169,6 +170,7 @@ export async function getVisibleRefereeGames(
   const decorated = items.map((row) => ({
     ...row,
     mySlot: computeMySlot(row, referee.apiId ?? null),
+    claimableSlots: resolveClaimableSlots(row, referee, rules),
   })) as RefereeGameListItem[];
   return {
     items: decorated,
@@ -250,6 +252,73 @@ function buildAwayVisibility(
 }
 
 /**
+ * Fetch a single referee game by internal match id if it matches the referee's visibility.
+ * Returns null when no referee-game exists for the match or the referee cannot see it.
+ */
+export async function getVisibleRefereeGameByMatchId(
+  refereeId: number,
+  matchId: number,
+): Promise<RefereeGameListItem | null> {
+  const [referee] = await db
+    .select({
+      apiId: referees.apiId,
+      allowAllHomeGames: referees.allowAllHomeGames,
+      allowAwayGames: referees.allowAwayGames,
+      isOwnClub: referees.isOwnClub,
+    })
+    .from(referees)
+    .where(eq(referees.id, refereeId));
+
+  if (!referee || !referee.isOwnClub) return null;
+
+  const rules = await db
+    .select({
+      teamId: refereeAssignmentRules.teamId,
+      deny: refereeAssignmentRules.deny,
+      allowSr1: refereeAssignmentRules.allowSr1,
+      allowSr2: refereeAssignmentRules.allowSr2,
+    })
+    .from(refereeAssignmentRules)
+    .where(eq(refereeAssignmentRules.refereeId, refereeId));
+
+  const homeVisibility = buildHomeVisibility(referee, rules);
+  const awayVisibility = buildAwayVisibility(referee);
+
+  const visibilityParts = [homeVisibility, awayVisibility].filter(
+    (p): p is NonNullable<typeof p> => p != null,
+  );
+  const visibilityCondition = visibilityParts.length === 0
+    ? null
+    : visibilityParts.length === 1
+      ? visibilityParts[0]!
+      : or(...visibilityParts)!;
+
+  const assignedToMe = buildAssignedToMe(referee.apiId ?? null);
+
+  const accessParts = [visibilityCondition, assignedToMe].filter(
+    (p): p is NonNullable<typeof p> => p != null,
+  );
+  if (accessParts.length === 0) return null;
+
+  const accessCondition = accessParts.length === 1
+    ? accessParts[0]!
+    : or(...accessParts)!;
+
+  const [row] = await db
+    .select(refereeGameColumns)
+    .from(refereeGames)
+    .where(and(eq(refereeGames.matchId, matchId), accessCondition)!)
+    .limit(1);
+
+  if (!row) return null;
+  return {
+    ...row,
+    mySlot: computeMySlot(row, referee.apiId ?? null),
+    claimableSlots: resolveClaimableSlots(row, referee, rules),
+  } as RefereeGameListItem;
+}
+
+/**
  * Fetch a single referee game by id if it matches the referee's visibility rules.
  * Returns null when the game does not exist or the referee cannot see it.
  */
@@ -312,5 +381,6 @@ export async function getVisibleRefereeGameById(
   return {
     ...row,
     mySlot: computeMySlot(row, referee.apiId ?? null),
+    claimableSlots: resolveClaimableSlots(row, referee, rules),
   } as RefereeGameListItem;
 }

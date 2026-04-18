@@ -1,4 +1,9 @@
-import type { PaginatedResponse, RefereeGameListItem } from "@dragons/shared";
+import type {
+  AssignRefereeResponse,
+  PaginatedResponse,
+  RefereeGameListItem,
+  UnassignRefereeResponse,
+} from "@dragons/shared";
 import type { ApiClient } from "../client";
 
 export interface RefereeGamesQueryParams {
@@ -9,6 +14,10 @@ export interface RefereeGamesQueryParams {
   league?: string;
   dateFrom?: string;
   dateTo?: string;
+}
+
+export interface ClaimGameParams {
+  slotNumber?: 1 | 2;
 }
 
 export function refereeEndpoints(client: ApiClient) {
@@ -23,6 +32,18 @@ export function refereeEndpoints(client: ApiClient) {
     },
     getGame(id: number): Promise<RefereeGameListItem> {
       return client.get(`/referee/games/${id}`);
+    },
+    getGameByMatchId(matchId: number): Promise<RefereeGameListItem> {
+      return client.get(`/referee/matches/${matchId}`);
+    },
+    claimGame(
+      id: number,
+      params?: ClaimGameParams,
+    ): Promise<AssignRefereeResponse> {
+      return client.post(`/referee/games/${id}/claim`, params ?? {});
+    },
+    unclaimGame(id: number): Promise<UnassignRefereeResponse> {
+      return client.delete(`/referee/games/${id}/claim`);
     },
   };
 }

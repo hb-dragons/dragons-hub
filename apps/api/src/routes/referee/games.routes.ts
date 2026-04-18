@@ -9,7 +9,9 @@ import {
 import {
   getVisibleRefereeGames,
   getVisibleRefereeGameById,
+  getVisibleRefereeGameByMatchId,
 } from "../../services/referee/referee-game-visibility.service";
+import { refereeGames } from "@dragons/db/schema";
 import { db } from "../../config/database";
 import { user as userTable } from "@dragons/db/schema";
 
@@ -46,6 +48,44 @@ refereeGamesRoutes.get("/games", async (c) => {
 
   const result = await getVisibleRefereeGames(userRow.refereeId, params);
   return c.json(result);
+});
+
+refereeGamesRoutes.get("/matches/:matchId", async (c) => {
+  const matchId = Number(c.req.param("matchId"));
+  if (!Number.isInteger(matchId) || matchId <= 0) {
+    return c.json({ error: "Invalid matchId", code: "VALIDATION_ERROR" }, 400);
+  }
+
+  const sessionUser = c.get("user");
+
+  if (sessionUser.role === "admin") {
+    const [row] = await db
+      .select()
+      .from(refereeGames)
+      .where(eq(refereeGames.matchId, matchId))
+      .limit(1);
+    if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    return c.json({
+      ...row,
+      isTrackedLeague: row.matchId != null,
+      mySlot: null,
+      claimableSlots: [],
+    });
+  }
+
+  const [userRow] = await db
+    .select({ refereeId: userTable.refereeId })
+    .from(userTable)
+    .where(eq(userTable.id, sessionUser.id))
+    .limit(1);
+
+  if (!userRow?.refereeId) {
+    return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
+  }
+
+  const row = await getVisibleRefereeGameByMatchId(userRow.refereeId, matchId);
+  if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+  return c.json(row);
 });
 
 refereeGamesRoutes.get("/games/:id", async (c) => {

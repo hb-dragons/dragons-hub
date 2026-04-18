@@ -4,6 +4,8 @@ import type { AppEnv } from "../../types";
 
 const mocks = vi.hoisted(() => ({
   assignReferee: vi.fn(),
+  claimRefereeGame: vi.fn(),
+  unclaimRefereeGame: vi.fn(),
   getSession: vi.fn(),
   dbSelect: vi.fn(),
 }));
@@ -15,6 +17,11 @@ vi.mock("../../services/referee/referee-assignment.service", () => ({
       super(message);
     }
   },
+}));
+
+vi.mock("../../services/referee/referee-claim.service", () => ({
+  claimRefereeGame: mocks.claimRefereeGame,
+  unclaimRefereeGame: mocks.unclaimRefereeGame,
 }));
 
 vi.mock("../../config/auth", () => ({
@@ -360,5 +367,251 @@ describe("POST /games/:spielplanId/assign", () => {
 
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ code: "DENY_RULE" });
+  });
+});
+
+describe("POST /games/:id/claim", () => {
+  it("returns 401 when no session", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    const res = await app.request("/games/5/claim", { method: "POST" });
+
+    expect(res.status).toBe(401);
+    expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when user role is admin (admins use /assign)", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "admin" } });
+
+    const res = await app.request("/games/5/claim", { method: "POST" });
+
+    expect(res.status).toBe(403);
+    expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when user role is not referee", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "member" } });
+
+    const res = await app.request("/games/5/claim", { method: "POST" });
+
+    expect(res.status).toBe(403);
+    expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid id", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+
+    const res = await app.request("/games/abc/claim", { method: "POST" });
+
+    expect(res.status).toBe(400);
+    expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when referee has no linked refereeId", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: null }]);
+
+    const res = await app.request("/games/5/claim", { method: "POST" });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "FORBIDDEN" });
+    expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
+  });
+
+  it("claims with auto-picked slot when no body", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+    mocks.claimRefereeGame.mockResolvedValue({
+      success: true,
+      slot: "sr1",
+      status: "assigned",
+      refereeName: "Hans Muster",
+    });
+
+    const res = await app.request("/games/5/claim", { method: "POST" });
+
+    expect(res.status).toBe(200);
+    expect(mocks.claimRefereeGame).toHaveBeenCalledWith({
+      refereeId: 7,
+      gameId: 5,
+      slotNumber: undefined,
+    });
+  });
+
+  it("claims with explicit slotNumber", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+    mocks.claimRefereeGame.mockResolvedValue({
+      success: true,
+      slot: "sr2",
+      status: "assigned",
+      refereeName: "Hans Muster",
+    });
+
+    const res = await app.request("/games/5/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 2 }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.claimRefereeGame).toHaveBeenCalledWith({
+      refereeId: 7,
+      gameId: 5,
+      slotNumber: 2,
+    });
+  });
+
+  it("returns 400 when body is malformed JSON", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+
+    const res = await app.request("/games/5/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not-json",
+    });
+
+    expect(res.status).toBe(400);
+    expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
+  });
+
+  it("maps SLOT_TAKEN from service to 409", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+    const { AssignmentError } = await import(
+      "../../services/referee/referee-assignment.service"
+    );
+    mocks.claimRefereeGame.mockRejectedValue(
+      new AssignmentError("taken", "SLOT_TAKEN"),
+    );
+
+    const res = await app.request("/games/5/claim", { method: "POST" });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "SLOT_TAKEN" });
+  });
+
+  it("maps NOT_OWN_CLUB from service to 403", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+    const { AssignmentError } = await import(
+      "../../services/referee/referee-assignment.service"
+    );
+    mocks.claimRefereeGame.mockRejectedValue(
+      new AssignmentError("not own club", "NOT_OWN_CLUB"),
+    );
+
+    const res = await app.request("/games/5/claim", { method: "POST" });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "NOT_OWN_CLUB" });
+  });
+
+  it("re-throws unknown errors to error handler", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+    mocks.claimRefereeGame.mockRejectedValue(new Error("boom"));
+
+    const res = await app.request("/games/5/claim", { method: "POST" });
+
+    expect(res.status).toBe(500);
+  });
+});
+
+describe("DELETE /games/:id/claim", () => {
+  it("returns 401 when no session", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    const res = await app.request("/games/5/claim", { method: "DELETE" });
+
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when user role is not referee", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "admin" } });
+
+    const res = await app.request("/games/5/claim", { method: "DELETE" });
+
+    expect(res.status).toBe(403);
+    expect(mocks.unclaimRefereeGame).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for invalid id", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+
+    const res = await app.request("/games/abc/claim", { method: "DELETE" });
+
+    expect(res.status).toBe(400);
+    expect(mocks.unclaimRefereeGame).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when referee has no linked refereeId", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: null }]);
+
+    const res = await app.request("/games/5/claim", { method: "DELETE" });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("unclaims and returns response", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+    mocks.unclaimRefereeGame.mockResolvedValue({
+      success: true,
+      slot: "sr1",
+      status: "open",
+    });
+
+    const res = await app.request("/games/5/claim", { method: "DELETE" });
+
+    expect(res.status).toBe(200);
+    expect(mocks.unclaimRefereeGame).toHaveBeenCalledWith({
+      refereeId: 7,
+      gameId: 5,
+    });
+  });
+
+  it("maps NOT_ASSIGNED from service to 409", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+    const { AssignmentError } = await import(
+      "../../services/referee/referee-assignment.service"
+    );
+    mocks.unclaimRefereeGame.mockRejectedValue(
+      new AssignmentError("not assigned", "NOT_ASSIGNED"),
+    );
+
+    const res = await app.request("/games/5/claim", { method: "DELETE" });
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "NOT_ASSIGNED" });
+  });
+
+  it("maps FEDERATION_ERROR from service to 502", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+    const { AssignmentError } = await import(
+      "../../services/referee/referee-assignment.service"
+    );
+    mocks.unclaimRefereeGame.mockRejectedValue(
+      new AssignmentError("federation", "FEDERATION_ERROR"),
+    );
+
+    const res = await app.request("/games/5/claim", { method: "DELETE" });
+
+    expect(res.status).toBe(502);
+  });
+
+  it("re-throws unknown errors", async () => {
+    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
+    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
+    mocks.unclaimRefereeGame.mockRejectedValue(new Error("boom"));
+
+    const res = await app.request("/games/5/claim", { method: "DELETE" });
+
+    expect(res.status).toBe(500);
   });
 });

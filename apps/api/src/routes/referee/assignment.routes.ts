@@ -9,11 +9,21 @@ import {
   assignReferee,
   AssignmentError,
 } from "../../services/referee/referee-assignment.service";
+import {
+  claimRefereeGame,
+  unclaimRefereeGame,
+} from "../../services/referee/referee-claim.service";
 
 const assignBodySchema = z.object({
   slotNumber: z.union([z.literal(1), z.literal(2)]),
   refereeApiId: z.number().int().positive(),
 });
+
+const claimBodySchema = z
+  .object({
+    slotNumber: z.union([z.literal(1), z.literal(2)]).optional(),
+  })
+  .optional();
 
 const ERROR_STATUS_MAP: Record<string, number> = {
   GAME_NOT_FOUND: 404,
@@ -22,6 +32,8 @@ const ERROR_STATUS_MAP: Record<string, number> = {
   DENY_RULE: 403,
   FEDERATION_ERROR: 502,
   FORBIDDEN: 403,
+  NOT_OWN_CLUB: 403,
+  NOT_ASSIGNED: 409,
 };
 
 const refereeAssignmentRoutes = new Hono<AppEnv>();
@@ -78,6 +90,95 @@ refereeAssignmentRoutes.post("/games/:spielplanId/assign", async (c) => {
 
   try {
     const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
+    return c.json(result);
+  } catch (error) {
+    if (error instanceof AssignmentError) {
+      const status = ERROR_STATUS_MAP[error.code] ?? 500;
+      return c.json({ error: error.message, code: error.code }, status as never);
+    }
+    throw error;
+  }
+});
+
+refereeAssignmentRoutes.post("/games/:id/claim", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) {
+    return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+  }
+
+  if (session.user.role !== "referee") {
+    return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
+  }
+
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0) {
+    return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
+  }
+
+  const [userRow] = await db
+    .select({ refereeId: userTable.refereeId })
+    .from(userTable)
+    .where(eq(userTable.id, session.user.id))
+    .limit(1);
+
+  if (!userRow?.refereeId) {
+    return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
+  }
+
+  let parsed: { slotNumber?: 1 | 2 } | undefined;
+  try {
+    const raw = await c.req.text();
+    parsed = raw ? claimBodySchema.parse(JSON.parse(raw)) : undefined;
+  } catch {
+    return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
+  }
+
+  try {
+    const result = await claimRefereeGame({
+      refereeId: userRow.refereeId,
+      gameId: id,
+      slotNumber: parsed?.slotNumber,
+    });
+    return c.json(result);
+  } catch (error) {
+    if (error instanceof AssignmentError) {
+      const status = ERROR_STATUS_MAP[error.code] ?? 500;
+      return c.json({ error: error.message, code: error.code }, status as never);
+    }
+    throw error;
+  }
+});
+
+refereeAssignmentRoutes.delete("/games/:id/claim", async (c) => {
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) {
+    return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+  }
+
+  if (session.user.role !== "referee") {
+    return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
+  }
+
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0) {
+    return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
+  }
+
+  const [userRow] = await db
+    .select({ refereeId: userTable.refereeId })
+    .from(userTable)
+    .where(eq(userTable.id, session.user.id))
+    .limit(1);
+
+  if (!userRow?.refereeId) {
+    return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
+  }
+
+  try {
+    const result = await unclaimRefereeGame({
+      refereeId: userRow.refereeId,
+      gameId: id,
+    });
     return c.json(result);
   } catch (error) {
     if (error instanceof AssignmentError) {

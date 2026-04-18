@@ -11,6 +11,7 @@ export interface RefereeGameListItem {
   leagueShort: string | null;
   venueName: string | null;
   venueCity: string | null;
+  homeTeamId: number | null;
   sr1OurClub: boolean;
   sr2OurClub: boolean;
   sr1Name: string | null;
@@ -27,4 +28,6 @@ export interface RefereeGameListItem {
   lastSyncedAt: string | null;
   /** 1 or 2 if the currently authenticated referee is assigned to that slot, else null. */
   mySlot: 1 | 2 | null;
+  /** Slots the current user is allowed to claim on this game. Empty for admins. */
+  claimableSlots: (1 | 2)[];
 }
