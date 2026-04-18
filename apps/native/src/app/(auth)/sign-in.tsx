@@ -23,6 +23,14 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
+  function dismiss() {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/");
+    }
+  }
+
   const canSubmit = useMemo(
     () => email.trim() !== "" && password !== "" && !loading,
     [email, password, loading],
@@ -43,7 +51,7 @@ export default function SignInScreen() {
         return;
       }
 
-      router.back();
+      dismiss();
     } catch (err) {
       setErrorText(
         err instanceof Error ? err.message : i18n.t("auth.unexpectedError"),
@@ -75,7 +83,7 @@ export default function SignInScreen() {
         accessibilityRole="button"
         disabled={loading}
         hitSlop={12}
-        onPress={() => router.back()}
+        onPress={dismiss}
         style={[
           styles.closeButton,
           { top: spacing.xl, left: spacing.lg, padding: spacing.md },
