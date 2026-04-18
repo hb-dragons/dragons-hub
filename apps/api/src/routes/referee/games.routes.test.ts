@@ -7,7 +7,9 @@ const mocks = vi.hoisted(() => ({
   getRefereeGameById: vi.fn(),
   getVisibleRefereeGames: vi.fn(),
   getVisibleRefereeGameById: vi.fn(),
+  getVisibleRefereeGameByMatchId: vi.fn(),
   dbSelect: vi.fn(),
+  refereeGamesSelect: vi.fn(),
   user: null as { role: string; id: string } | null,
 }));
 
@@ -29,11 +31,33 @@ vi.mock("../../services/referee/referee-games.service", () => ({
 vi.mock("../../services/referee/referee-game-visibility.service", () => ({
   getVisibleRefereeGames: mocks.getVisibleRefereeGames,
   getVisibleRefereeGameById: mocks.getVisibleRefereeGameById,
+  getVisibleRefereeGameByMatchId: mocks.getVisibleRefereeGameByMatchId,
 }));
+
+type Target = "user" | "refereeGames";
+const selectTargets: { current: Target } = { current: "user" };
 
 vi.mock("../../config/database", () => ({
   db: {
-    select: () => ({ from: () => ({ where: () => ({ limit: mocks.dbSelect }) }) }),
+    select: (arg?: unknown) => {
+      // admin /matches path: select() without args, then .from(refereeGames)
+      // referee /matches path: select({ refereeId: ... }), then .from(userTable)
+      const isProjection = arg !== undefined;
+      return {
+        from: (table: unknown) => {
+          if (table === "refereeGames-table") selectTargets.current = "refereeGames";
+          else if (isProjection) selectTargets.current = "user";
+          return {
+            where: () => ({
+              limit: () =>
+                selectTargets.current === "refereeGames"
+                  ? mocks.refereeGamesSelect()
+                  : mocks.dbSelect(),
+            }),
+          };
+        },
+      };
+    },
   },
 }));
 
@@ -43,6 +67,7 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@dragons/db/schema", () => ({
   user: { id: "u.id", refereeId: "u.refereeId" },
+  refereeGames: "refereeGames-table",
 }));
 
 import { refereeGamesRoutes } from "./games.routes";
@@ -57,6 +82,7 @@ function json(response: Response) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.user = null;
+  selectTargets.current = "user";
 });
 
 describe("GET /games", () => {
@@ -269,6 +295,108 @@ describe("GET /games/:id", () => {
       expect(res.status).toBe(403);
       expect(await json(res)).toMatchObject({ code: "FORBIDDEN" });
       expect(mocks.getVisibleRefereeGameById).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("GET /matches/:matchId", () => {
+  describe("admin user", () => {
+    beforeEach(() => {
+      mocks.user = { role: "admin", id: "admin-1" };
+    });
+
+    it("returns the refereeGames row with admin envelope", async () => {
+      const row = { id: 1, matchId: 500, apiMatchId: 9000 };
+      mocks.refereeGamesSelect.mockResolvedValueOnce([row]);
+
+      const res = await app.request("/matches/500");
+
+      expect(res.status).toBe(200);
+      expect(await json(res)).toEqual({
+        ...row,
+        isTrackedLeague: true,
+        mySlot: null,
+        claimableSlots: [],
+      });
+      expect(mocks.getVisibleRefereeGameByMatchId).not.toHaveBeenCalled();
+    });
+
+    it("sets isTrackedLeague false when matchId is null", async () => {
+      const row = { id: 2, matchId: null, apiMatchId: 9001 };
+      mocks.refereeGamesSelect.mockResolvedValueOnce([row]);
+
+      const res = await app.request("/matches/501");
+
+      expect(await json(res)).toMatchObject({ isTrackedLeague: false });
+    });
+
+    it("returns 404 when row missing", async () => {
+      mocks.refereeGamesSelect.mockResolvedValueOnce([]);
+
+      const res = await app.request("/matches/999");
+
+      expect(res.status).toBe(404);
+      expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+    });
+
+    it("returns 400 on non-integer matchId", async () => {
+      const res = await app.request("/matches/abc");
+      expect(res.status).toBe(400);
+      expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+      expect(mocks.refereeGamesSelect).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 on non-positive matchId", async () => {
+      const res = await app.request("/matches/0");
+      expect(res.status).toBe(400);
+      expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    });
+  });
+
+  describe("referee user", () => {
+    beforeEach(() => {
+      mocks.user = { role: "referee", id: "ref-user-1" };
+    });
+
+    it("returns visible row via getVisibleRefereeGameByMatchId", async () => {
+      mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 42 }]);
+      const row = { id: 7, matchId: 500, mySlot: null };
+      mocks.getVisibleRefereeGameByMatchId.mockResolvedValue(row);
+
+      const res = await app.request("/matches/500");
+
+      expect(res.status).toBe(200);
+      expect(await json(res)).toEqual(row);
+      expect(mocks.getVisibleRefereeGameByMatchId).toHaveBeenCalledWith(42, 500);
+    });
+
+    it("returns 404 when referee cannot see match", async () => {
+      mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 42 }]);
+      mocks.getVisibleRefereeGameByMatchId.mockResolvedValue(null);
+
+      const res = await app.request("/matches/500");
+
+      expect(res.status).toBe(404);
+      expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+    });
+
+    it("returns 403 when refereeId is null", async () => {
+      mocks.dbSelect.mockResolvedValueOnce([{ refereeId: null }]);
+
+      const res = await app.request("/matches/500");
+
+      expect(res.status).toBe(403);
+      expect(await json(res)).toMatchObject({ code: "FORBIDDEN" });
+      expect(mocks.getVisibleRefereeGameByMatchId).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 when user row missing", async () => {
+      mocks.dbSelect.mockResolvedValueOnce([]);
+
+      const res = await app.request("/matches/500");
+
+      expect(res.status).toBe(403);
+      expect(await json(res)).toMatchObject({ code: "FORBIDDEN" });
     });
   });
 });
