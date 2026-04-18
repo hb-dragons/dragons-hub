@@ -6,7 +6,6 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { LocaleProvider } from "@/hooks/useLocale";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
 import { fontAssets } from "@/theme/typography";
@@ -18,9 +17,20 @@ SplashScreen.preventAutoHideAsync();
 
 void i18n;
 
+// Install a global JS error handler that logs to NSLog BEFORE RCTFatal aborts
+// the app in Release builds. Readable via `idevicesyslog | grep DRAGONS_JS_ERROR`.
+const existingHandler = ErrorUtils.getGlobalHandler();
+ErrorUtils.setGlobalHandler((error, isFatal) => {
+  const err = error as Error | undefined;
+  // eslint-disable-next-line no-console
+  console.warn(
+    `DRAGONS_JS_ERROR fatal=${String(isFatal)} name=${err?.name} msg=${err?.message} stack=${err?.stack?.split("\n").slice(0, 8).join(" | ")}`,
+  );
+  existingHandler(error, isFatal);
+});
+
 function RootNavigator() {
   const { colors, isDark } = useTheme();
-  usePushNotifications();
 
   const detailHeaderOptions = {
     headerShown: true,

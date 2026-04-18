@@ -28,7 +28,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { data: session } = authClient.useSession();
 
-  const initial = session?.user.name?.trim().charAt(0).toUpperCase() ?? "";
+  const initial = session?.user?.name?.trim().charAt(0).toUpperCase() ?? "";
   const isSignedIn = Boolean(session);
 
   const { data: dashboard, isLoading } = useSWR("home:dashboard", () =>

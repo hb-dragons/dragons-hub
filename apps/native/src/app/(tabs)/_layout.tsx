@@ -13,7 +13,7 @@ export default function TabLayout() {
   const { colors } = useTheme();
   const { data: session } = authClient.useSession();
   const canRef = hasRefereeAccess(
-    session && "role" in session.user ? session.user.role : undefined,
+    session?.user && "role" in session.user ? session.user.role : undefined,
   );
 
   const router = useRouter();
