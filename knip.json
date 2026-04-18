@@ -31,7 +31,8 @@
     },
     "apps/native": {
       "project": ["src/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["expo-updates", "expo-system-ui"]
+      "ignore": ["src/hooks/usePushNotifications.ts"],
+      "ignoreDependencies": ["expo-updates", "expo-system-ui", "expo-notifications"]
     }
   },
   "ignore": [
