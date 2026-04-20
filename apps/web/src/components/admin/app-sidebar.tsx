@@ -37,7 +37,6 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { UserButton } from "@daveyplate/better-auth-ui";
-import { Logo } from "@/components/brand/logo";
 import { Wordmark } from "@/components/brand/wordmark";
 
 const navGroups = [
@@ -114,14 +113,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton size="lg" asChild className="justify-center">
               <Link href="/admin" aria-label="Dragons">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Logo size={20} alt="" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <Wordmark width={120} alt="" />
-                </div>
+                <Wordmark width={140} alt="" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
