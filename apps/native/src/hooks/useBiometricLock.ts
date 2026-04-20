@@ -8,22 +8,32 @@ export function useBiometricLock() {
   const [isSupported, setIsSupported] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  // `isReady` stays false until we've read SecureStore and know whether the
+  // app should start in the locked state. Without this, callers see
+  // `isLocked === false` for the first render pass even when biometric is
+  // enabled, which lets the authed tree render for a frame before the async
+  // init flips the lock on.
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     async function init() {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      setIsSupported(hasHardware && isEnrolled);
-
       const stored = await SecureStore.getItemAsync(BIOMETRIC_KEY);
       const enabled = stored === "true";
+
+      if (cancelled) return;
+      setIsSupported(hasHardware && isEnrolled);
       setIsEnabled(enabled);
-      if (enabled) {
-        setIsLocked(true);
-      }
+      setIsLocked(enabled);
+      setIsReady(true);
     }
 
     void init();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const authenticate = useCallback(async (): Promise<boolean> => {
@@ -53,5 +63,5 @@ export function useBiometricLock() {
     }
   }, [isEnabled]);
 
-  return { isEnabled, isLocked, isSupported, authenticate, toggle };
+  return { isEnabled, isLocked, isSupported, isReady, authenticate, toggle };
 }

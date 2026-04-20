@@ -114,28 +114,38 @@ function UnlockScreen({ onRetry }: { onRetry: () => void }) {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts(fontAssets);
-  const { isLocked, authenticate } = useBiometricLock();
+  const { isLocked, isReady: biometricReady, authenticate } = useBiometricLock();
   const { isPending: sessionPending } = authClient.useSession();
   const [authFailed, setAuthFailed] = useState(false);
 
+  // Gating: the authed tree must only render once every independent guard has
+  // settled. Three async sources feed this decision:
+  //   1. `fontsLoaded`     — expo-font has loaded custom faces.
+  //   2. `!sessionPending` — better-auth has restored (or not) the session.
+  //   3. `biometricReady`  — SecureStore has been read so `isLocked` is
+  //                          definitive; before this flag is true, `isLocked`
+  //                          defaults to `false` and would let the authed tree
+  //                          render for a frame when the user actually has the
+  //                          lock enabled.
+  // Once all three are ready, we either show the Unlock screen (when locked
+  // and auth has failed) or render the app. Splash stays up until the first
+  // definitive decision is made.
+  const isGateReady = fontsLoaded && !sessionPending && biometricReady;
+
   useEffect(() => {
-    if (!fontsLoaded || sessionPending) return;
+    if (!isGateReady) return;
 
     if (isLocked) {
       void authenticate().then((success) => {
-        if (success) {
-          void SplashScreen.hideAsync();
-        } else {
-          setAuthFailed(true);
-          void SplashScreen.hideAsync();
-        }
+        if (!success) setAuthFailed(true);
+        void SplashScreen.hideAsync();
       });
     } else {
       void SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, sessionPending, isLocked, authenticate]);
+  }, [isGateReady, isLocked, authenticate]);
 
-  if (!fontsLoaded || sessionPending) {
+  if (!isGateReady) {
     return null;
   }
 
