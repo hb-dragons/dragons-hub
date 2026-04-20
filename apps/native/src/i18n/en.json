@@ -182,5 +182,11 @@
     "loading": "Loading…",
     "vs": "vs",
     "at": "@"
+  },
+  "error": {
+    "boundary": {
+      "title": "Something went wrong",
+      "reload": "Reload"
+    }
   }
 }

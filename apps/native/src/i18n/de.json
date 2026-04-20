@@ -182,5 +182,11 @@
     "loading": "Laden…",
     "vs": "vs",
     "at": "@"
+  },
+  "error": {
+    "boundary": {
+      "title": "Etwas ist schiefgegangen",
+      "reload": "Neu laden"
+    }
   }
 }
