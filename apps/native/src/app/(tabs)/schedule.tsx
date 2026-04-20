@@ -1,9 +1,20 @@
-import { useState, useMemo, useCallback } from "react";
-import { View, Text, SectionList, ScrollView, ActivityIndicator, Pressable } from "react-native";
+import { useMemo, useState, useCallback } from "react";
+import type { ReactElement } from "react";
+import {
+  View,
+  Text,
+  SectionList,
+  ScrollView,
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+} from "react-native";
+import type { RefreshControlProps } from "react-native";
 import type { MatchListItem } from "@dragons/shared";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
 import { useTheme } from "@/hooks/useTheme";
+import { useRefresh } from "@/hooks/useRefresh";
 import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
 import { FilterPill } from "@/components/FilterPill";
@@ -116,13 +127,11 @@ function SegmentedControl({
 function MatchList({
   sections,
   isLoading,
-  onRefresh,
-  refreshing,
+  refreshControl,
 }: {
   sections: Section[];
   isLoading: boolean;
-  onRefresh?: () => void;
-  refreshing?: boolean;
+  refreshControl?: ReactElement<RefreshControlProps>;
 }) {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
@@ -176,14 +185,15 @@ function MatchList({
           />
         </View>
       )}
-      onRefresh={onRefresh}
-      refreshing={refreshing ?? false}
-      contentContainerStyle={{ paddingBottom: 100 }}
+      refreshControl={refreshControl}
+      contentContainerStyle={SECTION_LIST_CONTENT_STYLE}
       showsVerticalScrollIndicator={false}
       stickySectionHeadersEnabled={false}
     />
   );
 }
+
+const SECTION_LIST_CONTENT_STYLE = { paddingBottom: 100 } as const;
 
 /* ── Main Screen ── */
 export default function ScheduleScreen() {
@@ -207,6 +217,35 @@ export default function ScheduleScreen() {
     mutate: mutateResults,
   } = useSWR("schedule:results", () =>
     publicApi.getMatches({ limit: 1000, sort: "desc", dateTo: getToday(), hasScore: true }),
+  );
+
+  const upcomingRefresh = useRefresh(() => mutateUpcoming());
+  const resultsRefresh = useRefresh(() => mutateResults());
+
+  const upcomingRefreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={upcomingRefresh.refreshing}
+        onRefresh={() => {
+          void upcomingRefresh.onRefresh();
+        }}
+        tintColor={colors.primary}
+      />
+    ),
+    [upcomingRefresh.refreshing, upcomingRefresh.onRefresh, colors.primary],
+  );
+
+  const resultsRefreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={resultsRefresh.refreshing}
+        onRefresh={() => {
+          void resultsRefresh.onRefresh();
+        }}
+        tintColor={colors.primary}
+      />
+    ),
+    [resultsRefresh.refreshing, resultsRefresh.onRefresh, colors.primary],
   );
 
   const upcoming = upcomingData?.items ?? [];
@@ -265,15 +304,13 @@ export default function ScheduleScreen() {
         <MatchList
           sections={upcomingSections}
           isLoading={upcomingLoading}
-          onRefresh={() => { mutateUpcoming(); }}
-          refreshing={false}
+          refreshControl={upcomingRefreshControl}
         />
       ) : (
         <MatchList
           sections={resultsSections}
           isLoading={resultsLoading}
-          onRefresh={() => { mutateResults(); }}
-          refreshing={false}
+          refreshControl={resultsRefreshControl}
         />
       )}
     </Screen>

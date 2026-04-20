@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 import useSWR from "swr";
 import type { RefereeGameListItem } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
+import { useRefresh } from "@/hooks/useRefresh";
 import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
 import { RefereeGameCard } from "@/components/RefereeGameCard";
@@ -167,15 +168,25 @@ export default function RefereeScreen() {
     () => refereeApi.getGames({ status: "active", limit: 500 }),
   );
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      await mutate();
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [mutate]);
+  const { refreshing, onRefresh } = useRefresh(() => mutate());
+
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={() => {
+          void onRefresh();
+        }}
+        tintColor={colors.primary}
+      />
+    ),
+    [refreshing, onRefresh, colors.primary],
+  );
+
+  const listContentStyle = useMemo(
+    () => ({ paddingTop: spacing.sm, paddingBottom: 100 }),
+    [spacing.sm],
+  );
 
   const {
     mineSections,
@@ -348,16 +359,8 @@ export default function RefereeScreen() {
               />
             </View>
           )}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={() => {
-                void handleRefresh();
-              }}
-              tintColor={colors.primary}
-            />
-          }
-          contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 100 }}
+          refreshControl={refreshControl}
+          contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
         />

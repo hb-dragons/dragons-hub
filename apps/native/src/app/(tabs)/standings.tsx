@@ -25,15 +25,17 @@ export default function StandingsScreen() {
   const { colors, spacing } = useTheme();
   const router = useRouter();
 
-  const { data: standings, isLoading: standingsLoading } = useSWR(
-    "standings:all",
-    () => publicApi.getStandings(),
-  );
+  const {
+    data: standings,
+    isLoading: standingsLoading,
+    mutate: mutateStandings,
+  } = useSWR("standings:all", () => publicApi.getStandings());
 
-  const { data: teams, isLoading: teamsLoading } = useSWR(
-    "teams:all",
-    () => publicApi.getTeams(),
-  );
+  const {
+    data: teams,
+    isLoading: teamsLoading,
+    mutate: mutateTeams,
+  } = useSWR("teams:all", () => publicApi.getTeams());
 
   const isLoading = standingsLoading || teamsLoading;
 
@@ -76,7 +78,7 @@ export default function StandingsScreen() {
   };
 
   return (
-    <Screen>
+    <Screen onRefresh={[() => mutateStandings(), () => mutateTeams()]}>
       <SectionHeader title={i18n.t("standings.title")} />
 
       {leagues.map((league) => (

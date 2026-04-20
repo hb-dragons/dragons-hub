@@ -21,18 +21,28 @@ export default function TeamDetailScreen() {
 
   // --- Data fetching ---
 
-  const { data: teams, isLoading: teamsLoading } = useSWR("teams:all", () =>
-    publicApi.getTeams(),
-  );
+  const {
+    data: teams,
+    isLoading: teamsLoading,
+    mutate: mutateTeams,
+  } = useSWR("teams:all", () => publicApi.getTeams());
 
   const team = teams?.find((t) => String(t.id) === id) ?? null;
 
-  const { data: teamStats, isLoading: statsLoading } = useSWR(
+  const {
+    data: teamStats,
+    isLoading: statsLoading,
+    mutate: mutateStats,
+  } = useSWR(
     team ? `team:${String(team.id)}:stats` : null,
     () => publicApi.getTeamStats(Number(id)),
   );
 
-  const { data: matchesData, isLoading: matchesLoading } = useSWR(
+  const {
+    data: matchesData,
+    isLoading: matchesLoading,
+    mutate: mutateMatches,
+  } = useSWR(
     team ? `team:${String(team.id)}:matches` : null,
     () =>
       publicApi.getMatches({
@@ -42,8 +52,9 @@ export default function TeamDetailScreen() {
       }),
   );
 
-  const { data: standingsData } = useSWR("standings:all", () =>
-    publicApi.getStandings(),
+  const { data: standingsData, mutate: mutateStandings } = useSWR(
+    "standings:all",
+    () => publicApi.getStandings(),
   );
 
   // --- Derived data ---
@@ -149,7 +160,15 @@ export default function TeamDetailScreen() {
   const diff = teamStats?.pointsDiff ?? 0;
 
   return (
-    <Screen headerOffset={44}>
+    <Screen
+      headerOffset={44}
+      onRefresh={[
+        () => mutateTeams(),
+        () => mutateStats(),
+        () => mutateMatches(),
+        () => mutateStandings(),
+      ]}
+    >
         {/* 1. Team Header */}
         <View style={{ marginBottom: spacing.lg }}>
           <Text

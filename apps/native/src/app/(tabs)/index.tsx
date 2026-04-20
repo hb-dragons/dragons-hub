@@ -31,7 +31,7 @@ export default function HomeScreen() {
   const initial = session?.user?.name?.trim().charAt(0).toUpperCase() ?? "";
   const isSignedIn = Boolean(session);
 
-  const { data: dashboard, isLoading } = useSWR("home:dashboard", () =>
+  const { data: dashboard, isLoading, mutate } = useSWR("home:dashboard", () =>
     publicApi.getHomeDashboard(),
   );
 
@@ -55,7 +55,7 @@ export default function HomeScreen() {
   const { nextGame, recentResults, upcomingGames, clubStats } = dashboard;
 
   return (
-    <Screen>
+    <Screen onRefresh={() => mutate()}>
       {/* Profile / Sign-In affordance */}
       <View
         style={{

@@ -43,7 +43,7 @@ export default function GameDetailScreen() {
     hasValidId ? `match:${id}` : null,
     () => publicApi.getMatch(numericId),
   );
-  const { data: context } = useSWR(
+  const { data: context, mutate: mutateContext } = useSWR(
     hasValidId && match ? `match:${id}:context` : null,
     () => publicApi.getMatchContext(numericId),
   );
@@ -182,7 +182,14 @@ export default function GameDetailScreen() {
   };
 
   return (
-    <Screen headerOffset={44}>
+    <Screen
+      headerOffset={44}
+      onRefresh={[
+        () => mutateMatch(),
+        () => mutateContext(),
+        ...(isReferee ? [() => mutateRefereeGame()] : []),
+      ]}
+    >
       {/* ── 1. Score Header ── */}
         <Card
           style={{

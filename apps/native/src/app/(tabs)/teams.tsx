@@ -19,7 +19,7 @@ export default function TeamsScreen() {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
 
-  const { data, isLoading } = useSWR("teams:all", () => publicApi.getTeams());
+  const { data, isLoading, mutate } = useSWR("teams:all", () => publicApi.getTeams());
 
   if (isLoading) {
     return (
@@ -40,7 +40,7 @@ export default function TeamsScreen() {
   };
 
   return (
-    <Screen>
+    <Screen onRefresh={() => mutate()}>
       <SectionHeader
         title={i18n.t("teams.title")}
         subtitle={i18n.t("teams.subtitle")}

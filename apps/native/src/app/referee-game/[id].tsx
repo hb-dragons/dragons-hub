@@ -167,7 +167,7 @@ export default function RefereeGameDetailScreen() {
   const address = game.venueCity;
 
   return (
-    <Screen headerOffset={44}>
+    <Screen headerOffset={44} onRefresh={() => mutate()}>
       {/* ── 1. Teams + Kickoff ── */}
       <Card style={{ marginBottom: spacing.md }}>
         <View style={{ alignItems: "center" }}>
