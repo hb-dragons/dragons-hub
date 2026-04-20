@@ -11,6 +11,7 @@ export function Logo({ size, width, alt = "Dragons logo", className }: LogoProps
   const w = width ?? (size ?? 56) * ASPECT;
   const h = width !== undefined ? width / ASPECT : (size ?? 56);
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- static brand SVG; next/image remote-pattern config not warranted
     <img
       src="/brand/logo.svg"
       width={w}

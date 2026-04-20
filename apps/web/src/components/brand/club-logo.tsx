@@ -20,6 +20,7 @@ export function ClubLogo({ clubId, size = 24, alt = "", className }: ClubLogoPro
   }
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- remote club crest served from our own API; next/image optimizer bypassed
     <img
       src={clubLogoUrl(clubId)}
       width={size}
