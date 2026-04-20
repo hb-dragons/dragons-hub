@@ -5,6 +5,7 @@ import { Link } from "@/lib/navigation";
 import type { MatchListItem, LeagueStandings, FormEntry } from "@dragons/shared";
 import { resolveTeamName } from "@/components/public/schedule/types";
 import { cn } from "@dragons/ui/lib/utils";
+import { ClubLogo } from "@/components/brand/club-logo";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -127,7 +128,8 @@ export default async function TeamDetailPage({
   return (
     <div className="space-y-6">
       {/* -- 1. Team Header -- */}
-      <section className="text-center">
+      <section className="flex flex-col items-center gap-2 text-center">
+        <ClubLogo clubId={team.clubId} size={64} alt={teamDisplayName} />
         <h1 className="font-display text-2xl font-bold uppercase">
           {teamDisplayName}
         </h1>
