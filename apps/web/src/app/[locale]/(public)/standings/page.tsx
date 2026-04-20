@@ -2,6 +2,7 @@ import { getPublicApi } from "@/lib/api-client.server";
 import { getTranslations } from "next-intl/server";
 import type { StandingItem } from "@dragons/shared";
 import { cn } from "@dragons/ui/lib/utils";
+import { ClubLogo } from "@/components/brand/club-logo";
 
 export default async function StandingsPage() {
   const t = await getTranslations();
@@ -90,7 +91,10 @@ function StandingsRow({
       <tr className={cn("border-b last:border-0", isOwn && "bg-mint-tint/10")}>
         <td className="px-2 py-2.5 tabular-nums text-muted-foreground">{row.position}</td>
         <td className={cn("px-2 py-2.5 font-medium", isOwn && "text-mint-shade font-semibold")}>
-          <span className="block truncate max-w-[160px]">{row.teamNameShort ?? row.teamName}</span>
+          <div className="flex items-center gap-2">
+            <ClubLogo clubId={row.clubId} size={18} />
+            <span className="block truncate max-w-[140px]">{row.teamNameShort ?? row.teamName}</span>
+          </div>
         </td>
         <td className="px-2 py-2.5 text-center tabular-nums">{row.won}-{row.lost}</td>
         <td className="px-2 py-2.5 text-center font-semibold tabular-nums">{row.leaguePoints}</td>
@@ -102,7 +106,10 @@ function StandingsRow({
     <tr className={cn("border-b last:border-0", isOwn && "bg-mint-tint/10")}>
       <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{row.position}</td>
       <td className={cn("px-3 py-2.5 font-medium", isOwn && "text-mint-shade font-semibold")}>
-        {row.teamName}
+        <div className="flex items-center gap-2">
+          <ClubLogo clubId={row.clubId} size={20} />
+          <span>{row.teamName}</span>
+        </div>
       </td>
       <td className="px-3 py-2.5 text-center tabular-nums">{row.played}</td>
       <td className="px-3 py-2.5 text-center tabular-nums">{row.won}</td>
