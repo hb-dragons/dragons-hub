@@ -129,7 +129,7 @@ export default async function TeamDetailPage({
     <div className="space-y-6">
       {/* -- 1. Team Header -- */}
       <section className="flex flex-col items-center gap-2 text-center">
-        <ClubLogo clubId={team.clubId} size={64} alt={teamDisplayName} />
+        <ClubLogo clubId={team.clubId} size={64} />
         <h1 className="font-display text-2xl font-bold uppercase">
           {teamDisplayName}
         </h1>
