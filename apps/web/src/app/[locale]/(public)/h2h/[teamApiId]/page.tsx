@@ -5,6 +5,7 @@ import { Link } from "@/lib/navigation";
 import type { MatchListItem } from "@dragons/shared";
 import { resolveTeamName } from "@/components/public/schedule/types";
 import { cn } from "@dragons/ui/lib/utils";
+import { ClubLogo } from "@/components/brand/club-logo";
 
 export default async function H2HPage({
   params,
@@ -112,7 +113,8 @@ export default async function H2HPage({
 
                 {/* Teams */}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">
+                  <div className="flex items-center gap-2 truncate text-sm">
+                    <ClubLogo clubId={match.homeClubId} size={18} />
                     <span
                       className={cn(
                         match.homeIsOwnClub
@@ -122,9 +124,8 @@ export default async function H2HPage({
                     >
                       {homeName}
                     </span>
-                    <span className="mx-1 text-muted-foreground">
-                      {t("vs")}
-                    </span>
+                    <span className="text-muted-foreground">{t("vs")}</span>
+                    <ClubLogo clubId={match.guestClubId} size={18} />
                     <span
                       className={cn(
                         match.guestIsOwnClub
@@ -134,7 +135,7 @@ export default async function H2HPage({
                     >
                       {guestName}
                     </span>
-                  </p>
+                  </div>
                 </div>
 
                 {/* Score */}
