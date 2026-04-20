@@ -3,10 +3,12 @@ import type { HeadToHead as HeadToHeadData } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { fontFamilies } from "../theme/typography";
+import { ClubLogo } from "./brand/ClubLogo";
 
 interface HeadToHeadProps {
   data: HeadToHeadData;
   opponentName: string;
+  opponentClubId?: number;
   ownLabel: string;
   ownColor: string;
   onMatchPress?: (matchId: number) => void;
@@ -23,6 +25,7 @@ function formatDate(dateStr: string): string {
 export function HeadToHead({
   data,
   opponentName,
+  opponentClubId,
   ownLabel,
   ownColor,
   onMatchPress,
@@ -41,10 +44,23 @@ export function HeadToHead({
 
   return (
     <View>
-      {/* Section label */}
-      <Text style={[sectionLabelStyle, { marginBottom: spacing.sm }]}>
-        {i18n.t("gameDetail.record", { opponent: opponentName })}
-      </Text>
+      {/* Section label with opponent logo */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          marginBottom: spacing.sm,
+        }}
+      >
+        {opponentClubId ? (
+          <View style={{ marginRight: spacing.xs }}>
+            <ClubLogo clubId={opponentClubId} size={18} />
+          </View>
+        ) : null}
+        <Text style={sectionLabelStyle}>
+          {i18n.t("gameDetail.record", { opponent: opponentName })}
+        </Text>
+      </View>
 
       {/* Stats row */}
       <View

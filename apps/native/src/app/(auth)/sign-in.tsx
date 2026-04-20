@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
 import { authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 export default function SignInScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
@@ -93,18 +94,14 @@ export default function SignInScreen() {
       </Pressable>
 
       <View style={[styles.content, { gap: spacing.lg }]}>
-        <Text
-          style={[
-            textStyles.screenTitle,
-            {
-              color: colors.foreground,
-              textAlign: "center",
-              marginBottom: spacing.xl,
-            },
-          ]}
+        <View
+          style={{
+            alignItems: "center",
+            marginBottom: spacing.xl,
+          }}
         >
-          DRAGONS
-        </Text>
+          <Wordmark width={220} />
+        </View>
 
         <TextInput
           style={inputStyle}

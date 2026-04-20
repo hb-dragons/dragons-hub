@@ -56,6 +56,8 @@ describe("GET /standings", () => {
         standings: [
           {
             position: 1,
+            teamApiId: 42,
+            clubId: 500,
             teamName: "Dragons Herren 1",
             teamNameShort: "Dragons H1",
             isOwnClub: true,

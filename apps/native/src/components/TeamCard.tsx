@@ -2,6 +2,7 @@ import { View, Text, Pressable } from "react-native";
 import type { PublicTeam } from "@dragons/api-client";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
+import { ClubLogo } from "./brand/ClubLogo";
 
 interface TeamCardProps {
   team: PublicTeam;
@@ -17,6 +18,8 @@ export function TeamCard({ team, featured = false, onPress }: TeamCardProps) {
   const titleStyle = featured ? textStyles.screenTitle : textStyles.cardTitle;
   const nameColor = getNativeTeamColor(team.badgeColor, team.name, isDark).name;
 
+  const logoSize = featured ? 56 : 36;
+
   const cardContent = (
     <View
       style={{
@@ -24,24 +27,27 @@ export function TeamCard({ team, featured = false, onPress }: TeamCardProps) {
         borderRadius: radius.md,
         height,
         padding: spacing.lg,
-        justifyContent: "flex-end",
+        justifyContent: "space-between",
       }}
     >
-      <Text
-        style={[titleStyle, { color: nameColor }]}
-        numberOfLines={2}
-      >
-        {displayName}
-      </Text>
-      <Text
-        style={[
-          textStyles.caption,
-          { color: colors.mutedForeground, marginTop: spacing.xs },
-        ]}
-        numberOfLines={1}
-      >
-        {team.name}
-      </Text>
+      <ClubLogo clubId={team.clubId} size={logoSize} variant="chip" />
+      <View>
+        <Text
+          style={[titleStyle, { color: nameColor }]}
+          numberOfLines={2}
+        >
+          {displayName}
+        </Text>
+        <Text
+          style={[
+            textStyles.caption,
+            { color: colors.mutedForeground, marginTop: spacing.xs },
+          ]}
+          numberOfLines={1}
+        >
+          {team.name}
+        </Text>
+      </View>
     </View>
   );
 

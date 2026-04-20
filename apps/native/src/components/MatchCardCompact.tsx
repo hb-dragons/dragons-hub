@@ -4,6 +4,7 @@ import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { fontFamilies } from "../theme/typography";
+import { ClubLogo } from "./brand/ClubLogo";
 
 interface MatchCardCompactProps {
   match: MatchListItem;
@@ -112,7 +113,7 @@ export function MatchCardCompact({ match, onPress, highlighted }: MatchCardCompa
           alignItems: "center",
         }}
       >
-        {/* Own abbreviation + separator + opponent */}
+        {/* Own abbreviation + separator + opponent logo + opponent */}
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
           <Text
             style={{
@@ -133,12 +134,17 @@ export function MatchCardCompact({ match, onPress, highlighted }: MatchCardCompa
           >
             {separator}
           </Text>
+          <ClubLogo
+            clubId={isHomeGame ? match.guestClubId : match.homeClubId}
+            size={20}
+          />
           <Text
             style={{
               fontSize: 14,
               fontFamily: fontFamilies.body,
               color: colors.mutedForeground,
               flex: 1,
+              marginLeft: spacing.xs,
             }}
             numberOfLines={1}
           >

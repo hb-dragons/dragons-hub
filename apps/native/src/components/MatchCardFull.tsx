@@ -4,6 +4,7 @@ import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { fontFamilies } from "../theme/typography";
+import { ClubLogo } from "./brand/ClubLogo";
 
 interface MatchCardFullProps {
   match: MatchListItem;
@@ -151,6 +152,7 @@ export function MatchCardFull({ match, onPress }: MatchCardFullProps) {
           marginBottom: spacing.xs,
         }}
       >
+        <ClubLogo clubId={match.homeClubId} size={28} />
         <Text
           style={{
             flex: 1,
@@ -162,6 +164,7 @@ export function MatchCardFull({ match, onPress }: MatchCardFullProps) {
               ? homeTeamColor.name
               : colors.mutedForeground,
             textDecorationLine: isCancelled ? "line-through" : "none",
+            marginLeft: spacing.sm,
           }}
           numberOfLines={1}
         >
@@ -189,6 +192,7 @@ export function MatchCardFull({ match, onPress }: MatchCardFullProps) {
           alignItems: "center",
         }}
       >
+        <ClubLogo clubId={match.guestClubId} size={28} />
         <Text
           style={{
             flex: 1,
@@ -200,6 +204,7 @@ export function MatchCardFull({ match, onPress }: MatchCardFullProps) {
               ? guestTeamColor.name
               : colors.mutedForeground,
             textDecorationLine: isCancelled ? "line-through" : "none",
+            marginLeft: spacing.sm,
           }}
           numberOfLines={1}
         >

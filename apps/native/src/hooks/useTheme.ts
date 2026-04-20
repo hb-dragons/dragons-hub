@@ -6,7 +6,7 @@ import {
   useCallback,
   useEffect,
 } from "react";
-import { useColorScheme } from "react-native";
+import { Appearance, useColorScheme } from "react-native";
 import type { ReactNode } from "react";
 import { createElement } from "react";
 import * as SecureStore from "expo-secure-store";
@@ -21,6 +21,14 @@ const THEME_MODE_KEY = "theme_mode";
 
 function isValidMode(value: string | null): value is Mode {
   return value === "system" || value === "light" || value === "dark";
+}
+
+// Push the JS theme choice into the native window's overrideUserInterfaceStyle
+// so UITabBar / UINavigationBar chrome + back-chevron tint match immediately,
+// with no cross-fade flash on push or tab switch. `unspecified` clears the
+// override and lets iOS follow the device setting.
+function syncNativeAppearance(mode: Mode) {
+  Appearance.setColorScheme(mode === "system" ? "unspecified" : mode);
 }
 
 /** Resolved color map — values are hex strings from either light or dark palette */
@@ -45,14 +53,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void SecureStore.getItemAsync(THEME_MODE_KEY).then((stored) => {
-      if (isValidMode(stored)) {
-        setModeState(stored);
-      }
+      const resolved: Mode = isValidMode(stored) ? stored : "system";
+      syncNativeAppearance(resolved);
+      setModeState(resolved);
       setLoaded(true);
     });
   }, []);
 
   const setMode = useCallback((next: Mode) => {
+    syncNativeAppearance(next);
     setModeState(next);
     void SecureStore.setItemAsync(THEME_MODE_KEY, next);
   }, []);

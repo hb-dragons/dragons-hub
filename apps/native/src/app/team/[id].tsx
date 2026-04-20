@@ -10,6 +10,7 @@ import { MatchCardFull } from "@/components/MatchCardFull";
 import { MatchCardCompact } from "@/components/MatchCardCompact";
 import { FormStrip } from "@/components/FormStrip";
 import { StandingsTable } from "@/components/StandingsTable";
+import { ClubLogo } from "@/components/brand/ClubLogo";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { fontFamilies } from "@/theme/typography";
@@ -170,27 +171,37 @@ export default function TeamDetailScreen() {
       ]}
     >
         {/* 1. Team Header */}
-        <View style={{ marginBottom: spacing.lg }}>
-          <Text
-            style={[
-              textStyles.screenTitle,
-              { color: teamColor.name, textTransform: "none" },
-            ]}
-          >
-            {teamName}
-          </Text>
-          {teamStats?.leagueName ? (
+        <View
+          style={{
+            marginBottom: spacing.lg,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.md,
+          }}
+        >
+          {team ? <ClubLogo clubId={team.clubId} size={64} variant="chip" /> : null}
+          <View style={{ flex: 1 }}>
             <Text
-              style={{
-                fontSize: 14,
-                fontFamily: fontFamilies.body,
-                color: colors.mutedForeground,
-                marginTop: spacing.xs,
-              }}
+              style={[
+                textStyles.screenTitle,
+                { color: teamColor.name, textTransform: "none" },
+              ]}
             >
-              {teamStats.leagueName}
+              {teamName}
             </Text>
-          ) : null}
+            {teamStats?.leagueName ? (
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontFamily: fontFamilies.body,
+                  color: colors.mutedForeground,
+                  marginTop: spacing.xs,
+                }}
+              >
+                {teamStats.leagueName}
+              </Text>
+            ) : null}
+          </View>
         </View>
 
         {/* 2. Form + Position Row */}

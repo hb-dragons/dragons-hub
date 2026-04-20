@@ -4,6 +4,7 @@ import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
 import { fontFamilies } from "../theme/typography";
+import { ClubLogo } from "./brand/ClubLogo";
 
 interface StandingsTableProps {
   standings: StandingItem[];
@@ -167,19 +168,29 @@ export function StandingsTable({
                 {item.position}
               </Text>
 
-              {/* Team name */}
-              <Text
+              {/* Team logo + name */}
+              <View
                 style={{
                   flex: 1,
                   marginLeft: spacing.sm,
-                  fontSize: 13,
-                  fontFamily: isOwn ? fontFamilies.bodySemiBold : fontFamilies.body,
-                  color: teamColor,
+                  flexDirection: "row",
+                  alignItems: "center",
                 }}
-                numberOfLines={1}
               >
-                {isOwn ? (item.teamNameShort || item.teamName) : item.teamName}
-              </Text>
+                <ClubLogo clubId={item.clubId} size={20} />
+                <Text
+                  style={{
+                    flex: 1,
+                    marginLeft: spacing.xs,
+                    fontSize: 13,
+                    fontFamily: isOwn ? fontFamilies.bodySemiBold : fontFamilies.body,
+                    color: teamColor,
+                  }}
+                  numberOfLines={1}
+                >
+                  {isOwn ? (item.teamNameShort || item.teamName) : item.teamName}
+                </Text>
+              </View>
 
               {/* Played */}
               <Text

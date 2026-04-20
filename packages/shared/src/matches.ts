@@ -47,10 +47,12 @@ export interface MatchListItem {
   homeTeamName: string;
   homeTeamNameShort: string | null;
   homeTeamCustomName: string | null;
+  homeClubId: number;
   guestTeamApiId: number;
   guestTeamName: string;
   guestTeamNameShort: string | null;
   guestTeamCustomName: string | null;
+  guestClubId: number;
   homeIsOwnClub: boolean;
   guestIsOwnClub: boolean;
   homeBadgeColor: string | null;

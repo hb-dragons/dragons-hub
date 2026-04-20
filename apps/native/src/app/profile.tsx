@@ -9,6 +9,7 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Screen } from "@/components/Screen";
+import { Logo } from "@/components/brand/Logo";
 import { i18n } from "@/lib/i18n";
 import type { Mode } from "@/hooks/useTheme";
 
@@ -128,22 +129,34 @@ export default function ProfileScreen() {
         <View style={{ marginTop: spacing.lg, gap: spacing.xl }}>
           {/* User info card */}
           <Card>
-            <Text
-              style={[
-                textStyles.cardTitle,
-                { color: colors.foreground, marginBottom: spacing.xs },
-              ]}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.md,
+                marginBottom: spacing.md,
+              }}
             >
-              {session.user.name}
-            </Text>
-            <Text
-              style={[
-                textStyles.body,
-                { color: colors.mutedForeground, marginBottom: spacing.md },
-              ]}
-            >
-              {session.user.email}
-            </Text>
+              <Logo size={48} />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[
+                    textStyles.cardTitle,
+                    { color: colors.foreground, marginBottom: spacing.xs },
+                  ]}
+                >
+                  {session.user.name}
+                </Text>
+                <Text
+                  style={[
+                    textStyles.body,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  {session.user.email}
+                </Text>
+              </View>
+            </View>
             {(() => {
               const role =
                 "role" in session.user && typeof session.user.role === "string"

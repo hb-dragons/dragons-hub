@@ -32,13 +32,17 @@ ErrorUtils.setGlobalHandler((error, isFatal) => {
 function RootNavigator() {
   const { colors, isDark } = useTheme();
 
+  // Transparent detail header: content scrolls under the nav bar.
+  // Back-chevron tint + transparent background are applied at the Stack root
+  // (see screenOptions below) so UINavigationBar tintColor is set on mount,
+  // not re-applied per push. This prevents the default iOS tint from flashing
+  // during the push animation before react-native-screens syncs the header.
   const detailHeaderOptions = {
     headerShown: true,
     headerTransparent: true,
     headerTitle: "",
     headerBackTitle: "",
     headerShadowVisible: false,
-    headerTintColor: colors.foreground,
     headerBackTitleStyle: { fontSize: 0 },
   } as const;
 
@@ -49,6 +53,10 @@ function RootNavigator() {
         screenOptions={{
           contentStyle: { backgroundColor: colors.background },
           headerShown: false,
+          headerTintColor: colors.foreground,
+          headerStyle: { backgroundColor: "transparent" },
+          headerShadowVisible: false,
+          animation: "slide_from_right",
         }}
       >
         <Stack.Screen name="(tabs)" options={{ title: "" }} />
@@ -61,7 +69,6 @@ function RootNavigator() {
           name="profile"
           options={{
             headerShown: true,
-            headerTintColor: colors.foreground,
             headerStyle: { backgroundColor: colors.background },
             headerTitle: i18n.t("profile.title"),
           }}

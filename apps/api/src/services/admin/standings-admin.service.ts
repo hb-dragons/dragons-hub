@@ -10,6 +10,8 @@ export async function getStandings(): Promise<LeagueStandings[]> {
       leagueName: leagues.name,
       seasonName: leagues.seasonName,
       position: standings.position,
+      teamApiId: standings.teamApiId,
+      clubId: teams.clubId,
       teamName: teams.name,
       teamNameShort: teams.nameShort,
       isOwnClub: teams.isOwnClub,
@@ -42,6 +44,8 @@ export async function getStandings(): Promise<LeagueStandings[]> {
     }
     league.standings.push({
       position: row.position,
+      teamApiId: row.teamApiId,
+      clubId: row.clubId,
       teamName: row.teamName,
       teamNameShort: row.teamNameShort,
       isOwnClub: row.isOwnClub ?? false,

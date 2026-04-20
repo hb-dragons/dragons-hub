@@ -7,11 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#131313"
-    },
     "ios": {
       "bundleIdentifier": "de.hbdragons.app",
       "supportsTablet": true,
@@ -24,7 +19,7 @@
       "package": "de.hbdragons.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#131313"
+        "backgroundColor": "#004b23"
       },
       "intentFilters": [{
         "action": "VIEW",
@@ -33,12 +28,25 @@
         "category": ["BROWSABLE", "DEFAULT"]
       }]
     },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#004b23"
+    },
     "plugins": [
       "expo-router",
       "expo-font",
       "expo-secure-store",
       "expo-local-authentication",
       ["expo-camera", { "cameraPermission": "Allow Dragons to access your camera for team photos." }],
+      ["expo-splash-screen", {
+        "image": "./assets/splash-logo.png",
+        "backgroundColor": "#131313",
+        "imageWidth": 240,
+        "dark": {
+          "image": "./assets/splash-logo.png",
+          "backgroundColor": "#131313"
+        }
+      }],
       "./plugins/remove-push-entitlement"
     ],
     "experiments": {

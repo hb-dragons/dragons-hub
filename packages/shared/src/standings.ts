@@ -1,5 +1,7 @@
 export interface StandingItem {
   position: number;
+  teamApiId: number;
+  clubId: number;
   teamName: string;
   teamNameShort: string | null;
   isOwnClub: boolean;

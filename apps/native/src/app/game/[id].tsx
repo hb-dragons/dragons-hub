@@ -11,6 +11,7 @@ import { QuarterTable } from "@/components/QuarterTable";
 import { HeadToHead } from "@/components/HeadToHead";
 import { FormStrip } from "@/components/FormStrip";
 import { ClaimGameButton } from "@/components/ClaimGameButton";
+import { ClubLogo } from "@/components/brand/ClubLogo";
 import { authClient } from "@/lib/auth-client";
 import { publicApi, refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
@@ -221,6 +222,7 @@ export default function GameDetailScreen() {
             >
               {/* Home team */}
               <View style={{ flex: 1, alignItems: "center" }}>
+                <ClubLogo clubId={match.homeClubId} size={48} variant="chip" />
                 <Text
                   style={[
                     textStyles.cardTitle,
@@ -230,6 +232,7 @@ export default function GameDetailScreen() {
                         ? fontFamilies.bodySemiBold
                         : fontFamilies.body,
                       textAlign: "center",
+                      marginTop: spacing.sm,
                     },
                   ]}
                   numberOfLines={2}
@@ -290,6 +293,7 @@ export default function GameDetailScreen() {
 
               {/* Guest team */}
               <View style={{ flex: 1, alignItems: "center" }}>
+                <ClubLogo clubId={match.guestClubId} size={48} variant="chip" />
                 <Text
                   style={[
                     textStyles.cardTitle,
@@ -299,6 +303,7 @@ export default function GameDetailScreen() {
                         ? fontFamilies.bodySemiBold
                         : fontFamilies.body,
                       textAlign: "center",
+                      marginTop: spacing.sm,
                     },
                   ]}
                   numberOfLines={2}
@@ -351,6 +356,7 @@ export default function GameDetailScreen() {
             <HeadToHead
               data={context.headToHead}
               opponentName={opponentName}
+              opponentClubId={match.homeIsOwnClub ? match.guestClubId : match.homeClubId}
               ownLabel={ownLabel}
               ownColor={ownColor}
               onMatchPress={(matchId) => router.push(`/game/${matchId}`)}
