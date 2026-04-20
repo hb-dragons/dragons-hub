@@ -37,6 +37,9 @@ RUN adduser --system --uid 1001 hono
 # Copy built dist from tsdown (workspace packages compiled in)
 COPY --from=builder --chown=hono:nodejs /app/apps/api/dist ./dist
 
+# Copy static assets served by public routes (club logos, etc.)
+COPY --from=builder --chown=hono:nodejs /app/apps/api/public ./public
+
 # Copy production node_modules from pnpm deploy (all external npm packages)
 COPY --from=builder --chown=hono:nodejs /app/deploy/node_modules ./node_modules
 
