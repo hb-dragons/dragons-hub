@@ -4,9 +4,9 @@ import {
   deviceEndpoints,
   refereeEndpoints,
 } from "@dragons/api-client";
-import { authClient } from "./auth-client";
+import { authClient, resolveApiUrl } from "./auth-client";
 
-const baseUrl = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+const baseUrl = resolveApiUrl();
 
 export const apiClient = new ApiClient({
   baseUrl,

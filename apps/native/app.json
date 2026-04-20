@@ -37,7 +37,7 @@
       "expo-font",
       "expo-secure-store",
       "expo-local-authentication",
-      ["expo-camera", { "cameraPermission": "Allow Dragons to access your camera for team photos." }],
+      ["expo-camera", { "cameraPermission": "Allow Dragons to access your camera for team photos.", "microphonePermission": false }],
       ["expo-splash-screen", {
         "image": "./assets/splash-logo.png",
         "backgroundColor": "#131313",
