@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { View, Text, Pressable } from "react-native";
 import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
@@ -46,7 +47,7 @@ function getResultBadge(match: MatchListItem): { label: string; variant: "win" |
   return { label: i18n.t("match.loss"), variant: "loss" };
 }
 
-export function MatchCardCompact({ match, onPress, highlighted }: MatchCardCompactProps) {
+function MatchCardCompactImpl({ match, onPress, highlighted }: MatchCardCompactProps) {
   const { colors, radius, spacing, isDark } = useTheme();
 
   const isHomeGame = match.homeIsOwnClub;
@@ -229,3 +230,5 @@ export function MatchCardCompact({ match, onPress, highlighted }: MatchCardCompa
 
   return content;
 }
+
+export const MatchCardCompact = memo(MatchCardCompactImpl);

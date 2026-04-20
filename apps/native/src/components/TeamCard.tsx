@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { View, Text, Pressable } from "react-native";
 import type { PublicTeam } from "@dragons/api-client";
 import { getNativeTeamColor } from "@dragons/shared";
@@ -10,7 +11,7 @@ interface TeamCardProps {
   onPress?: () => void;
 }
 
-export function TeamCard({ team, featured = false, onPress }: TeamCardProps) {
+function TeamCardImpl({ team, featured = false, onPress }: TeamCardProps) {
   const { colors, radius, textStyles, spacing, isDark } = useTheme();
 
   const displayName = team.customName || team.nameShort || team.name;
@@ -66,3 +67,5 @@ export function TeamCard({ team, featured = false, onPress }: TeamCardProps) {
 
   return cardContent;
 }
+
+export const TeamCard = memo(TeamCardImpl);

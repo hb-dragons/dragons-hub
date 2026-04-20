@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { View, Text, Pressable } from "react-native";
 import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
@@ -47,7 +48,7 @@ function resolveName(
   return customName || nameShort || name;
 }
 
-export function MatchCardFull({ match, onPress }: MatchCardFullProps) {
+function MatchCardFullImpl({ match, onPress }: MatchCardFullProps) {
   const { colors, radius, spacing, isDark } = useTheme();
 
   const isHomeGame = match.homeIsOwnClub;
@@ -240,3 +241,5 @@ export function MatchCardFull({ match, onPress }: MatchCardFullProps) {
 
   return content;
 }
+
+export const MatchCardFull = memo(MatchCardFullImpl);

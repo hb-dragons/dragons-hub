@@ -1,5 +1,6 @@
-import { useMemo } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { useCallback, useMemo } from "react";
+import { View, Text, ActivityIndicator, FlatList } from "react-native";
+import type { ListRenderItem } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
@@ -120,6 +121,21 @@ export default function TeamDetailScreen() {
 
   // Last completed match id for highlighting in "All Games"
   const lastCompletedId = lastGame?.id ?? null;
+
+  // Memoized renderers for the "All Games" FlatList
+  const renderMatchItem = useCallback<ListRenderItem<MatchListItem>>(
+    ({ item: match }) => (
+      <View style={{ marginBottom: spacing.sm }}>
+        <MatchCardCompact
+          match={match}
+          highlighted={match.id === lastCompletedId}
+          onPress={() => router.push(`/game/${String(match.id)}`)}
+        />
+      </View>
+    ),
+    [lastCompletedId, router, spacing.sm],
+  );
+  const keyExtractMatch = useCallback((match: MatchListItem) => String(match.id), []);
 
   // Resolve opponent team API ID from standings team name
   const handleOpponentPress = (teamName: string) => {
@@ -370,15 +386,16 @@ export default function TeamDetailScreen() {
             >
               {i18n.t("teamDetail.allGames")}
             </Text>
-            {allMatches.map((match) => (
-              <View key={match.id} style={{ marginBottom: spacing.sm }}>
-                <MatchCardCompact
-                  match={match}
-                  highlighted={match.id === lastCompletedId}
-                  onPress={() => router.push(`/game/${String(match.id)}`)}
-                />
-              </View>
-            ))}
+            <FlatList
+              data={allMatches}
+              renderItem={renderMatchItem}
+              keyExtractor={keyExtractMatch}
+              scrollEnabled={false}
+              removeClippedSubviews={false}
+              initialNumToRender={10}
+              windowSize={5}
+              maxToRenderPerBatch={10}
+            />
           </View>
         ) : (
           <View style={{ paddingTop: spacing.xl, alignItems: "center" }}>
