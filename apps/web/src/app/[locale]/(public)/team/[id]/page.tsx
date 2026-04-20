@@ -260,7 +260,10 @@ export default async function TeamDetailPage({
                           isCurrentTeam && "font-medium text-primary",
                         )}
                       >
-                        {s.teamNameShort ?? s.teamName}
+                        <div className="flex items-center gap-2">
+                          <ClubLogo clubId={s.clubId} size={18} />
+                          <span>{s.teamNameShort ?? s.teamName}</span>
+                        </div>
                       </td>
                       <td className="px-3 py-2 text-center tabular-nums">
                         {s.won}-{s.lost}
