@@ -11,6 +11,7 @@ import { authClient } from "@/lib/auth-client";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { fontFamilies } from "@/theme/typography";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 function getCountdown(kickoffDate: string): string {
   const today = new Date();
@@ -56,14 +57,16 @@ export default function HomeScreen() {
 
   return (
     <Screen onRefresh={() => mutate()}>
-      {/* Profile / Sign-In affordance */}
+      {/* Header: Wordmark + Profile / Sign-In affordance */}
       <View
         style={{
           flexDirection: "row",
-          justifyContent: "flex-end",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginTop: spacing.sm,
         }}
       >
+        <Wordmark width={120} />
         <Pressable
           onPress={() => router.push("/profile")}
           hitSlop={8}
