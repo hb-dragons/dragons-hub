@@ -14,6 +14,7 @@
     "@better-auth/expo": "^1.6.4",
     "@dragons/api-client": "workspace:*",
     "@dragons/shared": "workspace:*",
+    "@react-navigation/native": "^7.2.2",
     "better-auth": "^1.6.5",
     "expo": "~55.0.0",
     "expo-camera": "~55.0.0",
