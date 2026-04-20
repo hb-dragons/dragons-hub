@@ -168,7 +168,6 @@ export function StandingsTable({
                 {item.position}
               </Text>
 
-              {/* Team logo + name */}
               <View
                 style={{
                   flex: 1,

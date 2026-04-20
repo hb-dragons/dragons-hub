@@ -44,7 +44,6 @@ export function HeadToHead({
 
   return (
     <View>
-      {/* Section label with opponent logo */}
       <View
         style={{
           flexDirection: "row",
