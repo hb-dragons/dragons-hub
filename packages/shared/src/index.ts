@@ -133,3 +133,6 @@ export type {
   UnassignRefereeResponse,
   CandidateSearchResponse,
 } from "./referee-assignment";
+
+// Brand utilities
+export { clubLogoUrl } from "./brand";

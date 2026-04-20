@@ -5,6 +5,7 @@ import { Link } from "@/lib/navigation";
 import type { PublicMatchDetail, FormEntry } from "@dragons/shared";
 import { resolveTeamName } from "@/components/public/schedule/types";
 import { cn } from "@dragons/ui/lib/utils";
+import { ClubLogo } from "@/components/brand/club-logo";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -194,7 +195,8 @@ export default async function GameDetailPage({
 
         {/* Teams + Score */}
         <div className="flex items-center justify-between gap-4">
-          <div className="flex-1 text-center">
+          <div className="flex flex-1 flex-col items-center gap-2">
+            <ClubLogo clubId={match.homeClubId} size={40} />
             <p
               className={cn(
                 "font-semibold",
@@ -237,7 +239,8 @@ export default async function GameDetailPage({
             )}
           </div>
 
-          <div className="flex-1 text-center">
+          <div className="flex flex-1 flex-col items-center gap-2">
+            <ClubLogo clubId={match.guestClubId} size={40} />
             <p
               className={cn(
                 "font-semibold",

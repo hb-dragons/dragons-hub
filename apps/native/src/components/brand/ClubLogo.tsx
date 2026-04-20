@@ -1,8 +1,7 @@
 import { View } from "react-native";
 import { Image } from "expo-image";
+import { clubLogoUrl } from "@dragons/shared";
 import { useTheme } from "../../hooks/useTheme";
-
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
 type ClubLogoProps = {
   clubId?: number | null;
@@ -26,7 +25,7 @@ export function ClubLogo({ clubId, size = 24 }: ClubLogoProps) {
     );
   }
 
-  const uri = `${BASE_URL}/public/assets/clubs/${clubId}.webp`;
+  const uri = clubLogoUrl(clubId);
 
   return (
     <Image

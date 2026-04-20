@@ -5,6 +5,7 @@ import { Link, usePathname } from "@/lib/navigation";
 import { cn } from "@dragons/ui/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { Wordmark } from "@/components/brand/wordmark";
 
 const navLinks = [
   { href: "/schedule" as const, labelKey: "public.schedule" as const },
@@ -19,8 +20,8 @@ export function PublicHeader() {
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[var(--safe-area-top)]">
       <div className="mx-auto flex h-14 max-w-2xl items-center gap-4 px-4">
-        <Link href="/" className="text-lg font-bold tracking-tight">
-          Dragons
+        <Link href="/" className="flex items-center">
+          <Wordmark width={110} alt="Dragons" />
         </Link>
 
         {/* Desktop navigation */}

@@ -3,6 +3,7 @@ import { Badge } from "@dragons/ui/components/badge";
 import { Home } from "lucide-react";
 import { Link } from "@/lib/navigation";
 import { resolveTeamName } from "./types";
+import { ClubLogo } from "@/components/brand/club-logo";
 
 interface MatchCardProps {
   match: MatchListItem;
@@ -42,12 +43,13 @@ export function MatchCard({ match, translations }: MatchCardProps) {
 
         {/* Center: teams + score */}
         <div className="flex items-center gap-3">
-          <div className="flex-1 text-right">
+          <div className="flex flex-1 items-center justify-end gap-2">
             <p
               className={`text-sm font-semibold leading-tight ${isOwnHome ? "text-mint-shade" : ""}`}
             >
               {getTeamName(match, "home")}
             </p>
+            <ClubLogo clubId={match.homeClubId} size={24} />
           </div>
           <div className="flex flex-col items-center min-w-[56px]">
             {hasScore ? (
@@ -60,7 +62,8 @@ export function MatchCard({ match, translations }: MatchCardProps) {
               </span>
             )}
           </div>
-          <div className="flex-1">
+          <div className="flex flex-1 items-center gap-2">
+            <ClubLogo clubId={match.guestClubId} size={24} />
             <p
               className={`text-sm font-semibold leading-tight ${isOwnGuest ? "text-mint-shade" : ""}`}
             >
