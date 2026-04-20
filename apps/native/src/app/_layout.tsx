@@ -12,6 +12,7 @@ import { fontAssets } from "@/theme/typography";
 import { i18n } from "@/lib/i18n";
 import { colors as themeColors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -152,10 +153,12 @@ export default function RootLayout() {
   }
 
   return (
-    <LocaleProvider>
-      <ThemeProvider>
-        <RootNavigator />
-      </ThemeProvider>
-    </LocaleProvider>
+    <ErrorBoundary>
+      <LocaleProvider>
+        <ThemeProvider>
+          <RootNavigator />
+        </ThemeProvider>
+      </LocaleProvider>
+    </ErrorBoundary>
   );
 }
