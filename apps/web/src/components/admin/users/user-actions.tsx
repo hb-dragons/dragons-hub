@@ -1,12 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import { MoreHorizontal } from "lucide-react"
 import { toast } from "sonner"
 import { authClient } from "@/lib/auth-client"
+import { parseRoles, ROLE_NAMES, type RoleName } from "@dragons/shared"
 
 import { Button } from "@dragons/ui/components/button"
+import { Checkbox } from "@dragons/ui/components/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@dragons/ui/components/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,14 +61,28 @@ export function UserActions({
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [unbanOpen, setUnbanOpen] = useState(false)
-  const [roleOpen, setRoleOpen] = useState(false)
+  const [rolesOpen, setRolesOpen] = useState(false)
   const [linkRefereeOpen, setLinkRefereeOpen] = useState(false)
+  const [selectedRoles, setSelectedRoles] = useState<RoleName[]>(() =>
+    parseRoles(user.role),
+  )
+  const [savingRoles, setSavingRoles] = useState(false)
 
   const isSelf = user.id === currentUserId
   const isBanned = user.banned === true
-  // TODO(T14): replace with multi-role editor. For now, toggle "admin" on/off;
-  // clearing uses "" which better-auth treats as no role.
-  const newRole = user.role === "admin" ? "" : "admin"
+
+  // Reset selection whenever the dialog opens or the user's role string changes.
+  useEffect(() => {
+    if (rolesOpen) {
+      setSelectedRoles(parseRoles(user.role))
+    }
+  }, [rolesOpen, user.role])
+
+  function toggleRole(role: RoleName) {
+    setSelectedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+    )
+  }
 
   async function handleDelete() {
     try {
@@ -92,23 +116,29 @@ export function UserActions({
     }
   }
 
-  async function handleRoleChange() {
+  async function handleSaveRoles() {
+    setSavingRoles(true)
     try {
+      // Better-auth stores multi-role assignments as a comma-separated string in
+      // the `user.role` column. The client-side `setRole` type narrows `role` to
+      // a single union member, but the server accepts the comma-joined form, so
+      // we force-cast through `never` to pass the concatenated list through.
+      const roleValue = selectedRoles.length === 0 ? "" : selectedRoles.join(",")
       const { error } = await authClient.admin.setRole({
         userId: user.id,
-        // TODO(T14): typed-roles editor. better-auth's setRole accepts the role
-        // union, but clearing a role here relies on passing "" which the server
-        // normalises to null. Cast until T14 replaces this with a multi-role editor.
-        role: newRole as "admin",
+        role: roleValue as never,
       })
       if (error) {
         toast.error(t("users.toast.roleChangeFailed"))
         return
       }
       toast.success(t("users.toast.roleChanged"))
+      setRolesOpen(false)
       onMutated()
     } catch {
       toast.error(t("users.toast.roleChangeFailed"))
+    } finally {
+      setSavingRoles(false)
     }
   }
 
@@ -145,8 +175,8 @@ export function UserActions({
             {t("users.actions.setPassword")}
           </DropdownMenuItem>
           {!isSelf && (
-            <DropdownMenuItem onSelect={() => setRoleOpen(true)}>
-              {t("users.actions.changeRole")}
+            <DropdownMenuItem onSelect={() => setRolesOpen(true)}>
+              {t("users.actions.editRoles")}
             </DropdownMenuItem>
           )}
           {!isSelf && user.role !== "referee" && (
@@ -236,28 +266,44 @@ export function UserActions({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={roleOpen} onOpenChange={setRoleOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("users.changeRoleConfirm.title")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("users.changeRoleConfirm.description", {
-                name: user.name,
-                currentRole: user.role ?? "user",
-                newRole,
-              })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRoleChange}>
-              {t("users.changeRoleConfirm.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Dialog open={rolesOpen} onOpenChange={setRolesOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("users.editRolesDialog.title")}</DialogTitle>
+            <DialogDescription>
+              {t("users.editRolesDialog.description", { name: user.name })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            {ROLE_NAMES.map((role) => (
+              <label
+                key={role}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer hover:bg-accent"
+              >
+                <Checkbox
+                  checked={selectedRoles.includes(role)}
+                  onCheckedChange={() => toggleRole(role)}
+                />
+                <span className="text-sm">{t(`users.roles.${role}`)}</span>
+              </label>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRolesOpen(false)}
+              disabled={savingRoles}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={handleSaveRoles} disabled={savingRoles}>
+              {savingRoles
+                ? t("users.editRolesDialog.saving")
+                : t("users.editRolesDialog.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <LinkRefereeDialog
         user={user}

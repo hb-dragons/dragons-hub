@@ -494,7 +494,10 @@
     "roles": {
       "admin": "Admin",
       "user": "User",
-      "referee": "Referee"
+      "referee": "Referee",
+      "refereeAdmin": "Referee Admin",
+      "venueManager": "Venue Manager",
+      "teamManager": "Team Manager"
     },
     "status": {
       "active": "Active",
@@ -503,6 +506,7 @@
     "actions": {
       "edit": "Edit",
       "changeRole": "Change Role",
+      "editRoles": "Edit Roles",
       "setPassword": "Set Password",
       "ban": "Ban User",
       "unban": "Unban User",
@@ -563,6 +567,12 @@
       "title": "Change Role",
       "description": "Change {name}'s role from {currentRole} to {newRole}?",
       "confirm": "Change Role"
+    },
+    "editRolesDialog": {
+      "title": "Edit Roles",
+      "description": "Select which roles {name} should have.",
+      "save": "Save",
+      "saving": "Saving..."
     },
     "linkRefereeDialog": {
       "title": "Link Referee",

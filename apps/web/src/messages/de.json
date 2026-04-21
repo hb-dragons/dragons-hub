@@ -494,7 +494,10 @@
     "roles": {
       "admin": "Admin",
       "user": "Benutzer",
-      "referee": "Schiedsrichter"
+      "referee": "Schiedsrichter",
+      "refereeAdmin": "Schiedsrichter-Admin",
+      "venueManager": "Hallenverwalter",
+      "teamManager": "Team-Manager"
     },
     "status": {
       "active": "Aktiv",
@@ -503,6 +506,7 @@
     "actions": {
       "edit": "Bearbeiten",
       "changeRole": "Rolle ändern",
+      "editRoles": "Rollen bearbeiten",
       "setPassword": "Passwort setzen",
       "ban": "Benutzer sperren",
       "unban": "Benutzer entsperren",
@@ -563,6 +567,12 @@
       "title": "Rolle ändern",
       "description": "Rolle von {name} von {currentRole} zu {newRole} ändern?",
       "confirm": "Rolle ändern"
+    },
+    "editRolesDialog": {
+      "title": "Rollen bearbeiten",
+      "description": "Wählen Sie die Rollen für {name}.",
+      "save": "Speichern",
+      "saving": "Wird gespeichert..."
     },
     "linkRefereeDialog": {
       "title": "Schiedsrichter verknüpfen",

@@ -6,6 +6,7 @@ import useSWR from "swr"
 import { Plus, SearchIcon, Users } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { SWR_KEYS } from "@/lib/swr-keys"
+import { parseRoles, type RoleName } from "@dragons/shared"
 
 import type { ColumnDef, FilterFn } from "@tanstack/react-table"
 import { Badge } from "@dragons/ui/components/badge"
@@ -60,10 +61,29 @@ function getColumns(
         <DataTableColumnHeader column={column} title={t("columns.role")} />
       ),
       cell: ({ row }) => {
-        const role = row.original.role ?? "user"
-        const variant = role === "admin" ? "default" : role === "referee" ? "outline" : "secondary"
-        const label = role === "admin" ? t("roles.admin") : role === "referee" ? t("roles.referee") : t("roles.user")
-        return <Badge variant={variant}>{label}</Badge>
+        const roles = parseRoles(row.original.role)
+        // Legacy "referee" role strings don't appear in ROLE_NAMES so parseRoles
+        // filters them out. Render the referee badge explicitly when the raw
+        // role string equals "referee" so the column doesn't look empty.
+        const isLegacyReferee = row.original.role === "referee"
+        if (roles.length === 0 && !isLegacyReferee) {
+          return <Badge variant="secondary">{t("roles.user")}</Badge>
+        }
+        const variantFor = (r: RoleName): "default" | "secondary" => (
+          r === "admin" ? "default" : "secondary"
+        )
+        return (
+          <div className="flex flex-wrap gap-1">
+            {roles.map((r) => (
+              <Badge key={r} variant={variantFor(r)}>
+                {t(`roles.${r}`)}
+              </Badge>
+            ))}
+            {isLegacyReferee && (
+              <Badge variant="outline">{t("roles.referee")}</Badge>
+            )}
+          </div>
+        )
       },
       meta: { label: t("columns.role") },
     },
