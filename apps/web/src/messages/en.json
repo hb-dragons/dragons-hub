@@ -387,6 +387,8 @@
       "intervalLabel": "Sync Interval",
       "intervalDescription": "How often to check for referee game updates",
       "everyNMinutes": "Every {minutes} min",
+      "everyNHours": "Every {hours, plural, =1 {hour} other {# hours}}",
+      "daily": "Daily",
       "startingSoon": "starting soon"
     }
   },

@@ -54,7 +54,7 @@ export const updateScheduleBodySchema = z.object({
     .regex(/^[\d*,\-/]+\s[\d*,\-/]+\s[\d*,\-/]+\s[\d*,\-/]+\s[\d*,\-/]+$/, "Invalid cron expression")
     .optional()
     .nullable(),
-  intervalMinutes: z.number().int().min(5).max(120).optional(),
+  intervalMinutes: z.number().int().min(5).max(1440).optional(),
   timezone: z.string().min(1).optional(),
   updatedBy: z.string().optional(),
 });

@@ -387,6 +387,8 @@
       "intervalLabel": "Sync-Intervall",
       "intervalDescription": "Wie oft nach Änderungen bei SR-Spielen geprüft wird",
       "everyNMinutes": "Alle {minutes} Min.",
+      "everyNHours": "Alle {hours, plural, =1 {Stunde} other {# Stunden}}",
+      "daily": "Täglich",
       "startingSoon": "startet bald"
     }
   },

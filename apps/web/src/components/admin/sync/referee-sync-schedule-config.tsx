@@ -25,14 +25,18 @@ import { fetchAPI } from "@/lib/api";
 import type { SyncScheduleData } from "./types";
 import { useRefereeSyncSchedule } from "./use-sync";
 
-const INTERVALS = [
-  { value: "5", label: "5" },
-  { value: "10", label: "10" },
-  { value: "15", label: "15" },
-  { value: "30", label: "30" },
-  { value: "45", label: "45" },
-  { value: "60", label: "60" },
-];
+const INTERVAL_MINUTES = [15, 30, 60, 120, 180, 240, 360, 480, 720, 1440];
+
+function formatIntervalLabel(
+  t: ReturnType<typeof useTranslations>,
+  minutes: number,
+): string {
+  if (minutes >= 1440) return t("sync.refereeSchedule.daily");
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return t("sync.refereeSchedule.everyNHours", { hours: minutes / 60 });
+  }
+  return t("sync.refereeSchedule.everyNMinutes", { minutes });
+}
 
 export function RefereeSyncScheduleConfig() {
   const t = useTranslations();
@@ -125,11 +129,9 @@ export function RefereeSyncScheduleConfig() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {INTERVALS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {t("sync.refereeSchedule.everyNMinutes", {
-                    minutes: opt.label,
-                  })}
+              {INTERVAL_MINUTES.map((minutes) => (
+                <SelectItem key={minutes} value={String(minutes)}>
+                  {formatIntervalLabel(t, minutes)}
                 </SelectItem>
               ))}
             </SelectContent>
