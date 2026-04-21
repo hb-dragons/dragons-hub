@@ -168,7 +168,7 @@ describe("assertPermission with errorHandler registered", () => {
 
 // --- requireRefereeSelf ---
 describe("requireRefereeSelf", () => {
-  const app = new Hono();
+  const app = new Hono<AppEnv>();
   app.use("/self/*", requireRefereeSelf);
   app.get("/self/games", (c) => c.json({ refereeId: c.get("refereeId") }));
 

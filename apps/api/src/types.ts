@@ -9,5 +9,6 @@ export type AppEnv = {
     requestId: string;
     user: AuthSession["user"];
     session: AuthSession["session"];
+    refereeId?: number;
   };
 };
