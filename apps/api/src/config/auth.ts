@@ -39,6 +39,24 @@ export const auth = betterAuth({
       secure: env.NODE_ENV === "production",
     },
   },
+  databaseHooks: {
+    user: {
+      create: {
+        // Better-auth's admin plugin injects a create.before hook that sets
+        // `role` to its `defaultRole` ("user" when unspecified). We treat
+        // role = null as the absence of any RBAC roles (see packages/shared/src/rbac.ts),
+        // so strip the injected "user" default back to null. User hooks run
+        // after plugin hooks, and the returned `data` is shallow-merged on top,
+        // so this overrides the plugin's default cleanly.
+        before: async (user) => {
+          if ((user as { role?: string | null }).role === "user") {
+            return { data: { ...user, role: null } };
+          }
+          return { data: user };
+        },
+      },
+    },
+  },
   plugins: [
     admin({
       ac,

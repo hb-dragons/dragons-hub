@@ -101,4 +101,82 @@ describe("auth config", () => {
     });
     expect(config.advanced.defaultCookieAttributes.secure).toBe(true);
   });
+
+  describe("databaseHooks.user.create.before", () => {
+    type UserCreateHook = (user: {
+      role?: string | null;
+      [key: string]: unknown;
+    }) => Promise<{ data: { role: string | null; [key: string]: unknown } }>;
+
+    async function getHook(): Promise<UserCreateHook> {
+      await import("./auth");
+      const config = mocks.betterAuth.mock.calls[0]![0] as {
+        databaseHooks?: {
+          user?: { create?: { before?: UserCreateHook } };
+        };
+      };
+      const hook = config.databaseHooks?.user?.create?.before;
+      if (!hook) throw new Error("Expected user.create.before hook to be configured");
+      return hook;
+    }
+
+    it("strips the injected 'user' default role back to null", async () => {
+      const hook = await getHook();
+      const result = await hook({
+        id: "u1",
+        email: "a@b.com",
+        name: "A",
+        role: "user",
+      });
+      expect(result.data.role).toBeNull();
+    });
+
+    it("preserves null role (already correct)", async () => {
+      const hook = await getHook();
+      const result = await hook({
+        id: "u2",
+        email: "b@b.com",
+        name: "B",
+        role: null,
+      });
+      expect(result.data.role).toBeNull();
+    });
+
+    it("preserves non-'user' roles (e.g., admin, refereeAdmin)", async () => {
+      const hook = await getHook();
+      const adminResult = await hook({
+        id: "u3",
+        email: "c@b.com",
+        name: "C",
+        role: "admin",
+      });
+      expect(adminResult.data.role).toBe("admin");
+
+      const multiResult = await hook({
+        id: "u4",
+        email: "d@b.com",
+        name: "D",
+        role: "admin,refereeAdmin",
+      });
+      expect(multiResult.data.role).toBe("admin,refereeAdmin");
+    });
+
+    it("preserves other user fields untouched", async () => {
+      const hook = await getHook();
+      const result = await hook({
+        id: "u5",
+        email: "e@b.com",
+        name: "E",
+        role: "user",
+        emailVerified: true,
+      });
+      expect(result.data).toMatchObject({
+        id: "u5",
+        email: "e@b.com",
+        name: "E",
+        emailVerified: true,
+        role: null,
+      });
+    });
+  });
 });
