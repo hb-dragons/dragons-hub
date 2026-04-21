@@ -30,6 +30,7 @@ export const refereeAdmin = ac.newRole({
   referee:    ["view", "create", "update", "delete"],
   assignment: ["view", "create", "update", "delete", "claim", "release"],
   match:      ["view"],
+  team:       ["view"],
   sync:       ["view", "trigger"],
 });
 

@@ -49,6 +49,8 @@ describe("can", () => {
     ["refereeAdmin", "assignment", "claim", true],
     ["refereeAdmin", "match", "view", true],
     ["refereeAdmin", "match", "update", false],
+    ["refereeAdmin", "team", "view", true],
+    ["refereeAdmin", "team", "manage", false],
     ["refereeAdmin", "venue", "view", false],
     ["venueManager", "venue", "create", true],
     ["venueManager", "booking", "delete", true],
