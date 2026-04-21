@@ -136,3 +136,21 @@ export type {
 
 // Brand utilities
 export { clubLogoUrl } from "./brand";
+
+// RBAC — role/permission definitions and helpers
+export {
+  statement,
+  ac,
+  roles,
+  admin,
+  refereeAdmin,
+  venueManager,
+  teamManager,
+  ROLE_NAMES,
+  parseRoles,
+  can,
+  canAll,
+  hasRole,
+  isReferee,
+} from "./rbac";
+export type { RoleName, Resource, Action } from "./rbac";

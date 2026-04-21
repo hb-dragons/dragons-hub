@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@dragons/sdk": "workspace:*",
+    "better-auth": "1.6.5",
     "zod": "^4.3.6"
   },
   "peerDependencies": {
