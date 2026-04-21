@@ -38,75 +38,152 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { UserButton } from "@daveyplate/better-auth-ui";
 import { Wordmark } from "@/components/brand/wordmark";
+import { can, type Resource, type Action } from "@dragons/shared";
+
+type Perm = { [R in Resource]: { resource: R; action: Action<R> } }[Resource];
 
 const navGroups = [
   {
     labelKey: "nav.groupReferee" as const,
     icon: Gavel,
-    roles: ["admin", "referee"],
     items: [
-      { href: "/admin/referee/matches", labelKey: "nav.openAssignments" as const },
+      {
+        href: "/admin/referee/matches",
+        labelKey: "nav.openAssignments" as const,
+        perm: { resource: "assignment", action: "view" } as const,
+      },
     ],
   },
   {
     labelKey: "nav.groupLeague" as const,
     icon: Trophy,
-    roles: ["admin"],
     items: [
-      { href: "/admin/matches", labelKey: "nav.matches" as const },
-      { href: "/admin/standings", labelKey: "nav.standings" as const },
-      { href: "/admin/teams", labelKey: "nav.teams" as const },
-      { href: "/admin/referees", labelKey: "nav.referees" as const },
+      {
+        href: "/admin/matches",
+        labelKey: "nav.matches" as const,
+        perm: { resource: "match", action: "view" } as const,
+      },
+      {
+        href: "/admin/standings",
+        labelKey: "nav.standings" as const,
+        perm: { resource: "standing", action: "view" } as const,
+      },
+      {
+        href: "/admin/teams",
+        labelKey: "nav.teams" as const,
+        perm: { resource: "team", action: "view" } as const,
+      },
+      {
+        href: "/admin/referees",
+        labelKey: "nav.referees" as const,
+        perm: { resource: "referee", action: "view" } as const,
+      },
     ],
   },
   {
     labelKey: "nav.groupOperations" as const,
     icon: KanbanSquare,
-    roles: ["admin"],
     items: [
-      { href: "/admin/board", labelKey: "nav.board" as const },
-      { href: "/admin/bookings", labelKey: "nav.bookings" as const },
-      { href: "/admin/venues", labelKey: "nav.venues" as const },
+      {
+        href: "/admin/board",
+        labelKey: "nav.board" as const,
+        perm: { resource: "settings", action: "view" } as const,
+      },
+      {
+        href: "/admin/bookings",
+        labelKey: "nav.bookings" as const,
+        perm: { resource: "booking", action: "view" } as const,
+      },
+      {
+        href: "/admin/venues",
+        labelKey: "nav.venues" as const,
+        perm: { resource: "venue", action: "view" } as const,
+      },
     ],
   },
   {
     labelKey: "nav.groupSocial" as const,
     icon: Image,
-    roles: ["admin"],
     items: [
-      { href: "/admin/social/create", labelKey: "nav.createPost" as const },
+      {
+        href: "/admin/social/create",
+        labelKey: "nav.createPost" as const,
+        perm: { resource: "settings", action: "view" } as const,
+      },
     ],
   },
   {
     labelKey: "nav.groupNotifications" as const,
     icon: Bell,
-    roles: ["admin"],
     items: [
-      { href: "/admin/notifications", labelKey: "nav.notificationCenter" as const },
-      { href: "/admin/notifications/rules", labelKey: "nav.watchRules" as const },
-      { href: "/admin/notifications/channels", labelKey: "nav.channels" as const },
-      { href: "/admin/notifications/events", labelKey: "nav.domainEvents" as const },
+      {
+        href: "/admin/notifications",
+        labelKey: "nav.notificationCenter" as const,
+        perm: { resource: "settings", action: "view" } as const,
+      },
+      {
+        href: "/admin/notifications/rules",
+        labelKey: "nav.watchRules" as const,
+        perm: { resource: "settings", action: "view" } as const,
+      },
+      {
+        href: "/admin/notifications/channels",
+        labelKey: "nav.channels" as const,
+        perm: { resource: "settings", action: "view" } as const,
+      },
+      {
+        href: "/admin/notifications/events",
+        labelKey: "nav.domainEvents" as const,
+        perm: { resource: "settings", action: "view" } as const,
+      },
     ],
   },
   {
     labelKey: "nav.groupSystem" as const,
     icon: Settings,
-    roles: ["admin"],
     items: [
-      { href: "/admin/sync", labelKey: "nav.sync" as const },
-      { href: "/admin/settings", labelKey: "nav.settings" as const },
-      { href: "/admin/users", labelKey: "nav.users" as const },
+      {
+        href: "/admin/sync",
+        labelKey: "nav.sync" as const,
+        perm: { resource: "sync", action: "view" } as const,
+      },
+      {
+        href: "/admin/settings",
+        labelKey: "nav.settings" as const,
+        perm: { resource: "settings", action: "view" } as const,
+      },
+      {
+        href: "/admin/users",
+        labelKey: "nav.users" as const,
+        perm: { resource: "settings", action: "update" } as const,
+      },
     ],
   },
-];
+] satisfies ReadonlyArray<{
+  labelKey: string;
+  icon: React.ComponentType;
+  items: ReadonlyArray<{ href: string; labelKey: string; perm: Perm }>;
+}>;
+
+function canPerm(
+  user: Parameters<typeof can>[0],
+  perm: { resource: Resource; action: string },
+): boolean {
+  return can(user, perm.resource, perm.action as Action<typeof perm.resource>);
+}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const t = useTranslations();
   const { setOpenMobile } = useSidebar();
   const { data: session } = authClient.useSession();
-  const userRole = (session?.user?.role ?? "user") as string;
-  const visibleGroups = navGroups.filter((g) => g.roles.includes(userRole));
+  const user = session?.user ?? null;
+  const visibleGroups = navGroups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => canPerm(user, i.perm)),
+    }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <Sidebar collapsible="icon" {...props}>
