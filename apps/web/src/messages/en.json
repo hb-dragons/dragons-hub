@@ -109,6 +109,7 @@
     "failed": "Failed",
     "saveChanges": "Save Changes",
     "cancel": "Cancel",
+    "close": "Close",
     "back": "Back",
     "loading": "Loading...",
     "noResults": "No results.",
@@ -493,12 +494,12 @@
     },
     "roles": {
       "admin": "Admin",
-      "user": "User",
-      "referee": "Referee",
       "refereeAdmin": "Referee Admin",
       "venueManager": "Venue Manager",
       "teamManager": "Team Manager"
     },
+    "noRole": "No role",
+    "refereeBadge": "Referee",
     "status": {
       "active": "Active",
       "banned": "Banned"
@@ -562,11 +563,6 @@
       "title": "Delete User",
       "description": "This will permanently delete {name} and all their data. This action cannot be undone.",
       "confirm": "Delete"
-    },
-    "changeRoleConfirm": {
-      "title": "Change Role",
-      "description": "Change {name}'s role from {currentRole} to {newRole}?",
-      "confirm": "Change Role"
     },
     "editRolesDialog": {
       "title": "Edit Roles",

@@ -119,10 +119,7 @@ export function UserActions({
   async function handleSaveRoles() {
     setSavingRoles(true)
     try {
-      // Better-auth stores multi-role assignments as a comma-separated string in
-      // the `user.role` column. The client-side `setRole` type narrows `role` to
-      // a single union member, but the server accepts the comma-joined form, so
-      // we force-cast through `never` to pass the concatenated list through.
+      // The server accepts comma-joined multi-role strings; client types narrow to a single union member.
       const roleValue = selectedRoles.length === 0 ? "" : selectedRoles.join(",")
       const { error } = await authClient.admin.setRole({
         userId: user.id,
@@ -144,8 +141,6 @@ export function UserActions({
 
   async function handleRemoveReferee() {
     try {
-      // Referee status is identity-based (refereeId FK). Unlinking only needs
-      // to clear the FK; no role assignment is involved.
       await fetchAPI(`/admin/users/${user.id}/referee-link`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -179,12 +174,12 @@ export function UserActions({
               {t("users.actions.editRoles")}
             </DropdownMenuItem>
           )}
-          {!isSelf && user.role !== "referee" && (
+          {!isSelf && user.refereeId === null && (
             <DropdownMenuItem onSelect={() => setLinkRefereeOpen(true)}>
               {t("users.actions.makeReferee")}
             </DropdownMenuItem>
           )}
-          {!isSelf && user.role === "referee" && (
+          {!isSelf && user.refereeId !== null && (
             <DropdownMenuItem onSelect={handleRemoveReferee}>
               {t("users.actions.removeReferee")}
             </DropdownMenuItem>

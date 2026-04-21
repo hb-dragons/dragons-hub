@@ -32,11 +32,12 @@ import {
 } from "./task.schemas";
 
 const taskRoutes = new Hono<AppEnv>();
-taskRoutes.use("*", requirePermission("settings", "update"));
+const settingsUpdate = requirePermission("settings", "update");
 
 // GET /admin/boards/:boardId/tasks - List tasks for a board
 taskRoutes.get(
   "/boards/:boardId/tasks",
+  settingsUpdate,
   describeRoute({
     description: "List tasks for a board",
     tags: ["Tasks"],
@@ -59,6 +60,7 @@ taskRoutes.get(
 // POST /admin/boards/:boardId/tasks - Create task
 taskRoutes.post(
   "/boards/:boardId/tasks",
+  settingsUpdate,
   describeRoute({
     description: "Create task",
     tags: ["Tasks"],
@@ -88,6 +90,7 @@ taskRoutes.post(
 // GET /admin/tasks/:id - Get task detail
 taskRoutes.get(
   "/tasks/:id",
+  settingsUpdate,
   describeRoute({
     description: "Get task detail",
     tags: ["Tasks"],
@@ -111,6 +114,7 @@ taskRoutes.get(
 // PATCH /admin/tasks/:id - Update task
 taskRoutes.patch(
   "/tasks/:id",
+  settingsUpdate,
   describeRoute({
     description: "Update task",
     tags: ["Tasks"],
@@ -135,6 +139,7 @@ taskRoutes.patch(
 // PATCH /admin/tasks/:id/move - Move task to column/position
 taskRoutes.patch(
   "/tasks/:id/move",
+  settingsUpdate,
   describeRoute({
     description: "Move task to column and position",
     tags: ["Tasks"],
@@ -162,6 +167,7 @@ taskRoutes.patch(
 // DELETE /admin/tasks/:id - Delete task
 taskRoutes.delete(
   "/tasks/:id",
+  settingsUpdate,
   describeRoute({
     description: "Delete task",
     tags: ["Tasks"],
@@ -185,6 +191,7 @@ taskRoutes.delete(
 // POST /admin/tasks/:id/checklist - Add checklist item
 taskRoutes.post(
   "/tasks/:id/checklist",
+  settingsUpdate,
   describeRoute({
     description: "Add checklist item",
     tags: ["Tasks"],
@@ -209,6 +216,7 @@ taskRoutes.post(
 // PATCH /admin/tasks/:id/checklist/:itemId - Update checklist item
 taskRoutes.patch(
   "/tasks/:id/checklist/:itemId",
+  settingsUpdate,
   describeRoute({
     description: "Update checklist item",
     tags: ["Tasks"],
@@ -239,6 +247,7 @@ taskRoutes.patch(
 // DELETE /admin/tasks/:id/checklist/:itemId - Delete checklist item
 taskRoutes.delete(
   "/tasks/:id/checklist/:itemId",
+  settingsUpdate,
   describeRoute({
     description: "Delete checklist item",
     tags: ["Tasks"],
@@ -268,6 +277,7 @@ taskRoutes.delete(
 // POST /admin/tasks/:id/comments - Add comment
 taskRoutes.post(
   "/tasks/:id/comments",
+  settingsUpdate,
   describeRoute({
     description: "Add comment",
     tags: ["Tasks"],
@@ -292,6 +302,7 @@ taskRoutes.post(
 // PATCH /admin/tasks/:id/comments/:commentId - Edit comment
 taskRoutes.patch(
   "/tasks/:id/comments/:commentId",
+  settingsUpdate,
   describeRoute({
     description: "Edit comment",
     tags: ["Tasks"],
@@ -319,6 +330,7 @@ taskRoutes.patch(
 // DELETE /admin/tasks/:id/comments/:commentId - Delete comment
 taskRoutes.delete(
   "/tasks/:id/comments/:commentId",
+  settingsUpdate,
   describeRoute({
     description: "Delete comment",
     tags: ["Tasks"],

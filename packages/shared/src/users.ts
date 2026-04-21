@@ -4,6 +4,7 @@ export interface UserListItem {
   email: string;
   emailVerified: boolean;
   role: string | null;
+  refereeId: number | null;
   banned: boolean | null;
   banReason: string | null;
   banExpires: number | null;

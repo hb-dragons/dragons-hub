@@ -19,6 +19,7 @@ import {
   requirePermission,
   assertPermission,
   requireRefereeSelf,
+  requireRefereeSelfOrPermission,
 } from "./rbac";
 import { errorHandler } from "./error";
 
@@ -195,5 +196,58 @@ describe("requireRefereeSelf", () => {
     const res = await app.request("/self/games");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ refereeId: 99 });
+  });
+});
+
+describe("requireRefereeSelfOrPermission", () => {
+  const app = new Hono<AppEnv>();
+  app.use("/either/*", requireRefereeSelfOrPermission("assignment", "view"));
+  app.get("/either/games", (c) =>
+    c.json({ refereeId: c.get("refereeId") ?? null }),
+  );
+
+  it("returns 401 when no session", async () => {
+    mockGetSession.mockResolvedValue(null);
+    const res = await app.request("/either/games");
+    expect(res.status).toBe(401);
+  });
+
+  it("passes a linked referee and populates refereeId", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: null, refereeId: 77 },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/either/games");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ refereeId: 77 });
+  });
+
+  it("passes an admin (no refereeId) and leaves refereeId unset", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "admin", refereeId: null },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/either/games");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ refereeId: null });
+  });
+
+  it("passes a refereeAdmin with no referee link (permission-only path)", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "refereeAdmin", refereeId: null },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/either/games");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ refereeId: null });
+  });
+
+  it("returns 403 when user has neither referee link nor the permission", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "teamManager", refereeId: null },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/either/games");
+    expect(res.status).toBe(403);
   });
 });

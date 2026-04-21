@@ -132,7 +132,7 @@ settingsRoutes.put(
 // POST /admin/settings/referee-games-sync — trigger manual referee games sync
 settingsRoutes.post(
   "/settings/referee-games-sync",
-  requirePermission("settings", "update"),
+  requirePermission("sync", "trigger"),
   describeRoute({
     description: "Trigger a manual referee games sync",
     tags: ["Settings"],

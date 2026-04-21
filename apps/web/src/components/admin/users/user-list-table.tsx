@@ -6,7 +6,7 @@ import useSWR from "swr"
 import { Plus, SearchIcon, Users } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 import { SWR_KEYS } from "@/lib/swr-keys"
-import { parseRoles, type RoleName } from "@dragons/shared"
+import { isReferee, parseRoles, type RoleName } from "@dragons/shared"
 
 import type { ColumnDef, FilterFn } from "@tanstack/react-table"
 import { Badge } from "@dragons/ui/components/badge"
@@ -62,12 +62,9 @@ function getColumns(
       ),
       cell: ({ row }) => {
         const roles = parseRoles(row.original.role)
-        // Legacy "referee" role strings don't appear in ROLE_NAMES so parseRoles
-        // filters them out. Render the referee badge explicitly when the raw
-        // role string equals "referee" so the column doesn't look empty.
-        const isLegacyReferee = row.original.role === "referee"
-        if (roles.length === 0 && !isLegacyReferee) {
-          return <Badge variant="secondary">{t("roles.user")}</Badge>
+        const showRefereeBadge = isReferee(row.original)
+        if (roles.length === 0 && !showRefereeBadge) {
+          return <Badge variant="secondary">{t("noRole")}</Badge>
         }
         const variantFor = (r: RoleName): "default" | "secondary" => (
           r === "admin" ? "default" : "secondary"
@@ -79,8 +76,8 @@ function getColumns(
                 {t(`roles.${r}`)}
               </Badge>
             ))}
-            {isLegacyReferee && (
-              <Badge variant="outline">{t("roles.referee")}</Badge>
+            {showRefereeBadge && (
+              <Badge variant="outline">{t("refereeBadge")}</Badge>
             )}
           </div>
         )
@@ -159,19 +156,24 @@ async function fetchUsers(): Promise<UserListItem[]> {
   })
   if (error) throw error
   return (
-    data?.users.map((u): UserListItem => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      emailVerified: u.emailVerified,
-      role: u.role ?? null,
-      banned: u.banned ?? null,
-      banReason: u.banReason ?? null,
-      banExpires: u.banExpires instanceof Date ? u.banExpires.getTime() : u.banExpires ?? null,
-      image: u.image ?? null,
-      createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
-      updatedAt: u.updatedAt instanceof Date ? u.updatedAt.toISOString() : String(u.updatedAt),
-    })) ?? []
+    data?.users.map((u): UserListItem => {
+      const refereeId =
+        (u as { refereeId?: number | null }).refereeId ?? null;
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        emailVerified: u.emailVerified,
+        role: u.role ?? null,
+        refereeId,
+        banned: u.banned ?? null,
+        banReason: u.banReason ?? null,
+        banExpires: u.banExpires instanceof Date ? u.banExpires.getTime() : u.banExpires ?? null,
+        image: u.image ?? null,
+        createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
+        updatedAt: u.updatedAt instanceof Date ? u.updatedAt.toISOString() : String(u.updatedAt),
+      };
+    }) ?? []
   )
 }
 

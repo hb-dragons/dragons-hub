@@ -20,7 +20,7 @@ import {
 import { env } from "../../config/env";
 
 const channelConfigRoutes = new Hono<AppEnv>();
-channelConfigRoutes.use("*", requirePermission("settings", "update"));
+const settingsUpdate = requirePermission("settings", "update");
 
 function isProviderConfigured(type: string): boolean {
   switch (type) {
@@ -44,6 +44,7 @@ function isProviderConfigured(type: string): boolean {
 // GET /admin/channel-configs/providers - Provider availability
 channelConfigRoutes.get(
   "/channel-configs/providers",
+  settingsUpdate,
   describeRoute({
     description: "List channel types with provider configuration status",
     tags: ["Channel Configs"],
@@ -61,6 +62,7 @@ channelConfigRoutes.get(
 // GET /admin/channel-configs - List channel configs
 channelConfigRoutes.get(
   "/channel-configs",
+  settingsUpdate,
   describeRoute({
     description: "List channel configurations with pagination",
     tags: ["Channel Configs"],
@@ -76,6 +78,7 @@ channelConfigRoutes.get(
 // GET /admin/channel-configs/:id - Get channel config by ID
 channelConfigRoutes.get(
   "/channel-configs/:id",
+  settingsUpdate,
   describeRoute({
     description: "Get a single channel configuration by ID",
     tags: ["Channel Configs"],
@@ -102,6 +105,7 @@ channelConfigRoutes.get(
 // POST /admin/channel-configs - Create channel config
 channelConfigRoutes.post(
   "/channel-configs",
+  settingsUpdate,
   describeRoute({
     description: "Create a new channel configuration",
     tags: ["Channel Configs"],
@@ -128,6 +132,7 @@ channelConfigRoutes.post(
 // PATCH /admin/channel-configs/:id - Update channel config
 channelConfigRoutes.patch(
   "/channel-configs/:id",
+  settingsUpdate,
   describeRoute({
     description: "Update a channel configuration",
     tags: ["Channel Configs"],
@@ -177,6 +182,7 @@ channelConfigRoutes.patch(
 // DELETE /admin/channel-configs/:id - Delete channel config
 channelConfigRoutes.delete(
   "/channel-configs/:id",
+  settingsUpdate,
   describeRoute({
     description: "Delete a channel configuration",
     tags: ["Channel Configs"],

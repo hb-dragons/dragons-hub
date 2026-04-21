@@ -10,7 +10,8 @@ import { requirePermission } from "../../middleware/rbac";
 import type { AppEnv } from "../../types";
 
 const leagueRoutes = new Hono<AppEnv>();
-leagueRoutes.use("*", requirePermission("settings", "update"));
+
+const settingsUpdate = requirePermission("settings", "update");
 
 const leagueNumbersSchema = z.object({
   leagueNumbers: z.array(z.number().int().positive()),
@@ -19,6 +20,7 @@ const leagueNumbersSchema = z.object({
 // GET /admin/settings/leagues - Get tracked leagues
 leagueRoutes.get(
   "/settings/leagues",
+  settingsUpdate,
   describeRoute({
     description: "Get tracked leagues",
     tags: ["Leagues"],
@@ -33,6 +35,7 @@ leagueRoutes.get(
 // PUT /admin/settings/leagues - Set tracked leagues by liganr
 leagueRoutes.put(
   "/settings/leagues",
+  settingsUpdate,
   describeRoute({
     description: "Set tracked leagues by league number",
     tags: ["Leagues"],
@@ -52,6 +55,7 @@ const ownClubRefsSchema = z.object({
 // PATCH /admin/settings/leagues/:id/own-club-refs - Toggle own-club-refs for a league
 leagueRoutes.patch(
   "/settings/leagues/:id/own-club-refs",
+  settingsUpdate,
   describeRoute({
     description: "Set whether a league uses own-club referees",
     tags: ["Leagues"],

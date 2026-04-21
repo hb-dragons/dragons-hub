@@ -16,11 +16,12 @@ import {
 } from "./notification.schemas";
 
 const notificationRoutes = new Hono<AppEnv>();
-notificationRoutes.use("*", requirePermission("settings", "update"));
+const settingsUpdate = requirePermission("settings", "update");
 
 // GET /admin/notifications - List notifications for a user
 notificationRoutes.get(
   "/notifications",
+  settingsUpdate,
   describeRoute({
     description: "List notifications for a user from the notification log",
     tags: ["Notifications"],
@@ -36,6 +37,7 @@ notificationRoutes.get(
 // PATCH /admin/notifications/:id/read - Mark one notification as read
 notificationRoutes.patch(
   "/notifications/:id/read",
+  settingsUpdate,
   describeRoute({
     description: "Mark one notification as read",
     tags: ["Notifications"],
@@ -62,6 +64,7 @@ notificationRoutes.patch(
 // PATCH /admin/notifications/read-all - Mark all user's notifications as read
 notificationRoutes.patch(
   "/notifications/read-all",
+  settingsUpdate,
   describeRoute({
     description: "Mark all user notifications as read",
     tags: ["Notifications"],
@@ -78,6 +81,7 @@ notificationRoutes.patch(
 // GET /admin/notifications/unread-count - Unread count for a user
 notificationRoutes.get(
   "/notifications/unread-count",
+  settingsUpdate,
   describeRoute({
     description: "Get unread count for a user",
     tags: ["Notifications"],
@@ -93,6 +97,7 @@ notificationRoutes.get(
 // POST /admin/notifications/:id/retry - Retry a failed notification
 notificationRoutes.post(
   "/notifications/:id/retry",
+  settingsUpdate,
   describeRoute({
     description: "Retry a failed notification delivery",
     tags: ["Notifications"],

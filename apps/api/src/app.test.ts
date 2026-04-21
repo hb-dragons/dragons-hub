@@ -110,6 +110,74 @@ describe("api routes", () => {
   });
 });
 
+// Regression guard: prevents sub-router `.use("*", ...)` from being
+// reintroduced. Such middleware leaks across sibling sub-routers sharing the
+// same mount prefix (`/admin`, `/referee`).
+describe("sub-router middleware isolation (Hono /admin leak)", () => {
+  it("admin/referee candidates gate only checks assignment:view, not foreign perms", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "refereeAdmin" },
+      session: { id: "s1" },
+    });
+    mockUserHasPermission.mockImplementation(async ({ body }) => {
+      const perms = body.permissions as Record<string, string[]>;
+      if (perms.assignment?.includes("view")) return { success: true };
+      return { success: false };
+    });
+
+    const response = await app.request(
+      "/admin/referee/games/12345/candidates?slotNumber=1",
+    );
+
+    expect(response.status).not.toBe(403);
+
+    const calls = mockUserHasPermission.mock.calls.map(
+      (c) => c[0].body.permissions,
+    );
+    for (const perms of calls) {
+      expect(perms).not.toHaveProperty("settings");
+      expect(perms).not.toHaveProperty("referee");
+    }
+  });
+
+  it("admin/bookings list only checks booking:view, not foreign perms", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "venueManager" },
+      session: { id: "s1" },
+    });
+    mockUserHasPermission.mockImplementation(async ({ body }) => {
+      const perms = body.permissions as Record<string, string[]>;
+      if (perms.booking?.includes("view")) return { success: true };
+      return { success: false };
+    });
+
+    const response = await app.request("/admin/bookings");
+
+    expect(response.status).not.toBe(403);
+
+    const calls = mockUserHasPermission.mock.calls.map(
+      (c) => c[0].body.permissions,
+    );
+    for (const perms of calls) {
+      expect(perms).not.toHaveProperty("settings");
+    }
+  });
+});
+
+describe("sub-router middleware isolation (Hono /referee leak)", () => {
+  it("non-referee admin can fetch /referee/games via assignment:view only", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "admin", refereeId: null },
+      session: { id: "s1" },
+    });
+    mockUserHasPermission.mockResolvedValue({ success: true });
+
+    const response = await app.request("/referee/games");
+
+    expect(response.status).not.toBe(403);
+  });
+});
+
 describe("Bull Board admin gate", () => {
   it("returns 401 when unauthenticated", async () => {
     mockGetSession.mockResolvedValue(null);

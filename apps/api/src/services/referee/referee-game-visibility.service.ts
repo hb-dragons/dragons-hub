@@ -37,7 +37,7 @@ interface GetVisibleRefereeGamesParams {
 }
 
 export async function getVisibleRefereeGames(
-  refereeId: number,
+  refereeId: number | null,
   params: GetVisibleRefereeGamesParams,
 ): Promise<{
   items: RefereeGameListItem[];
@@ -47,6 +47,62 @@ export async function getVisibleRefereeGames(
   hasMore: boolean;
 }> {
   const { limit, offset, search, status, league, dateFrom, dateTo } = params;
+
+  if (refereeId === null) {
+    const openOurClubSlot = or(
+      and(eq(refereeGames.sr1OurClub, true), eq(refereeGames.sr1Status, "open")),
+      and(eq(refereeGames.sr2OurClub, true), eq(refereeGames.sr2Status, "open")),
+    )!;
+    const conditions = [openOurClubSlot];
+
+    if (status === "cancelled") conditions.push(eq(refereeGames.isCancelled, true));
+    else if (status === "forfeited") conditions.push(eq(refereeGames.isForfeited, true));
+    else if (status !== "all") {
+      conditions.push(eq(refereeGames.isCancelled, false));
+      conditions.push(eq(refereeGames.isForfeited, false));
+    }
+
+    if (league) conditions.push(eq(refereeGames.leagueShort, league));
+    if (dateFrom) conditions.push(gte(refereeGames.kickoffDate, dateFrom));
+    if (dateTo) conditions.push(lte(refereeGames.kickoffDate, dateTo));
+
+    if (search) {
+      const words = search.split(/\s+/).filter(Boolean);
+      for (const word of words) {
+        const pattern = `%${word}%`;
+        conditions.push(or(
+          ilike(refereeGames.homeTeamName, pattern),
+          ilike(refereeGames.guestTeamName, pattern),
+          ilike(refereeGames.leagueName, pattern),
+        )!);
+      }
+    }
+
+    const whereClause = and(...conditions)!;
+    const [items, countResult] = await Promise.all([
+      db.select(refereeGameColumns)
+        .from(refereeGames)
+        .where(whereClause)
+        .orderBy(asc(refereeGames.kickoffDate), asc(refereeGames.kickoffTime))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(refereeGames)
+        .where(whereClause),
+    ]);
+
+    const total = countResult[0]?.count ?? 0;
+    const decorated = items.map((row) => ({
+      ...row,
+      mySlot: null,
+      claimableSlots: [],
+    })) as RefereeGameListItem[];
+    return {
+      items: decorated,
+      total, limit, offset,
+      hasMore: offset + items.length < total,
+    };
+  }
 
   // 1. Load referee flags + federation apiId
   const [referee] = await db
@@ -256,9 +312,19 @@ function buildAwayVisibility(
  * Returns null when no referee-game exists for the match or the referee cannot see it.
  */
 export async function getVisibleRefereeGameByMatchId(
-  refereeId: number,
+  refereeId: number | null,
   matchId: number,
 ): Promise<RefereeGameListItem | null> {
+  if (refereeId === null) {
+    const [row] = await db
+      .select(refereeGameColumns)
+      .from(refereeGames)
+      .where(eq(refereeGames.matchId, matchId))
+      .limit(1);
+    if (!row) return null;
+    return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
+  }
+
   const [referee] = await db
     .select({
       apiId: referees.apiId,
@@ -323,9 +389,19 @@ export async function getVisibleRefereeGameByMatchId(
  * Returns null when the game does not exist or the referee cannot see it.
  */
 export async function getVisibleRefereeGameById(
-  refereeId: number,
+  refereeId: number | null,
   id: number,
 ): Promise<RefereeGameListItem | null> {
+  if (refereeId === null) {
+    const [row] = await db
+      .select(refereeGameColumns)
+      .from(refereeGames)
+      .where(eq(refereeGames.id, id))
+      .limit(1);
+    if (!row) return null;
+    return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
+  }
+
   const [referee] = await db
     .select({
       apiId: referees.apiId,

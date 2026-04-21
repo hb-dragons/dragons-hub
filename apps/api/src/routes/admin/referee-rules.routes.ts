@@ -11,7 +11,9 @@ import type { AppEnv } from "../../types";
 import { refereeRulesParamSchema, updateRefereeRulesBodySchema } from "./referee-rules.schemas";
 
 const refereeRulesRoutes = new Hono<AppEnv>();
-refereeRulesRoutes.use("*", requirePermission("referee", "update"));
+
+const refereeView = requirePermission("referee", "view");
+const refereeUpdate = requirePermission("referee", "update");
 
 async function requireOwnClubReferee(id: number) {
   const [referee] = await db
@@ -22,7 +24,7 @@ async function requireOwnClubReferee(id: number) {
   return referee ?? null;
 }
 
-refereeRulesRoutes.get("/referees/:id/rules", async (c) => {
+refereeRulesRoutes.get("/referees/:id/rules", refereeView, async (c) => {
   const { id } = refereeRulesParamSchema.parse({ id: c.req.param("id") });
 
   const referee = await requireOwnClubReferee(id);
@@ -37,7 +39,7 @@ refereeRulesRoutes.get("/referees/:id/rules", async (c) => {
   return c.json(result);
 });
 
-refereeRulesRoutes.put("/referees/:id/rules", async (c) => {
+refereeRulesRoutes.put("/referees/:id/rules", refereeUpdate, async (c) => {
   const { id } = refereeRulesParamSchema.parse({ id: c.req.param("id") });
   const body = updateRefereeRulesBodySchema.parse(await c.req.json());
 

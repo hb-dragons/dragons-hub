@@ -84,6 +84,7 @@ vi.mock("drizzle-orm", () => ({
 import {
   getVisibleRefereeGames,
   getVisibleRefereeGameById,
+  getVisibleRefereeGameByMatchId,
 } from "./referee-game-visibility.service";
 
 // --- Helpers ---
@@ -743,5 +744,116 @@ describe("getVisibleRefereeGameById", () => {
     const result = await getVisibleRefereeGameById(1, 21);
 
     expect(result?.mySlot).toBe(2);
+  });
+});
+
+// --- Admin mode (refereeId = null): skip visibility filtering ---
+
+describe("getVisibleRefereeGames (admin mode)", () => {
+  const defaultParams = { limit: 20, offset: 0 };
+
+  it("returns all games with open slots; no referee/rules queries made", async () => {
+    const row = makeGameRow();
+    selectReturnValues.push([row], [{ count: 1 }]);
+
+    const result = await getVisibleRefereeGames(null, defaultParams);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.mySlot).toBeNull();
+    expect(result.items[0]?.claimableSlots).toEqual([]);
+    expect(result.total).toBe(1);
+    expect(mockSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it("applies status, league, date, and search filters in admin mode", async () => {
+    selectReturnValues.push([], [{ count: 0 }]);
+
+    await getVisibleRefereeGames(null, {
+      limit: 10,
+      offset: 0,
+      status: "cancelled",
+      league: "KLN",
+      dateFrom: "2026-04-01",
+      dateTo: "2026-04-30",
+      search: "Dragons Berlin",
+    });
+
+    expect(mockSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it("status 'all' in admin mode skips the cancelled/forfeited filter", async () => {
+    selectReturnValues.push([], [{ count: 0 }]);
+
+    const result = await getVisibleRefereeGames(null, {
+      limit: 10,
+      offset: 0,
+      status: "all",
+    });
+
+    expect(result.items).toEqual([]);
+  });
+
+  it("status 'forfeited' in admin mode filters to forfeited games", async () => {
+    selectReturnValues.push([], [{ count: 0 }]);
+
+    await getVisibleRefereeGames(null, {
+      limit: 10,
+      offset: 0,
+      status: "forfeited",
+    });
+
+    expect(mockSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it("defaults total to 0 when count is missing", async () => {
+    selectReturnValues.push([], []);
+
+    const result = await getVisibleRefereeGames(null, defaultParams);
+
+    expect(result.total).toBe(0);
+  });
+});
+
+describe("getVisibleRefereeGameById (admin mode)", () => {
+  it("returns the row without visibility filtering and with null mySlot", async () => {
+    const row = makeGameRow({ id: 7 });
+    selectReturnValues.push([row]);
+
+    const result = await getVisibleRefereeGameById(null, 7);
+
+    expect(result?.id).toBe(7);
+    expect(result?.mySlot).toBeNull();
+    expect(result?.claimableSlots).toEqual([]);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null when the row is not found", async () => {
+    selectReturnValues.push([]);
+
+    const result = await getVisibleRefereeGameById(null, 99);
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("getVisibleRefereeGameByMatchId (admin mode)", () => {
+  it("returns the row without visibility filtering and with null mySlot", async () => {
+    const row = makeGameRow({ id: 50, matchId: 500 });
+    selectReturnValues.push([row]);
+
+    const result = await getVisibleRefereeGameByMatchId(null, 500);
+
+    expect(result?.id).toBe(50);
+    expect(result?.mySlot).toBeNull();
+    expect(result?.claimableSlots).toEqual([]);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null when no row is found", async () => {
+    selectReturnValues.push([]);
+
+    const result = await getVisibleRefereeGameByMatchId(null, 999);
+
+    expect(result).toBeNull();
   });
 });

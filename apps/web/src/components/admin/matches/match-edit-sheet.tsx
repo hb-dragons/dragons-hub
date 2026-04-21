@@ -52,6 +52,8 @@ import {
 } from "@dragons/ui/components/popover";
 import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react";
 
+import { authClient } from "@/lib/auth-client";
+import { can } from "@dragons/shared";
 import { fetchAPI } from "@/lib/api";
 import {
   formatMatchTime,
@@ -77,6 +79,7 @@ function OverrideField({
   isDirty,
   onRelease,
   onReset,
+  canEdit,
 }: {
   label: string;
   remoteDisplay?: string;
@@ -85,6 +88,7 @@ function OverrideField({
   isDirty?: boolean;
   onRelease?: () => void;
   onReset?: () => void;
+  canEdit: boolean;
 }) {
   const t = useTranslations();
   const showHint = isOverridden || isDirty;
@@ -94,7 +98,7 @@ function OverrideField({
       <div className="flex min-h-6 items-center justify-between">
         <FieldLabel>{label}</FieldLabel>
         <div className="flex items-center gap-1">
-          {isDirty && onReset && (
+          {canEdit && isDirty && onReset && (
             <Button
               type="button"
               variant="ghost"
@@ -106,7 +110,7 @@ function OverrideField({
               {t("common.reset")}
             </Button>
           )}
-          {isOverridden && onRelease && (
+          {canEdit && isOverridden && onRelease && (
             <Button
               type="button"
               variant="ghost"
@@ -214,6 +218,8 @@ export function MatchEditSheet({
   const t = useTranslations();
   const format = useFormatter();
   const router = useRouter();
+  const { data: session } = authClient.useSession();
+  const canEdit = can(session?.user ?? null, "match", "update");
   const [loading, setLoading] = useState(false);
   const [match, setMatch] = useState<MatchDetail | null>(null);
   const [diffs, setDiffs] = useState<FieldDiff[]>([]);
@@ -594,6 +600,7 @@ export function MatchEditSheet({
                         isDirty={!!dirtyFields.kickoffDate}
                         onRelease={() => handleReleaseOverride("kickoffDate")}
                         onReset={() => form.resetField("kickoffDate")}
+                        canEdit={canEdit}
                       >
                         <div className={dirtyRing("kickoffDate")}>
                           <DatePicker
@@ -602,6 +609,7 @@ export function MatchEditSheet({
                             }
                             onChange={(v) => field.onChange(v)}
                             className="h-9 w-full"
+                            disabled={!canEdit}
                           />
                         </div>
                       </OverrideField>
@@ -623,6 +631,7 @@ export function MatchEditSheet({
                         isDirty={!!dirtyFields.kickoffTime}
                         onRelease={() => handleReleaseOverride("kickoffTime")}
                         onReset={() => form.resetField("kickoffTime")}
+                        canEdit={canEdit}
                       >
                         <div className={dirtyRing("kickoffTime")}>
                           <TimePicker
@@ -631,6 +640,7 @@ export function MatchEditSheet({
                             }
                             onChange={(v) => field.onChange(v)}
                             className="h-9 w-full"
+                            disabled={!canEdit}
                           />
                         </div>
                       </OverrideField>
@@ -660,9 +670,10 @@ export function MatchEditSheet({
                           <Switch
                             checked={field.value === true}
                             onCheckedChange={(checked) => field.onChange(checked)}
+                            disabled={!canEdit}
                             className={dirtyFields.isForfeited ? "ring-2 ring-primary/20" : ""}
                           />
-                          {match.overriddenFields.includes("isForfeited") && (
+                          {canEdit && match.overriddenFields.includes("isForfeited") && (
                             <Button
                               type="button"
                               variant="ghost"
@@ -699,9 +710,10 @@ export function MatchEditSheet({
                           <Switch
                             checked={field.value === true}
                             onCheckedChange={(checked) => field.onChange(checked)}
+                            disabled={!canEdit}
                             className={dirtyFields.isCancelled ? "ring-2 ring-primary/20" : ""}
                           />
-                          {match.overriddenFields.includes("isCancelled") && (
+                          {canEdit && match.overriddenFields.includes("isCancelled") && (
                             <Button
                               type="button"
                               variant="ghost"
@@ -746,6 +758,7 @@ export function MatchEditSheet({
                         handleReleaseOverride("venueNameOverride")
                       }
                       onReset={() => form.resetField("venueNameOverride")}
+                      canEdit={canEdit}
                     >
                       <div className={dirtyRing("venueNameOverride")}>
                         <Combobox
@@ -776,6 +789,7 @@ export function MatchEditSheet({
                           }}
                           placeholder={t("matchDetail.overrides.venuePlaceholder")}
                           className="h-9"
+                          disabled={!canEdit}
                         />
                       </div>
                       <FieldError>{fieldState.error?.message}</FieldError>
@@ -793,9 +807,9 @@ export function MatchEditSheet({
                 </h3>
 
                 {/* #7 — Set All as button + popover */}
-                <Popover open={setAllOpen} onOpenChange={setSetAllOpen}>
+                <Popover open={setAllOpen} onOpenChange={canEdit ? setSetAllOpen : undefined}>
                   <PopoverTrigger asChild>
-                    <Button type="button" variant="outline" size="sm">
+                    <Button type="button" variant="outline" size="sm" disabled={!canEdit}>
                       <Users className="mr-2 h-3.5 w-3.5" />
                       {t("matchDetail.staff.setAll")}
                     </Button>
@@ -836,6 +850,7 @@ export function MatchEditSheet({
                             <Select
                               value={field.value ?? ""}
                               onValueChange={(v) => field.onChange(v)}
+                              disabled={!canEdit}
                             >
                               <SelectTrigger className={`h-9 w-full ${dirtyRing(fieldName)}`}>
                                 <SelectValue placeholder={t("matchDetail.staff.placeholder")} />
@@ -851,7 +866,7 @@ export function MatchEditSheet({
                                 })}
                               </SelectContent>
                             </Select>
-                            {field.value && (
+                            {canEdit && field.value && (
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -928,6 +943,7 @@ export function MatchEditSheet({
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
+                        disabled={!canEdit}
                         className={dirtyRing("internalNotes")}
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
@@ -951,6 +967,7 @@ export function MatchEditSheet({
                           field.onChange(e.target.value || null)
                         }
                         onBlur={field.onBlur}
+                        disabled={!canEdit}
                         className={dirtyRing("publicComment")}
                       />
                       <FieldError>{fieldState.error?.message}</FieldError>
@@ -963,26 +980,39 @@ export function MatchEditSheet({
 
             {/* #4 — Footer: Cancel + Save — sticky at bottom */}
             <div className="flex gap-2 border-t bg-background px-4 py-4">
-              <Button
-                type="button"
-                variant="ghost"
-                className="flex-1"
-                onClick={handleClose}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                type="submit"
-                disabled={saving || !isDirty}
-                className="flex-1"
-              >
-                {saving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                {t("common.saveChanges")}
-              </Button>
+              {canEdit ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex-1"
+                    onClick={handleClose}
+                  >
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={saving || !isDirty}
+                    className="flex-1"
+                  >
+                    {saving ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    {t("common.saveChanges")}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleClose}
+                >
+                  {t("common.close")}
+                </Button>
+              )}
             </div>
           </form>
         )}

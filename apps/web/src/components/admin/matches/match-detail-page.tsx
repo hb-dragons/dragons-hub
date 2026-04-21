@@ -17,6 +17,7 @@ import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
 import { Sheet } from "@dragons/ui/components/sheet";
 import { ArrowLeft, Pencil } from "lucide-react";
+import { Can } from "@/components/rbac/can";
 import { MatchEditSheet } from "./match-edit-sheet";
 import { MatchDivergenceTable } from "./match-divergence-table";
 import { MatchChangeHistory } from "./match-change-history";
@@ -88,10 +89,12 @@ export function MatchDetailPage({
               {t("matchDetail.overrideCount", { count: overrideCount })}
             </Badge>
           )}
-          <Button size="sm" onClick={() => setEditOpen(true)}>
-            <Pencil className="mr-2 h-4 w-4" />
-            {t("matchDetail.edit")}
-          </Button>
+          <Can resource="match" action="update">
+            <Button size="sm" onClick={() => setEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              {t("matchDetail.edit")}
+            </Button>
+          </Can>
         </div>
       </div>
 

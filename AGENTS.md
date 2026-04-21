@@ -436,9 +436,12 @@ All resources, actions, and role → permission mappings live in `packages/share
 `apps/api/src/middleware/rbac.ts` exports:
 
 - `requireAuth` — 401 on no session; populates `c.get("user")` and `c.get("session")`.
-- `requirePermission(resource, action)` — route-group gate; 403 on insufficient permission.
+- `requirePermission(resource, action)` — per-route gate; 403 on insufficient permission. Attach as the second argument to `get/post/...` (not via `.use("*")` — see below).
 - `assertPermission(c, resource, action)` — inline check inside a handler for row-level logic.
 - `requireRefereeSelf` — gates self-service routes; populates `c.get("refereeId")`.
+- `requireRefereeSelfOrPermission(resource, action)` — dual gate for routes serving both referees and admins; populates `refereeId` when linked (undefined for non-referee admins, signaling admin mode).
+
+**Hono sub-router gotcha:** `.use("*", mw)` on a sub-router mounted at a shared prefix (e.g. `/admin`) registers the middleware at the parent's `<prefix>/*` path, so it fires on every sibling sub-router's routes too. Always attach permission middleware per-route instead (the app-level `app.use("/admin/*", requireAuth)` and `app.use("/admin/queues/*", requirePermission("settings", "update"))` in `app.ts` are safe because they live on the parent app, not on a sub-router).
 
 ### Frontend (web & native)
 

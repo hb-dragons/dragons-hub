@@ -36,16 +36,10 @@ const ERROR_STATUS_MAP: Record<string, number> = {
   NOT_ASSIGNED: 409,
 };
 
+// Admin-override variants live in admin/referee-assignment.routes.ts.
 const refereeAssignmentRoutes = new Hono<AppEnv>();
 
-// All referee self-service actions: requires a linked refereeId on the caller's session.
-// Admin-override variants live in admin/referee-assignment.routes.ts.
-// NOTE: The /assign route below used to accept admin callers in addition to referees;
-// that admin path has moved to the admin routes. A follow-up can decide whether to
-// expose a parallel admin route under /referee or deprecate that path.
-refereeAssignmentRoutes.use("/*", requireRefereeSelf);
-
-refereeAssignmentRoutes.post("/games/:spielplanId/assign", async (c) => {
+refereeAssignmentRoutes.post("/games/:spielplanId/assign", requireRefereeSelf, async (c) => {
   const spielplanId = Number(c.req.param("spielplanId"));
   if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
     return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
@@ -91,7 +85,7 @@ refereeAssignmentRoutes.post("/games/:spielplanId/assign", async (c) => {
   }
 });
 
-refereeAssignmentRoutes.post("/games/:id/claim", async (c) => {
+refereeAssignmentRoutes.post("/games/:id/claim", requireRefereeSelf, async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0) {
     return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
@@ -126,7 +120,7 @@ refereeAssignmentRoutes.post("/games/:id/claim", async (c) => {
   }
 });
 
-refereeAssignmentRoutes.delete("/games/:id/claim", async (c) => {
+refereeAssignmentRoutes.delete("/games/:id/claim", requireRefereeSelf, async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0) {
     return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);

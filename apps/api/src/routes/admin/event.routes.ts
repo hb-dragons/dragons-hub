@@ -10,11 +10,12 @@ import { requirePermission } from "../../middleware/rbac";
 import { eventListQuerySchema, triggerEventSchema } from "./event.schemas";
 
 const eventRoutes = new Hono<AppEnv>();
-eventRoutes.use("*", requirePermission("settings", "update"));
+const settingsUpdate = requirePermission("settings", "update");
 
 // GET /admin/events - List domain events
 eventRoutes.get(
   "/events",
+  settingsUpdate,
   describeRoute({
     description: "List domain events with filtering and pagination",
     tags: ["Events"],
@@ -30,6 +31,7 @@ eventRoutes.get(
 // POST /admin/events/trigger - Manually trigger a domain event
 eventRoutes.post(
   "/events/trigger",
+  settingsUpdate,
   describeRoute({
     description: "Manually trigger a domain event for notification processing",
     tags: ["Events"],
@@ -52,6 +54,7 @@ eventRoutes.post(
 // GET /admin/events/failed - List failed notification deliveries
 eventRoutes.get(
   "/events/failed",
+  settingsUpdate,
   describeRoute({
     description: "List failed notification deliveries with event context",
     tags: ["Events"],

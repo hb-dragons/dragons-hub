@@ -7,21 +7,27 @@ const mocks = vi.hoisted(() => ({
   getVisibleRefereeGameById: vi.fn(),
   getVisibleRefereeGameByMatchId: vi.fn(),
   refereeId: 42 as number | undefined,
+  allowedByPermission: false,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
-  requireRefereeSelf: vi.fn(
-    async (
-      c: { set: (k: string, v: unknown) => void },
-      next: () => Promise<void>,
-    ) => {
-      c.set("user", { id: "u1", refereeId: mocks.refereeId });
-      c.set("session", { id: "s1" });
-      if (mocks.refereeId !== undefined) {
-        c.set("refereeId", mocks.refereeId);
-      }
-      await next();
-    },
+  requireRefereeSelfOrPermission: vi.fn(
+    () =>
+      async (
+        c: { set: (k: string, v: unknown) => void; json: (body: unknown, status: number) => unknown },
+        next: () => Promise<void>,
+      ) => {
+        const linked = mocks.refereeId !== undefined;
+        if (!linked && !mocks.allowedByPermission) {
+          return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
+        }
+        c.set("user", { id: "u1", refereeId: mocks.refereeId });
+        c.set("session", { id: "s1" });
+        if (linked) {
+          c.set("refereeId", mocks.refereeId);
+        }
+        await next();
+      },
   ),
 }));
 
@@ -43,6 +49,7 @@ function json(response: Response) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.refereeId = 42;
+  mocks.allowedByPermission = false;
 });
 
 describe("GET /games", () => {
@@ -114,6 +121,20 @@ describe("GET /games", () => {
     expect(await json(res)).toMatchObject({ code: "FORBIDDEN" });
     expect(mocks.getVisibleRefereeGames).not.toHaveBeenCalled();
   });
+
+  it("admin (no refereeId, has permission) invokes service with refereeId=null", async () => {
+    mocks.refereeId = undefined;
+    mocks.allowedByPermission = true;
+    mocks.getVisibleRefereeGames.mockResolvedValue({ items: [], total: 0 });
+
+    const res = await app.request("/games");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ limit: 100, offset: 0, status: "active" }),
+    );
+  });
 });
 
 describe("GET /games/:id", () => {
@@ -159,6 +180,17 @@ describe("GET /games/:id", () => {
     expect(await json(res)).toMatchObject({ code: "FORBIDDEN" });
     expect(mocks.getVisibleRefereeGameById).not.toHaveBeenCalled();
   });
+
+  it("admin (no refereeId, has permission) invokes service with refereeId=null", async () => {
+    mocks.refereeId = undefined;
+    mocks.allowedByPermission = true;
+    mocks.getVisibleRefereeGameById.mockResolvedValue({ id: 7 });
+
+    const res = await app.request("/games/7");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getVisibleRefereeGameById).toHaveBeenCalledWith(null, 7);
+  });
 });
 
 describe("GET /matches/:matchId", () => {
@@ -203,5 +235,16 @@ describe("GET /matches/:matchId", () => {
     expect(res.status).toBe(403);
     expect(await json(res)).toMatchObject({ code: "FORBIDDEN" });
     expect(mocks.getVisibleRefereeGameByMatchId).not.toHaveBeenCalled();
+  });
+
+  it("admin (no refereeId, has permission) invokes service with refereeId=null", async () => {
+    mocks.refereeId = undefined;
+    mocks.allowedByPermission = true;
+    mocks.getVisibleRefereeGameByMatchId.mockResolvedValue({ id: 7, matchId: 500 });
+
+    const res = await app.request("/matches/500");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getVisibleRefereeGameByMatchId).toHaveBeenCalledWith(null, 500);
   });
 });

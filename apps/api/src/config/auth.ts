@@ -39,15 +39,22 @@ export const auth = betterAuth({
       secure: env.NODE_ENV === "production",
     },
   },
+  user: {
+    // Without this declaration, parseUserOutput strips refereeId from
+    // getSession / admin.listUsers responses.
+    additionalFields: {
+      refereeId: {
+        type: "number",
+        required: false,
+        input: false,
+      },
+    },
+  },
   databaseHooks: {
     user: {
       create: {
-        // Better-auth's admin plugin injects a create.before hook that sets
-        // `role` to its `defaultRole` ("user" when unspecified). We treat
-        // role = null as the absence of any RBAC roles (see packages/shared/src/rbac.ts),
-        // so strip the injected "user" default back to null. User hooks run
-        // after plugin hooks, and the returned `data` is shallow-merged on top,
-        // so this overrides the plugin's default cleanly.
+        // Undo the admin plugin's defaultRole = "user" injection; role = null
+        // means "no RBAC roles" in this codebase.
         before: async (user) => {
           if ((user as { role?: string | null }).role === "user") {
             return { data: { ...user, role: null } };

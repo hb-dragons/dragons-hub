@@ -109,6 +109,7 @@
     "failed": "Fehlgeschlagen",
     "saveChanges": "Speichern",
     "cancel": "Abbrechen",
+    "close": "Schließen",
     "back": "Zurück",
     "loading": "Laden...",
     "noResults": "Keine Ergebnisse.",
@@ -493,12 +494,12 @@
     },
     "roles": {
       "admin": "Admin",
-      "user": "Benutzer",
-      "referee": "Schiedsrichter",
       "refereeAdmin": "Schiedsrichter-Admin",
       "venueManager": "Hallenverwalter",
       "teamManager": "Team-Manager"
     },
+    "noRole": "Keine Rolle",
+    "refereeBadge": "Schiedsrichter",
     "status": {
       "active": "Aktiv",
       "banned": "Gesperrt"
@@ -562,11 +563,6 @@
       "title": "Benutzer löschen",
       "description": "{name} und alle zugehörigen Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
       "confirm": "Löschen"
-    },
-    "changeRoleConfirm": {
-      "title": "Rolle ändern",
-      "description": "Rolle von {name} von {currentRole} zu {newRole} ändern?",
-      "confirm": "Rolle ändern"
     },
     "editRolesDialog": {
       "title": "Rollen bearbeiten",

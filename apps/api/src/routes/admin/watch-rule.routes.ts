@@ -17,11 +17,12 @@ import {
 } from "./watch-rule.schemas";
 
 const watchRuleRoutes = new Hono<AppEnv>();
-watchRuleRoutes.use("*", requirePermission("settings", "update"));
+const settingsUpdate = requirePermission("settings", "update");
 
 // GET /admin/watch-rules - List watch rules
 watchRuleRoutes.get(
   "/watch-rules",
+  settingsUpdate,
   describeRoute({
     description: "List watch rules with pagination",
     tags: ["Watch Rules"],
@@ -37,6 +38,7 @@ watchRuleRoutes.get(
 // GET /admin/watch-rules/:id - Get watch rule by ID
 watchRuleRoutes.get(
   "/watch-rules/:id",
+  settingsUpdate,
   describeRoute({
     description: "Get a single watch rule by ID",
     tags: ["Watch Rules"],
@@ -63,6 +65,7 @@ watchRuleRoutes.get(
 // POST /admin/watch-rules - Create watch rule
 watchRuleRoutes.post(
   "/watch-rules",
+  settingsUpdate,
   describeRoute({
     description: "Create a new watch rule",
     tags: ["Watch Rules"],
@@ -79,6 +82,7 @@ watchRuleRoutes.post(
 // PATCH /admin/watch-rules/:id - Update watch rule
 watchRuleRoutes.patch(
   "/watch-rules/:id",
+  settingsUpdate,
   describeRoute({
     description: "Update a watch rule",
     tags: ["Watch Rules"],
@@ -106,6 +110,7 @@ watchRuleRoutes.patch(
 // DELETE /admin/watch-rules/:id - Delete watch rule
 watchRuleRoutes.delete(
   "/watch-rules/:id",
+  settingsUpdate,
   describeRoute({
     description: "Delete a watch rule",
     tags: ["Watch Rules"],
