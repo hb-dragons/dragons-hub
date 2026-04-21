@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -9,8 +9,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
+import { fontFamilies } from "@/theme/typography";
 import { authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -18,6 +20,8 @@ import { Wordmark } from "@/components/brand/Wordmark";
 export default function SignInScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const passwordRef = useRef<TextInput>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,8 +29,11 @@ export default function SignInScreen() {
   const [errorText, setErrorText] = useState<string | null>(null);
 
   function dismiss() {
-    if (router.canGoBack()) {
-      router.back();
+    // `(auth)` is a nested Stack with a single screen, so `router.back()` gets
+    // dispatched to the inner navigator and fails instead of bubbling up to
+    // the parent modal. `router.dismiss()` targets the modal group directly.
+    if (router.canDismiss()) {
+      router.dismiss();
     } else {
       router.replace("/");
     }
@@ -38,6 +45,7 @@ export default function SignInScreen() {
   );
 
   async function handleSignIn() {
+    if (!canSubmit) return;
     setErrorText(null);
     setLoading(true);
     try {
@@ -62,17 +70,21 @@ export default function SignInScreen() {
     }
   }
 
-  const inputStyle = [
-    textStyles.body,
-    {
-      backgroundColor: colors.input,
-      borderWidth: 1 as const,
-      borderColor: colors.border + "33",
-      borderRadius: radius.md,
-      padding: spacing.md,
-      color: colors.foreground,
-    },
-  ];
+  // Note: do NOT spread `textStyles.body` onto TextInput — its `lineHeight`
+  // clips descenders (g, j, p, q, y) in single-line inputs on iOS. Use
+  // explicit font + size only, with generous vertical padding.
+  const inputStyle = {
+    fontFamily: fontFamilies.body,
+    fontSize: 16,
+    backgroundColor: colors.input,
+    borderWidth: 1 as const,
+    borderColor: colors.border + "33",
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 48,
+    color: colors.foreground,
+  };
 
   return (
     <KeyboardAvoidingView
@@ -85,12 +97,19 @@ export default function SignInScreen() {
         disabled={loading}
         hitSlop={12}
         onPress={dismiss}
-        style={[
+        style={({ pressed }) => [
           styles.closeButton,
-          { top: spacing.xl, left: spacing.lg, padding: spacing.md },
+          {
+            top: insets.top + spacing.sm,
+            left: spacing.lg,
+            padding: spacing.md,
+            opacity: pressed ? 0.5 : 1,
+          },
         ]}
       >
-        <Text style={{ color: colors.foreground, fontSize: 22 }}>×</Text>
+        <Text style={{ color: colors.foreground, fontSize: 28, lineHeight: 32 }}>
+          ×
+        </Text>
       </Pressable>
 
       <View style={[styles.content, { gap: spacing.lg }]}>
@@ -115,9 +134,13 @@ export default function SignInScreen() {
           editable={!loading}
           textContentType="emailAddress"
           autoComplete="email"
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => passwordRef.current?.focus()}
         />
 
         <TextInput
+          ref={passwordRef}
           style={inputStyle}
           placeholder={i18n.t("auth.password")}
           placeholderTextColor={colors.mutedForeground}
@@ -127,6 +150,8 @@ export default function SignInScreen() {
           editable={!loading}
           textContentType="password"
           autoComplete="current-password"
+          returnKeyType="go"
+          onSubmitEditing={handleSignIn}
         />
 
         {errorText ? (
@@ -142,15 +167,19 @@ export default function SignInScreen() {
         <Pressable
           onPress={handleSignIn}
           disabled={!canSubmit}
-          style={[
+          style={({ pressed }) => [
             {
               backgroundColor: colors.primary,
               borderRadius: radius.md,
-              padding: spacing.md,
+              paddingVertical: spacing.md,
+              paddingHorizontal: spacing.md,
               alignItems: "center",
+              justifyContent: "center",
+              minHeight: 48,
               marginTop: spacing.sm,
             },
             !canSubmit && { opacity: 0.4 },
+            canSubmit && pressed && { opacity: 0.85 },
           ]}
         >
           {loading ? (

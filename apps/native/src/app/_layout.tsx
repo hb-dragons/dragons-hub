@@ -59,7 +59,13 @@ function RootNavigator() {
         <Stack.Screen name="game/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="referee-game/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="h2h/[teamApiId]" options={detailHeaderOptions} />
-        <Stack.Screen name="(auth)" options={{ presentation: "modal" }} />
+        <Stack.Screen
+          name="(auth)"
+          options={{
+            presentation: "fullScreenModal",
+            animation: "slide_from_bottom",
+          }}
+        />
         <Stack.Screen
           name="profile"
           options={{
