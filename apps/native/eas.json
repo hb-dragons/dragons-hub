@@ -15,6 +15,7 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.app.hbdragons.de"
       }
@@ -28,6 +29,13 @@
     }
   },
   "submit": {
-    "production": {}
+    "preview": {
+      "ios": {},
+      "android": {}
+    },
+    "production": {
+      "ios": {},
+      "android": {}
+    }
   }
 }

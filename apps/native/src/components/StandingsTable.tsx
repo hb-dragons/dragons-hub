@@ -218,7 +218,7 @@ function StandingRowImpl({ item, isOwn, badgeColor, onPress }: StandingRowProps)
           }}
           numberOfLines={1}
         >
-          {isOwn ? (item.teamNameShort || item.teamName) : item.teamName}
+          {item.teamName}
         </Text>
       </View>
 
