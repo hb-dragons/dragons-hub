@@ -67,7 +67,12 @@
     "languageSystem": "System",
     "languageDe": "Deutsch",
     "languageEn": "English",
-    "signOut": "Sign Out"
+    "signOut": "Sign Out",
+    "roleAdmin": "Admin",
+    "roleRefereeAdmin": "Referee Admin",
+    "roleVenueManager": "Venue Manager",
+    "roleTeamManager": "Team Manager",
+    "roleReferee": "Referee"
   },
   "teamDetail": {
     "league": "League",

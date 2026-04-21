@@ -1,5 +1,6 @@
 import { View, Text, Pressable, Switch, StyleSheet } from "react-native";
 import { Stack, useRouter } from "expo-router";
+import { parseRoles, isReferee, type RoleName } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocale } from "@/hooks/useLocale";
 import type { LocalePref } from "@/hooks/useLocale";
@@ -162,8 +163,34 @@ export default function ProfileScreen() {
                 "role" in session.user && typeof session.user.role === "string"
                   ? session.user.role
                   : null;
-              if (role !== "referee" && role !== "admin") return null;
-              return <Badge label={role} variant="secondary" />;
+              const roleNames = parseRoles(role);
+              const showRefereeBadge = isReferee(
+                session.user as { refereeId?: number | null },
+              );
+              if (roleNames.length === 0 && !showRefereeBadge) return null;
+              const roleLabelKey: Record<RoleName, string> = {
+                admin: "profile.roleAdmin",
+                refereeAdmin: "profile.roleRefereeAdmin",
+                venueManager: "profile.roleVenueManager",
+                teamManager: "profile.roleTeamManager",
+              };
+              return (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+                  {roleNames.map((name) => (
+                    <Badge
+                      key={name}
+                      label={i18n.t(roleLabelKey[name])}
+                      variant="secondary"
+                    />
+                  ))}
+                  {showRefereeBadge ? (
+                    <Badge
+                      label={i18n.t("profile.roleReferee")}
+                      variant="secondary"
+                    />
+                  ) : null}
+                </View>
+              );
             })()}
           </Card>
 

@@ -1,7 +1,7 @@
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import useSWR from "swr";
-import { getNativeTeamColor } from "@dragons/shared";
+import { getNativeTeamColor, isReferee } from "@dragons/shared";
 import { APIError } from "@dragons/api-client";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
@@ -50,14 +50,12 @@ export default function GameDetailScreen() {
   );
 
   const { data: session } = authClient.useSession();
-  const isReferee = Boolean(
-    session?.user &&
-      "role" in session.user &&
-      session.user.role === "referee",
+  const sessionUserIsReferee = isReferee(
+    session?.user as { refereeId?: number | null } | undefined,
   );
 
   const { data: refereeGame, mutate: mutateRefereeGame } = useSWR(
-    hasValidId && isReferee ? `referee-match:${id}` : null,
+    hasValidId && sessionUserIsReferee ? `referee-match:${id}` : null,
     () => refereeApi.getGameByMatchId(numericId),
     { shouldRetryOnError: false },
   );
@@ -188,7 +186,7 @@ export default function GameDetailScreen() {
       onRefresh={[
         () => mutateMatch(),
         () => mutateContext(),
-        ...(isReferee ? [() => mutateRefereeGame()] : []),
+        ...(sessionUserIsReferee ? [() => mutateRefereeGame()] : []),
       ]}
     >
       {/* ── 1. Score Header ── */}

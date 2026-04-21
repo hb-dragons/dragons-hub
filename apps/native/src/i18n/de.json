@@ -67,7 +67,12 @@
     "languageSystem": "System",
     "languageDe": "Deutsch",
     "languageEn": "English",
-    "signOut": "Abmelden"
+    "signOut": "Abmelden",
+    "roleAdmin": "Admin",
+    "roleRefereeAdmin": "Schiri-Admin",
+    "roleVenueManager": "Hallenverwaltung",
+    "roleTeamManager": "Team-Manager",
+    "roleReferee": "Schiri"
   },
   "teamDetail": {
     "league": "Liga",
