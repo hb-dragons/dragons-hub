@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Logger } from "pino";
 import type { AppEnv } from "../types";
@@ -45,6 +46,22 @@ function createBareApp() {
 
   app.get("/throw-non-error", () => {
     throw new Error("Unknown error occurred");
+  });
+
+  app.get("/throw-http-401", () => {
+    throw new HTTPException(401, { message: "Unauthorized" });
+  });
+
+  app.get("/throw-http-403", () => {
+    throw new HTTPException(403, { message: "Forbidden" });
+  });
+
+  app.get("/throw-http-404", () => {
+    throw new HTTPException(404, { message: "Not found" });
+  });
+
+  app.get("/throw-http-418", () => {
+    throw new HTTPException(418, { message: "I'm a teapot" });
   });
 
   return app;
@@ -174,5 +191,41 @@ describe("errorHandler", () => {
     );
     // Root logger should NOT be called when context logger is available
     expect(mocks.rootLogger.error).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 with UNAUTHORIZED code for HTTPException(401)", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-http-401");
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body).toEqual({ error: "Unauthorized", code: "UNAUTHORIZED" });
+  });
+
+  it("returns 403 with FORBIDDEN code for HTTPException(403)", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-http-403");
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toEqual({ error: "Forbidden", code: "FORBIDDEN" });
+  });
+
+  it("returns 404 with NOT_FOUND code for HTTPException(404)", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-http-404");
+
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body).toEqual({ error: "Not found", code: "NOT_FOUND" });
+  });
+
+  it("returns the HTTPException status with generic HTTP_ERROR code for other statuses", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-http-418");
+
+    expect(res.status).toBe(418);
+    const body = await res.json();
+    expect(body).toEqual({ error: "I'm a teapot", code: "HTTP_ERROR" });
   });
 });

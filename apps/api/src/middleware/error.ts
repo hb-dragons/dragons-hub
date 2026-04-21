@@ -1,4 +1,5 @@
 import type { ErrorHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import { logger as rootLogger } from "../config/logger";
 import type { AppEnv } from "../types";
@@ -16,6 +17,18 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
       },
       400,
     );
+  }
+
+  if (error instanceof HTTPException) {
+    const code =
+      error.status === 401
+        ? "UNAUTHORIZED"
+        : error.status === 403
+          ? "FORBIDDEN"
+          : error.status === 404
+            ? "NOT_FOUND"
+            : "HTTP_ERROR";
+    return c.json({ error: error.message, code }, error.status);
   }
 
   const isProd = process.env.NODE_ENV === "production";
