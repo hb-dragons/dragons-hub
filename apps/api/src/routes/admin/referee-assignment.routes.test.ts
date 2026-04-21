@@ -343,3 +343,49 @@ describe("error re-throw for non-AssignmentError", () => {
     expect(res.status).toBe(500);
   });
 });
+
+// Covers the `ERROR_STATUS_MAP[error.code] ?? 500` fallback branch when an
+// AssignmentError uses a code that isn't in the map.
+describe("unknown AssignmentError code falls back to 500", () => {
+  it("candidates returns 500 for unmapped code", async () => {
+    const { AssignmentError } = await import(
+      "../../services/referee/referee-assignment.service"
+    );
+    mocks.searchCandidates.mockRejectedValue(
+      new AssignmentError("Surprise", "UNKNOWN_CODE"),
+    );
+    const res = await app.request("/referee/games/12345/candidates");
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ code: "UNKNOWN_CODE" });
+  });
+
+  it("assign returns 500 for unmapped code", async () => {
+    const { AssignmentError } = await import(
+      "../../services/referee/referee-assignment.service"
+    );
+    mocks.assignReferee.mockRejectedValue(
+      new AssignmentError("Surprise", "UNKNOWN_CODE"),
+    );
+    const res = await app.request("/referee/games/12345/assign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 1, refereeApiId: 9001 }),
+    });
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ code: "UNKNOWN_CODE" });
+  });
+
+  it("unassign returns 500 for unmapped code", async () => {
+    const { AssignmentError } = await import(
+      "../../services/referee/referee-assignment.service"
+    );
+    mocks.unassignReferee.mockRejectedValue(
+      new AssignmentError("Surprise", "UNKNOWN_CODE"),
+    );
+    const res = await app.request("/referee/games/12345/assignment/1", {
+      method: "DELETE",
+    });
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ code: "UNKNOWN_CODE" });
+  });
+});

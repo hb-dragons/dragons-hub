@@ -493,3 +493,43 @@ describe("DELETE /games/:id/claim", () => {
     expect(res.status).toBe(500);
   });
 });
+
+// Covers the defensive `refereeId === undefined` branch inside each handler.
+// `requireRefereeSelf` normally guarantees refereeId is set, but these checks
+// exist as a fallback in case the middleware is ever bypassed or misconfigured.
+describe("defensive refereeId guard (middleware bypass)", () => {
+  it("POST /games/:id/assign returns 403 when refereeId is missing from context", async () => {
+    mocks.refereeId = undefined;
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001, isOwnClub: true }]);
+
+    const res = await app.request("/games/100/assign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slotNumber: 1, refereeApiId: 9001 }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "FORBIDDEN" });
+    expect(mocks.assignReferee).not.toHaveBeenCalled();
+  });
+
+  it("POST /games/:id/claim returns 403 when refereeId is missing from context", async () => {
+    mocks.refereeId = undefined;
+
+    const res = await app.request("/games/5/claim", { method: "POST" });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "FORBIDDEN" });
+    expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
+  });
+
+  it("DELETE /games/:id/claim returns 403 when refereeId is missing from context", async () => {
+    mocks.refereeId = undefined;
+
+    const res = await app.request("/games/5/claim", { method: "DELETE" });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "FORBIDDEN" });
+    expect(mocks.unclaimRefereeGame).not.toHaveBeenCalled();
+  });
+});

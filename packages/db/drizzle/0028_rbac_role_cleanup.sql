@@ -4,4 +4,5 @@
 -- "admin" rows are left unchanged.
 
 UPDATE "user" SET role = NULL WHERE role = 'user';
+--> statement-breakpoint
 UPDATE "user" SET role = NULL WHERE role = 'referee';
