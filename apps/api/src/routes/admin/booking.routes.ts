@@ -12,6 +12,8 @@ import {
   previewReconciliation,
   reconcileAfterSync,
 } from "../../services/venue-booking/venue-booking.service";
+import { requirePermission } from "../../middleware/rbac";
+import type { AppEnv } from "../../types";
 import {
   bookingIdParamSchema,
   bookingListQuerySchema,
@@ -20,11 +22,12 @@ import {
   bookingCreateBodySchema,
 } from "./booking.schemas";
 
-const bookingRoutes = new Hono();
+const bookingRoutes = new Hono<AppEnv>();
 
 // GET /admin/bookings - List all bookings
 bookingRoutes.get(
   "/bookings",
+  requirePermission("booking", "view"),
   describeRoute({
     description: "List all bookings",
     tags: ["Bookings"],
@@ -41,6 +44,7 @@ bookingRoutes.get(
 // Must be before /bookings/:id to avoid matching "reconcile" as an id
 bookingRoutes.get(
   "/bookings/reconcile/preview",
+  requirePermission("booking", "view"),
   describeRoute({
     description: "Preview booking reconciliation changes",
     tags: ["Bookings"],
@@ -55,6 +59,7 @@ bookingRoutes.get(
 // POST /admin/bookings/reconcile - Apply reconciliation
 bookingRoutes.post(
   "/bookings/reconcile",
+  requirePermission("booking", "update"),
   describeRoute({
     description: "Apply booking reconciliation from matches",
     tags: ["Bookings"],
@@ -69,6 +74,7 @@ bookingRoutes.post(
 // GET /admin/bookings/:id - Booking detail
 bookingRoutes.get(
   "/bookings/:id",
+  requirePermission("booking", "view"),
   describeRoute({
     description: "Get booking detail",
     tags: ["Bookings"],
@@ -92,6 +98,7 @@ bookingRoutes.get(
 // PATCH /admin/bookings/:id - Update booking
 bookingRoutes.patch(
   "/bookings/:id",
+  requirePermission("booking", "update"),
   describeRoute({
     description: "Update booking",
     tags: ["Bookings"],
@@ -116,6 +123,7 @@ bookingRoutes.patch(
 // PATCH /admin/bookings/:id/status - Quick status change
 bookingRoutes.patch(
   "/bookings/:id/status",
+  requirePermission("booking", "update"),
   describeRoute({
     description: "Quick status change for booking",
     tags: ["Bookings"],
@@ -140,6 +148,7 @@ bookingRoutes.patch(
 // POST /admin/bookings - Create a booking manually
 bookingRoutes.post(
   "/bookings",
+  requirePermission("booking", "create"),
   describeRoute({
     description: "Create a booking manually",
     tags: ["Bookings"],
@@ -166,6 +175,7 @@ bookingRoutes.post(
 // DELETE /admin/bookings/:id - Delete a booking
 bookingRoutes.delete(
   "/bookings/:id",
+  requirePermission("booking", "delete"),
   describeRoute({
     description: "Delete a booking",
     tags: ["Bookings"],

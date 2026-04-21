@@ -8,6 +8,7 @@ import {
   updateWatchRule,
   deleteWatchRule,
 } from "../../services/admin/watch-rule-admin.service";
+import { requirePermission } from "../../middleware/rbac";
 import {
   watchRuleIdParamSchema,
   watchRuleListQuerySchema,
@@ -16,6 +17,7 @@ import {
 } from "./watch-rule.schemas";
 
 const watchRuleRoutes = new Hono<AppEnv>();
+watchRuleRoutes.use("*", requirePermission("settings", "update"));
 
 // GET /admin/watch-rules - List watch rules
 watchRuleRoutes.get(

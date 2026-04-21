@@ -44,6 +44,12 @@ vi.mock("../../services/social/social-image.service", () => ({
   generatePostImage: mocks.generatePostImage,
 }));
 
+vi.mock("../../middleware/rbac", () => ({
+  requirePermission: vi.fn(() =>
+    async (_c: unknown, next: () => Promise<void>) => next(),
+  ),
+}));
+
 // --- Imports (after mocks) ---
 
 import { socialRoutes } from "./social.routes";

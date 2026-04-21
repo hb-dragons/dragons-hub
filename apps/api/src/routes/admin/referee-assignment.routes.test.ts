@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
   assignReferee: vi.fn(),
   unassignReferee: vi.fn(),
   searchCandidates: vi.fn(),
-  getSession: vi.fn(),
+  // gate: "allow" | "unauthorized" | "forbidden" — controls rbac middleware response
+  gate: "allow" as "allow" | "unauthorized" | "forbidden",
 }));
 
 vi.mock("../../services/referee/referee-assignment.service", () => ({
@@ -20,8 +21,21 @@ vi.mock("../../services/referee/referee-assignment.service", () => ({
   },
 }));
 
-vi.mock("../../config/auth", () => ({
-  auth: { api: { getSession: mocks.getSession } },
+vi.mock("../../middleware/rbac", () => ({
+  requirePermission: vi.fn(() =>
+    async (
+      c: { json: (body: unknown, status?: number) => Response },
+      next: () => Promise<void>,
+    ) => {
+      if (mocks.gate === "unauthorized") {
+        return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+      }
+      if (mocks.gate === "forbidden") {
+        return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
+      }
+      await next();
+    },
+  ),
 }));
 
 import { adminRefereeAssignmentRoutes } from "./referee-assignment.routes";
@@ -31,33 +45,25 @@ const app = new Hono<AppEnv>();
 app.onError(errorHandler);
 app.route("/", adminRefereeAssignmentRoutes);
 
-const adminSession = {
-  user: { id: "u1", role: "admin", refereeId: null },
-  session: {},
-};
-
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.gate = "allow";
 });
 
 describe("GET /referee/games/:spielplanId/candidates", () => {
   it("returns 401 without session", async () => {
-    mocks.getSession.mockResolvedValue(null);
+    mocks.gate = "unauthorized";
     const res = await app.request("/referee/games/12345/candidates?slotNumber=1");
     expect(res.status).toBe(401);
   });
 
   it("returns 403 for non-admin", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "u1", role: "referee", refereeId: 7 },
-      session: {},
-    });
+    mocks.gate = "forbidden";
     const res = await app.request("/referee/games/12345/candidates?slotNumber=1");
     expect(res.status).toBe(403);
   });
 
   it("returns candidates for admin", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     mocks.searchCandidates.mockResolvedValue({ total: 3, results: [] });
 
     const res = await app.request(
@@ -70,7 +76,6 @@ describe("GET /referee/games/:spielplanId/candidates", () => {
   });
 
   it("returns 400 for invalid spielplanId (0 or negative)", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
 
     const res1 = await app.request("/referee/games/0/candidates?slotNumber=1");
     expect(res1.status).toBe(400);
@@ -81,7 +86,6 @@ describe("GET /referee/games/:spielplanId/candidates", () => {
   });
 
   it("returns 400 for invalid pageFrom (-1)", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
 
     const res = await app.request("/referee/games/12345/candidates?slotNumber=1&pageFrom=-1");
     expect(res.status).toBe(400);
@@ -89,7 +93,6 @@ describe("GET /referee/games/:spielplanId/candidates", () => {
   });
 
   it("returns 400 for invalid pageSize (0 or 101)", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
 
     const res1 = await app.request("/referee/games/12345/candidates?slotNumber=1&pageSize=0");
     expect(res1.status).toBe(400);
@@ -99,7 +102,6 @@ describe("GET /referee/games/:spielplanId/candidates", () => {
   });
 
   it("returns mapped error status for AssignmentError", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -115,7 +117,7 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   const validBody = { slotNumber: 1, refereeApiId: 9001 };
 
   it("returns 401 without session", async () => {
-    mocks.getSession.mockResolvedValue(null);
+    mocks.gate = "unauthorized";
     const res = await app.request("/referee/games/12345/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -125,10 +127,7 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 403 for non-admin", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "u1", role: "referee", refereeId: 7 },
-      session: {},
-    });
+    mocks.gate = "forbidden";
     const res = await app.request("/referee/games/12345/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -138,7 +137,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("assigns referee and returns result", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     mocks.assignReferee.mockResolvedValue({
       success: true,
       slot: "sr1",
@@ -158,7 +156,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 404 for GAME_NOT_FOUND", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -173,7 +170,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 502 for FEDERATION_ERROR", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -187,7 +183,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 400 for invalid spielplanId (0)", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const res = await app.request("/referee/games/0/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -198,7 +193,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 400 for invalid JSON body", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const res = await app.request("/referee/games/12345/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -208,7 +202,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 400 for invalid slotNumber (3)", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const res = await app.request("/referee/games/12345/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -218,7 +211,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 409 for SLOT_TAKEN", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -233,7 +225,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 422 for NOT_QUALIFIED", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -250,7 +241,7 @@ describe("POST /referee/games/:spielplanId/assign", () => {
 
 describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   it("returns 401 without session", async () => {
-    mocks.getSession.mockResolvedValue(null);
+    mocks.gate = "unauthorized";
     const res = await app.request("/referee/games/12345/assignment/1", {
       method: "DELETE",
     });
@@ -258,10 +249,7 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("returns 403 for non-admin", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "u1", role: "referee", refereeId: 7 },
-      session: {},
-    });
+    mocks.gate = "forbidden";
     const res = await app.request("/referee/games/12345/assignment/1", {
       method: "DELETE",
     });
@@ -269,7 +257,6 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("unassigns and returns open status", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     mocks.unassignReferee.mockResolvedValue({
       success: true,
       slot: "sr1",
@@ -286,7 +273,6 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("returns 400 for non-numeric slotNumber", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const res = await app.request("/referee/games/12345/assignment/abc", {
       method: "DELETE",
     });
@@ -294,7 +280,6 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("returns 404 for GAME_NOT_FOUND", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -307,7 +292,6 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("returns 502 for FEDERATION_ERROR", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -319,7 +303,6 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("returns 400 for slotNumber 3 (not 1 or 2)", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const res = await app.request("/referee/games/12345/assignment/3", {
       method: "DELETE",
     });
@@ -327,7 +310,6 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("returns 400 for invalid spielplanId (0)", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     const res = await app.request("/referee/games/0/assignment/1", {
       method: "DELETE",
     });
@@ -336,7 +318,6 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("re-throws non-AssignmentError", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     mocks.unassignReferee.mockRejectedValue(new Error("Unexpected DB failure"));
     const res = await app.request("/referee/games/12345/assignment/1", {
       method: "DELETE",
@@ -347,14 +328,12 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
 
 describe("error re-throw for non-AssignmentError", () => {
   it("re-throws in candidates search", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     mocks.searchCandidates.mockRejectedValue(new Error("Unexpected DB failure"));
     const res = await app.request("/referee/games/12345/candidates");
     expect(res.status).toBe(500);
   });
 
   it("re-throws in assign", async () => {
-    mocks.getSession.mockResolvedValue(adminSession);
     mocks.assignReferee.mockRejectedValue(new Error("Unexpected DB failure"));
     const res = await app.request("/referee/games/12345/assign", {
       method: "POST",

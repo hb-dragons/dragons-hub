@@ -14,6 +14,8 @@ import {
   updateComment,
   deleteComment,
 } from "../../services/admin/task.service";
+import { requirePermission } from "../../middleware/rbac";
+import type { AppEnv } from "../../types";
 import {
   taskBoardIdParamSchema,
   taskIdParamSchema,
@@ -29,7 +31,8 @@ import {
   commentUpdateBodySchema,
 } from "./task.schemas";
 
-const taskRoutes = new Hono();
+const taskRoutes = new Hono<AppEnv>();
+taskRoutes.use("*", requirePermission("settings", "update"));
 
 // GET /admin/boards/:boardId/tasks - List tasks for a board
 taskRoutes.get(

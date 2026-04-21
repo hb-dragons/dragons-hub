@@ -16,6 +16,12 @@ vi.mock("../../services/admin/event-admin.service", () => ({
   listFailedNotifications: mocks.listFailedNotifications,
 }));
 
+vi.mock("../../middleware/rbac", () => ({
+  requirePermission: vi.fn(() =>
+    async (_c: unknown, next: () => Promise<void>) => next(),
+  ),
+}));
+
 vi.mock("../../config/logger", () => ({
   logger: { error: vi.fn() },
 }));

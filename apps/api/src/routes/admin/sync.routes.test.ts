@@ -45,6 +45,12 @@ vi.mock("../../services/admin/sync-admin.service", () => ({
   getMatchChangesForEntry: mocks.getMatchChangesForEntry,
 }));
 
+vi.mock("../../middleware/rbac", () => ({
+  requirePermission: vi.fn(() =>
+    async (_c: unknown, next: () => Promise<void>) => next(),
+  ),
+}));
+
 vi.mock("../../config/logger", () => ({
   logger: { error: vi.fn() },
 }));

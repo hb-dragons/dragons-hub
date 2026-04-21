@@ -7,13 +7,16 @@ import {
   getUnreadCount,
   retryFailedNotification,
 } from "../../services/admin/notification-admin.service";
+import { requirePermission } from "../../middleware/rbac";
+import type { AppEnv } from "../../types";
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
   notificationUserIdQuerySchema,
 } from "./notification.schemas";
 
-const notificationRoutes = new Hono();
+const notificationRoutes = new Hono<AppEnv>();
+notificationRoutes.use("*", requirePermission("settings", "update"));
 
 // GET /admin/notifications - List notifications for a user
 notificationRoutes.get(

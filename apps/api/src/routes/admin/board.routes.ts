@@ -11,6 +11,8 @@ import {
   deleteColumn,
   reorderColumns,
 } from "../../services/admin/board.service";
+import { requirePermission } from "../../middleware/rbac";
+import type { AppEnv } from "../../types";
 import {
   boardIdParamSchema,
   boardCreateBodySchema,
@@ -21,7 +23,8 @@ import {
   columnReorderBodySchema,
 } from "./board.schemas";
 
-const boardRoutes = new Hono();
+const boardRoutes = new Hono<AppEnv>();
+boardRoutes.use("*", requirePermission("settings", "update"));
 
 // GET /admin/boards - List all boards
 boardRoutes.get(

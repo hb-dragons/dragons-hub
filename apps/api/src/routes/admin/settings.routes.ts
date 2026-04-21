@@ -9,7 +9,7 @@ import {
   getSetting,
   upsertSetting,
 } from "../../services/admin/settings.service";
-import { requireAdmin } from "../../middleware/auth";
+import { requirePermission } from "../../middleware/rbac";
 import type { AppEnv } from "../../types";
 
 const settingsRoutes = new Hono<AppEnv>();
@@ -17,6 +17,7 @@ const settingsRoutes = new Hono<AppEnv>();
 // GET /admin/settings/club - Get current club config
 settingsRoutes.get(
   "/settings/club",
+  requirePermission("settings", "view"),
   describeRoute({
     description: "Get current club configuration",
     tags: ["Settings"],
@@ -36,6 +37,7 @@ const clubConfigSchema = z.object({
 // PUT /admin/settings/club - Set club config
 settingsRoutes.put(
   "/settings/club",
+  requirePermission("settings", "update"),
   describeRoute({
     description: "Set club configuration",
     tags: ["Settings"],
@@ -51,6 +53,7 @@ settingsRoutes.put(
 // GET /admin/settings/booking - Get booking config
 settingsRoutes.get(
   "/settings/booking",
+  requirePermission("settings", "view"),
   describeRoute({
     description: "Get booking configuration",
     tags: ["Settings"],
@@ -72,6 +75,7 @@ const bookingConfigSchema = z.object({
 // PUT /admin/settings/booking - Set booking config
 settingsRoutes.put(
   "/settings/booking",
+  requirePermission("settings", "update"),
   describeRoute({
     description: "Set booking configuration",
     tags: ["Settings"],
@@ -87,7 +91,7 @@ settingsRoutes.put(
 // GET /admin/settings/referee-reminders - Get referee reminder days
 settingsRoutes.get(
   "/settings/referee-reminders",
-  requireAdmin,
+  requirePermission("settings", "view"),
   describeRoute({
     description: "Get referee reminder days configuration",
     tags: ["Settings"],
@@ -107,7 +111,7 @@ const refereeReminderSchema = z.object({
 // PUT /admin/settings/referee-reminders - Set referee reminder days
 settingsRoutes.put(
   "/settings/referee-reminders",
-  requireAdmin,
+  requirePermission("settings", "update"),
   describeRoute({
     description: "Set referee reminder days configuration",
     tags: ["Settings"],
@@ -128,7 +132,7 @@ settingsRoutes.put(
 // POST /admin/settings/referee-games-sync — trigger manual referee games sync
 settingsRoutes.post(
   "/settings/referee-games-sync",
-  requireAdmin,
+  requirePermission("settings", "update"),
   describeRoute({
     description: "Trigger a manual referee games sync",
     tags: ["Settings"],

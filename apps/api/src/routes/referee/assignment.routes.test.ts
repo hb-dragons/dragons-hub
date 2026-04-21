@@ -6,8 +6,10 @@ const mocks = vi.hoisted(() => ({
   assignReferee: vi.fn(),
   claimRefereeGame: vi.fn(),
   unclaimRefereeGame: vi.fn(),
-  getSession: vi.fn(),
   dbSelect: vi.fn(),
+  // gate: "allow" | "unauthorized" | "forbidden" — controls requireRefereeSelf response.
+  gate: "allow" as "allow" | "unauthorized" | "forbidden",
+  refereeId: 7 as number | undefined,
 }));
 
 vi.mock("../../services/referee/referee-assignment.service", () => ({
@@ -24,8 +26,29 @@ vi.mock("../../services/referee/referee-claim.service", () => ({
   unclaimRefereeGame: mocks.unclaimRefereeGame,
 }));
 
-vi.mock("../../config/auth", () => ({
-  auth: { api: { getSession: mocks.getSession } },
+vi.mock("../../middleware/rbac", () => ({
+  requireRefereeSelf: vi.fn(
+    async (
+      c: {
+        set: (k: string, v: unknown) => void;
+        json: (body: unknown, status?: number) => Response;
+      },
+      next: () => Promise<void>,
+    ) => {
+      if (mocks.gate === "unauthorized") {
+        return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+      }
+      if (mocks.gate === "forbidden") {
+        return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
+      }
+      c.set("user", { id: "u1", refereeId: mocks.refereeId });
+      c.set("session", { id: "s1" });
+      if (mocks.refereeId !== undefined) {
+        c.set("refereeId", mocks.refereeId);
+      }
+      await next();
+    },
+  ),
 }));
 
 vi.mock("../../config/database", () => ({
@@ -40,7 +63,6 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@dragons/db/schema", () => ({
   referees: { id: "r.id", apiId: "r.apiId", isOwnClub: "r.isOwnClub" },
-  user: { id: "u.id", refereeId: "u.refereeId" },
 }));
 
 import { refereeAssignmentRoutes } from "./assignment.routes";
@@ -54,11 +76,15 @@ function json(response: Response) {
   return response.json();
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.gate = "allow";
+  mocks.refereeId = 7;
+});
 
 describe("POST /games/:spielplanId/assign", () => {
   it("returns 401 when no session", async () => {
-    mocks.getSession.mockResolvedValue(null);
+    mocks.gate = "unauthorized";
 
     const res = await app.request("/games/100/assign", {
       method: "POST",
@@ -70,11 +96,8 @@ describe("POST /games/:spielplanId/assign", () => {
     expect(await json(res)).toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("returns 403 when authenticated user has role 'member'", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-3", role: "member" },
-      session: {},
-    });
+  it("returns 403 when user has no referee profile", async () => {
+    mocks.gate = "forbidden";
 
     const res = await app.request("/games/100/assign", {
       method: "POST",
@@ -88,11 +111,6 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("returns 400 for malformed JSON body", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-2", role: "admin" },
-      session: {},
-    });
-
     const res = await app.request("/games/100/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,34 +122,9 @@ describe("POST /games/:spielplanId/assign", () => {
     expect(mocks.assignReferee).not.toHaveBeenCalled();
   });
 
-  it("returns 403 when referee role has no refereeId linked in DB", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-1", role: "referee" },
-      session: {},
-    });
-    // DB user lookup returns no refereeId
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: null }]);
-
-    const res = await app.request("/games/100/assign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slotNumber: 1, refereeApiId: 9001 }),
-    });
-
-    expect(res.status).toBe(403);
-    expect(await json(res)).toMatchObject({ code: "FORBIDDEN" });
-    expect(mocks.assignReferee).not.toHaveBeenCalled();
-  });
-
   it("returns 403 when referee tries to assign a different referee", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-1", role: "referee" },
-      session: {},
-    });
-    // First DB call: user table lookup returns refereeId 7
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
-    // Second DB call: referees lookup for id=7 returns apiId 9999 (≠ 9001)
-    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9999 }]);
+    // Referees lookup returns apiId 9999 (≠ 9001 in body)
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9999, isOwnClub: true }]);
 
     const res = await app.request("/games/100/assign", {
       method: "POST",
@@ -145,12 +138,7 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("returns 403 when referee is not own club", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user1", role: "referee" },
-    });
-    mocks.dbSelect
-      .mockResolvedValueOnce([{ refereeId: 10 }])
-      .mockResolvedValueOnce([{ apiId: 555, isOwnClub: false }]);
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 555, isOwnClub: false }]);
 
     const res = await app.request("/games/123/assign", {
       method: "POST",
@@ -162,37 +150,7 @@ describe("POST /games/:spielplanId/assign", () => {
     expect(await json(res)).toMatchObject({ code: "NOT_OWN_CLUB" });
   });
 
-  it("allows admin to assign any referee without DB lookup", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-2", role: "admin" },
-      session: {},
-    });
-    mocks.assignReferee.mockResolvedValue({
-      success: true,
-      slot: "sr1",
-      status: "assigned",
-      refereeName: "Hans Muster",
-    });
-
-    const res = await app.request("/games/200/assign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slotNumber: 1, refereeApiId: 9001 }),
-    });
-
-    expect(res.status).toBe(200);
-    expect(mocks.dbSelect).not.toHaveBeenCalled();
-    expect(mocks.assignReferee).toHaveBeenCalledWith(200, 1, 9001);
-  });
-
   it("allows referee to assign themselves when apiId matches", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-1", role: "referee" },
-      session: {},
-    });
-    // First DB call: user table lookup returns refereeId 7
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
-    // Second DB call: referees lookup for id=7 returns apiId 9001 (matches body)
     mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001, isOwnClub: true }]);
     mocks.assignReferee.mockResolvedValue({
       success: true,
@@ -218,11 +176,6 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("returns 400 for invalid body (slotNumber out of range)", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-2", role: "admin" },
-      session: {},
-    });
-
     const res = await app.request("/games/100/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -234,11 +187,6 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("returns 400 for invalid spielplanId (non-numeric)", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-2", role: "admin" },
-      session: {},
-    });
-
     const res = await app.request("/games/abc/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -250,10 +198,7 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("maps AssignmentError SLOT_TAKEN to HTTP 409", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-2", role: "admin" },
-      session: {},
-    });
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001, isOwnClub: true }]);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -272,10 +217,7 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("maps AssignmentError GAME_NOT_FOUND to HTTP 404", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-2", role: "admin" },
-      session: {},
-    });
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001, isOwnClub: true }]);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -294,10 +236,7 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("maps AssignmentError NOT_QUALIFIED to HTTP 422", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-2", role: "admin" },
-      session: {},
-    });
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001, isOwnClub: true }]);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -316,10 +255,7 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("maps AssignmentError FEDERATION_ERROR to HTTP 502", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-2", role: "admin" },
-      session: {},
-    });
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001, isOwnClub: true }]);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -338,10 +274,7 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("re-throws unknown errors to the error handler", async () => {
-    mocks.getSession.mockResolvedValue({
-      user: { id: "user-2", role: "admin" },
-      session: {},
-    });
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001, isOwnClub: true }]);
     mocks.assignReferee.mockRejectedValue(new Error("Unexpected DB failure"));
 
     const res = await app.request("/games/100/assign", {
@@ -355,7 +288,7 @@ describe("POST /games/:spielplanId/assign", () => {
   });
 
   it("maps DENY_RULE to 403", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "admin" }, session: {} });
+    mocks.dbSelect.mockResolvedValueOnce([{ apiId: 9001, isOwnClub: true }]);
     const { AssignmentError } = await import("../../services/referee/referee-assignment.service");
     mocks.assignReferee.mockRejectedValue(new AssignmentError("blocked by rule", "DENY_RULE"));
 
@@ -372,7 +305,7 @@ describe("POST /games/:spielplanId/assign", () => {
 
 describe("POST /games/:id/claim", () => {
   it("returns 401 when no session", async () => {
-    mocks.getSession.mockResolvedValue(null);
+    mocks.gate = "unauthorized";
 
     const res = await app.request("/games/5/claim", { method: "POST" });
 
@@ -380,17 +313,8 @@ describe("POST /games/:id/claim", () => {
     expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
   });
 
-  it("returns 403 when user role is admin (admins use /assign)", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "admin" } });
-
-    const res = await app.request("/games/5/claim", { method: "POST" });
-
-    expect(res.status).toBe(403);
-    expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
-  });
-
-  it("returns 403 when user role is not referee", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "member" } });
+  it("returns 403 when user has no referee profile", async () => {
+    mocks.gate = "forbidden";
 
     const res = await app.request("/games/5/claim", { method: "POST" });
 
@@ -399,28 +323,13 @@ describe("POST /games/:id/claim", () => {
   });
 
   it("returns 400 for invalid id", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-
     const res = await app.request("/games/abc/claim", { method: "POST" });
 
     expect(res.status).toBe(400);
     expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
   });
 
-  it("returns 403 when referee has no linked refereeId", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: null }]);
-
-    const res = await app.request("/games/5/claim", { method: "POST" });
-
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "FORBIDDEN" });
-    expect(mocks.claimRefereeGame).not.toHaveBeenCalled();
-  });
-
   it("claims with auto-picked slot when no body", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     mocks.claimRefereeGame.mockResolvedValue({
       success: true,
       slot: "sr1",
@@ -439,8 +348,6 @@ describe("POST /games/:id/claim", () => {
   });
 
   it("claims with explicit slotNumber", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     mocks.claimRefereeGame.mockResolvedValue({
       success: true,
       slot: "sr2",
@@ -463,9 +370,6 @@ describe("POST /games/:id/claim", () => {
   });
 
   it("returns 400 when body is malformed JSON", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
-
     const res = await app.request("/games/5/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -477,8 +381,6 @@ describe("POST /games/:id/claim", () => {
   });
 
   it("maps SLOT_TAKEN from service to 409", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -493,8 +395,6 @@ describe("POST /games/:id/claim", () => {
   });
 
   it("maps NOT_OWN_CLUB from service to 403", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -509,8 +409,6 @@ describe("POST /games/:id/claim", () => {
   });
 
   it("re-throws unknown errors to error handler", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     mocks.claimRefereeGame.mockRejectedValue(new Error("boom"));
 
     const res = await app.request("/games/5/claim", { method: "POST" });
@@ -521,15 +419,15 @@ describe("POST /games/:id/claim", () => {
 
 describe("DELETE /games/:id/claim", () => {
   it("returns 401 when no session", async () => {
-    mocks.getSession.mockResolvedValue(null);
+    mocks.gate = "unauthorized";
 
     const res = await app.request("/games/5/claim", { method: "DELETE" });
 
     expect(res.status).toBe(401);
   });
 
-  it("returns 403 when user role is not referee", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "admin" } });
+  it("returns 403 when user has no referee profile", async () => {
+    mocks.gate = "forbidden";
 
     const res = await app.request("/games/5/claim", { method: "DELETE" });
 
@@ -538,27 +436,13 @@ describe("DELETE /games/:id/claim", () => {
   });
 
   it("returns 400 for invalid id", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-
     const res = await app.request("/games/abc/claim", { method: "DELETE" });
 
     expect(res.status).toBe(400);
     expect(mocks.unclaimRefereeGame).not.toHaveBeenCalled();
   });
 
-  it("returns 403 when referee has no linked refereeId", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: null }]);
-
-    const res = await app.request("/games/5/claim", { method: "DELETE" });
-
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ code: "FORBIDDEN" });
-  });
-
   it("unclaims and returns response", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     mocks.unclaimRefereeGame.mockResolvedValue({
       success: true,
       slot: "sr1",
@@ -575,8 +459,6 @@ describe("DELETE /games/:id/claim", () => {
   });
 
   it("maps NOT_ASSIGNED from service to 409", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -591,8 +473,6 @@ describe("DELETE /games/:id/claim", () => {
   });
 
   it("maps FEDERATION_ERROR from service to 502", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     const { AssignmentError } = await import(
       "../../services/referee/referee-assignment.service"
     );
@@ -606,8 +486,6 @@ describe("DELETE /games/:id/claim", () => {
   });
 
   it("re-throws unknown errors", async () => {
-    mocks.getSession.mockResolvedValue({ user: { id: "u1", role: "referee" } });
-    mocks.dbSelect.mockResolvedValueOnce([{ refereeId: 7 }]);
     mocks.unclaimRefereeGame.mockRejectedValue(new Error("boom"));
 
     const res = await app.request("/games/5/claim", { method: "DELETE" });

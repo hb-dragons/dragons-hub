@@ -6,9 +6,12 @@ import {
   getRulesForReferee,
   updateRulesForReferee,
 } from "../../services/referee/referee-rules.service";
+import { requirePermission } from "../../middleware/rbac";
+import type { AppEnv } from "../../types";
 import { refereeRulesParamSchema, updateRefereeRulesBodySchema } from "./referee-rules.schemas";
 
-const refereeRulesRoutes = new Hono();
+const refereeRulesRoutes = new Hono<AppEnv>();
+refereeRulesRoutes.use("*", requirePermission("referee", "update"));
 
 async function requireOwnClubReferee(id: number) {
   const [referee] = await db

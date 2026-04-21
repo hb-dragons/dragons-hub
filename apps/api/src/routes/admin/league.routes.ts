@@ -6,8 +6,11 @@ import {
   resolveAndSaveLeagues,
   setLeagueOwnClubRefs,
 } from "../../services/admin/league-discovery.service";
+import { requirePermission } from "../../middleware/rbac";
+import type { AppEnv } from "../../types";
 
-const leagueRoutes = new Hono();
+const leagueRoutes = new Hono<AppEnv>();
+leagueRoutes.use("*", requirePermission("settings", "update"));
 
 const leagueNumbersSchema = z.object({
   leagueNumbers: z.array(z.number().int().positive()),

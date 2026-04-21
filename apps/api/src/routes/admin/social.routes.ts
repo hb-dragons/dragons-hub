@@ -17,8 +17,11 @@ import {
 } from "../../services/social/background.service";
 import { getWeekendMatches } from "../../services/social/match-social.service";
 import { generatePostImage } from "../../services/social/social-image.service";
+import { requirePermission } from "../../middleware/rbac";
+import type { AppEnv } from "../../types";
 
-const socialRoutes = new Hono();
+const socialRoutes = new Hono<AppEnv>();
+socialRoutes.use("*", requirePermission("settings", "update"));
 
 // --- Matches ---
 

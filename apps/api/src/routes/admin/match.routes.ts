@@ -8,6 +8,7 @@ import {
   updateMatchLocal,
   releaseOverride,
 } from "../../services/admin/match-admin.service";
+import { requirePermission } from "../../middleware/rbac";
 import {
   matchListQuerySchema,
   matchIdParamSchema,
@@ -21,6 +22,7 @@ const matchRoutes = new Hono<AppEnv>();
 // GET /admin/matches - List own club matches
 matchRoutes.get(
   "/matches",
+  requirePermission("match", "view"),
   describeRoute({
     description: "List own club matches",
     tags: ["Matches"],
@@ -45,6 +47,7 @@ matchRoutes.get(
 // GET /admin/matches/:id - Match detail with diffs
 matchRoutes.get(
   "/matches/:id",
+  requirePermission("match", "view"),
   describeRoute({
     description: "Get match detail with diffs",
     tags: ["Matches"],
@@ -68,6 +71,7 @@ matchRoutes.get(
 // GET /admin/matches/:id/history - Match change history
 matchRoutes.get(
   "/matches/:id/history",
+  requirePermission("match", "view"),
   describeRoute({
     description: "Get match change history",
     tags: ["Matches"],
@@ -89,6 +93,7 @@ matchRoutes.get(
 // PATCH /admin/matches/:id - Update local overrides
 matchRoutes.patch(
   "/matches/:id",
+  requirePermission("match", "update"),
   describeRoute({
     description: "Update local match overrides",
     tags: ["Matches"],
@@ -125,6 +130,7 @@ matchRoutes.patch(
 // DELETE /admin/matches/:id/overrides/:fieldName - Release a specific override
 matchRoutes.delete(
   "/matches/:id/overrides/:fieldName",
+  requirePermission("match", "update"),
   describeRoute({
     description: "Release a specific field override",
     tags: ["Matches"],

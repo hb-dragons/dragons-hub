@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../types";
-import { auth } from "../../config/auth";
+import { requirePermission } from "../../middleware/rbac";
 import {
   assignReferee,
   unassignReferee,
@@ -25,88 +25,73 @@ const ERROR_STATUS_MAP: Record<string, number> = {
 
 const adminRefereeAssignmentRoutes = new Hono<AppEnv>();
 
-adminRefereeAssignmentRoutes.get("/referee/games/:spielplanId/candidates", async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) {
-    return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
-  }
-  if (session.user.role !== "admin") {
-    return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-  }
-
-  const spielplanId = Number(c.req.param("spielplanId"));
-  if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
-    return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
-  }
-
-  const search = c.req.query("search") ?? "";
-  const pageFrom = Number(c.req.query("pageFrom") ?? "0");
-  const pageSize = Number(c.req.query("pageSize") ?? "15");
-
-  if (!Number.isInteger(pageFrom) || pageFrom < 0) {
-    return c.json({ error: "Invalid pageFrom", code: "VALIDATION_ERROR" }, 400);
-  }
-  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
-    return c.json({ error: "Invalid pageSize", code: "VALIDATION_ERROR" }, 400);
-  }
-
-  try {
-    const result = await searchCandidates(spielplanId, search, pageFrom, pageSize);
-    return c.json(result);
-  } catch (error) {
-    if (error instanceof AssignmentError) {
-      const status = ERROR_STATUS_MAP[error.code] ?? 500;
-      return c.json({ error: error.message, code: error.code }, status as never);
+adminRefereeAssignmentRoutes.get(
+  "/referee/games/:spielplanId/candidates",
+  requirePermission("assignment", "view"),
+  async (c) => {
+    const spielplanId = Number(c.req.param("spielplanId"));
+    if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
+      return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
     }
-    throw error;
-  }
-});
 
-adminRefereeAssignmentRoutes.post("/referee/games/:spielplanId/assign", async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) {
-    return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
-  }
-  if (session.user.role !== "admin") {
-    return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-  }
+    const search = c.req.query("search") ?? "";
+    const pageFrom = Number(c.req.query("pageFrom") ?? "0");
+    const pageSize = Number(c.req.query("pageSize") ?? "15");
 
-  const spielplanId = Number(c.req.param("spielplanId"));
-  if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
-    return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
-  }
-
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
-  }
-  const { slotNumber, refereeApiId } = assignBodySchema.parse(body);
-
-  try {
-    const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
-    return c.json(result);
-  } catch (error) {
-    if (error instanceof AssignmentError) {
-      const status = ERROR_STATUS_MAP[error.code] ?? 500;
-      return c.json({ error: error.message, code: error.code }, status as never);
+    if (!Number.isInteger(pageFrom) || pageFrom < 0) {
+      return c.json({ error: "Invalid pageFrom", code: "VALIDATION_ERROR" }, 400);
     }
-    throw error;
-  }
-});
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+      return c.json({ error: "Invalid pageSize", code: "VALIDATION_ERROR" }, 400);
+    }
+
+    try {
+      const result = await searchCandidates(spielplanId, search, pageFrom, pageSize);
+      return c.json(result);
+    } catch (error) {
+      if (error instanceof AssignmentError) {
+        const status = ERROR_STATUS_MAP[error.code] ?? 500;
+        return c.json({ error: error.message, code: error.code }, status as never);
+      }
+      throw error;
+    }
+  },
+);
+
+adminRefereeAssignmentRoutes.post(
+  "/referee/games/:spielplanId/assign",
+  requirePermission("assignment", "create"),
+  async (c) => {
+    const spielplanId = Number(c.req.param("spielplanId"));
+    if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
+      return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
+    }
+    const { slotNumber, refereeApiId } = assignBodySchema.parse(body);
+
+    try {
+      const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
+      return c.json(result);
+    } catch (error) {
+      if (error instanceof AssignmentError) {
+        const status = ERROR_STATUS_MAP[error.code] ?? 500;
+        return c.json({ error: error.message, code: error.code }, status as never);
+      }
+      throw error;
+    }
+  },
+);
 
 adminRefereeAssignmentRoutes.delete(
   "/referee/games/:spielplanId/assignment/:slotNumber",
+  requirePermission("assignment", "delete"),
   async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) {
-      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
-    }
-    if (session.user.role !== "admin") {
-      return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-    }
-
     const spielplanId = Number(c.req.param("spielplanId"));
     if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
       return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);

@@ -12,6 +12,7 @@ import {
   upsertSchedule,
   getMatchChangesForEntry,
 } from "../../services/admin/sync-admin.service";
+import { requirePermission } from "../../middleware/rbac";
 import {
   syncLogsQuerySchema,
   syncEntryIdParamSchema,
@@ -32,6 +33,7 @@ const DEFAULT_JOB_STATUSES: JobType[] = ["active", "waiting", "delayed", "failed
 // POST /admin/sync/trigger - Trigger manual sync via queue (non-blocking)
 syncRoutes.post(
   "/sync/trigger",
+  requirePermission("sync", "trigger"),
   describeRoute({
     description: "Trigger manual sync via queue (non-blocking)",
     tags: ["Sync"],
@@ -47,6 +49,7 @@ syncRoutes.post(
 // GET /admin/sync/status - Overall sync status
 syncRoutes.get(
   "/sync/status",
+  requirePermission("sync", "view"),
   describeRoute({
     description: "Get overall sync status",
     tags: ["Sync"],
@@ -62,6 +65,7 @@ syncRoutes.get(
 // GET /admin/sync/status/:jobId - Specific job status
 syncRoutes.get(
   "/sync/status/:jobId",
+  requirePermission("sync", "view"),
   describeRoute({
     description: "Get specific job status",
     tags: ["Sync"],
@@ -85,6 +89,7 @@ syncRoutes.get(
 // GET /admin/sync/jobs - List queue jobs with status filtering
 syncRoutes.get(
   "/sync/jobs",
+  requirePermission("sync", "view"),
   describeRoute({
     description: "List queue jobs with status filtering",
     tags: ["Sync"],
@@ -122,6 +127,7 @@ syncRoutes.get(
 // POST /admin/sync/jobs/:jobId/retry - Retry failed job
 syncRoutes.post(
   "/sync/jobs/:jobId/retry",
+  requirePermission("sync", "trigger"),
   describeRoute({
     description: "Retry a failed job",
     tags: ["Sync"],
@@ -152,6 +158,7 @@ syncRoutes.post(
 // DELETE /admin/sync/jobs/:jobId - Remove job
 syncRoutes.delete(
   "/sync/jobs/:jobId",
+  requirePermission("sync", "trigger"),
   describeRoute({
     description: "Remove a job from the queue",
     tags: ["Sync"],
@@ -176,6 +183,7 @@ syncRoutes.delete(
 // GET /admin/sync/jobs/:jobId/logs - BullMQ job logs
 syncRoutes.get(
   "/sync/jobs/:jobId/logs",
+  requirePermission("sync", "view"),
   describeRoute({
     description: "Get BullMQ logs for a job",
     tags: ["Sync"],
@@ -200,6 +208,7 @@ syncRoutes.get(
 // GET /admin/sync/logs - Sync run history with pagination + status filtering
 syncRoutes.get(
   "/sync/logs",
+  requirePermission("sync", "view"),
   describeRoute({
     description: "List sync run history with pagination and status filtering",
     tags: ["Sync"],
@@ -220,6 +229,7 @@ syncRoutes.get(
 // GET /admin/sync/logs/:id/entries - Per-item entries with filtering + summary
 syncRoutes.get(
   "/sync/logs/:id/entries",
+  requirePermission("sync", "view"),
   describeRoute({
     description: "Get per-item entries for a sync run",
     tags: ["Sync"],
@@ -251,6 +261,7 @@ syncRoutes.get(
 // GET /admin/sync/logs/:id/match-changes/:apiMatchId - Field-level changes for a match entry
 syncRoutes.get(
   "/sync/logs/:id/match-changes/:apiMatchId",
+  requirePermission("sync", "view"),
   describeRoute({
     description: "Get field-level changes for a match entry",
     tags: ["Sync"],
@@ -280,6 +291,7 @@ syncRoutes.get(
 // GET /admin/sync/logs/:id/stream - SSE real-time streaming via Redis pub/sub
 syncRoutes.get(
   "/sync/logs/:id/stream",
+  requirePermission("sync", "view"),
   describeRoute({
     description: "Stream real-time sync entries via SSE",
     tags: ["Sync"],
@@ -373,6 +385,7 @@ syncRoutes.get(
 // GET /admin/sync/schedule - Get current schedule
 syncRoutes.get(
   "/sync/schedule",
+  requirePermission("sync", "view"),
   describeRoute({
     description: "Get current sync schedule",
     tags: ["Sync"],
@@ -388,6 +401,7 @@ syncRoutes.get(
 // PUT /admin/sync/schedule - Update schedule
 syncRoutes.put(
   "/sync/schedule",
+  requirePermission("sync", "trigger"),
   describeRoute({
     description: "Update sync schedule",
     tags: ["Sync"],

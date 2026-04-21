@@ -9,6 +9,7 @@ import {
   deleteChannelConfig,
 } from "../../services/admin/channel-config-admin.service";
 import type { CreateChannelConfigBody, UpdateChannelConfigBody } from "@dragons/shared";
+import { requirePermission } from "../../middleware/rbac";
 import {
   channelConfigIdParamSchema,
   channelConfigListQuerySchema,
@@ -19,6 +20,7 @@ import {
 import { env } from "../../config/env";
 
 const channelConfigRoutes = new Hono<AppEnv>();
+channelConfigRoutes.use("*", requirePermission("settings", "update"));
 
 function isProviderConfigured(type: string): boolean {
   switch (type) {

@@ -5,7 +5,7 @@ import { Scalar } from "@scalar/hono-api-reference";
 import { errorHandler } from "./middleware/error";
 import { corsMiddleware } from "./middleware/cors";
 import { requestLogger } from "./middleware/request-logger";
-import { requireAdmin } from "./middleware/auth";
+import { requireAuth } from "./middleware/rbac";
 import { auth } from "./config/auth";
 import { openApiSpec } from "./config/openapi";
 import { routes } from "./routes/index";
@@ -36,8 +36,8 @@ app.get("/docs", Scalar({ url: "/openapi.json" }));
 // Better Auth handler
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
-// Protect all admin routes
-app.use("/admin/*", requireAdmin);
+// Require authentication on all admin routes; per-route guards check granular permissions.
+app.use("/admin/*", requireAuth);
 
 app.route("/admin/queues", serverAdapter.registerPlugin());
 app.route("/", routes);

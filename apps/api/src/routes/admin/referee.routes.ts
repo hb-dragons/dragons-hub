@@ -5,13 +5,16 @@ import {
   getReferees,
   updateRefereeVisibility,
 } from "../../services/admin/referee-admin.service";
+import { requirePermission } from "../../middleware/rbac";
+import type { AppEnv } from "../../types";
 import { refereeListQuerySchema } from "./referee.schemas";
 
-const refereeRoutes = new Hono();
+const refereeRoutes = new Hono<AppEnv>();
 
 // GET /admin/referees - List all referees
 refereeRoutes.get(
   "/referees",
+  requirePermission("referee", "view"),
   describeRoute({
     description: "List all referees with pagination and search",
     tags: ["Referees"],
@@ -38,6 +41,7 @@ const visibilityBodySchema = z.object({
 // PATCH /admin/referees/:id/visibility - Update referee game visibility flags
 refereeRoutes.patch(
   "/referees/:id/visibility",
+  requirePermission("referee", "update"),
   describeRoute({
     description: "Update referee game visibility flags",
     tags: ["Referees"],

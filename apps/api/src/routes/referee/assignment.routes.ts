@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../../types";
-import { auth } from "../../config/auth";
+import { requireRefereeSelf } from "../../middleware/rbac";
 import { db } from "../../config/database";
-import { referees, user as userTable } from "@dragons/db/schema";
+import { referees } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import {
   assignReferee,
@@ -38,16 +38,14 @@ const ERROR_STATUS_MAP: Record<string, number> = {
 
 const refereeAssignmentRoutes = new Hono<AppEnv>();
 
+// All referee self-service actions: requires a linked refereeId on the caller's session.
+// Admin-override variants live in admin/referee-assignment.routes.ts.
+// NOTE: The /assign route below used to accept admin callers in addition to referees;
+// that admin path has moved to the admin routes. A follow-up can decide whether to
+// expose a parallel admin route under /referee or deprecate that path.
+refereeAssignmentRoutes.use("/*", requireRefereeSelf);
+
 refereeAssignmentRoutes.post("/games/:spielplanId/assign", async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) {
-    return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
-  }
-
-  if (session.user.role !== "referee" && session.user.role !== "admin") {
-    return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-  }
-
   const spielplanId = Number(c.req.param("spielplanId"));
   if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
     return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
@@ -61,31 +59,24 @@ refereeAssignmentRoutes.post("/games/:spielplanId/assign", async (c) => {
   }
   const { slotNumber, refereeApiId } = assignBodySchema.parse(body);
 
-  // Self-assign guard: referees can only assign themselves
-  if (session.user.role === "referee") {
-    const [userRow] = await db
-      .select({ refereeId: userTable.refereeId })
-      .from(userTable)
-      .where(eq(userTable.id, session.user.id))
-      .limit(1);
+  // Ownership check: referee can only assign themselves.
+  const refereeId = c.get("refereeId");
+  if (refereeId === undefined) {
+    return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
+  }
 
-    if (!userRow?.refereeId) {
-      return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
-    }
+  const [refereeRow] = await db
+    .select({ apiId: referees.apiId, isOwnClub: referees.isOwnClub })
+    .from(referees)
+    .where(eq(referees.id, refereeId))
+    .limit(1);
 
-    const [refereeRow] = await db
-      .select({ apiId: referees.apiId, isOwnClub: referees.isOwnClub })
-      .from(referees)
-      .where(eq(referees.id, userRow.refereeId))
-      .limit(1);
+  if (!refereeRow || refereeRow.apiId !== refereeApiId) {
+    return c.json({ error: "Cannot assign another referee", code: "FORBIDDEN" }, 403);
+  }
 
-    if (!refereeRow || refereeRow.apiId !== refereeApiId) {
-      return c.json({ error: "Cannot assign another referee", code: "FORBIDDEN" }, 403);
-    }
-
-    if (!refereeRow.isOwnClub) {
-      return c.json({ error: "Referee is not an own-club referee", code: "NOT_OWN_CLUB" }, 403);
-    }
+  if (!refereeRow.isOwnClub) {
+    return c.json({ error: "Referee is not an own-club referee", code: "NOT_OWN_CLUB" }, 403);
   }
 
   try {
@@ -101,27 +92,13 @@ refereeAssignmentRoutes.post("/games/:spielplanId/assign", async (c) => {
 });
 
 refereeAssignmentRoutes.post("/games/:id/claim", async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) {
-    return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
-  }
-
-  if (session.user.role !== "referee") {
-    return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-  }
-
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0) {
     return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
   }
 
-  const [userRow] = await db
-    .select({ refereeId: userTable.refereeId })
-    .from(userTable)
-    .where(eq(userTable.id, session.user.id))
-    .limit(1);
-
-  if (!userRow?.refereeId) {
+  const refereeId = c.get("refereeId");
+  if (refereeId === undefined) {
     return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
   }
 
@@ -135,7 +112,7 @@ refereeAssignmentRoutes.post("/games/:id/claim", async (c) => {
 
   try {
     const result = await claimRefereeGame({
-      refereeId: userRow.refereeId,
+      refereeId,
       gameId: id,
       slotNumber: parsed?.slotNumber,
     });
@@ -150,33 +127,19 @@ refereeAssignmentRoutes.post("/games/:id/claim", async (c) => {
 });
 
 refereeAssignmentRoutes.delete("/games/:id/claim", async (c) => {
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  if (!session) {
-    return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
-  }
-
-  if (session.user.role !== "referee") {
-    return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
-  }
-
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0) {
     return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
   }
 
-  const [userRow] = await db
-    .select({ refereeId: userTable.refereeId })
-    .from(userTable)
-    .where(eq(userTable.id, session.user.id))
-    .limit(1);
-
-  if (!userRow?.refereeId) {
+  const refereeId = c.get("refereeId");
+  if (refereeId === undefined) {
     return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
   }
 
   try {
     const result = await unclaimRefereeGame({
-      refereeId: userRow.refereeId,
+      refereeId,
       gameId: id,
     });
     return c.json(result);

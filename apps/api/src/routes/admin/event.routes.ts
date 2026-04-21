@@ -6,9 +6,11 @@ import {
   triggerManualEvent,
   listFailedNotifications,
 } from "../../services/admin/event-admin.service";
+import { requirePermission } from "../../middleware/rbac";
 import { eventListQuerySchema, triggerEventSchema } from "./event.schemas";
 
 const eventRoutes = new Hono<AppEnv>();
+eventRoutes.use("*", requirePermission("settings", "update"));
 
 // GET /admin/events - List domain events
 eventRoutes.get(

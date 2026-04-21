@@ -1,22 +1,14 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
 import type { AppEnv } from "../../types";
-import { requireReferee } from "../../middleware/auth";
-import {
-  getRefereeGames,
-  getRefereeGameById,
-} from "../../services/referee/referee-games.service";
+import { requireRefereeSelf } from "../../middleware/rbac";
 import {
   getVisibleRefereeGames,
   getVisibleRefereeGameById,
   getVisibleRefereeGameByMatchId,
 } from "../../services/referee/referee-game-visibility.service";
-import { refereeGames } from "@dragons/db/schema";
-import { db } from "../../config/database";
-import { user as userTable } from "@dragons/db/schema";
 
 const refereeGamesRoutes = new Hono<AppEnv>();
-refereeGamesRoutes.use("/*", requireReferee);
+refereeGamesRoutes.use("/*", requireRefereeSelf);
 
 refereeGamesRoutes.get("/games", async (c) => {
   const limit = Math.min(Number(c.req.query("limit") || 100), 500);
@@ -27,26 +19,13 @@ refereeGamesRoutes.get("/games", async (c) => {
   const dateFrom = c.req.query("dateFrom") || undefined;
   const dateTo = c.req.query("dateTo") || undefined;
 
-  const sessionUser = c.get("user");
-  const params = { limit, offset, search, status, league, dateFrom, dateTo };
-
-  if (sessionUser.role === "admin") {
-    const result = await getRefereeGames(params);
-    return c.json(result);
-  }
-
-  // Referee: look up linked refereeId
-  const [userRow] = await db
-    .select({ refereeId: userTable.refereeId })
-    .from(userTable)
-    .where(eq(userTable.id, sessionUser.id))
-    .limit(1);
-
-  if (!userRow?.refereeId) {
+  const refereeId = c.get("refereeId");
+  if (refereeId === undefined) {
     return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
   }
 
-  const result = await getVisibleRefereeGames(userRow.refereeId, params);
+  const params = { limit, offset, search, status, league, dateFrom, dateTo };
+  const result = await getVisibleRefereeGames(refereeId, params);
   return c.json(result);
 });
 
@@ -56,34 +35,12 @@ refereeGamesRoutes.get("/matches/:matchId", async (c) => {
     return c.json({ error: "Invalid matchId", code: "VALIDATION_ERROR" }, 400);
   }
 
-  const sessionUser = c.get("user");
-
-  if (sessionUser.role === "admin") {
-    const [row] = await db
-      .select()
-      .from(refereeGames)
-      .where(eq(refereeGames.matchId, matchId))
-      .limit(1);
-    if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    return c.json({
-      ...row,
-      isTrackedLeague: row.matchId != null,
-      mySlot: null,
-      claimableSlots: [],
-    });
-  }
-
-  const [userRow] = await db
-    .select({ refereeId: userTable.refereeId })
-    .from(userTable)
-    .where(eq(userTable.id, sessionUser.id))
-    .limit(1);
-
-  if (!userRow?.refereeId) {
+  const refereeId = c.get("refereeId");
+  if (refereeId === undefined) {
     return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
   }
 
-  const row = await getVisibleRefereeGameByMatchId(userRow.refereeId, matchId);
+  const row = await getVisibleRefereeGameByMatchId(refereeId, matchId);
   if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
   return c.json(row);
 });
@@ -94,25 +51,12 @@ refereeGamesRoutes.get("/games/:id", async (c) => {
     return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
   }
 
-  const sessionUser = c.get("user");
-
-  if (sessionUser.role === "admin") {
-    const row = await getRefereeGameById(id);
-    if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    return c.json(row);
-  }
-
-  const [userRow] = await db
-    .select({ refereeId: userTable.refereeId })
-    .from(userTable)
-    .where(eq(userTable.id, sessionUser.id))
-    .limit(1);
-
-  if (!userRow?.refereeId) {
+  const refereeId = c.get("refereeId");
+  if (refereeId === undefined) {
     return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
   }
 
-  const row = await getVisibleRefereeGameById(userRow.refereeId, id);
+  const row = await getVisibleRefereeGameById(refereeId, id);
   if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
   return c.json(row);
 });
