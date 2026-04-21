@@ -56,7 +56,9 @@ export function UserActions({
 
   const isSelf = user.id === currentUserId
   const isBanned = user.banned === true
-  const newRole = user.role === "admin" ? "user" : "admin"
+  // TODO(T14): replace with multi-role editor. For now, toggle "admin" on/off;
+  // clearing uses "" which better-auth treats as no role.
+  const newRole = user.role === "admin" ? "" : "admin"
 
   async function handleDelete() {
     try {
@@ -94,7 +96,10 @@ export function UserActions({
     try {
       const { error } = await authClient.admin.setRole({
         userId: user.id,
-        role: newRole,
+        // TODO(T14): typed-roles editor. better-auth's setRole accepts the role
+        // union, but clearing a role here relies on passing "" which the server
+        // normalises to null. Cast until T14 replaces this with a multi-role editor.
+        role: newRole as "admin",
       })
       if (error) {
         toast.error(t("users.toast.roleChangeFailed"))
@@ -109,14 +114,8 @@ export function UserActions({
 
   async function handleRemoveReferee() {
     try {
-      const { error } = await authClient.admin.setRole({
-        userId: user.id,
-        role: "user",
-      })
-      if (error) {
-        toast.error(t("users.toast.roleChangeFailed"))
-        return
-      }
+      // Referee status is identity-based (refereeId FK). Unlinking only needs
+      // to clear the FK; no role assignment is involved.
       await fetchAPI(`/admin/users/${user.id}/referee-link`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

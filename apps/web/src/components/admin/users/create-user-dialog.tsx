@@ -18,20 +18,14 @@ import {
   DialogTitle,
 } from "@dragons/ui/components/dialog"
 import { Input } from "@dragons/ui/components/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@dragons/ui/components/select"
 import { Field, FieldLabel, FieldError } from "@dragons/ui/components/field"
 
+// Roles are assigned post-creation via the user actions dialog (T14).
+// New users start with no elevated access (role = null).
 const createUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.enum(["user", "admin", "referee"]),
 })
 
 type CreateUserFormValues = z.infer<typeof createUserSchema>
@@ -56,7 +50,6 @@ export function CreateUserDialog({
       name: "",
       email: "",
       password: "",
-      role: "user",
     },
   })
 
@@ -67,7 +60,6 @@ export function CreateUserDialog({
         name: values.name,
         email: values.email,
         password: values.password,
-        role: values.role as "admin" | "user",
       })
       if (error) {
         toast.error(t("users.toast.createFailed"))
@@ -141,25 +133,6 @@ export function CreateUserDialog({
                   {...field}
                 />
                 <FieldError>{fieldState.error?.message}</FieldError>
-              </Field>
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="role"
-            render={({ field }) => (
-              <Field>
-                <FieldLabel>{t("users.createDialog.roleLabel")}</FieldLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">{t("users.roles.user")}</SelectItem>
-                    <SelectItem value="admin">{t("users.roles.admin")}</SelectItem>
-                    <SelectItem value="referee">{t("users.roles.referee")}</SelectItem>
-                  </SelectContent>
-                </Select>
               </Field>
             )}
           />

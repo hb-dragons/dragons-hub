@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { authClient } from "@/lib/auth-client"
 import { fetchAPI } from "@/lib/api"
 
 import { Button } from "@dragons/ui/components/button"
@@ -63,17 +62,8 @@ export function LinkRefereeDialog({
     if (!user || !selected) return
     setSubmitting(true)
     try {
-      // Set role to referee
-      const { error } = await authClient.admin.setRole({
-        userId: user.id,
-        role: "referee" as "admin" | "user",
-      })
-      if (error) {
-        toast.error(t("users.toast.roleChangeFailed"))
-        return
-      }
-
-      // Link referee record
+      // Referee status is identity-based: the refereeId FK on the user is the
+      // authoritative "is a referee" signal. No role assignment is needed.
       await fetchAPI(`/admin/users/${user.id}/referee-link`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
