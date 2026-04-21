@@ -1,20 +1,16 @@
 import { useEffect } from "react";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useRouter, useSegments } from "expo-router";
+import { isReferee } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 
-function hasRefereeAccess(role: unknown): boolean {
-  return role === "referee" || role === "admin";
-}
-
 export default function TabLayout() {
   const { colors } = useTheme();
   const { data: session } = authClient.useSession();
-  const canRef = hasRefereeAccess(
-    session?.user && "role" in session.user ? session.user.role : undefined,
-  );
+  const user = session?.user;
+  const canRef = Boolean(user) && isReferee(user as { refereeId?: number | null });
 
   const router = useRouter();
   const segments = useSegments();
