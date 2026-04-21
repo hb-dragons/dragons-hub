@@ -204,10 +204,7 @@ Wrapper around basketball-bund-sdk at `services/sync/sdk-client.ts`:
 | POST | `/api/auth/sign-out` | Sign out (invalidate session) |
 | GET | `/api/auth/get-session` | Get current session + user |
 
-All `/admin/*` routes require an authenticated session with `role: "admin"`. Returns 401 if unauthenticated, 403 if not admin.
-
-Auth config: `apps/api/src/config/auth.ts` (Better Auth with Drizzle adapter + admin plugin)
-Auth middleware: `apps/api/src/middleware/auth.ts` (`requireAdmin`)
+`/admin/*` routes require an authenticated session plus the specific permission for that route — see the Access Control section below. `/referee/*` self-service routes require the caller's user to be linked to a referee profile. Auth config: `apps/api/src/config/auth.ts`. RBAC middleware: `apps/api/src/middleware/rbac.ts`.
 
 ### Admin - Sync Control
 
@@ -422,6 +419,54 @@ Match list and detail responses include associated venue booking data when avail
 Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`, `apps/api/src/routes/device.routes.ts`
 Validation schemas: `apps/api/src/routes/admin/*.schemas.ts`
 Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
+
+## Access Control (RBAC)
+
+Two concepts, two APIs:
+
+- **Role permissions** — for acting on other users' or global data. Checked via `can(user, resource, action)` from `@dragons/shared`.
+- **Referee self-service** — for acting on the caller's own referee data. Checked via `isReferee(user)` from `@dragons/shared` (an identity check, not a role).
+
+### Source of truth
+
+All resources, actions, and role → permission mappings live in `packages/shared/src/rbac.ts`. Never hardcode role name strings anywhere else.
+
+### Backend
+
+`apps/api/src/middleware/rbac.ts` exports:
+
+- `requireAuth` — 401 on no session; populates `c.get("user")` and `c.get("session")`.
+- `requirePermission(resource, action)` — route-group gate; 403 on insufficient permission.
+- `assertPermission(c, resource, action)` — inline check inside a handler for row-level logic.
+- `requireRefereeSelf` — gates self-service routes; populates `c.get("refereeId")`.
+
+### Frontend (web & native)
+
+- `can(user, resource, action)` — pure synchronous check for UI rendering.
+- `isReferee(user)` — pure synchronous check for self-service UI.
+- `<Can resource action>` — JSX wrapper (web only).
+- `parseRoles(user.role)` — normalize better-auth's comma-separated role string to `RoleName[]`.
+
+### Role catalog (v1)
+
+| Role | Grants |
+|---|---|
+| `admin` | Full access to every resource and action. |
+| `refereeAdmin` | Manage referees, assignments; view matches; trigger referee sync. |
+| `venueManager` | Manage venues and bookings; view matches. |
+| `teamManager` | Manage teams; view matches, standings, referees. |
+| *(no role, refereeId set)* | Referee self-service (own assignments via `isReferee`). |
+
+A user may have multiple roles. Roles are stored in the `user.role` column as a comma-separated string (better-auth native format).
+
+### Adding a role or resource
+
+1. Add to `statement` in `packages/shared/src/rbac.ts`.
+2. Add/extend role(s) with the new permission(s) in the same file.
+3. If a new role, also add to `ROLE_NAMES`.
+4. Apply `requirePermission("newResource", "newAction")` on the relevant API routes.
+5. Gate UI with `<Can>` or `can()`.
+6. Update this section.
 
 ## Frontend Architecture
 
