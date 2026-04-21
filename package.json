@@ -18,9 +18,9 @@
     "seed:extract": "pnpm --filter @dragons/api exec tsx ../../scripts/extract-test-seed.ts"
   },
   "devDependencies": {
-    "knip": "^6.4.1",
+    "knip": "^6.6.0",
     "turbo": "^2.9.6",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   },
   "pnpm": {
     "overrides": {
