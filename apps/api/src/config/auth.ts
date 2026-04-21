@@ -2,6 +2,7 @@ import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins/admin";
+import { ac, roles } from "@dragons/shared";
 import { db } from "./database";
 import { env } from "./env";
 
@@ -40,7 +41,8 @@ export const auth = betterAuth({
   },
   plugins: [
     admin({
-      defaultRole: "user",
+      ac,
+      roles,
       adminRoles: ["admin"],
     }),
     expo(),
