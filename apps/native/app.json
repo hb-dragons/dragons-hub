@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "Use Face ID to unlock the Dragons app",
-        "NSCameraUsageDescription": "Allow Dragons to access your camera for team photos"
+        "NSCameraUsageDescription": "Allow Dragons to access your camera for team photos",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -21,12 +22,46 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#004b23"
       },
-      "intentFilters": [{
-        "action": "VIEW",
-        "autoVerify": true,
-        "data": [{ "scheme": "https", "host": "app.hbdragons.de" }],
-        "category": ["BROWSABLE", "DEFAULT"]
-      }]
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "app.hbdragons.de"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "app.hbdragons.de"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "notification": {
       "icon": "./assets/notification-icon.png",
@@ -37,20 +72,46 @@
       "expo-font",
       "expo-secure-store",
       "expo-local-authentication",
-      ["expo-camera", { "cameraPermission": "Allow Dragons to access your camera for team photos.", "microphonePermission": false }],
-      ["expo-splash-screen", {
-        "image": "./assets/splash-logo.png",
-        "backgroundColor": "#131313",
-        "imageWidth": 240,
-        "dark": {
-          "image": "./assets/splash-logo.png",
-          "backgroundColor": "#131313"
+      "expo-updates",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Dragons to access your camera for team photos.",
+          "microphonePermission": false
         }
-      }],
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-logo.png",
+          "backgroundColor": "#131313",
+          "imageWidth": 240,
+          "dark": {
+            "image": "./assets/splash-logo.png",
+            "backgroundColor": "#131313"
+          }
+        }
+      ],
       "./plugins/remove-push-entitlement"
     ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/7b7481e3-ca0a-42dd-ba38-6a9169d6492d"
+    },
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7b7481e3-ca0a-42dd-ba38-6a9169d6492d"
+      }
+    },
+    "owner": "eshamounskerto"
   }
 }

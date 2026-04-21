@@ -4,6 +4,8 @@ import { StatusBar } from "expo-status-bar";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
+import { SWRConfig } from "swr";
+import { swrConfig } from "@/lib/swr-config";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { LocaleProvider } from "@/hooks/useLocale";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
@@ -15,8 +17,6 @@ import { spacing } from "@/theme/spacing";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 SplashScreen.preventAutoHideAsync();
-
-void i18n;
 
 // Install a global JS error handler that logs to NSLog BEFORE RCTFatal aborts
 // the app in Release builds. Readable via `idevicesyslog | grep DRAGONS_JS_ERROR`.
@@ -170,11 +170,13 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <LocaleProvider>
-        <ThemeProvider>
-          <RootNavigator />
-        </ThemeProvider>
-      </LocaleProvider>
+      <SWRConfig value={swrConfig}>
+        <LocaleProvider>
+          <ThemeProvider>
+            <RootNavigator />
+          </ThemeProvider>
+        </LocaleProvider>
+      </SWRConfig>
     </ErrorBoundary>
   );
 }
