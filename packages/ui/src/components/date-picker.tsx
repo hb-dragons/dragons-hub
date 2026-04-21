@@ -19,6 +19,7 @@ interface DatePickerProps {
   onChange: (value: string | null) => void
   placeholder?: string
   className?: string
+  disabled?: boolean
 }
 
 function DatePicker({
@@ -26,6 +27,7 @@ function DatePicker({
   onChange,
   placeholder = "Datum wählen",
   className,
+  disabled,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
 
@@ -44,10 +46,11 @@ function DatePicker({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
+          disabled={disabled}
           className={cn(
             "justify-start text-left font-normal",
             !value && "text-muted-foreground",

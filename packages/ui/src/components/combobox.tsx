@@ -19,6 +19,7 @@ export interface ComboboxProps {
   placeholder?: string;
   debounceMs?: number;
   className?: string;
+  disabled?: boolean;
 }
 
 export function Combobox({
@@ -29,6 +30,7 @@ export function Combobox({
   placeholder = "Search...",
   debounceMs = 300,
   className,
+  disabled,
 }: ComboboxProps) {
   const isControlled = value !== undefined;
   const [internalQuery, setInternalQuery] = React.useState("");
@@ -100,7 +102,7 @@ export function Combobox({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal>
+    <Popover open={open && !disabled} onOpenChange={disabled ? undefined : setOpen} modal>
       <PopoverAnchor asChild>
         <Input
           ref={inputRef}
@@ -108,6 +110,7 @@ export function Combobox({
           onChange={handleInputChange}
           placeholder={placeholder}
           className={className}
+          disabled={disabled}
         />
       </PopoverAnchor>
       <PopoverContent
