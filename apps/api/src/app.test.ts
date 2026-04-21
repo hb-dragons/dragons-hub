@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("./config/database", () => ({
   db: {
@@ -19,10 +19,15 @@ vi.mock("./workers/queues", () => ({
   },
 }));
 
+const mockGetSession = vi.fn().mockResolvedValue(null);
+const mockUserHasPermission = vi.fn().mockResolvedValue({ success: false });
 vi.mock("./config/auth", () => ({
   auth: {
     handler: vi.fn().mockResolvedValue(new Response("ok")),
-    api: { getSession: vi.fn().mockResolvedValue(null) },
+    api: {
+      getSession: (...args: unknown[]) => mockGetSession(...args),
+      userHasPermission: (...args: unknown[]) => mockUserHasPermission(...args),
+    },
   },
 }));
 
@@ -59,6 +64,11 @@ vi.mock("@bull-board/hono", async () => {
 });
 
 import { app } from "./app";
+
+beforeEach(() => {
+  mockGetSession.mockReset().mockResolvedValue(null);
+  mockUserHasPermission.mockReset().mockResolvedValue({ success: false });
+});
 
 describe("api routes", () => {
   it("returns health status", async () => {
@@ -97,5 +107,42 @@ describe("api routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
+  });
+});
+
+describe("Bull Board admin gate", () => {
+  it("returns 401 when unauthenticated", async () => {
+    mockGetSession.mockResolvedValue(null);
+    const response = await app.request("/admin/queues");
+    expect(response.status).toBe(401);
+  });
+
+  it("returns 403 when authenticated user lacks settings:update", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: null },
+      session: { id: "s1" },
+    });
+    mockUserHasPermission.mockResolvedValue({ success: false });
+    const response = await app.request("/admin/queues");
+    expect(response.status).toBe(403);
+  });
+
+  it("passes middleware when user has settings:update (admin)", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "admin" },
+      session: { id: "s1" },
+    });
+    mockUserHasPermission.mockResolvedValue({ success: true });
+    const response = await app.request("/admin/queues");
+    // The mocked Bull Board plugin returns an empty Hono app, which yields 404
+    // for unmatched paths. What matters is that we got past the 401/403 gate.
+    expect(response.status).not.toBe(401);
+    expect(response.status).not.toBe(403);
+    expect(mockUserHasPermission).toHaveBeenCalledWith({
+      body: {
+        userId: "u1",
+        permissions: { settings: ["update"] },
+      },
+    });
   });
 });
