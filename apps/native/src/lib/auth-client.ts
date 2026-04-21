@@ -1,6 +1,8 @@
 import { createAuthClient } from "better-auth/react";
+import { adminClient } from "better-auth/client/plugins";
 import { expoClient } from "@better-auth/expo/client";
 import * as SecureStore from "expo-secure-store";
+import { ac, roles } from "@dragons/shared";
 
 export function resolveApiUrl(): string {
   const url = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
@@ -17,6 +19,7 @@ const baseURL = resolveApiUrl();
 export const authClient = createAuthClient({
   baseURL,
   plugins: [
+    adminClient({ ac, roles }),
     expoClient({
       scheme: "dragons",
       storagePrefix: "dragons",
