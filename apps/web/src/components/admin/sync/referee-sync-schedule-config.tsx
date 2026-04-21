@@ -24,19 +24,9 @@ import { toast } from "sonner";
 import { fetchAPI } from "@/lib/api";
 import type { SyncScheduleData } from "./types";
 import { useRefereeSyncSchedule } from "./use-sync";
+import { formatIntervalLabel } from "./utils";
 
 const INTERVAL_MINUTES = [15, 30, 60, 120, 180, 240, 360, 480, 720, 1440];
-
-function formatIntervalLabel(
-  t: ReturnType<typeof useTranslations>,
-  minutes: number,
-): string {
-  if (minutes >= 1440) return t("sync.refereeSchedule.daily");
-  if (minutes >= 60 && minutes % 60 === 0) {
-    return t("sync.refereeSchedule.everyNHours", { hours: minutes / 60 });
-  }
-  return t("sync.refereeSchedule.everyNMinutes", { minutes });
-}
 
 export function RefereeSyncScheduleConfig() {
   const t = useTranslations();

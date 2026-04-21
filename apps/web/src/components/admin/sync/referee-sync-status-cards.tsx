@@ -12,7 +12,7 @@ import { Activity, Clock, Timer, Calendar } from "lucide-react";
 import { cn } from "@dragons/ui/lib/utils";
 import type { SyncScheduleData, SyncRun } from "./types";
 import { useRefereeSyncStatus, useRefereeSyncSchedule } from "./use-sync";
-import { formatDuration } from "./utils";
+import { formatDuration, formatIntervalLabel } from "./utils";
 
 export function RefereeSyncStatusCards() {
   const t = useTranslations();
@@ -39,6 +39,16 @@ export function RefereeSyncStatusCards() {
     const diffMs = nextRun - now;
 
     if (diffMs <= 0) return t("sync.refereeSchedule.startingSoon");
+
+    const diffHoursTotal = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHoursTotal >= 24) return t("sync.status.tomorrow");
+    if (diffHoursTotal >= 1) {
+      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      return t("sync.status.inHours", {
+        hours: String(diffHoursTotal),
+        minutes: String(diffMinutes),
+      });
+    }
     const diffMinutes = Math.ceil(diffMs / (1000 * 60));
     return t("sync.status.inMinutes", { minutes: String(diffMinutes) });
   }
@@ -131,7 +141,7 @@ export function RefereeSyncStatusCards() {
           </div>
           {schedule?.enabled && schedule.intervalMinutes && (
             <p className="text-xs text-muted-foreground">
-              {t("sync.refereeSchedule.everyNMinutes", { minutes: String(schedule.intervalMinutes) })}
+              {formatIntervalLabel(t, schedule.intervalMinutes)}
             </p>
           )}
         </CardContent>
@@ -154,7 +164,7 @@ export function RefereeSyncStatusCards() {
           </div>
           {schedule?.intervalMinutes && (
             <p className="text-xs text-muted-foreground">
-              {t("sync.refereeSchedule.everyNMinutes", { minutes: String(schedule.intervalMinutes) })}
+              {formatIntervalLabel(t, schedule.intervalMinutes)}
             </p>
           )}
         </CardContent>
