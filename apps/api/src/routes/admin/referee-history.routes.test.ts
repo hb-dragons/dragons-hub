@@ -7,11 +7,13 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   getRefereeHistorySummary: vi.fn(),
   getRefereeHistoryGames: vi.fn(),
+  getRefereeHistoryLeaderboard: vi.fn(),
 }));
 
 vi.mock("../../services/admin/referee-history.service", () => ({
   getRefereeHistorySummary: mocks.getRefereeHistorySummary,
   getRefereeHistoryGames: mocks.getRefereeHistoryGames,
+  getRefereeHistoryLeaderboard: mocks.getRefereeHistoryLeaderboard,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -247,5 +249,34 @@ describe("GET /referee/history/games.csv", () => {
     );
     expect(res.headers.get("X-Total-Count")).toBe("5");
     expect(res.headers.get("X-Result-Truncated")).toBeNull();
+  });
+});
+
+describe("GET /referee/history/leaderboard.csv", () => {
+  it("returns text/csv with rank-indexed rows and no row cap", async () => {
+    mocks.getRefereeHistoryLeaderboard.mockResolvedValue([
+      { refereeApiId: 100, refereeId: 1, displayName: "Mueller, A",
+        isOwnClub: true, sr1Count: 3, sr2Count: 1, total: 4,
+        lastRefereedDate: "2025-09-30" },
+      { refereeApiId: null, refereeId: null, displayName: "Guest",
+        isOwnClub: false, sr1Count: 0, sr2Count: 1, total: 1,
+        lastRefereedDate: null },
+    ]);
+
+    const res = await app.request(
+      "/referee/history/leaderboard.csv?dateFrom=2025-08-01&dateTo=2026-07-31",
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
+    const body = await res.text();
+    // Strip BOM prefix if present (handler mirrors games.csv).
+    const stripped = body.startsWith("﻿") ? body.slice(1) : body;
+    const lines = stripped.trim().split("\r\n");
+    expect(lines[0]).toBe(
+      "rank,displayName,isOwnClub,refereeApiId,refereeId,sr1Count,sr2Count,total,lastRefereedDate",
+    );
+    expect(lines[1]).toBe("1,\"Mueller, A\",true,100,1,3,1,4,2025-09-30");
+    expect(lines[2]).toBe("2,Guest,false,,,0,1,1,");
   });
 });

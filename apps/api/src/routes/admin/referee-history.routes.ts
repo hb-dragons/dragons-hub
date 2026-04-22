@@ -6,6 +6,7 @@ import type { AppEnv } from "../../types";
 import {
   getRefereeHistorySummary,
   getRefereeHistoryGames,
+  getRefereeHistoryLeaderboard,
 } from "../../services/admin/referee-history.service";
 import {
   historyFilterSchema,
@@ -14,6 +15,8 @@ import {
 import {
   GAMES_CSV_HEADERS,
   gamesToCsvRows,
+  LEADERBOARD_CSV_HEADERS,
+  leaderboardToCsvRows,
   toCsv,
 } from "../../services/admin/referee-history.csv";
 
@@ -116,6 +119,38 @@ adminRefereeHistoryRoutes.get(
       headers["X-Result-Truncated"] = "true";
     }
     return new Response(csv, { headers });
+  },
+);
+
+// GET /admin/referee/history/leaderboard.csv - CSV export of referee leaderboard (no row cap)
+adminRefereeHistoryRoutes.get(
+  "/referee/history/leaderboard.csv",
+  requirePermission("assignment", "view"),
+  describeRoute({
+    description: "CSV export of referee history leaderboard",
+    tags: ["Referees"],
+    responses: { 200: { description: "text/csv" } },
+  }),
+  async (c) => {
+    const parsed = historyFilterSchema.parse({
+      dateFrom: c.req.query("dateFrom"),
+      dateTo: c.req.query("dateTo"),
+      league: c.req.query("league"),
+      status: c.req.query("status"),
+    });
+    const entries = await getRefereeHistoryLeaderboard(parsed, { limit: 10000 });
+    const BOM = "﻿";
+    const csv = BOM + toCsv(LEADERBOARD_CSV_HEADERS, leaderboardToCsvRows(entries));
+    const from = parsed.dateFrom ?? "range";
+    const to = parsed.dateTo ?? "range";
+    return new Response(csv, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition":
+          `attachment; filename="referee-history-leaderboard-${from}-${to}.csv"`,
+        "X-Total-Count": String(entries.length),
+      },
+    });
   },
 );
 
