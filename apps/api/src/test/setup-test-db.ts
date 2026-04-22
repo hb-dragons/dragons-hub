@@ -31,7 +31,7 @@ export async function resetTestDb(ctx: TestDbContext): Promise<void> {
     TRUNCATE
       match_changes, match_remote_versions, match_local_versions,
       match_overrides, match_referees, referee_assignment_intents,
-      referee_assignment_rules, referee_roles,
+      referee_assignment_rules, referee_roles, referee_games,
       referees, standings, matches, teams, venues, leagues,
       sync_run_entries, sync_runs, sync_schedule,
       domain_events, notifications, notification_log,
