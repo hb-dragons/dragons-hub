@@ -52,6 +52,11 @@ const navGroups = [
         labelKey: "nav.openAssignments" as const,
         perm: { resource: "assignment", action: "view" } as const,
       },
+      {
+        href: "/admin/referee/history",
+        labelKey: "nav.refereeHistory" as const,
+        perm: { resource: "assignment", action: "view" } as const,
+      },
     ],
   },
   {
