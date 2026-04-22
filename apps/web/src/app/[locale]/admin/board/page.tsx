@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { can } from "@dragons/shared";
+import { getServerSession } from "@/lib/auth-server";
 import { fetchAPIServer } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
@@ -8,6 +11,9 @@ import { CreateBoardButton } from "@/components/admin/board/create-board-button"
 import type { BoardData, TaskCardData } from "@/components/admin/board/types";
 
 export default async function BoardPage() {
+  const session = await getServerSession();
+  if (!can(session?.user ?? null, "settings", "view")) notFound();
+
   const t = await getTranslations();
   let boards: BoardData[] | null = null;
   let board: BoardData | null = null;

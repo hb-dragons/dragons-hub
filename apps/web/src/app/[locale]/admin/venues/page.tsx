@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { can } from "@dragons/shared";
+import { getServerSession } from "@/lib/auth-server";
 import { fetchAPIServer } from "@/lib/api.server"
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
@@ -7,6 +10,9 @@ import { VenueListTable } from "@/components/admin/venues/venue-list-table"
 import type { VenueListItem } from "@/components/admin/venues/types"
 
 export default async function VenuesPage() {
+  const session = await getServerSession();
+  if (!can(session?.user ?? null, "venue", "view")) notFound();
+
   const t = await getTranslations();
   let data: VenueListItem[] | null = null;
   let error: string | null = null;

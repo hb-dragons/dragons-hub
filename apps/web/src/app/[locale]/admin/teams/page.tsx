@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { can } from "@dragons/shared";
+import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { fetchAPIServer } from "@/lib/api.server";
 import { SWRConfig } from "swr";
@@ -13,6 +16,9 @@ interface OwnClubTeam {
 }
 
 export default async function TeamsPage() {
+  const session = await getServerSession();
+  if (!can(session?.user ?? null, "team", "view")) notFound();
+
   const t = await getTranslations();
   let teams: OwnClubTeam[] | null = null;
   let error: string | null = null;

@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { can } from "@dragons/shared";
+import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { fetchAPIServer } from "@/lib/api.server";
 import { SWRConfig } from "swr";
@@ -13,6 +16,9 @@ import type {
 } from "@/components/admin/settings/settings-provider";
 
 export default async function SettingsPage() {
+  const session = await getServerSession();
+  if (!can(session?.user ?? null, "settings", "view")) notFound();
+
   const t = await getTranslations();
   let clubConfig: ClubConfigType | null = null;
   let leaguesResponse: TrackedLeaguesResponse | null = null;

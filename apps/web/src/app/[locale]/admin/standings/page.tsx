@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { can } from "@dragons/shared";
+import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { fetchAPIServer } from "@/lib/api.server"
 import { SWRConfig } from "swr";
@@ -7,6 +10,9 @@ import { StandingsView } from "@/components/admin/standings/standings-view"
 import type { LeagueStandings } from "@/components/admin/standings/types"
 
 export default async function StandingsPage() {
+  const session = await getServerSession();
+  if (!can(session?.user ?? null, "standing", "view")) notFound();
+
   const t = await getTranslations();
   let data: LeagueStandings[] | null = null
   let error: string | null = null

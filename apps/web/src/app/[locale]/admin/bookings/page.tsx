@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { can } from "@dragons/shared";
+import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { fetchAPIServer } from "@/lib/api.server";
 import { SWRConfig } from "swr";
@@ -7,6 +10,9 @@ import { BookingListTable } from "@/components/admin/bookings/booking-list-table
 import type { BookingListItem } from "@/components/admin/bookings/types";
 
 export default async function BookingsPage() {
+  const session = await getServerSession();
+  if (!can(session?.user ?? null, "booking", "view")) notFound();
+
   const t = await getTranslations();
   let data: BookingListItem[] | null = null;
   let error: string | null = null;

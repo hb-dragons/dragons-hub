@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { can } from "@dragons/shared";
+import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { fetchAPIServer } from "@/lib/api.server"
 import { SWRConfig } from "swr";
@@ -7,6 +10,9 @@ import { MatchListTable } from "@/components/admin/matches/match-list-table"
 import type { PaginatedResponse, MatchListItem } from "@/components/admin/matches/types"
 
 export default async function MatchesPage() {
+  const session = await getServerSession();
+  if (!can(session?.user ?? null, "match", "view")) notFound();
+
   const t = await getTranslations();
   let data: PaginatedResponse<MatchListItem> | null = null
   let error: string | null = null
