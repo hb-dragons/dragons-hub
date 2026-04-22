@@ -5,7 +5,6 @@ import { fetchAPI } from "@/lib/api";
 import {
   summaryKey,
   gamesKey,
-  type HistoryFilterState,
   type HistoryFilterStateWithSearch,
 } from "@/components/referee/history/filter-state";
 import type {
@@ -13,17 +12,10 @@ import type {
   HistoryGameItem,
 } from "@dragons/shared";
 
-export type { HistoryFilterState } from "@/components/referee/history/filter-state";
-
-export function useRefereeHistorySummary(state: HistoryFilterState) {
+export function useRefereeHistorySummary(state: HistoryFilterStateWithSearch) {
   return useSWR<HistorySummaryResponse>(summaryKey(state), (url: string) =>
     fetchAPI<HistorySummaryResponse>(url),
   );
-}
-
-export interface HistoryGamesQueryState extends HistoryFilterStateWithSearch {
-  limit: number;
-  offset: number;
 }
 
 export interface HistoryGamesResponse {
@@ -34,8 +26,17 @@ export interface HistoryGamesResponse {
   hasMore: boolean;
 }
 
-export function useRefereeHistoryGames(state: HistoryGamesQueryState) {
-  const key = gamesKey(state, state.limit, state.offset);
+export function useRefereeHistoryGames(
+  state: HistoryFilterStateWithSearch,
+  override: Partial<{ refereeApiId: number; limit: number; offset: number }> = {},
+) {
+  const effective: HistoryFilterStateWithSearch = {
+    ...state,
+    ref: override.refereeApiId ?? state.ref,
+  };
+  const limit = override.limit ?? state.limit;
+  const offset = override.offset ?? state.offset;
+  const key = gamesKey(effective, limit, offset);
   return useSWR<HistoryGamesResponse>(key, (url: string) =>
     fetchAPI<HistoryGamesResponse>(url),
   );
