@@ -146,7 +146,22 @@
     },
     "games": {
       "title": "Games",
-      "empty": "No games in this range."
+      "empty": "No games in this range.",
+      "prev": "Prev",
+      "next": "Next",
+      "columns": {
+        "date": "Date",
+        "match": "Match",
+        "league": "League",
+        "sr1": "SR1",
+        "sr2": "SR2",
+        "status": "Status"
+      },
+      "statusCell": {
+        "cancelled": "Cancelled",
+        "forfeited": "Forfeited",
+        "played": "Played"
+      }
     },
     "range": {
       "source": {

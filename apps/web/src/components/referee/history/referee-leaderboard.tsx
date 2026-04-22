@@ -24,7 +24,7 @@ export function RefereeLeaderboard({ rows }: { rows: HistoryLeaderboardEntry[] }
           <tbody>
             {rows.map((r) => (
               <tr
-                key={`${r.refereeApiId ?? "name"}-${r.displayName}`}
+                key={`${r.refereeId ?? r.refereeApiId ?? r.displayName}`}
                 className="border-t"
               >
                 <td className="py-1 pr-4">

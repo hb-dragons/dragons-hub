@@ -26,12 +26,12 @@ export function HistoryGameList({ items, total, limit, offset, onPage }: Props) 
         <table className="w-full text-sm">
           <thead className="text-left text-muted-foreground">
             <tr>
-              <th className="py-2 pr-4">Date</th>
-              <th className="py-2 pr-4">Match</th>
-              <th className="py-2 pr-4">League</th>
-              <th className="py-2 pr-4">SR1</th>
-              <th className="py-2 pr-4">SR2</th>
-              <th className="py-2 pr-4">Status</th>
+              <th className="py-2 pr-4">{t("columns.date")}</th>
+              <th className="py-2 pr-4">{t("columns.match")}</th>
+              <th className="py-2 pr-4">{t("columns.league")}</th>
+              <th className="py-2 pr-4">{t("columns.sr1")}</th>
+              <th className="py-2 pr-4">{t("columns.sr2")}</th>
+              <th className="py-2 pr-4">{t("columns.status")}</th>
             </tr>
           </thead>
           <tbody>
@@ -47,7 +47,11 @@ export function HistoryGameList({ items, total, limit, offset, onPage }: Props) 
                 <td className="py-1 pr-4">{g.sr1Name ?? "—"}</td>
                 <td className="py-1 pr-4">{g.sr2Name ?? "—"}</td>
                 <td className="py-1 pr-4">
-                  {g.isCancelled ? "cancelled" : g.isForfeited ? "forfeited" : "played"}
+                  {g.isCancelled
+                    ? t("statusCell.cancelled")
+                    : g.isForfeited
+                      ? t("statusCell.forfeited")
+                      : t("statusCell.played")}
                 </td>
               </tr>
             ))}
@@ -65,7 +69,7 @@ export function HistoryGameList({ items, total, limit, offset, onPage }: Props) 
             disabled={offset === 0}
             onClick={() => onPage(Math.max(0, offset - limit))}
           >
-            Prev
+            {t("prev")}
           </Button>
           <Button
             variant="outline"
@@ -73,7 +77,7 @@ export function HistoryGameList({ items, total, limit, offset, onPage }: Props) 
             disabled={offset + items.length >= total}
             onClick={() => onPage(offset + limit)}
           >
-            Next
+            {t("next")}
           </Button>
         </div>
       </div>

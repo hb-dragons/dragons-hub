@@ -146,7 +146,22 @@
     },
     "games": {
       "title": "Spiele",
-      "empty": "Keine Spiele im gewählten Zeitraum."
+      "empty": "Keine Spiele im gewählten Zeitraum.",
+      "prev": "Zurück",
+      "next": "Weiter",
+      "columns": {
+        "date": "Datum",
+        "match": "Spiel",
+        "league": "Liga",
+        "sr1": "SR1",
+        "sr2": "SR2",
+        "status": "Status"
+      },
+      "statusCell": {
+        "cancelled": "Abgesagt",
+        "forfeited": "Verzicht",
+        "played": "Gespielt"
+      }
     },
     "range": {
       "source": {

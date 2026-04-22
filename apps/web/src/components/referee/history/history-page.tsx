@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -33,7 +33,10 @@ export function HistoryPage() {
   const t = useTranslations("refereeHistory");
 
   const [offset, setOffset] = useState(0);
-  const filterState = parseState(new URLSearchParams(params.toString()));
+  const filterState = useMemo(
+    () => parseState(new URLSearchParams(params.toString())),
+    [params],
+  );
 
   const setParams = useCallback(
     (patch: Partial<HistoryFilterState & { search?: string }>) => {

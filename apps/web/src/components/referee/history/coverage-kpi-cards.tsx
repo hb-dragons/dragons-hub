@@ -21,19 +21,19 @@ export function CoverageKPICards({
 }: { kpis: HistoryKpis; mode: HistoryMode }) {
   const t = useTranslations("refereeHistory.kpi");
 
-  const cards: Array<[string, number | string, ("default" | "warn")?]> = [
-    [t("games"), kpis.games],
-    [t("distinctReferees"), kpis.distinctReferees],
-    [t("cancelled"), kpis.cancelled],
-    [t("forfeited"), kpis.forfeited],
+  const cards: Array<[string, number | string, "default" | "warn" | undefined]> = [
+    [t("games"), kpis.games, undefined],
+    [t("distinctReferees"), kpis.distinctReferees, undefined],
+    [t("cancelled"), kpis.cancelled, undefined],
+    [t("forfeited"), kpis.forfeited, undefined],
   ];
   if (mode === "obligation") {
-    cards.push([t("obligatedSlots"), kpis.obligatedSlots ?? 0]);
-    cards.push([t("filledSlots"), kpis.filledSlots ?? 0]);
+    cards.push([t("obligatedSlots"), kpis.obligatedSlots ?? 0, undefined]);
+    cards.push([t("filledSlots"), kpis.filledSlots ?? 0, undefined]);
     cards.push([
       t("unfilledSlots"),
       kpis.unfilledSlots ?? 0,
-      (kpis.unfilledSlots ?? 0) > 0 ? "warn" : "default",
+      (kpis.unfilledSlots ?? 0) > 0 ? "warn" : undefined,
     ]);
   }
 
