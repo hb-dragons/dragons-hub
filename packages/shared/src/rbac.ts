@@ -31,7 +31,6 @@ export const refereeAdmin = ac.newRole({
   assignment: ["view", "create", "update", "delete", "claim", "release"],
   match:      ["view"],
   team:       ["view"],
-  sync:       ["view", "trigger"],
 });
 
 export const venueManager = ac.newRole({

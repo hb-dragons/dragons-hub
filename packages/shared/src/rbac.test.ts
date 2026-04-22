@@ -51,6 +51,8 @@ describe("can", () => {
     ["refereeAdmin", "match", "update", false],
     ["refereeAdmin", "team", "view", true],
     ["refereeAdmin", "team", "manage", false],
+    ["refereeAdmin", "sync", "view", false],
+    ["refereeAdmin", "sync", "trigger", false],
     ["refereeAdmin", "venue", "view", false],
     ["venueManager", "venue", "create", true],
     ["venueManager", "booking", "delete", true],

@@ -1,4 +1,7 @@
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
+import { can } from "@dragons/shared";
+import { getServerSession } from "@/lib/auth-server";
 import { fetchAPIServer } from "@/lib/api.server";
 import {
   Tabs,
@@ -25,6 +28,9 @@ import type {
 } from "@/components/admin/sync/types";
 
 export default async function SyncPage() {
+  const session = await getServerSession();
+  if (!can(session?.user ?? null, "sync", "view")) notFound();
+
   const t = await getTranslations();
   let status: SyncStatusResponse | null = null;
   let logs: PaginatedResponse<SyncRun> | null = null;
