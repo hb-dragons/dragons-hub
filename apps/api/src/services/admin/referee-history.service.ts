@@ -126,7 +126,72 @@ export async function getRefereeHistorySummary(
         distinctReferees: 0,
       };
 
-  const leaderboard: HistoryLeaderboardEntry[] = []; // Task 6
+  const leaderboardRows = await db.execute(sql`
+    WITH appearances AS (
+      SELECT
+        ${refereeGames.sr1RefereeApiId} AS api_id,
+        ${refereeGames.sr1Name} AS raw_name,
+        1 AS sr1, 0 AS sr2,
+        ${refereeGames.kickoffDate} AS kickoff_date
+      FROM ${refereeGames}
+      WHERE ${where}
+        AND (${refereeGames.sr1RefereeApiId} IS NOT NULL OR ${refereeGames.sr1Name} IS NOT NULL)
+      UNION ALL
+      SELECT
+        ${refereeGames.sr2RefereeApiId},
+        ${refereeGames.sr2Name},
+        0, 1,
+        ${refereeGames.kickoffDate}
+      FROM ${refereeGames}
+      WHERE ${where}
+        AND (${refereeGames.sr2RefereeApiId} IS NOT NULL OR ${refereeGames.sr2Name} IS NOT NULL)
+    )
+    SELECT
+      a.api_id::int AS "apiId",
+      COALESCE(a.api_id::text, a.raw_name) AS group_key,
+      MAX(a.raw_name) AS "rawName",
+      SUM(a.sr1)::int AS "sr1Count",
+      SUM(a.sr2)::int AS "sr2Count",
+      (SUM(a.sr1) + SUM(a.sr2))::int AS total,
+      MAX(a.kickoff_date)::text AS "lastRefereedDate",
+      r.id AS "refereeId",
+      r.first_name AS "firstName",
+      r.last_name  AS "lastName",
+      COALESCE(r.is_own_club, false) AS "isOwnClub"
+    FROM appearances a
+    LEFT JOIN ${referees} r ON r.api_id = a.api_id
+    GROUP BY group_key, a.api_id, r.id, r.first_name, r.last_name, r.is_own_club
+    ORDER BY total DESC, "lastRefereedDate" DESC NULLS LAST
+    LIMIT 100
+  `);
 
-  return { range, kpis, leaderboard };
+  const leaderboard: HistoryLeaderboardEntry[] = (
+    leaderboardRows.rows as Array<{
+      apiId: number | null;
+      rawName: string | null;
+      refereeId: number | null;
+      firstName: string | null;
+      lastName: string | null;
+      isOwnClub: boolean;
+      sr1Count: number;
+      sr2Count: number;
+      total: number;
+      lastRefereedDate: string | null;
+    }>
+  ).map((r) => ({
+    refereeApiId: r.apiId,
+    refereeId: r.refereeId,
+    displayName:
+      r.lastName || r.firstName
+        ? `${r.lastName ?? ""}${r.firstName ? ", " + r.firstName : ""}`.trim()
+        : r.rawName ?? "",
+    isOwnClub: !!r.isOwnClub,
+    sr1Count: r.sr1Count,
+    sr2Count: r.sr2Count,
+    total: r.total,
+    lastRefereedDate: r.lastRefereedDate,
+  }));
+
+  const finalKpis = { ...kpis, distinctReferees: leaderboard.length };
+  return { range, kpis: finalKpis, leaderboard };
 }

@@ -197,3 +197,80 @@ describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
     });
   });
 });
+
+describe("getRefereeHistorySummary leaderboard", () => {
+  beforeEach(async () => { await seedReferees(); });
+
+  it("counts sr1/sr2 per referee, joining own-club names", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, kickoffDate: "2025-09-15",
+        sr1RefereeApiId: 100, sr2RefereeApiId: 101 }),
+      baseGame({ apiMatchId: 2, kickoffDate: "2025-10-01",
+        sr1RefereeApiId: 100, sr2RefereeApiId: 100 }),
+      baseGame({ apiMatchId: 3, kickoffDate: "2025-10-02",
+        sr1RefereeApiId: 200, sr2RefereeApiId: 101,
+        sr1Name: "Guest, Carl", sr2Name: "Own, Ben" }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      mode: "obligation", status: "all",
+      dateFrom: "2025-08-01", dateTo: "2026-07-31",
+    });
+
+    const anna  = res.leaderboard.find((e) => e.refereeApiId === 100);
+    const ben   = res.leaderboard.find((e) => e.refereeApiId === 101);
+    const carl  = res.leaderboard.find((e) => e.refereeApiId === 200);
+
+    expect(anna).toEqual(expect.objectContaining({
+      sr1Count: 2, sr2Count: 1, total: 3, isOwnClub: true,
+      displayName: "Own, Anna", refereeId: expect.any(Number),
+      lastRefereedDate: "2025-10-01",
+    }));
+    expect(ben).toEqual(expect.objectContaining({
+      sr1Count: 0, sr2Count: 2, total: 2, isOwnClub: true,
+    }));
+    expect(carl).toEqual(expect.objectContaining({
+      sr1Count: 1, sr2Count: 0, total: 1, isOwnClub: false,
+      displayName: "Guest, Carl",
+    }));
+    expect(res.kpis.distinctReferees).toBe(3);
+    // total desc sort
+    expect(res.leaderboard.map((e) => e.refereeApiId)).toEqual([100, 101, 200]);
+  });
+
+  it("falls back to stored name when apiId is null", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, kickoffDate: "2025-09-15",
+        sr1RefereeApiId: null, sr2RefereeApiId: null,
+        sr1Name: "Unknown, X", sr2Name: "Unknown, Y" }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      mode: "obligation", status: "all",
+      dateFrom: "2025-08-01", dateTo: "2026-07-31",
+    });
+
+    const x = res.leaderboard.find((e) => e.displayName === "Unknown, X");
+    expect(x).toEqual(expect.objectContaining({
+      refereeApiId: null, refereeId: null,
+      isOwnClub: false, sr1Count: 1, sr2Count: 0, total: 1,
+    }));
+  });
+
+  it("caps leaderboard at 100 entries", async () => {
+    const rows = Array.from({ length: 110 }, (_, i) => baseGame({
+      apiMatchId: 10_000 + i,
+      kickoffDate: "2025-09-15",
+      sr1RefereeApiId: null, sr2RefereeApiId: null,
+      sr1Name: `Ref ${i}, A`, sr2Name: `Ref ${i}, B`,
+    }));
+    await ctx.db.insert(refereeGames).values(rows);
+
+    const res = await getRefereeHistorySummary({
+      mode: "obligation", status: "all",
+      dateFrom: "2025-08-01", dateTo: "2026-07-31",
+    });
+
+    expect(res.leaderboard.length).toBe(100);
+  });
+});
