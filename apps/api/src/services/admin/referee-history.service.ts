@@ -1,12 +1,16 @@
 import { db } from "../../config/database";
 import { appSettings, referees, refereeGames } from "@dragons/db/schema";
-import { and, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import type {
   HistoryDateRange,
+  HistoryGameItem,
   HistorySummaryResponse,
   HistoryLeaderboardEntry,
 } from "@dragons/shared";
-import type { HistoryFilterParams } from "../../routes/admin/referee-history.schemas";
+import type {
+  HistoryFilterParams,
+  HistoryGamesQueryParams,
+} from "../../routes/admin/referee-history.schemas";
 
 export async function resolveHistoryDateRange(
   from?: string,
@@ -194,4 +198,71 @@ export async function getRefereeHistorySummary(
 
   const finalKpis = { ...kpis, distinctReferees: leaderboard.length };
   return { range, kpis: finalKpis, leaderboard };
+}
+
+export async function getRefereeHistoryGames(
+  params: HistoryGamesQueryParams,
+): Promise<{
+  items: HistoryGameItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}> {
+  const range = await resolveHistoryDateRange(params.dateFrom, params.dateTo);
+  const baseWhere = buildBaseWhere(params, range.from, range.to);
+
+  const conds = [baseWhere];
+  if (params.search) {
+    const words = params.search.split(/\s+/).filter(Boolean);
+    for (const word of words) {
+      const p = `%${word}%`;
+      conds.push(or(
+        ilike(refereeGames.homeTeamName, p),
+        ilike(refereeGames.guestTeamName, p),
+        ilike(refereeGames.leagueName, p),
+      )!);
+    }
+  }
+  const where = and(...conds)!;
+
+  const columns = {
+    id: refereeGames.id,
+    matchId: refereeGames.matchId,
+    matchNo: refereeGames.matchNo,
+    kickoffDate: refereeGames.kickoffDate,
+    kickoffTime: refereeGames.kickoffTime,
+    homeTeamName: refereeGames.homeTeamName,
+    guestTeamName: refereeGames.guestTeamName,
+    leagueName: refereeGames.leagueName,
+    leagueShort: refereeGames.leagueShort,
+    venueName: refereeGames.venueName,
+    venueCity: refereeGames.venueCity,
+    sr1OurClub: refereeGames.sr1OurClub,
+    sr2OurClub: refereeGames.sr2OurClub,
+    sr1Name: refereeGames.sr1Name,
+    sr2Name: refereeGames.sr2Name,
+    sr1Status: refereeGames.sr1Status,
+    sr2Status: refereeGames.sr2Status,
+    isCancelled: refereeGames.isCancelled,
+    isForfeited: refereeGames.isForfeited,
+    isHomeGame: refereeGames.isHomeGame,
+  };
+
+  const [items, countResult] = await Promise.all([
+    db.select(columns).from(refereeGames).where(where)
+      .orderBy(desc(refereeGames.kickoffDate), desc(refereeGames.kickoffTime))
+      .limit(params.limit).offset(params.offset),
+    db.select({ count: sql<number>`count(*)::int` })
+      .from(refereeGames).where(where),
+  ]);
+
+  const total = countResult[0]?.count ?? 0;
+  return {
+    items: items as HistoryGameItem[],
+    total,
+    limit: params.limit,
+    offset: params.offset,
+    hasMore: params.offset + items.length < total,
+  };
 }

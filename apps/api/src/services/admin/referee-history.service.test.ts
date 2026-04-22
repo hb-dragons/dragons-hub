@@ -16,7 +16,11 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
-import { resolveHistoryDateRange, getRefereeHistorySummary } from "./referee-history.service";
+import {
+  resolveHistoryDateRange,
+  getRefereeHistorySummary,
+  getRefereeHistoryGames,
+} from "./referee-history.service";
 import { appSettings, referees, refereeGames } from "@dragons/db/schema";
 import {
   setupTestDb, resetTestDb, closeTestDb, type TestDbContext,
@@ -272,5 +276,61 @@ describe("getRefereeHistorySummary leaderboard", () => {
     });
 
     expect(res.leaderboard.length).toBe(100);
+  });
+});
+
+describe("getRefereeHistoryGames", () => {
+  beforeEach(async () => { await seedReferees(); });
+
+  it("returns paginated list sorted by kickoffDate desc", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, kickoffDate: "2025-09-01", kickoffTime: "18:00:00" }),
+      baseGame({ apiMatchId: 2, kickoffDate: "2025-10-05", kickoffTime: "20:00:00" }),
+      baseGame({ apiMatchId: 3, kickoffDate: "2025-10-05", kickoffTime: "17:00:00" }),
+    ]);
+    const res = await getRefereeHistoryGames({
+      mode: "obligation", status: "all",
+      dateFrom: "2025-08-01", dateTo: "2026-07-31",
+      limit: 50, offset: 0,
+    });
+    expect(res.total).toBe(3);
+    expect(res.hasMore).toBe(false);
+    expect(res.items.map((i) => i.kickoffDate + " " + i.kickoffTime)).toEqual([
+      "2025-10-05 20:00:00",
+      "2025-10-05 17:00:00",
+      "2025-09-01 18:00:00",
+    ]);
+  });
+
+  it("respects limit/offset with hasMore", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, kickoffDate: "2025-09-01" }),
+      baseGame({ apiMatchId: 2, kickoffDate: "2025-10-01" }),
+      baseGame({ apiMatchId: 3, kickoffDate: "2025-11-01" }),
+    ]);
+    const res = await getRefereeHistoryGames({
+      mode: "obligation", status: "all",
+      dateFrom: "2025-08-01", dateTo: "2026-07-31",
+      limit: 2, offset: 0,
+    });
+    expect(res.items.length).toBe(2);
+    expect(res.hasMore).toBe(true);
+    expect(res.total).toBe(3);
+  });
+
+  it("applies search on team + league names", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, homeTeamName: "Dragons", guestTeamName: "Bears" }),
+      baseGame({ apiMatchId: 2, homeTeamName: "Wolves",  guestTeamName: "Eagles" }),
+      baseGame({ apiMatchId: 3, homeTeamName: "Owls",    guestTeamName: "Hawks",
+        leagueName: "Oberliga" }),
+    ]);
+    const res = await getRefereeHistoryGames({
+      mode: "obligation", status: "all",
+      dateFrom: "2025-08-01", dateTo: "2026-07-31",
+      limit: 50, offset: 0, search: "drag",
+    });
+    expect(res.items.length).toBe(1);
+    expect(res.items[0]!.homeTeamName).toBe("Dragons");
   });
 });
