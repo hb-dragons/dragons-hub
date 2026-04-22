@@ -102,6 +102,59 @@
     "syncTriggered": "Referee sync started",
     "syncFailed": "Referee sync failed"
   },
+  "refereeHistory": {
+    "title": "Referee History",
+    "mode": {
+      "label": "Lens",
+      "obligation": "Obligation",
+      "activity": "Activity"
+    },
+    "status": {
+      "label": "Status",
+      "all": "All",
+      "active": "Played",
+      "cancelled": "Cancelled",
+      "forfeited": "Forfeited"
+    },
+    "filters": {
+      "dateFrom": "From",
+      "dateTo": "To",
+      "league": "League",
+      "search": "Search team or league",
+      "reset": "Reset"
+    },
+    "kpi": {
+      "games": "Games",
+      "obligatedSlots": "Obligated slots",
+      "filledSlots": "Filled slots",
+      "unfilledSlots": "Unfilled slots",
+      "cancelled": "Cancelled",
+      "forfeited": "Forfeited",
+      "distinctReferees": "Distinct referees",
+      "unfilledWarning": "Past games with unfilled slots indicate a data issue."
+    },
+    "leaderboard": {
+      "title": "Referee leaderboard",
+      "name": "Name",
+      "ownClub": "Own club",
+      "guest": "Guest",
+      "sr1": "SR1",
+      "sr2": "SR2",
+      "total": "Total",
+      "lastRefereed": "Last refereed"
+    },
+    "games": {
+      "title": "Games",
+      "empty": "No games in this range."
+    },
+    "range": {
+      "source": {
+        "user": "Custom range",
+        "settings": "Current season",
+        "default": "Current season (fallback)"
+      }
+    }
+  },
   "common": {
     "save": "Save",
     "saving": "Saving...",

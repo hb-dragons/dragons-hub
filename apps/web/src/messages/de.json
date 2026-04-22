@@ -102,6 +102,59 @@
     "syncTriggered": "SR-Synchronisation gestartet",
     "syncFailed": "SR-Synchronisation fehlgeschlagen"
   },
+  "refereeHistory": {
+    "title": "Schiedsrichter-Historie",
+    "mode": {
+      "label": "Sicht",
+      "obligation": "Verpflichtung",
+      "activity": "Einsätze"
+    },
+    "status": {
+      "label": "Status",
+      "all": "Alle",
+      "active": "Gespielt",
+      "cancelled": "Abgesagt",
+      "forfeited": "Verzicht"
+    },
+    "filters": {
+      "dateFrom": "Von",
+      "dateTo": "Bis",
+      "league": "Liga",
+      "search": "Team oder Liga suchen",
+      "reset": "Zurücksetzen"
+    },
+    "kpi": {
+      "games": "Spiele",
+      "obligatedSlots": "Pflicht-Slots",
+      "filledSlots": "Besetzt",
+      "unfilledSlots": "Unbesetzt",
+      "cancelled": "Abgesagt",
+      "forfeited": "Verzicht",
+      "distinctReferees": "Schiedsrichter",
+      "unfilledWarning": "Vergangene Spiele mit offenen Slots deuten auf Datenprobleme hin."
+    },
+    "leaderboard": {
+      "title": "Schiedsrichter-Rangliste",
+      "name": "Name",
+      "ownClub": "Eigener Verein",
+      "guest": "Gast",
+      "sr1": "SR1",
+      "sr2": "SR2",
+      "total": "Gesamt",
+      "lastRefereed": "Zuletzt gepfiffen"
+    },
+    "games": {
+      "title": "Spiele",
+      "empty": "Keine Spiele im gewählten Zeitraum."
+    },
+    "range": {
+      "source": {
+        "user": "Eigener Zeitraum",
+        "settings": "Aktuelle Saison",
+        "default": "Aktuelle Saison (Fallback)"
+      }
+    }
+  },
   "common": {
     "save": "Speichern",
     "saving": "Speichere...",
