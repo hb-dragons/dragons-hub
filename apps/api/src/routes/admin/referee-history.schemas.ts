@@ -41,7 +41,7 @@ export const historyFilterSchema = z.object({
 
 export const historyGamesQuerySchema = historyFilterSchema.extend({
   search: z.string().trim().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(5000).default(50),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   refereeApiId: z.coerce.number().int().positive().optional(),
 });

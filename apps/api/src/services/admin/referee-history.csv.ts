@@ -11,6 +11,13 @@ function escape(field: string): string {
 }
 
 export function toCsv(headers: string[], rows: string[][]): string {
+  for (const r of rows) {
+    if (r.length !== headers.length) {
+      throw new Error(
+        `CSV row length ${r.length} does not match header length ${headers.length}`,
+      );
+    }
+  }
   const lines = [headers.map(escape).join(",")];
   for (const r of rows) lines.push(r.map(escape).join(","));
   return lines.join("\r\n") + "\r\n";

@@ -23,7 +23,7 @@ vi.mock("../../middleware/rbac", () => ({
 }));
 
 vi.mock("../../config/logger", () => ({
-  logger: { error: vi.fn() },
+  logger: { error: vi.fn(), warn: vi.fn() },
 }));
 
 // --- Imports (after mocks) ---
@@ -148,7 +148,7 @@ describe("GET /referee/history/games", () => {
   });
 
   it("returns 400 on limit exceeding max", async () => {
-    const res = await app.request("/referee/history/games?limit=5001");
+    const res = await app.request("/referee/history/games?limit=501");
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
@@ -220,5 +220,32 @@ describe("GET /referee/history/games.csv", () => {
     );
     const body = await res.text();
     expect(body.split("\r\n")[0]).toContain("kickoffDate");
+  });
+
+  it("sets X-Result-Truncated when page has more results", async () => {
+    mocks.getRefereeHistoryGames.mockResolvedValue({
+      items: [],
+      total: 2500,
+      limit: 1000,
+      offset: 0,
+      hasMore: true,
+    });
+    const res = await app.request(
+      "/referee/history/games.csv?dateFrom=2025-08-01&dateTo=2026-07-31",
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Total-Count")).toBe("2500");
+    expect(res.headers.get("X-Result-Truncated")).toBe("true");
+  });
+
+  it("omits X-Result-Truncated when full result fits", async () => {
+    mocks.getRefereeHistoryGames.mockResolvedValue({
+      items: [], total: 5, limit: 1000, offset: 0, hasMore: false,
+    });
+    const res = await app.request(
+      "/referee/history/games.csv?dateFrom=2025-08-01&dateTo=2026-07-31",
+    );
+    expect(res.headers.get("X-Total-Count")).toBe("5");
+    expect(res.headers.get("X-Result-Truncated")).toBeNull();
   });
 });

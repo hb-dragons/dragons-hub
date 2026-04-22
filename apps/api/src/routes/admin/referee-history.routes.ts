@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { requirePermission } from "../../middleware/rbac";
+import { logger } from "../../config/logger";
 import type { AppEnv } from "../../types";
 import {
   getRefereeHistorySummary,
@@ -81,20 +82,40 @@ adminRefereeHistoryRoutes.get(
       status: c.req.query("status"),
       search: c.req.query("search"),
       refereeApiId: c.req.query("refereeApiId"),
-      limit: "1000",
-      offset: "0",
+      // CSV always exports a full page; override after validation.
+      // If the dataset exceeds this cap, `page.hasMore` drives the truncation header.
     });
-    const page = await getRefereeHistoryGames(parsed);
-    const csv = toCsv(GAMES_CSV_HEADERS, gamesToCsvRows(page.items));
+    const CSV_MAX_ROWS = 1000;
+    const page = await getRefereeHistoryGames({
+      ...parsed,
+      limit: CSV_MAX_ROWS,
+      offset: 0,
+    });
+    if (page.hasMore) {
+      logger.warn(
+        {
+          total: page.total,
+          returned: page.items.length,
+          dateFrom: parsed.dateFrom,
+          dateTo: parsed.dateTo,
+        },
+        "CSV export truncated — consider paginating or widening limit",
+      );
+    }
+    const BOM = "﻿";
+    const csv = BOM + toCsv(GAMES_CSV_HEADERS, gamesToCsvRows(page.items));
     const from = parsed.dateFrom ?? "range";
     const to = parsed.dateTo ?? "range";
-    return new Response(csv, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition":
-          `attachment; filename="referee-history-games-${from}-${to}.csv"`,
-      },
-    });
+    const headers: Record<string, string> = {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition":
+        `attachment; filename="referee-history-games-${from}-${to}.csv"`,
+      "X-Total-Count": String(page.total),
+    };
+    if (page.hasMore) {
+      headers["X-Result-Truncated"] = "true";
+    }
+    return new Response(csv, { headers });
   },
 );
 

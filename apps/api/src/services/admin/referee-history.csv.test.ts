@@ -17,6 +17,10 @@ describe("toCsv", () => {
     const csv = toCsv(["h1", "h2"], []);
     expect(csv).toBe("h1,h2\r\n");
   });
+
+  it("throws when row length does not match header length", () => {
+    expect(() => toCsv(["a", "b"], [["1"]])).toThrow(/row length/);
+  });
 });
 
 describe("gamesToCsvRows", () => {
