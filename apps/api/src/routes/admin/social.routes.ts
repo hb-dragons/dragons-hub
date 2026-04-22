@@ -21,11 +21,11 @@ import { requirePermission } from "../../middleware/rbac";
 import type { AppEnv } from "../../types";
 
 const socialRoutes = new Hono<AppEnv>();
-socialRoutes.use("*", requirePermission("settings", "update"));
+const settingsUpdate = requirePermission("settings", "update");
 
 // --- Matches ---
 
-socialRoutes.get("/matches", async (c) => {
+socialRoutes.get("/matches", settingsUpdate, async (c) => {
   const query = matchesQuerySchema.safeParse(c.req.query());
   if (!query.success) return c.json({ error: query.error.flatten() }, 400);
   const matches = await getWeekendMatches(query.data);
@@ -34,12 +34,12 @@ socialRoutes.get("/matches", async (c) => {
 
 // --- Player Photos ---
 
-socialRoutes.get("/player-photos", async (c) => {
+socialRoutes.get("/player-photos", settingsUpdate, async (c) => {
   const photos = await listPlayerPhotos();
   return c.json(photos);
 });
 
-socialRoutes.get("/player-photos/:id/image", async (c) => {
+socialRoutes.get("/player-photos/:id/image", settingsUpdate, async (c) => {
   const { id } = idParamSchema.parse(c.req.param());
   const photo = await getPlayerPhotoById(id);
   if (!photo) return c.json({ error: "Not found" }, 404);
@@ -55,7 +55,7 @@ socialRoutes.get("/player-photos/:id/image", async (c) => {
   });
 });
 
-socialRoutes.post("/player-photos", async (c) => {
+socialRoutes.post("/player-photos", settingsUpdate, async (c) => {
   const body = await c.req.parseBody();
   const file = body["file"];
   if (!(file instanceof File)) return c.json({ error: "File is required" }, 400);
@@ -68,7 +68,7 @@ socialRoutes.post("/player-photos", async (c) => {
   }
 });
 
-socialRoutes.delete("/player-photos/:id", async (c) => {
+socialRoutes.delete("/player-photos/:id", settingsUpdate, async (c) => {
   const { id } = idParamSchema.parse(c.req.param());
   const record = await deletePlayerPhoto(id);
   if (!record) return c.json({ error: "Not found" }, 404);
@@ -77,12 +77,12 @@ socialRoutes.delete("/player-photos/:id", async (c) => {
 
 // --- Backgrounds ---
 
-socialRoutes.get("/backgrounds", async (c) => {
+socialRoutes.get("/backgrounds", settingsUpdate, async (c) => {
   const backgrounds = await listBackgrounds();
   return c.json(backgrounds);
 });
 
-socialRoutes.get("/backgrounds/:id/image", async (c) => {
+socialRoutes.get("/backgrounds/:id/image", settingsUpdate, async (c) => {
   const { id } = idParamSchema.parse(c.req.param());
   const bg = await getBackgroundById(id);
   if (!bg) return c.json({ error: "Not found" }, 404);
@@ -96,7 +96,7 @@ socialRoutes.get("/backgrounds/:id/image", async (c) => {
   });
 });
 
-socialRoutes.post("/backgrounds", async (c) => {
+socialRoutes.post("/backgrounds", settingsUpdate, async (c) => {
   const body = await c.req.parseBody();
   const file = body["file"];
   if (!(file instanceof File)) return c.json({ error: "File is required" }, 400);
@@ -109,14 +109,14 @@ socialRoutes.post("/backgrounds", async (c) => {
   }
 });
 
-socialRoutes.delete("/backgrounds/:id", async (c) => {
+socialRoutes.delete("/backgrounds/:id", settingsUpdate, async (c) => {
   const { id } = idParamSchema.parse(c.req.param());
   const record = await deleteBackground(id);
   if (!record) return c.json({ error: "Not found" }, 404);
   return c.json({ success: true });
 });
 
-socialRoutes.patch("/backgrounds/:id/default", async (c) => {
+socialRoutes.patch("/backgrounds/:id/default", settingsUpdate, async (c) => {
   const { id } = idParamSchema.parse(c.req.param());
   const bg = await getBackgroundById(id);
   if (!bg) return c.json({ error: "Not found" }, 404);
@@ -126,7 +126,7 @@ socialRoutes.patch("/backgrounds/:id/default", async (c) => {
 
 // --- Generate ---
 
-socialRoutes.post("/generate", async (c) => {
+socialRoutes.post("/generate", settingsUpdate, async (c) => {
   const body = generateBodySchema.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: body.error.flatten() }, 400);
 
