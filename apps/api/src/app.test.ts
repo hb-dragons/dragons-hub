@@ -185,32 +185,33 @@ describe("Bull Board admin gate", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns 403 when authenticated user lacks settings:update", async () => {
+  it("returns 403 when user does not hold the admin role", async () => {
     mockGetSession.mockResolvedValue({
-      user: { id: "u1", role: null },
+      user: { id: "u1", role: "refereeAdmin" },
       session: { id: "s1" },
     });
-    mockUserHasPermission.mockResolvedValue({ success: false });
     const response = await app.request("/admin/queues");
     expect(response.status).toBe(403);
   });
 
-  it("passes middleware when user has settings:update (admin)", async () => {
+  it("returns 403 when user has no role at all", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: null },
+      session: { id: "s1" },
+    });
+    const response = await app.request("/admin/queues");
+    expect(response.status).toBe(403);
+  });
+
+  it("passes middleware when user has the admin role", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: "admin" },
       session: { id: "s1" },
     });
-    mockUserHasPermission.mockResolvedValue({ success: true });
     const response = await app.request("/admin/queues");
     // The mocked Bull Board plugin returns an empty Hono app, which yields 404
     // for unmatched paths. What matters is that we got past the 401/403 gate.
     expect(response.status).not.toBe(401);
     expect(response.status).not.toBe(403);
-    expect(mockUserHasPermission).toHaveBeenCalledWith({
-      body: {
-        userId: "u1",
-        permissions: { settings: ["update"] },
-      },
-    });
   });
 });

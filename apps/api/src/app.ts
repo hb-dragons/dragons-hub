@@ -5,7 +5,7 @@ import { Scalar } from "@scalar/hono-api-reference";
 import { errorHandler } from "./middleware/error";
 import { corsMiddleware } from "./middleware/cors";
 import { requestLogger } from "./middleware/request-logger";
-import { requireAuth, requirePermission } from "./middleware/rbac";
+import { requireAuth, requireAnyRole } from "./middleware/rbac";
 import { auth } from "./config/auth";
 import { openApiSpec } from "./config/openapi";
 import { routes } from "./routes/index";
@@ -39,9 +39,9 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 // Require authentication on all admin routes; per-route guards check granular permissions.
 app.use("/admin/*", requireAuth);
 
-// Bull Board queue dashboard: admin-only (settings:update is admin-only in v1).
-// Must come before the route mount so the middleware runs first.
-app.use("/admin/queues/*", requirePermission("settings", "update"));
+// Bull Board queue dashboard: admin role only. Must come before the route
+// mount so the middleware runs first.
+app.use("/admin/queues/*", requireAnyRole("admin"));
 app.route("/admin/queues", serverAdapter.registerPlugin());
 app.route("/", routes);
 app.get("/", (c) => c.json({ service: "api", message: "Hello from Hono" }));
