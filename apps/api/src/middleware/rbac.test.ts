@@ -16,6 +16,7 @@ vi.mock("../config/auth", () => ({
 
 import {
   requireAuth,
+  requireAnyRole,
   requirePermission,
   assertPermission,
   requireRefereeSelf,
@@ -46,6 +47,68 @@ describe("requireAuth", () => {
     });
     const res = await app.request("/protected/ping");
     expect(res.status).toBe(200);
+  });
+});
+
+// --- requireAnyRole ---
+describe("requireAnyRole", () => {
+  const app = new Hono();
+  app.use("/adm/*", requireAnyRole("admin"));
+  app.get("/adm/panel", (c) => c.json({ ok: true }));
+
+  it("returns 401 when no session", async () => {
+    mockGetSession.mockResolvedValue(null);
+    const res = await app.request("/adm/panel");
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when user has no role", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: null },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/adm/panel");
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when user holds only non-matching roles", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "refereeAdmin,teamManager" },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/adm/panel");
+    expect(res.status).toBe(403);
+  });
+
+  it("passes when user holds the required role", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "admin" },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/adm/panel");
+    expect(res.status).toBe(200);
+  });
+
+  it("passes when user holds one of several accepted roles", async () => {
+    const multi = new Hono();
+    multi.use("/m/*", requireAnyRole("admin", "refereeAdmin"));
+    multi.get("/m/x", (c) => c.json({ ok: true }));
+
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "refereeAdmin" },
+      session: { id: "s1" },
+    });
+    const res = await multi.request("/m/x");
+    expect(res.status).toBe(200);
+  });
+
+  it("does not call userHasPermission", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "admin" },
+      session: { id: "s1" },
+    });
+    await app.request("/adm/panel");
+    expect(mockUserHasPermission).not.toHaveBeenCalled();
   });
 });
 
@@ -249,5 +312,18 @@ describe("requireRefereeSelfOrPermission", () => {
     });
     const res = await app.request("/either/games");
     expect(res.status).toBe(403);
+  });
+
+  // Permission wins over identity. An admin who also happens to be linked as
+  // a referee gets the full admin scope (refereeId unset) so downstream
+  // services don't silently narrow their query to that referee.
+  it("does not set refereeId when user has both permission and refereeId", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "admin", refereeId: 42 },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/either/games");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ refereeId: null });
   });
 });

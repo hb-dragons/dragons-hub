@@ -1,8 +1,8 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { auth } from "../config/auth";
-import type { Resource, Action } from "@dragons/shared";
-import { isReferee, can } from "@dragons/shared";
+import type { Resource, Action, RoleName } from "@dragons/shared";
+import { isReferee, can, hasRole } from "@dragons/shared";
 
 export const requireAuth: MiddlewareHandler = async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -59,6 +59,22 @@ export async function assertPermission<R extends Resource>(
   }
 }
 
+export function requireAnyRole(...names: RoleName[]): MiddlewareHandler {
+  return async (c, next) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const user = session.user as { role?: string | null };
+    if (!names.some((n) => hasRole(user, n))) {
+      return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
+    }
+    c.set("user", session.user);
+    c.set("session", session.session);
+    await next();
+  };
+}
+
 export const requireRefereeSelf: MiddlewareHandler = async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!session) {
@@ -74,6 +90,9 @@ export const requireRefereeSelf: MiddlewareHandler = async (c, next) => {
   await next();
 };
 
+// Permission wins over identity: a user who has the permission sees the full admin
+// scope even if they also have a refereeId. refereeId is only set when the user
+// qualifies solely as a referee, so downstream services scope queries to self.
 export function requireRefereeSelfOrPermission<R extends Resource>(
   resource: R,
   action: Action<R>,
@@ -84,14 +103,14 @@ export function requireRefereeSelfOrPermission<R extends Resource>(
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
     const user = session.user as { refereeId?: number | null; role?: string | null };
+    const hasPerm = can(user, resource, action);
     const linked = isReferee(user);
-    const allowed = linked || can(user, resource, action);
-    if (!allowed) {
+    if (!hasPerm && !linked) {
       return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
     }
     c.set("user", session.user);
     c.set("session", session.session);
-    if (linked) {
+    if (!hasPerm && linked) {
       c.set("refereeId", user.refereeId as number);
     }
     await next();
