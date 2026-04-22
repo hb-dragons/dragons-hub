@@ -154,3 +154,5 @@ export {
   isReferee,
 } from "./rbac";
 export type { RoleName, Resource, Action } from "./rbac";
+
+export * from "./referee-history";
