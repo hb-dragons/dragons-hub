@@ -120,7 +120,7 @@ describe("getRefereeHistorySummary KPIs", () => {
     const res = await getRefereeHistorySummary({
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
-      status: "all",
+      status: [],
     });
 
     expect(res.kpis.games).toBe(4);
@@ -141,7 +141,7 @@ describe("getRefereeHistorySummary KPIs", () => {
     const res = await getRefereeHistorySummary({
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
-      status: "active",
+      status: ["played"],
     });
 
     expect(res.kpis.games).toBe(1);
@@ -168,7 +168,7 @@ describe("getRefereeHistorySummary KPIs", () => {
     const res = await getRefereeHistorySummary({
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
-      status: "all",
+      status: [],
     });
 
     expect(res.kpis.games).toBe(2);
@@ -187,7 +187,7 @@ describe("getRefereeHistorySummary KPIs", () => {
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
       league: "RLW",
-      status: "all",
+      status: [],
     });
     expect(res.kpis.games).toBe(1);
   });
@@ -196,7 +196,7 @@ describe("getRefereeHistorySummary KPIs", () => {
     const res = await getRefereeHistorySummary({
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
-      status: "all",
+      status: [],
     });
     expect(res.range).toEqual({
       from: "2025-08-01", to: "2026-07-31", source: "user",
@@ -214,7 +214,7 @@ describe("getRefereeHistorySummary KPIs", () => {
     const res = await getRefereeHistorySummary({
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
-      status: "cancelled",
+      status: ["cancelled"],
     });
 
     expect(res.kpis.games).toBe(2);
@@ -232,12 +232,28 @@ describe("getRefereeHistorySummary KPIs", () => {
     const res = await getRefereeHistorySummary({
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
-      status: "forfeited",
+      status: ["forfeited"],
     });
 
     expect(res.kpis.games).toBe(1);
     expect(res.kpis.forfeited).toBe(1);
     expect(res.kpis.cancelled).toBe(0);
+  });
+
+  it("status=['cancelled','forfeited'] returns both", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1 }),
+      baseGame({ apiMatchId: 2, isCancelled: true }),
+      baseGame({ apiMatchId: 3, isForfeited: true }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: ["cancelled", "forfeited"],
+    });
+
+    expect(res.kpis.games).toBe(2);
   });
 });
 
@@ -256,7 +272,7 @@ describe("getRefereeHistorySummary leaderboard", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      status: "all",
+      status: [],
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
     });
 
@@ -289,7 +305,7 @@ describe("getRefereeHistorySummary leaderboard", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      status: "all",
+      status: [],
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
     });
 
@@ -310,7 +326,7 @@ describe("getRefereeHistorySummary leaderboard", () => {
     await ctx.db.insert(refereeGames).values(rows);
 
     const res = await getRefereeHistorySummary({
-      status: "all",
+      status: [],
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
     });
 
@@ -332,7 +348,7 @@ describe("getRefereeHistorySummary leaderboard", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      status: "all",
+      status: [],
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
     });
 
@@ -344,7 +360,7 @@ describe("getRefereeHistorySummary leaderboard", () => {
 
   it("empty result set: no rows in range returns empty summary", async () => {
     const res = await getRefereeHistorySummary({
-      status: "all",
+      status: [],
       dateFrom: "2030-01-01", dateTo: "2030-12-31",
     });
 
@@ -364,7 +380,7 @@ describe("getRefereeHistoryGames", () => {
       baseGame({ apiMatchId: 3, kickoffDate: "2025-10-05", kickoffTime: "17:00:00" }),
     ]);
     const res = await getRefereeHistoryGames({
-      status: "all",
+      status: [],
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       limit: 50, offset: 0,
     });
@@ -384,7 +400,7 @@ describe("getRefereeHistoryGames", () => {
       baseGame({ apiMatchId: 3, kickoffDate: "2025-11-01" }),
     ]);
     const res = await getRefereeHistoryGames({
-      status: "all",
+      status: [],
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       limit: 2, offset: 0,
     });
@@ -401,7 +417,7 @@ describe("getRefereeHistoryGames", () => {
         leagueName: "Oberliga" }),
     ]);
     const res = await getRefereeHistoryGames({
-      status: "all",
+      status: [],
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       limit: 50, offset: 0, search: "drag",
     });
@@ -415,7 +431,7 @@ describe("getRefereeHistoryGames", () => {
       baseGame({ apiMatchId: 2, leagueShort: "OL" }),
     ]);
     const res = await getRefereeHistoryGames({
-      status: "all",
+      status: [],
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       league: "RLW", limit: 50, offset: 0,
     });
@@ -426,7 +442,7 @@ describe("getRefereeHistoryGames", () => {
 
   it("empty result set: no rows in range returns empty list", async () => {
     const res = await getRefereeHistoryGames({
-      status: "all",
+      status: [],
       dateFrom: "2030-01-01", dateTo: "2030-12-31",
       limit: 50, offset: 0,
     });
@@ -444,7 +460,7 @@ describe("getRefereeHistoryGames", () => {
         homeTeamName: "Dragons Blue", guestTeamName: "Wolves" }),
     ]);
     const res = await getRefereeHistoryGames({
-      status: "all",
+      status: [],
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       limit: 50, offset: 0, search: "drag bears",
     });

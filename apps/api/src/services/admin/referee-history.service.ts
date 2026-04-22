@@ -68,13 +68,27 @@ function buildBaseWhere(
     buildRelevantGamesPredicate(),
   ];
   if (params.league) conds.push(eq(refereeGames.leagueShort, params.league));
-  if (params.status === "cancelled")
-    conds.push(eq(refereeGames.isCancelled, true));
-  else if (params.status === "forfeited")
-    conds.push(eq(refereeGames.isForfeited, true));
-  else if (params.status === "active") {
-    conds.push(eq(refereeGames.isCancelled, false));
-    conds.push(eq(refereeGames.isForfeited, false));
+
+  // Empty array = no status filter (show all).
+  if (params.status.length > 0) {
+    const wants = new Set(params.status);
+    const wantsPlayed = wants.has("played");
+    const wantsCancelled = wants.has("cancelled");
+    const wantsForfeited = wants.has("forfeited");
+
+    // "played" = not cancelled AND not forfeited.
+    const statusPreds: ReturnType<typeof or>[] = [];
+    if (wantsPlayed) {
+      statusPreds.push(
+        and(
+          eq(refereeGames.isCancelled, false),
+          eq(refereeGames.isForfeited, false),
+        )!,
+      );
+    }
+    if (wantsCancelled) statusPreds.push(eq(refereeGames.isCancelled, true)!);
+    if (wantsForfeited) statusPreds.push(eq(refereeGames.isForfeited, true)!);
+    conds.push(or(...statusPreds)!);
   }
   return and(...conds)!;
 }
