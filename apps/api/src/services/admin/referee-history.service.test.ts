@@ -200,6 +200,45 @@ describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
       from: "2025-08-01", to: "2026-07-31", source: "user",
     });
   });
+
+  it("status=cancelled returns only cancelled games", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1 }),
+      baseGame({ apiMatchId: 2, isCancelled: true }),
+      baseGame({ apiMatchId: 3, isCancelled: true }),
+      baseGame({ apiMatchId: 4, isForfeited: true }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      mode: "obligation",
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: "cancelled",
+    });
+
+    expect(res.kpis.games).toBe(2);
+    expect(res.kpis.cancelled).toBe(2);
+    expect(res.kpis.forfeited).toBe(0);
+  });
+
+  it("status=forfeited returns only forfeited games", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1 }),
+      baseGame({ apiMatchId: 2, isCancelled: true }),
+      baseGame({ apiMatchId: 3, isForfeited: true }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      mode: "obligation",
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: "forfeited",
+    });
+
+    expect(res.kpis.games).toBe(1);
+    expect(res.kpis.forfeited).toBe(1);
+    expect(res.kpis.cancelled).toBe(0);
+  });
 });
 
 describe("getRefereeHistorySummary leaderboard", () => {
@@ -277,6 +316,43 @@ describe("getRefereeHistorySummary leaderboard", () => {
 
     expect(res.leaderboard.length).toBe(100);
   });
+
+  it("activity-mode leaderboard only includes refs from our-club games", async () => {
+    await ctx.db.insert(refereeGames).values([
+      // own-club game: Anna (100) + Ben (101), both own refs
+      baseGame({ apiMatchId: 1, kickoffDate: "2025-09-15",
+        sr1OurClub: true, sr2OurClub: true,
+        sr1RefereeApiId: 100, sr2RefereeApiId: 101,
+        sr1Name: "Own, Anna", sr2Name: "Own, Ben" }),
+      // guest-only game: Carl (200) both slots, no own-club obligation,
+      // no own-club ref present → excluded from activity-mode base query
+      baseGame({ apiMatchId: 2, kickoffDate: "2025-09-16",
+        sr1OurClub: false, sr2OurClub: false,
+        sr1RefereeApiId: 200, sr2RefereeApiId: 200,
+        sr1Name: "Guest, Carl", sr2Name: "Guest, Carl" }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      mode: "activity", status: "all",
+      dateFrom: "2025-08-01", dateTo: "2026-07-31",
+    });
+
+    const ids = res.leaderboard.map((e) => e.refereeApiId);
+    expect(ids).toContain(100);
+    expect(ids).toContain(101);
+    expect(ids).not.toContain(200);
+  });
+
+  it("empty result set: no rows in range returns empty summary", async () => {
+    const res = await getRefereeHistorySummary({
+      mode: "obligation", status: "all",
+      dateFrom: "2030-01-01", dateTo: "2030-12-31",
+    });
+
+    expect(res.kpis.games).toBe(0);
+    expect(res.leaderboard).toEqual([]);
+    expect(res.kpis.distinctReferees).toBe(0);
+  });
 });
 
 describe("getRefereeHistoryGames", () => {
@@ -332,5 +408,48 @@ describe("getRefereeHistoryGames", () => {
     });
     expect(res.items.length).toBe(1);
     expect(res.items[0]!.homeTeamName).toBe("Dragons");
+  });
+
+  it("league filter narrows items to matching leagueShort", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, leagueShort: "RLW" }),
+      baseGame({ apiMatchId: 2, leagueShort: "OL" }),
+    ]);
+    const res = await getRefereeHistoryGames({
+      mode: "obligation", status: "all",
+      dateFrom: "2025-08-01", dateTo: "2026-07-31",
+      league: "RLW", limit: 50, offset: 0,
+    });
+    expect(res.items.length).toBe(1);
+    expect(res.total).toBe(1);
+    expect(res.items[0]!.leagueShort).toBe("RLW");
+  });
+
+  it("empty result set: no rows in range returns empty list", async () => {
+    const res = await getRefereeHistoryGames({
+      mode: "obligation", status: "all",
+      dateFrom: "2030-01-01", dateTo: "2030-12-31",
+      limit: 50, offset: 0,
+    });
+    expect(res.items).toEqual([]);
+    expect(res.total).toBe(0);
+    expect(res.hasMore).toBe(false);
+  });
+
+  it("multi-word search ANDs across teams/league", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1,
+        homeTeamName: "Dragons Red", guestTeamName: "Bears" }),
+      // distractor: matches "drag" but not "bears"
+      baseGame({ apiMatchId: 2,
+        homeTeamName: "Dragons Blue", guestTeamName: "Wolves" }),
+    ]);
+    const res = await getRefereeHistoryGames({
+      mode: "obligation", status: "all",
+      dateFrom: "2025-08-01", dateTo: "2026-07-31",
+      limit: 50, offset: 0, search: "drag bears",
+    });
+    expect(res.items.length).toBe(1);
+    expect(res.items[0]!.homeTeamName).toBe("Dragons Red");
   });
 });

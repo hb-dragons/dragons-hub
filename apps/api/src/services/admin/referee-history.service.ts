@@ -12,6 +12,8 @@ import type {
   HistoryGamesQueryParams,
 } from "../../routes/admin/referee-history.schemas";
 
+const REFEREE_SLOT_OPEN_STATUS = "open";
+
 export async function resolveHistoryDateRange(
   from?: string,
   to?: string,
@@ -97,14 +99,15 @@ export async function getRefereeHistorySummary(
         sum(case when ${refereeGames.sr1OurClub} then 1 else 0 end)
         + sum(case when ${refereeGames.sr2OurClub} then 1 else 0 end)
       )::int`,
+      // "filled" here means "any non-open status" — includes both offered and assigned
       filledSr1: sql<number>`sum(case when ${refereeGames.sr1OurClub}
-        and ${refereeGames.sr1Status} <> 'open' then 1 else 0 end)::int`,
+        and ${refereeGames.sr1Status} <> ${REFEREE_SLOT_OPEN_STATUS} then 1 else 0 end)::int`,
       filledSr2: sql<number>`sum(case when ${refereeGames.sr2OurClub}
-        and ${refereeGames.sr2Status} <> 'open' then 1 else 0 end)::int`,
+        and ${refereeGames.sr2Status} <> ${REFEREE_SLOT_OPEN_STATUS} then 1 else 0 end)::int`,
       unfilledSr1: sql<number>`sum(case when ${refereeGames.sr1OurClub}
-        and ${refereeGames.sr1Status} = 'open' then 1 else 0 end)::int`,
+        and ${refereeGames.sr1Status} = ${REFEREE_SLOT_OPEN_STATUS} then 1 else 0 end)::int`,
       unfilledSr2: sql<number>`sum(case when ${refereeGames.sr2OurClub}
-        and ${refereeGames.sr2Status} = 'open' then 1 else 0 end)::int`,
+        and ${refereeGames.sr2Status} = ${REFEREE_SLOT_OPEN_STATUS} then 1 else 0 end)::int`,
       cancelled: sql<number>`sum(case when ${refereeGames.isCancelled}
         then 1 else 0 end)::int`,
       forfeited: sql<number>`sum(case when ${refereeGames.isForfeited}
@@ -164,6 +167,8 @@ export async function getRefereeHistorySummary(
       COALESCE(r.is_own_club, false) AS "isOwnClub"
     FROM appearances a
     LEFT JOIN ${referees} r ON r.api_id = a.api_id
+    -- Guest refs without an api_id are grouped by raw_name — two distinct people
+    -- with identical display names will collapse into one row.
     GROUP BY group_key, a.api_id, r.id, r.first_name, r.last_name, r.is_own_club
     ORDER BY total DESC, "lastRefereedDate" DESC NULLS LAST
     LIMIT 100

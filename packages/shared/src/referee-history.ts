@@ -50,8 +50,8 @@ export interface HistoryGameItem {
   sr2OurClub: boolean;
   sr1Name: string | null;
   sr2Name: string | null;
-  sr1Status: "open" | "offered" | "assigned";
-  sr2Status: "open" | "offered" | "assigned";
+  sr1Status: string;
+  sr2Status: string;
   isCancelled: boolean;
   isForfeited: boolean;
   isHomeGame: boolean;
