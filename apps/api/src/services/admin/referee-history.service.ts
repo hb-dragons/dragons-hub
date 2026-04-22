@@ -42,19 +42,16 @@ export async function resolveHistoryDateRange(
   };
 }
 
-function buildObligationPredicate() {
-  return or(
-    eq(refereeGames.sr1OurClub, true),
-    eq(refereeGames.sr2OurClub, true),
-  )!;
-}
-
-function buildActivityPredicate() {
+// Matches games where our club has a slot obligation (home referee duty)
+// OR where one of our own referees is actually assigned to a slot.
+function buildRelevantGamesPredicate() {
   const ownIds = db
     .select({ id: referees.apiId })
     .from(referees)
     .where(eq(referees.isOwnClub, true));
   return or(
+    eq(refereeGames.sr1OurClub, true),
+    eq(refereeGames.sr2OurClub, true),
     sql`${refereeGames.sr1RefereeApiId} IN (${ownIds})`,
     sql`${refereeGames.sr2RefereeApiId} IN (${ownIds})`,
   )!;
@@ -68,12 +65,8 @@ function buildBaseWhere(
   const conds = [
     gte(refereeGames.kickoffDate, resolvedFrom),
     lte(refereeGames.kickoffDate, resolvedTo),
+    buildRelevantGamesPredicate(),
   ];
-  conds.push(
-    params.mode === "obligation"
-      ? buildObligationPredicate()
-      : buildActivityPredicate(),
-  );
   if (params.league) conds.push(eq(refereeGames.leagueShort, params.league));
   if (params.status === "cancelled")
     conds.push(eq(refereeGames.isCancelled, true));
@@ -116,22 +109,15 @@ export async function getRefereeHistorySummary(
     .from(refereeGames)
     .where(where);
 
-  const kpis = params.mode === "obligation"
-    ? {
-        games: row?.games ?? 0,
-        obligatedSlots: row?.obligatedSlots ?? 0,
-        filledSlots: (row?.filledSr1 ?? 0) + (row?.filledSr2 ?? 0),
-        unfilledSlots: (row?.unfilledSr1 ?? 0) + (row?.unfilledSr2 ?? 0),
-        cancelled: row?.cancelled ?? 0,
-        forfeited: row?.forfeited ?? 0,
-        distinctReferees: 0, // filled in by leaderboard step
-      }
-    : {
-        games: row?.games ?? 0,
-        cancelled: row?.cancelled ?? 0,
-        forfeited: row?.forfeited ?? 0,
-        distinctReferees: 0,
-      };
+  const kpis = {
+    games: row?.games ?? 0,
+    obligatedSlots: row?.obligatedSlots ?? 0,
+    filledSlots: (row?.filledSr1 ?? 0) + (row?.filledSr2 ?? 0),
+    unfilledSlots: (row?.unfilledSr1 ?? 0) + (row?.unfilledSr2 ?? 0),
+    cancelled: row?.cancelled ?? 0,
+    forfeited: row?.forfeited ?? 0,
+    distinctReferees: 0, // filled in by leaderboard step
+  };
 
   const leaderboardRows = await db.execute(sql`
     WITH appearances AS (

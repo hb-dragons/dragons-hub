@@ -5,7 +5,6 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
 
 export const historyFilterSchema = z.object({
-  mode: z.enum(["obligation", "activity"]).default("obligation"),
   dateFrom: isoDate.optional(),
   dateTo: isoDate.optional(),
   league: z.string().trim().min(1).optional(),

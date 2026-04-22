@@ -1,4 +1,3 @@
-export type HistoryMode = "obligation" | "activity";
 export type HistoryStatus = "all" | "active" | "cancelled" | "forfeited";
 
 export interface HistoryDateRange {
@@ -9,9 +8,9 @@ export interface HistoryDateRange {
 
 export interface HistoryKpis {
   games: number;
-  obligatedSlots?: number;
-  filledSlots?: number;
-  unfilledSlots?: number;
+  obligatedSlots: number;
+  filledSlots: number;
+  unfilledSlots: number;
   cancelled: number;
   forfeited: number;
   distinctReferees: number;

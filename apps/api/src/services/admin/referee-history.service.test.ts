@@ -101,7 +101,7 @@ function baseGame(overrides: Partial<typeof refereeGames.$inferInsert> = {}) {
   };
 }
 
-describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
+describe("getRefereeHistorySummary KPIs", () => {
   beforeEach(async () => { await seedReferees(); });
 
   it("counts games and slot fill states within range", async () => {
@@ -118,7 +118,6 @@ describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      mode: "obligation",
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
       status: "all",
@@ -140,7 +139,6 @@ describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      mode: "obligation",
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
       status: "active",
@@ -151,27 +149,33 @@ describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
     expect(res.kpis.forfeited).toBe(0);
   });
 
-  it("activity mode omits obligation KPIs and counts games our refs worked", async () => {
+  it("includes guest-club games where one of our referees officiated", async () => {
     await ctx.db.insert(refereeGames).values([
-      baseGame({ apiMatchId: 1, sr1OurClub: false, sr2OurClub: false,
-        sr1RefereeApiId: 100, sr2RefereeApiId: 200,
-        sr1Name: "Own, Anna", sr2Name: "Guest, Carl" }),
+      // Our obligation + own refs: included
+      baseGame({ apiMatchId: 1 }),
+      // Away game, other club's obligation, but Anna (own ref) officiated: included
       baseGame({ apiMatchId: 2, sr1OurClub: false, sr2OurClub: false,
+        sr1RefereeApiId: 100, sr2RefereeApiId: 200,
+        sr1Name: "Own, Anna", sr2Name: "Guest, Carl",
+        isHomeGame: false }),
+      // Guest-only game, no own obligation, no own ref: excluded
+      baseGame({ apiMatchId: 3, sr1OurClub: false, sr2OurClub: false,
         sr1RefereeApiId: 200, sr2RefereeApiId: 200,
-        sr1Name: "Guest, Carl", sr2Name: "Guest, Carl" }),
+        sr1Name: "Guest, Carl", sr2Name: "Guest, Carl",
+        isHomeGame: false }),
     ]);
 
     const res = await getRefereeHistorySummary({
-      mode: "activity",
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
       status: "all",
     });
 
-    expect(res.kpis.games).toBe(1);
-    expect(res.kpis.obligatedSlots).toBeUndefined();
-    expect(res.kpis.filledSlots).toBeUndefined();
-    expect(res.kpis.unfilledSlots).toBeUndefined();
+    expect(res.kpis.games).toBe(2);
+    // Only game 1 has own-club obligated slots (2 of them)
+    expect(res.kpis.obligatedSlots).toBe(2);
+    expect(res.kpis.filledSlots).toBe(2);
+    expect(res.kpis.unfilledSlots).toBe(0);
   });
 
   it("league filter narrows to matching leagueShort", async () => {
@@ -180,7 +184,6 @@ describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
       baseGame({ apiMatchId: 2, leagueShort: "OL" }),
     ]);
     const res = await getRefereeHistorySummary({
-      mode: "obligation",
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
       league: "RLW",
@@ -191,7 +194,6 @@ describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
 
   it("includes resolved range in response", async () => {
     const res = await getRefereeHistorySummary({
-      mode: "obligation",
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
       status: "all",
@@ -210,7 +212,6 @@ describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      mode: "obligation",
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
       status: "cancelled",
@@ -229,7 +230,6 @@ describe("getRefereeHistorySummary KPIs (obligation mode)", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      mode: "obligation",
       dateFrom: "2025-08-01",
       dateTo: "2026-07-31",
       status: "forfeited",
@@ -256,7 +256,7 @@ describe("getRefereeHistorySummary leaderboard", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
     });
 
@@ -289,7 +289,7 @@ describe("getRefereeHistorySummary leaderboard", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
     });
 
@@ -310,22 +310,21 @@ describe("getRefereeHistorySummary leaderboard", () => {
     await ctx.db.insert(refereeGames).values(rows);
 
     const res = await getRefereeHistorySummary({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
     });
 
     expect(res.leaderboard.length).toBe(100);
   });
 
-  it("activity-mode leaderboard only includes refs from our-club games", async () => {
+  it("excludes games where neither own club nor own referees are involved", async () => {
     await ctx.db.insert(refereeGames).values([
       // own-club game: Anna (100) + Ben (101), both own refs
       baseGame({ apiMatchId: 1, kickoffDate: "2025-09-15",
         sr1OurClub: true, sr2OurClub: true,
         sr1RefereeApiId: 100, sr2RefereeApiId: 101,
         sr1Name: "Own, Anna", sr2Name: "Own, Ben" }),
-      // guest-only game: Carl (200) both slots, no own-club obligation,
-      // no own-club ref present → excluded from activity-mode base query
+      // guest-only game: no own-club obligation, no own-club ref → excluded
       baseGame({ apiMatchId: 2, kickoffDate: "2025-09-16",
         sr1OurClub: false, sr2OurClub: false,
         sr1RefereeApiId: 200, sr2RefereeApiId: 200,
@@ -333,7 +332,7 @@ describe("getRefereeHistorySummary leaderboard", () => {
     ]);
 
     const res = await getRefereeHistorySummary({
-      mode: "activity", status: "all",
+      status: "all",
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
     });
 
@@ -345,7 +344,7 @@ describe("getRefereeHistorySummary leaderboard", () => {
 
   it("empty result set: no rows in range returns empty summary", async () => {
     const res = await getRefereeHistorySummary({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2030-01-01", dateTo: "2030-12-31",
     });
 
@@ -365,7 +364,7 @@ describe("getRefereeHistoryGames", () => {
       baseGame({ apiMatchId: 3, kickoffDate: "2025-10-05", kickoffTime: "17:00:00" }),
     ]);
     const res = await getRefereeHistoryGames({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       limit: 50, offset: 0,
     });
@@ -385,7 +384,7 @@ describe("getRefereeHistoryGames", () => {
       baseGame({ apiMatchId: 3, kickoffDate: "2025-11-01" }),
     ]);
     const res = await getRefereeHistoryGames({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       limit: 2, offset: 0,
     });
@@ -402,7 +401,7 @@ describe("getRefereeHistoryGames", () => {
         leagueName: "Oberliga" }),
     ]);
     const res = await getRefereeHistoryGames({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       limit: 50, offset: 0, search: "drag",
     });
@@ -416,7 +415,7 @@ describe("getRefereeHistoryGames", () => {
       baseGame({ apiMatchId: 2, leagueShort: "OL" }),
     ]);
     const res = await getRefereeHistoryGames({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       league: "RLW", limit: 50, offset: 0,
     });
@@ -427,7 +426,7 @@ describe("getRefereeHistoryGames", () => {
 
   it("empty result set: no rows in range returns empty list", async () => {
     const res = await getRefereeHistoryGames({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2030-01-01", dateTo: "2030-12-31",
       limit: 50, offset: 0,
     });
@@ -445,7 +444,7 @@ describe("getRefereeHistoryGames", () => {
         homeTeamName: "Dragons Blue", guestTeamName: "Wolves" }),
     ]);
     const res = await getRefereeHistoryGames({
-      mode: "obligation", status: "all",
+      status: "all",
       dateFrom: "2025-08-01", dateTo: "2026-07-31",
       limit: 50, offset: 0, search: "drag bears",
     });

@@ -105,11 +105,6 @@
   },
   "refereeHistory": {
     "title": "Referee History",
-    "mode": {
-      "label": "Lens",
-      "obligation": "Obligation",
-      "activity": "Activity"
-    },
     "status": {
       "label": "Status",
       "all": "All",

@@ -105,11 +105,6 @@
   },
   "refereeHistory": {
     "title": "Schiedsrichter-Historie",
-    "mode": {
-      "label": "Sicht",
-      "obligation": "Verpflichtung",
-      "activity": "Einsätze"
-    },
     "status": {
       "label": "Status",
       "all": "Alle",

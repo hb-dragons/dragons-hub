@@ -47,7 +47,10 @@ describe("GET /referee/history/summary", () => {
   it("parses defaults and calls service", async () => {
     const summary = {
       range: { from: "2025-08-01", to: "2026-07-31", source: "default" },
-      kpis: { games: 0, cancelled: 0, forfeited: 0, distinctReferees: 0 },
+      kpis: {
+        games: 0, obligatedSlots: 0, filledSlots: 0, unfilledSlots: 0,
+        cancelled: 0, forfeited: 0, distinctReferees: 0,
+      },
       leaderboard: [],
     };
     mocks.getRefereeHistorySummary.mockResolvedValue(summary);
@@ -57,12 +60,12 @@ describe("GET /referee/history/summary", () => {
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(summary);
     expect(mocks.getRefereeHistorySummary).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: "obligation", status: "active" }),
+      expect.objectContaining({ status: "active" }),
     );
   });
 
-  it("returns 400 on invalid mode", async () => {
-    const res = await app.request("/referee/history/summary?mode=bogus");
+  it("returns 400 on invalid status", async () => {
+    const res = await app.request("/referee/history/summary?status=bogus");
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
@@ -78,15 +81,17 @@ describe("GET /referee/history/summary", () => {
   it("forwards explicit filters", async () => {
     mocks.getRefereeHistorySummary.mockResolvedValue({
       range: { from: "2024-08-01", to: "2025-07-31", source: "user" },
-      kpis: { games: 1, cancelled: 0, forfeited: 0, distinctReferees: 0 },
+      kpis: {
+        games: 1, obligatedSlots: 0, filledSlots: 0, unfilledSlots: 0,
+        cancelled: 0, forfeited: 0, distinctReferees: 0,
+      },
       leaderboard: [],
     });
     const res = await app.request(
-      "/referee/history/summary?mode=activity&dateFrom=2024-08-01&dateTo=2025-07-31&league=RLW&status=all",
+      "/referee/history/summary?dateFrom=2024-08-01&dateTo=2025-07-31&league=RLW&status=all",
     );
     expect(res.status).toBe(200);
     expect(mocks.getRefereeHistorySummary).toHaveBeenCalledWith({
-      mode: "activity",
       dateFrom: "2024-08-01",
       dateTo: "2025-07-31",
       league: "RLW",
@@ -108,7 +113,6 @@ describe("GET /referee/history/games", () => {
       expect.objectContaining({
         limit: 50,
         offset: 0,
-        mode: "obligation",
         status: "active",
       }),
     );
@@ -138,12 +142,11 @@ describe("GET /referee/history/games", () => {
     });
 
     const res = await app.request(
-      "/referee/history/games?mode=activity&dateFrom=2024-08-01&dateTo=2025-07-31&league=RLW&status=cancelled&search=Mueller&limit=25&offset=10",
+      "/referee/history/games?dateFrom=2024-08-01&dateTo=2025-07-31&league=RLW&status=cancelled&search=Mueller&limit=25&offset=10",
     );
 
     expect(res.status).toBe(200);
     expect(mocks.getRefereeHistoryGames).toHaveBeenCalledWith({
-      mode: "activity",
       dateFrom: "2024-08-01",
       dateTo: "2025-07-31",
       league: "RLW",

@@ -1,50 +1,67 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { HistoryKpis, HistoryMode } from "@dragons/shared";
+import { StatCard } from "@/components/admin/shared/stat-card";
+import {
+  AlertTriangle,
+  Ban,
+  CalendarDays,
+  CheckCircle2,
+  Target,
+  Users,
+  XCircle,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { HistoryKpis } from "@dragons/shared";
 
-function KpiCard({ label, value, tone = "default" }: {
-  label: string; value: number | string; tone?: "default" | "warn";
-}) {
-  return (
-    <div className={`rounded-lg border p-3 ${
-      tone === "warn" ? "border-destructive/50 bg-destructive/5" : "border-border"
-    }`}>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-2xl font-semibold">{value}</div>
-    </div>
-  );
+interface Props {
+  kpis: HistoryKpis;
 }
 
-export function CoverageKPICards({
-  kpis, mode,
-}: { kpis: HistoryKpis; mode: HistoryMode }) {
+interface Kpi {
+  label: string;
+  value: number | string;
+  icon: LucideIcon;
+  warn?: boolean;
+}
+
+export function CoverageKPICards({ kpis }: Props) {
   const t = useTranslations("refereeHistory.kpi");
 
-  const cards: Array<[string, number | string, "default" | "warn" | undefined]> = [
-    [t("games"), kpis.games, undefined],
-    [t("distinctReferees"), kpis.distinctReferees, undefined],
-    [t("cancelled"), kpis.cancelled, undefined],
-    [t("forfeited"), kpis.forfeited, undefined],
+  const cards: Kpi[] = [
+    { label: t("games"), value: kpis.games, icon: CalendarDays },
+    { label: t("distinctReferees"), value: kpis.distinctReferees, icon: Users },
+    { label: t("obligatedSlots"), value: kpis.obligatedSlots, icon: Target },
+    { label: t("filledSlots"), value: kpis.filledSlots, icon: CheckCircle2 },
+    {
+      label: t("unfilledSlots"),
+      value: kpis.unfilledSlots,
+      icon: AlertTriangle,
+      warn: kpis.unfilledSlots > 0,
+    },
+    { label: t("cancelled"), value: kpis.cancelled, icon: Ban },
+    { label: t("forfeited"), value: kpis.forfeited, icon: XCircle },
   ];
-  if (mode === "obligation") {
-    cards.push([t("obligatedSlots"), kpis.obligatedSlots ?? 0, undefined]);
-    cards.push([t("filledSlots"), kpis.filledSlots ?? 0, undefined]);
-    cards.push([
-      t("unfilledSlots"),
-      kpis.unfilledSlots ?? 0,
-      (kpis.unfilledSlots ?? 0) > 0 ? "warn" : undefined,
-    ]);
-  }
+
+  const showWarning = kpis.unfilledSlots > 0;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {cards.map(([label, value, tone]) => (
-        <KpiCard key={label} label={label} value={value} tone={tone} />
-      ))}
-      {mode === "obligation" && (kpis.unfilledSlots ?? 0) > 0 && (
-        <div className="col-span-full text-sm text-destructive">
-          {t("unfilledWarning")}
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+        {cards.map((card) => (
+          <StatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            icon={card.icon}
+            className={card.warn ? "bg-heat/10" : undefined}
+          />
+        ))}
+      </div>
+      {showWarning && (
+        <div className="bg-heat/10 text-heat flex items-center gap-2 rounded-md px-4 py-2.5 text-sm">
+          <AlertTriangle className="size-4 shrink-0" />
+          <span>{t("unfilledWarning")}</span>
         </div>
       )}
     </div>

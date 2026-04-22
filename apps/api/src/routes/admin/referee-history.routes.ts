@@ -24,7 +24,6 @@ adminRefereeHistoryRoutes.get(
   }),
   async (c) => {
     const parsed = historyFilterSchema.parse({
-      mode: c.req.query("mode"),
       dateFrom: c.req.query("dateFrom"),
       dateTo: c.req.query("dateTo"),
       league: c.req.query("league"),
@@ -46,7 +45,6 @@ adminRefereeHistoryRoutes.get(
   }),
   async (c) => {
     const parsed = historyGamesQuerySchema.parse({
-      mode: c.req.query("mode"),
       dateFrom: c.req.query("dateFrom"),
       dateTo: c.req.query("dateTo"),
       league: c.req.query("league"),

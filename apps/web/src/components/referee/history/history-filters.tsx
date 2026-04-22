@@ -1,89 +1,119 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Button } from "@dragons/ui";
-import type { HistoryFilterState } from "@/hooks/use-referee-history";
+import { Button, DatePicker } from "@dragons/ui";
+import { Input } from "@dragons/ui/components/input";
+import { Label } from "@dragons/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@dragons/ui/components/select";
+import { SearchIcon, XIcon } from "lucide-react";
+import type {
+  HistoryFilterState,
+  HistoryFilterStateWithSearch,
+} from "./filter-state";
 
 interface Props {
-  state: HistoryFilterState & { search?: string };
-  onChange: (patch: Partial<HistoryFilterState & { search?: string }>) => void;
+  state: HistoryFilterStateWithSearch;
+  onChange: (patch: Partial<HistoryFilterStateWithSearch>) => void;
   onReset: () => void;
+  rangeLabel?: string | null;
 }
 
-export function HistoryFilters({ state, onChange, onReset }: Props) {
+export function HistoryFilters({ state, onChange, onReset, rangeLabel }: Props) {
   const t = useTranslations("refereeHistory");
 
   return (
-    <div className="flex flex-wrap gap-3 items-end">
-      <label className="flex flex-col text-sm">
-        {t("mode.label")}
-        <select
-          className="border rounded px-2 py-1"
-          value={state.mode}
-          onChange={(e) => onChange({ mode: e.target.value as HistoryFilterState["mode"] })}
-        >
-          <option value="obligation">{t("mode.obligation")}</option>
-          <option value="activity">{t("mode.activity")}</option>
-        </select>
-      </label>
+    <div className="bg-card rounded-md">
+      <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
+        <Field label={t("status.label")}>
+          <Select
+            value={state.status}
+            onValueChange={(value) =>
+              onChange({ status: value as HistoryFilterState["status"] })
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">{t("status.active")}</SelectItem>
+              <SelectItem value="all">{t("status.all")}</SelectItem>
+              <SelectItem value="cancelled">{t("status.cancelled")}</SelectItem>
+              <SelectItem value="forfeited">{t("status.forfeited")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
 
-      <label className="flex flex-col text-sm">
-        {t("status.label")}
-        <select
-          className="border rounded px-2 py-1"
-          value={state.status}
-          onChange={(e) => onChange({ status: e.target.value as HistoryFilterState["status"] })}
-        >
-          <option value="active">{t("status.active")}</option>
-          <option value="all">{t("status.all")}</option>
-          <option value="cancelled">{t("status.cancelled")}</option>
-          <option value="forfeited">{t("status.forfeited")}</option>
-        </select>
-      </label>
+        <Field label={t("filters.dateFrom")}>
+          <DatePicker
+            value={state.dateFrom ?? null}
+            onChange={(value) => onChange({ dateFrom: value ?? undefined })}
+            className="w-full"
+          />
+        </Field>
 
-      <label className="flex flex-col text-sm">
-        {t("filters.dateFrom")}
-        <input
-          type="date"
-          className="border rounded px-2 py-1"
-          value={state.dateFrom ?? ""}
-          onChange={(e) => onChange({ dateFrom: e.target.value || undefined })}
-        />
-      </label>
+        <Field label={t("filters.dateTo")}>
+          <DatePicker
+            value={state.dateTo ?? null}
+            onChange={(value) => onChange({ dateTo: value ?? undefined })}
+            className="w-full"
+          />
+        </Field>
 
-      <label className="flex flex-col text-sm">
-        {t("filters.dateTo")}
-        <input
-          type="date"
-          className="border rounded px-2 py-1"
-          value={state.dateTo ?? ""}
-          onChange={(e) => onChange({ dateTo: e.target.value || undefined })}
-        />
-      </label>
+        <Field label={t("filters.league")}>
+          <Input
+            value={state.league ?? ""}
+            onChange={(event) =>
+              onChange({ league: event.target.value || undefined })
+            }
+          />
+        </Field>
 
-      <label className="flex flex-col text-sm">
-        {t("filters.league")}
-        <input
-          type="text"
-          className="border rounded px-2 py-1 w-24"
-          value={state.league ?? ""}
-          onChange={(e) => onChange({ league: e.target.value || undefined })}
-        />
-      </label>
+        <Field label={t("filters.search")}>
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              value={state.search ?? ""}
+              onChange={(event) =>
+                onChange({ search: event.target.value || undefined })
+              }
+            />
+          </div>
+        </Field>
+      </div>
 
-      <label className="flex flex-col text-sm">
-        {t("filters.search")}
-        <input
-          type="text"
-          className="border rounded px-2 py-1"
-          value={state.search ?? ""}
-          onChange={(e) => onChange({ search: e.target.value || undefined })}
-        />
-      </label>
+      <div className="bg-surface-low rounded-b-md flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+        <span className="text-muted-foreground text-xs">
+          {rangeLabel ?? ""}
+        </span>
+        <Button variant="ghost" size="sm" onClick={onReset}>
+          <XIcon className="size-3.5" />
+          {t("filters.reset")}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
-      <Button variant="outline" size="sm" onClick={onReset}>
-        {t("filters.reset")}
-      </Button>
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="font-display text-muted-foreground text-xs font-medium uppercase tracking-wide">
+        {label}
+      </Label>
+      {children}
     </div>
   );
 }
