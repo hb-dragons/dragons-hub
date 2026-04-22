@@ -131,7 +131,7 @@ describe("getRefereeHistorySummary KPIs", () => {
     expect(res.kpis.forfeited).toBe(1);
   });
 
-  it("default status=active excludes cancelled/forfeited from game count", async () => {
+  it("status=['played'] excludes cancelled/forfeited from game count", async () => {
     await ctx.db.insert(refereeGames).values([
       baseGame({ apiMatchId: 1 }),
       baseGame({ apiMatchId: 2, isCancelled: true }),
