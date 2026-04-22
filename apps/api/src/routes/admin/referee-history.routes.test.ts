@@ -148,7 +148,7 @@ describe("GET /referee/history/games", () => {
   });
 
   it("returns 400 on limit exceeding max", async () => {
-    const res = await app.request("/referee/history/games?limit=501");
+    const res = await app.request("/referee/history/games?limit=5001");
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
@@ -189,5 +189,36 @@ describe("GET /referee/history/games", () => {
     expect(mocks.getRefereeHistoryGames).toHaveBeenCalledWith(
       expect.objectContaining({ refereeApiId: 42 }),
     );
+  });
+});
+
+describe("GET /referee/history/games.csv", () => {
+  it("returns text/csv with attachment filename based on range", async () => {
+    mocks.getRefereeHistoryGames.mockResolvedValue({
+      items: [{
+        id: 1, matchId: null, matchNo: 1,
+        kickoffDate: "2025-09-01", kickoffTime: "18:00:00",
+        homeTeamName: "D", guestTeamName: "B",
+        leagueName: null, leagueShort: "OL",
+        venueName: null, venueCity: null,
+        sr1OurClub: true, sr2OurClub: false,
+        sr1Name: null, sr2Name: null,
+        sr1Status: "open", sr2Status: "open",
+        isCancelled: false, isForfeited: false, isHomeGame: true,
+      }],
+      total: 1, limit: 1000, offset: 0, hasMore: false,
+    });
+
+    const res = await app.request(
+      "/referee/history/games.csv?dateFrom=2025-08-01&dateTo=2026-07-31",
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
+    expect(res.headers.get("Content-Disposition")).toBe(
+      'attachment; filename="referee-history-games-2025-08-01-2026-07-31.csv"',
+    );
+    const body = await res.text();
+    expect(body.split("\r\n")[0]).toContain("kickoffDate");
   });
 });
