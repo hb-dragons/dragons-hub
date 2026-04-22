@@ -8,9 +8,22 @@ export function formatDuration(ms: number | null | undefined): string {
   return `${minutes}m ${remainingSeconds}s`;
 }
 
-type Translator = (key: string, values?: Record<string, unknown>) => string;
+type IntervalLabelTranslator = {
+  (key: "sync.refereeSchedule.daily"): string;
+  (
+    key: "sync.refereeSchedule.everyNHours",
+    values: { hours: number | string },
+  ): string;
+  (
+    key: "sync.refereeSchedule.everyNMinutes",
+    values: { minutes: number | string },
+  ): string;
+};
 
-export function formatIntervalLabel(t: Translator, minutes: number): string {
+export function formatIntervalLabel(
+  t: IntervalLabelTranslator,
+  minutes: number,
+): string {
   if (minutes >= 1440) return t("sync.refereeSchedule.daily");
   if (minutes >= 60 && minutes % 60 === 0) {
     return t("sync.refereeSchedule.everyNHours", { hours: minutes / 60 });
