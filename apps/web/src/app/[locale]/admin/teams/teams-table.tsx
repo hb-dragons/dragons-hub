@@ -6,7 +6,8 @@ import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { fetchAPI } from "@/lib/api";
-import { COLOR_PRESET_KEYS, getColorPreset } from "@dragons/shared";
+import { authClient } from "@/lib/auth-client";
+import { can, COLOR_PRESET_KEYS, getColorPreset } from "@dragons/shared";
 import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
 import { cn } from "@dragons/ui/lib/utils";
@@ -30,6 +31,8 @@ interface OwnClubTeam {
 
 export function TeamsTable() {
   const t = useTranslations();
+  const { data: session } = authClient.useSession();
+  const canManage = can(session?.user ?? null, "team", "manage");
   const { data: teams } = useSWR<OwnClubTeam[]>(SWR_KEYS.teams, apiFetcher);
   const { mutate } = useSWRConfig();
   const teamsList = teams ?? [];
@@ -134,6 +137,7 @@ export function TeamsTable() {
                 }
                 placeholder={t("teams.placeholder")}
                 maxLength={50}
+                disabled={!canManage}
                 className="max-w-xs"
               />
             </TableCell>
@@ -146,6 +150,7 @@ export function TeamsTable() {
                   setDurationDrafts((prev) => ({ ...prev, [team.id]: e.target.value }))
                 }
                 placeholder={t("teams.gameDurationPlaceholder")}
+                disabled={!canManage}
                 className="max-w-[100px]"
               />
             </TableCell>
@@ -158,10 +163,12 @@ export function TeamsTable() {
                     <button
                       key={colorKey}
                       type="button"
+                      disabled={!canManage}
                       style={{ backgroundColor: preset.dot }}
                       className={cn(
                         "size-6 rounded-full border-2 transition-transform",
-                        isSelected ? "scale-110 border-foreground ring-2 ring-foreground/20" : "border-transparent hover:scale-105"
+                        isSelected ? "scale-110 border-foreground ring-2 ring-foreground/20" : "border-transparent",
+                        canManage ? "hover:scale-105" : "cursor-not-allowed opacity-50",
                       )}
                       onClick={() =>
                         setColorDrafts((prev) => ({ ...prev, [team.id]: colorKey }))
@@ -173,13 +180,15 @@ export function TeamsTable() {
               </div>
             </TableCell>
             <TableCell>
-              <Button
-                size="sm"
-                disabled={!isDirty(team) || saving[team.id]}
-                onClick={() => save(team)}
-              >
-                {saving[team.id] ? t("common.saving") : t("common.save")}
-              </Button>
+              {canManage && (
+                <Button
+                  size="sm"
+                  disabled={!isDirty(team) || saving[team.id]}
+                  onClick={() => save(team)}
+                >
+                  {saving[team.id] ? t("common.saving") : t("common.save")}
+                </Button>
+              )}
             </TableCell>
           </TableRow>
         ))}
