@@ -127,7 +127,10 @@
       "cancelled": "Abgesagt",
       "forfeited": "Verzicht",
       "distinctReferees": "Schiedsrichter",
-      "unfilledWarning": "Vergangene Spiele mit offenen Slots deuten auf Datenprobleme hin."
+      "unfilledWarning": "Vergangene Spiele mit offenen Slots deuten auf Datenprobleme hin.",
+      "coverage": "Pflicht-Abdeckung",
+      "coverageRatio": "{filled} / {total} besetzt",
+      "noObligation": "Keine Heimspiel-Pflichten im Zeitraum"
     },
     "leaderboard": {
       "title": "Schiedsrichter-Rangliste",

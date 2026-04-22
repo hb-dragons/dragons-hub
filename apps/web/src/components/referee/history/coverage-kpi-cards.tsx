@@ -1,69 +1,66 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { CalendarDays, Users } from "lucide-react";
 import { StatCard } from "@/components/admin/shared/stat-card";
-import {
-  AlertTriangle,
-  Ban,
-  CalendarDays,
-  CheckCircle2,
-  Target,
-  Users,
-  XCircle,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { cn } from "@dragons/ui/lib/utils";
 import type { HistoryKpis } from "@dragons/shared";
 
 interface Props {
   kpis: HistoryKpis;
 }
 
-interface Kpi {
-  label: string;
-  value: number | string;
-  icon: LucideIcon;
-  warn?: boolean;
-}
-
 export function CoverageKPICards({ kpis }: Props) {
   const t = useTranslations("refereeHistory.kpi");
-
-  const cards: Kpi[] = [
-    { label: t("games"), value: kpis.games, icon: CalendarDays },
-    { label: t("distinctReferees"), value: kpis.distinctReferees, icon: Users },
-    { label: t("obligatedSlots"), value: kpis.obligatedSlots, icon: Target },
-    { label: t("filledSlots"), value: kpis.filledSlots, icon: CheckCircle2 },
-    {
-      label: t("unfilledSlots"),
-      value: kpis.unfilledSlots,
-      icon: AlertTriangle,
-      warn: kpis.unfilledSlots > 0,
-    },
-    { label: t("cancelled"), value: kpis.cancelled, icon: Ban },
-    { label: t("forfeited"), value: kpis.forfeited, icon: XCircle },
-  ];
-
-  const showWarning = kpis.unfilledSlots > 0;
+  const hasObligation = kpis.obligatedSlots > 0;
+  const pct = hasObligation
+    ? Math.round((kpis.filledSlots / kpis.obligatedSlots) * 100)
+    : null;
+  const filledPct = hasObligation
+    ? (kpis.filledSlots / kpis.obligatedSlots) * 100
+    : 0;
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-        {cards.map((card) => (
-          <StatCard
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            icon={card.icon}
-            className={card.warn ? "bg-heat/10" : undefined}
-          />
-        ))}
-      </div>
-      {showWarning && (
-        <div className="bg-heat/10 text-heat flex items-center gap-2 rounded-md px-4 py-2.5 text-sm">
-          <AlertTriangle className="size-4 shrink-0" />
-          <span>{t("unfilledWarning")}</span>
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+      <div className="bg-card md:col-span-2 rounded-md p-4">
+        <div className="text-muted-foreground font-display text-[10px] font-medium uppercase tracking-wide">
+          {t("coverage")}
         </div>
-      )}
+        <div className="mt-1 flex items-baseline gap-2">
+          <span
+            data-testid="coverage-value"
+            className="text-2xl font-bold tabular-nums"
+          >
+            {pct === null ? "—" : `${pct}%`}
+          </span>
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {hasObligation
+              ? t("coverageRatio", {
+                  filled: kpis.filledSlots,
+                  total: kpis.obligatedSlots,
+                })
+              : t("noObligation")}
+          </span>
+        </div>
+        {hasObligation && (
+          <div className="bg-surface-low mt-2 flex h-1.5 overflow-hidden rounded-sm">
+            <div
+              className="bg-success"
+              style={{ width: `${filledPct}%` }}
+            />
+            <div
+              className={cn("bg-heat", kpis.unfilledSlots === 0 && "hidden")}
+              style={{ width: `${100 - filledPct}%` }}
+            />
+          </div>
+        )}
+      </div>
+      <StatCard label={t("games")} value={kpis.games} icon={CalendarDays} />
+      <StatCard
+        label={t("distinctReferees")}
+        value={kpis.distinctReferees}
+        icon={Users}
+      />
     </div>
   );
 }

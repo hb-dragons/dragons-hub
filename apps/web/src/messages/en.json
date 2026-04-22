@@ -127,7 +127,10 @@
       "cancelled": "Cancelled",
       "forfeited": "Forfeited",
       "distinctReferees": "Distinct referees",
-      "unfilledWarning": "Past games with unfilled slots indicate a data issue."
+      "unfilledWarning": "Past games with unfilled slots indicate a data issue.",
+      "coverage": "Obligation coverage",
+      "coverageRatio": "{filled} / {total} filled",
+      "noObligation": "No home obligations in range"
     },
     "leaderboard": {
       "title": "Referee leaderboard",
