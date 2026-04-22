@@ -58,7 +58,10 @@ function buildRelevantGamesPredicate() {
   )!;
 }
 
-function buildBaseWhere(
+// Shared predicate pieces used by both buildBaseWhere (the full filter) and
+// buildLeagueScopeWhere (which intentionally omits the league filter).
+// Ignores params.league — callers add that themselves when appropriate.
+function buildBaseConds(
   params: HistoryFilterParams,
   resolvedFrom: string,
   resolvedTo: string,
@@ -68,47 +71,10 @@ function buildBaseWhere(
     lte(refereeGames.kickoffDate, resolvedTo),
     buildRelevantGamesPredicate(),
   ];
-  if (params.league) conds.push(eq(refereeGames.leagueShort, params.league));
-
   // Empty array = no status filter (show all).
   if (params.status.length > 0) {
     const wants = new Set(params.status);
-    const wantsPlayed = wants.has("played");
-    const wantsCancelled = wants.has("cancelled");
-    const wantsForfeited = wants.has("forfeited");
-
     // "played" = not cancelled AND not forfeited.
-    const statusPreds: ReturnType<typeof or>[] = [];
-    if (wantsPlayed) {
-      statusPreds.push(
-        and(
-          eq(refereeGames.isCancelled, false),
-          eq(refereeGames.isForfeited, false),
-        )!,
-      );
-    }
-    if (wantsCancelled) statusPreds.push(eq(refereeGames.isCancelled, true)!);
-    if (wantsForfeited) statusPreds.push(eq(refereeGames.isForfeited, true)!);
-    conds.push(or(...statusPreds)!);
-  }
-  return and(...conds)!;
-}
-
-// Scope used for the availableLeagues list: a subset of buildBaseWhere that
-// intentionally excludes the league filter, so switching leagues doesn't
-// shrink the league dropdown the user picks from.
-function buildLeagueScopeWhere(
-  params: HistoryFilterParams,
-  resolvedFrom: string,
-  resolvedTo: string,
-) {
-  const conds = [
-    gte(refereeGames.kickoffDate, resolvedFrom),
-    lte(refereeGames.kickoffDate, resolvedTo),
-    buildRelevantGamesPredicate(),
-  ];
-  if (params.status.length > 0) {
-    const wants = new Set(params.status);
     const statusPreds: ReturnType<typeof or>[] = [];
     if (wants.has("played")) {
       statusPreds.push(
@@ -122,7 +88,28 @@ function buildLeagueScopeWhere(
     if (wants.has("forfeited")) statusPreds.push(eq(refereeGames.isForfeited, true)!);
     conds.push(or(...statusPreds)!);
   }
+  return conds;
+}
+
+function buildBaseWhere(
+  params: HistoryFilterParams,
+  resolvedFrom: string,
+  resolvedTo: string,
+) {
+  const conds = buildBaseConds(params, resolvedFrom, resolvedTo);
+  if (params.league) conds.push(eq(refereeGames.leagueShort, params.league));
   return and(...conds)!;
+}
+
+// Scope used for the availableLeagues list: a subset of buildBaseWhere that
+// intentionally excludes the league filter, so switching leagues doesn't
+// shrink the league dropdown the user picks from.
+function buildLeagueScopeWhere(
+  params: HistoryFilterParams,
+  resolvedFrom: string,
+  resolvedTo: string,
+) {
+  return and(...buildBaseConds(params, resolvedFrom, resolvedTo))!;
 }
 
 export async function getRefereeHistorySummary(
