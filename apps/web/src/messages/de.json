@@ -137,10 +137,13 @@
       "name": "Name",
       "ownClub": "Eigener Verein",
       "guest": "Gast",
+      "ourRefs": "Unsere Schiris",
+      "guestRefs": "Gast-Schiris bei unseren Spielen",
+      "workload": "Pensum",
       "sr1": "SR1",
       "sr2": "SR2",
       "total": "Gesamt",
-      "lastRefereed": "Zuletzt gepfiffen"
+      "lastRefereed": "Zuletzt"
     },
     "games": {
       "title": "Spiele",
