@@ -52,6 +52,7 @@ adminRefereeHistoryRoutes.get(
       search: c.req.query("search"),
       limit: c.req.query("limit"),
       offset: c.req.query("offset"),
+      refereeApiId: c.req.query("refereeApiId"),
     });
     const result = await getRefereeHistoryGames(parsed);
     return c.json(result);

@@ -263,6 +263,14 @@ export async function getRefereeHistoryGames(
       )!);
     }
   }
+  if (params.refereeApiId !== undefined) {
+    conds.push(
+      or(
+        eq(refereeGames.sr1RefereeApiId, params.refereeApiId),
+        eq(refereeGames.sr2RefereeApiId, params.refereeApiId),
+      )!,
+    );
+  }
   const where = and(...conds)!;
 
   const columns = {

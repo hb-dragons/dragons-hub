@@ -524,3 +524,34 @@ describe("getRefereeHistoryGames", () => {
     expect(res.items[0]!.homeTeamName).toBe("Dragons Red");
   });
 });
+
+describe("getRefereeHistoryGames refereeApiId filter", () => {
+  beforeEach(async () => { await seedReferees(); });
+
+  it("returns only games where the given refereeApiId appears in SR1 or SR2", async () => {
+    await ctx.db.insert(refereeGames).values([
+      // Anna (100) as SR1
+      baseGame({ apiMatchId: 1, kickoffDate: "2025-09-01",
+        sr1RefereeApiId: 100, sr2RefereeApiId: 101 }),
+      // Anna (100) as SR2
+      baseGame({ apiMatchId: 2, kickoffDate: "2025-09-02",
+        sr1RefereeApiId: 101, sr2RefereeApiId: 100 }),
+      // Anna not involved
+      baseGame({ apiMatchId: 3, kickoffDate: "2025-09-03",
+        sr1RefereeApiId: 101, sr2RefereeApiId: 200,
+        sr1Name: "Own, Ben", sr2Name: "Guest, Carl" }),
+    ]);
+
+    const res = await getRefereeHistoryGames({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: [],
+      limit: 50,
+      offset: 0,
+      refereeApiId: 100,
+    });
+
+    expect(res.total).toBe(2);
+    expect(res.items.map((i) => i.matchNo).sort()).not.toContain(3);
+  });
+});

@@ -61,7 +61,7 @@ describe("GET /referee/history/summary", () => {
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(summary);
     expect(mocks.getRefereeHistorySummary).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "active" }),
+      expect.objectContaining({ status: [] }),
     );
   });
 
@@ -97,7 +97,7 @@ describe("GET /referee/history/summary", () => {
       dateFrom: "2024-08-01",
       dateTo: "2025-07-31",
       league: "RLW",
-      status: "all",
+      status: [],
     });
   });
 });
@@ -115,7 +115,7 @@ describe("GET /referee/history/games", () => {
       expect.objectContaining({
         limit: 50,
         offset: 0,
-        status: "active",
+        status: [],
       }),
     );
   });
@@ -152,10 +152,23 @@ describe("GET /referee/history/games", () => {
       dateFrom: "2024-08-01",
       dateTo: "2025-07-31",
       league: "RLW",
-      status: "cancelled",
+      status: ["cancelled"],
       search: "Mueller",
       limit: 25,
       offset: 10,
     });
+  });
+
+  it("forwards refereeApiId", async () => {
+    mocks.getRefereeHistoryGames.mockResolvedValue({
+      items: [], total: 0, limit: 50, offset: 0, hasMore: false,
+    });
+    const res = await app.request(
+      "/referee/history/games?refereeApiId=42",
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.getRefereeHistoryGames).toHaveBeenCalledWith(
+      expect.objectContaining({ refereeApiId: 42 }),
+    );
   });
 });
