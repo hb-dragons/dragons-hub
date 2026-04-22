@@ -15,11 +15,16 @@ export function resolveApiUrl(): string {
 }
 
 const baseURL = resolveApiUrl();
+type AdminPluginOptions = NonNullable<Parameters<typeof adminClient>[0]>;
+const adminPluginConfig = {
+  ac: ac as AdminPluginOptions["ac"],
+  roles: roles as AdminPluginOptions["roles"],
+};
 
 export const authClient = createAuthClient({
   baseURL,
   plugins: [
-    adminClient({ ac, roles }),
+    adminClient(adminPluginConfig),
     expoClient({
       scheme: "dragons",
       storagePrefix: "dragons",
