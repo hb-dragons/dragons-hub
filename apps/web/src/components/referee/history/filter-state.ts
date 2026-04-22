@@ -78,6 +78,12 @@ export function parseHistoryFilterState(
 export interface ResolvePresetInput {
   from: string;
   to: string;
+  /**
+   * Reference "today" for relative presets (30d, month). Interpreted in UTC —
+   * pass a Date whose UTC components represent the day you want treated as
+   * today (typically `new Date()` is fine; at month-boundary midnights in
+   * non-UTC locales the `month` preset may resolve to the prior month).
+   */
   today: Date;
 }
 

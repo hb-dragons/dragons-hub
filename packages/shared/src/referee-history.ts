@@ -1,5 +1,9 @@
 export type HistoryStatusValue = "played" | "cancelled" | "forfeited";
-// Kept for legacy callers only; new code should use HistoryStatusValue[]
+
+/**
+ * @deprecated Use `HistoryStatusValue[]` instead. Kept for legacy URL parsing
+ * and any pre-restructure callers. New code should pass the array form.
+ */
 export type HistoryStatus = "all" | "active" | "cancelled" | "forfeited";
 
 export interface HistoryDateRange {
