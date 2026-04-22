@@ -531,13 +531,13 @@ describe("getRefereeHistoryGames refereeApiId filter", () => {
   it("returns only games where the given refereeApiId appears in SR1 or SR2", async () => {
     await ctx.db.insert(refereeGames).values([
       // Anna (100) as SR1
-      baseGame({ apiMatchId: 1, kickoffDate: "2025-09-01",
+      baseGame({ apiMatchId: 1, matchNo: 11, kickoffDate: "2025-09-01",
         sr1RefereeApiId: 100, sr2RefereeApiId: 101 }),
       // Anna (100) as SR2
-      baseGame({ apiMatchId: 2, kickoffDate: "2025-09-02",
+      baseGame({ apiMatchId: 2, matchNo: 22, kickoffDate: "2025-09-02",
         sr1RefereeApiId: 101, sr2RefereeApiId: 100 }),
       // Anna not involved
-      baseGame({ apiMatchId: 3, kickoffDate: "2025-09-03",
+      baseGame({ apiMatchId: 3, matchNo: 33, kickoffDate: "2025-09-03",
         sr1RefereeApiId: 101, sr2RefereeApiId: 200,
         sr1Name: "Own, Ben", sr2Name: "Guest, Carl" }),
     ]);
@@ -552,6 +552,7 @@ describe("getRefereeHistoryGames refereeApiId filter", () => {
     });
 
     expect(res.total).toBe(2);
-    expect(res.items.map((i) => i.matchNo).sort()).not.toContain(3);
+    const matchNos = res.items.map((i) => i.matchNo).sort((a, b) => a - b);
+    expect(matchNos).toEqual([11, 22]);
   });
 });

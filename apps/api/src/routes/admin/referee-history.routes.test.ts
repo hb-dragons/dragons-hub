@@ -100,6 +100,25 @@ describe("GET /referee/history/summary", () => {
       status: [],
     });
   });
+
+  it("legacy status=active maps to ['played']", async () => {
+    mocks.getRefereeHistorySummary.mockResolvedValue({
+      range: { from: "2025-08-01", to: "2026-07-31", source: "user" },
+      kpis: {
+        games: 0, obligatedSlots: 0, filledSlots: 0, unfilledSlots: 0,
+        cancelled: 0, forfeited: 0, distinctReferees: 0,
+      },
+      leaderboard: [],
+      availableLeagues: [],
+    });
+    const res = await app.request(
+      "/referee/history/summary?status=active",
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.getRefereeHistorySummary).toHaveBeenCalledWith(
+      expect.objectContaining({ status: ["played"] }),
+    );
+  });
 });
 
 describe("GET /referee/history/games", () => {
