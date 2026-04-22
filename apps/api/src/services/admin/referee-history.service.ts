@@ -2,6 +2,7 @@ import { db } from "../../config/database";
 import { appSettings, referees, refereeGames } from "@dragons/db/schema";
 import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import type {
+  HistoryAvailableLeague,
   HistoryDateRange,
   HistoryGameItem,
   HistorySummaryResponse,
@@ -88,6 +89,37 @@ function buildBaseWhere(
     }
     if (wantsCancelled) statusPreds.push(eq(refereeGames.isCancelled, true)!);
     if (wantsForfeited) statusPreds.push(eq(refereeGames.isForfeited, true)!);
+    conds.push(or(...statusPreds)!);
+  }
+  return and(...conds)!;
+}
+
+// Scope used for the availableLeagues list: a subset of buildBaseWhere that
+// intentionally excludes the league filter, so switching leagues doesn't
+// shrink the league dropdown the user picks from.
+function buildLeagueScopeWhere(
+  params: HistoryFilterParams,
+  resolvedFrom: string,
+  resolvedTo: string,
+) {
+  const conds = [
+    gte(refereeGames.kickoffDate, resolvedFrom),
+    lte(refereeGames.kickoffDate, resolvedTo),
+    buildRelevantGamesPredicate(),
+  ];
+  if (params.status.length > 0) {
+    const wants = new Set(params.status);
+    const statusPreds: ReturnType<typeof or>[] = [];
+    if (wants.has("played")) {
+      statusPreds.push(
+        and(
+          eq(refereeGames.isCancelled, false),
+          eq(refereeGames.isForfeited, false),
+        )!,
+      );
+    }
+    if (wants.has("cancelled")) statusPreds.push(eq(refereeGames.isCancelled, true)!);
+    if (wants.has("forfeited")) statusPreds.push(eq(refereeGames.isForfeited, true)!);
     conds.push(or(...statusPreds)!);
   }
   return and(...conds)!;
@@ -202,7 +234,22 @@ export async function getRefereeHistorySummary(
   }));
 
   const finalKpis = { ...kpis, distinctReferees: leaderboard.length };
-  return { range, kpis: finalKpis, leaderboard };
+
+  const leagueScope = buildLeagueScopeWhere(params, range.from, range.to);
+  const leagueRows = await db
+    .selectDistinct({
+      short: refereeGames.leagueShort,
+      name: refereeGames.leagueName,
+    })
+    .from(refereeGames)
+    .where(and(leagueScope, sql`${refereeGames.leagueShort} IS NOT NULL`)!)
+    .orderBy(refereeGames.leagueShort);
+
+  const availableLeagues: HistoryAvailableLeague[] = leagueRows
+    .filter((r): r is { short: string; name: string | null } => r.short !== null)
+    .map((r) => ({ short: r.short, name: r.name }));
+
+  return { range, kpis: finalKpis, leaderboard, availableLeagues };
 }
 
 export async function getRefereeHistoryGames(

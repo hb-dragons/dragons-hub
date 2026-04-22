@@ -52,6 +52,7 @@ describe("GET /referee/history/summary", () => {
         cancelled: 0, forfeited: 0, distinctReferees: 0,
       },
       leaderboard: [],
+      availableLeagues: [],
     };
     mocks.getRefereeHistorySummary.mockResolvedValue(summary);
 
@@ -86,6 +87,7 @@ describe("GET /referee/history/summary", () => {
         cancelled: 0, forfeited: 0, distinctReferees: 0,
       },
       leaderboard: [],
+      availableLeagues: [],
     });
     const res = await app.request(
       "/referee/history/summary?dateFrom=2024-08-01&dateTo=2025-07-31&league=RLW&status=all",

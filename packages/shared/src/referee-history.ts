@@ -27,10 +27,16 @@ export interface HistoryLeaderboardEntry {
   lastRefereedDate: string | null;
 }
 
+export interface HistoryAvailableLeague {
+  short: string;
+  name: string | null;
+}
+
 export interface HistorySummaryResponse {
   range: HistoryDateRange;
   kpis: HistoryKpis;
   leaderboard: HistoryLeaderboardEntry[];
+  availableLeagues: HistoryAvailableLeague[];
 }
 
 export interface HistoryGameItem {

@@ -370,6 +370,62 @@ describe("getRefereeHistorySummary leaderboard", () => {
   });
 });
 
+describe("getRefereeHistorySummary availableLeagues", () => {
+  beforeEach(async () => { await seedReferees(); });
+
+  it("returns distinct (short, name) pairs within range, sorted by short", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, leagueShort: "OL", leagueName: "Oberliga" }),
+      baseGame({ apiMatchId: 2, leagueShort: "RLW", leagueName: "Regionalliga West" }),
+      baseGame({ apiMatchId: 3, leagueShort: "OL", leagueName: "Oberliga" }), // dup
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: [],
+    });
+
+    expect(res.availableLeagues).toEqual([
+      { short: "OL", name: "Oberliga" },
+      { short: "RLW", name: "Regionalliga West" },
+    ]);
+  });
+
+  it("availableLeagues is not narrowed by league filter", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, leagueShort: "OL", leagueName: "Oberliga" }),
+      baseGame({ apiMatchId: 2, leagueShort: "RLW", leagueName: "Regionalliga West" }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      league: "RLW",
+      status: [],
+    });
+
+    expect(res.availableLeagues.map((l) => l.short)).toEqual(["OL", "RLW"]);
+  });
+
+  it("skips rows with null leagueShort", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, leagueShort: null, leagueName: null }),
+      baseGame({ apiMatchId: 2, leagueShort: "OL", leagueName: "Oberliga" }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: [],
+    });
+
+    expect(res.availableLeagues).toEqual([
+      { short: "OL", name: "Oberliga" },
+    ]);
+  });
+});
+
 describe("getRefereeHistoryGames", () => {
   beforeEach(async () => { await seedReferees(); });
 
