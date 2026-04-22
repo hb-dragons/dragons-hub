@@ -18,6 +18,22 @@ export const auth = betterAuth({
   ],
   emailAndPassword: {
     enabled: true,
+    // Accounts are admin-created via the admin plugin; close the self-serve endpoint.
+    disableSignUp: true,
+    minPasswordLength: 12,
+  },
+  // Memory storage is single-instance only. Wire up secondary storage (Redis)
+  // before horizontally scaling the API.
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+      "/sign-up/email": { window: 60, max: 3 },
+      "/forget-password": { window: 60, max: 3 },
+      "/reset-password": { window: 60, max: 5 },
+    },
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
