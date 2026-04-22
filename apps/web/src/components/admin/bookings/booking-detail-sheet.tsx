@@ -30,6 +30,8 @@ import { Skeleton } from "@dragons/ui/components/skeleton";
 import { AlertTriangle, Loader2, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@dragons/ui/lib/utils";
+import { authClient } from "@/lib/auth-client";
+import { can } from "@dragons/shared";
 import { getTeamColor } from "../matches/utils";
 import type { BookingDetail } from "./types";
 
@@ -79,6 +81,9 @@ export function BookingDetailSheet({
 }: BookingDetailSheetProps) {
   const t = useTranslations();
   const format = useFormatter();
+  const { data: session } = authClient.useSession();
+  const canUpdate = can(session?.user ?? null, "booking", "update");
+  const canDelete = can(session?.user ?? null, "booking", "delete");
   const [loading, setLoading] = useState(false);
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [status, setStatus] = useState<string>("");
@@ -287,7 +292,7 @@ export function BookingDetailSheet({
                       variant={status === s ? "default" : "outline"}
                       size="sm"
                       onClick={() => setStatus(s)}
-                      disabled={status === s}
+                      disabled={status === s || !canUpdate}
                     >
                       {t(`bookings.status.${s}`)}
                     </Button>
@@ -318,6 +323,7 @@ export function BookingDetailSheet({
                       value={startTime.slice(0, 5) || null}
                       onChange={(v) => setStartTime(v ? v + ":00" : "")}
                       className="h-9 w-full"
+                      disabled={!canUpdate}
                     />
                     {booking.calculatedStartTime && startTime !== booking.calculatedStartTime && (
                       <p className="text-xs text-muted-foreground">
@@ -331,6 +337,7 @@ export function BookingDetailSheet({
                       value={endTime.slice(0, 5) || null}
                       onChange={(v) => setEndTime(v ? v + ":00" : "")}
                       className="h-9 w-full"
+                      disabled={!canUpdate}
                     />
                     {booking.calculatedEndTime && endTime !== booking.calculatedEndTime && (
                       <p className="text-xs text-muted-foreground">
@@ -347,6 +354,7 @@ export function BookingDetailSheet({
                       value={overrideReason}
                       onChange={(e) => setOverrideReason(e.target.value)}
                       placeholder={t("bookings.detail.reasonPlaceholder")}
+                      disabled={!canUpdate}
                     />
                   </Field>
                 )}
@@ -411,6 +419,7 @@ export function BookingDetailSheet({
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder={t("bookings.detail.notesPlaceholder")}
+                    disabled={!canUpdate}
                   />
                 </Field>
               </section>
@@ -424,30 +433,34 @@ export function BookingDetailSheet({
                   className="flex-1"
                   onClick={handleClose}
                 >
-                  {t("common.cancel")}
+                  {canUpdate ? t("common.cancel") : t("common.close")}
                 </Button>
-                <Button
-                  className="flex-1"
-                  onClick={handleSave}
-                  disabled={saving || !isDirty}
-                >
-                  {saving ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="mr-2 h-4 w-4" />
-                  )}
-                  {t("common.saveChanges")}
-                </Button>
+                {canUpdate && (
+                  <Button
+                    className="flex-1"
+                    onClick={handleSave}
+                    disabled={saving || !isDirty}
+                  >
+                    {saving ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    {t("common.saveChanges")}
+                  </Button>
+                )}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-2 w-full text-destructive hover:text-destructive"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t("bookings.detail.delete")}
-              </Button>
+              {canDelete && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2 w-full text-destructive hover:text-destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t("bookings.detail.delete")}
+                </Button>
+              )}
             </div>
           </div>
         )}

@@ -5,6 +5,8 @@ import { useTranslations, useFormatter } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { authClient } from "@/lib/auth-client";
+import { can } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 import { Sheet } from "@dragons/ui/components/sheet";
 import {
@@ -42,6 +44,8 @@ const statusVariantMap: Record<
 export function BookingListTable() {
   const t = useTranslations();
   const format = useFormatter();
+  const { data: session } = authClient.useSession();
+  const canCreate = can(session?.user ?? null, "booking", "create");
   const { data: bookings } = useSWR<BookingListItem[]>(
     SWR_KEYS.bookings,
     apiFetcher,
@@ -79,11 +83,15 @@ export function BookingListTable() {
             <SelectItem value="cancelled">{t("bookings.status.cancelled")}</SelectItem>
           </SelectContent>
         </Select>
-        <ReconcileDialog onReconciled={() => mutate(SWR_KEYS.bookings)} />
-        <Button size="sm" onClick={() => setShowCreateDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          {t("bookings.create.title")}
-        </Button>
+        {canCreate && (
+          <ReconcileDialog onReconciled={() => mutate(SWR_KEYS.bookings)} />
+        )}
+        {canCreate && (
+          <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t("bookings.create.title")}
+          </Button>
+        )}
       </div>
 
       {bookingList.length === 0 ? (

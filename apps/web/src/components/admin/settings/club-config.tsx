@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { authClient } from "@/lib/auth-client";
+import { can } from "@dragons/shared";
 import {
   Card,
   CardContent,
@@ -22,6 +24,8 @@ import type { ClubConfig as ClubConfigType } from "./settings-provider";
 
 export function ClubConfig() {
   const t = useTranslations();
+  const { data: session } = authClient.useSession();
+  const canUpdate = can(session?.user ?? null, "settings", "update");
   const { data: clubConfig } = useSWR<ClubConfigType | null>(SWR_KEYS.settingsClub, apiFetcher);
   const { mutate } = useSWRConfig();
   const [clubId, setClubId] = useState(clubConfig?.clubId?.toString() ?? "");
@@ -88,6 +92,7 @@ export function ClubConfig() {
               placeholder={t("settings.club.idPlaceholder")}
               value={clubId}
               onChange={(e) => setClubId(e.target.value)}
+              disabled={!canUpdate}
             />
           </div>
           <div className="space-y-2">
@@ -97,11 +102,12 @@ export function ClubConfig() {
               placeholder={t("settings.club.namePlaceholder")}
               value={clubName}
               onChange={(e) => setClubName(e.target.value)}
+              disabled={!canUpdate}
             />
           </div>
           <Button
             onClick={handleSave}
-            disabled={!hasChanges || saving}
+            disabled={!hasChanges || saving || !canUpdate}
             className="w-fit"
           >
             {saving ? (
