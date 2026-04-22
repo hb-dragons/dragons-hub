@@ -1,3 +1,5 @@
+export type HistoryStatusValue = "played" | "cancelled" | "forfeited";
+// Kept for legacy callers only; new code should use HistoryStatusValue[]
 export type HistoryStatus = "all" | "active" | "cancelled" | "forfeited";
 
 export interface HistoryDateRange {

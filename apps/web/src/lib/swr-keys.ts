@@ -49,4 +49,8 @@ export const SWR_KEYS = {
     `/admin/referee/history/summary${qs ? `?${qs}` : ""}`,
   refereeHistoryGames: (qs: string) =>
     `/admin/referee/history/games${qs ? `?${qs}` : ""}`,
+  refereeHistoryGamesCsv: (qs: string) =>
+    `/admin/referee/history/games.csv${qs ? `?${qs}` : ""}`,
+  refereeHistoryLeaderboardCsv: (qs: string) =>
+    `/admin/referee/history/leaderboard.csv${qs ? `?${qs}` : ""}`,
 } as const;
