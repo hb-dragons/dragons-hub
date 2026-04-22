@@ -27,6 +27,7 @@ import { publicAssetsRoutes } from "./public/assets.routes";
 import { refereeGamesRoutes } from "./referee/games.routes";
 import { refereeAssignmentRoutes } from "./referee/assignment.routes";
 import { adminRefereeAssignmentRoutes } from "./admin/referee-assignment.routes";
+import { adminRefereeHistoryRoutes } from "./admin/referee-history.routes";
 
 const routes = new Hono();
 
@@ -58,5 +59,6 @@ routes.route("/public", publicAssetsRoutes);
 routes.route("/referee", refereeGamesRoutes);
 routes.route("/referee", refereeAssignmentRoutes);
 routes.route("/admin", adminRefereeAssignmentRoutes);
+routes.route("/admin", adminRefereeHistoryRoutes);
 
 export { routes };
