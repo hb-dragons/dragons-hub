@@ -236,4 +236,56 @@ describe("getDefaultNotificationsForEvent", () => {
       expect(rescheduled.some((n) => n.channel === "push")).toBe(true);
     });
   });
+
+  // ── PUSH_ELIGIBLE_EVENTS invariants ────────────────────────────────────
+  //
+  // Pins two contracts that were easy to accidentally break during the push
+  // fan-out rollout: no duplicate in_app entries per (audience, refereeId)
+  // tuple, and every in_app entry on a push-eligible event has a matching
+  // push entry. If either invariant fails, we'll either spam users with
+  // double notifications or silently drop push rows.
+  describe("PUSH_ELIGIBLE_EVENTS invariants", () => {
+    const eligibleEvents = [
+      { type: "referee.assigned", payload: { refereeId: 42 } },
+      { type: "referee.unassigned", payload: { refereeId: 42 } },
+      {
+        type: "referee.reassigned",
+        payload: { oldRefereeId: 1, newRefereeId: 2 },
+      },
+      { type: "referee.slots.needed", payload: {} },
+      { type: "referee.slots.reminder", payload: {} },
+      { type: "match.cancelled", payload: {} },
+      { type: "match.rescheduled", payload: {} },
+    ];
+
+    it.each(eligibleEvents)(
+      "$type: no duplicate in_app entries per audience+refereeId",
+      ({ type, payload }) => {
+        const out = getDefaultNotificationsForEvent(type, payload, "test");
+        const inApp = out.filter((n) => n.channel === "in_app");
+        const keys = inApp.map(
+          (n) => `${n.audience}:${n.refereeId ?? "_"}`,
+        );
+        expect(new Set(keys).size).toBe(keys.length);
+      },
+    );
+
+    it.each(eligibleEvents)(
+      "$type: every in_app entry has a matching push entry",
+      ({ type, payload }) => {
+        const out = getDefaultNotificationsForEvent(type, payload, "test");
+        const inAppKeys = new Set(
+          out
+            .filter((n) => n.channel === "in_app")
+            .map((n) => `${n.audience}:${n.refereeId ?? "_"}`),
+        );
+        const pushKeys = new Set(
+          out
+            .filter((n) => n.channel === "push")
+            .map((n) => `${n.audience}:${n.refereeId ?? "_"}`),
+        );
+        expect(pushKeys).toEqual(inAppKeys);
+      },
+    );
+  });
 });
