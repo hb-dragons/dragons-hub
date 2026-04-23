@@ -709,16 +709,65 @@
   "board": {
     "title": "Operations Board",
     "addTask": "Add Task",
+    "addBoard": "Add Board",
     "addColumn": "Add Column",
     "editColumn": "Edit Column",
     "deleteColumn": "Delete Column",
     "emptyColumn": "No tasks",
     "emptyBoard": "No board found. Create one to get started.",
     "createBoard": "Create Board",
+    "boardName": "Board name",
+    "boardDescription": "Description (optional)",
+    "dnd": {
+      "pickUp": "Picked up {title}. Now in {column}, position {position} of {total}. Use arrow keys to move, Space or Enter to drop, Escape to cancel.",
+      "move": "Now in {column}, position {position} of {total}.",
+      "drop": "Dropped in {column} at position {position}.",
+      "cancel": "Drag cancelled."
+    },
+    "actions": {
+      "editBoard": "Edit Board",
+      "deleteBoard": "Delete Board",
+      "archive": "Archive",
+      "archiveSoon": "Archive coming soon",
+      "copy": "Copy",
+      "duplicate": "Duplicate",
+      "link": "Link…",
+      "watch": "Watch",
+      "labels": "Labels",
+      "attachments": "Attachments",
+      "comingSoon": "Coming soon"
+    },
+    "switcher": {
+      "current": "Current board",
+      "other": "Other boards",
+      "newBoard": "+ New board"
+    },
     "filters": {
       "assignee": "Assignee",
       "priority": "Priority",
-      "all": "All"
+      "all": "All",
+      "search": "Search tasks…",
+      "clear": "Clear filters",
+      "noResults": "No tasks match these filters."
+    },
+    "delete": {
+      "taskTitle": "Delete task?",
+      "taskBody": "This can't be undone. Task and its checklist + comments will be removed.",
+      "boardTitle": "Delete board?",
+      "boardBody": "This removes the board, all columns, and all tasks permanently.",
+      "columnTitle": "Delete column?",
+      "columnBody": "The column must be empty before it can be deleted.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "column": {
+      "colorHex": "Color (hex)",
+      "doneColumn": "Done column",
+      "wipOver": "Over WIP limit"
+    },
+    "comments": {
+      "empty": "No comments yet.",
+      "unknownUser": "Unknown user"
     },
     "task": {
       "title": "Title",

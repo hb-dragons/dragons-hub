@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { useSWRConfig } from "swr";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
-import { SWR_KEYS } from "@/lib/swr-keys";
 import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
 import { Label } from "@dragons/ui/components/label";
@@ -27,10 +24,14 @@ import {
   DialogTitle,
 } from "@dragons/ui/components/dialog";
 import { Loader2 } from "lucide-react";
-import type { BoardColumnData, TaskCardData } from "./types";
-import { TASK_PRIORITIES } from "@dragons/shared";
+import { TASK_PRIORITIES, type TaskPriority } from "@dragons/shared";
+import type { BoardColumnData } from "@dragons/shared";
+import { AssigneePicker } from "./assignee-picker";
+import { AssigneeStack } from "./assignee-stack";
+import { useUsers } from "@/hooks/use-users";
+import { useTaskMutations } from "@/hooks/use-task-mutations";
 
-interface CreateTaskDialogProps {
+export interface CreateTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   boardId: number;
@@ -46,11 +47,14 @@ export function CreateTaskDialog({
   defaultColumnId,
 }: CreateTaskDialogProps) {
   const t = useTranslations();
-  const { mutate } = useSWRConfig();
+  const { data: users } = useUsers();
+  const { createTask } = useTaskMutations(boardId);
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState("normal");
+  const [priority, setPriority] = useState<TaskPriority>("normal");
   const [dueDate, setDueDate] = useState<string | null>(null);
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [columnId, setColumnId] = useState<string>(
     defaultColumnId?.toString() ?? columns[0]?.id.toString() ?? "",
   );
@@ -61,38 +65,35 @@ export function CreateTaskDialog({
     setDescription("");
     setPriority("normal");
     setDueDate(null);
+    setAssigneeIds([]);
     setColumnId(defaultColumnId?.toString() ?? columns[0]?.id.toString() ?? "");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  const assigneeObjects = assigneeIds
+    .map((id) => users?.get(id))
+    .filter((u): u is NonNullable<typeof u> => !!u)
+    .map((u) => ({
+      userId: u.id,
+      name: u.name,
+      assignedAt: new Date().toISOString(),
+    }));
+
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-
     setSaving(true);
     try {
-      const created = await fetchAPI<TaskCardData>(
-        `/admin/boards/${boardId}/tasks`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            title: title.trim(),
-            description: description.trim() || null,
-            priority,
-            dueDate,
-            columnId: parseInt(columnId, 10),
-          }),
-        },
-      );
-      await mutate(
-        SWR_KEYS.boardTasks(boardId),
-        (current: TaskCardData[] | undefined) => [...(current ?? []), created],
-        { revalidate: false },
-      );
+      await createTask({
+        title: title.trim(),
+        description: description.trim() || null,
+        priority,
+        dueDate,
+        columnId: parseInt(columnId, 10),
+        assigneeIds: assigneeIds.length > 0 ? assigneeIds : undefined,
+      });
       toast.success(t("board.toast.created"));
       reset();
       onOpenChange(false);
-    } catch {
-      // Error surfaced by fetchAPI
     } finally {
       setSaving(false);
     }
@@ -105,11 +106,11 @@ export function CreateTaskDialog({
           <DialogTitle>{t("board.addTask")}</DialogTitle>
           <DialogDescription>{t("board.task.title")}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="task-title">{t("board.task.title")}</Label>
+            <Label htmlFor="ct-title">{t("board.task.title")}</Label>
             <Input
-              id="task-title"
+              id="ct-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
@@ -117,9 +118,9 @@ export function CreateTaskDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="task-description">{t("board.task.description")}</Label>
+            <Label htmlFor="ct-desc">{t("board.task.description")}</Label>
             <Textarea
-              id="task-description"
+              id="ct-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -128,7 +129,10 @@ export function CreateTaskDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>{t("board.task.priority")}</Label>
-              <Select value={priority} onValueChange={setPriority}>
+              <Select
+                value={priority}
+                onValueChange={(v) => setPriority(v as TaskPriority)}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -160,6 +164,19 @@ export function CreateTaskDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{t("board.task.assignee")}</Label>
+            <div className="flex items-center gap-2">
+              <AssigneePicker
+                assignees={assigneeObjects}
+                onAdd={(id) => setAssigneeIds((prev) => [...prev, id])}
+                onRemove={(id) =>
+                  setAssigneeIds((prev) => prev.filter((x) => x !== id))
+                }
+              />
+              <AssigneeStack assignees={assigneeObjects} />
+            </div>
           </div>
           <DialogFooter>
             <Button

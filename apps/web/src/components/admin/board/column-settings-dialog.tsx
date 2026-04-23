@@ -126,7 +126,7 @@ export function ColumnSettingsDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="col-color">Color (hex)</Label>
+            <Label htmlFor="col-color">{t("board.column.colorHex")}</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="col-color"
@@ -150,7 +150,7 @@ export function ColumnSettingsDialog({
               checked={isDoneColumn}
               onCheckedChange={(checked) => setIsDoneColumn(checked === true)}
             />
-            <Label htmlFor="col-done">Done column</Label>
+            <Label htmlFor="col-done">{t("board.column.doneColumn")}</Label>
           </div>
         </div>
 

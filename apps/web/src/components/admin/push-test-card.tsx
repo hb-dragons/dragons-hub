@@ -98,7 +98,9 @@ export function PushTestCard() {
       if (failed === 0) {
         toast.success(t("toast.success", { count: res.deviceCount }));
       } else {
-        toast.warning(t("toast.partialFailure", { failed, total }));
+        toast.warning(
+          t("toast.partialFailure", { failed: String(failed), total: String(total) }),
+        );
       }
       setMessage("");
       await mutate();

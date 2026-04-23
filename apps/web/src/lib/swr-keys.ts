@@ -21,7 +21,20 @@ export const SWR_KEYS = {
   users: "admin-users",
   boards: "/admin/boards",
   boardDetail: (id: number) => `/admin/boards/${id}`,
-  boardTasks: (boardId: number) => `/admin/boards/${boardId}/tasks`,
+  boardTasks: (
+    boardId: number,
+    filters?: { assigneeId?: string; priority?: string; columnId?: number },
+  ) => {
+    const qs = new URLSearchParams();
+    if (filters?.assigneeId) qs.set("assigneeId", filters.assigneeId);
+    if (filters?.priority) qs.set("priority", filters.priority);
+    if (filters?.columnId) qs.set("columnId", String(filters.columnId));
+    const suffix = qs.toString();
+    return suffix
+      ? `/admin/boards/${boardId}/tasks?${suffix}`
+      : `/admin/boards/${boardId}/tasks`;
+  },
+  taskDetail: (id: number) => `/admin/tasks/${id}`,
   bookings: "/admin/bookings",
   bookingDetail: (id: number) => `/admin/bookings/${id}`,
   settingsBooking: "/admin/settings/booking",
