@@ -2,11 +2,15 @@
 
 import { useTranslations } from "next-intl";
 import { Badge } from "@dragons/ui/components/badge";
-import { Calendar, CheckSquare } from "lucide-react";
-import type { TaskCardData } from "./types";
-import type { TaskPriority } from "@dragons/shared";
+import { Calendar, CheckSquare, Paperclip, MessageSquare } from "lucide-react";
+import type { TaskCardData, TaskPriority } from "@dragons/shared";
+import { AssigneeStack } from "./assignee-stack";
+import { LabelsBar } from "./labels-bar.stub";
 
-const priorityVariant: Record<TaskPriority, "default" | "secondary" | "destructive" | "outline"> = {
+const priorityVariant: Record<
+  TaskPriority,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
   low: "secondary",
   normal: "outline",
   high: "default",
@@ -14,56 +18,72 @@ const priorityVariant: Record<TaskPriority, "default" | "secondary" | "destructi
 };
 
 interface TaskCardProps {
-  task: TaskCardData;
-  onDragStart: (e: React.DragEvent, taskId: number) => void;
-  onClick: (task: TaskCardData) => void;
+  task: TaskCardData & {
+    labels?: { id: number; color: string; name?: string | null }[];
+    attachmentCount?: number;
+    commentCount?: number;
+  };
+  onOpen: (task: TaskCardData) => void;
+  dragHandle?: React.HTMLAttributes<HTMLDivElement>;
 }
 
-export function TaskCard({ task, onDragStart, onClick }: TaskCardProps) {
+export function TaskCard({ task, onOpen, dragHandle }: TaskCardProps) {
   const t = useTranslations("board");
   const variant = priorityVariant[task.priority];
-  const priorityKey = task.priority;
   const hasChecklist = task.checklistTotal > 0;
 
   return (
     <div
-      draggable
-      onDragStart={(e) => onDragStart(e, task.id)}
-      onClick={() => onClick(task)}
-      className="cursor-grab rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
+      {...dragHandle}
+      onClick={() => onOpen(task)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(task);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
+      <LabelsBar labels={task.labels} />
+
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium leading-tight">{task.title}</p>
         <Badge variant={variant} className="shrink-0">
-          {t(`priority.${priorityKey}`)}
+          {t(`priority.${task.priority}`)}
         </Badge>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        {task.dueDate && (
-          <span className="inline-flex items-center gap-1">
-            <Calendar className="h-3 w-3" />
-            {task.dueDate}
-          </span>
-        )}
-        {hasChecklist && (
-          <span className="inline-flex items-center gap-1">
-            <CheckSquare className="h-3 w-3" />
-            {task.checklistChecked}/{task.checklistTotal}
-          </span>
-        )}
-      </div>
-
-      {hasChecklist && (
-        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{
-              width: `${Math.round((task.checklistChecked / task.checklistTotal) * 100)}%`,
-            }}
-          />
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          {task.dueDate && (
+            <span className="inline-flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {task.dueDate}
+            </span>
+          )}
+          {hasChecklist && (
+            <span className="inline-flex items-center gap-1">
+              <CheckSquare className="h-3 w-3" />
+              {task.checklistChecked}/{task.checklistTotal}
+            </span>
+          )}
+          {task.attachmentCount && task.attachmentCount > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Paperclip className="h-3 w-3" />
+              {task.attachmentCount}
+            </span>
+          )}
+          {task.commentCount && task.commentCount > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <MessageSquare className="h-3 w-3" />
+              {task.commentCount}
+            </span>
+          )}
         </div>
-      )}
+        <AssigneeStack assignees={task.assignees} />
+      </div>
     </div>
   );
 }
