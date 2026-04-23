@@ -199,6 +199,26 @@
     },
     "issuesCallout": {
       "label": "{cancelled, plural, =0 {} one {# Absage} other {# Absagen}} · {forfeited, plural, =0 {} one {# Verzicht} other {# Verzichte}} in diesem Zeitraum"
+    },
+    "drawer": {
+      "ownClub": "Eigener Verein",
+      "guest": "Gast",
+      "close": "Schließen",
+      "first": "Erstes",
+      "last": "Letztes",
+      "daysAgo": "vor {days} Tagen",
+      "workloadShare": "Anteil am Eigenvereins-Pensum",
+      "rankOfTotal": "Platz {rank} von {total}",
+      "openProfile": "Schiri-Profil öffnen",
+      "empty": "Keine Spiele für diesen Schiri im Zeitraum.",
+      "gamesCount": "Spiele · {count}",
+      "role": { "sr1": "SR1", "sr2": "SR2" },
+      "stats": {
+        "total": "Gesamt",
+        "sr1": "SR1",
+        "sr2": "SR2",
+        "leagues": "Ligen"
+      }
     }
   },
   "common": {

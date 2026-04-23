@@ -199,6 +199,26 @@
     },
     "issuesCallout": {
       "label": "{cancelled, plural, =0 {} one {# cancelled} other {# cancelled}} · {forfeited, plural, =0 {} one {# forfeited} other {# forfeited}} in this range"
+    },
+    "drawer": {
+      "ownClub": "Own club",
+      "guest": "Guest",
+      "close": "Close",
+      "first": "First",
+      "last": "Last",
+      "daysAgo": "{days}d ago",
+      "workloadShare": "Share of own-club workload",
+      "rankOfTotal": "Rank {rank} of {total}",
+      "openProfile": "Open ref profile",
+      "empty": "No games for this ref in range.",
+      "gamesCount": "Games · {count}",
+      "role": { "sr1": "SR1", "sr2": "SR2" },
+      "stats": {
+        "total": "Total",
+        "sr1": "SR1",
+        "sr2": "SR2",
+        "leagues": "Leagues"
+      }
     }
   },
   "common": {
