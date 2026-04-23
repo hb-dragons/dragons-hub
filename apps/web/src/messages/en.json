@@ -168,6 +168,11 @@
         "played": "Played",
         "cancelled": "Cancelled",
         "forfeited": "Forfeited"
+      },
+      "badges": {
+        "home": "Home",
+        "away": "Away",
+        "open": "Open"
       }
     },
     "range": {
