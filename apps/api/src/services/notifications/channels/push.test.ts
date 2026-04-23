@@ -259,7 +259,7 @@ describe("PushChannelAdapter", () => {
     expect(rows[0]!.errorMessage).toContain("ECONNREFUSED");
   });
 
-  it("prefers user preference locale over device locale", async () => {
+  it("prefers user preference locale over device locale when a pref row exists", async () => {
     mockSelectReturning([
       { id: 1, userId: "user_a", token: "ExponentPushToken[a]", platform: "ios", locale: "de-DE" },
     ]);
@@ -283,5 +283,53 @@ describe("PushChannelAdapter", () => {
     const sendArg = mocks.sendBatch.mock.calls[0]![0] as Array<{ title: string }>;
     // English template should have been used
     expect(sendArg[0]!.title.toLowerCase()).toContain("referee");
+  });
+
+  it("uses device locale (en) when no pref row exists — EN device renders EN", async () => {
+    mockSelectReturning([
+      { id: 1, userId: "user_a", token: "ExponentPushToken[a]", platform: "ios", locale: "en-US" },
+    ]);
+    mockSelectReturning([]); // no prefs row
+
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt" }]);
+    mockInsertOK();
+
+    const adapter = new PushChannelAdapter(new ExpoPushClient({}));
+    await adapter.send({
+      eventId: "evt_test_1",
+      eventType: "referee.assigned",
+      payload: validRefereeAssignedPayload,
+      watchRuleId: null,
+      channelConfigId: 1,
+      recipientUserIds: ["user_a"],
+    });
+
+    const sendArg = mocks.sendBatch.mock.calls[0]![0] as Array<{ title: string }>;
+    // English template renders "referee" in title
+    expect(sendArg[0]!.title.toLowerCase()).toContain("referee");
+  });
+
+  it("uses device locale (de) when no pref row exists — DE device renders DE", async () => {
+    mockSelectReturning([
+      { id: 1, userId: "user_a", token: "ExponentPushToken[a]", platform: "ios", locale: "de-DE" },
+    ]);
+    mockSelectReturning([]); // no prefs row
+
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt" }]);
+    mockInsertOK();
+
+    const adapter = new PushChannelAdapter(new ExpoPushClient({}));
+    await adapter.send({
+      eventId: "evt_test_1",
+      eventType: "referee.assigned",
+      payload: validRefereeAssignedPayload,
+      watchRuleId: null,
+      channelConfigId: 1,
+      recipientUserIds: ["user_a"],
+    });
+
+    const sendArg = mocks.sendBatch.mock.calls[0]![0] as Array<{ title: string }>;
+    // German template contains "Schiedsrichter" or similar — we just assert it's NOT the English title
+    expect(sendArg[0]!.title.toLowerCase()).not.toContain("referee");
   });
 });

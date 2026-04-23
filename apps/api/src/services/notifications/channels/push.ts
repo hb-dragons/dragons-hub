@@ -76,7 +76,7 @@ export class PushChannelAdapter {
       const userPref = prefByUser.get(device.userId);
       if (userPref?.mutedEventTypes?.includes(params.eventType)) continue;
 
-      const locale = pickLocale(userPref?.locale, device.locale);
+      const locale = pickLocale(userPref, device.locale);
       const rendered = renderPushTemplate({
         eventType: params.eventType,
         payload: params.payload,
@@ -149,7 +149,20 @@ export class PushChannelAdapter {
   }
 }
 
-function pickLocale(userLocale: string | undefined | null, deviceLocale: string | null | undefined): Locale {
-  const candidate = userLocale ?? deviceLocale ?? "de";
+// Authoritative locale selection:
+//   1. If the user has a preferences row at all, honor that row's locale — they
+//      visited the settings page and either kept the default or changed it.
+//   2. Otherwise the pref row is absent; fall back to the device's reported
+//      locale (installed system language). The default pref-row value of "de"
+//      would otherwise override the device for every English user who never
+//      opened the settings screen.
+//   3. Final fallback "de" keeps the existing behaviour when both are missing.
+function pickLocale(
+  userPref: PrefRow | undefined,
+  deviceLocale: string | null | undefined,
+): Locale {
+  const candidate = userPref
+    ? (userPref.locale ?? "de")
+    : (deviceLocale ?? "de");
   return candidate.toLowerCase().startsWith("en") ? "en" : "de";
 }
