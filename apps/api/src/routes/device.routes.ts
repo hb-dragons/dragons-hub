@@ -11,6 +11,7 @@ const deviceRoutes = new Hono();
 const registerBodySchema = z.object({
   token: z.string().min(1),
   platform: z.enum(["ios", "android"]),
+  locale: z.string().min(2).max(15).optional(),
 });
 
 // POST /register — Register push notification device token
@@ -30,14 +31,20 @@ deviceRoutes.post(
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
 
-    const { token, platform } = registerBodySchema.parse(await c.req.json());
+    const { token, platform, locale } = registerBodySchema.parse(await c.req.json());
 
     await db
       .insert(pushDevices)
-      .values({ userId: session.user.id, token, platform })
+      .values({ userId: session.user.id, token, platform, locale })
       .onConflictDoUpdate({
         target: pushDevices.token,
-        set: { userId: session.user.id, platform, updatedAt: new Date() },
+        set: {
+          userId: session.user.id,
+          platform,
+          locale,
+          lastSeenAt: new Date(),
+          updatedAt: new Date(),
+        },
       });
 
     return c.json({ success: true });

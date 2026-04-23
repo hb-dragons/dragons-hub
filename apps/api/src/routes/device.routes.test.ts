@@ -30,6 +30,8 @@ vi.mock("@dragons/db/schema", () => ({
     token: "token",
     userId: "user_id",
     platform: "platform",
+    locale: "locale",
+    lastSeenAt: "last_seen_at",
     updatedAt: "updated_at",
   },
 }));
@@ -70,6 +72,22 @@ function mockInsertSuccess() {
       onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
     }),
   });
+}
+
+function mockInsertCapture() {
+  const valuesCall = vi.fn();
+  const setCall = vi.fn();
+  const values = vi.fn().mockImplementation((v) => {
+    valuesCall(v);
+    return {
+      onConflictDoUpdate: vi.fn().mockImplementation((cfg) => {
+        setCall(cfg.set);
+        return Promise.resolve(undefined);
+      }),
+    };
+  });
+  mocks.dbInsert.mockReturnValue({ values });
+  return { valuesCall, setCall };
 }
 
 function mockDeleteSuccess() {
@@ -190,6 +208,89 @@ describe("POST /register", () => {
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("stores locale on register", async () => {
+    mocks.getSession.mockResolvedValue(validSession);
+    const { valuesCall } = mockInsertCapture();
+
+    const res = await app.request("/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: "ExponentPushToken[loc1]",
+        platform: "ios",
+        locale: "de-DE",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(valuesCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-123",
+        token: "ExponentPushToken[loc1]",
+        platform: "ios",
+        locale: "de-DE",
+      }),
+    );
+  });
+
+  it("bumps lastSeenAt and updates locale on re-register", async () => {
+    mocks.getSession.mockResolvedValue(validSession);
+    const { setCall } = mockInsertCapture();
+
+    const res = await app.request("/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: "ExponentPushToken[bump1]",
+        platform: "ios",
+        locale: "en-US",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(setCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-123",
+        platform: "ios",
+        locale: "en-US",
+        lastSeenAt: expect.any(Date),
+        updatedAt: expect.any(Date),
+      }),
+    );
+  });
+
+  it("accepts request without locale (optional field)", async () => {
+    mocks.getSession.mockResolvedValue(validSession);
+    const { valuesCall } = mockInsertCapture();
+
+    const res = await app.request("/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: "ExponentPushToken[nolocale]", platform: "ios" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(valuesCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: "ExponentPushToken[nolocale]",
+        platform: "ios",
+      }),
+    );
+    // locale may be undefined or omitted — not asserted either way here
+  });
+
+  it("rejects locale shorter than 2 chars", async () => {
+    mocks.getSession.mockResolvedValue(validSession);
+
+    const res = await app.request("/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: "ExponentPushToken[xx]", platform: "ios", locale: "a" }),
+    });
+
+    expect(res.status).toBe(400);
   });
 });
 
