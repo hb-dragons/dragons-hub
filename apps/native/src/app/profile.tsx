@@ -6,6 +6,7 @@ import { useLocale } from "@/hooks/useLocale";
 import type { LocalePref } from "@/hooks/useLocale";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
+import { unregisterForPush } from "@/lib/push/registration";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -34,6 +35,9 @@ export default function ProfileScreen() {
   const { data: session } = authClient.useSession();
 
   async function handleSignOut() {
+    // DELETE push token BEFORE clearing auth — the DELETE endpoint requires
+    // an authenticated session to authorize the deletion.
+    await unregisterForPush();
     await authClient.signOut();
     router.replace("/");
   }

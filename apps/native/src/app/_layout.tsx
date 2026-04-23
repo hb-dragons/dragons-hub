@@ -15,8 +15,11 @@ import { i18n } from "@/lib/i18n";
 import { colors as themeColors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { configureNotificationHandler } from "@/lib/push/handler";
+import { usePushRegistration } from "@/hooks/usePushRegistration";
 
 SplashScreen.preventAutoHideAsync();
+configureNotificationHandler();
 
 // Install a global JS error handler that logs to NSLog BEFORE RCTFatal aborts
 // the app in Release builds. Readable via `idevicesyslog | grep DRAGONS_JS_ERROR`.
@@ -40,6 +43,7 @@ const detailHeaderOptions = {
 } as const;
 
 function RootNavigator() {
+  usePushRegistration();
   const { colors, isDark } = useTheme();
 
   return (
