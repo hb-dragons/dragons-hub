@@ -90,9 +90,9 @@ const navGroups = [
     icon: KanbanSquare,
     items: [
       {
-        href: "/admin/board",
+        href: "/admin/boards",
         labelKey: "nav.board" as const,
-        perm: { resource: "settings", action: "view" } as const,
+        perm: { resource: "board", action: "view" } as const,
       },
       {
         href: "/admin/bookings",
