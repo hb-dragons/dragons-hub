@@ -162,6 +162,12 @@
         "cancelled": "Abgesagt",
         "forfeited": "Verzicht",
         "played": "Gespielt"
+      },
+      "statusChip": {
+        "all": "Alle",
+        "played": "Gespielt",
+        "cancelled": "Abgesagt",
+        "forfeited": "Verzicht"
       }
     },
     "range": {

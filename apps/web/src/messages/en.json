@@ -162,6 +162,12 @@
         "cancelled": "Cancelled",
         "forfeited": "Forfeited",
         "played": "Played"
+      },
+      "statusChip": {
+        "all": "All",
+        "played": "Played",
+        "cancelled": "Cancelled",
+        "forfeited": "Forfeited"
       }
     },
     "range": {
