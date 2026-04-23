@@ -109,22 +109,21 @@
       "workload": "Workload",
       "games": "Games"
     },
-    "status": {
-      "label": "Status",
-      "all": "All",
-      "active": "Played",
-      "cancelled": "Cancelled",
-      "forfeited": "Forfeited"
+    "presets": {
+      "season": "Season",
+      "30d": "Last 30 days",
+      "month": "This month",
+      "custom": "Custom"
     },
     "filters": {
+      "range": "Range",
       "dateFrom": "From",
       "dateTo": "To",
       "league": "League",
-      "search": "Search team or league",
-      "reset": "Reset",
-      "range": "Range",
       "leagueAll": "All leagues",
+      "search": "Search team or league",
       "searchPlaceholder": "Search teams, league…",
+      "reset": "Reset",
       "export": "Export CSV",
       "chips": {
         "league": "League: {value}",
@@ -132,32 +131,20 @@
         "search": "Search: {value}"
       }
     },
-    "presets": {
-      "season": "Season",
-      "30d": "Last 30 days",
-      "month": "This month",
-      "custom": "Custom"
+    "issuesCallout": {
+      "label": "{cancelled, plural, =0 {} one {# cancelled} other {# cancelled}} · {forfeited, plural, =0 {} one {# forfeited} other {# forfeited}} in this range"
     },
     "kpi": {
-      "games": "Games",
-      "obligatedSlots": "Obligated slots",
-      "filledSlots": "Filled slots",
-      "unfilledSlots": "Unfilled slots",
-      "cancelled": "Cancelled",
-      "forfeited": "Forfeited",
-      "distinctReferees": "Distinct referees",
-      "unfilledWarning": "Past games with unfilled slots indicate a data issue.",
       "coverage": "Obligation coverage",
       "coverageRatio": "{filled} / {total} filled",
-      "noObligation": "No home obligations in range"
+      "noObligation": "No home obligations in range",
+      "games": "Games",
+      "distinctReferees": "Distinct referees"
     },
     "leaderboard": {
-      "title": "Referee leaderboard",
-      "name": "Name",
-      "ownClub": "Own club",
-      "guest": "Guest",
       "ourRefs": "Our refs",
       "guestRefs": "Guest refs on our games",
+      "name": "Name",
       "workload": "Workload",
       "sr1": "SR1",
       "sr2": "SR2",
@@ -194,16 +181,6 @@
         "open": "Open"
       }
     },
-    "range": {
-      "source": {
-        "user": "Custom range",
-        "settings": "Current season",
-        "default": "Current season (fallback)"
-      }
-    },
-    "issuesCallout": {
-      "label": "{cancelled, plural, =0 {} one {# cancelled} other {# cancelled}} · {forfeited, plural, =0 {} one {# forfeited} other {# forfeited}} in this range"
-    },
     "drawer": {
       "ownClub": "Own club",
       "guest": "Guest",
@@ -222,6 +199,13 @@
         "sr1": "SR1",
         "sr2": "SR2",
         "leagues": "Leagues"
+      }
+    },
+    "range": {
+      "source": {
+        "user": "Custom range",
+        "settings": "Current season",
+        "default": "Current season (fallback)"
       }
     }
   },

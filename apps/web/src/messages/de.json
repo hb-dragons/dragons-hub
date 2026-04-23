@@ -109,22 +109,21 @@
       "workload": "Pensum",
       "games": "Spiele"
     },
-    "status": {
-      "label": "Status",
-      "all": "Alle",
-      "active": "Gespielt",
-      "cancelled": "Abgesagt",
-      "forfeited": "Verzicht"
+    "presets": {
+      "season": "Saison",
+      "30d": "Letzte 30 Tage",
+      "month": "Dieser Monat",
+      "custom": "Benutzerdefiniert"
     },
     "filters": {
+      "range": "Zeitraum",
       "dateFrom": "Von",
       "dateTo": "Bis",
       "league": "Liga",
-      "search": "Team oder Liga suchen",
-      "reset": "Zurücksetzen",
-      "range": "Zeitraum",
       "leagueAll": "Alle Ligen",
+      "search": "Team oder Liga suchen",
       "searchPlaceholder": "Teams, Liga suchen…",
+      "reset": "Zurücksetzen",
       "export": "CSV exportieren",
       "chips": {
         "league": "Liga: {value}",
@@ -132,32 +131,20 @@
         "search": "Suche: {value}"
       }
     },
-    "presets": {
-      "season": "Saison",
-      "30d": "Letzte 30 Tage",
-      "month": "Dieser Monat",
-      "custom": "Benutzerdefiniert"
+    "issuesCallout": {
+      "label": "{cancelled, plural, =0 {} one {# Absage} other {# Absagen}} · {forfeited, plural, =0 {} one {# Verzicht} other {# Verzichte}} in diesem Zeitraum"
     },
     "kpi": {
-      "games": "Spiele",
-      "obligatedSlots": "Pflicht-Slots",
-      "filledSlots": "Besetzt",
-      "unfilledSlots": "Unbesetzt",
-      "cancelled": "Abgesagt",
-      "forfeited": "Verzicht",
-      "distinctReferees": "Schiedsrichter",
-      "unfilledWarning": "Vergangene Spiele mit offenen Slots deuten auf Datenprobleme hin.",
       "coverage": "Pflicht-Abdeckung",
       "coverageRatio": "{filled} / {total} besetzt",
-      "noObligation": "Keine Heimspiel-Pflichten im Zeitraum"
+      "noObligation": "Keine Heimspiel-Pflichten im Zeitraum",
+      "games": "Spiele",
+      "distinctReferees": "Einzelne Schiris"
     },
     "leaderboard": {
-      "title": "Schiedsrichter-Rangliste",
-      "name": "Name",
-      "ownClub": "Eigener Verein",
-      "guest": "Gast",
       "ourRefs": "Unsere Schiris",
       "guestRefs": "Gast-Schiris bei unseren Spielen",
+      "name": "Name",
       "workload": "Pensum",
       "sr1": "SR1",
       "sr2": "SR2",
@@ -166,7 +153,7 @@
     },
     "games": {
       "title": "Spiele",
-      "empty": "Keine Spiele im gewählten Zeitraum.",
+      "empty": "Keine Spiele im Zeitraum.",
       "prev": "Zurück",
       "next": "Weiter",
       "columns": {
@@ -194,16 +181,6 @@
         "open": "Offen"
       }
     },
-    "range": {
-      "source": {
-        "user": "Eigener Zeitraum",
-        "settings": "Aktuelle Saison",
-        "default": "Aktuelle Saison (Fallback)"
-      }
-    },
-    "issuesCallout": {
-      "label": "{cancelled, plural, =0 {} one {# Absage} other {# Absagen}} · {forfeited, plural, =0 {} one {# Verzicht} other {# Verzichte}} in diesem Zeitraum"
-    },
     "drawer": {
       "ownClub": "Eigener Verein",
       "guest": "Gast",
@@ -222,6 +199,13 @@
         "sr1": "SR1",
         "sr2": "SR2",
         "leagues": "Ligen"
+      }
+    },
+    "range": {
+      "source": {
+        "user": "Eigener Zeitraum",
+        "settings": "Aktuelle Saison",
+        "default": "Aktuelle Saison (Fallback)"
       }
     }
   },
