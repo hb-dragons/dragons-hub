@@ -117,7 +117,22 @@
       "dateTo": "To",
       "league": "League",
       "search": "Search team or league",
-      "reset": "Reset"
+      "reset": "Reset",
+      "range": "Range",
+      "leagueAll": "All leagues",
+      "searchPlaceholder": "Search teams, league…",
+      "export": "Export CSV",
+      "chips": {
+        "league": "League: {value}",
+        "status": "Status: {value}",
+        "search": "Search: {value}"
+      }
+    },
+    "presets": {
+      "season": "Season",
+      "30d": "Last 30 days",
+      "month": "This month",
+      "custom": "Custom"
     },
     "kpi": {
       "games": "Games",

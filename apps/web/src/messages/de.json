@@ -117,7 +117,22 @@
       "dateTo": "Bis",
       "league": "Liga",
       "search": "Team oder Liga suchen",
-      "reset": "Zurücksetzen"
+      "reset": "Zurücksetzen",
+      "range": "Zeitraum",
+      "leagueAll": "Alle Ligen",
+      "searchPlaceholder": "Teams, Liga suchen…",
+      "export": "CSV exportieren",
+      "chips": {
+        "league": "Liga: {value}",
+        "status": "Status: {value}",
+        "search": "Suche: {value}"
+      }
+    },
+    "presets": {
+      "season": "Saison",
+      "30d": "Letzte 30 Tage",
+      "month": "Dieser Monat",
+      "custom": "Benutzerdefiniert"
     },
     "kpi": {
       "games": "Spiele",
