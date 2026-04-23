@@ -79,6 +79,7 @@ taskRoutes.post(
     });
     const body = taskCreateBodySchema.parse(await c.req.json());
     const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
@@ -135,6 +136,7 @@ taskRoutes.patch(
     const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
     const body = taskUpdateBodySchema.parse(await c.req.json());
     const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }

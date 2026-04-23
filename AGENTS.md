@@ -81,7 +81,8 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `venueBookingMatches` | `packages/db/src/schema/venue-booking-matches.ts` | venueBookingId FK (cascade), matchId FK — unique(venueBookingId, matchId) |
 | `boards` | `packages/db/src/schema/boards.ts` | name, description, createdBy |
 | `boardColumns` | `packages/db/src/schema/boards.ts` | boardId FK (cascade), name, position, color, isDoneColumn |
-| `tasks` | `packages/db/src/schema/tasks.ts` | boardId FK (cascade), columnId FK, title, description, assigneeId, priority, dueDate, position |
+| `tasks` | `packages/db/src/schema/tasks.ts` | boardId FK (cascade), columnId FK, title, description, priority, dueDate, position, createdBy |
+| `taskAssignees` | `packages/db/src/schema/tasks.ts` | taskId FK (cascade), userId FK (cascade), assignedAt, assignedBy FK — composite PK (taskId, userId) |
 | `taskChecklistItems` | `packages/db/src/schema/tasks.ts` | taskId FK (cascade), label, isChecked, checkedBy, position |
 | `taskComments` | `packages/db/src/schema/tasks.ts` | taskId FK (cascade), authorId, body |
 | `notifications` | `packages/db/src/schema/notifications.ts` | recipientId, channel, title, body, status, sentAt, errorMessage |
@@ -299,6 +300,8 @@ Match list and detail responses include associated venue booking data when avail
 | PATCH | `/admin/tasks/:id` | Update task fields |
 | PATCH | `/admin/tasks/:id/move` | Move task to another column/position |
 | DELETE | `/admin/tasks/:id` | Delete task |
+| PUT | `/admin/tasks/:id/assignees/:userId` | Assign a user to a task (idempotent) |
+| DELETE | `/admin/tasks/:id/assignees/:userId` | Remove a user from a task |
 | POST | `/admin/tasks/:id/checklist` | Add checklist item |
 | PATCH | `/admin/tasks/checklist/:id` | Toggle/update checklist item |
 | DELETE | `/admin/tasks/checklist/:id` | Delete checklist item |
