@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import type { BoardData, BoardColumnData, TaskCardData } from "./types";
 import { TaskCard } from "./task-card";
 import { CreateTaskDialog } from "./create-task-dialog";
-import { TaskDetailSheet } from "./task-detail-sheet";
+import { TaskDialog } from "./task-dialog";
 import { ColumnSettingsDialog } from "./column-settings-dialog";
 
 interface KanbanBoardProps {
@@ -189,10 +189,10 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
         defaultColumnId={createDialogColumnId}
       />
 
-      <TaskDetailSheet
-        task={selectedTask}
-        onClose={() => setSelectedTask(null)}
+      <TaskDialog
+        taskId={selectedTask?.id ?? null}
         boardId={boardId}
+        onClose={() => setSelectedTask(null)}
       />
 
       <ColumnSettingsDialog
