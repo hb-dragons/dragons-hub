@@ -30,19 +30,25 @@ export function KanbanColumn({
 }: KanbanColumnProps) {
   const t = useTranslations("board");
 
-  const sortable = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+  } = useSortable({
     id: `col-${column.id}`,
     data: { type: "column", id: column.id, columnId: column.id },
   });
 
-  const droppable = useDroppable({
+  const { setNodeRef: setDroppableRef } = useDroppable({
     id: `col-${column.id}`,
     data: { type: "column", id: column.id, columnId: column.id },
   });
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(sortable.transform),
-    transition: sortable.transition,
+    transform: CSS.Transform.toString(transform),
+    transition,
   };
 
   const overLimit =
@@ -50,7 +56,7 @@ export function KanbanColumn({
 
   return (
     <div
-      ref={sortable.setNodeRef}
+      ref={setSortableRef}
       style={style}
       className={`flex w-72 shrink-0 flex-col rounded-lg border bg-muted/50 ${
         overLimit ? "ring-2 ring-destructive" : ""
@@ -58,8 +64,8 @@ export function KanbanColumn({
     >
       <div className="flex items-center justify-between border-b px-3 py-2">
         <button
-          {...sortable.attributes}
-          {...sortable.listeners}
+          {...attributes}
+          {...listeners}
           className="cursor-grab p-1 text-muted-foreground hover:text-foreground"
           aria-label={t("actions.editBoard")}
           type="button"
@@ -98,7 +104,7 @@ export function KanbanColumn({
         </Button>
       </div>
       <div
-        ref={droppable.setNodeRef}
+        ref={setDroppableRef}
         className="flex flex-1 flex-col gap-2 p-2 min-h-[50px]"
       >
         <SortableContext
