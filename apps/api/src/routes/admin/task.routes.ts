@@ -13,6 +13,8 @@ import {
   addComment,
   updateComment,
   deleteComment,
+  addAssignee,
+  removeAssignee,
 } from "../../services/admin/task.service";
 import { requirePermission } from "../../middleware/rbac";
 import type { AppEnv } from "../../types";
@@ -29,15 +31,17 @@ import {
   checklistItemUpdateBodySchema,
   commentCreateBodySchema,
   commentUpdateBodySchema,
+  taskAssigneeParamSchema,
 } from "./task.schemas";
 
 const taskRoutes = new Hono<AppEnv>();
-const settingsUpdate = requirePermission("settings", "update");
+const boardView = requirePermission("board", "view");
+const boardUpdate = requirePermission("board", "update");
 
 // GET /admin/boards/:boardId/tasks - List tasks for a board
 taskRoutes.get(
   "/boards/:boardId/tasks",
-  settingsUpdate,
+  boardView,
   describeRoute({
     description: "List tasks for a board",
     tags: ["Tasks"],
@@ -60,7 +64,7 @@ taskRoutes.get(
 // POST /admin/boards/:boardId/tasks - Create task
 taskRoutes.post(
   "/boards/:boardId/tasks",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Create task",
     tags: ["Tasks"],
@@ -74,7 +78,12 @@ taskRoutes.post(
       boardId: c.req.param("boardId"),
     });
     const body = taskCreateBodySchema.parse(await c.req.json());
-    const result = await createTask(boardId, body);
+    const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await createTask(boardId, body, callerId);
 
     if (!result) {
       return c.json(
@@ -90,7 +99,7 @@ taskRoutes.post(
 // GET /admin/tasks/:id - Get task detail
 taskRoutes.get(
   "/tasks/:id",
-  settingsUpdate,
+  boardView,
   describeRoute({
     description: "Get task detail",
     tags: ["Tasks"],
@@ -114,7 +123,7 @@ taskRoutes.get(
 // PATCH /admin/tasks/:id - Update task
 taskRoutes.patch(
   "/tasks/:id",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Update task",
     tags: ["Tasks"],
@@ -126,7 +135,12 @@ taskRoutes.patch(
   async (c) => {
     const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
     const body = taskUpdateBodySchema.parse(await c.req.json());
-    const result = await updateTask(id, body);
+    const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await updateTask(id, body, callerId);
 
     if (!result) {
       return c.json({ error: "Task not found", code: "NOT_FOUND" }, 404);
@@ -139,7 +153,7 @@ taskRoutes.patch(
 // PATCH /admin/tasks/:id/move - Move task to column/position
 taskRoutes.patch(
   "/tasks/:id/move",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Move task to column and position",
     tags: ["Tasks"],
@@ -167,7 +181,7 @@ taskRoutes.patch(
 // DELETE /admin/tasks/:id - Delete task
 taskRoutes.delete(
   "/tasks/:id",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Delete task",
     tags: ["Tasks"],
@@ -191,7 +205,7 @@ taskRoutes.delete(
 // POST /admin/tasks/:id/checklist - Add checklist item
 taskRoutes.post(
   "/tasks/:id/checklist",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Add checklist item",
     tags: ["Tasks"],
@@ -216,7 +230,7 @@ taskRoutes.post(
 // PATCH /admin/tasks/:id/checklist/:itemId - Update checklist item
 taskRoutes.patch(
   "/tasks/:id/checklist/:itemId",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Update checklist item",
     tags: ["Tasks"],
@@ -231,7 +245,12 @@ taskRoutes.patch(
       itemId: c.req.param("itemId"),
     });
     const body = checklistItemUpdateBodySchema.parse(await c.req.json());
-    const result = await updateChecklistItem(id, itemId, body);
+    const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await updateChecklistItem(id, itemId, body, callerId);
 
     if (!result) {
       return c.json(
@@ -247,7 +266,7 @@ taskRoutes.patch(
 // DELETE /admin/tasks/:id/checklist/:itemId - Delete checklist item
 taskRoutes.delete(
   "/tasks/:id/checklist/:itemId",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Delete checklist item",
     tags: ["Tasks"],
@@ -277,7 +296,7 @@ taskRoutes.delete(
 // POST /admin/tasks/:id/comments - Add comment
 taskRoutes.post(
   "/tasks/:id/comments",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Add comment",
     tags: ["Tasks"],
@@ -289,7 +308,12 @@ taskRoutes.post(
   async (c) => {
     const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
     const body = commentCreateBodySchema.parse(await c.req.json());
-    const result = await addComment(id, body);
+    const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await addComment(id, body, callerId);
 
     if (!result) {
       return c.json({ error: "Task not found", code: "NOT_FOUND" }, 404);
@@ -302,7 +326,7 @@ taskRoutes.post(
 // PATCH /admin/tasks/:id/comments/:commentId - Edit comment
 taskRoutes.patch(
   "/tasks/:id/comments/:commentId",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Edit comment",
     tags: ["Tasks"],
@@ -330,7 +354,7 @@ taskRoutes.patch(
 // DELETE /admin/tasks/:id/comments/:commentId - Delete comment
 taskRoutes.delete(
   "/tasks/:id/comments/:commentId",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Delete comment",
     tags: ["Tasks"],
@@ -350,6 +374,61 @@ taskRoutes.delete(
       return c.json({ error: "Comment not found", code: "NOT_FOUND" }, 404);
     }
 
+    return c.json({ success: true });
+  },
+);
+
+// PUT /tasks/:id/assignees/:userId — idempotent add
+taskRoutes.put(
+  "/tasks/:id/assignees/:userId",
+  boardUpdate,
+  describeRoute({
+    description: "Assign a user to a task (idempotent)",
+    tags: ["Tasks"],
+    responses: {
+      200: { description: "Success" },
+      404: { description: "Task or user not found" },
+    },
+  }),
+  async (c) => {
+    const { id, userId } = taskAssigneeParamSchema.parse({
+      id: c.req.param("id"),
+      userId: c.req.param("userId"),
+    });
+    const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await addAssignee(id, userId, callerId);
+    if (!result) {
+      return c.json({ error: "Task or user not found", code: "NOT_FOUND" }, 404);
+    }
+    return c.json(result);
+  },
+);
+
+// DELETE /tasks/:id/assignees/:userId
+taskRoutes.delete(
+  "/tasks/:id/assignees/:userId",
+  boardUpdate,
+  describeRoute({
+    description: "Remove a user from a task",
+    tags: ["Tasks"],
+    responses: {
+      200: { description: "Success" },
+      404: { description: "Assignee not found" },
+    },
+  }),
+  async (c) => {
+    const { id, userId } = taskAssigneeParamSchema.parse({
+      id: c.req.param("id"),
+      userId: c.req.param("userId"),
+    });
+    const removed = await removeAssignee(id, userId);
+    if (!removed) {
+      return c.json({ error: "Assignee not found", code: "NOT_FOUND" }, 404);
+    }
     return c.json({ success: true });
   },
 );

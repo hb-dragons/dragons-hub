@@ -8,9 +8,11 @@ import {
   date,
   timestamp,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import type { TaskPriority } from "@dragons/shared";
 import { boards, boardColumns } from "./boards";
+import { user } from "./auth";
 
 export const tasks = pgTable(
   "tasks",
@@ -24,7 +26,6 @@ export const tasks = pgTable(
       .references(() => boardColumns.id),
     title: varchar("title", { length: 300 }).notNull(),
     description: text("description"),
-    assigneeId: text("assignee_id"),
     priority: varchar("priority", { length: 10 }).notNull().default("normal").$type<TaskPriority>(),
     dueDate: date("due_date"),
     position: integer("position").notNull().default(0),
@@ -39,7 +40,6 @@ export const tasks = pgTable(
   (table) => ({
     boardIdIdx: index("tasks_board_id_idx").on(table.boardId),
     columnIdIdx: index("tasks_column_id_idx").on(table.columnId),
-    assigneeIdx: index("tasks_assignee_idx").on(table.assigneeId),
     dueDateIdx: index("tasks_due_date_idx").on(table.dueDate),
   }),
 );
@@ -92,3 +92,27 @@ export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
 export type NewTaskChecklistItem = typeof taskChecklistItems.$inferInsert;
 export type TaskComment = typeof taskComments.$inferSelect;
 export type NewTaskComment = typeof taskComments.$inferInsert;
+
+export const taskAssignees = pgTable(
+  "task_assignees",
+  {
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    assignedBy: text("assigned_by")
+      .references(() => user.id, { onDelete: "set null" }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.taskId, table.userId] }),
+    userIdIdx: index("task_assignees_user_id_idx").on(table.userId),
+  }),
+);
+
+export type TaskAssigneeRow = typeof taskAssignees.$inferSelect;
+export type NewTaskAssignee = typeof taskAssignees.$inferInsert;

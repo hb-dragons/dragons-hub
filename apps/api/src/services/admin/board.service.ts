@@ -1,6 +1,6 @@
 import { db } from "../../config/database";
 import { boards, boardColumns, tasks } from "@dragons/db/schema";
-import { eq, asc, and, count } from "drizzle-orm";
+import { eq, asc, and, count, sql } from "drizzle-orm";
 import type { BoardSummary, BoardData } from "@dragons/shared";
 
 const DEFAULT_COLUMNS = [
@@ -153,45 +153,47 @@ export async function addColumn(
   color: string | null;
   isDoneColumn: boolean;
 } | null> {
-  // Check board exists
-  const [board] = await db
-    .select({ id: boards.id })
-    .from(boards)
-    .where(eq(boards.id, boardId))
-    .limit(1);
+  return db.transaction(async (tx) => {
+    const [board] = await tx
+      .select({ id: boards.id })
+      .from(boards)
+      .where(eq(boards.id, boardId))
+      .limit(1);
+    if (!board) return null;
 
-  if (!board) return null;
+    // Lock columns of this board to serialize concurrent inserts.
+    await tx
+      .select({ id: boardColumns.id })
+      .from(boardColumns)
+      .where(eq(boardColumns.boardId, boardId))
+      .for("update");
 
-  // Get max position for this board
-  const existingColumns = await db
-    .select({ position: boardColumns.position })
-    .from(boardColumns)
-    .where(eq(boardColumns.boardId, boardId))
-    .orderBy(asc(boardColumns.position));
+    const [maxRow] = await tx
+      .select({
+        maxPosition: sql<number>`COALESCE(MAX(${boardColumns.position}), -1)`,
+      })
+      .from(boardColumns)
+      .where(eq(boardColumns.boardId, boardId));
 
-  const maxPosition =
-    existingColumns.length > 0
-      ? Math.max(...existingColumns.map((c) => c.position))
-      : -1;
+    const [column] = await tx
+      .insert(boardColumns)
+      .values({
+        boardId,
+        name: data.name,
+        position: (maxRow?.maxPosition ?? -1) + 1,
+        color: data.color ?? null,
+        isDoneColumn: data.isDoneColumn ?? false,
+      })
+      .returning();
 
-  const [column] = await db
-    .insert(boardColumns)
-    .values({
-      boardId,
-      name: data.name,
-      position: maxPosition + 1,
-      color: data.color ?? null,
-      isDoneColumn: data.isDoneColumn ?? false,
-    })
-    .returning();
-
-  return {
-    id: column!.id,
-    name: column!.name,
-    position: column!.position,
-    color: column!.color,
-    isDoneColumn: column!.isDoneColumn,
-  };
+    return {
+      id: column!.id,
+      name: column!.name,
+      position: column!.position,
+      color: column!.color,
+      isDoneColumn: column!.isDoneColumn,
+    };
+  });
 }
 
 export async function updateColumn(

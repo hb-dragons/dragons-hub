@@ -5,6 +5,8 @@ import {
   taskComments,
   boardColumns,
   boards,
+  taskAssignees,
+  user,
 } from "@dragons/db/schema";
 import { eq, and, asc, sql, count } from "drizzle-orm";
 import type {
@@ -13,12 +15,63 @@ import type {
   ChecklistItem,
   TaskComment,
   TaskPriority,
+  TaskAssignee,
 } from "@dragons/shared";
 
 export interface TaskFilters {
   columnId?: number;
   assigneeId?: string;
   priority?: string;
+}
+
+// --- Private helpers ---
+
+async function fetchAssignees(taskId: number): Promise<TaskAssignee[]> {
+  const rows = await db
+    .select({
+      userId: taskAssignees.userId,
+      name: user.name,
+      assignedAt: taskAssignees.assignedAt,
+    })
+    .from(taskAssignees)
+    .innerJoin(user, eq(user.id, taskAssignees.userId))
+    .where(eq(taskAssignees.taskId, taskId))
+    .orderBy(asc(taskAssignees.assignedAt));
+  return rows.map((r) => ({
+    userId: r.userId,
+    name: r.name,
+    assignedAt: r.assignedAt.toISOString(),
+  }));
+}
+
+async function fetchAssigneesBatch(
+  taskIds: number[],
+): Promise<Map<number, TaskAssignee[]>> {
+  if (taskIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      taskId: taskAssignees.taskId,
+      userId: taskAssignees.userId,
+      name: user.name,
+      assignedAt: taskAssignees.assignedAt,
+    })
+    .from(taskAssignees)
+    .innerJoin(user, eq(user.id, taskAssignees.userId))
+    .where(
+      sql`${taskAssignees.taskId} IN (${sql.join(taskIds.map((id) => sql`${id}`), sql`, `)})`,
+    )
+    .orderBy(asc(taskAssignees.assignedAt));
+  const map = new Map<number, TaskAssignee[]>();
+  for (const r of rows) {
+    const list = map.get(r.taskId) ?? [];
+    list.push({
+      userId: r.userId,
+      name: r.name,
+      assignedAt: r.assignedAt.toISOString(),
+    });
+    map.set(r.taskId, list);
+  }
+  return map;
 }
 
 export async function listTasks(
@@ -31,7 +84,11 @@ export async function listTasks(
     conditions.push(eq(tasks.columnId, filters.columnId));
   }
   if (filters?.assigneeId) {
-    conditions.push(eq(tasks.assigneeId, filters.assigneeId));
+    conditions.push(
+      sql`EXISTS (SELECT 1 FROM ${taskAssignees} ta
+                  WHERE ta.task_id = ${tasks.id}
+                    AND ta.user_id = ${filters.assigneeId})`,
+    );
   }
   if (filters?.priority) {
     conditions.push(eq(tasks.priority, filters.priority as TaskPriority));
@@ -44,7 +101,6 @@ export async function listTasks(
       columnId: tasks.columnId,
       title: tasks.title,
       description: tasks.description,
-      assigneeId: tasks.assigneeId,
       priority: tasks.priority,
       dueDate: tasks.dueDate,
       position: tasks.position,
@@ -76,11 +132,14 @@ export async function listTasks(
     checklistCounts.map((c) => [c.taskId, { total: c.total, checked: c.checked }]),
   );
 
+  const assigneesMap = await fetchAssigneesBatch(taskIds);
+
   return rows.map((row) => ({
     ...row,
     priority: row.priority as TaskPriority,
     checklistTotal: countMap.get(row.id)?.total ?? 0,
     checklistChecked: countMap.get(row.id)?.checked ?? 0,
+    assignees: assigneesMap.get(row.id) ?? [],
   }));
 }
 
@@ -89,70 +148,93 @@ export async function createTask(
   data: {
     title: string;
     description?: string | null;
-    assigneeId?: string | null;
+    assigneeIds?: string[];
     priority?: string;
     dueDate?: string | null;
     columnId: number;
   },
+  callerId: string,
 ): Promise<TaskDetail | null> {
-  // Verify board exists
-  const [board] = await db
-    .select({ id: boards.id })
-    .from(boards)
-    .where(eq(boards.id, boardId))
-    .limit(1);
+  const created = await db.transaction(async (tx) => {
+    const [board] = await tx
+      .select({ id: boards.id })
+      .from(boards)
+      .where(eq(boards.id, boardId))
+      .limit(1);
+    if (!board) return null;
 
-  if (!board) return null;
+    const [column] = await tx
+      .select({ id: boardColumns.id })
+      .from(boardColumns)
+      .where(
+        and(
+          eq(boardColumns.id, data.columnId),
+          eq(boardColumns.boardId, boardId),
+        ),
+      )
+      .limit(1);
+    if (!column) return null;
 
-  // Verify column exists and belongs to board
-  const [column] = await db
-    .select({ id: boardColumns.id })
-    .from(boardColumns)
-    .where(
-      and(
-        eq(boardColumns.id, data.columnId),
-        eq(boardColumns.boardId, boardId),
-      ),
-    )
-    .limit(1);
+    // Lock target column's tasks to serialize concurrent appends.
+    await tx
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.columnId, data.columnId))
+      .for("update");
 
-  if (!column) return null;
+    const [maxPos] = await tx
+      .select({ maxPosition: sql<number>`COALESCE(MAX(${tasks.position}), -1)` })
+      .from(tasks)
+      .where(eq(tasks.columnId, data.columnId));
 
-  // Get max position in this column
-  const [maxPos] = await db
-    .select({ maxPosition: sql<number>`COALESCE(MAX(${tasks.position}), -1)` })
-    .from(tasks)
-    .where(eq(tasks.columnId, data.columnId));
+    const [task] = await tx
+      .insert(tasks)
+      .values({
+        boardId,
+        columnId: data.columnId,
+        title: data.title,
+        description: data.description ?? null,
+        priority: (data.priority ?? "normal") as TaskPriority,
+        dueDate: data.dueDate ?? null,
+        position: (maxPos?.maxPosition ?? -1) + 1,
+        createdBy: callerId,
+      })
+      .returning();
 
-  const [task] = await db
-    .insert(tasks)
-    .values({
-      boardId,
-      columnId: data.columnId,
-      title: data.title,
-      description: data.description ?? null,
-      assigneeId: data.assigneeId ?? null,
-      priority: (data.priority ?? "normal") as TaskPriority,
-      dueDate: data.dueDate ?? null,
-      position: (maxPos?.maxPosition ?? -1) + 1,
-    })
-    .returning();
+    if (data.assigneeIds && data.assigneeIds.length > 0) {
+      const uniq = [...new Set(data.assigneeIds)];
+      await tx
+        .insert(taskAssignees)
+        .values(uniq.map((uid) => ({
+          taskId: task!.id,
+          userId: uid,
+          assignedBy: callerId,
+        })))
+        .onConflictDoNothing();
+    }
+
+    return task!;
+  });
+
+  if (!created) return null;
+
+  const assignees = await fetchAssignees(created.id);
 
   return {
-    id: task!.id,
-    boardId: task!.boardId,
-    columnId: task!.columnId,
-    title: task!.title,
-    description: task!.description,
-    assigneeId: task!.assigneeId,
-    priority: task!.priority as TaskPriority,
-    dueDate: task!.dueDate,
-    position: task!.position,
+    id: created.id,
+    boardId: created.boardId,
+    columnId: created.columnId,
+    title: created.title,
+    description: created.description,
+    assignees,
+    priority: created.priority as TaskPriority,
+    dueDate: created.dueDate,
+    position: created.position,
     checklistTotal: 0,
     checklistChecked: 0,
-    createdBy: task!.createdBy,
-    createdAt: task!.createdAt.toISOString(),
-    updatedAt: task!.updatedAt.toISOString(),
+    createdBy: created.createdBy,
+    createdAt: created.createdAt.toISOString(),
+    updatedAt: created.updatedAt.toISOString(),
     checklist: [],
     comments: [],
   };
@@ -192,13 +274,15 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
     .where(eq(taskComments.taskId, id))
     .orderBy(asc(taskComments.createdAt));
 
+  const assignees = await fetchAssignees(id);
+
   return {
     id: task.id,
     boardId: task.boardId,
     columnId: task.columnId,
     title: task.title,
     description: task.description,
-    assigneeId: task.assigneeId,
+    assignees,
     priority: task.priority as TaskPriority,
     dueDate: task.dueDate,
     position: task.position,
@@ -224,23 +308,39 @@ export async function updateTask(
   data: {
     title?: string;
     description?: string | null;
-    assigneeId?: string | null;
+    assigneeIds?: string[];
     priority?: string;
     dueDate?: string | null;
   },
+  callerId: string,
 ): Promise<TaskDetail | null> {
   const setData: Record<string, unknown> = { updatedAt: new Date() };
   if (data.title !== undefined) setData.title = data.title;
   if (data.description !== undefined) setData.description = data.description;
-  if (data.assigneeId !== undefined) setData.assigneeId = data.assigneeId;
   if (data.priority !== undefined) setData.priority = data.priority;
   if (data.dueDate !== undefined) setData.dueDate = data.dueDate;
 
-  const [updated] = await db
-    .update(tasks)
-    .set(setData)
-    .where(eq(tasks.id, id))
-    .returning();
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(tasks)
+      .set(setData)
+      .where(eq(tasks.id, id))
+      .returning();
+
+    if (!row) return null;
+
+    if (data.assigneeIds !== undefined) {
+      const uniq = [...new Set(data.assigneeIds)];
+      await tx.delete(taskAssignees).where(eq(taskAssignees.taskId, id));
+      if (uniq.length > 0) {
+        await tx.insert(taskAssignees).values(
+          uniq.map((uid) => ({ taskId: id, userId: uid, assignedBy: callerId })),
+        );
+      }
+    }
+
+    return row;
+  });
 
   if (!updated) return null;
 
@@ -249,37 +349,117 @@ export async function updateTask(
 
 export async function moveTask(
   id: number,
-  columnId: number,
-  position: number,
+  targetColumnId: number,
+  targetPosition: number,
 ): Promise<TaskDetail | null> {
-  // Get the task first
-  const [task] = await db
-    .select()
-    .from(tasks)
-    .where(eq(tasks.id, id))
-    .limit(1);
+  const result = await db.transaction(async (tx) => {
+    const [task] = await tx
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, id))
+      .for("update");
+    if (!task) return null;
 
-  if (!task) return null;
+    const [column] = await tx
+      .select({ id: boardColumns.id })
+      .from(boardColumns)
+      .where(eq(boardColumns.id, targetColumnId))
+      .limit(1);
+    if (!column) return null;
 
-  // Verify column exists
-  const [column] = await db
-    .select({
-      id: boardColumns.id,
-      boardId: boardColumns.boardId,
-    })
-    .from(boardColumns)
-    .where(eq(boardColumns.id, columnId))
-    .limit(1);
+    const fromColumnId = task.columnId;
+    const fromPosition = task.position;
 
-  if (!column) return null;
+    // Lock rows in source and target columns to serialize concurrent moves.
+    await tx
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(
+        sql`${tasks.columnId} IN (${fromColumnId}, ${targetColumnId})`,
+      )
+      .for("update");
 
-  // Update task position and column
-  await db
-    .update(tasks)
-    .set({ columnId, position, updatedAt: new Date() })
-    .where(eq(tasks.id, id));
+    // Count target-column siblings excluding the moving task.
+    const [targetCount] = await tx
+      .select({ c: count() })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.columnId, targetColumnId),
+          sql`${tasks.id} <> ${id}`,
+        ),
+      );
+    const maxAllowed = targetCount?.c ?? 0;
+    const clamped = Math.max(0, Math.min(targetPosition, maxAllowed));
 
-  return getTaskDetail(id);
+    if (fromColumnId === targetColumnId) {
+      if (clamped === fromPosition) {
+        // No-op reorder.
+        return task.id;
+      }
+      if (clamped < fromPosition) {
+        // Moving up: shift rows in [clamped, fromPosition) down by +1.
+        await tx
+          .update(tasks)
+          .set({ position: sql`${tasks.position} + 1` })
+          .where(
+            and(
+              eq(tasks.columnId, targetColumnId),
+              sql`${tasks.position} >= ${clamped}`,
+              sql`${tasks.position} < ${fromPosition}`,
+              sql`${tasks.id} <> ${id}`,
+            ),
+          );
+      } else {
+        // Moving down: shift rows in (fromPosition, clamped] up by -1.
+        await tx
+          .update(tasks)
+          .set({ position: sql`${tasks.position} - 1` })
+          .where(
+            and(
+              eq(tasks.columnId, targetColumnId),
+              sql`${tasks.position} > ${fromPosition}`,
+              sql`${tasks.position} <= ${clamped}`,
+              sql`${tasks.id} <> ${id}`,
+            ),
+          );
+      }
+      await tx
+        .update(tasks)
+        .set({ position: clamped, updatedAt: new Date() })
+        .where(eq(tasks.id, id));
+    } else {
+      // Close the gap in the source column.
+      await tx
+        .update(tasks)
+        .set({ position: sql`${tasks.position} - 1` })
+        .where(
+          and(
+            eq(tasks.columnId, fromColumnId),
+            sql`${tasks.position} > ${fromPosition}`,
+          ),
+        );
+      // Open a slot in the target column.
+      await tx
+        .update(tasks)
+        .set({ position: sql`${tasks.position} + 1` })
+        .where(
+          and(
+            eq(tasks.columnId, targetColumnId),
+            sql`${tasks.position} >= ${clamped}`,
+          ),
+        );
+      await tx
+        .update(tasks)
+        .set({ columnId: targetColumnId, position: clamped, updatedAt: new Date() })
+        .where(eq(tasks.id, id));
+    }
+
+    return task.id;
+  });
+
+  if (result === null) return null;
+  return getTaskDetail(result);
 }
 
 export async function deleteTask(id: number): Promise<boolean> {
@@ -289,6 +469,59 @@ export async function deleteTask(id: number): Promise<boolean> {
     .returning({ id: tasks.id });
 
   return !!deleted;
+}
+
+// --- Assignees ---
+
+export async function addAssignee(
+  taskId: number,
+  userId: string,
+  callerId: string,
+): Promise<TaskAssignee | null> {
+  const [task] = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(eq(tasks.id, taskId))
+    .limit(1);
+  if (!task) return null;
+
+  const [u] = await db
+    .select({ id: user.id, name: user.name })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  if (!u) return null;
+
+  await db
+    .insert(taskAssignees)
+    .values({ taskId, userId, assignedBy: callerId })
+    .onConflictDoNothing();
+
+  const [row] = await db
+    .select({
+      userId: taskAssignees.userId,
+      assignedAt: taskAssignees.assignedAt,
+    })
+    .from(taskAssignees)
+    .where(
+      and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)),
+    );
+  return row
+    ? { userId, name: u.name, assignedAt: row.assignedAt.toISOString() }
+    : null;
+}
+
+export async function removeAssignee(
+  taskId: number,
+  userId: string,
+): Promise<boolean> {
+  const result = await db
+    .delete(taskAssignees)
+    .where(
+      and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)),
+    )
+    .returning({ taskId: taskAssignees.taskId });
+  return result.length > 0;
 }
 
 // --- Checklist Items ---
@@ -339,7 +572,8 @@ export async function addChecklistItem(
 export async function updateChecklistItem(
   taskId: number,
   itemId: number,
-  data: { label?: string; isChecked?: boolean; checkedBy?: string | null },
+  data: { label?: string; isChecked?: boolean },
+  callerId: string,
 ): Promise<ChecklistItem | null> {
   const updateData: Record<string, unknown> = {};
   if (data.label !== undefined) updateData.label = data.label;
@@ -347,13 +581,11 @@ export async function updateChecklistItem(
     updateData.isChecked = data.isChecked;
     if (data.isChecked) {
       updateData.checkedAt = new Date();
-      if (data.checkedBy !== undefined) updateData.checkedBy = data.checkedBy;
+      updateData.checkedBy = callerId;
     } else {
       updateData.checkedAt = null;
       updateData.checkedBy = null;
     }
-  } else if (data.checkedBy !== undefined) {
-    updateData.checkedBy = data.checkedBy;
   }
 
   const [updated] = await db
@@ -400,7 +632,8 @@ export async function deleteChecklistItem(
 
 export async function addComment(
   taskId: number,
-  data: { body: string; authorId: string },
+  data: { body: string },
+  callerId: string,
 ): Promise<TaskComment | null> {
   // Verify task exists
   const [task] = await db
@@ -415,7 +648,7 @@ export async function addComment(
     .insert(taskComments)
     .values({
       taskId,
-      authorId: data.authorId,
+      authorId: callerId,
       body: data.body,
     })
     .returning();

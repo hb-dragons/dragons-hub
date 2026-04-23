@@ -12,7 +12,7 @@ import type { BoardData, TaskCardData } from "@/components/admin/board/types";
 
 export default async function BoardPage() {
   const session = await getServerSession();
-  if (!can(session?.user ?? null, "settings", "view")) notFound();
+  if (!can(session?.user ?? null, "board", "view")) notFound();
 
   const t = await getTranslations();
   let boards: BoardData[] | null = null;

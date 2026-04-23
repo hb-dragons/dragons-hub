@@ -1,11 +1,17 @@
 import type { TaskPriority } from "./constants";
 
+export interface TaskAssignee {
+  userId: string;
+  name: string | null;
+  assignedAt: string;
+}
+
 export interface TaskCardData {
   id: number;
   boardId: number;
   title: string;
   description: string | null;
-  assigneeId: string | null;
+  assignees: TaskAssignee[];
   priority: TaskPriority;
   dueDate: string | null;
   position: number;

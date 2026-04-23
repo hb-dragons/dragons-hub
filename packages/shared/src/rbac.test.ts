@@ -63,6 +63,23 @@ describe("can", () => {
     ["teamManager", "referee", "view", true],
     ["teamManager", "referee", "update", false],
     ["teamManager", "venue", "view", false],
+    // board resource
+    ["admin", "board", "view", true],
+    ["admin", "board", "create", true],
+    ["admin", "board", "update", true],
+    ["admin", "board", "delete", true],
+    ["refereeAdmin", "board", "view", true],
+    ["refereeAdmin", "board", "create", true],
+    ["refereeAdmin", "board", "update", true],
+    ["refereeAdmin", "board", "delete", false],
+    ["venueManager", "board", "view", true],
+    ["venueManager", "board", "create", true],
+    ["venueManager", "board", "update", true],
+    ["venueManager", "board", "delete", false],
+    ["teamManager", "board", "view", true],
+    ["teamManager", "board", "create", true],
+    ["teamManager", "board", "update", true],
+    ["teamManager", "board", "delete", false],
   ];
   for (const [role, resource, action, expected] of cases) {
     it(`${role} ${expected ? "CAN" : "CANNOT"} ${action} on ${resource}`, () => {

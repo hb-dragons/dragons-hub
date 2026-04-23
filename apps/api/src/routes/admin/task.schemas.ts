@@ -28,7 +28,7 @@ export const taskListQuerySchema = z.object({
 export const taskCreateBodySchema = z.object({
   title: z.string().min(1).max(300),
   description: z.string().max(5000).nullable().optional(),
-  assigneeId: z.string().max(100).nullable().optional(),
+  assigneeIds: z.array(z.string().min(1).max(100)).optional(),
   priority: taskPrioritySchema.optional(),
   dueDate: dateSchema.nullable().optional(),
   columnId: z.number().int().positive(),
@@ -37,10 +37,17 @@ export const taskCreateBodySchema = z.object({
 export const taskUpdateBodySchema = z.object({
   title: z.string().min(1).max(300).optional(),
   description: z.string().max(5000).nullable().optional(),
-  assigneeId: z.string().max(100).nullable().optional(),
+  assigneeIds: z.array(z.string().min(1).max(100)).optional(),
   priority: taskPrioritySchema.optional(),
   dueDate: dateSchema.nullable().optional(),
 });
+
+export const taskAssigneeParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  userId: z.string().min(1).max(100),
+});
+
+export type TaskAssigneeParam = z.infer<typeof taskAssigneeParamSchema>;
 
 export const taskMoveBodySchema = z.object({
   columnId: z.number().int().positive(),
@@ -55,12 +62,10 @@ export const checklistItemCreateBodySchema = z.object({
 export const checklistItemUpdateBodySchema = z.object({
   label: z.string().min(1).max(200).optional(),
   isChecked: z.boolean().optional(),
-  checkedBy: z.string().max(100).nullable().optional(),
 });
 
 export const commentCreateBodySchema = z.object({
   body: z.string().min(1).max(5000),
-  authorId: z.string().min(1).max(100),
 });
 
 export const commentUpdateBodySchema = z.object({

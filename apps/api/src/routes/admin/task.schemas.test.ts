@@ -143,7 +143,7 @@ describe("taskCreateBodySchema", () => {
       title: "Task",
       columnId: 1,
       description: "Details",
-      assigneeId: "user-1",
+      assigneeIds: ["user-1"],
       priority: "high" as const,
       dueDate: "2025-06-01",
     };
@@ -155,7 +155,6 @@ describe("taskCreateBodySchema", () => {
       title: "Task",
       columnId: 1,
       description: null,
-      assigneeId: null,
       dueDate: null,
     };
     expect(taskCreateBodySchema.parse(body)).toEqual(body);
@@ -219,9 +218,9 @@ describe("taskUpdateBodySchema", () => {
     });
   });
 
-  it("accepts null assigneeId", () => {
-    expect(taskUpdateBodySchema.parse({ assigneeId: null })).toEqual({
-      assigneeId: null,
+  it("accepts assigneeIds array", () => {
+    expect(taskUpdateBodySchema.parse({ assigneeIds: ["u1", "u2"] })).toEqual({
+      assigneeIds: ["u1", "u2"],
     });
   });
 
@@ -322,16 +321,9 @@ describe("checklistItemUpdateBodySchema", () => {
     });
   });
 
-  it("accepts checkedBy update", () => {
-    expect(
-      checklistItemUpdateBodySchema.parse({ checkedBy: "admin" }),
-    ).toEqual({ checkedBy: "admin" });
-  });
-
-  it("accepts null checkedBy", () => {
-    expect(
-      checklistItemUpdateBodySchema.parse({ checkedBy: null }),
-    ).toEqual({ checkedBy: null });
+  it("strips unknown checkedBy field (derived from session, not body)", () => {
+    const result = checklistItemUpdateBodySchema.parse({ checkedBy: "admin" });
+    expect(result).not.toHaveProperty("checkedBy");
   });
 
   it("accepts empty object", () => {
@@ -351,38 +343,34 @@ describe("checklistItemUpdateBodySchema", () => {
   });
 });
 
-describe("commentCreateBodySchema", () => {
-  it("accepts valid body and authorId", () => {
-    expect(
-      commentCreateBodySchema.parse({ body: "Nice work!", authorId: "user-1" }),
-    ).toEqual({ body: "Nice work!", authorId: "user-1" });
+describe("commentCreateBodySchema (session-author)", () => {
+  it("does NOT require authorId in body", () => {
+    const result = commentCreateBodySchema.safeParse({ body: "Hello" });
+    expect(result.success).toBe(true);
   });
 
-  it("rejects empty body", () => {
-    expect(() =>
-      commentCreateBodySchema.parse({ body: "", authorId: "user-1" }),
-    ).toThrow();
+  it("does not expose an authorId field in parsed output", () => {
+    const result = commentCreateBodySchema.safeParse({ body: "Hello", authorId: "x" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty("authorId");
+    }
+  });
+
+  it("requires non-empty body", () => {
+    const result = commentCreateBodySchema.safeParse({ body: "" });
+    expect(result.success).toBe(false);
   });
 
   it("rejects body exceeding 5000 chars", () => {
     expect(() =>
-      commentCreateBodySchema.parse({ body: "x".repeat(5001), authorId: "user-1" }),
+      commentCreateBodySchema.parse({ body: "x".repeat(5001) }),
     ).toThrow();
-  });
-
-  it("rejects empty authorId", () => {
-    expect(() =>
-      commentCreateBodySchema.parse({ body: "Text", authorId: "" }),
-    ).toThrow();
-  });
-
-  it("rejects missing authorId", () => {
-    expect(() => commentCreateBodySchema.parse({ body: "Text" })).toThrow();
   });
 
   it("rejects missing body", () => {
     expect(() =>
-      commentCreateBodySchema.parse({ authorId: "user-1" }),
+      commentCreateBodySchema.parse({}),
     ).toThrow();
   });
 });

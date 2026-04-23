@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   addComment: vi.fn(),
   updateComment: vi.fn(),
   deleteComment: vi.fn(),
+  addAssignee: vi.fn(),
+  removeAssignee: vi.fn(),
 }));
 
 vi.mock("../../services/admin/task.service", () => ({
@@ -32,6 +34,8 @@ vi.mock("../../services/admin/task.service", () => ({
   addComment: mocks.addComment,
   updateComment: mocks.updateComment,
   deleteComment: mocks.deleteComment,
+  addAssignee: mocks.addAssignee,
+  removeAssignee: mocks.removeAssignee,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -52,6 +56,10 @@ import { errorHandler } from "../../middleware/error";
 // Test app without auth middleware
 const app = new Hono<AppEnv>();
 app.onError(errorHandler);
+app.use("*", async (c, next) => {
+  c.set("user", { id: "test-user", name: "Test", email: "t@x.io" } as never);
+  await next();
+});
 app.route("/", taskRoutes);
 
 function json(response: Response) {
@@ -130,7 +138,7 @@ describe("POST /boards/:boardId/tasks", () => {
     expect(mocks.createTask).toHaveBeenCalledWith(1, {
       title: "New Task",
       columnId: 1,
-    });
+    }, "test-user");
   });
 
   it("passes all optional fields to service", async () => {
@@ -143,7 +151,7 @@ describe("POST /boards/:boardId/tasks", () => {
         title: "Task",
         columnId: 1,
         description: "Desc",
-        assigneeId: "user-1",
+        assigneeIds: ["user-1"],
         priority: "high",
         dueDate: "2025-06-01",
       }),
@@ -153,10 +161,10 @@ describe("POST /boards/:boardId/tasks", () => {
       title: "Task",
       columnId: 1,
       description: "Desc",
-      assigneeId: "user-1",
+      assigneeIds: ["user-1"],
       priority: "high",
       dueDate: "2025-06-01",
-    });
+    }, "test-user");
   });
 
   it("returns 404 when board/column not found", async () => {
@@ -259,7 +267,7 @@ describe("PATCH /tasks/:id", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(detail);
-    expect(mocks.updateTask).toHaveBeenCalledWith(1, { title: "Updated" });
+    expect(mocks.updateTask).toHaveBeenCalledWith(1, { title: "Updated" }, "test-user");
   });
 
   it("returns 404 when task not found", async () => {
@@ -473,7 +481,7 @@ describe("PATCH /tasks/:id/checklist/:itemId", () => {
     expect(await json(res)).toEqual(item);
     expect(mocks.updateChecklistItem).toHaveBeenCalledWith(1, 1, {
       isChecked: true,
-    });
+    }, "test-user");
   });
 
   it("returns 404 when item not found", async () => {
@@ -555,21 +563,18 @@ describe("DELETE /tasks/:id/checklist/:itemId", () => {
 
 describe("POST /tasks/:id/comments", () => {
   it("adds comment and returns 201", async () => {
-    const comment = { id: 1, body: "Great!", authorId: "user-1" };
+    const comment = { id: 1, body: "Great!", authorId: "test-user" };
     mocks.addComment.mockResolvedValue(comment);
 
     const res = await app.request("/tasks/1/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "Great!", authorId: "user-1" }),
+      body: JSON.stringify({ body: "Great!" }),
     });
 
     expect(res.status).toBe(201);
     expect(await json(res)).toEqual(comment);
-    expect(mocks.addComment).toHaveBeenCalledWith(1, {
-      body: "Great!",
-      authorId: "user-1",
-    });
+    expect(mocks.addComment).toHaveBeenCalledWith(1, { body: "Great!" }, "test-user");
   });
 
   it("returns 404 when task not found", async () => {
@@ -578,7 +583,7 @@ describe("POST /tasks/:id/comments", () => {
     const res = await app.request("/tasks/999/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "Text", authorId: "user-1" }),
+      body: JSON.stringify({ body: "Text" }),
     });
 
     expect(res.status).toBe(404);
@@ -589,18 +594,7 @@ describe("POST /tasks/:id/comments", () => {
     const res = await app.request("/tasks/1/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "", authorId: "user-1" }),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-
-  it("returns 400 for missing authorId", async () => {
-    const res = await app.request("/tasks/1/comments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "Text" }),
+      body: JSON.stringify({ body: "" }),
     });
 
     expect(res.status).toBe(400);
@@ -611,7 +605,7 @@ describe("POST /tasks/:id/comments", () => {
     const res = await app.request("/tasks/abc/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "Text", authorId: "user-1" }),
+      body: JSON.stringify({ body: "Text" }),
     });
 
     expect(res.status).toBe(400);
@@ -707,5 +701,36 @@ describe("DELETE /tasks/:id/comments/:commentId", () => {
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("PUT /tasks/:id/assignees/:userId", () => {
+  it("returns 200 with the assignee on success", async () => {
+    mocks.addAssignee.mockResolvedValue({
+      userId: "u_alice", name: "Alice", assignedAt: "2026-01-01T00:00:00Z",
+    });
+    const res = await app.request("/tasks/1/assignees/u_alice", { method: "PUT" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ userId: "u_alice" });
+  });
+
+  it("returns 404 when task or user missing", async () => {
+    mocks.addAssignee.mockResolvedValue(null);
+    const res = await app.request("/tasks/999/assignees/u_alice", { method: "PUT" });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("DELETE /tasks/:id/assignees/:userId", () => {
+  it("returns 200 on success", async () => {
+    mocks.removeAssignee.mockResolvedValue(true);
+    const res = await app.request("/tasks/1/assignees/u_alice", { method: "DELETE" });
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 404 when assignee row missing", async () => {
+    mocks.removeAssignee.mockResolvedValue(false);
+    const res = await app.request("/tasks/1/assignees/u_alice", { method: "DELETE" });
+    expect(res.status).toBe(404);
   });
 });

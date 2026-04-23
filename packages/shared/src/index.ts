@@ -58,6 +58,7 @@ export type {
 } from "./bookings";
 
 export type {
+  TaskAssignee,
   TaskCardData,
   ChecklistItem,
   TaskComment,
