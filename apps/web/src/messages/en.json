@@ -895,7 +895,7 @@
       },
       "toast": {
         "success": "Test push sent to {count, plural, one {# device} other {# devices}}",
-        "partialFailure": "{count, plural, one {# push} other {# pushes}} failed"
+        "partialFailure": "{failed} of {total} pushes failed"
       }
     }
   },

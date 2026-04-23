@@ -93,11 +93,12 @@ export function PushTestCard() {
         method: "POST",
         body: JSON.stringify(body),
       });
+      const total = res.tickets.length;
       const failed = res.tickets.filter((t) => t.status === "failed").length;
       if (failed === 0) {
         toast.success(t("toast.success", { count: res.deviceCount }));
       } else {
-        toast.warning(t("toast.partialFailure", { count: failed }));
+        toast.warning(t("toast.partialFailure", { failed, total }));
       }
       setMessage("");
       await mutate();
