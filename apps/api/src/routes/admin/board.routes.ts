@@ -24,12 +24,14 @@ import {
 } from "./board.schemas";
 
 const boardRoutes = new Hono<AppEnv>();
-const settingsUpdate = requirePermission("settings", "update");
+const boardView = requirePermission("board", "view");
+const boardUpdate = requirePermission("board", "update");
+const boardDelete = requirePermission("board", "delete");
 
 // GET /admin/boards - List all boards
 boardRoutes.get(
   "/boards",
-  settingsUpdate,
+  boardView,
   describeRoute({
     description: "List all boards",
     tags: ["Boards"],
@@ -44,7 +46,7 @@ boardRoutes.get(
 // POST /admin/boards - Create board with default columns
 boardRoutes.post(
   "/boards",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Create board with default columns",
     tags: ["Boards"],
@@ -60,7 +62,7 @@ boardRoutes.post(
 // GET /admin/boards/:id - Get board with columns
 boardRoutes.get(
   "/boards/:id",
-  settingsUpdate,
+  boardView,
   describeRoute({
     description: "Get board with columns",
     tags: ["Boards"],
@@ -84,7 +86,7 @@ boardRoutes.get(
 // PATCH /admin/boards/:id - Update board
 boardRoutes.patch(
   "/boards/:id",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Update board",
     tags: ["Boards"],
@@ -109,7 +111,7 @@ boardRoutes.patch(
 // DELETE /admin/boards/:id - Delete board
 boardRoutes.delete(
   "/boards/:id",
-  settingsUpdate,
+  boardDelete,
   describeRoute({
     description: "Delete board",
     tags: ["Boards"],
@@ -133,7 +135,7 @@ boardRoutes.delete(
 // POST /admin/boards/:id/columns - Add column
 boardRoutes.post(
   "/boards/:id/columns",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Add column to board",
     tags: ["Boards"],
@@ -159,7 +161,7 @@ boardRoutes.post(
 // NOTE: This must be defined before the /:colId route to avoid conflicts
 boardRoutes.patch(
   "/boards/:id/columns/reorder",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Reorder board columns",
     tags: ["Boards"],
@@ -176,7 +178,7 @@ boardRoutes.patch(
 // PATCH /admin/boards/:id/columns/:colId - Update column
 boardRoutes.patch(
   "/boards/:id/columns/:colId",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Update column",
     tags: ["Boards"],
@@ -204,7 +206,7 @@ boardRoutes.patch(
 // DELETE /admin/boards/:id/columns/:colId - Delete column
 boardRoutes.delete(
   "/boards/:id/columns/:colId",
-  settingsUpdate,
+  boardUpdate,
   describeRoute({
     description: "Delete column",
     tags: ["Boards"],
