@@ -165,8 +165,12 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
                       >
                         <TaskCard
                           task={task}
-                          onDragStart={handleDragStart}
-                          onClick={setSelectedTask}
+                          onOpen={setSelectedTask}
+                          dragHandle={{
+                            draggable: true,
+                            onDragStart: (e: React.DragEvent) =>
+                              handleDragStart(e, task.id),
+                          } as React.HTMLAttributes<HTMLDivElement>}
                         />
                       </div>
                     ))
