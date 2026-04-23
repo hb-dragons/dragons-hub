@@ -141,6 +141,11 @@ const navGroups = [
         labelKey: "nav.domainEvents" as const,
         perm: { resource: "settings", action: "view" } as const,
       },
+      {
+        href: "/admin/settings/notifications",
+        labelKey: "nav.pushTest" as const,
+        perm: { resource: "settings", action: "update" } as const,
+      },
     ],
   },
   {

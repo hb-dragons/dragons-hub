@@ -29,6 +29,7 @@
     "watchRules": "Regeln",
     "channels": "Kanäle",
     "domainEvents": "Events",
+    "pushTest": "Push-Test",
     "groupSystem": "System"
   },
   "dashboard": {
