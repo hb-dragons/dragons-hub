@@ -22,6 +22,8 @@ vi.mock("../../services/admin/task.service", () => ({
   addComment: vi.fn(),
   updateComment: vi.fn(),
   deleteComment: vi.fn(),
+  addAssignee: vi.fn(),
+  removeAssignee: vi.fn(),
 }));
 
 await import("./task.routes");

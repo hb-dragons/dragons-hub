@@ -143,7 +143,7 @@ describe("taskCreateBodySchema", () => {
       title: "Task",
       columnId: 1,
       description: "Details",
-      assigneeId: "user-1",
+      assigneeIds: ["user-1"],
       priority: "high" as const,
       dueDate: "2025-06-01",
     };
@@ -155,7 +155,6 @@ describe("taskCreateBodySchema", () => {
       title: "Task",
       columnId: 1,
       description: null,
-      assigneeId: null,
       dueDate: null,
     };
     expect(taskCreateBodySchema.parse(body)).toEqual(body);
@@ -219,9 +218,9 @@ describe("taskUpdateBodySchema", () => {
     });
   });
 
-  it("accepts null assigneeId", () => {
-    expect(taskUpdateBodySchema.parse({ assigneeId: null })).toEqual({
-      assigneeId: null,
+  it("accepts assigneeIds array", () => {
+    expect(taskUpdateBodySchema.parse({ assigneeIds: ["u1", "u2"] })).toEqual({
+      assigneeIds: ["u1", "u2"],
     });
   });
 

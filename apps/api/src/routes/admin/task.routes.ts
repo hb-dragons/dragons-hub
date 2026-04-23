@@ -13,6 +13,8 @@ import {
   addComment,
   updateComment,
   deleteComment,
+  addAssignee,
+  removeAssignee,
 } from "../../services/admin/task.service";
 import { requirePermission } from "../../middleware/rbac";
 import type { AppEnv } from "../../types";
@@ -29,6 +31,7 @@ import {
   checklistItemUpdateBodySchema,
   commentCreateBodySchema,
   commentUpdateBodySchema,
+  taskAssigneeParamSchema,
 } from "./task.schemas";
 
 const taskRoutes = new Hono<AppEnv>();
@@ -367,6 +370,60 @@ taskRoutes.delete(
       return c.json({ error: "Comment not found", code: "NOT_FOUND" }, 404);
     }
 
+    return c.json({ success: true });
+  },
+);
+
+// PUT /tasks/:id/assignees/:userId — idempotent add
+taskRoutes.put(
+  "/tasks/:id/assignees/:userId",
+  boardUpdate,
+  describeRoute({
+    description: "Assign a user to a task (idempotent)",
+    tags: ["Tasks"],
+    responses: {
+      200: { description: "Success" },
+      404: { description: "Task or user not found" },
+    },
+  }),
+  async (c) => {
+    const { id, userId } = taskAssigneeParamSchema.parse({
+      id: c.req.param("id"),
+      userId: c.req.param("userId"),
+    });
+    const callerId = c.get("user")?.id;
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await addAssignee(id, userId, callerId);
+    if (!result) {
+      return c.json({ error: "Task or user not found", code: "NOT_FOUND" }, 404);
+    }
+    return c.json(result);
+  },
+);
+
+// DELETE /tasks/:id/assignees/:userId
+taskRoutes.delete(
+  "/tasks/:id/assignees/:userId",
+  boardUpdate,
+  describeRoute({
+    description: "Remove a user from a task",
+    tags: ["Tasks"],
+    responses: {
+      200: { description: "Success" },
+      404: { description: "Assignee not found" },
+    },
+  }),
+  async (c) => {
+    const { id, userId } = taskAssigneeParamSchema.parse({
+      id: c.req.param("id"),
+      userId: c.req.param("userId"),
+    });
+    const removed = await removeAssignee(id, userId);
+    if (!removed) {
+      return c.json({ error: "Assignee not found", code: "NOT_FOUND" }, 404);
+    }
     return c.json({ success: true });
   },
 );

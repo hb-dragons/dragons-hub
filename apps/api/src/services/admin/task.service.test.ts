@@ -28,6 +28,8 @@ import {
   addComment,
   updateComment,
   deleteComment,
+  addAssignee,
+  removeAssignee,
 } from "./task.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
@@ -115,7 +117,15 @@ describe("listTasks", () => {
   it("filters by assigneeId", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await ctx.client.exec(
-      `INSERT INTO tasks (board_id, column_id, title, assignee_id) VALUES (${boardId}, ${todoColId}, 'Mine', 'user-1'), (${boardId}, ${todoColId}, 'Theirs', 'user-2')`,
+      `INSERT INTO "user" (id, name, email) VALUES ('user-1', 'User One', 'u1@x.io'), ('user-2', 'User Two', 'u2@x.io')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+    await ctx.client.exec(
+      `INSERT INTO tasks (board_id, column_id, title) VALUES (${boardId}, ${todoColId}, 'Mine'), (${boardId}, ${todoColId}, 'Theirs')`,
+    );
+    // task id 1 assigned to user-1, task id 2 assigned to user-2
+    await ctx.client.exec(
+      `INSERT INTO task_assignees (task_id, user_id) VALUES (1, 'user-1'), (2, 'user-2')`,
     );
 
     const result = await listTasks(boardId, { assigneeId: "user-1" });
@@ -169,18 +179,22 @@ describe("createTask", () => {
 
   it("creates task with all optional fields", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES ('user-1', 'User One', 'u1@x.io')
+       ON CONFLICT (id) DO NOTHING`,
+    );
 
     const result = await createTask(boardId, {
       title: "Full Task",
       columnId: todoColId,
       description: "Details here",
-      assigneeId: "user-1",
+      assigneeIds: ["user-1"],
       priority: "high",
       dueDate: "2025-06-01",
     }, "test-user");
 
     expect(result!.description).toBe("Details here");
-    expect(result!.assigneeId).toBe("user-1");
+    expect(result!.assignees.map((a) => a.userId)).toEqual(["user-1"]);
     expect(result!.priority).toBe("high");
     expect(result!.dueDate).toBe("2025-06-01");
   });
@@ -729,5 +743,91 @@ describe("moveTask position integrity", () => {
 
     const todo = await listTasks(boardId, { columnId: todoColId });
     expect(todo.map((t) => t.title)).toEqual(["C", "A", "B"]);
+  });
+});
+
+describe("task assignees", () => {
+  async function setupTaskWithUsers() {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES
+        ('u_alice', 'Alice', 'a@x.io'),
+        ('u_bob',   'Bob',   'b@x.io'),
+        ('u_root',  'Root',  'r@x.io')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+    const task = await createTask(boardId, { title: "T", columnId: todoColId }, "u_root");
+    return { boardId, taskId: task!.id };
+  }
+
+  it("createTask with assigneeIds inserts assignee rows", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES
+        ('u_alice', 'Alice', 'a@x.io'),
+        ('u_bob',   'Bob',   'b@x.io')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+    const task = await createTask(
+      boardId,
+      { title: "T", columnId: todoColId, assigneeIds: ["u_alice", "u_bob"] },
+      "u_alice",
+    );
+    expect(task!.assignees.map((a) => a.userId).sort()).toEqual(["u_alice", "u_bob"]);
+  });
+
+  it("getTaskDetail hydrates assignees with user names", async () => {
+    const { taskId } = await setupTaskWithUsers();
+    await addAssignee(taskId, "u_alice", "u_root");
+    const detail = await getTaskDetail(taskId);
+    expect(detail!.assignees).toHaveLength(1);
+    expect(detail!.assignees[0]!.userId).toBe("u_alice");
+    expect(detail!.assignees[0]!.name).toBe("Alice");
+  });
+
+  it("addAssignee is idempotent", async () => {
+    const { taskId } = await setupTaskWithUsers();
+    await addAssignee(taskId, "u_alice", "u_root");
+    await addAssignee(taskId, "u_alice", "u_root");
+    const detail = await getTaskDetail(taskId);
+    expect(detail!.assignees).toHaveLength(1);
+  });
+
+  it("removeAssignee removes the row", async () => {
+    const { taskId } = await setupTaskWithUsers();
+    await addAssignee(taskId, "u_alice", "u_root");
+    await addAssignee(taskId, "u_bob", "u_root");
+    await removeAssignee(taskId, "u_alice");
+    const detail = await getTaskDetail(taskId);
+    expect(detail!.assignees.map((a) => a.userId)).toEqual(["u_bob"]);
+  });
+
+  it("updateTask with assigneeIds replaces the assignee set", async () => {
+    const { taskId } = await setupTaskWithUsers();
+    await addAssignee(taskId, "u_alice", "u_root");
+    await updateTask(
+      taskId,
+      { assigneeIds: ["u_bob"] },
+      "u_root",
+    );
+    const detail = await getTaskDetail(taskId);
+    expect(detail!.assignees.map((a) => a.userId)).toEqual(["u_bob"]);
+  });
+
+  it("listTasks includes assignees per row", async () => {
+    const { boardId, taskId } = await setupTaskWithUsers();
+    await addAssignee(taskId, "u_alice", "u_root");
+    await addAssignee(taskId, "u_bob", "u_root");
+    const list = await listTasks(boardId);
+    expect(list[0]!.assignees.map((a) => a.userId).sort()).toEqual(["u_alice", "u_bob"]);
+  });
+
+  it("listTasks with assigneeId filter returns matching tasks", async () => {
+    const { boardId, taskId } = await setupTaskWithUsers();
+    await addAssignee(taskId, "u_alice", "u_root");
+    const filtered = await listTasks(boardId, { assigneeId: "u_alice" });
+    expect(filtered).toHaveLength(1);
+    const empty = await listTasks(boardId, { assigneeId: "u_bob" });
+    expect(empty).toHaveLength(0);
   });
 });
