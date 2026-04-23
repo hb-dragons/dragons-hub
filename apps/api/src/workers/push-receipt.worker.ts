@@ -84,41 +84,61 @@ export async function reconcilePushReceipts(
   const now = new Date();
   const tokensToPurge: string[] = [];
 
+  // Bucket rows so deliveries + "not ready" bumps each collapse to a single UPDATE.
+  // Failures stay per-row because each needs its own errorMessage; they're rare.
+  const deliveredIds: number[] = [];
+  const bumpOnlyIds: number[] = [];
+  const failures: Array<{
+    id: number;
+    errorCode: string;
+    recipientToken: string | null;
+  }> = [];
+
   for (const row of usable) {
     const receipt = receipts[row.providerTicketId];
-
     if (!receipt) {
-      // Not ready yet; bump checkedAt to space out polling
-      await db
-        .update(notificationLog)
-        .set({ providerReceiptCheckedAt: now })
-        .where(eq(notificationLog.id, row.id));
+      bumpOnlyIds.push(row.id);
       continue;
     }
-
     if (receipt.status === "ok") {
-      await db
-        .update(notificationLog)
-        .set({ status: "delivered", providerReceiptCheckedAt: now })
-        .where(eq(notificationLog.id, row.id));
-      result.delivered++;
+      deliveredIds.push(row.id);
       continue;
     }
-
-    // status === "error"
     const errorCode = receipt.details?.error ?? receipt.message ?? "unknown";
+    failures.push({
+      id: row.id,
+      errorCode,
+      recipientToken: row.recipientToken,
+    });
+  }
+
+  if (deliveredIds.length > 0) {
+    await db
+      .update(notificationLog)
+      .set({ status: "delivered", providerReceiptCheckedAt: now })
+      .where(inArray(notificationLog.id, deliveredIds));
+    result.delivered = deliveredIds.length;
+  }
+
+  if (bumpOnlyIds.length > 0) {
+    await db
+      .update(notificationLog)
+      .set({ providerReceiptCheckedAt: now })
+      .where(inArray(notificationLog.id, bumpOnlyIds));
+  }
+
+  for (const f of failures) {
     await db
       .update(notificationLog)
       .set({
         status: "failed",
         providerReceiptCheckedAt: now,
-        errorMessage: errorCode,
+        errorMessage: f.errorCode,
       })
-      .where(eq(notificationLog.id, row.id));
+      .where(eq(notificationLog.id, f.id));
     result.failed++;
-
-    if (errorCode.includes("DeviceNotRegistered") && row.recipientToken) {
-      tokensToPurge.push(row.recipientToken);
+    if (f.errorCode.includes("DeviceNotRegistered") && f.recipientToken) {
+      tokensToPurge.push(f.recipientToken);
     }
   }
 
