@@ -28,6 +28,18 @@ const expoPushClient = new ExpoPushClient({
   accessToken: env.EXPO_ACCESS_TOKEN,
 });
 
+// Per-user cooldown for the test-push endpoint. A 10s window is enough to
+// stop accidental double-taps or impatient debugging without forcing admins
+// to wait out a real notification round-trip. Process-local map is fine
+// because the endpoint is admin-only and traffic is tiny.
+const TEST_PUSH_COOLDOWN_MS = 10_000;
+const lastSendByUser = new Map<string, number>();
+
+/** @internal — exposed for tests to reset rate-limit state between cases. */
+export function __resetTestPushRateLimitForTests(): void {
+  lastSendByUser.clear();
+}
+
 notificationTestRoutes.post(
   "/notifications/test-push",
   settingsUpdate,
@@ -49,6 +61,17 @@ notificationTestRoutes.post(
     const raw = await c.req.json().catch(() => ({}));
     const body = sendBodySchema.parse(raw);
     const callerId = user.id;
+
+    const last = lastSendByUser.get(callerId);
+    const nowMs = Date.now();
+    if (last !== undefined && nowMs - last < TEST_PUSH_COOLDOWN_MS) {
+      const retryAfter = Math.ceil(
+        (TEST_PUSH_COOLDOWN_MS - (nowMs - last)) / 1000,
+      );
+      c.header("Retry-After", String(retryAfter));
+      return c.json({ error: "rate_limited", retryAfter }, 429);
+    }
+    lastSendByUser.set(callerId, nowMs);
 
     const devices = await db
       .select()

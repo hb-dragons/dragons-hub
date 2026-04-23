@@ -81,7 +81,10 @@ vi.mock("../../middleware/rbac", () => ({
     },
 }));
 
-import { notificationTestRoutes } from "./notification-test.routes";
+import {
+  notificationTestRoutes,
+  __resetTestPushRateLimitForTests,
+} from "./notification-test.routes";
 
 function makeApp(user: { id: string; role: string } | null) {
   const app = new Hono<AppEnv>();
@@ -123,6 +126,7 @@ beforeEach(() => {
   mocks.dbInsert.mockReset();
   mocks.dbTransaction.mockReset();
   mocks.sendBatch.mockReset();
+  __resetTestPushRateLimitForTests();
 
   // Default: transaction simulator that delegates tx.insert -> mocks.dbInsert
   mocks.dbTransaction.mockImplementation(
@@ -265,6 +269,44 @@ describe("POST /notifications/test-push", () => {
     const body = await res.json();
     expect(body.tickets[0].status).toBe("failed");
     expect(body.tickets[0].error).toMatch(/ECONNREFUSED|unknown/);
+  });
+
+  it("rate-limits rapid consecutive test pushes from the same user", async () => {
+    const app = makeApp({ id: "u_admin", role: "admin" });
+
+    // First call succeeds — queue up all its mocks
+    mockSelectSimple([
+      {
+        id: 1,
+        userId: "u_admin",
+        token: "ExponentPushToken[a]",
+        platform: "ios",
+        locale: "de-DE",
+      },
+    ]);
+    mockSelectSimple([{ id: 7, type: "push" }]);
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_1" }]);
+    mockInsertCapture();
+
+    const first = await app.request("/notifications/test-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    expect(first.status).toBe(200);
+
+    // Second call within the 10s window should be rejected before any DB work.
+    // No additional mocks queued on purpose — if the handler reaches the DB we'll fail loud.
+    const second = await app.request("/notifications/test-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    expect(second.status).toBe(429);
+    const body = await second.json();
+    expect(body.error).toBe("rate_limited");
+    expect(typeof body.retryAfter).toBe("number");
+    expect(second.headers.get("Retry-After")).toBeTruthy();
   });
 });
 
