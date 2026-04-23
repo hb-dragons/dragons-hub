@@ -708,16 +708,65 @@
   "board": {
     "title": "Operations Board",
     "addTask": "Aufgabe hinzufügen",
+    "addBoard": "Board hinzufügen",
     "addColumn": "Spalte hinzufügen",
     "editColumn": "Spalte bearbeiten",
     "deleteColumn": "Spalte löschen",
     "emptyColumn": "Keine Aufgaben",
     "emptyBoard": "Kein Board gefunden. Erstelle eines, um zu beginnen.",
     "createBoard": "Board erstellen",
+    "boardName": "Board-Name",
+    "boardDescription": "Beschreibung (optional)",
+    "dnd": {
+      "pickUp": "{title} aufgenommen. Jetzt in {column}, Position {position} von {total}. Pfeiltasten zum Verschieben, Leertaste oder Enter zum Ablegen, Escape zum Abbrechen.",
+      "move": "Jetzt in {column}, Position {position} von {total}.",
+      "drop": "In {column} an Position {position} abgelegt.",
+      "cancel": "Verschieben abgebrochen."
+    },
+    "actions": {
+      "editBoard": "Board bearbeiten",
+      "deleteBoard": "Board löschen",
+      "archive": "Archivieren",
+      "archiveSoon": "Archivieren folgt später",
+      "copy": "Kopieren",
+      "duplicate": "Duplizieren",
+      "link": "Verknüpfen…",
+      "watch": "Beobachten",
+      "labels": "Labels",
+      "attachments": "Anhänge",
+      "comingSoon": "Folgt später"
+    },
+    "switcher": {
+      "current": "Aktuelles Board",
+      "other": "Andere Boards",
+      "newBoard": "+ Neues Board"
+    },
     "filters": {
       "assignee": "Zuständig",
       "priority": "Priorität",
-      "all": "Alle"
+      "all": "Alle",
+      "search": "Aufgaben suchen…",
+      "clear": "Filter löschen",
+      "noResults": "Keine Aufgaben entsprechen diesen Filtern."
+    },
+    "delete": {
+      "taskTitle": "Aufgabe löschen?",
+      "taskBody": "Das kann nicht rückgängig gemacht werden. Aufgabe und Checkliste + Kommentare werden entfernt.",
+      "boardTitle": "Board löschen?",
+      "boardBody": "Board, alle Spalten und alle Aufgaben werden dauerhaft entfernt.",
+      "columnTitle": "Spalte löschen?",
+      "columnBody": "Die Spalte muss leer sein, bevor sie gelöscht werden kann.",
+      "confirm": "Löschen",
+      "cancel": "Abbrechen"
+    },
+    "column": {
+      "colorHex": "Farbe (Hex)",
+      "doneColumn": "Fertig-Spalte",
+      "wipOver": "Über WIP-Limit"
+    },
+    "comments": {
+      "empty": "Noch keine Kommentare.",
+      "unknownUser": "Unbekannte/r Nutzer/in"
     },
     "task": {
       "title": "Titel",
