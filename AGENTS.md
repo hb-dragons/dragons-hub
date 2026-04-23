@@ -400,6 +400,15 @@ Match list and detail responses include associated venue booking data when avail
 | POST | `/admin/referee/games/:spielplanId/assign` | admin | Assign referee to slot. Body: `{ slotNumber: 1\|2, refereeApiId: number }` |
 | DELETE | `/admin/referee/games/:spielplanId/assignment/:slotNumber` | admin | Remove referee from slot |
 
+### Admin Referee History (role: admin, refereeAdmin)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/referee/history/summary` | KPIs + leaderboard + availableLeagues for a date range. Query: `dateFrom`, `dateTo`, `league`, `status` (comma-list of `played\|cancelled\|forfeited`, or `all`) |
+| GET | `/admin/referee/history/games` | Paginated past games. Query: summary params + `search`, `refereeApiId` (filter SR1 or SR2 matches), `limit` (default 50, max 500), `offset` |
+| GET | `/admin/referee/history/games.csv` | CSV export of games matching filters. Forces `limit=1000`; sets `X-Result-Truncated: true` when results exceed cap. Prepends UTF-8 BOM for Excel |
+| GET | `/admin/referee/history/leaderboard.csv` | CSV export of referee leaderboard (no 100-row cap). Filters: `dateFrom`, `dateTo`, `league`, `status` |
+
 ### Admin - Social Post Generator
 
 | Method | Path | Description |
