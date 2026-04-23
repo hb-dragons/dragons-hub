@@ -36,8 +36,8 @@ export function CoverageKPICards({ kpis }: Props) {
           <span className="text-muted-foreground text-xs tabular-nums">
             {hasObligation
               ? t("coverageRatio", {
-                  filled: kpis.filledSlots,
-                  total: kpis.obligatedSlots,
+                  filled: String(kpis.filledSlots),
+                  total: String(kpis.obligatedSlots),
                 })
               : t("noObligation")}
           </span>
