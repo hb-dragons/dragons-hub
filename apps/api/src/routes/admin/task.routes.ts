@@ -244,6 +244,7 @@ taskRoutes.patch(
     });
     const body = checklistItemUpdateBodySchema.parse(await c.req.json());
     const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
@@ -306,6 +307,7 @@ taskRoutes.post(
     const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
     const body = commentCreateBodySchema.parse(await c.req.json());
     const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
@@ -392,6 +394,7 @@ taskRoutes.put(
       userId: c.req.param("userId"),
     });
     const callerId = c.get("user")?.id;
+    /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }

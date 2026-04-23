@@ -744,6 +744,41 @@ describe("moveTask position integrity", () => {
     const todo = await listTasks(boardId, { columnId: todoColId });
     expect(todo.map((t) => t.title)).toEqual(["C", "A", "B"]);
   });
+
+  it("is a no-op when clamped position equals current position", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO tasks (board_id, column_id, title, position) VALUES
+        (${boardId}, ${todoColId}, 'A', 0),
+        (${boardId}, ${todoColId}, 'B', 1)`,
+    );
+    const moved = await moveTask(1, todoColId, 0);
+    expect(moved).not.toBeNull();
+    expect(moved!.id).toBe(1);
+    expect(moved!.position).toBe(0);
+
+    const rows = await listTasks(boardId, { columnId: todoColId });
+    expect(rows.map((t) => t.title)).toEqual(["A", "B"]);
+    expect(rows.map((t) => t.position)).toEqual([0, 1]);
+  });
+
+  it("reorders down within the same column", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO tasks (board_id, column_id, title, position) VALUES
+        (${boardId}, ${todoColId}, 'A', 0),
+        (${boardId}, ${todoColId}, 'B', 1),
+        (${boardId}, ${todoColId}, 'C', 2)`,
+    );
+    // Move A from position 0 to position 2
+    const moved = await moveTask(1, todoColId, 2);
+    expect(moved).not.toBeNull();
+    expect(moved!.position).toBe(2);
+
+    const rows = await listTasks(boardId, { columnId: todoColId });
+    expect(rows.map((t) => t.title)).toEqual(["B", "C", "A"]);
+    expect(rows.map((t) => t.position)).toEqual([0, 1, 2]);
+  });
 });
 
 describe("task assignees", () => {
