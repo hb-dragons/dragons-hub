@@ -13,6 +13,7 @@ export const statement = {
   team:       ["view", "manage"],
   sync:       ["view", "trigger"],
   settings:   ["view", "update"],
+  board:      ["view", "create", "update", "delete"],
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -31,12 +32,14 @@ export const refereeAdmin = ac.newRole({
   assignment: ["view", "create", "update", "delete", "claim", "release"],
   match:      ["view"],
   team:       ["view"],
+  board:      ["view", "create", "update"],
 });
 
 export const venueManager = ac.newRole({
   venue:   ["view", "create", "update", "delete"],
   booking: ["view", "create", "update", "delete"],
   match:   ["view"],
+  board:   ["view", "create", "update"],
 });
 
 export const teamManager = ac.newRole({
@@ -44,6 +47,7 @@ export const teamManager = ac.newRole({
   match:    ["view"],
   standing: ["view"],
   referee:  ["view"],
+  board:    ["view", "create", "update"],
 });
 
 export const roles = { admin, refereeAdmin, venueManager, teamManager };
