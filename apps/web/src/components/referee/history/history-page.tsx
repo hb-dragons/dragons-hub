@@ -1,23 +1,30 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useFormatter, useTranslations } from "next-intl";
+import {
+  Tabs, TabsList, TabsTrigger, TabsContent,
+} from "@dragons/ui/components/tabs";
 import { Skeleton } from "@dragons/ui/components/skeleton";
+import { Button } from "@dragons/ui";
+import { DownloadIcon } from "lucide-react";
 import {
-  useRefereeHistorySummary,
-  useRefereeHistoryGames,
+  useRefereeHistorySummary, useRefereeHistoryGames,
 } from "@/hooks/use-referee-history";
-import { HistoryFilters } from "./history-filters";
-import { CoverageKPICards } from "./coverage-kpi-cards";
-import { RefereeLeaderboard } from "./referee-leaderboard";
-import { HistoryGameList } from "./history-game-list";
+import { FilterBar } from "./filter-bar";
+import { IssuesCallout } from "./issues-callout";
+import { WorkloadTab } from "./workload-tab";
+import { GamesTab } from "./games-tab";
+import { RefDrawer } from "./ref-drawer";
 import {
+  gamesCsvUrl,
+  leaderboardCsvUrl,
   parseHistoryFilterState,
   type HistoryFilterStateWithSearch,
+  type HistoryTab,
 } from "./filter-state";
-
-const DEFAULT_LIMIT = 50;
+import type { HistoryStatusValue } from "@dragons/shared";
 
 export function HistoryPage() {
   const router = useRouter();
@@ -25,8 +32,7 @@ export function HistoryPage() {
   const t = useTranslations("refereeHistory");
   const format = useFormatter();
 
-  const [offset, setOffset] = useState(0);
-  const filterState = useMemo<HistoryFilterStateWithSearch>(
+  const state = useMemo<HistoryFilterStateWithSearch>(
     () => parseHistoryFilterState(new URLSearchParams(params.toString())),
     [params],
   );
@@ -35,83 +41,124 @@ export function HistoryPage() {
     (patch: Partial<HistoryFilterStateWithSearch>) => {
       const next = new URLSearchParams(params.toString());
       for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined || v === "") next.delete(k);
-        else next.set(k, String(v));
+        if (v === undefined || v === "" || (Array.isArray(v) && v.length === 0)) {
+          next.delete(k);
+        } else if (Array.isArray(v)) {
+          next.set(k, v.join(","));
+        } else {
+          next.set(k, String(v));
+        }
       }
+      if (!("offset" in patch)) next.set("offset", "0");
       router.replace(`?${next.toString()}`);
-      setOffset(0);
     },
     [params, router],
   );
 
-  const reset = () => {
-    router.replace("?");
-    setOffset(0);
-  };
+  const reset = useCallback(() => router.replace("?"), [router]);
 
-  const summary = useRefereeHistorySummary(filterState);
-  const games = useRefereeHistoryGames({
-    ...filterState,
-    limit: DEFAULT_LIMIT,
-    offset,
-  });
+  const summary = useRefereeHistorySummary(state);
+  const games = useRefereeHistoryGames(state);
 
   const rangeLabel = summary.data
     ? `${t(`range.source.${summary.data.range.source}`)} · ${format.dateTime(
-        new Date(summary.data.range.from + "T00:00:00"),
-        "matchDate",
+        new Date(summary.data.range.from + "T00:00:00"), "matchDate",
       )} → ${format.dateTime(
-        new Date(summary.data.range.to + "T00:00:00"),
-        "matchDate",
+        new Date(summary.data.range.to + "T00:00:00"), "matchDate",
       )}`
     : null;
 
+  const ownLeaderboard = summary.data?.leaderboard.filter((e) => e.isOwnClub) ?? [];
+  const drawerEntry = state.ref !== undefined
+    ? (summary.data?.leaderboard.find((e) => e.refereeApiId === state.ref) ?? null)
+    : null;
+
+  const goToIssues = () => setParams({
+    tab: "games",
+    status: ["cancelled", "forfeited"] satisfies HistoryStatusValue[],
+  });
+
+  const csvHref = state.tab === "workload"
+    ? leaderboardCsvUrl(state)
+    : gamesCsvUrl(state);
+
   return (
-    <div className="space-y-6">
-      <HistoryFilters
-        state={filterState}
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-muted-foreground text-xs">{rangeLabel}</div>
+        <Button asChild size="sm" variant="outline">
+          <a href={`${process.env.NEXT_PUBLIC_API_URL ?? ""}${csvHref}`}>
+            <DownloadIcon className="size-3.5" />{t("filters.export")}
+          </a>
+        </Button>
+      </div>
+
+      <FilterBar
+        state={state}
+        availableLeagues={summary.data?.availableLeagues ?? []}
         onChange={setParams}
         onReset={reset}
-        rangeLabel={rangeLabel}
       />
 
-      {summary.data ? (
-        <CoverageKPICards kpis={summary.data.kpis} />
-      ) : (
-        <KpiSkeleton />
-      )}
-
-      {summary.data ? (
-        <RefereeLeaderboard rows={summary.data.leaderboard} />
-      ) : (
-        <SectionSkeleton />
-      )}
-
-      {games.data ? (
-        <HistoryGameList
-          items={games.data.items}
-          total={games.data.total}
-          limit={games.data.limit}
-          offset={games.data.offset}
-          onPage={setOffset}
+      {summary.data && (
+        <IssuesCallout
+          cancelled={summary.data.kpis.cancelled}
+          forfeited={summary.data.kpis.forfeited}
+          onNavigate={goToIssues}
         />
-      ) : (
-        <SectionSkeleton />
       )}
+
+      <Tabs
+        value={state.tab}
+        onValueChange={(v) => setParams({ tab: v as HistoryTab })}
+      >
+        <TabsList>
+          <TabsTrigger value="workload">{t("tab.workload")}</TabsTrigger>
+          <TabsTrigger value="games">
+            {t("tab.games")}
+            {summary.data && (
+              <span className="text-muted-foreground ml-1.5 tabular-nums">
+                {summary.data.kpis.games}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="workload" className="mt-3">
+          {summary.data ? (
+            <WorkloadTab
+              summary={summary.data}
+              onSelectRef={(refereeApiId) =>
+                refereeApiId !== null
+                  ? setParams({ ref: refereeApiId })
+                  : undefined
+              }
+            />
+          ) : (
+            <Skeleton className="h-64 w-full" />
+          )}
+        </TabsContent>
+        <TabsContent value="games" className="mt-3">
+          {summary.data ? (
+            <GamesTab
+              kpis={summary.data.kpis}
+              games={games.data}
+              status={state.status}
+              onStatusChange={(status) => setParams({ status })}
+              onPage={(offset) => setParams({ offset })}
+              onLimit={(limit) => setParams({ limit, offset: 0 })}
+            />
+          ) : (
+            <Skeleton className="h-64 w-full" />
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <RefDrawer
+        entry={drawerEntry}
+        filters={state}
+        ownClubLeaderboard={ownLeaderboard}
+        onClose={() => setParams({ ref: undefined })}
+      />
     </div>
   );
-}
-
-function KpiSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-      {Array.from({ length: 7 }, (_, i) => (
-        <Skeleton key={i} className="h-[88px]" />
-      ))}
-    </div>
-  );
-}
-
-function SectionSkeleton() {
-  return <Skeleton className="h-64 w-full" />;
 }

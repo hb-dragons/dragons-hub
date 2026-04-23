@@ -105,6 +105,10 @@
   },
   "refereeHistory": {
     "title": "Schiedsrichter-Historie",
+    "tab": {
+      "workload": "Pensum",
+      "games": "Spiele"
+    },
     "status": {
       "label": "Status",
       "all": "Alle",

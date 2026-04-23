@@ -105,6 +105,10 @@
   },
   "refereeHistory": {
     "title": "Referee History",
+    "tab": {
+      "workload": "Workload",
+      "games": "Games"
+    },
     "status": {
       "label": "Status",
       "all": "All",
