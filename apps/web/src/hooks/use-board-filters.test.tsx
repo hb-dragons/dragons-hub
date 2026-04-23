@@ -1,4 +1,6 @@
+// @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
+import { renderHook, act } from "@testing-library/react";
 
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -21,8 +23,8 @@ describe("useBoardFilters", () => {
     mocks.searchParams.getAll.mockReturnValue([]);
     mocks.searchParams.get.mockReturnValue(null);
 
-    const result = useBoardFilters();
-    expect(result.filters).toEqual({
+    const { result } = renderHook(() => useBoardFilters());
+    expect(result.current.filters).toEqual({
       assigneeIds: [],
       priority: null,
       q: "",
@@ -37,9 +39,9 @@ describe("useBoardFilters", () => {
       k === "priority" ? "urgent" : null,
     );
 
-    const result = useBoardFilters();
-    expect(result.filters.assigneeIds).toEqual(["u_a", "u_b"]);
-    expect(result.filters.priority).toBe("urgent");
+    const { result } = renderHook(() => useBoardFilters());
+    expect(result.current.filters.assigneeIds).toEqual(["u_a", "u_b"]);
+    expect(result.current.filters.priority).toBe("urgent");
   });
 
   it("setAssigneeIds calls router.replace with new URL", () => {
@@ -47,8 +49,8 @@ describe("useBoardFilters", () => {
     mocks.searchParams.get.mockReturnValue(null);
     mocks.replace.mockClear();
 
-    const result = useBoardFilters();
-    result.setAssigneeIds(["u_alice"]);
+    const { result } = renderHook(() => useBoardFilters());
+    act(() => result.current.setAssigneeIds(["u_alice"]));
     expect(mocks.replace).toHaveBeenCalledWith(
       expect.stringContaining("assignee=u_alice"),
       { scroll: false },
@@ -62,8 +64,8 @@ describe("useBoardFilters", () => {
     );
     mocks.replace.mockClear();
 
-    const result = useBoardFilters();
-    result.clear();
+    const { result } = renderHook(() => useBoardFilters());
+    act(() => result.current.clear());
     expect(mocks.replace).toHaveBeenCalledWith("/admin/boards/1", {
       scroll: false,
     });
@@ -75,7 +77,7 @@ describe("useBoardFilters", () => {
       k === "priority" ? "bogus" : null,
     );
 
-    const result = useBoardFilters();
-    expect(result.filters.priority).toBeNull();
+    const { result } = renderHook(() => useBoardFilters());
+    expect(result.current.filters.priority).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useCallback, useMemo } from "react";
 import type { TaskPriority } from "@dragons/shared";
 import { TASK_PRIORITIES } from "@dragons/shared";
 
@@ -17,34 +18,38 @@ export function useBoardFilters() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const priorityRaw = searchParams.get("priority");
-  const filters: BoardFilters = {
-    assigneeIds: searchParams.getAll("assignee"),
-    priority: isTaskPriority(priorityRaw) ? priorityRaw : null,
-    q: searchParams.get("q") ?? "",
-  };
+  const filters = useMemo<BoardFilters>(() => {
+    const priorityRaw = searchParams.get("priority");
+    return {
+      assigneeIds: searchParams.getAll("assignee"),
+      priority: isTaskPriority(priorityRaw) ? priorityRaw : null,
+      q: searchParams.get("q") ?? "",
+    };
+  }, [searchParams]);
 
-  const update = (next: Partial<BoardFilters>) => {
-    const qs = new URLSearchParams();
-    const assigneeIds = next.assigneeIds ?? filters.assigneeIds;
-    const priority =
-      next.priority !== undefined ? next.priority : filters.priority;
-    const q = next.q !== undefined ? next.q : filters.q;
-    for (const id of assigneeIds) qs.append("assignee", id);
-    if (priority) qs.set("priority", priority);
-    if (q) qs.set("q", q);
-    const suffix = qs.toString();
-    router.replace(suffix ? `${pathname}?${suffix}` : pathname, {
-      scroll: false,
-    });
-  };
+  const update = useCallback(
+    (next: Partial<BoardFilters>) => {
+      const qs = new URLSearchParams();
+      const assigneeIds = next.assigneeIds ?? filters.assigneeIds;
+      const priority =
+        next.priority !== undefined ? next.priority : filters.priority;
+      const q = next.q !== undefined ? next.q : filters.q;
+      for (const id of assigneeIds) qs.append("assignee", id);
+      if (priority) qs.set("priority", priority);
+      if (q) qs.set("q", q);
+      const suffix = qs.toString();
+      router.replace(suffix ? `${pathname}?${suffix}` : pathname, {
+        scroll: false,
+      });
+    },
+    [filters, router, pathname],
+  );
 
   return {
     filters,
     setAssigneeIds: (ids: string[]) => update({ assigneeIds: ids }),
     setPriority: (p: TaskPriority | null) => update({ priority: p }),
     setQuery: (q: string) => update({ q }),
-    clear: () =>
-      update({ assigneeIds: [], priority: null, q: "" }),
+    clear: () => update({ assigneeIds: [], priority: null, q: "" }),
   };
 }
