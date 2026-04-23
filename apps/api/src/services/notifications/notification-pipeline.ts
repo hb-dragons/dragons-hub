@@ -12,6 +12,9 @@ import { getDefaultNotificationsForEvent } from "./role-defaults";
 import { renderEventMessage } from "./templates/index";
 import { InAppChannelAdapter } from "./channels/in-app";
 import { WhatsAppGroupAdapter } from "./channels/whatsapp-group";
+import { PushChannelAdapter } from "./channels/push";
+import { ExpoPushClient } from "./expo-push.client";
+import { resolveRecipientUserIds } from "./recipient-resolver";
 import { renderRefereeSlotsWhatsApp } from "./templates/referee-slots";
 import { env } from "../../config/env";
 import type { WhatsAppGroupConfig } from "@dragons/shared";
@@ -128,6 +131,8 @@ export interface PipelineResult {
 
 const inAppAdapter = new InAppChannelAdapter();
 const whatsAppGroupAdapter = new WhatsAppGroupAdapter();
+const expoPushClient = new ExpoPushClient({ accessToken: env.EXPO_ACCESS_TOKEN });
+const pushAdapter = new PushChannelAdapter(expoPushClient);
 
 /**
  * Step 1: Load watch rules and channel configs from DB.
@@ -310,6 +315,20 @@ async function dispatchImmediate(params: {
       },
       groupChatId,
     );
+    return sendResult.success;
+  }
+
+  if (channelType === "push") {
+    const userIds = await resolveRecipientUserIds(recipientId);
+    if (userIds.length === 0) return false;
+    const sendResult = await pushAdapter.send({
+      eventId: event.id,
+      eventType: event.type,
+      payload,
+      watchRuleId,
+      channelConfigId: config.id,
+      recipientUserIds: userIds,
+    });
     return sendResult.success;
   }
 
