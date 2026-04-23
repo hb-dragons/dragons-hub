@@ -1,8 +1,10 @@
 // ── Types ───────────────────────────────────────────────────────────────────
 
+export type Channel = "in_app" | "push";
+
 export interface DefaultNotification {
   audience: "admin" | "referee";
-  channel: "in_app";
+  channel: Channel;
   refereeId?: number; // present for referee audience
 }
 
@@ -22,16 +24,36 @@ const REFEREE_SELF_EVENTS = new Set([
   "referee.unassigned",
 ]);
 
+// ── Push-eligible event types ───────────────────────────────────────────────
+
+/**
+ * Events where users should receive a native push notification in addition
+ * to the in-app entry. Limited to personal + high-urgency events to avoid
+ * notification noise.
+ */
+const PUSH_ELIGIBLE_EVENTS = new Set([
+  "referee.assigned",
+  "referee.unassigned",
+  "referee.reassigned",
+  "referee.slots.needed",
+  "referee.slots.reminder",
+  "match.cancelled",
+  "match.rescheduled",
+]);
+
 // ── getDefaultNotificationsForEvent ─────────────────────────────────────────
 
 /**
  * Determine the default set of notifications to emit for a domain event,
  * based on role-based rules rather than user-created watch rules.
  *
- * Phase 1:
- * - Admins receive all match.*, booking.*, override.*, referee.* events.
- * - Referees receive referee.assigned / unassigned / reassigned for their own
- *   refereeId. For reassigned events, both old and new referee are notified.
+ * Admins receive all match.*, booking.*, override.*, referee.* events on
+ * in-app. Referees receive referee.assigned / unassigned / reassigned on
+ * in-app for their own refereeId. For reassigned events, both old and new
+ * referee are notified.
+ *
+ * For events in PUSH_ELIGIBLE_EVENTS, a parallel push-channel entry is added
+ * for every in-app entry emitted.
  */
 export function getDefaultNotificationsForEvent(
   eventType: string,
@@ -39,17 +61,23 @@ export function getDefaultNotificationsForEvent(
   _source: string,
 ): DefaultNotification[] {
   const results: DefaultNotification[] = [];
+  const pushEligible = PUSH_ELIGIBLE_EVENTS.has(eventType);
 
-  // Admin defaults
+  const emit = (n: DefaultNotification) => {
+    results.push(n);
+    if (pushEligible) {
+      results.push({ ...n, channel: "push" });
+    }
+  };
+
   if (isAdminEvent(eventType)) {
-    results.push({ audience: "admin", channel: "in_app" });
+    emit({ audience: "admin", channel: "in_app" });
   }
 
-  // Referee defaults
   if (REFEREE_SELF_EVENTS.has(eventType)) {
     const refereeId = toNumber(payload["refereeId"]);
     if (refereeId != null) {
-      results.push({ audience: "referee", channel: "in_app", refereeId });
+      emit({ audience: "referee", channel: "in_app", refereeId });
     }
   }
 
@@ -58,24 +86,11 @@ export function getDefaultNotificationsForEvent(
     const newRefereeId = toNumber(payload["newRefereeId"]);
 
     if (oldRefereeId != null) {
-      results.push({
-        audience: "referee",
-        channel: "in_app",
-        refereeId: oldRefereeId,
-      });
+      emit({ audience: "referee", channel: "in_app", refereeId: oldRefereeId });
     }
     if (newRefereeId != null) {
-      results.push({
-        audience: "referee",
-        channel: "in_app",
-        refereeId: newRefereeId,
-      });
+      emit({ audience: "referee", channel: "in_app", refereeId: newRefereeId });
     }
-  }
-
-  // Referee slot events → admin in-app notification
-  if (eventType === "referee.slots.needed" || eventType === "referee.slots.reminder") {
-    results.push({ audience: "admin", channel: "in_app" });
   }
 
   return results;
