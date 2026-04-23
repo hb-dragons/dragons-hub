@@ -38,7 +38,7 @@ export async function resetTestDb(ctx: TestDbContext): Promise<void> {
       digest_buffer, watch_rules, channel_configs,
       user_notification_preferences,
       venue_booking_matches, venue_bookings,
-      board_columns, tasks, task_checklist_items,
+      board_columns, tasks, task_assignees, task_checklist_items,
       task_comments, boards,
       push_devices, player_photos, social_backgrounds,
       app_settings,
