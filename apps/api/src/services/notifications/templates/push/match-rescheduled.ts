@@ -21,10 +21,12 @@ export function renderMatchRescheduledPush(
   p: MatchRescheduledPayload,
   locale: Locale,
 ): PushTemplateOutput {
+  const dateNew = formatDate(p.kickoffDate, locale);
+  const dateOld = formatDate(p.oldKickoffDate, locale);
   const body =
     locale === "de"
-      ? `${p.homeTeam} vs. ${p.guestTeam}: neuer Termin ${formatDe(p.kickoffDate)} ${p.kickoffTime} (vorher ${formatDe(p.oldKickoffDate)} ${p.oldKickoffTime}).`
-      : `${p.homeTeam} vs. ${p.guestTeam}: new kickoff ${p.kickoffDate} ${p.kickoffTime} (was ${p.oldKickoffDate} ${p.oldKickoffTime}).`;
+      ? `${p.homeTeam} vs. ${p.guestTeam}: neuer Termin ${dateNew} ${p.kickoffTime} (vorher ${dateOld} ${p.oldKickoffTime}).`
+      : `${p.homeTeam} vs. ${p.guestTeam}: new kickoff ${dateNew} ${p.kickoffTime} (was ${dateOld} ${p.oldKickoffTime}).`;
   return {
     title: truncate(TITLE[locale], TITLE_MAX),
     body: truncate(body, BODY_MAX),
@@ -40,7 +42,7 @@ function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max - 1) + "…";
 }
 
-function formatDe(iso: string): string {
+function formatDate(iso: string, locale: Locale): string {
   const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
+  return locale === "de" ? `${d}.${m}.${y}` : `${y}-${m}-${d}`;
 }
