@@ -64,7 +64,9 @@ function mockInsertOK() {
   mocks.dbInsert.mockReturnValue({
     values: vi.fn().mockImplementation((v) => {
       valuesCall(v);
-      return Promise.resolve(undefined);
+      return {
+        onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+      };
     }),
   });
   return valuesCall;

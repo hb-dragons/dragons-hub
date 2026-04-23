@@ -120,7 +120,7 @@ export class PushChannelAdapter {
           errorMessage: ok ? null : (ticket?.message ?? ticket?.details?.error ?? "unknown"),
         };
       });
-      await db.insert(notificationLog).values(rows);
+      await db.insert(notificationLog).values(rows).onConflictDoNothing();
 
       result.sent = rows.filter((r) => r.status === "sent_ticket").length;
       result.failed = rows.length - result.sent;
@@ -143,7 +143,7 @@ export class PushChannelAdapter {
         providerTicketId: null,
         errorMessage: message,
       }));
-      await db.insert(notificationLog).values(rows);
+      await db.insert(notificationLog).values(rows).onConflictDoNothing();
       return { success: false, sent: 0, failed: outgoing.length };
     }
   }
