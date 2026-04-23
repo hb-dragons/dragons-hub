@@ -73,8 +73,7 @@
             "backgroundColor": "#131313"
           }
         }
-      ],
-      "./plugins/remove-push-entitlement"
+      ]
     ],
     "runtimeVersion": {
       "policy": "appVersion"
