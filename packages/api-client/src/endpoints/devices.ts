@@ -13,8 +13,9 @@ export function deviceEndpoints(client: ApiClient) {
     register(
       token: string,
       platform: "ios" | "android",
+      locale?: string,
     ): Promise<RegisterDeviceResponse> {
-      return client.post("/api/devices/register", { token, platform });
+      return client.post("/api/devices/register", { token, platform, locale });
     },
 
     unregister(token: string): Promise<UnregisterDeviceResponse> {
