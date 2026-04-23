@@ -55,7 +55,6 @@ export const checklistItemCreateBodySchema = z.object({
 export const checklistItemUpdateBodySchema = z.object({
   label: z.string().min(1).max(200).optional(),
   isChecked: z.boolean().optional(),
-  checkedBy: z.string().max(100).nullable().optional(),
 });
 
 export const commentCreateBodySchema = z.object({

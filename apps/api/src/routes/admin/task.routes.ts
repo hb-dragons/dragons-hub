@@ -240,7 +240,11 @@ taskRoutes.patch(
       itemId: c.req.param("itemId"),
     });
     const body = checklistItemUpdateBodySchema.parse(await c.req.json());
-    const result = await updateChecklistItem(id, itemId, body);
+    const callerId = c.get("user")?.id;
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await updateChecklistItem(id, itemId, body, callerId);
 
     if (!result) {
       return c.json(

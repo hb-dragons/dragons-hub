@@ -344,7 +344,8 @@ export async function addChecklistItem(
 export async function updateChecklistItem(
   taskId: number,
   itemId: number,
-  data: { label?: string; isChecked?: boolean; checkedBy?: string | null },
+  data: { label?: string; isChecked?: boolean },
+  callerId: string,
 ): Promise<ChecklistItem | null> {
   const updateData: Record<string, unknown> = {};
   if (data.label !== undefined) updateData.label = data.label;
@@ -352,13 +353,11 @@ export async function updateChecklistItem(
     updateData.isChecked = data.isChecked;
     if (data.isChecked) {
       updateData.checkedAt = new Date();
-      if (data.checkedBy !== undefined) updateData.checkedBy = data.checkedBy;
+      updateData.checkedBy = callerId;
     } else {
       updateData.checkedAt = null;
       updateData.checkedBy = null;
     }
-  } else if (data.checkedBy !== undefined) {
-    updateData.checkedBy = data.checkedBy;
   }
 
   const [updated] = await db

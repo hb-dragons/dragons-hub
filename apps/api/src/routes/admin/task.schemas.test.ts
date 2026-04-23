@@ -322,16 +322,9 @@ describe("checklistItemUpdateBodySchema", () => {
     });
   });
 
-  it("accepts checkedBy update", () => {
-    expect(
-      checklistItemUpdateBodySchema.parse({ checkedBy: "admin" }),
-    ).toEqual({ checkedBy: "admin" });
-  });
-
-  it("accepts null checkedBy", () => {
-    expect(
-      checklistItemUpdateBodySchema.parse({ checkedBy: null }),
-    ).toEqual({ checkedBy: null });
+  it("strips unknown checkedBy field (derived from session, not body)", () => {
+    const result = checklistItemUpdateBodySchema.parse({ checkedBy: "admin" });
+    expect(result).not.toHaveProperty("checkedBy");
   });
 
   it("accepts empty object", () => {

@@ -477,7 +477,7 @@ describe("PATCH /tasks/:id/checklist/:itemId", () => {
     expect(await json(res)).toEqual(item);
     expect(mocks.updateChecklistItem).toHaveBeenCalledWith(1, 1, {
       isChecked: true,
-    });
+    }, "test-user");
   });
 
   it("returns 404 when item not found", async () => {

@@ -394,7 +394,7 @@ describe("updateChecklistItem", () => {
     await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Old" });
 
-    const result = await updateChecklistItem(1, 1, { label: "New" });
+    const result = await updateChecklistItem(1, 1, { label: "New" }, "test-user");
 
     expect(result!.label).toBe("New");
   });
@@ -404,13 +404,10 @@ describe("updateChecklistItem", () => {
     await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
 
-    const result = await updateChecklistItem(1, 1, {
-      isChecked: true,
-      checkedBy: "admin",
-    });
+    const result = await updateChecklistItem(1, 1, { isChecked: true }, "test-user");
 
     expect(result!.isChecked).toBe(true);
-    expect(result!.checkedBy).toBe("admin");
+    expect(result!.checkedBy).toBe("test-user");
     expect(result!.checkedAt).not.toBeNull();
   });
 
@@ -418,30 +415,32 @@ describe("updateChecklistItem", () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
-    await updateChecklistItem(1, 1, { isChecked: true, checkedBy: "admin" });
+    await updateChecklistItem(1, 1, { isChecked: true }, "test-user");
 
-    const result = await updateChecklistItem(1, 1, { isChecked: false });
+    const result = await updateChecklistItem(1, 1, { isChecked: false }, "test-user");
 
     expect(result!.isChecked).toBe(false);
     expect(result!.checkedBy).toBeNull();
     expect(result!.checkedAt).toBeNull();
   });
 
-  it("updates checkedBy without changing isChecked", async () => {
+  it("updates label without changing isChecked", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
 
-    const result = await updateChecklistItem(1, 1, { checkedBy: "user-1" });
+    const result = await updateChecklistItem(1, 1, { label: "Renamed" }, "test-user");
 
-    expect(result!.checkedBy).toBe("user-1");
+    expect(result!.label).toBe("Renamed");
+    expect(result!.isChecked).toBe(false);
+    expect(result!.checkedBy).toBeNull();
   });
 
   it("returns null for non-existent item", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
-    const result = await updateChecklistItem(1, 999, { label: "X" });
+    const result = await updateChecklistItem(1, 999, { label: "X" }, "test-user");
 
     expect(result).toBeNull();
   });
@@ -453,22 +452,21 @@ describe("updateChecklistItem", () => {
     await addChecklistItem(2, { label: "Item" });
 
     // Item 1 belongs to task 2, try to update via task 1
-    const result = await updateChecklistItem(1, 1, { label: "Hack" });
+    const result = await updateChecklistItem(1, 1, { label: "Hack" }, "test-user");
 
     expect(result).toBeNull();
   });
 
-  it("checks item without specifying checkedBy", async () => {
+  it("sets checkedBy from callerId when checking item", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
 
-    const result = await updateChecklistItem(1, 1, { isChecked: true });
+    const result = await updateChecklistItem(1, 1, { isChecked: true }, "test-user");
 
     expect(result!.isChecked).toBe(true);
     expect(result!.checkedAt).not.toBeNull();
-    // checkedBy stays null since not provided
-    expect(result!.checkedBy).toBeNull();
+    expect(result!.checkedBy).toBe("test-user");
   });
 });
 
@@ -603,6 +601,54 @@ describe("updateComment", () => {
     const result = await updateComment(1, 1, { body: "Hack" });
 
     expect(result).toBeNull();
+  });
+});
+
+describe("updateChecklistItem checkedBy", () => {
+  it("sets checkedBy to callerId when item becomes checked", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES ('u_carol', 'Carol', 'c@x.io')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+    const task = await createTask(
+      boardId,
+      { title: "T", columnId: todoColId },
+      "test-user",
+    );
+    const item = await addChecklistItem(task!.id, { label: "step" });
+    const updated = await updateChecklistItem(
+      task!.id,
+      item!.id,
+      { isChecked: true },
+      "u_carol",
+    );
+    expect(updated!.isChecked).toBe(true);
+    expect(updated!.checkedBy).toBe("u_carol");
+  });
+
+  it("clears checkedBy when item becomes unchecked", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES ('u_carol', 'Carol', 'c@x.io')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+    const task = await createTask(
+      boardId,
+      { title: "T", columnId: todoColId },
+      "test-user",
+    );
+    const item = await addChecklistItem(task!.id, { label: "step" });
+    await updateChecklistItem(task!.id, item!.id, { isChecked: true }, "u_carol");
+    const cleared = await updateChecklistItem(
+      task!.id,
+      item!.id,
+      { isChecked: false },
+      "u_carol",
+    );
+    expect(cleared!.isChecked).toBe(false);
+    expect(cleared!.checkedBy).toBeNull();
+    expect(cleared!.checkedAt).toBeNull();
   });
 });
 
