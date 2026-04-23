@@ -15,6 +15,10 @@ export const pushDevices = pgTable(
     userId: text("user_id").notNull(),
     token: text("token").notNull(),
     platform: varchar("platform", { length: 10 }).notNull(),
+    locale: text("locale"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

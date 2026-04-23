@@ -35,6 +35,11 @@ export const notificationLog = pgTable(
     digestRunId: integer("digest_run_id"),
     errorMessage: text("error_message"),
     retryCount: integer("retry_count").notNull().default(0),
+    providerTicketId: text("provider_ticket_id"),
+    providerReceiptCheckedAt: timestamp("provider_receipt_checked_at", {
+      withTimezone: true,
+    }),
+    recipientToken: text("recipient_token"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
