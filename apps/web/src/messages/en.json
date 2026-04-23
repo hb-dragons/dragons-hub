@@ -181,6 +181,9 @@
         "settings": "Current season",
         "default": "Current season (fallback)"
       }
+    },
+    "issuesCallout": {
+      "label": "{cancelled, plural, =0 {} one {# cancelled} other {# cancelled}} · {forfeited, plural, =0 {} one {# forfeited} other {# forfeited}} in this range"
     }
   },
   "common": {

@@ -181,6 +181,9 @@
         "settings": "Aktuelle Saison",
         "default": "Aktuelle Saison (Fallback)"
       }
+    },
+    "issuesCallout": {
+      "label": "{cancelled, plural, =0 {} one {# Absage} other {# Absagen}} · {forfeited, plural, =0 {} one {# Verzicht} other {# Verzichte}} in diesem Zeitraum"
     }
   },
   "common": {
