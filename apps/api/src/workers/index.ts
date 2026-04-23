@@ -2,7 +2,8 @@ import { syncWorker } from "./sync.worker";
 import { eventWorker } from "./event.worker";
 import { digestWorker } from "./digest.worker";
 import { refereeReminderWorker } from "./referee-reminder.worker";
-import { initializeScheduledJobs, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue } from "./queues";
+import { pushReceiptWorker } from "./push-receipt.worker";
+import { initializeScheduledJobs, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue } from "./queues";
 import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-poller";
 import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
 import { syncRefereeGames } from "../services/sync/referee-games.sync";
@@ -94,6 +95,7 @@ export async function initializeWorkers() {
   logger.info("Event worker started");
   logger.info("Digest worker started");
   logger.info("Referee reminder worker started");
+  logger.info("Push receipt worker started");
   logger.info("Workers initialized");
 }
 
@@ -252,6 +254,8 @@ export async function shutdownWorkers() {
   stopOutboxPoller();
   await refereeReminderWorker.close();
   await refereeRemindersQueue.close();
+  await pushReceiptWorker.close();
+  await pushReceiptQueue.close();
   await digestWorker.close();
   await eventWorker.close();
   await syncWorker.close();
@@ -266,4 +270,5 @@ export { syncWorker };
 export { eventWorker };
 export { digestWorker };
 export { refereeReminderWorker };
+export { pushReceiptWorker };
 export * from "./queues";

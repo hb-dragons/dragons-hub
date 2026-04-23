@@ -50,6 +50,16 @@ export const refereeRemindersQueue = new Queue("referee-reminders", {
   },
 });
 
+export const pushReceiptQueue = new Queue("push-receipt", {
+  prefix: "{bull}",
+  connection: { url: env.REDIS_URL },
+  defaultJobOptions: {
+    attempts: 1, // reconcile is idempotent; next cycle retries naturally
+    removeOnComplete: { count: 100 },
+    removeOnFail: { count: 100 },
+  },
+});
+
 export async function triggerRefereeGamesSync(
   triggeredBy?: string,
 ): Promise<{ syncRunId: number; status: string } | null> {
@@ -166,6 +176,21 @@ export async function initializeScheduledJobs() {
       },
     );
   }
+
+  // Push receipt reconcile — every 15 minutes
+  const pushReceiptRepeatables = await pushReceiptQueue.getRepeatableJobs();
+  for (const job of pushReceiptRepeatables) {
+    await pushReceiptQueue.removeRepeatableByKey(job.key);
+  }
+  await pushReceiptQueue.add(
+    "reconcile",
+    {},
+    {
+      jobId: "push-receipt-reconcile-cron",
+      repeat: { every: 15 * 60 * 1000 },
+    },
+  );
+  logger.info("Push receipt reconcile scheduled (every 15m)");
 }
 
 export async function triggerManualSync(userId?: string) {
