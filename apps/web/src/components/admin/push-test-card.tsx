@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { apiFetcher } from "@/lib/swr";
 import { fetchAPI, APIError } from "@/lib/api";
@@ -73,6 +74,7 @@ function formatDate(iso: string | null): string {
 }
 
 export function PushTestCard() {
+  const t = useTranslations("settings.pushTest");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -93,29 +95,23 @@ export function PushTestCard() {
       });
       const failed = res.tickets.filter((t) => t.status === "failed").length;
       if (failed === 0) {
-        toast.success(
-          `Test push sent to ${res.deviceCount} device${res.deviceCount === 1 ? "" : "s"}`,
-        );
+        toast.success(t("toast.success", { count: res.deviceCount }));
       } else {
-        toast.warning(
-          `Sent to ${res.deviceCount} device${res.deviceCount === 1 ? "" : "s"}, ${failed} failed`,
-        );
+        toast.warning(t("toast.partialFailure", { count: failed }));
       }
       setMessage("");
       await mutate();
     } catch (err) {
       if (err instanceof APIError) {
         if (err.status === 400 && /no_devices/i.test(err.message)) {
-          toast.error(
-            "No devices registered. Open the native app on a signed-in device first.",
-          );
+          toast.error(t("noDevicesError"));
         } else if (err.status === 403) {
-          toast.error("You do not have permission to send test pushes.");
+          toast.error(t("permissionError"));
         } else {
-          toast.error(err.message || "Failed to send test push");
+          toast.error(err.message || t("genericError"));
         }
       } else {
-        toast.error("Failed to send test push");
+        toast.error(t("genericError"));
       }
     } finally {
       setSending(false);
@@ -127,21 +123,18 @@ export function PushTestCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Test push notification</CardTitle>
-        <CardDescription>
-          Send a test push to your own registered devices. Open the Dragons
-          native app on a signed-in device first to register it.
-        </CardDescription>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
           <div className="grid max-w-xl gap-3">
-            <Label htmlFor="push-test-message">Custom message (optional)</Label>
+            <Label htmlFor="push-test-message">{t("messageLabel")}</Label>
             <Textarea
               id="push-test-message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Leave empty for default test message"
+              placeholder={t("messagePlaceholder")}
               rows={3}
               maxLength={180}
               disabled={sending}
@@ -160,27 +153,27 @@ export function PushTestCard() {
                 ) : (
                   <Send className="mr-2 h-4 w-4" />
                 )}
-                {sending ? "Sending..." : "Send test push"}
+                {sending ? t("sendingButton") : t("sendButton")}
               </Button>
             </div>
           </div>
 
           <div className="space-y-2">
             <h3 className="font-display text-sm font-semibold uppercase tracking-wide">
-              Recent test pushes
+              {t("recentHeading")}
             </h3>
             {results.length === 0 ? (
               <p className="text-muted-foreground text-sm">
-                No test pushes yet. Send one above to see results.
+                {t("emptyState")}
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Sent at</TableHead>
-                    <TableHead>Token</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Error</TableHead>
+                    <TableHead>{t("columns.sentAt")}</TableHead>
+                    <TableHead>{t("columns.token")}</TableHead>
+                    <TableHead>{t("columns.status")}</TableHead>
+                    <TableHead>{t("columns.error")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

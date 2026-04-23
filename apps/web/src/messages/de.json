@@ -871,6 +871,31 @@
       "description": "Zwischen hellem und dunklem Modus wählen",
       "light": "Hell",
       "dark": "Dunkel"
+    },
+    "pushTest": {
+      "pageTitle": "Benachrichtigungen",
+      "pageDescription": "Tests und Diagnose für Push-Benachrichtigungen.",
+      "title": "Push-Benachrichtigungen — Test",
+      "description": "Sendet eine Test-Benachrichtigung an alle auf diesem Admin-Konto registrierten Geräte.",
+      "messageLabel": "Eigene Nachricht (optional)",
+      "messagePlaceholder": "Leer lassen für Standard-Testnachricht",
+      "sendButton": "Test-Benachrichtigung senden",
+      "sendingButton": "Wird gesendet…",
+      "noDevicesError": "Keine Geräte registriert. Öffne zuerst die native App mit einem angemeldeten Account.",
+      "permissionError": "Admin-Rechte erforderlich",
+      "genericError": "Test-Benachrichtigung konnte nicht gesendet werden",
+      "recentHeading": "Zuletzt",
+      "emptyState": "Noch keine Tests. Oben senden, um Ergebnisse zu sehen.",
+      "columns": {
+        "sentAt": "Gesendet",
+        "token": "Token",
+        "status": "Status",
+        "error": "Fehler"
+      },
+      "toast": {
+        "success": "Test an {count, plural, one {# Gerät} other {# Geräte}} gesendet",
+        "partialFailure": "{count, plural, one {# Push} other {# Pushes}} fehlgeschlagen"
+      }
     }
   },
   "time": {

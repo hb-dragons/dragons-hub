@@ -871,6 +871,31 @@
       "description": "Choose between light and dark mode",
       "light": "Light",
       "dark": "Dark"
+    },
+    "pushTest": {
+      "pageTitle": "Notifications",
+      "pageDescription": "Push notification testing and diagnostics.",
+      "title": "Test push notification",
+      "description": "Send a test notification to every device registered against this admin account.",
+      "messageLabel": "Custom message (optional)",
+      "messagePlaceholder": "Leave empty for default test message",
+      "sendButton": "Send test push",
+      "sendingButton": "Sending…",
+      "noDevicesError": "No devices registered. Open the native app on a signed-in device first.",
+      "permissionError": "Admin permissions required",
+      "genericError": "Failed to send test push",
+      "recentHeading": "Recent test pushes",
+      "emptyState": "No test pushes yet. Send one above to see results.",
+      "columns": {
+        "sentAt": "Sent at",
+        "token": "Token",
+        "status": "Status",
+        "error": "Error"
+      },
+      "toast": {
+        "success": "Test push sent to {count, plural, one {# device} other {# devices}}",
+        "partialFailure": "{count, plural, one {# push} other {# pushes}} failed"
+      }
     }
   },
   "time": {
