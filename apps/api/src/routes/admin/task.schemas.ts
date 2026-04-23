@@ -60,7 +60,6 @@ export const checklistItemUpdateBodySchema = z.object({
 
 export const commentCreateBodySchema = z.object({
   body: z.string().min(1).max(5000),
-  authorId: z.string().min(1).max(100),
 });
 
 export const commentUpdateBodySchema = z.object({

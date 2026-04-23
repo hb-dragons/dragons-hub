@@ -290,7 +290,11 @@ taskRoutes.post(
   async (c) => {
     const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
     const body = commentCreateBodySchema.parse(await c.req.json());
-    const result = await addComment(id, body);
+    const callerId = c.get("user")?.id;
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await addComment(id, body, callerId);
 
     if (!result) {
       return c.json({ error: "Task not found", code: "NOT_FOUND" }, 404);

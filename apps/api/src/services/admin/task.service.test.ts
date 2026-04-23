@@ -339,7 +339,7 @@ describe("deleteTask", () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task", columnId: todoColId });
     await addChecklistItem(1, { label: "Item" });
-    await addComment(1, { body: "Comment", authorId: "user-1" });
+    await addComment(1, { body: "Comment" }, "user-1");
 
     await deleteTask(1);
 
@@ -505,7 +505,7 @@ describe("addComment", () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task", columnId: todoColId });
 
-    const result = await addComment(1, { body: "Nice!", authorId: "user-1" });
+    const result = await addComment(1, { body: "Nice!" }, "user-1");
 
     expect(result).not.toBeNull();
     expect(result!.body).toBe("Nice!");
@@ -514,8 +514,24 @@ describe("addComment", () => {
   });
 
   it("returns null for non-existent task", async () => {
-    const result = await addComment(999, { body: "Text", authorId: "user-1" });
+    const result = await addComment(999, { body: "Text" }, "user-1");
     expect(result).toBeNull();
+  });
+});
+
+describe("addComment with caller", () => {
+  it("uses callerId as authorId", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES ('u_alice', 'Alice', 'a@x.io')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+    await ctx.client.exec(
+      `INSERT INTO tasks (board_id, column_id, title) VALUES (${boardId}, ${todoColId}, 'T')`,
+    );
+    const comment = await addComment(1, { body: "hello" }, "u_alice");
+    expect(comment).not.toBeNull();
+    expect(comment!.authorId).toBe("u_alice");
   });
 });
 
@@ -523,7 +539,7 @@ describe("updateComment", () => {
   it("updates comment body", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task", columnId: todoColId });
-    await addComment(1, { body: "Old", authorId: "user-1" });
+    await addComment(1, { body: "Old" }, "user-1");
 
     const result = await updateComment(1, 1, { body: "New" });
 
@@ -544,7 +560,7 @@ describe("updateComment", () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task 1", columnId: todoColId });
     await createTask(boardId, { title: "Task 2", columnId: todoColId });
-    await addComment(2, { body: "Text", authorId: "user-1" });
+    await addComment(2, { body: "Text" }, "user-1");
 
     const result = await updateComment(1, 1, { body: "Hack" });
 
@@ -556,7 +572,7 @@ describe("deleteComment", () => {
   it("deletes existing comment", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task", columnId: todoColId });
-    await addComment(1, { body: "To delete", authorId: "user-1" });
+    await addComment(1, { body: "To delete" }, "user-1");
 
     const result = await deleteComment(1, 1);
 
@@ -576,7 +592,7 @@ describe("deleteComment", () => {
     const { boardId, todoColId } = await createBoardWithColumns();
     await createTask(boardId, { title: "Task 1", columnId: todoColId });
     await createTask(boardId, { title: "Task 2", columnId: todoColId });
-    await addComment(2, { body: "Text", authorId: "user-1" });
+    await addComment(2, { body: "Text" }, "user-1");
 
     const result = await deleteComment(1, 1);
 

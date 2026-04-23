@@ -52,6 +52,10 @@ import { errorHandler } from "../../middleware/error";
 // Test app without auth middleware
 const app = new Hono<AppEnv>();
 app.onError(errorHandler);
+app.use("*", async (c, next) => {
+  c.set("user", { id: "test-user", name: "Test", email: "t@x.io" } as never);
+  await next();
+});
 app.route("/", taskRoutes);
 
 function json(response: Response) {
@@ -555,21 +559,18 @@ describe("DELETE /tasks/:id/checklist/:itemId", () => {
 
 describe("POST /tasks/:id/comments", () => {
   it("adds comment and returns 201", async () => {
-    const comment = { id: 1, body: "Great!", authorId: "user-1" };
+    const comment = { id: 1, body: "Great!", authorId: "test-user" };
     mocks.addComment.mockResolvedValue(comment);
 
     const res = await app.request("/tasks/1/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "Great!", authorId: "user-1" }),
+      body: JSON.stringify({ body: "Great!" }),
     });
 
     expect(res.status).toBe(201);
     expect(await json(res)).toEqual(comment);
-    expect(mocks.addComment).toHaveBeenCalledWith(1, {
-      body: "Great!",
-      authorId: "user-1",
-    });
+    expect(mocks.addComment).toHaveBeenCalledWith(1, { body: "Great!" }, "test-user");
   });
 
   it("returns 404 when task not found", async () => {
@@ -578,7 +579,7 @@ describe("POST /tasks/:id/comments", () => {
     const res = await app.request("/tasks/999/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "Text", authorId: "user-1" }),
+      body: JSON.stringify({ body: "Text" }),
     });
 
     expect(res.status).toBe(404);
@@ -589,18 +590,7 @@ describe("POST /tasks/:id/comments", () => {
     const res = await app.request("/tasks/1/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "", authorId: "user-1" }),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-
-  it("returns 400 for missing authorId", async () => {
-    const res = await app.request("/tasks/1/comments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "Text" }),
+      body: JSON.stringify({ body: "" }),
     });
 
     expect(res.status).toBe(400);
@@ -611,7 +601,7 @@ describe("POST /tasks/:id/comments", () => {
     const res = await app.request("/tasks/abc/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: "Text", authorId: "user-1" }),
+      body: JSON.stringify({ body: "Text" }),
     });
 
     expect(res.status).toBe(400);

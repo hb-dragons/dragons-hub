@@ -115,7 +115,7 @@ export function TaskDetailSheet({ task, onClose, boardId }: TaskDetailSheetProps
     try {
       await fetchAPI(`/admin/tasks/${task.id}/comments`, {
         method: "POST",
-        body: JSON.stringify({ body: newComment.trim(), authorId: "admin" }),
+        body: JSON.stringify({ body: newComment.trim() }),
       });
       setNewComment("");
       await mutate(`/admin/tasks/${task.id}`);

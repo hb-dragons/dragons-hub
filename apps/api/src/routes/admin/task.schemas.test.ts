@@ -351,38 +351,34 @@ describe("checklistItemUpdateBodySchema", () => {
   });
 });
 
-describe("commentCreateBodySchema", () => {
-  it("accepts valid body and authorId", () => {
-    expect(
-      commentCreateBodySchema.parse({ body: "Nice work!", authorId: "user-1" }),
-    ).toEqual({ body: "Nice work!", authorId: "user-1" });
+describe("commentCreateBodySchema (session-author)", () => {
+  it("does NOT require authorId in body", () => {
+    const result = commentCreateBodySchema.safeParse({ body: "Hello" });
+    expect(result.success).toBe(true);
   });
 
-  it("rejects empty body", () => {
-    expect(() =>
-      commentCreateBodySchema.parse({ body: "", authorId: "user-1" }),
-    ).toThrow();
+  it("does not expose an authorId field in parsed output", () => {
+    const result = commentCreateBodySchema.safeParse({ body: "Hello", authorId: "x" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty("authorId");
+    }
+  });
+
+  it("requires non-empty body", () => {
+    const result = commentCreateBodySchema.safeParse({ body: "" });
+    expect(result.success).toBe(false);
   });
 
   it("rejects body exceeding 5000 chars", () => {
     expect(() =>
-      commentCreateBodySchema.parse({ body: "x".repeat(5001), authorId: "user-1" }),
+      commentCreateBodySchema.parse({ body: "x".repeat(5001) }),
     ).toThrow();
-  });
-
-  it("rejects empty authorId", () => {
-    expect(() =>
-      commentCreateBodySchema.parse({ body: "Text", authorId: "" }),
-    ).toThrow();
-  });
-
-  it("rejects missing authorId", () => {
-    expect(() => commentCreateBodySchema.parse({ body: "Text" })).toThrow();
   });
 
   it("rejects missing body", () => {
     expect(() =>
-      commentCreateBodySchema.parse({ authorId: "user-1" }),
+      commentCreateBodySchema.parse({}),
     ).toThrow();
   });
 });

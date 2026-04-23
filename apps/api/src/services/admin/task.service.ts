@@ -400,7 +400,8 @@ export async function deleteChecklistItem(
 
 export async function addComment(
   taskId: number,
-  data: { body: string; authorId: string },
+  data: { body: string },
+  callerId: string,
 ): Promise<TaskComment | null> {
   // Verify task exists
   const [task] = await db
@@ -415,7 +416,7 @@ export async function addComment(
     .insert(taskComments)
     .values({
       taskId,
-      authorId: data.authorId,
+      authorId: callerId,
       body: data.body,
     })
     .returning();
