@@ -96,65 +96,73 @@ export async function createTask(
   },
   callerId: string,
 ): Promise<TaskDetail | null> {
-  // Verify board exists
-  const [board] = await db
-    .select({ id: boards.id })
-    .from(boards)
-    .where(eq(boards.id, boardId))
-    .limit(1);
+  const created = await db.transaction(async (tx) => {
+    const [board] = await tx
+      .select({ id: boards.id })
+      .from(boards)
+      .where(eq(boards.id, boardId))
+      .limit(1);
+    if (!board) return null;
 
-  if (!board) return null;
+    const [column] = await tx
+      .select({ id: boardColumns.id })
+      .from(boardColumns)
+      .where(
+        and(
+          eq(boardColumns.id, data.columnId),
+          eq(boardColumns.boardId, boardId),
+        ),
+      )
+      .limit(1);
+    if (!column) return null;
 
-  // Verify column exists and belongs to board
-  const [column] = await db
-    .select({ id: boardColumns.id })
-    .from(boardColumns)
-    .where(
-      and(
-        eq(boardColumns.id, data.columnId),
-        eq(boardColumns.boardId, boardId),
-      ),
-    )
-    .limit(1);
+    // Lock target column's tasks to serialize concurrent appends.
+    await tx
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.columnId, data.columnId))
+      .for("update");
 
-  if (!column) return null;
+    const [maxPos] = await tx
+      .select({ maxPosition: sql<number>`COALESCE(MAX(${tasks.position}), -1)` })
+      .from(tasks)
+      .where(eq(tasks.columnId, data.columnId));
 
-  // Get max position in this column
-  const [maxPos] = await db
-    .select({ maxPosition: sql<number>`COALESCE(MAX(${tasks.position}), -1)` })
-    .from(tasks)
-    .where(eq(tasks.columnId, data.columnId));
+    const [task] = await tx
+      .insert(tasks)
+      .values({
+        boardId,
+        columnId: data.columnId,
+        title: data.title,
+        description: data.description ?? null,
+        assigneeId: data.assigneeId ?? null,
+        priority: (data.priority ?? "normal") as TaskPriority,
+        dueDate: data.dueDate ?? null,
+        position: (maxPos?.maxPosition ?? -1) + 1,
+        createdBy: callerId,
+      })
+      .returning();
 
-  const [task] = await db
-    .insert(tasks)
-    .values({
-      boardId,
-      columnId: data.columnId,
-      title: data.title,
-      description: data.description ?? null,
-      assigneeId: data.assigneeId ?? null,
-      priority: (data.priority ?? "normal") as TaskPriority,
-      dueDate: data.dueDate ?? null,
-      position: (maxPos?.maxPosition ?? -1) + 1,
-      createdBy: callerId,
-    })
-    .returning();
+    return task!;
+  });
+
+  if (!created) return null;
 
   return {
-    id: task!.id,
-    boardId: task!.boardId,
-    columnId: task!.columnId,
-    title: task!.title,
-    description: task!.description,
-    assigneeId: task!.assigneeId,
-    priority: task!.priority as TaskPriority,
-    dueDate: task!.dueDate,
-    position: task!.position,
+    id: created.id,
+    boardId: created.boardId,
+    columnId: created.columnId,
+    title: created.title,
+    description: created.description,
+    assigneeId: created.assigneeId,
+    priority: created.priority as TaskPriority,
+    dueDate: created.dueDate,
+    position: created.position,
     checklistTotal: 0,
     checklistChecked: 0,
-    createdBy: task!.createdBy,
-    createdAt: task!.createdAt.toISOString(),
-    updatedAt: task!.updatedAt.toISOString(),
+    createdBy: created.createdBy,
+    createdAt: created.createdAt.toISOString(),
+    updatedAt: created.updatedAt.toISOString(),
     checklist: [],
     comments: [],
   };
@@ -254,37 +262,117 @@ export async function updateTask(
 
 export async function moveTask(
   id: number,
-  columnId: number,
-  position: number,
+  targetColumnId: number,
+  targetPosition: number,
 ): Promise<TaskDetail | null> {
-  // Get the task first
-  const [task] = await db
-    .select()
-    .from(tasks)
-    .where(eq(tasks.id, id))
-    .limit(1);
+  const result = await db.transaction(async (tx) => {
+    const [task] = await tx
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, id))
+      .for("update");
+    if (!task) return null;
 
-  if (!task) return null;
+    const [column] = await tx
+      .select({ id: boardColumns.id })
+      .from(boardColumns)
+      .where(eq(boardColumns.id, targetColumnId))
+      .limit(1);
+    if (!column) return null;
 
-  // Verify column exists
-  const [column] = await db
-    .select({
-      id: boardColumns.id,
-      boardId: boardColumns.boardId,
-    })
-    .from(boardColumns)
-    .where(eq(boardColumns.id, columnId))
-    .limit(1);
+    const fromColumnId = task.columnId;
+    const fromPosition = task.position;
 
-  if (!column) return null;
+    // Lock rows in source and target columns to serialize concurrent moves.
+    await tx
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(
+        sql`${tasks.columnId} IN (${fromColumnId}, ${targetColumnId})`,
+      )
+      .for("update");
 
-  // Update task position and column
-  await db
-    .update(tasks)
-    .set({ columnId, position, updatedAt: new Date() })
-    .where(eq(tasks.id, id));
+    // Count target-column siblings excluding the moving task.
+    const [targetCount] = await tx
+      .select({ c: count() })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.columnId, targetColumnId),
+          sql`${tasks.id} <> ${id}`,
+        ),
+      );
+    const maxAllowed = targetCount?.c ?? 0;
+    const clamped = Math.max(0, Math.min(targetPosition, maxAllowed));
 
-  return getTaskDetail(id);
+    if (fromColumnId === targetColumnId) {
+      if (clamped === fromPosition) {
+        // No-op reorder.
+        return task.id;
+      }
+      if (clamped < fromPosition) {
+        // Moving up: shift rows in [clamped, fromPosition) down by +1.
+        await tx
+          .update(tasks)
+          .set({ position: sql`${tasks.position} + 1` })
+          .where(
+            and(
+              eq(tasks.columnId, targetColumnId),
+              sql`${tasks.position} >= ${clamped}`,
+              sql`${tasks.position} < ${fromPosition}`,
+              sql`${tasks.id} <> ${id}`,
+            ),
+          );
+      } else {
+        // Moving down: shift rows in (fromPosition, clamped] up by -1.
+        await tx
+          .update(tasks)
+          .set({ position: sql`${tasks.position} - 1` })
+          .where(
+            and(
+              eq(tasks.columnId, targetColumnId),
+              sql`${tasks.position} > ${fromPosition}`,
+              sql`${tasks.position} <= ${clamped}`,
+              sql`${tasks.id} <> ${id}`,
+            ),
+          );
+      }
+      await tx
+        .update(tasks)
+        .set({ position: clamped, updatedAt: new Date() })
+        .where(eq(tasks.id, id));
+    } else {
+      // Close the gap in the source column.
+      await tx
+        .update(tasks)
+        .set({ position: sql`${tasks.position} - 1` })
+        .where(
+          and(
+            eq(tasks.columnId, fromColumnId),
+            sql`${tasks.position} > ${fromPosition}`,
+          ),
+        );
+      // Open a slot in the target column.
+      await tx
+        .update(tasks)
+        .set({ position: sql`${tasks.position} + 1` })
+        .where(
+          and(
+            eq(tasks.columnId, targetColumnId),
+            sql`${tasks.position} >= ${clamped}`,
+          ),
+        );
+      await tx
+        .update(tasks)
+        .set({ columnId: targetColumnId, position: clamped, updatedAt: new Date() })
+        .where(eq(tasks.id, id));
+    }
+
+    return task.id;
+  });
+
+  if (result === null) return null;
+  return getTaskDetail(result);
 }
 
 export async function deleteTask(id: number): Promise<boolean> {

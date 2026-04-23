@@ -683,3 +683,51 @@ describe("deleteComment", () => {
     expect(result).toBe(false);
   });
 });
+
+describe("moveTask position integrity", () => {
+  it("appends to end when target position equals current sibling count", async () => {
+    const { boardId, todoColId, inProgressColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO tasks (board_id, column_id, title, position) VALUES
+        (${boardId}, ${inProgressColId}, 'A', 0),
+        (${boardId}, ${inProgressColId}, 'B', 1),
+        (${boardId}, ${todoColId}, 'C', 0)`,
+    );
+    // Move C to position 2 in inProgress (end)
+    const moved = await moveTask(3, inProgressColId, 2);
+    expect(moved!.position).toBe(2);
+
+    const inProgress = await listTasks(boardId, { columnId: inProgressColId });
+    expect(inProgress.map((t) => t.title)).toEqual(["A", "B", "C"]);
+  });
+
+  it("inserts at position 0 and shifts siblings", async () => {
+    const { boardId, todoColId, inProgressColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO tasks (board_id, column_id, title, position) VALUES
+        (${boardId}, ${inProgressColId}, 'A', 0),
+        (${boardId}, ${inProgressColId}, 'B', 1),
+        (${boardId}, ${todoColId}, 'C', 0)`,
+    );
+    await moveTask(3, inProgressColId, 0);
+
+    const inProgress = await listTasks(boardId, { columnId: inProgressColId });
+    expect(inProgress.map((t) => t.title)).toEqual(["C", "A", "B"]);
+    expect(inProgress.map((t) => t.position)).toEqual([0, 1, 2]);
+  });
+
+  it("reorders within the same column", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO tasks (board_id, column_id, title, position) VALUES
+        (${boardId}, ${todoColId}, 'A', 0),
+        (${boardId}, ${todoColId}, 'B', 1),
+        (${boardId}, ${todoColId}, 'C', 2)`,
+    );
+    // Move C from position 2 to position 0
+    await moveTask(3, todoColId, 0);
+
+    const todo = await listTasks(boardId, { columnId: todoColId });
+    expect(todo.map((t) => t.title)).toEqual(["C", "A", "B"]);
+  });
+});
