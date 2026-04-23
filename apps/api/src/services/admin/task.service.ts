@@ -94,6 +94,7 @@ export async function createTask(
     dueDate?: string | null;
     columnId: number;
   },
+  callerId: string,
 ): Promise<TaskDetail | null> {
   // Verify board exists
   const [board] = await db
@@ -135,6 +136,7 @@ export async function createTask(
       priority: (data.priority ?? "normal") as TaskPriority,
       dueDate: data.dueDate ?? null,
       position: (maxPos?.maxPosition ?? -1) + 1,
+      createdBy: callerId,
     })
     .returning();
 
@@ -228,7 +230,10 @@ export async function updateTask(
     priority?: string;
     dueDate?: string | null;
   },
+  callerId: string,
 ): Promise<TaskDetail | null> {
+  // callerId reserved for task 10+ (updatedBy column not yet added)
+  void callerId;
   const setData: Record<string, unknown> = { updatedAt: new Date() };
   if (data.title !== undefined) setData.title = data.title;
   if (data.description !== undefined) setData.description = data.description;

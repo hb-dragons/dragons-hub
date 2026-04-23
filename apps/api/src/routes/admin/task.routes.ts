@@ -75,7 +75,11 @@ taskRoutes.post(
       boardId: c.req.param("boardId"),
     });
     const body = taskCreateBodySchema.parse(await c.req.json());
-    const result = await createTask(boardId, body);
+    const callerId = c.get("user")?.id;
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await createTask(boardId, body, callerId);
 
     if (!result) {
       return c.json(
@@ -127,7 +131,11 @@ taskRoutes.patch(
   async (c) => {
     const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
     const body = taskUpdateBodySchema.parse(await c.req.json());
-    const result = await updateTask(id, body);
+    const callerId = c.get("user")?.id;
+    if (!callerId) {
+      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    }
+    const result = await updateTask(id, body, callerId);
 
     if (!result) {
       return c.json({ error: "Task not found", code: "NOT_FOUND" }, 404);

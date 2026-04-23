@@ -50,6 +50,10 @@ afterAll(async () => {
 // --- Helpers ---
 
 async function createBoardWithColumns() {
+  await ctx.client.exec(
+    `INSERT INTO "user" (id, name, email) VALUES ('test-user', 'Test', 'test@x.io')
+     ON CONFLICT (id) DO NOTHING`,
+  );
   await ctx.client.exec("INSERT INTO boards (name) VALUES ('Test Board')");
   await ctx.client.exec(`
     INSERT INTO board_columns (board_id, name, position, is_done_column)
@@ -152,7 +156,7 @@ describe("createTask", () => {
     const result = await createTask(boardId, {
       title: "New Task",
       columnId: todoColId,
-    });
+    }, "test-user");
 
     expect(result).not.toBeNull();
     expect(result!.title).toBe("New Task");
@@ -173,7 +177,7 @@ describe("createTask", () => {
       assigneeId: "user-1",
       priority: "high",
       dueDate: "2025-06-01",
-    });
+    }, "test-user");
 
     expect(result!.description).toBe("Details here");
     expect(result!.assigneeId).toBe("user-1");
@@ -184,21 +188,21 @@ describe("createTask", () => {
   it("auto-increments position within column", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
 
-    const task1 = await createTask(boardId, { title: "First", columnId: todoColId });
-    const task2 = await createTask(boardId, { title: "Second", columnId: todoColId });
+    const task1 = await createTask(boardId, { title: "First", columnId: todoColId }, "test-user");
+    const task2 = await createTask(boardId, { title: "Second", columnId: todoColId }, "test-user");
 
     expect(task1!.position).toBe(0);
     expect(task2!.position).toBe(1);
   });
 
   it("returns null for non-existent board", async () => {
-    const result = await createTask(999, { title: "Task", columnId: 1 });
+    const result = await createTask(999, { title: "Task", columnId: 1 }, "test-user");
     expect(result).toBeNull();
   });
 
   it("returns null for non-existent column", async () => {
     const { boardId } = await createBoardWithColumns();
-    const result = await createTask(boardId, { title: "Task", columnId: 999 });
+    const result = await createTask(boardId, { title: "Task", columnId: 999 }, "test-user");
     expect(result).toBeNull();
   });
 
@@ -210,7 +214,7 @@ describe("createTask", () => {
     );
 
     // Column 4 belongs to board 2, try to use it with board 1
-    const result = await createTask(1, { title: "Task", columnId: 4 });
+    const result = await createTask(1, { title: "Task", columnId: 4 }, "test-user");
     expect(result).toBeNull();
   });
 });
@@ -218,7 +222,7 @@ describe("createTask", () => {
 describe("getTaskDetail", () => {
   it("returns task with checklist and comments", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task 1", columnId: todoColId });
+    await createTask(boardId, { title: "Task 1", columnId: todoColId }, "test-user");
 
     await ctx.client.exec(
       "INSERT INTO task_checklist_items (task_id, label, position) VALUES (1, 'Item 1', 0)",
@@ -244,7 +248,7 @@ describe("getTaskDetail", () => {
 
   it("returns empty checklist and comments for new task", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Bare Task", columnId: todoColId });
+    await createTask(boardId, { title: "Bare Task", columnId: todoColId }, "test-user");
 
     const result = await getTaskDetail(1);
 
@@ -256,9 +260,9 @@ describe("getTaskDetail", () => {
 describe("updateTask", () => {
   it("updates task title", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Old", columnId: todoColId });
+    await createTask(boardId, { title: "Old", columnId: todoColId }, "test-user");
 
-    const result = await updateTask(1, { title: "New" });
+    const result = await updateTask(1, { title: "New" }, "test-user");
 
     expect(result).not.toBeNull();
     expect(result!.title).toBe("New");
@@ -266,9 +270,9 @@ describe("updateTask", () => {
 
   it("updates task description", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
-    const result = await updateTask(1, { description: "Updated desc" });
+    const result = await updateTask(1, { description: "Updated desc" }, "test-user");
 
     expect(result!.description).toBe("Updated desc");
   });
@@ -279,15 +283,15 @@ describe("updateTask", () => {
       title: "Task",
       columnId: todoColId,
       description: "Has desc",
-    });
+    }, "test-user");
 
-    const result = await updateTask(1, { description: null });
+    const result = await updateTask(1, { description: null }, "test-user");
 
     expect(result!.description).toBeNull();
   });
 
   it("returns null for non-existent task", async () => {
-    const result = await updateTask(999, { title: "Nothing" });
+    const result = await updateTask(999, { title: "Nothing" }, "test-user");
     expect(result).toBeNull();
   });
 });
@@ -295,7 +299,7 @@ describe("updateTask", () => {
 describe("moveTask", () => {
   it("moves task to new column and position", async () => {
     const { boardId, todoColId, inProgressColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
     const result = await moveTask(1, inProgressColId, 0);
 
@@ -312,7 +316,7 @@ describe("moveTask", () => {
 
   it("returns null for non-existent column", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
     const result = await moveTask(1, 999, 0);
     expect(result).toBeNull();
@@ -322,7 +326,7 @@ describe("moveTask", () => {
 describe("deleteTask", () => {
   it("deletes existing task", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "To Delete", columnId: todoColId });
+    await createTask(boardId, { title: "To Delete", columnId: todoColId }, "test-user");
 
     const result = await deleteTask(1);
 
@@ -337,7 +341,7 @@ describe("deleteTask", () => {
 
   it("cascades delete to checklist items and comments", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
     await addComment(1, { body: "Comment" }, "user-1");
 
@@ -358,7 +362,7 @@ describe("deleteTask", () => {
 describe("addChecklistItem", () => {
   it("adds item with auto-incremented position", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
     const item1 = await addChecklistItem(1, { label: "Step 1" });
     const item2 = await addChecklistItem(1, { label: "Step 2" });
@@ -371,7 +375,7 @@ describe("addChecklistItem", () => {
 
   it("adds item with explicit position", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
     const item = await addChecklistItem(1, { label: "Step", position: 5 });
 
@@ -387,7 +391,7 @@ describe("addChecklistItem", () => {
 describe("updateChecklistItem", () => {
   it("updates label", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Old" });
 
     const result = await updateChecklistItem(1, 1, { label: "New" });
@@ -397,7 +401,7 @@ describe("updateChecklistItem", () => {
 
   it("checks item and sets checkedAt", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
 
     const result = await updateChecklistItem(1, 1, {
@@ -412,7 +416,7 @@ describe("updateChecklistItem", () => {
 
   it("unchecks item and clears checkedAt and checkedBy", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
     await updateChecklistItem(1, 1, { isChecked: true, checkedBy: "admin" });
 
@@ -425,7 +429,7 @@ describe("updateChecklistItem", () => {
 
   it("updates checkedBy without changing isChecked", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
 
     const result = await updateChecklistItem(1, 1, { checkedBy: "user-1" });
@@ -435,7 +439,7 @@ describe("updateChecklistItem", () => {
 
   it("returns null for non-existent item", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
     const result = await updateChecklistItem(1, 999, { label: "X" });
 
@@ -444,8 +448,8 @@ describe("updateChecklistItem", () => {
 
   it("returns null when item belongs to different task", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task 1", columnId: todoColId });
-    await createTask(boardId, { title: "Task 2", columnId: todoColId });
+    await createTask(boardId, { title: "Task 1", columnId: todoColId }, "test-user");
+    await createTask(boardId, { title: "Task 2", columnId: todoColId }, "test-user");
     await addChecklistItem(2, { label: "Item" });
 
     // Item 1 belongs to task 2, try to update via task 1
@@ -456,7 +460,7 @@ describe("updateChecklistItem", () => {
 
   it("checks item without specifying checkedBy", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
 
     const result = await updateChecklistItem(1, 1, { isChecked: true });
@@ -471,7 +475,7 @@ describe("updateChecklistItem", () => {
 describe("deleteChecklistItem", () => {
   it("deletes existing item", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addChecklistItem(1, { label: "Item" });
 
     const result = await deleteChecklistItem(1, 1);
@@ -481,7 +485,7 @@ describe("deleteChecklistItem", () => {
 
   it("returns false for non-existent item", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
     const result = await deleteChecklistItem(1, 999);
 
@@ -490,8 +494,8 @@ describe("deleteChecklistItem", () => {
 
   it("returns false when item belongs to different task", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task 1", columnId: todoColId });
-    await createTask(boardId, { title: "Task 2", columnId: todoColId });
+    await createTask(boardId, { title: "Task 1", columnId: todoColId }, "test-user");
+    await createTask(boardId, { title: "Task 2", columnId: todoColId }, "test-user");
     await addChecklistItem(2, { label: "Item" });
 
     const result = await deleteChecklistItem(1, 1);
@@ -503,7 +507,7 @@ describe("deleteChecklistItem", () => {
 describe("addComment", () => {
   it("adds comment to task", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
     const result = await addComment(1, { body: "Nice!" }, "user-1");
 
@@ -516,6 +520,40 @@ describe("addComment", () => {
   it("returns null for non-existent task", async () => {
     const result = await addComment(999, { body: "Text" }, "user-1");
     expect(result).toBeNull();
+  });
+});
+
+describe("createTask with caller", () => {
+  it("sets createdBy to callerId", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES ('u_bob', 'Bob', 'b@x.io')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+    const task = await createTask(
+      boardId,
+      { title: "T", columnId: todoColId },
+      "u_bob",
+    );
+    expect(task).not.toBeNull();
+    expect(task!.createdBy).toBe("u_bob");
+  });
+});
+
+describe("updateTask with caller", () => {
+  it("does not change createdBy on update", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES ('u_bob', 'Bob', 'b@x.io'), ('u_eve', 'Eve', 'e@x.io')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+    const created = await createTask(
+      boardId,
+      { title: "T", columnId: todoColId },
+      "u_bob",
+    );
+    const updated = await updateTask(created!.id, { title: "T2" }, "u_eve");
+    expect(updated!.createdBy).toBe("u_bob");
   });
 });
 
@@ -538,7 +576,7 @@ describe("addComment with caller", () => {
 describe("updateComment", () => {
   it("updates comment body", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addComment(1, { body: "Old" }, "user-1");
 
     const result = await updateComment(1, 1, { body: "New" });
@@ -549,7 +587,7 @@ describe("updateComment", () => {
 
   it("returns null for non-existent comment", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
     const result = await updateComment(1, 999, { body: "X" });
 
@@ -558,8 +596,8 @@ describe("updateComment", () => {
 
   it("returns null when comment belongs to different task", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task 1", columnId: todoColId });
-    await createTask(boardId, { title: "Task 2", columnId: todoColId });
+    await createTask(boardId, { title: "Task 1", columnId: todoColId }, "test-user");
+    await createTask(boardId, { title: "Task 2", columnId: todoColId }, "test-user");
     await addComment(2, { body: "Text" }, "user-1");
 
     const result = await updateComment(1, 1, { body: "Hack" });
@@ -571,7 +609,7 @@ describe("updateComment", () => {
 describe("deleteComment", () => {
   it("deletes existing comment", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
     await addComment(1, { body: "To delete" }, "user-1");
 
     const result = await deleteComment(1, 1);
@@ -581,7 +619,7 @@ describe("deleteComment", () => {
 
   it("returns false for non-existent comment", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task", columnId: todoColId });
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
 
     const result = await deleteComment(1, 999);
 
@@ -590,8 +628,8 @@ describe("deleteComment", () => {
 
   it("returns false when comment belongs to different task", async () => {
     const { boardId, todoColId } = await createBoardWithColumns();
-    await createTask(boardId, { title: "Task 1", columnId: todoColId });
-    await createTask(boardId, { title: "Task 2", columnId: todoColId });
+    await createTask(boardId, { title: "Task 1", columnId: todoColId }, "test-user");
+    await createTask(boardId, { title: "Task 2", columnId: todoColId }, "test-user");
     await addComment(2, { body: "Text" }, "user-1");
 
     const result = await deleteComment(1, 1);

@@ -134,7 +134,7 @@ describe("POST /boards/:boardId/tasks", () => {
     expect(mocks.createTask).toHaveBeenCalledWith(1, {
       title: "New Task",
       columnId: 1,
-    });
+    }, "test-user");
   });
 
   it("passes all optional fields to service", async () => {
@@ -160,7 +160,7 @@ describe("POST /boards/:boardId/tasks", () => {
       assigneeId: "user-1",
       priority: "high",
       dueDate: "2025-06-01",
-    });
+    }, "test-user");
   });
 
   it("returns 404 when board/column not found", async () => {
@@ -263,7 +263,7 @@ describe("PATCH /tasks/:id", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(detail);
-    expect(mocks.updateTask).toHaveBeenCalledWith(1, { title: "Updated" });
+    expect(mocks.updateTask).toHaveBeenCalledWith(1, { title: "Updated" }, "test-user");
   });
 
   it("returns 404 when task not found", async () => {
