@@ -346,6 +346,8 @@ Match list and detail responses include associated venue booking data when avail
 | PATCH | `/admin/notifications/preferences` | Update notification preferences |
 | PATCH | `/admin/notifications/:id/read` | Mark notification as read |
 | GET | `/admin/notifications/preferences` | Get notification preferences |
+| POST | `/admin/notifications/test-push` | Send a test push to the caller's own registered devices. Body: `{ message?: string }`. Returns device count + per-ticket status. |
+| GET | `/admin/notifications/test-push/recent` | Last 10 test push results for the caller (for admin test UI). |
 
 ### Admin - Channel Configs
 
@@ -378,8 +380,8 @@ Match list and detail responses include associated venue booking data when avail
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/devices` | Register push notification device |
-| DELETE | `/devices/:token` | Unregister device |
+| POST | `/devices/register` | Register push notification device token. Body: `{ token, platform: "ios"\|"android", locale? }`. Upserts by token and bumps `lastSeenAt`. |
+| DELETE | `/devices/:token` | Unregister device token (caller must own the token). |
 
 ### Referee
 
@@ -571,6 +573,24 @@ Sample API responses: `/Users/jn/git/dragons-mono/apps/api/sdk-type-samples/` (g
 - Keeps last 100 completed, 500 failed jobs
 - Worker concurrency: 1
 - Config: `apps/api/src/workers/queues.ts`
+
+### Notification Channels
+
+Channel adapters live in `apps/api/src/services/notifications/channels/` and are dispatched by the notification pipeline per user preference + channel config.
+
+- **in_app** — Writes to `notification_log` for in-app inbox rendering. Adapter: `channels/in-app.ts`.
+- **whatsapp_group** — Posts to a WhatsApp group via configured provider. Adapter: `channels/whatsapp-group.ts`.
+- **push** — Native push notifications via Expo Push Service. Delivers `PUSH_ELIGIBLE_EVENTS` (referee assignments, slot requests/reminders, urgent match changes) to devices registered via `POST /api/devices/register`. Adapter: `channels/push.ts`. HTTP wrapper: `expo-push.client.ts`. Device tokens live in `push_devices`; delivery receipts reconciled via the `push-receipt` worker.
+
+### Workers
+
+Located in `apps/api/src/workers/`. Queues configured in `workers/queues.ts`.
+
+- **sync.worker** — Processes `sync` queue jobs (full/partial sync). Default concurrency 1.
+- **event.worker** — Fan-out for domain events into per-recipient notification dispatch.
+- **digest.worker** — Aggregates buffered events into daily digest notifications.
+- **referee-reminder.worker** — Scheduled reminders for open referee slots.
+- **push-receipt.worker** — Cron, runs every 15 minutes (queue `push-receipt`). Polls Expo Push receipts for `sent_ticket` rows in `notification_log`, marks them `delivered` or `failed`, and purges `push_devices` rows whose tokens returned `DeviceNotRegistered`.
 
 ### Redis
 

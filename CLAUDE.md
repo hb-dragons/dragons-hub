@@ -142,6 +142,8 @@ BETTER_AUTH_URL=http://localhost:3001
 LOG_LEVEL=info                    # Pino log level (fatal/error/warn/info/debug/trace)
 REFEREE_SDK_USERNAME=<separate federation account for referee assignment>
 REFEREE_SDK_PASSWORD=<separate federation account for referee assignment>
+EXPO_ACCESS_TOKEN=<optional — enables authenticated Expo Push send tier, higher rate limits + better receipt SLA>
+EXPO_PROJECT_ID=<optional — validates EAS project ID match between server and native; surfaces mismatch early>
 ```
 
 Note: Club and league tracking configuration is managed via the admin UI (`/admin/settings`) and stored in the `app_settings` database table.
