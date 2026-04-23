@@ -113,20 +113,123 @@ export function KanbanBoard({
     ? tasks.find((x) => x.id === Number(activeId.slice(5))) ?? null
     : null;
 
+  function describeLocation(taskId: number): {
+    column: string;
+    position: number;
+    total: number;
+  } {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return { column: "", position: 0, total: 0 };
+    const columnName =
+      sortedColumns.find((c) => c.id === task.columnId)?.name ?? "";
+    const colTasks = tasksByColumn.get(task.columnId) ?? [];
+    const index = colTasks.findIndex((t) => t.id === taskId);
+    return {
+      column: columnName,
+      position: index + 1,
+      total: colTasks.length,
+    };
+  }
+
+  function describeDropTarget(
+    activeIdNum: number,
+    overData: { type: "task" | "column"; id: number; columnId: number },
+  ): { column: string; position: number; total: number } {
+    const columnId =
+      overData.type === "column" ? overData.id : overData.columnId;
+    const columnName =
+      sortedColumns.find((c) => c.id === columnId)?.name ?? "";
+    const colTasks = tasksByColumn.get(columnId) ?? [];
+    const total =
+      activeTask && activeTask.columnId !== columnId
+        ? colTasks.length + 1
+        : colTasks.length;
+    let position = colTasks.length;
+    if (overData.type === "task") {
+      const idx = colTasks.findIndex((t) => t.id === overData.id);
+      position = (idx === -1 ? colTasks.length : idx) + 1;
+    }
+    void activeIdNum;
+    return { column: columnName, position, total };
+  }
+
   const announcements = {
     onDragStart({ active }: { active: { id: string | number } }) {
-      return t("dnd.pickUp", {
-        title: String(active.id),
-        column: "",
-        position: 0,
-        total: tasks.length,
-      });
+      const idStr = String(active.id);
+      if (idStr.startsWith("task-")) {
+        const taskId = Number(idStr.slice(5));
+        const task = tasks.find((x) => x.id === taskId);
+        const loc = describeLocation(taskId);
+        return t("dnd.pickUp", {
+          title: task?.title ?? idStr,
+          column: loc.column,
+          position: loc.position,
+          total: loc.total,
+        });
+      }
+      if (idStr.startsWith("col-")) {
+        const colId = Number(idStr.slice(4));
+        const column = sortedColumns.find((c) => c.id === colId);
+        return t("dnd.pickUp", {
+          title: column?.name ?? idStr,
+          column: column?.name ?? "",
+          position:
+            sortedColumns.findIndex((c) => c.id === colId) + 1,
+          total: sortedColumns.length,
+        });
+      }
+      return t("dnd.cancel");
     },
-    onDragOver() {
-      return t("dnd.move", { column: "", position: 0, total: tasks.length });
+    onDragOver({
+      active,
+      over,
+    }: {
+      active: { id: string | number };
+      over: { id: string | number; data: { current?: unknown } } | null;
+    }) {
+      if (!over) return t("dnd.cancel");
+      const activeIdStr = String(active.id);
+      if (activeIdStr.startsWith("col-")) {
+        const overId = String(over.id);
+        if (!overId.startsWith("col-")) return t("dnd.cancel");
+        const colId = Number(overId.slice(4));
+        const column = sortedColumns.find((c) => c.id === colId);
+        return t("dnd.move", {
+          column: column?.name ?? "",
+          position: sortedColumns.findIndex((c) => c.id === colId) + 1,
+          total: sortedColumns.length,
+        });
+      }
+      const overData = over.data.current as
+        | { type: "task" | "column"; id: number; columnId: number }
+        | undefined;
+      if (!overData) return t("dnd.cancel");
+      const loc = describeDropTarget(Number(activeIdStr.slice(5)), overData);
+      return t("dnd.move", loc);
     },
-    onDragEnd() {
-      return t("dnd.drop", { column: "", position: 0 });
+    onDragEnd({
+      active,
+      over,
+    }: {
+      active: { id: string | number };
+      over: { id: string | number; data: { current?: unknown } } | null;
+    }) {
+      if (!over) return t("dnd.cancel");
+      const activeIdStr = String(active.id);
+      if (activeIdStr.startsWith("col-")) {
+        const colId = Number(String(over.id).slice(4));
+        const column = sortedColumns.find((c) => c.id === colId);
+        return t("dnd.drop", {
+          column: column?.name ?? "",
+          position: sortedColumns.findIndex((c) => c.id === colId) + 1,
+        });
+      }
+      const overData = over.data.current as
+        | { type: "task" | "column"; id: number; columnId: number }
+        | undefined;
+      if (!overData) return t("dnd.cancel");
+      const loc = describeDropTarget(Number(activeIdStr.slice(5)), overData);
+      return t("dnd.drop", { column: loc.column, position: loc.position });
     },
     onDragCancel() {
       return t("dnd.cancel");
