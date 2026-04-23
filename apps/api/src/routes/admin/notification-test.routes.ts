@@ -7,6 +7,7 @@ import {
   pushDevices,
   notificationLog,
   channelConfigs,
+  domainEvents,
 } from "@dragons/db/schema";
 import { ExpoPushClient } from "../../services/notifications/expo-push.client";
 import { env } from "../../config/env";
@@ -119,7 +120,29 @@ notificationTestRoutes.post(
           : (t?.details?.error ?? t?.message ?? "unknown"),
       };
     });
-    await db.insert(notificationLog).values(rows);
+
+    // Synthetic domain_events row so notification_log FK is satisfied.
+    // Wrapped in a transaction so the event + log rows land atomically.
+    await db.transaction(async (tx) => {
+      await tx.insert(domainEvents).values({
+        id: eventId,
+        type: "admin.test_push",
+        source: "manual",
+        urgency: "immediate",
+        occurredAt: sentAt,
+        actor: callerId,
+        entityType: "user",
+        entityId: 0,
+        entityName: "admin test",
+        deepLinkPath: "/",
+        payload: {
+          isTest: true,
+          sentAt: sentAt.toISOString(),
+          message: text,
+        },
+      });
+      await tx.insert(notificationLog).values(rows);
+    });
 
     return c.json({
       deviceCount: devices.length,

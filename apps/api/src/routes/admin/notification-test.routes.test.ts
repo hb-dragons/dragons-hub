@@ -5,6 +5,7 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   dbSelect: vi.fn(),
   dbInsert: vi.fn(),
+  dbTransaction: vi.fn(),
   sendBatch: vi.fn(),
 }));
 
@@ -12,6 +13,7 @@ vi.mock("../../config/database", () => ({
   db: {
     select: (...args: unknown[]) => mocks.dbSelect(...args),
     insert: (...args: unknown[]) => mocks.dbInsert(...args),
+    transaction: (fn: (tx: unknown) => Promise<unknown>) => mocks.dbTransaction(fn),
   },
 }));
 
@@ -28,6 +30,7 @@ vi.mock("@dragons/db/schema", () => ({
     createdAt: "created_at",
   },
   channelConfigs: { id: "id", type: "type" },
+  domainEvents: { id: "id", type: "type" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -99,21 +102,37 @@ function mockSelectSimple(rows: unknown[]) {
 }
 
 function mockInsertCapture() {
-  const valuesCall = vi.fn();
-  mocks.dbInsert.mockReturnValue({
+  const domainEventsValues = vi.fn();
+  const logValues = vi.fn();
+  let call = 0;
+  mocks.dbInsert.mockImplementation(() => ({
     values: vi.fn().mockImplementation((v) => {
-      valuesCall(v);
+      // First insert in the transaction is domain_events, second is notification_log
+      if (call === 0) domainEventsValues(v);
+      else logValues(v);
+      call++;
       return Promise.resolve(undefined);
     }),
-  });
-  return valuesCall;
+  }));
+  return { domainEventsValues, logValues };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.dbSelect.mockReset();
   mocks.dbInsert.mockReset();
+  mocks.dbTransaction.mockReset();
   mocks.sendBatch.mockReset();
+
+  // Default: transaction simulator that delegates tx.insert -> mocks.dbInsert
+  mocks.dbTransaction.mockImplementation(
+    async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        insert: (...a: unknown[]) => mocks.dbInsert(...a),
+      };
+      return fn(tx);
+    },
+  );
 });
 
 describe("POST /notifications/test-push", () => {
@@ -163,7 +182,7 @@ describe("POST /notifications/test-push", () => {
     ]);
     mockSelectSimple([{ id: 7, type: "push" }]); // push channel lookup
     mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_1" }]);
-    const valuesCall = mockInsertCapture();
+    const { domainEventsValues, logValues } = mockInsertCapture();
 
     const res = await app.request("/notifications/test-push", {
       method: "POST",
@@ -177,8 +196,18 @@ describe("POST /notifications/test-push", () => {
     expect(body.tickets).toHaveLength(1);
     expect(body.tickets[0].status).toBe("sent_ticket");
 
-    expect(valuesCall).toHaveBeenCalled();
-    const rows = valuesCall.mock.calls[0]![0] as Array<Record<string, unknown>>;
+    // Synthetic domain_events row inserted first
+    expect(domainEventsValues).toHaveBeenCalled();
+    const eventRow = domainEventsValues.mock.calls[0]![0] as Record<
+      string,
+      unknown
+    >;
+    expect(eventRow.id).toMatch(/^admin_test:u_admin:/);
+    expect(eventRow.type).toBe("admin.test_push");
+
+    // notification_log rows referencing that event
+    expect(logValues).toHaveBeenCalled();
+    const rows = logValues.mock.calls[0]![0] as Array<Record<string, unknown>>;
     expect(rows[0]!.eventId).toMatch(/^admin_test:u_admin:/);
     expect(rows[0]!.providerTicketId).toBe("tkt_1");
     expect(rows[0]!.status).toBe("sent_ticket");
