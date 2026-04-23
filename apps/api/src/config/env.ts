@@ -24,6 +24,10 @@ const envSchema = z.object({
   WAHA_BASE_URL: z.string().url().optional(),
   WAHA_SESSION: z.string().default("default"),
 
+  // Expo Push (native notifications)
+  EXPO_ACCESS_TOKEN: z.string().min(1).optional(),
+  EXPO_PROJECT_ID: z.string().min(1).optional(),
+
   // Referee SDK (separate federation account for offenespiele sync)
   REFEREE_SDK_USERNAME: z.string().min(1).optional(),
   REFEREE_SDK_PASSWORD: z.string().min(1).optional(),
