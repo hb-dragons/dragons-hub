@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { KanbanBoard } from "@/components/admin/board/kanban-board";
-import { CreateBoardButton } from "@/components/admin/board/create-board-button";
+import { CreateBoardDialog } from "@/components/admin/board/create-board-dialog";
 import type { BoardData, TaskCardData } from "@/components/admin/board/types";
 
 export default async function BoardPage() {
@@ -44,7 +44,7 @@ export default async function BoardPage() {
       ) : !board ? (
         <div className="flex flex-col items-center justify-center py-12">
           <p className="mb-4 text-muted-foreground">{t("board.emptyBoard")}</p>
-          <CreateBoardButton />
+          <CreateBoardDialog />
         </div>
       ) : (
         <SWRConfig
