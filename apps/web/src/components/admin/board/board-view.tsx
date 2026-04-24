@@ -104,6 +104,7 @@ export function BoardView({ boardId }: BoardViewProps) {
       <TaskDialog
         taskId={openTaskId}
         boardId={boardId}
+        columns={board.columns}
         onClose={() => setOpenTaskId(null)}
       />
     </div>

@@ -782,7 +782,12 @@
       "linkedBooking": "Verknüpfte Buchung",
       "venueBooking": "Hallenbuchung",
       "linkedMatches": "Verknüpfte Spiele",
-      "source": "Quelle"
+      "source": "Quelle",
+      "titlePlaceholder": "Unbenannte Aufgabe",
+      "descriptionPlaceholder": "Beschreibung hinzufügen…",
+      "createdAt": "Erstellt",
+      "updatedAt": "Aktualisiert",
+      "loadFailed": "Aufgabe konnte nicht geladen werden."
     },
     "priority": {
       "low": "Niedrig",

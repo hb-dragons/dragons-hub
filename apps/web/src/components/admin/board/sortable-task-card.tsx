@@ -20,7 +20,7 @@ export function SortableTaskCard({ task, onOpen }: SortableTaskCardProps) {
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0 : 1,
   };
 
   return (

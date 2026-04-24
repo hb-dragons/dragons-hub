@@ -255,12 +255,14 @@ export async function reorderColumns(
   boardId: number,
   positions: { id: number; position: number }[],
 ): Promise<void> {
-  for (const { id, position } of positions) {
-    await db
-      .update(boardColumns)
-      .set({ position, updatedAt: new Date() })
-      .where(
-        and(eq(boardColumns.id, id), eq(boardColumns.boardId, boardId)),
-      );
-  }
+  await db.transaction(async (tx) => {
+    for (const { id, position } of positions) {
+      await tx
+        .update(boardColumns)
+        .set({ position, updatedAt: new Date() })
+        .where(
+          and(eq(boardColumns.id, id), eq(boardColumns.boardId, boardId)),
+        );
+    }
+  });
 }

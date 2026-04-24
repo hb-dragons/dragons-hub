@@ -36,6 +36,7 @@ export function KanbanColumn({
     setNodeRef: setSortableRef,
     transform,
     transition,
+    isDragging,
   } = useSortable({
     id: `col-${column.id}`,
     data: { type: "column", id: column.id, columnId: column.id },
@@ -46,9 +47,14 @@ export function KanbanColumn({
     data: { type: "column", id: column.id, columnId: column.id },
   });
 
+  // While dragging we hide the source column — the DragOverlay shows a clone
+  // that follows the pointer, and the reordered items array snaps the source
+  // to its new DOM slot at drop time. Without opacity 0 the source would
+  // briefly render at (newSlot + lingering transform), flashing off-screen.
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
+    opacity: isDragging ? 0 : 1,
   };
 
   const overLimit =

@@ -782,7 +782,12 @@
       "linkedBooking": "Linked Booking",
       "venueBooking": "Venue Booking",
       "linkedMatches": "Linked Matches",
-      "source": "Source"
+      "source": "Source",
+      "titlePlaceholder": "Untitled task",
+      "descriptionPlaceholder": "Add a description…",
+      "createdAt": "Created",
+      "updatedAt": "Updated",
+      "loadFailed": "Task could not be loaded."
     },
     "priority": {
       "low": "Low",

@@ -167,16 +167,16 @@ export function CreateTaskDialog({
           </div>
           <div className="space-y-2">
             <Label>{t("board.task.assignee")}</Label>
-            <div className="flex items-center gap-2">
-              <AssigneePicker
-                assignees={assigneeObjects}
-                onAdd={(id) => setAssigneeIds((prev) => [...prev, id])}
-                onRemove={(id) =>
-                  setAssigneeIds((prev) => prev.filter((x) => x !== id))
-                }
-              />
-              <AssigneeStack assignees={assigneeObjects} />
-            </div>
+            <AssigneePicker
+              assignees={assigneeObjects}
+              onAdd={(id) => setAssigneeIds((prev) => [...prev, id])}
+              onRemove={(id) =>
+                setAssigneeIds((prev) => prev.filter((x) => x !== id))
+              }
+            />
+            {assigneeObjects.length > 0 && (
+              <AssigneeStack assignees={assigneeObjects} size="md" />
+            )}
           </div>
           <DialogFooter>
             <Button

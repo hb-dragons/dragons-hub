@@ -56,6 +56,13 @@
       "expo-local-authentication",
       "expo-updates",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#004b23"
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Allow Dragons to access your camera for team photos.",
