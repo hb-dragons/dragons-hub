@@ -76,6 +76,16 @@ export {
 } from "./board-dnd";
 export type { DragItem, DropTarget } from "./board-dnd";
 
+// Board drop-target resolution (pure, testable, no React deps)
+export { findDropTarget } from "./board-drop-target";
+export type {
+  TaskContentRect,
+  PagerLayout,
+  ColumnScrollState,
+  FindDropTargetArgs,
+  FindDropTargetResult,
+} from "./board-drop-target";
+
 export type {
   SyncRunSummary,
   SyncRun,

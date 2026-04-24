@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSharedValue, type SharedValue } from "react-native-reanimated";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
-import { computeDropTarget } from "@dragons/shared";
+import { findDropTarget } from "@dragons/shared";
+import type { ColumnScrollState } from "@dragons/shared";
 import type { BoardColumnHandle } from "@/components/board/BoardColumn";
 import type { BoardPagerHandle, PagerLayout } from "@/components/board/BoardPager";
 import type { TaskCardLayout, TaskContentRect } from "@/components/board/TaskCard";
@@ -157,87 +158,35 @@ export function useBoardDrag({
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Drop-target computation (geometric column x, content-local task coords)
+  // Drop-target computation (delegates to pure findDropTarget from @dragons/shared)
   // ---------------------------------------------------------------------------
 
-  const findDropTarget = useCallback(
+  const callFindDropTarget = useCallback(
     (pageX: number, pageY: number, draggedTask: TaskCardData) => {
-      const allColumns = columnsRef.current;
-      const allTasks = tasksRef.current;
-      const pagerLayout = pagerLayoutRef.current;
-
-      if (!pagerLayout || allColumns.length === 0) return null;
-
-      const { pageX: pagerOriginX, pageY: pagerOriginY, width: pagerWidth } = pagerLayout;
-      const scrollX = pagerScrollXRef.current;
-
-      // Each column slot is columnWidth wide inside the pager.
-      // The column component adds paddingHorizontal: spacing.sm inside the slot.
-      const columnWidth = Math.round(pagerWidth * 0.88);
-
-      // Determine which column index the pointer is over.
-      // Column i occupies pager x range: [i * columnWidth, (i+1) * columnWidth)
-      // Screen x of that range: pagerOriginX + i * columnWidth - scrollX
-      let overColumnIndex = -1;
-      for (let i = 0; i < allColumns.length; i++) {
-        const colScreenLeft = pagerOriginX + i * columnWidth - scrollX;
-        const colScreenRight = colScreenLeft + columnWidth;
-        if (pageX >= colScreenLeft && pageX <= colScreenRight) {
-          overColumnIndex = i;
-          break;
-        }
+      // Build column scroll state map from the separate per-property refs.
+      const columnScrollStates = new Map<number, ColumnScrollState>();
+      for (const col of columnsRef.current) {
+        columnScrollStates.set(col.id, {
+          scrollY: columnScrollOffsets.current[col.id] ?? 0,
+          viewportHeight: columnViewportHeights.current[col.id] ?? 0,
+          contentHeight: columnContentHeights.current[col.id] ?? 0,
+          headerHeight: columnHeaderHeights.current[col.id] ?? 0,
+        });
       }
 
-      // Fall back to the dragged task's column.
-      if (overColumnIndex === -1) {
-        overColumnIndex = allColumns.findIndex((c) => c.id === draggedTask.columnId);
-        if (overColumnIndex === -1) return null;
-      }
-
-      const overColumn = allColumns[overColumnIndex];
-      if (!overColumn) return null;
-      const overColumnId = overColumn.id;
-
-      // Convert pointer to column-content coords.
-      const colScreenLeft = pagerOriginX + overColumnIndex * columnWidth - scrollX;
-      // spacing.sm is the horizontal padding of the column wrapper.
-      const columnContentX = pageX - colScreenLeft - spacing.sm;
-      const headerHeight = columnHeaderHeights.current[overColumnId] ?? 0;
-      const scrollY = columnScrollOffsets.current[overColumnId] ?? 0;
-      const columnContentY = pageY - pagerOriginY - headerHeight + scrollY;
-
-      // Find which task in that column the pointer overlaps in content-local coords.
-      let overTask: TaskCardData | null = null;
-      for (const t of allTasks) {
-        if (t.columnId !== overColumnId) continue;
-        if (t.id === draggedTask.id) continue;
-        const rect = taskContentRects.current.get(t.id);
-        if (!rect) continue;
-        // The ScrollView has padding: spacing.sm on all sides; cards are laid
-        // out inside that padding. onLayout reports coords relative to the
-        // ScrollView's content origin (including that padding).
-        if (
-          columnContentX >= rect.contentX &&
-          columnContentX <= rect.contentX + rect.width &&
-          columnContentY >= rect.contentY &&
-          columnContentY <= rect.contentY + rect.height
-        ) {
-          overTask = t;
-          break;
-        }
-      }
-
-      const active = {
-        type: "task" as const,
-        id: draggedTask.id,
-        columnId: draggedTask.columnId,
-      };
-
-      const over = overTask
-        ? { type: "task" as const, id: overTask.id, columnId: overTask.columnId }
-        : { type: "column" as const, id: overColumnId, columnId: overColumnId };
-
-      return { dropTarget: computeDropTarget(active, over, allTasks), overColumnId };
+      return findDropTarget({
+        pointerX: pageX,
+        pointerY: pageY,
+        draggedTask,
+        tasks: tasksRef.current,
+        columns: columnsRef.current,
+        pagerLayout: pagerLayoutRef.current,
+        pagerScrollX: pagerScrollXRef.current,
+        // spacing.sm is the horizontal padding added by the column wrapper.
+        columnPaddingX: spacing.sm,
+        taskContentRects: taskContentRects.current,
+        columnScrollStates,
+      });
     },
     [],
   );
@@ -277,7 +226,7 @@ export function useBoardDrag({
       const prev = dragStateRef.current;
       if (!prev.active) return;
 
-      const result = findDropTarget(pageX, pageY, prev.task);
+      const result = callFindDropTarget(pageX, pageY, prev.task);
       const dropTargetColumnId = result?.overColumnId ?? prev.task.columnId;
 
       if (prev.dropTargetColumnId === dropTargetColumnId) return;
@@ -286,7 +235,7 @@ export function useBoardDrag({
       dragStateRef.current = next;
       setDragState(next);
     },
-    [pointerX, pointerY, findDropTarget],
+    [pointerX, pointerY, callFindDropTarget],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -300,7 +249,7 @@ export function useBoardDrag({
     if (!snapshot.active) return;
 
     const { x, y } = pointerRef.current;
-    const result = findDropTarget(x, y, snapshot.task);
+    const result = callFindDropTarget(x, y, snapshot.task);
     const dropTarget = result?.dropTarget ?? null;
 
     if (
@@ -311,7 +260,7 @@ export function useBoardDrag({
       haptics.success();
       void moveTask(snapshot.task.id, dropTarget.columnId, dropTarget.position);
     }
-  }, [findDropTarget, moveTask]);
+  }, [callFindDropTarget, moveTask]);
 
   const onTaskDrag = {
     start: handleDragStart,
