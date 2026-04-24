@@ -185,4 +185,56 @@ describe("runTaskReminderSweep", () => {
       .where(eq(domainEvents.entityId, taskId));
     expect(events).toHaveLength(2);
   });
+
+  it("emits day_of reminder when task is due today after 08:00 UTC", async () => {
+    // Freeze time at 10:00 UTC today — past the 08:00 threshold — so the
+    // day-of branch of loadDayOfCandidates runs (not the pre-08:00 early return).
+    const today = new Date();
+    today.setUTCHours(10, 0, 0, 0);
+    vi.useFakeTimers();
+    vi.setSystemTime(today);
+
+    try {
+      const { taskId, userId } = await setup({ dueDate: today });
+
+      await runTaskReminderSweep();
+
+      const events = await (ctx.db as typeof import("../config/database").db)
+        .select()
+        .from(domainEvents)
+        .where(eq(domainEvents.entityId, taskId));
+
+      const dayOf = events.find(
+        (e) => (e.payload as Record<string, unknown>).reminderKind === "day_of",
+      );
+      expect(dayOf).toBeDefined();
+      expect((dayOf!.payload as Record<string, unknown>).assigneeUserIds).toEqual([userId]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("returns no day_of candidates before 08:00 UTC", async () => {
+    const today = new Date();
+    today.setUTCHours(4, 0, 0, 0);
+    vi.useFakeTimers();
+    vi.setSystemTime(today);
+
+    try {
+      const { taskId } = await setup({ dueDate: today });
+
+      await runTaskReminderSweep();
+
+      const events = await (ctx.db as typeof import("../config/database").db)
+        .select()
+        .from(domainEvents)
+        .where(eq(domainEvents.entityId, taskId));
+      const dayOf = events.filter(
+        (e) => (e.payload as Record<string, unknown>).reminderKind === "day_of",
+      );
+      expect(dayOf).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
