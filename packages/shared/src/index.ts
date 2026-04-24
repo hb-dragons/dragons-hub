@@ -88,7 +88,8 @@ export type { RefereeListItem, RefereeRule, RefereeRulesResponse, UpdateRefereeR
 export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";
 export type { UserListItem } from "./users";
-export type { NotificationItem, NotificationListResult } from "./notifications";
+export type { NotificationItem, NotificationListResult, UserToggleableEventType } from "./notifications";
+export { USER_TOGGLEABLE_EVENTS, isUserToggleableEventType } from "./notifications";
 export type { ClubConfig, BookingSettings } from "./settings";
 export { BOOKING_DEFAULTS } from "./settings";
 export type {
