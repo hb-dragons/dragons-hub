@@ -67,6 +67,13 @@ export type {
 
 export type { BoardColumnData, BoardSummary, BoardData } from "./boards";
 
+// Board DnD (drag-and-drop)
+export {
+  computeDropTarget,
+  buildColumnReorder,
+} from "./board-dnd";
+export type { DragItem, DropTarget } from "./board-dnd";
+
 export type {
   SyncRunSummary,
   SyncRun,
