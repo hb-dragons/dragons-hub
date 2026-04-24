@@ -64,3 +64,13 @@ variable "referee_sdk_password" {
   type        = string
   sensitive   = true
 }
+
+variable "log_retention_days" {
+  description = "Retention for the Cloud Logging _Default bucket. Documented explicitly for GDPR transparency + DSAR handling."
+  type        = number
+  default     = 30
+  validation {
+    condition     = var.log_retention_days >= 1 && var.log_retention_days <= 3650
+    error_message = "Retention must be between 1 and 3650 days."
+  }
+}

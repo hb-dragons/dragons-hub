@@ -7,7 +7,7 @@ if (process.env.NODE_ENV !== "production") {
 // Dynamic imports — must come after dotenv so env vars are available
 // when modules that access env at top level (e.g. queues.ts) are loaded.
 const { env } = await import("./config/env");
-const { logger } = await import("./config/logger");
+const { logger, flushLogger } = await import("./config/logger");
 
 const mode = env.RUN_MODE;
 const port = Number(process.env.PORT ?? 3001);
@@ -49,6 +49,7 @@ async function shutdown() {
   if (httpServer) (httpServer as { close: () => void }).close();
   const { closeDb } = await import("./config/database");
   await closeDb();
+  await flushLogger();
   process.exit(0);
 }
 

@@ -160,7 +160,12 @@ describe("errorHandler", () => {
       500,
     );
     expect(mocks.rootLogger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ err: "string error", stack: undefined }),
+      expect.objectContaining({
+        err: "string error",
+        stack_trace: undefined,
+        "@type":
+          "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent",
+      }),
       "Unknown error",
     );
   });
@@ -172,7 +177,9 @@ describe("errorHandler", () => {
     expect(mocks.rootLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         err: expect.any(Error),
-        stack: expect.any(String),
+        stack_trace: expect.any(String),
+        "@type":
+          "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent",
       }),
       "Something broke",
     );
@@ -185,11 +192,12 @@ describe("errorHandler", () => {
     expect(mocks.childLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         err: expect.any(Error),
-        stack: expect.any(String),
+        stack_trace: expect.any(String),
+        "@type":
+          "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent",
       }),
       "Something broke",
     );
-    // Root logger should NOT be called when context logger is available
     expect(mocks.rootLogger.error).not.toHaveBeenCalled();
   });
 

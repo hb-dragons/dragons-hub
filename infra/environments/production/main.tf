@@ -53,6 +53,23 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
+# Cloud Logging retention for the _Default log bucket.
+#
+# Under GDPR, operational logs that can still identify users (e.g. via an
+# incident trail) need a documented retention period. Thirty days is enough
+# for debugging + incident response but short enough to defend under a DSAR.
+#
+# The _Default bucket is created automatically by the platform; this resource
+# reconfigures it rather than creating a new one. `locked = false` keeps the
+# door open for shortening the window later without a support ticket.
+resource "google_logging_project_bucket_config" "default" {
+  project        = var.project_id
+  location       = "global"
+  bucket_id      = "_Default"
+  retention_days = var.log_retention_days
+  description    = "Default log bucket. Retention is bounded for GDPR compliance."
+}
+
 # Random passwords
 resource "random_password" "db_password" {
   length  = 32
@@ -220,6 +237,11 @@ module "api" {
     LOG_LEVEL       = "info"
     GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
     GCS_PROJECT_ID  = var.project_id
+    # Logging / Cloud Logging + Trace correlation.
+    # SERVICE_VERSION is left unset; the logger falls back to K_REVISION,
+    # which Cloud Run updates automatically on every revision.
+    SERVICE_NAME   = "api"
+    GCP_PROJECT_ID = var.project_id
   }
 
   secrets = {
@@ -287,6 +309,10 @@ module "worker" {
     LOG_LEVEL       = "info"
     GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
     GCS_PROJECT_ID  = var.project_id
+    # Logging / Cloud Logging + Trace correlation.
+    # SERVICE_NAME differs from the API so logs are filterable per workload.
+    SERVICE_NAME   = "worker"
+    GCP_PROJECT_ID = var.project_id
   }
 
   secrets = {
