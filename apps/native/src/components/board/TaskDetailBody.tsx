@@ -8,6 +8,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { AssigneePickerSheet, type AssigneePickerHandle } from "./AssigneePickerSheet";
 import { ChecklistSection } from "./ChecklistSection";
+import { CommentsSection } from "./CommentsSection";
 import { PriorityPickerSheet, type PriorityPickerHandle } from "./PriorityPickerSheet";
 import { DuePickerSheet, type DuePickerHandle } from "./DuePickerSheet";
 
@@ -153,6 +154,8 @@ export function TaskDetailBody({ task, boardId }: Props) {
         </Pressable>
 
         <ChecklistSection task={task} boardId={boardId} />
+
+        <CommentsSection task={task} />
       </BottomSheetScrollView>
 
       <AssigneePickerSheet ref={assigneePickerRef} />
