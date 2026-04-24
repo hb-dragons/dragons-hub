@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import * as eventPublisher from "../events/event-publisher";
 
 // --- Mock setup ---
 
@@ -1055,5 +1056,128 @@ describe("task event emission — comment", () => {
     const events = await getTaskEvents(taskId);
     const commentEvents = events.filter((e) => e.type === "task.comment.added");
     expect(commentEvents).toHaveLength(0);
+  });
+});
+
+describe("updateTask — additional branches", () => {
+  it("updates task priority", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await createTask(boardId, { title: "Task", columnId: todoColId }, "test-user");
+
+    const result = await updateTask(1, { priority: "urgent" }, "test-user");
+
+    expect(result).not.toBeNull();
+    expect(result!.priority).toBe("urgent");
+  });
+
+  it("removes all assignees when updateTask receives empty assigneeIds", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES ('u_a', 'A', 'a@x.io') ON CONFLICT (id) DO NOTHING`,
+    );
+    const task = await createTask(
+      boardId,
+      { title: "Task", columnId: todoColId, assigneeIds: ["u_a"] },
+      "test-user",
+    );
+
+    const updated = await updateTask(task!.id, { assigneeIds: [] }, "test-user");
+
+    expect(updated).not.toBeNull();
+    expect(updated!.assignees).toHaveLength(0);
+  });
+});
+
+describe("addAssignee — null task and null user branches", () => {
+  it("returns null when task does not exist", async () => {
+    await createBoardWithColumns();
+
+    const result = await addAssignee(999, "test-user", "test-user");
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null when user does not exist", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    const task = await createTask(boardId, { title: "T", columnId: todoColId }, "test-user");
+
+    const result = await addAssignee(task!.id, "nonexistent-user", "test-user");
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("removeAssignee — null task and not-found branches", () => {
+  it("returns false when task does not exist", async () => {
+    const result = await removeAssignee(999, "test-user", "test-user");
+
+    expect(result).toBe(false);
+  });
+
+  it("returns false when user is not an assignee", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    const task = await createTask(boardId, { title: "T", columnId: todoColId }, "test-user");
+
+    const result = await removeAssignee(task!.id, "nonexistent-user", "test-user");
+
+    expect(result).toBe(false);
+  });
+});
+
+describe("emitTaskEvent error handling — catch branch", () => {
+  it("swallows publishDomainEvent errors so the task mutation still succeeds", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+
+    // Make publishDomainEvent throw once to exercise the catch branch in emitTaskEvent
+    const spy = vi
+      .spyOn(eventPublisher, "publishDomainEvent")
+      .mockRejectedValueOnce(new Error("forced event failure"));
+
+    // addAssignee calls emitTaskEvent → publishDomainEvent inside a try/catch.
+    // The task mutation (INSERT into task_assignees) commits before the event
+    // fires, so the assignee row should exist even when publishDomainEvent fails.
+    await expect(addAssignee(taskId, targetUserId, callerId)).resolves.not.toThrow();
+
+    spy.mockRestore();
+
+    // The assignee was persisted despite the event failure
+    const detail = await getTaskDetail(taskId);
+    expect(detail!.assignees.some((a) => a.userId === targetUserId)).toBe(true);
+  });
+});
+
+describe("updateTask dueDate branch — resets reminder timestamps", () => {
+  it("clears leadReminderSentAt and dueReminderSentAt when dueDate is provided", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+
+    // Create task with a due date and pre-populate reminder timestamps via raw SQL
+    await ctx.client.exec(
+      `INSERT INTO tasks (board_id, column_id, title, due_date, lead_reminder_sent_at, due_reminder_sent_at)
+       VALUES (${boardId}, ${todoColId}, 'Reminder Task', '2026-04-01',
+               NOW(), NOW())`,
+    );
+    const taskId = (
+      await ctx.client.query("SELECT id FROM tasks WHERE title = 'Reminder Task'")
+    ).rows[0] as { id: number };
+
+    // Confirm timestamps are set before the update
+    const before = await ctx.client.query(
+      `SELECT lead_reminder_sent_at, due_reminder_sent_at FROM tasks WHERE id = ${taskId.id}`,
+    );
+    const beforeRow = before.rows[0] as { lead_reminder_sent_at: unknown; due_reminder_sent_at: unknown };
+    expect(beforeRow.lead_reminder_sent_at).not.toBeNull();
+    expect(beforeRow.due_reminder_sent_at).not.toBeNull();
+
+    // Updating dueDate must clear both reminder timestamps
+    const result = await updateTask(taskId.id, { dueDate: "2026-05-10" }, "test-user");
+    expect(result).not.toBeNull();
+    expect(result!.dueDate).toBe("2026-05-10");
+
+    const after = await ctx.client.query(
+      `SELECT lead_reminder_sent_at, due_reminder_sent_at FROM tasks WHERE id = ${taskId.id}`,
+    );
+    const afterRow = after.rows[0] as { lead_reminder_sent_at: unknown; due_reminder_sent_at: unknown };
+    expect(afterRow.lead_reminder_sent_at).toBeNull();
+    expect(afterRow.due_reminder_sent_at).toBeNull();
   });
 });

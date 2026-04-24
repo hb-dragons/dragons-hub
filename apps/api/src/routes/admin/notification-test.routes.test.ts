@@ -308,6 +308,64 @@ describe("POST /notifications/test-push", () => {
     expect(typeof body.retryAfter).toBe("number");
     expect(second.headers.get("Retry-After")).toBeTruthy();
   });
+
+  it("returns 500 when no push channel config exists", async () => {
+    const app = makeApp({ id: "u_admin", role: "admin" });
+    mockSelectSimple([
+      { id: 1, userId: "u_admin", token: "ExponentPushToken[x]", platform: "ios" },
+    ]); // devices found
+    mockSelectSimple([]); // no push channel config row
+
+    const res = await app.request("/notifications/test-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("push_channel_missing");
+  });
+
+  it("handles ok ticket with no ticketId (id is undefined)", async () => {
+    const app = makeApp({ id: "u_admin", role: "admin" });
+    mockSelectSimple([
+      { id: 1, userId: "u_admin", token: "ExponentPushToken[x]", platform: "ios" },
+    ]);
+    mockSelectSimple([{ id: 7, type: "push" }]);
+    // Ticket with status=ok but no id field
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok" }]);
+    mockInsertCapture();
+
+    const res = await app.request("/notifications/test-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.tickets[0].ticketId).toBeNull();
+    expect(body.tickets[0].status).toBe("sent_ticket");
+  });
+
+  it("uses 'unknown' as errorMessage when ticket has no message or details", async () => {
+    const app = makeApp({ id: "u_admin", role: "admin" });
+    mockSelectSimple([
+      { id: 1, userId: "u_admin", token: "ExponentPushToken[x]", platform: "ios" },
+    ]);
+    mockSelectSimple([{ id: 7, type: "push" }]);
+    // Ticket with status=error but no message or details fields
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "error" }]);
+    mockInsertCapture();
+
+    const res = await app.request("/notifications/test-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.tickets[0].error).toBe("unknown");
+  });
 });
 
 describe("GET /notifications/test-push/recent", () => {
@@ -346,5 +404,87 @@ describe("GET /notifications/test-push/recent", () => {
     const tok = body.results[0].recipientToken as string;
     expect(tok.startsWith("...")).toBe(true);
     expect(tok.length).toBeLessThanOrEqual(9); // "..." + 6
+  });
+
+  it("returns sentAt from createdAt when sentAt is null", async () => {
+    const app = makeApp({ id: "u_admin", role: "admin" });
+    const createdAt = new Date("2026-04-23T09:00:00Z");
+    mocks.dbSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 2,
+                sentAt: null,
+                createdAt,
+                recipientToken: "ExponentPushToken[xyz789]",
+                status: "failed",
+                providerTicketId: null,
+                errorMessage: "ECONNREFUSED",
+              },
+            ]),
+          }),
+        }),
+      }),
+    });
+
+    const res = await app.request("/notifications/test-push/recent");
+    const body = await res.json();
+    expect(body.results[0].sentAt).toBe(createdAt.toISOString());
+  });
+
+  it("maskToken returns null for null token", async () => {
+    const app = makeApp({ id: "u_admin", role: "admin" });
+    mocks.dbSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 3,
+                sentAt: new Date(),
+                createdAt: new Date(),
+                recipientToken: null,
+                status: "failed",
+                providerTicketId: null,
+                errorMessage: null,
+              },
+            ]),
+          }),
+        }),
+      }),
+    });
+
+    const res = await app.request("/notifications/test-push/recent");
+    const body = await res.json();
+    expect(body.results[0].recipientToken).toBeNull();
+  });
+
+  it("maskToken returns token as-is when 6 chars or fewer", async () => {
+    const app = makeApp({ id: "u_admin", role: "admin" });
+    mocks.dbSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 4,
+                sentAt: new Date(),
+                createdAt: new Date(),
+                recipientToken: "abc",
+                status: "sent_ticket",
+                providerTicketId: "t1",
+                errorMessage: null,
+              },
+            ]),
+          }),
+        }),
+      }),
+    });
+
+    const res = await app.request("/notifications/test-push/recent");
+    const body = await res.json();
+    expect(body.results[0].recipientToken).toBe("abc");
   });
 });

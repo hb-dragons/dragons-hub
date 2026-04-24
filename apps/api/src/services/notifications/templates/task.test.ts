@@ -133,6 +133,95 @@ describe("renderTaskMessage", () => {
     });
   });
 
+  it("renders task.due.reminder day_of variant in German", () => {
+    const payload = {
+      taskId: 1,
+      boardId: 10,
+      boardName: "Board X",
+      title: "Write report",
+      dueDate: "2026-05-01",
+      reminderKind: "day_of" as const,
+      assigneeUserIds: ["u1"],
+    };
+    const result = renderTaskMessage("task.due.reminder", payload, "Write report", "de");
+    expect(result).toEqual({
+      title: "Heute fällig: Write report",
+      body: "Deine Aufgabe auf Board X ist heute fällig.",
+    });
+  });
+
+  it("renders task.due.reminder lead variant in English", () => {
+    const payload = {
+      taskId: 1,
+      boardId: 10,
+      boardName: "Board X",
+      title: "Write report",
+      dueDate: "2026-05-01",
+      reminderKind: "lead" as const,
+      assigneeUserIds: ["u1"],
+    };
+    const result = renderTaskMessage("task.due.reminder", payload, "Write report", "en");
+    expect(result).toEqual({
+      title: "Due tomorrow: Write report",
+      body: "Your task on Board X is due tomorrow.",
+    });
+  });
+
+  it("renders task.due.reminder with unknown reminderKind falls back to lead behavior", () => {
+    const payload = {
+      taskId: 1,
+      boardId: 10,
+      boardName: "Board X",
+      title: "Write report",
+      dueDate: "2026-05-01",
+      reminderKind: "unknown_kind",
+      assigneeUserIds: ["u1"],
+    };
+    // Any non-"day_of" value maps to "lead" per the ternary on line 72
+    const result = renderTaskMessage("task.due.reminder", payload, "Write report", "en");
+    expect(result).toEqual({
+      title: "Due tomorrow: Write report",
+      body: "Your task on Board X is due tomorrow.",
+    });
+  });
+
+  it("uses empty string fallback when assignedBy or boardName are absent", () => {
+    // Exercises the ?? "" fallback branches on lines 15 and 16
+    const result = renderTaskMessage("task.assigned", {}, "Task", "en");
+    expect(result).toEqual({
+      title: "New task: Task",
+      body: " assigned you a task on .",
+    });
+  });
+
+  it("uses empty string fallback when unassignedBy or boardName are absent", () => {
+    // Exercises the ?? "" fallback branches on lines 34 and 35
+    const result = renderTaskMessage("task.unassigned", {}, "Task", "en");
+    expect(result).toEqual({
+      title: "Removed from task: Task",
+      body: " removed you from a task on .",
+    });
+  });
+
+  it("uses empty string fallback when authorName or bodyPreview are absent", () => {
+    // Exercises the ?? "" fallback branches on lines 53 and 54
+    const result = renderTaskMessage("task.comment.added", {}, "Task", "en");
+    expect(result).toEqual({
+      title: "New comment: Task",
+      body: ": ",
+    });
+  });
+
+  it("uses empty string fallback for boardName when absent in due reminder", () => {
+    // Exercises the ?? "" fallback branch for boardName in renderDueReminder
+    const payload = { reminderKind: "lead" };
+    const result = renderTaskMessage("task.due.reminder", payload, "Task", "en");
+    expect(result).toEqual({
+      title: "Due tomorrow: Task",
+      body: "Your task on  is due tomorrow.",
+    });
+  });
+
   it("returns null for non-task event type", () => {
     expect(renderTaskMessage("match.cancelled", {}, "x", "de")).toBeNull();
   });

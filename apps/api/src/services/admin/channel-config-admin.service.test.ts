@@ -274,6 +274,56 @@ describe("updateChannelConfig", () => {
 
     expect(result).toBeNull();
   });
+
+  it("sets enabled when provided", async () => {
+    const row = makeDbRow({ enabled: false });
+    const updateChain = setupUpdateChain([row]);
+
+    await updateChannelConfig(1, { enabled: false });
+
+    const setCall = updateChain.set.mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.enabled).toBe(false);
+  });
+
+  it("sets config when provided", async () => {
+    const row = makeDbRow({ config: { locale: "en" as const } });
+    const updateChain = setupUpdateChain([row]);
+
+    await updateChannelConfig(1, { config: { locale: "en" } });
+
+    const setCall = updateChain.set.mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.config).toEqual({ locale: "en" });
+  });
+
+  it("sets digestMode when provided", async () => {
+    const row = makeDbRow({ digestMode: "daily" });
+    const updateChain = setupUpdateChain([row]);
+
+    await updateChannelConfig(1, { digestMode: "daily" });
+
+    const setCall = updateChain.set.mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.digestMode).toBe("daily");
+  });
+
+  it("sets digestCron when provided", async () => {
+    const row = makeDbRow({ digestCron: "0 8 * * *" });
+    const updateChain = setupUpdateChain([row]);
+
+    await updateChannelConfig(1, { digestCron: "0 8 * * *" });
+
+    const setCall = updateChain.set.mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.digestCron).toBe("0 8 * * *");
+  });
+
+  it("sets digestTimezone when provided", async () => {
+    const row = makeDbRow({ digestTimezone: "America/New_York" });
+    const updateChain = setupUpdateChain([row]);
+
+    await updateChannelConfig(1, { digestTimezone: "America/New_York" });
+
+    const setCall = updateChain.set.mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.digestTimezone).toBe("America/New_York");
+  });
 });
 
 describe("deleteChannelConfig", () => {

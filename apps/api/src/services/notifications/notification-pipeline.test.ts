@@ -53,6 +53,26 @@ vi.mock("./channels/in-app", () => ({
   },
 }));
 
+const mockPushSend = vi.fn().mockResolvedValue({ success: true });
+vi.mock("./channels/push", () => ({
+  PushChannelAdapter: class {
+    send(...args: unknown[]) {
+      return mockPushSend(...args);
+    }
+  },
+}));
+
+vi.mock("./expo-push.client", () => ({
+  ExpoPushClient: class {
+    constructor() {}
+  },
+}));
+
+const mockResolveRecipientUserIds = vi.fn().mockResolvedValue([]);
+vi.mock("./recipient-resolver", () => ({
+  resolveRecipientUserIds: (...args: unknown[]) => mockResolveRecipientUserIds(...args),
+}));
+
 const mockWhatsAppSend = vi.fn().mockResolvedValue({ success: true });
 vi.mock("./channels/whatsapp-group", () => ({
   WhatsAppGroupAdapter: class {
@@ -90,7 +110,7 @@ vi.mock("../../config/logger", () => ({
 
 // --- Import after mocks ---
 
-import { processEvent, clearCoalesceCache } from "./notification-pipeline";
+import { processEvent, clearCoalesceCache, loadMutedEventTypes } from "./notification-pipeline";
 
 // --- Helpers ---
 
@@ -951,6 +971,214 @@ describe("processEvent", () => {
 
       expect(result.dispatched).toBe(0);
       expect(result.buffered).toBe(1);
+    });
+  });
+
+  describe("push channel dispatch", () => {
+    it("dispatches via push adapter when channelType is push and userIds are resolved", async () => {
+      const rule = makeRule({
+        channels: [{ channel: "push", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "push",
+        config: { locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "push", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+      // resolveRecipientUserIds returns a non-empty list so the push send fires
+      mockResolveRecipientUserIds.mockResolvedValueOnce(["user-abc"]);
+
+      const result = await processEvent(makeEvent());
+
+      expect(mockPushSend).toHaveBeenCalledTimes(1);
+      expect(mockPushSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventId: "evt-1",
+          channelConfigId: 10,
+          recipientUserIds: ["user-abc"],
+        }),
+      );
+      expect(result.dispatched).toBe(1);
+    });
+
+    it("skips push dispatch when resolveRecipientUserIds returns empty list", async () => {
+      const rule = makeRule({
+        channels: [{ channel: "push", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "push",
+        config: { locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "push", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+      // resolveRecipientUserIds returns empty → send is NOT called, returns false
+      mockResolveRecipientUserIds.mockResolvedValueOnce([]);
+
+      const result = await processEvent(makeEvent());
+
+      expect(mockPushSend).not.toHaveBeenCalled();
+      expect(result.dispatched).toBe(0);
+    });
+
+    it("counts failed push send as not dispatched", async () => {
+      const rule = makeRule({
+        channels: [{ channel: "push", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "push",
+        config: { locale: "de" },
+      });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "push", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+      mockResolveRecipientUserIds.mockResolvedValueOnce(["user-xyz"]);
+      mockPushSend.mockResolvedValueOnce({ success: false });
+
+      const result = await processEvent(makeEvent());
+
+      expect(mockPushSend).toHaveBeenCalledTimes(1);
+      expect(result.dispatched).toBe(0);
+    });
+  });
+
+  describe("coalesce cache lazy cleanup", () => {
+    it("does not crash when recentDispatches grows past 1000 and triggers cleanup", async () => {
+      clearCoalesceCache();
+
+      // Use fake timers so all 1001 entries are added at time 0 (instantly stale
+      // relative to COALESCE_WINDOW_MS=60_000). The 1001st call fires the lazy
+      // cleanup, which removes all stale entries, exercising L54-57.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(0)); // t=0: all entries stamped at 0
+
+      try {
+        const rule = makeRule();
+        const config = makeChannelConfig();
+
+        // Seed the map with 1001 distinct entity dispatches.
+        for (let i = 0; i < 1001; i++) {
+          setupDbMocks({ rules: [rule], configs: [config] });
+          mockEvaluateRule.mockReturnValue({
+            matched: true,
+            channels: [{ channel: "in_app", targetId: "10" }],
+            urgencyOverride: null,
+          });
+          await processEvent(makeEvent({ entityId: i, id: `evt-${i}` }));
+        }
+
+        // Advance past the coalesce window so entries become stale.
+        vi.advanceTimersByTime(61_000);
+
+        // The 1002nd call (different entity) will trigger cleanup of all stale entries.
+        setupDbMocks({ rules: [rule], configs: [config] });
+        mockEvaluateRule.mockReturnValue({
+          matched: true,
+          channels: [{ channel: "in_app", targetId: "10" }],
+          urgencyOverride: null,
+        });
+        const result = await processEvent(makeEvent({ entityId: 99999, id: "evt-final" }));
+        expect(result.dispatched).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    }, 60_000);
+  });
+
+  describe("resolveLocaleForRecipient edge cases", () => {
+    it("falls back to de when user has no locale preference and config has no locale", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: {} });
+      // localePrefs: empty array means no pref row returned → pref is undefined
+      setupDbMocks({ rules: [], configs: [config], localePrefs: [] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "user", channel: "in_app", userId: "user-no-pref" },
+      ]);
+
+      await processEvent(
+        makeEvent({ type: "task.assigned", entityType: "task", entityId: 1, entityName: "T" }),
+      );
+
+      // renderEventMessage should have been called with "de" (the final fallback)
+      expect(mockRenderEventMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Object),
+        expect.any(String),
+        "de",
+      );
+    });
+
+    it("uses configLocale when user preference is absent but config locale is set", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { locale: "en" } });
+      // localePrefs: empty → pref is undefined, falls back to configLocale="en"
+      setupDbMocks({ rules: [], configs: [config], localePrefs: [] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "user", channel: "in_app", userId: "user-no-pref" },
+      ]);
+
+      await processEvent(
+        makeEvent({ type: "task.assigned", entityType: "task", entityId: 2, entityName: "T" }),
+      );
+
+      expect(mockRenderEventMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Object),
+        expect.any(String),
+        "en",
+      );
+    });
+
+    it("uses de when non-user recipient has no configLocale", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: {} });
+      setupDbMocks({ rules: [], configs: [config] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "admin", channel: "in_app" },
+      ]);
+
+      await processEvent(makeEvent({ entityType: "match", entityId: 99 }));
+
+      expect(mockRenderEventMessage).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Object),
+        expect.any(String),
+        "de",
+      );
+    });
+  });
+
+  describe("loadMutedEventTypes — empty mutedEventTypes list", () => {
+    it("does not add recipient to muted map when mutedEventTypes is empty", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
+      setupDbMocks({
+        rules: [],
+        configs: [config],
+        prefs: [
+          // mutedEventTypes is empty — the pref row exists but muting does not apply
+          { userId: "referee:77", mutedEventTypes: [] },
+        ],
+      });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "referee", channel: "in_app", refereeId: 77 },
+      ]);
+
+      const result = await processEvent(makeEvent());
+
+      // Not muted — dispatch should proceed
+      expect(mockInAppSend).toHaveBeenCalledTimes(1);
+      expect(result.muted).toBe(0);
+      expect(result.dispatched).toBe(1);
     });
   });
 

@@ -299,6 +299,63 @@ describe("updateWatchRule", () => {
 
     expect(result).toBeNull();
   });
+
+  it("sets eventTypes when provided", async () => {
+    const row = makeRow({ id: 4, eventTypes: ["match.cancelled"] });
+    const chain = buildChain([row]);
+    mockUpdate.mockReturnValueOnce(chain);
+
+    await updateWatchRule(4, { eventTypes: ["match.cancelled"] });
+
+    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.eventTypes).toEqual(["match.cancelled"]);
+  });
+
+  it("sets filters when provided", async () => {
+    const row = makeRow({ id: 5 });
+    const chain = buildChain([row]);
+    mockUpdate.mockReturnValueOnce(chain);
+
+    const filters = [{ field: "teamId", operator: "eq", value: "99" }];
+    await updateWatchRule(5, { filters });
+
+    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.filters).toEqual(filters);
+  });
+
+  it("sets channels when provided", async () => {
+    const row = makeRow({ id: 6 });
+    const chain = buildChain([row]);
+    mockUpdate.mockReturnValueOnce(chain);
+
+    const channels = [{ channel: "push", targetId: "ch-1" }];
+    await updateWatchRule(6, { channels });
+
+    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.channels).toEqual(channels);
+  });
+
+  it("sets urgencyOverride when provided", async () => {
+    const row = makeRow({ id: 7, urgencyOverride: "high" });
+    const chain = buildChain([row]);
+    mockUpdate.mockReturnValueOnce(chain);
+
+    await updateWatchRule(7, { urgencyOverride: "high" });
+
+    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.urgencyOverride).toBe("high");
+  });
+
+  it("sets templateOverride when provided", async () => {
+    const row = makeRow({ id: 8, templateOverride: "my-tpl" });
+    const chain = buildChain([row]);
+    mockUpdate.mockReturnValueOnce(chain);
+
+    await updateWatchRule(8, { templateOverride: "my-tpl" });
+
+    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
+    expect(setCall.templateOverride).toBe("my-tpl");
+  });
 });
 
 describe("deleteWatchRule", () => {

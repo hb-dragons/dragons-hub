@@ -309,6 +309,58 @@ describe("PushChannelAdapter", () => {
     expect(sendArg[0]!.title.toLowerCase()).toContain("referee");
   });
 
+  it("handles ok ticket with no id field — providerTicketId is null", async () => {
+    mockSelectReturning([
+      { id: 1, userId: "user_a", token: "ExponentPushToken[a]", platform: "ios" },
+    ]);
+    mockSelectReturning([]);
+
+    // status=ok but no id property
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok" }]);
+
+    const insertCall = mockInsertOK();
+
+    const adapter = new PushChannelAdapter(new ExpoPushClient({}));
+    const result = await adapter.send({
+      eventId: "evt_test_1",
+      eventType: "referee.assigned",
+      payload: validRefereeAssignedPayload,
+      watchRuleId: null,
+      channelConfigId: 1,
+      recipientUserIds: ["user_a"],
+    });
+
+    expect(result.sent).toBe(1);
+    const rows = insertCall.mock.calls[0]![0] as Array<Record<string, unknown>>;
+    expect(rows[0]!.providerTicketId).toBeNull();
+  });
+
+  it("uses 'unknown' as errorMessage when error ticket has no message or details", async () => {
+    mockSelectReturning([
+      { id: 1, userId: "user_a", token: "ExponentPushToken[a]", platform: "ios" },
+    ]);
+    mockSelectReturning([]);
+
+    // status=error with no message or details fields
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "error" }]);
+
+    const insertCall = mockInsertOK();
+
+    const adapter = new PushChannelAdapter(new ExpoPushClient({}));
+    const result = await adapter.send({
+      eventId: "evt_test_1",
+      eventType: "referee.assigned",
+      payload: validRefereeAssignedPayload,
+      watchRuleId: null,
+      channelConfigId: 1,
+      recipientUserIds: ["user_a"],
+    });
+
+    expect(result.success).toBe(false);
+    const rows = insertCall.mock.calls[0]![0] as Array<Record<string, unknown>>;
+    expect(rows[0]!.errorMessage).toBe("unknown");
+  });
+
   it("uses device locale (de) when no pref row exists — DE device renders DE", async () => {
     mockSelectReturning([
       { id: 1, userId: "user_a", token: "ExponentPushToken[a]", platform: "ios", locale: "de-DE" },
