@@ -17,6 +17,7 @@ import { DuePickerSheet, type DuePickerHandle } from "@/components/board/DuePick
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
+import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
 import type { BoardColumnHandle, ColumnRect } from "@/components/board/BoardColumn";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
@@ -504,8 +505,12 @@ export default function BoardDetailScreen() {
         onToggleUnassigned={() => setFilters((f) => ({ ...f, unassigned: !f.unassigned }))}
       />
       <View style={{ flex: 1 }}>
-        {tasksLoading && !tasks ? (
-          <ActivityIndicator color={colors.foreground} style={{ marginTop: 40 }} />
+        {tasksLoading && !rawTasks ? (
+          <View style={{ flex: 1, paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md }}>
+            <TaskCardSkeleton />
+            <TaskCardSkeleton />
+            <TaskCardSkeleton />
+          </View>
         ) : (
           <BoardPager
             ref={pagerRef}

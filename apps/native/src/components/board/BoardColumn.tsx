@@ -171,6 +171,13 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
                 onMeasure={onTaskMeasure}
               />
             ))}
+            {columnTasks.length === 0 ? (
+              <View style={{ padding: spacing.lg, alignItems: "center" }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: "center" }}>
+                  {i18n.t("board.column.empty")}
+                </Text>
+              </View>
+            ) : null}
             <Pressable
               onPress={() => onAddTask(column.id)}
               style={{
