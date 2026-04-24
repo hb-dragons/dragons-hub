@@ -946,6 +946,22 @@
         "success": "Test an {count, plural, one {# Gerät} other {# Geräte}} gesendet",
         "partialFailure": "{failed} von {total} Pushes fehlgeschlagen"
       }
+    },
+    "myNotifications": {
+      "cardTitle": "Deine Benachrichtigungen",
+      "cardDescription": "Wähle, über welche Ereignisse du benachrichtigt werden möchtest.",
+      "events": {
+        "taskAssigned": "Du wurdest einer Aufgabe zugewiesen",
+        "taskUnassigned": "Du wurdest von einer Aufgabe entfernt",
+        "taskComment": "Jemand kommentiert deine Aufgabe",
+        "taskDueReminder": "Eine Aufgabe ist bald fällig"
+      },
+      "language": "Sprache",
+      "localeDe": "Deutsch",
+      "localeEn": "English",
+      "refereeNote": "Schiri-Einsatzbenachrichtigungen werden auf der Schiri-Einstellungsseite verwaltet.",
+      "saveSuccess": "Benachrichtigungseinstellungen gespeichert",
+      "saveError": "Einstellungen konnten nicht gespeichert werden"
     }
   },
   "time": {

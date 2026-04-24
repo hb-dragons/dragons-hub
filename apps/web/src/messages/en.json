@@ -946,6 +946,22 @@
         "success": "Test push sent to {count, plural, one {# device} other {# devices}}",
         "partialFailure": "{failed} of {total} pushes failed"
       }
+    },
+    "myNotifications": {
+      "cardTitle": "Your notifications",
+      "cardDescription": "Choose which events you want to be notified about.",
+      "events": {
+        "taskAssigned": "You're assigned to a task",
+        "taskUnassigned": "You're removed from a task",
+        "taskComment": "Someone comments on your task",
+        "taskDueReminder": "A task is due soon"
+      },
+      "language": "Language",
+      "localeDe": "Deutsch",
+      "localeEn": "English",
+      "refereeNote": "Referee-slot notifications are managed separately on the Referee settings page.",
+      "saveSuccess": "Notification preferences saved",
+      "saveError": "Could not save notification preferences"
     }
   },
   "time": {
