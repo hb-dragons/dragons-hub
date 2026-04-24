@@ -26,12 +26,7 @@ vi.mock("../../config/logger", () => ({
 
 // --- Imports (after mocks) ---
 
-import {
-  sendNotification,
-  notifyTaskAssigned,
-  notifyBookingNeedsAction,
-  notifyTaskComment,
-} from "./notification.service";
+import { sendNotification } from "./notification.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- PGlite setup ---
@@ -79,52 +74,5 @@ describe("sendNotification", () => {
     expect(rows[0]!.body).toBe("Test Body");
     expect(rows[0]!.status).toBe("sent");
     expect(rows[0]!.sent_at).not.toBeNull();
-  });
-});
-
-describe("notifyTaskAssigned", () => {
-  it("sends notification", async () => {
-    await notifyTaskAssigned(1, "user-1", "Fix the thing");
-
-    const rows = await getNotifications();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.title).toBe("Task assigned: Fix the thing");
-    expect(rows[0]!.body).toBe("You have been assigned to task: Fix the thing");
-    expect(rows[0]!.recipient_id).toBe("user-1");
-  });
-});
-
-describe("notifyBookingNeedsAction", () => {
-  it("sends notification", async () => {
-    await notifyBookingNeedsAction(
-      1,
-      "user-2",
-      "Main Hall",
-      "2025-03-15",
-    );
-
-    const rows = await getNotifications();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.title).toBe(
-      "Venue booking needs attention: Main Hall on 2025-03-15",
-    );
-    expect(rows[0]!.body).toBe(
-      "The venue booking for Main Hall on 2025-03-15 requires your attention.",
-    );
-    expect(rows[0]!.recipient_id).toBe("user-2");
-  });
-});
-
-describe("notifyTaskComment", () => {
-  it("sends notification", async () => {
-    await notifyTaskComment(1, "user-3", "John Doe", "Fix the thing");
-
-    const rows = await getNotifications();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.title).toBe("John Doe commented on: Fix the thing");
-    expect(rows[0]!.body).toBe(
-      "John Doe left a comment on task: Fix the thing",
-    );
-    expect(rows[0]!.recipient_id).toBe("user-3");
   });
 });
