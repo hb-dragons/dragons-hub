@@ -207,7 +207,7 @@ Default for every user is "all event types enabled". Opting out appends the even
 
 **Schema additions:**
 
-`board_columns.is_done_column` already exists in the schema (`packages/db/src/schema/boards.ts`) but is currently unused — surfacing it in the UI is part of this work.
+`board_columns.is_done_column` is already fully wired end-to-end (schema, service, create/update API schemas, and the `column-settings-dialog.tsx` UI toggle). This work only needs to *read* the flag inside the reminder worker — no new UI or API surface required.
 
 ```ts
 // packages/db/src/schema/tasks.ts — tasks (new)
