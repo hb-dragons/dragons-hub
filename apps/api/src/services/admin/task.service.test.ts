@@ -1015,3 +1015,45 @@ describe("task event emission — assign / unassign", () => {
     expect(events).toHaveLength(1);
   });
 });
+
+describe("task event emission — comment", () => {
+  it("emits task.comment.added with assignees minus author as recipients", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+    await addAssignee(taskId, callerId, callerId);
+
+    await addComment(taskId, { body: "Hello, this is a test comment." }, callerId);
+
+    const events = await getTaskEvents(taskId);
+    const commentEvent = events.find((e) => e.type === "task.comment.added");
+    expect(commentEvent).toBeDefined();
+    const payload = commentEvent!.payload;
+    expect(payload.recipientUserIds).toEqual([targetUserId]);
+    expect(payload.authorId).toBe(callerId);
+    expect(payload.bodyPreview).toBe("Hello, this is a test comment.");
+  });
+
+  it("truncates long comment bodies to 140 chars with ellipsis in preview", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+
+    const longBody = "x".repeat(200);
+    await addComment(taskId, { body: longBody }, callerId);
+
+    const events = await getTaskEvents(taskId);
+    const commentEvent = events.find((e) => e.type === "task.comment.added");
+    const payload = commentEvent!.payload;
+    expect(payload.bodyPreview).toBe(`${"x".repeat(140)}…`);
+  });
+
+  it("does not emit when there are no assignees other than the author", async () => {
+    const { taskId, callerId } = await seedTaskAndUsers();
+    await addAssignee(taskId, callerId, callerId);
+
+    await addComment(taskId, { body: "Solo" }, callerId);
+
+    const events = await getTaskEvents(taskId);
+    const commentEvents = events.filter((e) => e.type === "task.comment.added");
+    expect(commentEvents).toHaveLength(0);
+  });
+});
