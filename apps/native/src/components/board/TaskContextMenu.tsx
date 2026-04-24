@@ -67,6 +67,7 @@ export const TaskContextMenu = forwardRef<TaskContextMenuHandle>(
                 }, 150);
               }}
               accessibilityRole="button"
+              accessibilityLabel={item.label}
               style={{
                 padding: spacing.md,
                 borderRadius: radius.md,

@@ -6,6 +6,7 @@ import { useCommentMutations } from "@/hooks/board/useCommentMutations";
 import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { haptics } from "@/lib/haptics";
 
 interface Props {
   task: TaskDetail;
@@ -49,6 +50,7 @@ export function CommentsSection({ task }: Props) {
   };
 
   const confirmDelete = (id: number) => {
+    haptics.warning();
     Alert.alert(
       i18n.t("board.comments.deleteTitle"),
       i18n.t("board.comments.deleteMessage"),
@@ -189,6 +191,7 @@ export function CommentsSection({ task }: Props) {
           onPress={submit}
           disabled={!draft.trim() || sending}
           accessibilityRole="button"
+          accessibilityLabel={i18n.t("board.comments.send")}
           style={{
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.sm,

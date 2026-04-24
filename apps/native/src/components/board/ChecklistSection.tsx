@@ -5,6 +5,7 @@ import type { TaskDetail } from "@dragons/shared";
 import { useChecklistMutations } from "@/hooks/board/useChecklistMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { haptics } from "@/lib/haptics";
 
 interface Props {
   task: TaskDetail;
@@ -34,6 +35,7 @@ export function ChecklistSection({ task, boardId }: Props) {
   };
 
   const confirmDelete = (itemId: number) => {
+    haptics.warning();
     Alert.alert(
       i18n.t("board.checklist.deleteTitle"),
       i18n.t("board.checklist.deleteMessage"),
@@ -100,7 +102,10 @@ export function ChecklistSection({ task, boardId }: Props) {
         .map((item) => (
           <Pressable
             key={item.id}
-            onPress={() => mutations.toggle(task.id, item.id, !item.isChecked)}
+            onPress={() => {
+              haptics.selection();
+              mutations.toggle(task.id, item.id, !item.isChecked);
+            }}
             onLongPress={() => confirmDelete(item.id)}
             delayLongPress={500}
             accessibilityRole="checkbox"

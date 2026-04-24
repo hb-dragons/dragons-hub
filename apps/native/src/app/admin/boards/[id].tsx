@@ -280,7 +280,7 @@ export default function BoardDetailScreen() {
         (dropTarget.columnId !== prev.task.columnId ||
           dropTarget.position !== prev.task.position)
       ) {
-        haptics.light();
+        haptics.success();
         void moveTask(prev.task.id, dropTarget.columnId, dropTarget.position);
       }
 
@@ -417,6 +417,7 @@ export default function BoardDetailScreen() {
               void taskMutations.setDueDate(task.id, iso);
             });
           } else if (action === "delete") {
+            haptics.warning();
             Alert.alert(
               i18n.t("board.task.deleteConfirmTitle"),
               i18n.t("board.task.deleteConfirmMessage"),
