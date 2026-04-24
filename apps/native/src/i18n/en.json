@@ -279,6 +279,13 @@
       "top": "Top",
       "bottom": "Bottom",
       "confirm": "Move"
+    },
+    "quickCreate": {
+      "title": "New task",
+      "titlePlaceholder": "Task title",
+      "descriptionPlaceholder": "Add a description (optional)",
+      "submit": "Create",
+      "fab": "New task"
     }
   },
   "error": {

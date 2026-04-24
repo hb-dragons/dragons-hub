@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, View, Text, ActivityIndicator } from "react-native";
+import { Alert, Pressable, Text, View, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
@@ -12,6 +13,7 @@ import { TaskContextMenu, type TaskContextMenuHandle } from "@/components/board/
 import { MoveToSheet, type MoveToSheetHandle } from "@/components/board/MoveToSheet";
 import { PriorityPickerSheet, type PriorityPickerHandle } from "@/components/board/PriorityPickerSheet";
 import { DuePickerSheet, type DuePickerHandle } from "@/components/board/DuePickerSheet";
+import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import type { TaskCardData } from "@dragons/shared";
@@ -22,6 +24,7 @@ export default function BoardDetailScreen() {
   const { data: board, isLoading: boardLoading } = useBoard(boardId);
   const { data: tasks, isLoading: tasksLoading } = useBoardTasks(boardId);
   const { colors, spacing } = useTheme();
+  const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);
   const pagerRef = useRef<BoardPagerHandle | null>(null);
   const taskSheetRef = useRef<TaskDetailSheetHandle | null>(null);
@@ -29,6 +32,7 @@ export default function BoardDetailScreen() {
   const moveToSheetRef = useRef<MoveToSheetHandle | null>(null);
   const priorityPickerRef = useRef<PriorityPickerHandle | null>(null);
   const duePickerRef = useRef<DuePickerHandle | null>(null);
+  const quickCreateRef = useRef<QuickCreateSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
   const moveTask = useMoveTask(boardId);
 
@@ -89,6 +93,24 @@ export default function BoardDetailScreen() {
     });
   }, [columns, countsByColumn, moveTask, taskMutations]);
 
+  const openQuickCreate = useCallback((columnId: number) => {
+    quickCreateRef.current?.open({
+      boardId,
+      columns,
+      initialColumnId: columnId,
+    });
+  }, [boardId, columns]);
+
+  const openQuickCreateFab = useCallback(() => {
+    const active = columns[activeIndex] ?? columns[0];
+    if (!active) return;
+    quickCreateRef.current?.open({
+      boardId,
+      columns,
+      initialColumnId: active.id,
+    });
+  }, [activeIndex, boardId, columns]);
+
   if (boardLoading && !board) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -126,17 +148,41 @@ export default function BoardDetailScreen() {
               taskSheetRef.current?.open(task.id);
             }}
             onTaskLongPress={handleTaskLongPress}
-            onAddTask={() => {
-              /* wired in Phase 10 */
-            }}
+            onAddTask={openQuickCreate}
           />
         )}
       </View>
+      <Pressable
+        onPress={openQuickCreateFab}
+        accessibilityRole="button"
+        accessibilityLabel={i18n.t("board.quickCreate.fab")}
+        style={{
+          position: "absolute",
+          right: spacing.lg,
+          bottom: insets.bottom + spacing.lg,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: colors.primary,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.15,
+          shadowRadius: 6,
+          elevation: 5,
+        }}
+      >
+        <Text style={{ color: colors.primaryForeground, fontSize: 28, fontWeight: "700", marginTop: -2 }}>
+          +
+        </Text>
+      </Pressable>
       <TaskDetailSheet ref={taskSheetRef} boardId={boardId} />
       <TaskContextMenu ref={contextMenuRef} />
       <MoveToSheet ref={moveToSheetRef} />
       <PriorityPickerSheet ref={priorityPickerRef} />
       <DuePickerSheet ref={duePickerRef} />
+      <QuickCreateSheet ref={quickCreateRef} />
     </View>
   );
 }

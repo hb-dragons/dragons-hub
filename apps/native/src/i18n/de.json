@@ -279,6 +279,13 @@
       "top": "Oben",
       "bottom": "Unten",
       "confirm": "Verschieben"
+    },
+    "quickCreate": {
+      "title": "Neue Aufgabe",
+      "titlePlaceholder": "Aufgabentitel",
+      "descriptionPlaceholder": "Beschreibung hinzufügen (optional)",
+      "submit": "Erstellen",
+      "fab": "Neue Aufgabe"
     }
   },
   "error": {
