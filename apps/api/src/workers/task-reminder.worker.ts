@@ -24,10 +24,10 @@ interface TaskReminderRow {
 
 async function loadLeadCandidates(): Promise<TaskReminderRow[]> {
   const leadEnd = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  // Use today's date string as the lower bound so that tasks due today are
-  // included. Casting a date column to timestamptz gives midnight UTC, which
-  // is earlier than the current wall-clock time and would incorrectly exclude
-  // same-day tasks if we compared against `now`.
+  // Lead reminder = "Due tomorrow" — strictly after today. Today's tasks are
+  // handled by loadDayOfCandidates, which renders "Due today" text. Without
+  // this exclusion a task due today would match both queries and produce a
+  // misleading "Due tomorrow" in-app message alongside the day-of one.
   const todayStr = new Date().toISOString().slice(0, 10);
   return await db
     .select({
@@ -44,7 +44,7 @@ async function loadLeadCandidates(): Promise<TaskReminderRow[]> {
       and(
         sql`${tasks.dueDate} IS NOT NULL`,
         sql`${tasks.dueDate}::timestamptz <= ${leadEnd}`,
-        sql`${tasks.dueDate} >= ${todayStr}`,
+        sql`${tasks.dueDate} > ${todayStr}`,
         isNull(tasks.leadReminderSentAt),
         eq(boardColumns.isDoneColumn, false),
       ),

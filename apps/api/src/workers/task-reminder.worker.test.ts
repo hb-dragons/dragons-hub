@@ -162,35 +162,73 @@ describe("runTaskReminderSweep", () => {
   });
 
   it("re-fires lead reminder after dueDate is changed and timestamps are reset", async () => {
-    const dueIn20h = new Date(Date.now() + 20 * 60 * 60 * 1000);
-    const { taskId } = await setup({ dueDate: dueIn20h });
+    // Freeze at 04:00 UTC today so day-of returns early (< 08:00 UTC). Set
+    // both dueDates to clearly-tomorrow so the lead query matches on both
+    // sweeps independent of wall-clock time.
+    const today = new Date();
+    today.setUTCHours(4, 0, 0, 0);
+    vi.useFakeTimers();
+    vi.setSystemTime(today);
 
-    await runTaskReminderSweep();
+    try {
+      const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+      const { taskId } = await setup({ dueDate: tomorrow });
 
-    const newDue = new Date(Date.now() + 10 * 60 * 60 * 1000);
-    await (ctx.db as typeof import("../config/database").db)
-      .update(tasks)
-      .set({
-        dueDate: newDue.toISOString().slice(0, 10),
-        leadReminderSentAt: null,
-        dueReminderSentAt: null,
-      })
-      .where(eq(tasks.id, taskId));
+      await runTaskReminderSweep();
 
-    await runTaskReminderSweep();
+      const newTomorrow = new Date(today.getTime() + 20 * 60 * 60 * 1000);
+      await (ctx.db as typeof import("../config/database").db)
+        .update(tasks)
+        .set({
+          dueDate: newTomorrow.toISOString().slice(0, 10),
+          leadReminderSentAt: null,
+          dueReminderSentAt: null,
+        })
+        .where(eq(tasks.id, taskId));
 
-    // Filter to just lead events — a second sweep may also fire the day-of
-    // reminder if the updated dueDate happens to land on today's UTC date and
-    // the current UTC hour is >= 8. The property under test is that lead fires
-    // twice after the timestamp reset.
-    const events = await (ctx.db as typeof import("../config/database").db)
-      .select()
-      .from(domainEvents)
-      .where(eq(domainEvents.entityId, taskId));
-    const leadEvents = events.filter(
-      (e) => (e.payload as Record<string, unknown>).reminderKind === "lead",
-    );
-    expect(leadEvents).toHaveLength(2);
+      await runTaskReminderSweep();
+
+      const events = await (ctx.db as typeof import("../config/database").db)
+        .select()
+        .from(domainEvents)
+        .where(eq(domainEvents.entityId, taskId));
+      const leadEvents = events.filter(
+        (e) => (e.payload as Record<string, unknown>).reminderKind === "lead",
+      );
+      expect(leadEvents).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not fire the lead reminder for a task due today (day-of only)", async () => {
+    // Freeze at 04:00 UTC today so loadDayOfCandidates returns early (< 08:00),
+    // leaving only loadLeadCandidates potentially matching. A due-today task
+    // must NOT match the lead query — its "Due tomorrow" text would be wrong.
+    const today = new Date();
+    today.setUTCHours(4, 0, 0, 0);
+    vi.useFakeTimers();
+    vi.setSystemTime(today);
+
+    try {
+      const { taskId } = await setup({ dueDate: today });
+
+      await runTaskReminderSweep();
+
+      const events = await (ctx.db as typeof import("../config/database").db)
+        .select()
+        .from(domainEvents)
+        .where(eq(domainEvents.entityId, taskId));
+      expect(events).toHaveLength(0);
+
+      const [row] = await (ctx.db as typeof import("../config/database").db)
+        .select({ at: tasks.leadReminderSentAt })
+        .from(tasks)
+        .where(eq(tasks.id, taskId));
+      expect(row!.at).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("emits day_of reminder when task is due today after 08:00 UTC", async () => {
