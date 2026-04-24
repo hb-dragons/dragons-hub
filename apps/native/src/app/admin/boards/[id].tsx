@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { Alert, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -52,7 +53,7 @@ type DragState =
 export default function BoardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = Number(id);
-  const { data: board, isLoading: boardLoading } = useBoard(boardId);
+  const { data: board, isLoading: boardLoading, mutate: revalidateBoard } = useBoard(boardId);
 
   const [filters, setFilters] = useState<BoardFilters>({
     mine: false,
@@ -69,7 +70,12 @@ export default function BoardDetailScreen() {
     return Object.keys(f).length ? f : undefined;
   }, [filters.priority]);
 
-  const { data: rawTasks, isLoading: tasksLoading } = useBoardTasks(boardId, apiFilters);
+  const {
+    data: rawTasks,
+    isLoading: tasksLoading,
+    isValidating: validatingTasks,
+    mutate: revalidateTasks,
+  } = useBoardTasks(boardId, apiFilters);
 
   const tasks = useMemo(() => {
     if (!rawTasks) return rawTasks;
@@ -157,6 +163,17 @@ export default function BoardDetailScreen() {
     for (const t of tasks ?? []) m.set(t.columnId, (m.get(t.columnId) ?? 0) + 1);
     return m;
   }, [tasks]);
+
+  // ---------------------------------------------------------------------------
+  // Focus-based revalidation
+  // ---------------------------------------------------------------------------
+
+  useFocusEffect(
+    useCallback(() => {
+      void revalidateBoard();
+      void revalidateTasks();
+    }, [revalidateBoard, revalidateTasks]),
+  );
 
   // ---------------------------------------------------------------------------
   // Drop target computation using measured rects
@@ -505,6 +522,21 @@ export default function BoardDetailScreen() {
         onToggleDueSoon={() => setFilters((f) => ({ ...f, dueSoon: !f.dueSoon }))}
         onToggleUnassigned={() => setFilters((f) => ({ ...f, unassigned: !f.unassigned }))}
       />
+      <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: spacing.md, paddingVertical: spacing.xs }}>
+        <Pressable
+          onPress={() => { void revalidateTasks(); void revalidateBoard(); }}
+          accessibilityRole="button"
+          accessibilityLabel={i18n.t("board.refresh")}
+          style={{ flexDirection: "row", gap: spacing.xs, alignItems: "center", padding: spacing.xs }}
+        >
+          {validatingTasks ? (
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+          ) : null}
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+            {i18n.t("board.refresh")}
+          </Text>
+        </Pressable>
+      </View>
       <View style={{ flex: 1 }}>
         {tasksLoading && !rawTasks ? (
           <View style={{ flex: 1, paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md }}>
