@@ -177,7 +177,12 @@
       "assign": "Zuweisen",
       "assigning": "Weise zu…",
       "assignSuccess": "Schiedsrichter zugewiesen",
-      "assignFailed": "Zuweisung fehlgeschlagen"
+      "assignFailed": "Zuweisung fehlgeschlagen",
+      "assignConfirmTitle": "%{name} zuweisen?",
+      "assignConfirmMessage": "Wird als %{slot} beim Verband eingeteilt.",
+      "nearby": "In der Nähe",
+      "further": "Weiter weg",
+      "distant": "Weit entfernt"
     }
   },
   "auth": {

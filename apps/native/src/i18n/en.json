@@ -177,7 +177,12 @@
       "assign": "Assign",
       "assigning": "Assigning…",
       "assignSuccess": "Referee assigned",
-      "assignFailed": "Couldn't assign referee"
+      "assignFailed": "Couldn't assign referee",
+      "assignConfirmTitle": "Assign %{name}?",
+      "assignConfirmMessage": "Will be assigned as %{slot} with the federation.",
+      "nearby": "Nearby",
+      "further": "Further away",
+      "distant": "Far"
     }
   },
   "auth": {

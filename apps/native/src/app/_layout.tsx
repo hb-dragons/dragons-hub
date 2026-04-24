@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { SWRConfig } from "swr";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { swrConfig } from "@/lib/swr-config";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { LocaleProvider } from "@/hooks/useLocale";
@@ -174,13 +175,15 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <SWRConfig value={swrConfig}>
-        <LocaleProvider>
-          <ThemeProvider>
-            <RootNavigator />
-          </ThemeProvider>
-        </LocaleProvider>
-      </SWRConfig>
+      <KeyboardProvider>
+        <SWRConfig value={swrConfig}>
+          <LocaleProvider>
+            <ThemeProvider>
+              <RootNavigator />
+            </ThemeProvider>
+          </LocaleProvider>
+        </SWRConfig>
+      </KeyboardProvider>
     </ErrorBoundary>
   );
 }
