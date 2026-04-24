@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { Alert, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSharedValue } from "react-native-reanimated";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
 import { useMoveTask } from "@/hooks/board/useMoveTask";
+import { useBoardDrag } from "@/hooks/board/useBoardDrag";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager";
 import { TaskDetailSheet, type TaskDetailSheetHandle } from "@/components/board/TaskDetailSheet";
@@ -19,32 +19,13 @@ import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/boar
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
-import type { BoardColumnHandle, ColumnRect } from "@/components/board/BoardColumn";
+import type { BoardColumnHandle } from "@/components/board/BoardColumn";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 import { authClient } from "@/lib/auth-client";
-import { computeDropTarget } from "@dragons/shared";
 import type { TaskCardData } from "@dragons/shared";
 import type { TaskListFilters } from "@dragons/api-client";
-import type { TaskCardLayout, TaskRect } from "@/components/board/TaskCard";
-
-// ---------------------------------------------------------------------------
-// Drag state
-// ---------------------------------------------------------------------------
-
-type ActiveDragState = {
-  active: true;
-  task: TaskCardData;
-  cardWidth: number;
-  cardHeight: number;
-  /** Column ID currently highlighted as drop target (null = none) */
-  dropTargetColumnId: number | null;
-};
-
-type DragState =
-  | { active: false }
-  | ActiveDragState;
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -111,42 +92,8 @@ export default function BoardDetailScreen() {
   const taskMutations = useTaskMutations(boardId);
   const moveTask = useMoveTask(boardId);
 
-  // Reanimated shared values for the ghost position — updated on the UI thread,
-  // no JS re-render on every frame.
-  const pointerX = useSharedValue(0);
-  const pointerY = useSharedValue(0);
-
-  // React state for the rest of the drag (task identity, card size, drop target).
-  const [dragState, setDragState] = useState<DragState>({ active: false });
-
-  // Keep a stable ref to tasks for use inside gesture callbacks (avoids stale closure).
-  const tasksRef = useRef<TaskCardData[]>([]);
-  tasksRef.current = tasks ?? [];
-
-  // ---------------------------------------------------------------------------
-  // Measurement maps for drop-target detection
-  // ---------------------------------------------------------------------------
-
-  const taskRects = useRef<Map<number, TaskRect>>(new Map());
-  const columnRects = useRef<Map<number, ColumnRect>>(new Map());
-
-  // Plain JS pointer coords for the autoscroll interval to read.
-  const pointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  // Scroll offset per column (to track current position for autoscroll).
-  const columnScrollOffsets = useRef<Record<number, number>>({});
-
-  // Per-column ScrollView handles for imperatively scrolling.
+  // Per-column ScrollView handles for imperatively scrolling (autoscroll).
   const columnRefsMap = useRef<Map<number, BoardColumnHandle>>(new Map());
-
-  // Throttle horizontal pager snaps.
-  const lastHorizontalScrollAt = useRef<number>(0);
-
-  // Track drag active state in a ref so the interval can read it synchronously.
-  const dragActiveRef = useRef<boolean>(false);
-
-  // Keep columns stable ref.
-  const columnsRef = useRef<typeof columns>([]);
 
   // ---------------------------------------------------------------------------
   // Derived
@@ -156,7 +103,6 @@ export default function BoardDetailScreen() {
     () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
     [board],
   );
-  columnsRef.current = columns;
 
   const countsByColumn = useMemo(() => {
     const m = new Map<number, number>();
@@ -176,231 +122,29 @@ export default function BoardDetailScreen() {
   );
 
   // ---------------------------------------------------------------------------
-  // Drop target computation using measured rects
+  // Drag state machine
   // ---------------------------------------------------------------------------
 
-  const findDropTarget = useCallback(
-    (pageX: number, pageY: number, draggedTask: TaskCardData) => {
-      const allColumns = columnsRef.current;
-      const allTasks = tasksRef.current;
-
-      // Find which column the pointer is over.
-      let overColumn: (typeof allColumns)[0] | null = null;
-      for (const col of allColumns) {
-        const rect = columnRects.current.get(col.id);
-        if (!rect) continue;
-        if (
-          pageX >= rect.x &&
-          pageX <= rect.x + rect.width &&
-          pageY >= rect.y &&
-          pageY <= rect.y + rect.height
-        ) {
-          overColumn = col;
-          break;
-        }
-      }
-
-      if (!overColumn) {
-        // Fall back: use the dragged task's own column.
-        overColumn = allColumns.find((c) => c.id === draggedTask.columnId) ?? null;
-      }
-      if (!overColumn) return null;
-
-      const overColumnId = overColumn.id;
-
-      // Find which task in that column the pointer is over.
-      let overTask: TaskCardData | null = null;
-      for (const t of allTasks) {
-        if (t.columnId !== overColumnId) continue;
-        if (t.id === draggedTask.id) continue;
-        const rect = taskRects.current.get(t.id);
-        if (!rect) continue;
-        if (
-          pageX >= rect.x &&
-          pageX <= rect.x + rect.width &&
-          pageY >= rect.y &&
-          pageY <= rect.y + rect.height
-        ) {
-          overTask = t;
-          break;
-        }
-      }
-
-      const active = {
-        type: "task" as const,
-        id: draggedTask.id,
-        columnId: draggedTask.columnId,
-      };
-
-      const over = overTask
-        ? { type: "task" as const, id: overTask.id, columnId: overTask.columnId }
-        : { type: "column" as const, id: overColumnId, columnId: overColumnId };
-
-      return { dropTarget: computeDropTarget(active, over, allTasks), overColumnId };
-    },
-    [],
-  );
-
-  // ---------------------------------------------------------------------------
-  // Drag callbacks (passed to BoardPager → BoardColumn → TaskCard)
-  // ---------------------------------------------------------------------------
-
-  const handleDragStart = useCallback(
-    (task: TaskCardData, layout: TaskCardLayout) => {
-      haptics.medium();
-      pointerX.value = layout.x + layout.width / 2;
-      pointerY.value = layout.y + layout.height / 2;
-      pointerRef.current = { x: layout.x + layout.width / 2, y: layout.y + layout.height / 2 };
-      dragActiveRef.current = true;
-      setDragState({
-        active: true,
-        task,
-        cardWidth: layout.width,
-        cardHeight: layout.height,
-        dropTargetColumnId: task.columnId,
-      });
-    },
-    [pointerX, pointerY],
-  );
-
-  const handleDragMove = useCallback(
-    (pageX: number, pageY: number) => {
-      // Update ghost position (no React re-render).
-      pointerX.value = pageX;
-      pointerY.value = pageY;
-      pointerRef.current = { x: pageX, y: pageY };
-
-      setDragState((prev) => {
-        if (!prev.active) return prev;
-
-        const result = findDropTarget(pageX, pageY, prev.task);
-        const dropTargetColumnId = result?.overColumnId ?? prev.task.columnId;
-
-        if (prev.dropTargetColumnId === dropTargetColumnId) return prev;
-        return { ...prev, dropTargetColumnId };
-      });
-    },
-    [pointerX, pointerY, findDropTarget],
-  );
-
-  const handleDragEnd = useCallback(() => {
-    dragActiveRef.current = false;
-    setDragState((prev) => {
-      if (!prev.active) return prev;
-
-      const { x, y } = pointerRef.current;
-      const result = findDropTarget(x, y, prev.task);
-      const dropTarget = result?.dropTarget ?? null;
-
-      if (
-        dropTarget &&
-        (dropTarget.columnId !== prev.task.columnId ||
-          dropTarget.position !== prev.task.position)
-      ) {
-        haptics.success();
-        void moveTask(prev.task.id, dropTarget.columnId, dropTarget.position);
-      }
-
-      return { active: false };
-    });
-  }, [findDropTarget, moveTask]);
-
-  // ---------------------------------------------------------------------------
-  // Autoscroll interval — runs while drag is active
-  // ---------------------------------------------------------------------------
-
-  const activeIndexRef = useRef(activeIndex);
-  activeIndexRef.current = activeIndex;
-
-  useEffect(() => {
-    if (!dragState.active) return;
-
-    const EDGE_BAND_VERTICAL = 80; // px from top/bottom of column to trigger vertical scroll
-    const SCROLL_SPEED = 8;         // px per tick (32ms → ~250 px/s)
-    const HORIZONTAL_EDGE = 48;     // px from screen left/right to trigger column snap
-    const HORIZONTAL_THROTTLE = 500; // ms between horizontal snaps
-
-    const tick = setInterval(() => {
-      if (!dragActiveRef.current) return;
-
-      const { x: pageX, y: pageY } = pointerRef.current;
-      const allColumns = columnsRef.current;
-
-      // --- Vertical autoscroll ---
-      // Find the column the pointer is currently over.
-      let activeColumn: (typeof allColumns)[0] | null = null;
-      for (const col of allColumns) {
-        const rect = columnRects.current.get(col.id);
-        if (!rect) continue;
-        if (
-          pageX >= rect.x &&
-          pageX <= rect.x + rect.width &&
-          pageY >= rect.y &&
-          pageY <= rect.y + rect.height
-        ) {
-          activeColumn = col;
-          break;
-        }
-      }
-
-      if (activeColumn) {
-        const rect = columnRects.current.get(activeColumn.id);
-        const columnHandle = columnRefsMap.current.get(activeColumn.id);
-        if (rect && columnHandle) {
-          const currentScroll = columnScrollOffsets.current[activeColumn.id] ?? 0;
-          const topEdge = rect.y + EDGE_BAND_VERTICAL;
-          const bottomEdge = rect.y + rect.height - EDGE_BAND_VERTICAL;
-
-          if (pageY < topEdge && currentScroll > 0) {
-            const nextY = Math.max(0, currentScroll - SCROLL_SPEED);
-            columnHandle.scrollTo(nextY);
-            columnScrollOffsets.current[activeColumn.id] = nextY;
-          } else if (pageY > bottomEdge) {
-            const nextY = currentScroll + SCROLL_SPEED;
-            columnHandle.scrollTo(nextY);
-            columnScrollOffsets.current[activeColumn.id] = nextY;
-          }
-        }
-      }
-
-      // --- Horizontal autoscroll ---
-      const now = Date.now();
-      const idx = activeIndexRef.current;
-      if (now - lastHorizontalScrollAt.current > HORIZONTAL_THROTTLE) {
-        if (pageX < HORIZONTAL_EDGE && idx > 0) {
-          const nextIdx = idx - 1;
-          pagerRef.current?.scrollToIndex(nextIdx, true);
-          setActiveIndex(nextIdx);
-          haptics.light();
-          lastHorizontalScrollAt.current = now;
-        } else if (pageX > windowWidth - HORIZONTAL_EDGE && idx < allColumns.length - 1) {
-          const nextIdx = idx + 1;
-          pagerRef.current?.scrollToIndex(nextIdx, true);
-          setActiveIndex(nextIdx);
-          haptics.light();
-          lastHorizontalScrollAt.current = now;
-        }
-      }
-    }, 32);
-
-    return () => clearInterval(tick);
-  }, [dragState.active, windowWidth]);
-
-  // ---------------------------------------------------------------------------
-  // Measurement callbacks
-  // ---------------------------------------------------------------------------
-
-  const handleColumnMeasure = useCallback((columnId: number, rect: ColumnRect) => {
-    columnRects.current.set(columnId, rect);
-  }, []);
-
-  const handleTaskMeasure = useCallback((taskId: number, rect: TaskRect) => {
-    taskRects.current.set(taskId, rect);
-  }, []);
-
-  const handleScrollUpdate = useCallback((columnId: number, y: number) => {
-    columnScrollOffsets.current[columnId] = y;
-  }, []);
+  const {
+    pointerX,
+    pointerY,
+    dragState,
+    onTaskDrag,
+    onPagerLayout,
+    onPagerScrollUpdate,
+    onColumnScrollUpdate,
+    onColumnContentSizeChange,
+    onTaskMeasure,
+    onColumnHeaderHeight,
+    dropTargetColumnId,
+  } = useBoardDrag({
+    boardId,
+    columns,
+    tasks,
+    windowWidth,
+    pagerRef,
+    columnHandlesRef: columnRefsMap,
+  });
 
   // ---------------------------------------------------------------------------
   // Context menu / other interactions (unchanged)
@@ -549,20 +293,23 @@ export default function BoardDetailScreen() {
             ref={pagerRef}
             columns={columns}
             tasks={tasks ?? []}
-            onActiveColumnChange={setActiveIndex}
+            onActiveColumnChange={(i) => {
+              setActiveIndex(i);
+            }}
             onTaskPress={(task: TaskCardData) => {
               taskSheetRef.current?.open(task.id);
             }}
             onTaskLongPress={handleTaskLongPress}
             onAddTask={openQuickCreate}
             draggingTaskId={dragState.active ? dragState.task.id : null}
-            dropTargetColumnId={dragState.active ? dragState.dropTargetColumnId : null}
-            onTaskDragStart={handleDragStart}
-            onTaskDragMove={handleDragMove}
-            onTaskDragEnd={handleDragEnd}
-            onColumnMeasure={handleColumnMeasure}
-            onTaskMeasure={handleTaskMeasure}
-            onScrollUpdate={handleScrollUpdate}
+            dropTargetColumnId={dropTargetColumnId}
+            onTaskDrag={onTaskDrag}
+            onTaskMeasure={onTaskMeasure}
+            onColumnScrollUpdate={onColumnScrollUpdate}
+            onColumnContentSizeChange={onColumnContentSizeChange}
+            onColumnHeaderHeight={onColumnHeaderHeight}
+            onPagerScrollUpdate={onPagerScrollUpdate}
+            onPagerLayout={onPagerLayout}
             columnRefs={columnRefsMap}
           />
         )}

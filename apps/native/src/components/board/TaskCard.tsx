@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback } from "react";
 import { View, Text, Pressable } from "react-native";
+import type { LayoutChangeEvent } from "react-native";
 import type { TaskCardData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
@@ -17,12 +18,25 @@ export interface TaskCardLayout {
   height: number;
 }
 
-export interface TaskRect {
-  x: number;
-  y: number;
+/**
+ * Card rect in column-content-local coordinates.
+ * `contentX` / `contentY` are the card's position inside the column's
+ * ScrollView content container (as reported by onLayout). This is
+ * stale-proof under parent scroll because the scroll offset is tracked
+ * separately and added at hit-test time.
+ */
+export interface TaskContentRect {
+  contentX: number;
+  contentY: number;
   width: number;
   height: number;
   columnId: number;
+}
+
+export interface TaskDragCallbacks {
+  start: (task: TaskCardData, layout: TaskCardLayout) => void;
+  move: (pageX: number, pageY: number) => void;
+  end: () => void;
 }
 
 interface TaskCardProps {
@@ -30,18 +44,17 @@ interface TaskCardProps {
   onPress: (task: TaskCardData) => void;
   onLongPress?: (task: TaskCardData) => void;
   /**
-   * Called when drag activates (long-press + move). Layout is in screen coords.
-   * When undefined drag is disabled and the card behaves as before.
+   * Drag callbacks bundled together. When undefined the card is not
+   * draggable and GestureDetector is omitted entirely.
    */
-  onDragStart?: (task: TaskCardData, layout: TaskCardLayout) => void;
-  /** Called on every pointer move during drag. Values are absolute screen coords. */
-  onDragMove?: (pageX: number, pageY: number) => void;
-  /** Called when the drag gesture ends (pointer lifted). */
-  onDragEnd?: () => void;
+  onDrag?: TaskDragCallbacks;
   /** When true the card body is rendered transparent so only the ghost is visible. */
   isBeingDragged?: boolean;
-  /** Called with the card's screen rect after layout. Lets the parent track drop targets. */
-  onMeasure?: (taskId: number, rect: TaskRect) => void;
+  /**
+   * Called with the card's column-local rect after every layout.
+   * Lets the parent track drop targets without stale screen coords.
+   */
+  onMeasure?: (taskId: number, rect: TaskContentRect) => void;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -50,9 +63,7 @@ export function TaskCard({
   task,
   onPress,
   onLongPress,
-  onDragStart,
-  onDragMove,
-  onDragEnd,
+  onDrag,
   isBeingDragged = false,
   onMeasure,
 }: TaskCardProps) {
@@ -65,82 +76,38 @@ export function TaskCard({
   const hasChecklist = task.checklistTotal > 0;
   const firstAssigneeName = task.assignees[0]?.name ?? null;
 
+  // Animated ref for worklet-side measurement (gesture start).
   const cardRef = useAnimatedRef<Animated.View>();
-  // Plain View ref for measureInWindow (works from JS thread)
-  const viewRef = useRef<View>(null);
 
-  const measureCard = useCallback(() => {
-    if (!onMeasure) return;
-    const t = setTimeout(() => {
-      viewRef.current?.measureInWindow((x, y, width, height) => {
-        if (width > 0 && height > 0) {
-          onMeasure(task.id, { x, y, width, height, columnId: task.columnId });
-        }
-      });
-    }, 50);
-    return t;
-  }, [onMeasure, task.id, task.columnId]);
-
-  useEffect(() => {
-    const t = measureCard();
-    return () => {
-      if (t !== undefined) clearTimeout(t);
-    };
-  }, [measureCard, task.position, task.columnId]);
-
-  // Only build the drag gesture when callbacks are wired up.
-  const dragGesture = (() => {
-    if (!onDragStart || !onDragMove || !onDragEnd) {
-      // No-op tap so GestureDetector always has a gesture.
-      return Gesture.Tap().maxDuration(0);
-    }
-
-    const safeStart = onDragStart;
-    const safeMove = onDragMove;
-    const safeEnd = onDragEnd;
-
-    return Gesture.Pan()
-      .activateAfterLongPress(300)
-      .onStart(() => {
-        "worklet";
-        const m = measure(cardRef);
-        if (!m) return;
-        runOnJS(safeStart)(task, {
-          x: m.pageX,
-          y: m.pageY,
-          width: m.width,
-          height: m.height,
+  // Report layout in parent-local coords via onLayout on the Pressable itself.
+  // onLayout gives the full border-box including padding, stale-proof under
+  // parent scroll because contentY is relative to the scroll container.
+  const handleLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      if (!onMeasure) return;
+      const { x, y, width, height } = e.nativeEvent.layout;
+      if (width > 0 && height > 0) {
+        onMeasure(task.id, {
+          contentX: x,
+          contentY: y,
+          width,
+          height,
+          columnId: task.columnId,
         });
-      })
-      .onUpdate((e) => {
-        "worklet";
-        // e.absoluteX/Y is the raw pointer position on screen.
-        runOnJS(safeMove)(e.absoluteX, e.absoluteY);
-      })
-      .onEnd(() => {
-        "worklet";
-        runOnJS(safeEnd)();
-      })
-      .onFinalize((_e, success) => {
-        "worklet";
-        // Fire end on cancel as well (e.g. system interrupt).
-        if (!success) {
-          runOnJS(safeEnd)();
-        }
-      });
-  })();
+      }
+    },
+    [onMeasure, task.id, task.columnId],
+  );
 
   const cardContent = (
     <AnimatedPressable
       ref={cardRef}
       onPress={() => onPress(task)}
       onLongPress={onLongPress ? () => onLongPress(task) : undefined}
-      // Use a shorter delay when drag is active so the context-menu fires
-      // only if the user truly taps-and-holds without moving.
       delayLongPress={350}
       accessibilityRole="button"
       accessibilityLabel={task.title}
-      onLayout={measureCard}
+      onLayout={handleLayout}
       style={({ pressed }) => ({
         padding: spacing.md,
         borderRadius: radius.md,
@@ -152,12 +119,6 @@ export function TaskCard({
         opacity: isBeingDragged ? 0 : 1,
       })}
     >
-      {/* Plain View for measureInWindow — Animated.View ref is for worklet measure */}
-      <View
-        ref={viewRef}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-        pointerEvents="none"
-      />
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
         {priorityDot ? (
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: priorityDot }} />
@@ -194,9 +155,40 @@ export function TaskCard({
     </AnimatedPressable>
   );
 
-  if (!onDragStart || !onDragMove || !onDragEnd) {
+  // No drag — return the card without a gesture wrapper.
+  if (!onDrag) {
     return cardContent;
   }
+
+  const { start: safeStart, move: safeMove, end: safeEnd } = onDrag;
+
+  const dragGesture = Gesture.Pan()
+    .activateAfterLongPress(300)
+    .onStart(() => {
+      "worklet";
+      const m = measure(cardRef);
+      if (!m) return;
+      runOnJS(safeStart)(task, {
+        x: m.pageX,
+        y: m.pageY,
+        width: m.width,
+        height: m.height,
+      });
+    })
+    .onUpdate((e) => {
+      "worklet";
+      runOnJS(safeMove)(e.absoluteX, e.absoluteY);
+    })
+    .onEnd(() => {
+      "worklet";
+      runOnJS(safeEnd)();
+    })
+    .onFinalize((_e, success) => {
+      "worklet";
+      if (!success) {
+        runOnJS(safeEnd)();
+      }
+    });
 
   return (
     <GestureDetector gesture={dragGesture}>

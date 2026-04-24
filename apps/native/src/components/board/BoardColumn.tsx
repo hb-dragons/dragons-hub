@@ -1,16 +1,10 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useImperativeHandle, useRef } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
+import type { LayoutChangeEvent } from "react-native";
 import type { TaskCardData, BoardColumnData } from "@dragons/shared";
-import { TaskCard, type TaskCardLayout, type TaskRect } from "./TaskCard";
+import { TaskCard, type TaskContentRect, type TaskDragCallbacks } from "./TaskCard";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
-
-export interface ColumnRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 export interface BoardColumnHandle {
   /** Imperatively scroll the column's ScrollView. */
@@ -26,21 +20,26 @@ interface BoardColumnProps {
   onAddTask: (columnId: number) => void;
   /** ID of the task currently being dragged, used to fade out its placeholder. */
   draggingTaskId?: number | null;
-  /** Called when a task card activates drag. */
-  onTaskDragStart?: (task: TaskCardData, layout: TaskCardLayout) => void;
-  /** Called on every drag move with absolute pointer coords. */
-  onTaskDragMove?: (pageX: number, pageY: number) => void;
-  /** Called when drag ends. */
-  onTaskDragEnd?: () => void;
+  /** Drag callbacks forwarded to each task card. */
+  onTaskDrag?: TaskDragCallbacks;
   /** When set, this column is highlighted as a potential drop target. */
   isDropTarget?: boolean;
-  /** Called when this column's outer container is measured in screen coords. */
-  onColumnMeasure?: (columnId: number, rect: ColumnRect) => void;
-  /** Called when a task card reports its screen rect. */
-  onTaskMeasure?: (taskId: number, rect: TaskRect) => void;
-  /** Called when the scroll position changes. */
-  onScrollUpdate?: (columnId: number, y: number) => void;
+  /** Called when a task card reports its column-local rect. */
+  onTaskMeasure?: (taskId: number, rect: TaskContentRect) => void;
+  /**
+   * Called when the column's scroll position changes.
+   * Also reports the visible viewport height so autoscroll can clamp
+   * without needing a separate callback.
+   */
+  onScrollUpdate?: (columnId: number, scrollY: number, viewportHeight: number) => void;
+  /** Called when the ScrollView content height changes (for autoscroll upper bound). */
+  onContentSizeChange?: (columnId: number, contentHeight: number) => void;
+  /** Called once with the pixel height of the column header above the ScrollView. */
+  onHeaderHeight?: (columnId: number, headerHeight: number) => void;
 }
+
+// Re-export so BoardPager can forward it without importing TaskCard directly.
+export type { TaskDragCallbacks };
 
 export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
   function BoardColumn(
@@ -52,13 +51,12 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
       onTaskLongPress,
       onAddTask,
       draggingTaskId,
-      onTaskDragStart,
-      onTaskDragMove,
-      onTaskDragEnd,
+      onTaskDrag,
       isDropTarget = false,
-      onColumnMeasure,
       onTaskMeasure,
       onScrollUpdate,
+      onContentSizeChange,
+      onHeaderHeight,
     },
     ref,
   ) {
@@ -68,7 +66,6 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
       .sort((a, b) => a.position - b.position);
 
     const scrollRef = useRef<ScrollView | null>(null);
-    const outerRef = useRef<View | null>(null);
 
     useImperativeHandle(ref, () => ({
       scrollTo: (y: number) => {
@@ -76,31 +73,12 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
       },
     }), []);
 
-    const measureColumn = useCallback(() => {
-      if (!onColumnMeasure) return;
-      const t = setTimeout(() => {
-        outerRef.current?.measureInWindow((x, y, w, h) => {
-          if (w > 0 && h > 0) {
-            onColumnMeasure(column.id, { x, y, width: w, height: h });
-          }
-        });
-      }, 50);
-      return t;
-    }, [onColumnMeasure, column.id]);
-
-    useEffect(() => {
-      const t = measureColumn();
-      return () => {
-        if (t !== undefined) clearTimeout(t);
-      };
-    }, [measureColumn, width]);
+    const handleHeaderLayout = (e: LayoutChangeEvent) => {
+      onHeaderHeight?.(column.id, e.nativeEvent.layout.height);
+    };
 
     return (
-      <View
-        ref={outerRef}
-        style={{ width, paddingHorizontal: spacing.sm }}
-        onLayout={measureColumn}
-      >
+      <View style={{ width, paddingHorizontal: spacing.sm }}>
         <View
           style={{
             flex: 1,
@@ -112,6 +90,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
           }}
         >
           <View
+            onLayout={handleHeaderLayout}
             style={{
               paddingHorizontal: spacing.md,
               paddingTop: spacing.md,
@@ -155,7 +134,14 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
             showsVerticalScrollIndicator={false}
             scrollEventThrottle={16}
             onScroll={(e) => {
-              onScrollUpdate?.(column.id, e.nativeEvent.contentOffset.y);
+              onScrollUpdate?.(
+                column.id,
+                e.nativeEvent.contentOffset.y,
+                e.nativeEvent.layoutMeasurement.height,
+              );
+            }}
+            onContentSizeChange={(_w, h) => {
+              onContentSizeChange?.(column.id, h);
             }}
           >
             {columnTasks.map((t) => (
@@ -165,9 +151,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
                 onPress={onTaskPress}
                 onLongPress={onTaskLongPress}
                 isBeingDragged={t.id === draggingTaskId}
-                onDragStart={onTaskDragStart}
-                onDragMove={onTaskDragMove}
-                onDragEnd={onTaskDragEnd}
+                onDrag={onTaskDrag}
                 onMeasure={onTaskMeasure}
               />
             ))}
