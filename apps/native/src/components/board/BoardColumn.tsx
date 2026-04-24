@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, Pressable } from "react-native";
 import type { TaskCardData, BoardColumnData } from "@dragons/shared";
-import { TaskCard } from "./TaskCard";
+import { TaskCard, type TaskCardLayout } from "./TaskCard";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 
@@ -11,6 +11,16 @@ interface BoardColumnProps {
   onTaskPress: (task: TaskCardData) => void;
   onTaskLongPress?: (task: TaskCardData) => void;
   onAddTask: (columnId: number) => void;
+  /** ID of the task currently being dragged, used to fade out its placeholder. */
+  draggingTaskId?: number | null;
+  /** Called when a task card activates drag. */
+  onTaskDragStart?: (task: TaskCardData, layout: TaskCardLayout) => void;
+  /** Called on every drag move with absolute pointer coords. */
+  onTaskDragMove?: (pageX: number, pageY: number) => void;
+  /** Called when drag ends. */
+  onTaskDragEnd?: () => void;
+  /** When set, this column is highlighted as a potential drop target. */
+  isDropTarget?: boolean;
 }
 
 export function BoardColumn({
@@ -20,6 +30,11 @@ export function BoardColumn({
   onTaskPress,
   onTaskLongPress,
   onAddTask,
+  draggingTaskId,
+  onTaskDragStart,
+  onTaskDragMove,
+  onTaskDragEnd,
+  isDropTarget = false,
 }: BoardColumnProps) {
   const { colors, spacing, radius } = useTheme();
   const columnTasks = tasks
@@ -34,6 +49,8 @@ export function BoardColumn({
           backgroundColor: colors.surfaceLow,
           borderRadius: radius.md,
           overflow: "hidden",
+          borderWidth: isDropTarget ? 2 : 0,
+          borderColor: isDropTarget ? colors.primary : "transparent",
         }}
       >
         <View
@@ -84,6 +101,10 @@ export function BoardColumn({
               task={t}
               onPress={onTaskPress}
               onLongPress={onTaskLongPress}
+              isBeingDragged={t.id === draggingTaskId}
+              onDragStart={onTaskDragStart}
+              onDragMove={onTaskDragMove}
+              onDragEnd={onTaskDragEnd}
             />
           ))}
           <Pressable

@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
 import { BoardColumn } from "./BoardColumn";
+import type { TaskCardLayout } from "./TaskCard";
 
 export interface BoardPagerHandle {
   scrollToIndex: (i: number, animated?: boolean) => void;
@@ -19,11 +20,30 @@ interface BoardPagerProps {
   onTaskPress: (task: TaskCardData) => void;
   onTaskLongPress?: (task: TaskCardData) => void;
   onAddTask: (columnId: number) => void;
+  /** ID of the task being dragged — fades out its placeholder. */
+  draggingTaskId?: number | null;
+  /** Column ID that is currently a valid drop target. */
+  dropTargetColumnId?: number | null;
+  onTaskDragStart?: (task: TaskCardData, layout: TaskCardLayout) => void;
+  onTaskDragMove?: (pageX: number, pageY: number) => void;
+  onTaskDragEnd?: () => void;
 }
 
 export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
   function BoardPager(
-    { columns, tasks, onActiveColumnChange, onTaskPress, onTaskLongPress, onAddTask },
+    {
+      columns,
+      tasks,
+      onActiveColumnChange,
+      onTaskPress,
+      onTaskLongPress,
+      onAddTask,
+      draggingTaskId,
+      dropTargetColumnId,
+      onTaskDragStart,
+      onTaskDragMove,
+      onTaskDragEnd,
+    },
     ref,
   ) {
     const scrollRef = useRef<ScrollView | null>(null);
@@ -67,6 +87,11 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
             onTaskPress={onTaskPress}
             onTaskLongPress={onTaskLongPress}
             onAddTask={onAddTask}
+            draggingTaskId={draggingTaskId}
+            isDropTarget={col.id === dropTargetColumnId}
+            onTaskDragStart={onTaskDragStart}
+            onTaskDragMove={onTaskDragMove}
+            onTaskDragEnd={onTaskDragEnd}
           />
         ))}
       </ScrollView>
