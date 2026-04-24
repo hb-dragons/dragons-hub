@@ -238,6 +238,13 @@
       "clear": "Clear",
       "set": "Set"
     },
+    "assignees": {
+      "searchPlaceholder": "Search users",
+      "empty": "No users found.",
+      "none": "Unassigned",
+      "title": "Assignees",
+      "count": "%{count} assignees"
+    },
     "column": {
       "addCard": "+ Add card"
     }

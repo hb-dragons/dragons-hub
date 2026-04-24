@@ -238,6 +238,13 @@
       "clear": "Entfernen",
       "set": "Setzen"
     },
+    "assignees": {
+      "searchPlaceholder": "Benutzer suchen",
+      "empty": "Keine Benutzer gefunden.",
+      "none": "Nicht zugewiesen",
+      "title": "Zugewiesene",
+      "count": "%{count} zugewiesen"
+    },
     "column": {
       "addCard": "+ Karte"
     }

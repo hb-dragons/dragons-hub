@@ -2,9 +2,11 @@ import { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import type { TaskDetail } from "@dragons/shared";
+import { useAssigneeMutations } from "@/hooks/board/useAssigneeMutations";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { AssigneePickerSheet, type AssigneePickerHandle } from "./AssigneePickerSheet";
 import { PriorityPickerSheet, type PriorityPickerHandle } from "./PriorityPickerSheet";
 import { DuePickerSheet, type DuePickerHandle } from "./DuePickerSheet";
 
@@ -16,6 +18,8 @@ interface Props {
 export function TaskDetailBody({ task, boardId }: Props) {
   const { colors, spacing, radius } = useTheme();
   const mutations = useTaskMutations(boardId);
+  const assigneeMutations = useAssigneeMutations(boardId);
+  const assigneePickerRef = useRef<AssigneePickerHandle>(null);
   const priorityRef = useRef<PriorityPickerHandle>(null);
   const dueRef = useRef<DuePickerHandle>(null);
 
@@ -33,6 +37,13 @@ export function TaskDetailBody({ task, boardId }: Props) {
     if (next === task.description) return;
     await mutations.setDescription(task.id, next);
   };
+
+  const assigneeSummary =
+    task.assignees.length === 0
+      ? i18n.t("board.assignees.none")
+      : task.assignees.length === 1
+        ? (task.assignees[0]?.name ?? i18n.t("board.task.unnamedUser"))
+        : i18n.t("board.assignees.count", { count: task.assignees.length });
 
   const rowStyle = {
     flexDirection: "row" as const,
@@ -84,6 +95,28 @@ export function TaskDetailBody({ task, boardId }: Props) {
 
         <Pressable
           onPress={() =>
+            assigneePickerRef.current?.open(
+              task.id,
+              task.assignees,
+              async (userId, add) => {
+                if (add) await assigneeMutations.add(task.id, userId);
+                else await assigneeMutations.remove(task.id, userId);
+              },
+            )
+          }
+          accessibilityRole="button"
+          style={rowStyle}
+        >
+          <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>
+            {i18n.t("board.assignees.title")}
+          </Text>
+          <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>
+            {assigneeSummary}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() =>
             priorityRef.current?.open(task.priority, (p) => {
               void mutations.setPriority(task.id, p);
             })
@@ -119,6 +152,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
         </Pressable>
       </BottomSheetScrollView>
 
+      <AssigneePickerSheet ref={assigneePickerRef} />
       <PriorityPickerSheet ref={priorityRef} />
       <DuePickerSheet ref={dueRef} />
     </>
