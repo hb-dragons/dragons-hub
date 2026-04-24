@@ -16,12 +16,15 @@ import { PriorityPickerSheet, type PriorityPickerHandle } from "@/components/boa
 import { DuePickerSheet, type DuePickerHandle } from "@/components/board/DuePickerSheet";
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
+import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
 import type { BoardColumnHandle, ColumnRect } from "@/components/board/BoardColumn";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
+import { authClient } from "@/lib/auth-client";
 import { computeDropTarget } from "@dragons/shared";
 import type { TaskCardData } from "@dragons/shared";
+import type { TaskListFilters } from "@dragons/api-client";
 import type { TaskCardLayout, TaskRect } from "@/components/board/TaskCard";
 
 // ---------------------------------------------------------------------------
@@ -49,7 +52,44 @@ export default function BoardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = Number(id);
   const { data: board, isLoading: boardLoading } = useBoard(boardId);
-  const { data: tasks, isLoading: tasksLoading } = useBoardTasks(boardId);
+
+  const [filters, setFilters] = useState<BoardFilters>({
+    mine: false,
+    priority: null,
+    dueSoon: false,
+    unassigned: false,
+  });
+
+  const currentUserId = authClient.useSession().data?.user?.id ?? null;
+
+  const apiFilters = useMemo<TaskListFilters | undefined>(() => {
+    const f: TaskListFilters = {};
+    if (filters.priority) f.priority = filters.priority;
+    return Object.keys(f).length ? f : undefined;
+  }, [filters.priority]);
+
+  const { data: rawTasks, isLoading: tasksLoading } = useBoardTasks(boardId, apiFilters);
+
+  const tasks = useMemo(() => {
+    if (!rawTasks) return rawTasks;
+    return rawTasks.filter((t) => {
+      if (filters.mine && currentUserId) {
+        if (!t.assignees.some((a) => a.userId === currentUserId)) return false;
+      }
+      if (filters.dueSoon) {
+        if (!t.dueDate) return false;
+        const d = new Date(t.dueDate);
+        const now = Date.now();
+        if (d.getTime() < now) return false;
+        if (d.getTime() > now + 7 * 24 * 60 * 60 * 1000) return false;
+      }
+      if (filters.unassigned) {
+        if (t.assignees.length > 0) return false;
+      }
+      return true;
+    });
+  }, [rawTasks, filters, currentUserId]);
+
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
@@ -397,6 +437,16 @@ export default function BoardDetailScreen() {
     [columns, countsByColumn, moveTask, taskMutations],
   );
 
+  const onPressPriorityChip = useCallback(() => {
+    if (filters.priority != null) {
+      setFilters((f) => ({ ...f, priority: null }));
+      return;
+    }
+    priorityPickerRef.current?.open("normal", (p) => {
+      setFilters((f) => ({ ...f, priority: p }));
+    });
+  }, [filters.priority]);
+
   const openQuickCreate = useCallback(
     (columnId: number) => {
       quickCreateRef.current?.open({
@@ -442,9 +492,16 @@ export default function BoardDetailScreen() {
       <Stack.Screen options={{ title: board.name }} />
       <BoardHeader
         columns={columns}
-        tasks={tasks ?? []}
+        tasks={rawTasks ?? []}
         activeColumnIndex={activeIndex}
         onPillPress={onPillPress}
+      />
+      <FilterChips
+        filters={filters}
+        onToggleMine={() => setFilters((f) => ({ ...f, mine: !f.mine }))}
+        onPressPriority={onPressPriorityChip}
+        onToggleDueSoon={() => setFilters((f) => ({ ...f, dueSoon: !f.dueSoon }))}
+        onToggleUnassigned={() => setFilters((f) => ({ ...f, unassigned: !f.unassigned }))}
       />
       <View style={{ flex: 1 }}>
         {tasksLoading && !tasks ? (

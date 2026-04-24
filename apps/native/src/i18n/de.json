@@ -256,8 +256,16 @@
       "count": "%{count} zugewiesen"
     },
     "column": {
-      "addCard": "+ Karte"
+      "addCard": "+ Karte",
+      "empty": "Aufgaben hier ablegen"
     },
+    "filters": {
+      "mine": "Meine",
+      "priority": "Priorität",
+      "dueSoon": "Bald fällig",
+      "unassigned": "Nicht zugewiesen"
+    },
+    "refresh": "Aktualisieren",
     "checklist": {
       "title": "Checkliste",
       "addPlaceholder": "Eintrag hinzufügen",

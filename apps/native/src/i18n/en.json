@@ -256,8 +256,16 @@
       "count": "%{count} assignees"
     },
     "column": {
-      "addCard": "+ Add card"
+      "addCard": "+ Add card",
+      "empty": "Drop tasks here"
     },
+    "filters": {
+      "mine": "Mine",
+      "priority": "Priority",
+      "dueSoon": "Due soon",
+      "unassigned": "Unassigned"
+    },
+    "refresh": "Refresh",
     "checklist": {
       "title": "Checklist",
       "addPlaceholder": "Add item",
