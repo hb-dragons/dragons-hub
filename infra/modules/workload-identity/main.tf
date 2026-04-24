@@ -74,6 +74,7 @@ locals {
     "roles/resourcemanager.projectIamAdmin",
     "roles/networkconnectivity.admin",
     "roles/memorystore.admin",
+    "roles/logging.configWriter",
   ]
 }
 
