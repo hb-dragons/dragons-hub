@@ -20,6 +20,7 @@ import type {
 } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import { publishDomainEvent, type TransactionClient } from "../events/event-publisher";
+import { truncateForPreview } from "../notifications/templates/task";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "task.service" });
@@ -822,7 +823,7 @@ export async function addComment(
     if (recipients.length > 0) {
       const ctx = await loadBoardAndActor(tx, task.boardId, callerId);
       if (ctx) {
-        const preview = data.body.length <= 140 ? data.body : `${data.body.slice(0, 140)}…`;
+        const preview = truncateForPreview(data.body);
         await emitTaskEvent({
           type: EVENT_TYPES.TASK_COMMENT_ADDED,
           taskId: task.id,
