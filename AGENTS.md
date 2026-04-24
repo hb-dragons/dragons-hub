@@ -86,7 +86,7 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `taskChecklistItems` | `packages/db/src/schema/tasks.ts` | taskId FK (cascade), label, isChecked, checkedBy, position |
 | `taskComments` | `packages/db/src/schema/tasks.ts` | taskId FK (cascade), authorId, body |
 | `notifications` | `packages/db/src/schema/notifications.ts` | recipientId, channel, title, body, status, sentAt, errorMessage |
-| `userNotificationPreferences` | `packages/db/src/schema/notifications.ts` | userId (unique), whatsappEnabled, whatsappNumber, notifyOnTaskAssigned, notifyOnBookingNeedsAction, notifyOnTaskComment |
+| `userNotificationPreferences` | `packages/db/src/schema/notifications.ts` | userId (unique), whatsappEnabled, whatsappNumber, locale, mutedEventTypes (text[]). Per-event opt-outs live in mutedEventTypes; the user-toggleable catalog is in packages/shared/src/notification-events.ts. |
 | `syncRuns` | `packages/db/src/schema/sync-runs.ts` | syncType, status, triggeredBy, records*, durationMs, summary JSONB |
 | `syncRunEntries` | `packages/db/src/schema/sync-runs.ts` | syncRunId FK (cascade), entityType, action, metadata JSONB |
 | `syncSchedule` | `packages/db/src/schema/sync-runs.ts` | enabled, cronExpression, timezone |
@@ -184,6 +184,50 @@ Wrapper around basketball-bund-sdk at `services/sync/sdk-client.ts`:
 - Rate limiting: 15 burst, 10/sec refill
 - Batch game details: 10 concurrent requests max
 - Methods: `getAllLigen()`, `getSpielplan()`, `getTabelle()`, `getTabelleResponse()`, `getGameDetails()`, `getGameDetailsBatch()`, `searchClubs()`, `getClubMatches()`
+
+## Domain Events
+
+Event types are defined in `packages/shared/src/domain-events.ts`. Events are published to the outbox, picked up by the event.worker, and dispatched to notification channels.
+
+### Match Events
+
+- `match.created` — New match discovered via sync
+- `match.schedule.changed` — Match kickoff date/time altered
+- `match.venue.changed` — Match venue reassigned
+- `match.cancelled` — Match cancelled
+- `match.forfeited` — Match forfeited
+- `match.score.changed` — Match score updated
+- `match.confirmed` — Match finalized
+- `match.removed` — Match deleted from remote API
+- `match.result_entered` — Result initially recorded
+- `match.result_changed` — Result score corrected
+
+### Referee Events
+
+- `referee.assigned` — Referee assigned to match slot
+- `referee.unassigned` — Referee removed from match slot
+- `referee.reassigned` — Referee replaced on match slot
+- `referee.slots.needed` — Match has open slots requiring assignment
+- `referee.slots.reminder` — Reminders for open referee slots
+
+### Booking Events
+
+- `booking.created` — Venue booking created
+- `booking.status.changed` — Booking status or times updated
+- `booking.needs_reconfirmation` — Booking flagged for reconfirmation
+
+### Override Events
+
+- `override.applied` — Local field override applied
+- `override.conflict` — Override conflicts with remote data
+- `override.reverted` — Override removed
+
+### Task Events
+
+- `task.assigned` — User added to task assignees (emitted by createTask initial set, updateTask assignee diff, or addAssignee)
+- `task.unassigned` — User removed from task assignees
+- `task.comment.added` — Comment posted on task (recipients = current assignees minus author)
+- `task.due.reminder` — Emitted 24h before and on the morning of task due date by task reminder worker; skipped for tasks whose column is flagged `isDoneColumn`
 
 ## API Endpoints
 
@@ -343,9 +387,9 @@ Match list and detail responses include associated venue booking data when avail
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/notifications` | List notifications |
-| PATCH | `/admin/notifications/preferences` | Update notification preferences |
+| GET | `/admin/notifications/preferences` | Get the calling user's own notification preferences. Returns `{ mutedEventTypes: string[], locale: "de" \| "en" }`. Any authenticated user may call this. |
+| PATCH | `/admin/notifications/preferences` | Update the calling user's own notification preferences. Body: `{ mutedEventTypes?: string[], locale?: "de" \| "en" }`. Rejects event types not in the shared `USER_TOGGLEABLE_EVENTS` catalog. |
 | PATCH | `/admin/notifications/:id/read` | Mark notification as read |
-| GET | `/admin/notifications/preferences` | Get notification preferences |
 | POST | `/admin/notifications/test-push` | Send a test push to the caller's own registered devices. Body: `{ message?: string }`. Returns device count + per-ticket status. |
 | GET | `/admin/notifications/test-push/recent` | Last 10 test push results for the caller (for admin test UI). |
 
@@ -590,6 +634,7 @@ Located in `apps/api/src/workers/`. Queues configured in `workers/queues.ts`.
 - **event.worker** — Fan-out for domain events into per-recipient notification dispatch.
 - **digest.worker** — Aggregates buffered events into daily digest notifications.
 - **referee-reminder.worker** — Scheduled reminders for open referee slots.
+- **task-reminder.worker** — Repeatable sweep every 15 minutes, driven by `apps/api/src/workers/task-reminder.worker.ts`. Loads tasks whose due date is within the next 24 hours (lead) or today past 08:00 UTC (day-of), whose column is not flagged `isDoneColumn`, and whose corresponding `lead_reminder_sent_at` / `due_reminder_sent_at` has not yet fired. Emits `task.due.reminder` events via the outbox.
 - **push-receipt.worker** — Cron, runs every 15 minutes (queue `push-receipt`). Polls Expo Push receipts for `sent_ticket` rows in `notification_log`, marks them `delivered` or `failed`, and purges `push_devices` rows whose tokens returned `DeviceNotRegistered`.
 
 ### Redis
