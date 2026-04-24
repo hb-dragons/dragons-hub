@@ -228,7 +228,15 @@
       "idLabel": "#%{id}",
       "priority": "Priority",
       "due": "Due",
-      "noDue": "No due date"
+      "noDue": "No due date",
+      "deleteConfirmTitle": "Delete task?",
+      "deleteConfirmMessage": "This cannot be undone.",
+      "actions": {
+        "moveTo": "Move to…",
+        "setPriority": "Set priority",
+        "setDue": "Set due date",
+        "delete": "Delete task"
+      }
     },
     "priority": {
       "low": "Low",

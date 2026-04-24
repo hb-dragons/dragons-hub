@@ -228,7 +228,15 @@
       "idLabel": "#%{id}",
       "priority": "Priorität",
       "due": "Fällig",
-      "noDue": "Kein Fälligkeitsdatum"
+      "noDue": "Kein Fälligkeitsdatum",
+      "deleteConfirmTitle": "Aufgabe löschen?",
+      "deleteConfirmMessage": "Das kann nicht rückgängig gemacht werden.",
+      "actions": {
+        "moveTo": "Verschieben nach…",
+        "setPriority": "Priorität setzen",
+        "setDue": "Fälligkeit setzen",
+        "delete": "Aufgabe löschen"
+      }
     },
     "priority": {
       "low": "Niedrig",

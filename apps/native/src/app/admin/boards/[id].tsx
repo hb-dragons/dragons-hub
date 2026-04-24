@@ -1,12 +1,19 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { Alert, View, Text, ActivityIndicator } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
+import { useTaskMutations } from "@/hooks/board/useTaskMutations";
+import { useMoveTask } from "@/hooks/board/useMoveTask";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager";
 import { TaskDetailSheet, type TaskDetailSheetHandle } from "@/components/board/TaskDetailSheet";
+import { TaskContextMenu, type TaskContextMenuHandle } from "@/components/board/TaskContextMenu";
+import { MoveToSheet, type MoveToSheetHandle } from "@/components/board/MoveToSheet";
+import { PriorityPickerSheet, type PriorityPickerHandle } from "@/components/board/PriorityPickerSheet";
+import { DuePickerSheet, type DuePickerHandle } from "@/components/board/DuePickerSheet";
 import { useTheme } from "@/hooks/useTheme";
+import { i18n } from "@/lib/i18n";
 import type { TaskCardData } from "@dragons/shared";
 
 export default function BoardDetailScreen() {
@@ -18,16 +25,69 @@ export default function BoardDetailScreen() {
   const [activeIndex, setActiveIndex] = useState(0);
   const pagerRef = useRef<BoardPagerHandle | null>(null);
   const taskSheetRef = useRef<TaskDetailSheetHandle | null>(null);
+  const contextMenuRef = useRef<TaskContextMenuHandle | null>(null);
+  const moveToSheetRef = useRef<MoveToSheetHandle | null>(null);
+  const priorityPickerRef = useRef<PriorityPickerHandle | null>(null);
+  const duePickerRef = useRef<DuePickerHandle | null>(null);
+  const taskMutations = useTaskMutations(boardId);
+  const moveTask = useMoveTask(boardId);
 
   const columns = useMemo(
     () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
     [board],
   );
 
+  const countsByColumn = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const t of tasks ?? []) m.set(t.columnId, (m.get(t.columnId) ?? 0) + 1);
+    return m;
+  }, [tasks]);
+
   const onPillPress = useCallback((i: number) => {
     setActiveIndex(i);
     pagerRef.current?.scrollToIndex(i, true);
   }, []);
+
+  const handleTaskLongPress = useCallback((task: TaskCardData) => {
+    contextMenuRef.current?.open({
+      task,
+      onAction: (action) => {
+        if (action === "move") {
+          moveToSheetRef.current?.open({
+            task,
+            columns,
+            countsByColumn,
+            onMove: async (columnId, position) => {
+              await moveTask(task.id, columnId, position);
+            },
+          });
+        } else if (action === "priority") {
+          priorityPickerRef.current?.open(task.priority, (p) => {
+            void taskMutations.setPriority(task.id, p);
+          });
+        } else if (action === "due") {
+          duePickerRef.current?.open(task.dueDate, (iso) => {
+            void taskMutations.setDueDate(task.id, iso);
+          });
+        } else if (action === "delete") {
+          Alert.alert(
+            i18n.t("board.task.deleteConfirmTitle"),
+            i18n.t("board.task.deleteConfirmMessage"),
+            [
+              { text: i18n.t("common.cancel"), style: "cancel" },
+              {
+                text: i18n.t("common.delete"),
+                style: "destructive",
+                onPress: () => {
+                  void taskMutations.deleteTask(task.id);
+                },
+              },
+            ],
+          );
+        }
+      },
+    });
+  }, [columns, countsByColumn, moveTask, taskMutations]);
 
   if (boardLoading && !board) {
     return (
@@ -65,6 +125,7 @@ export default function BoardDetailScreen() {
             onTaskPress={(task: TaskCardData) => {
               taskSheetRef.current?.open(task.id);
             }}
+            onTaskLongPress={handleTaskLongPress}
             onAddTask={() => {
               /* wired in Phase 10 */
             }}
@@ -72,6 +133,10 @@ export default function BoardDetailScreen() {
         )}
       </View>
       <TaskDetailSheet ref={taskSheetRef} boardId={boardId} />
+      <TaskContextMenu ref={contextMenuRef} />
+      <MoveToSheet ref={moveToSheetRef} />
+      <PriorityPickerSheet ref={priorityPickerRef} />
+      <DuePickerSheet ref={duePickerRef} />
     </View>
   );
 }
