@@ -36,6 +36,8 @@ export const tasks = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+    leadReminderSentAt: timestamp("lead_reminder_sent_at", { withTimezone: true }),
+    dueReminderSentAt: timestamp("due_reminder_sent_at", { withTimezone: true }),
   },
   (table) => ({
     boardIdIdx: index("tasks_board_id_idx").on(table.boardId),

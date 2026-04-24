@@ -1,7 +1,6 @@
 import { db } from "../../config/database";
 import { logger } from "../../config/logger";
-import { notifications, userNotificationPreferences } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
+import { notifications } from "@dragons/db/schema";
 
 const log = logger.child({ service: "notification" });
 
@@ -11,35 +10,6 @@ interface SendNotificationParams {
   recipientId: string;
   title: string;
   body: string;
-}
-
-interface UserPrefs {
-  notifyOnTaskAssigned: boolean;
-  notifyOnBookingNeedsAction: boolean;
-  notifyOnTaskComment: boolean;
-}
-
-const DEFAULT_PREFS: UserPrefs = {
-  notifyOnTaskAssigned: true,
-  notifyOnBookingNeedsAction: true,
-  notifyOnTaskComment: true,
-};
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-async function getUserPrefs(userId: string): Promise<UserPrefs> {
-  const [row] = await db
-    .select({
-      notifyOnTaskAssigned: userNotificationPreferences.notifyOnTaskAssigned,
-      notifyOnBookingNeedsAction:
-        userNotificationPreferences.notifyOnBookingNeedsAction,
-      notifyOnTaskComment: userNotificationPreferences.notifyOnTaskComment,
-    })
-    .from(userNotificationPreferences)
-    .where(eq(userNotificationPreferences.userId, userId))
-    .limit(1);
-
-  return row ?? DEFAULT_PREFS;
 }
 
 // ── sendNotification ────────────────────────────────────────────────────────
@@ -69,16 +39,6 @@ export async function notifyTaskAssigned(
   assigneeId: string,
   taskTitle: string,
 ): Promise<void> {
-  const prefs = await getUserPrefs(assigneeId);
-
-  if (!prefs.notifyOnTaskAssigned) {
-    log.info(
-      { taskId, assigneeId },
-      "Task assigned notification suppressed by user preference",
-    );
-    return;
-  }
-
   await sendNotification({
     recipientId: assigneeId,
     title: `Task assigned: ${taskTitle}`,
@@ -94,16 +54,6 @@ export async function notifyBookingNeedsAction(
   venueName: string,
   date: string,
 ): Promise<void> {
-  const prefs = await getUserPrefs(assigneeId);
-
-  if (!prefs.notifyOnBookingNeedsAction) {
-    log.info(
-      { venueBookingId, assigneeId },
-      "Booking needs action notification suppressed by user preference",
-    );
-    return;
-  }
-
   await sendNotification({
     recipientId: assigneeId,
     title: `Venue booking needs attention: ${venueName} on ${date}`,
@@ -119,16 +69,6 @@ export async function notifyTaskComment(
   commenterName: string,
   taskTitle: string,
 ): Promise<void> {
-  const prefs = await getUserPrefs(assigneeId);
-
-  if (!prefs.notifyOnTaskComment) {
-    log.info(
-      { taskId, assigneeId },
-      "Task comment notification suppressed by user preference",
-    );
-    return;
-  }
-
   await sendNotification({
     recipientId: assigneeId,
     title: `${commenterName} commented on: ${taskTitle}`,

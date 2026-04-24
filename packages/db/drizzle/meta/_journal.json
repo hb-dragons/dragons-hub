@@ -218,6 +218,13 @@
       "when": 1776971771667,
       "tag": "0030_fair_human_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1777012352919,
+      "tag": "0031_free_talon",
+      "breakpoints": true
     }
   ]
 }
