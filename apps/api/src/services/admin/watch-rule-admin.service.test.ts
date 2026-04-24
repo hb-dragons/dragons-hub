@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { FilterCondition, ChannelTarget } from "@dragons/shared";
 
 // --- Mock setup ---
 
@@ -316,7 +317,7 @@ describe("updateWatchRule", () => {
     const chain = buildChain([row]);
     mockUpdate.mockReturnValueOnce(chain);
 
-    const filters = [{ field: "teamId", operator: "eq", value: "99" }];
+    const filters: FilterCondition[] = [{ field: "teamId", operator: "eq", value: "99" }];
     await updateWatchRule(5, { filters });
 
     const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
@@ -328,7 +329,7 @@ describe("updateWatchRule", () => {
     const chain = buildChain([row]);
     mockUpdate.mockReturnValueOnce(chain);
 
-    const channels = [{ channel: "push", targetId: "ch-1" }];
+    const channels: ChannelTarget[] = [{ channel: "push", targetId: "ch-1" }];
     await updateWatchRule(6, { channels });
 
     const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;

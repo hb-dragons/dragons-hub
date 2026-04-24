@@ -296,13 +296,13 @@ describe("updateChannelConfig", () => {
   });
 
   it("sets digestMode when provided", async () => {
-    const row = makeDbRow({ digestMode: "daily" });
+    const row = makeDbRow({ digestMode: "scheduled" });
     const updateChain = setupUpdateChain([row]);
 
-    await updateChannelConfig(1, { digestMode: "daily" });
+    await updateChannelConfig(1, { digestMode: "scheduled" });
 
     const setCall = updateChain.set.mock.calls[0]![0] as Record<string, unknown>;
-    expect(setCall.digestMode).toBe("daily");
+    expect(setCall.digestMode).toBe("scheduled");
   });
 
   it("sets digestCron when provided", async () => {
@@ -354,7 +354,7 @@ describe("toItem mapping", () => {
       type: "email",
       enabled: false,
       config: { locale: "en" as const },
-      digestMode: "daily",
+      digestMode: "scheduled",
       digestCron: "0 8 * * *",
       digestTimezone: "America/New_York",
       createdAt,
@@ -376,7 +376,7 @@ describe("toItem mapping", () => {
       type: "email",
       enabled: false,
       config: { locale: "en" as const },
-      digestMode: "daily",
+      digestMode: "scheduled",
       digestCron: "0 8 * * *",
       digestTimezone: "America/New_York",
       createdAt: "2026-01-15T12:30:00.000Z",
