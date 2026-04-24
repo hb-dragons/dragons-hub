@@ -37,24 +37,42 @@ const {
   mockGetJobs,
   mockGetJob,
   mockLimit,
-} = vi.hoisted(() => ({
-  mockAdd: vi.fn().mockResolvedValue({ id: "job-1" }),
-  mockGetRepeatableJobs: vi.fn().mockResolvedValue([]),
-  mockRemoveRepeatableByKey: vi.fn().mockResolvedValue(undefined),
-  mockGetJobs: vi.fn().mockResolvedValue([]),
-  mockGetJob: vi.fn(),
-  mockLimit: vi.fn().mockResolvedValue([]),
-}));
+  taskRemindersQueueInstance,
+} = vi.hoisted(() => {
+  const taskRemindersQueueMocks = {
+    add: vi.fn().mockResolvedValue({ id: "job-1" }),
+    getRepeatableJobs: vi.fn().mockResolvedValue([]),
+    removeRepeatableByKey: vi.fn().mockResolvedValue(undefined),
+  };
+  return {
+    mockAdd: vi.fn().mockResolvedValue({ id: "job-1" }),
+    mockGetRepeatableJobs: vi.fn().mockResolvedValue([]),
+    mockRemoveRepeatableByKey: vi.fn().mockResolvedValue(undefined),
+    mockGetJobs: vi.fn().mockResolvedValue([]),
+    mockGetJob: vi.fn(),
+    mockLimit: vi.fn().mockResolvedValue([]),
+    taskRemindersQueueInstance: taskRemindersQueueMocks,
+  };
+});
 
 vi.mock("bullmq", () => ({
   Queue: class MockQueue {
     name: string;
     constructor(name: string) {
       this.name = name;
+      if (name === "task-reminders") {
+        this.add = taskRemindersQueueInstance.add;
+        this.getRepeatableJobs = taskRemindersQueueInstance.getRepeatableJobs;
+        this.removeRepeatableByKey = taskRemindersQueueInstance.removeRepeatableByKey;
+      } else {
+        this.add = mockAdd;
+        this.getRepeatableJobs = mockGetRepeatableJobs;
+        this.removeRepeatableByKey = mockRemoveRepeatableByKey;
+      }
     }
-    add = mockAdd;
-    getRepeatableJobs = mockGetRepeatableJobs;
-    removeRepeatableByKey = mockRemoveRepeatableByKey;
+    add: any;
+    getRepeatableJobs: any;
+    removeRepeatableByKey: any;
     getJobs = mockGetJobs;
     getJob = mockGetJob;
     close = vi.fn();
@@ -68,6 +86,8 @@ import {
   getJobStatus,
   updateSyncSchedule,
   updateRefereeSyncSchedule,
+  initTaskReminders,
+  taskRemindersQueue,
 } from "./queues";
 
 beforeEach(() => {
@@ -384,5 +404,40 @@ describe("triggerRefereeGamesSync", () => {
     await triggerRefereeGamesSync("cron");
 
     expect(mockInsert).toHaveBeenCalled();
+  });
+});
+
+describe("initTaskReminders", () => {
+  it("registers a repeatable sweep job every 15 minutes", async () => {
+    taskRemindersQueueInstance.getRepeatableJobs.mockResolvedValueOnce([]);
+    taskRemindersQueueInstance.add.mockResolvedValueOnce({ id: "job-1" });
+
+    await initTaskReminders();
+
+    expect(taskRemindersQueueInstance.add).toHaveBeenCalledWith(
+      "sweep",
+      {},
+      expect.objectContaining({
+        jobId: "task-reminder-sweep-cron",
+        repeat: { every: 15 * 60 * 1000 },
+        removeOnComplete: true,
+        removeOnFail: 100,
+      }),
+    );
+  });
+
+  it("replaces any existing repeatable sweep job", async () => {
+    taskRemindersQueueInstance.getRepeatableJobs.mockResolvedValue([
+      { key: "existing-key" },
+    ]);
+    taskRemindersQueueInstance.removeRepeatableByKey.mockResolvedValue(undefined);
+    taskRemindersQueueInstance.add.mockResolvedValue({ id: "job-1" });
+
+    await initTaskReminders();
+    await initTaskReminders();
+
+    expect(taskRemindersQueueInstance.removeRepeatableByKey).toHaveBeenCalledWith(
+      "existing-key",
+    );
   });
 });

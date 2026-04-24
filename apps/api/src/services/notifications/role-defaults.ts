@@ -3,9 +3,10 @@
 export type Channel = "in_app" | "push";
 
 export interface DefaultNotification {
-  audience: "admin" | "referee";
+  audience: "admin" | "referee" | "user";
   channel: Channel;
   refereeId?: number; // present for referee audience
+  userId?: string; // present for user audience
 }
 
 // ── Event type prefixes that admins receive ─────────────────────────────────
@@ -39,7 +40,20 @@ const PUSH_ELIGIBLE_EVENTS = new Set([
   "referee.slots.reminder",
   "match.cancelled",
   "match.rescheduled",
+  "task.assigned",
+  "task.unassigned",
+  "task.comment.added",
+  "task.due.reminder",
 ]);
+
+// ── Task event recipient field map ───────────────────────────────────────────
+
+const TASK_RECIPIENT_FIELDS: Record<string, string> = {
+  "task.assigned": "assigneeUserIds",
+  "task.unassigned": "unassignedUserIds",
+  "task.comment.added": "recipientUserIds",
+  "task.due.reminder": "assigneeUserIds",
+};
 
 // ── getDefaultNotificationsForEvent ─────────────────────────────────────────
 
@@ -90,6 +104,15 @@ export function getDefaultNotificationsForEvent(
     }
     if (newRefereeId != null) {
       emit({ audience: "referee", channel: "in_app", refereeId: newRefereeId });
+    }
+  }
+
+  const taskField = TASK_RECIPIENT_FIELDS[eventType];
+  if (taskField) {
+    const raw = payload[taskField];
+    const userIds = Array.isArray(raw) ? raw.filter((x) => typeof x === "string") as string[] : [];
+    for (const userId of userIds) {
+      emit({ audience: "user", channel: "in_app", userId });
     }
   }
 

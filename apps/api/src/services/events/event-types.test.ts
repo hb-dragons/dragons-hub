@@ -381,3 +381,35 @@ describe("classifyUrgency", () => {
     );
   });
 });
+
+describe("task event urgency", () => {
+  it("classifies task.assigned as immediate when dueDate within 7 days", () => {
+    const soon = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    expect(classifyUrgency("task.assigned", { dueDate: soon })).toBe("immediate");
+  });
+
+  it("classifies task.assigned as routine when dueDate beyond 7 days", () => {
+    const later = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    expect(classifyUrgency("task.assigned", { dueDate: later })).toBe("routine");
+  });
+
+  it("classifies task.assigned as routine when dueDate is null", () => {
+    expect(classifyUrgency("task.assigned", { dueDate: null })).toBe("routine");
+  });
+
+  it("classifies task.unassigned as routine", () => {
+    expect(classifyUrgency("task.unassigned", {})).toBe("routine");
+  });
+
+  it("classifies task.comment.added as routine", () => {
+    expect(classifyUrgency("task.comment.added", {})).toBe("routine");
+  });
+
+  it("classifies task.due.reminder as immediate (lead)", () => {
+    expect(classifyUrgency("task.due.reminder", { reminderKind: "lead" })).toBe("immediate");
+  });
+
+  it("classifies task.due.reminder as immediate (day_of)", () => {
+    expect(classifyUrgency("task.due.reminder", { reminderKind: "day_of" })).toBe("immediate");
+  });
+});

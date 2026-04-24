@@ -13,3 +13,8 @@ export const notificationListQuerySchema = z.object({
 export const notificationUserIdQuerySchema = z.object({
   userId: z.string().min(1),
 });
+
+export const notificationPreferencesBodySchema = z.object({
+  mutedEventTypes: z.array(z.string()).optional(),
+  locale: z.enum(["de", "en"]).optional(),
+});

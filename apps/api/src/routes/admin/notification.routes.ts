@@ -7,12 +7,17 @@ import {
   getUnreadCount,
   retryFailedNotification,
 } from "../../services/admin/notification-admin.service";
+import {
+  getUserNotificationPreferences,
+  updateUserNotificationPreferences,
+} from "../../services/notifications/user-preferences.service";
 import { requirePermission } from "../../middleware/rbac";
 import type { AppEnv } from "../../types";
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
   notificationUserIdQuerySchema,
+  notificationPreferencesBodySchema,
 } from "./notification.schemas";
 
 const notificationRoutes = new Hono<AppEnv>();
@@ -120,6 +125,47 @@ notificationRoutes.post(
     }
 
     return c.json({ success: true });
+  },
+);
+
+// GET /admin/notifications/preferences - fetch caller's notification preferences
+notificationRoutes.get(
+  "/notifications/preferences",
+  describeRoute({
+    description: "Get the caller's notification preferences",
+    tags: ["Notifications"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const userId = c.get("user").id;
+    const prefs = await getUserNotificationPreferences(userId);
+    return c.json(prefs);
+  },
+);
+
+// PATCH /admin/notifications/preferences - update caller's notification preferences
+notificationRoutes.patch(
+  "/notifications/preferences",
+  describeRoute({
+    description: "Update the caller's notification preferences",
+    tags: ["Notifications"],
+    responses: {
+      200: { description: "Updated" },
+      400: { description: "Invalid body" },
+    },
+  }),
+  async (c) => {
+    const userId = c.get("user").id;
+    const body = notificationPreferencesBodySchema.parse(await c.req.json());
+    try {
+      const prefs = await updateUserNotificationPreferences(userId, body);
+      return c.json(prefs);
+    } catch (err) {
+      if (err instanceof Error && /unknown event type/i.test(err.message)) {
+        return c.json({ error: err.message, code: "INVALID_EVENT_TYPE" }, 400);
+      }
+      throw err;
+    }
   },
 );
 

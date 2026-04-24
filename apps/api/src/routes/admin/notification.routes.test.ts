@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   markAllRead: vi.fn(),
   getUnreadCount: vi.fn(),
   retryFailedNotification: vi.fn(),
+  getUserNotificationPreferences: vi.fn(),
+  updateUserNotificationPreferences: vi.fn(),
 }));
 
 vi.mock("../../services/admin/notification-admin.service", () => ({
@@ -30,6 +32,11 @@ vi.mock("../../config/logger", () => ({
   logger: { error: vi.fn() },
 }));
 
+vi.mock("../../services/notifications/user-preferences.service", () => ({
+  getUserNotificationPreferences: mocks.getUserNotificationPreferences,
+  updateUserNotificationPreferences: mocks.updateUserNotificationPreferences,
+}));
+
 // --- Imports (after mocks) ---
 
 import { notificationRoutes } from "./notification.routes";
@@ -38,6 +45,11 @@ import { errorHandler } from "../../middleware/error";
 // Test app without auth middleware
 const app = new Hono<AppEnv>();
 app.onError(errorHandler);
+app.use("*", async (c, next) => {
+  c.set("user", { id: "test-user-1", name: "Test" } as unknown as AppEnv["Variables"]["user"]);
+  c.set("session", {} as unknown as AppEnv["Variables"]["session"]);
+  await next();
+});
 app.route("/", notificationRoutes);
 
 function json(response: Response) {
@@ -285,5 +297,48 @@ describe("POST /notifications/:id/retry", () => {
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("GET /notifications/preferences", () => {
+  it("returns the caller's preferences", async () => {
+    mocks.getUserNotificationPreferences.mockResolvedValue({
+      mutedEventTypes: [],
+      locale: "de",
+    });
+    const res = await app.request("/notifications/preferences");
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ mutedEventTypes: [], locale: "de" });
+    expect(mocks.getUserNotificationPreferences).toHaveBeenCalledWith("test-user-1");
+  });
+});
+
+describe("PATCH /notifications/preferences", () => {
+  it("updates the caller's preferences", async () => {
+    mocks.updateUserNotificationPreferences.mockResolvedValue({
+      mutedEventTypes: ["task.assigned"],
+      locale: "en",
+    });
+    const res = await app.request("/notifications/preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mutedEventTypes: ["task.assigned"], locale: "en" }),
+    });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ mutedEventTypes: ["task.assigned"], locale: "en" });
+    expect(mocks.updateUserNotificationPreferences).toHaveBeenCalledWith("test-user-1", {
+      mutedEventTypes: ["task.assigned"],
+      locale: "en",
+    });
+  });
+
+  it("returns 400 when service rejects unknown event type", async () => {
+    mocks.updateUserNotificationPreferences.mockRejectedValue(new Error("Unknown event type: bogus.event"));
+    const res = await app.request("/notifications/preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mutedEventTypes: ["bogus.event"] }),
+    });
+    expect(res.status).toBe(400);
   });
 });

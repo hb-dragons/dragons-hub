@@ -237,6 +237,72 @@ describe("getDefaultNotificationsForEvent", () => {
     });
   });
 
+  describe("task event defaults", () => {
+    it("emits one in-app + one push default per assigneeUserId for task.assigned", () => {
+      const result = getDefaultNotificationsForEvent(
+        "task.assigned",
+        { assigneeUserIds: ["u1", "u2"], boardName: "X" },
+        "manual",
+      );
+      expect(result).toEqual([
+        { audience: "user", channel: "in_app", userId: "u1" },
+        { audience: "user", channel: "push", userId: "u1" },
+        { audience: "user", channel: "in_app", userId: "u2" },
+        { audience: "user", channel: "push", userId: "u2" },
+      ]);
+    });
+
+    it("emits for unassignedUserIds on task.unassigned", () => {
+      const result = getDefaultNotificationsForEvent(
+        "task.unassigned",
+        { unassignedUserIds: ["u3"] },
+        "manual",
+      );
+      expect(result).toEqual([
+        { audience: "user", channel: "in_app", userId: "u3" },
+        { audience: "user", channel: "push", userId: "u3" },
+      ]);
+    });
+
+    it("emits for recipientUserIds on task.comment.added", () => {
+      const result = getDefaultNotificationsForEvent(
+        "task.comment.added",
+        { recipientUserIds: ["u1"] },
+        "manual",
+      );
+      expect(result).toEqual([
+        { audience: "user", channel: "in_app", userId: "u1" },
+        { audience: "user", channel: "push", userId: "u1" },
+      ]);
+    });
+
+    it("emits for assigneeUserIds on task.due.reminder", () => {
+      const result = getDefaultNotificationsForEvent(
+        "task.due.reminder",
+        { assigneeUserIds: ["u1"] },
+        "sync",
+      );
+      expect(result).toEqual([
+        { audience: "user", channel: "in_app", userId: "u1" },
+        { audience: "user", channel: "push", userId: "u1" },
+      ]);
+    });
+
+    it("returns empty when task payload is missing userIds field", () => {
+      const result = getDefaultNotificationsForEvent("task.assigned", {}, "manual");
+      expect(result).toEqual([]);
+    });
+
+    it("does not emit admin notifications for task events", () => {
+      const result = getDefaultNotificationsForEvent(
+        "task.assigned",
+        { assigneeUserIds: ["u1"] },
+        "manual",
+      );
+      expect(result.some((n) => n.audience === "admin")).toBe(false);
+    });
+  });
+
   // ── PUSH_ELIGIBLE_EVENTS invariants ────────────────────────────────────
   //
   // Pins two contracts that were easy to accidentally break during the push

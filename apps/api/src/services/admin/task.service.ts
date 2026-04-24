@@ -16,7 +16,14 @@ import type {
   TaskComment,
   TaskPriority,
   TaskAssignee,
+  EventType,
 } from "@dragons/shared";
+import { EVENT_TYPES } from "@dragons/shared";
+import { publishDomainEvent, type TransactionClient } from "../events/event-publisher";
+import { truncateForPreview } from "../notifications/templates/task";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "task.service" });
 
 export interface TaskFilters {
   columnId?: number;
@@ -72,6 +79,52 @@ async function fetchAssigneesBatch(
     map.set(r.taskId, list);
   }
   return map;
+}
+
+async function loadBoardAndActor(
+  tx: TransactionClient,
+  boardId: number,
+  actorId: string,
+): Promise<{ boardName: string; actorName: string } | null> {
+  const [b] = await tx.select({ name: boards.name }).from(boards).where(eq(boards.id, boardId)).limit(1);
+  if (!b) return null;
+  const [u] = await tx.select({ name: user.name }).from(user).where(eq(user.id, actorId)).limit(1);
+  return { boardName: b.name, actorName: u?.name ?? actorId };
+}
+
+async function emitTaskEvent(params: {
+  type: EventType;
+  taskId: number;
+  boardId: number;
+  title: string;
+  boardName: string;
+  actor: string;
+  payloadExtras: Record<string, unknown>;
+  tx: TransactionClient;
+}): Promise<void> {
+  try {
+    await publishDomainEvent(
+      {
+        type: params.type,
+        source: "manual",
+        entityType: "task",
+        entityId: params.taskId,
+        entityName: params.title,
+        deepLinkPath: `/admin/boards/${params.boardId}?task=${params.taskId}`,
+        actor: params.actor,
+        payload: {
+          taskId: params.taskId,
+          boardId: params.boardId,
+          boardName: params.boardName,
+          title: params.title,
+          ...params.payloadExtras,
+        },
+      },
+      params.tx,
+    );
+  } catch (err) {
+    log.warn({ err, taskId: params.taskId, type: params.type }, "Failed to emit task event");
+  }
 }
 
 export async function listTasks(
@@ -211,6 +264,25 @@ export async function createTask(
           assignedBy: callerId,
         })))
         .onConflictDoNothing();
+
+      const ctx = await loadBoardAndActor(tx, boardId, callerId);
+      if (ctx) {
+        await emitTaskEvent({
+          type: EVENT_TYPES.TASK_ASSIGNED,
+          taskId: task!.id,
+          boardId: task!.boardId,
+          title: task!.title,
+          boardName: ctx.boardName,
+          actor: callerId,
+          payloadExtras: {
+            assigneeUserIds: uniq,
+            assignedBy: ctx.actorName,
+            dueDate: task!.dueDate,
+            priority: task!.priority ?? "normal",
+          },
+          tx,
+        });
+      }
     }
 
     return task!;
@@ -318,7 +390,11 @@ export async function updateTask(
   if (data.title !== undefined) setData.title = data.title;
   if (data.description !== undefined) setData.description = data.description;
   if (data.priority !== undefined) setData.priority = data.priority;
-  if (data.dueDate !== undefined) setData.dueDate = data.dueDate;
+  if (data.dueDate !== undefined) {
+    setData.dueDate = data.dueDate;
+    setData.leadReminderSentAt = null;
+    setData.dueReminderSentAt = null;
+  }
 
   const updated = await db.transaction(async (tx) => {
     const [row] = await tx
@@ -330,12 +406,57 @@ export async function updateTask(
     if (!row) return null;
 
     if (data.assigneeIds !== undefined) {
-      const uniq = [...new Set(data.assigneeIds)];
+      const nextIds = new Set([...new Set(data.assigneeIds)]);
+      const existing = await tx
+        .select({ userId: taskAssignees.userId })
+        .from(taskAssignees)
+        .where(eq(taskAssignees.taskId, id));
+      const existingIds = new Set(existing.map((r) => r.userId));
+      const added: string[] = [];
+      const removed: string[] = [];
+      for (const uid of nextIds) if (!existingIds.has(uid)) added.push(uid);
+      for (const uid of existingIds) if (!nextIds.has(uid)) removed.push(uid);
+
       await tx.delete(taskAssignees).where(eq(taskAssignees.taskId, id));
-      if (uniq.length > 0) {
+      if (nextIds.size > 0) {
         await tx.insert(taskAssignees).values(
-          uniq.map((uid) => ({ taskId: id, userId: uid, assignedBy: callerId })),
+          [...nextIds].map((uid) => ({ taskId: id, userId: uid, assignedBy: callerId })),
         );
+      }
+
+      if (added.length > 0 || removed.length > 0) {
+        const ctx = await loadBoardAndActor(tx, row.boardId, callerId);
+        if (ctx) {
+          if (removed.length > 0) {
+            await emitTaskEvent({
+              type: EVENT_TYPES.TASK_UNASSIGNED,
+              taskId: row.id,
+              boardId: row.boardId,
+              title: row.title,
+              boardName: ctx.boardName,
+              actor: callerId,
+              payloadExtras: { unassignedUserIds: removed, unassignedBy: ctx.actorName },
+              tx,
+            });
+          }
+          if (added.length > 0) {
+            await emitTaskEvent({
+              type: EVENT_TYPES.TASK_ASSIGNED,
+              taskId: row.id,
+              boardId: row.boardId,
+              title: row.title,
+              boardName: ctx.boardName,
+              actor: callerId,
+              payloadExtras: {
+                assigneeUserIds: added,
+                assignedBy: ctx.actorName,
+                dueDate: row.dueDate,
+                priority: row.priority ?? "normal",
+              },
+              tx,
+            });
+          }
+        }
       }
     }
 
@@ -478,50 +599,93 @@ export async function addAssignee(
   userId: string,
   callerId: string,
 ): Promise<TaskAssignee | null> {
-  const [task] = await db
-    .select({ id: tasks.id })
-    .from(tasks)
-    .where(eq(tasks.id, taskId))
-    .limit(1);
-  if (!task) return null;
+  return await db.transaction(async (tx) => {
+    const [task] = await tx
+      .select({ id: tasks.id, boardId: tasks.boardId, title: tasks.title, dueDate: tasks.dueDate, priority: tasks.priority })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+    if (!task) return null;
 
-  const [u] = await db
-    .select({ id: user.id, name: user.name })
-    .from(user)
-    .where(eq(user.id, userId))
-    .limit(1);
-  if (!u) return null;
+    const [u] = await tx
+      .select({ id: user.id, name: user.name })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1);
+    if (!u) return null;
 
-  await db
-    .insert(taskAssignees)
-    .values({ taskId, userId, assignedBy: callerId })
-    .onConflictDoNothing();
+    const insertResult = await tx
+      .insert(taskAssignees)
+      .values({ taskId, userId, assignedBy: callerId })
+      .onConflictDoNothing()
+      .returning({ userId: taskAssignees.userId });
+    const created = insertResult.length > 0;
 
-  const [row] = await db
-    .select({
-      userId: taskAssignees.userId,
-      assignedAt: taskAssignees.assignedAt,
-    })
-    .from(taskAssignees)
-    .where(
-      and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)),
-    );
-  return row
-    ? { userId, name: u.name, assignedAt: row.assignedAt.toISOString() }
-    : null;
+    const [row] = await tx
+      .select({ userId: taskAssignees.userId, assignedAt: taskAssignees.assignedAt })
+      .from(taskAssignees)
+      .where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)));
+
+    if (created) {
+      const ctx = await loadBoardAndActor(tx, task.boardId, callerId);
+      if (ctx) {
+        await emitTaskEvent({
+          type: EVENT_TYPES.TASK_ASSIGNED,
+          taskId: task.id,
+          boardId: task.boardId,
+          title: task.title,
+          boardName: ctx.boardName,
+          actor: callerId,
+          payloadExtras: {
+            assigneeUserIds: [userId],
+            assignedBy: ctx.actorName,
+            dueDate: task.dueDate,
+            priority: task.priority ?? "normal",
+          },
+          tx,
+        });
+      }
+    }
+
+    return row ? { userId, name: u.name, assignedAt: row.assignedAt.toISOString() } : null;
+  });
 }
 
 export async function removeAssignee(
   taskId: number,
   userId: string,
+  callerId: string,
 ): Promise<boolean> {
-  const result = await db
-    .delete(taskAssignees)
-    .where(
-      and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)),
-    )
-    .returning({ taskId: taskAssignees.taskId });
-  return result.length > 0;
+  return await db.transaction(async (tx) => {
+    const [task] = await tx
+      .select({ id: tasks.id, boardId: tasks.boardId, title: tasks.title, dueDate: tasks.dueDate, priority: tasks.priority })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+    if (!task) return false;
+
+    const deleted = await tx
+      .delete(taskAssignees)
+      .where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)))
+      .returning({ taskId: taskAssignees.taskId });
+
+    if (deleted.length === 0) return false;
+
+    const ctx = await loadBoardAndActor(tx, task.boardId, callerId);
+    if (ctx) {
+      await emitTaskEvent({
+        type: EVENT_TYPES.TASK_UNASSIGNED,
+        taskId: task.id,
+        boardId: task.boardId,
+        title: task.title,
+        boardName: ctx.boardName,
+        actor: callerId,
+        payloadExtras: { unassignedUserIds: [userId], unassignedBy: ctx.actorName },
+        tx,
+      });
+    }
+    return true;
+  });
 }
 
 // --- Checklist Items ---
@@ -635,31 +799,58 @@ export async function addComment(
   data: { body: string },
   callerId: string,
 ): Promise<TaskComment | null> {
-  // Verify task exists
-  const [task] = await db
-    .select({ id: tasks.id })
-    .from(tasks)
-    .where(eq(tasks.id, taskId))
-    .limit(1);
+  return await db.transaction(async (tx) => {
+    const [task] = await tx
+      .select({ id: tasks.id, boardId: tasks.boardId, title: tasks.title })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+    if (!task) return null;
 
-  if (!task) return null;
+    const [comment] = await tx
+      .insert(taskComments)
+      .values({ taskId, authorId: callerId, body: data.body })
+      .returning();
 
-  const [comment] = await db
-    .insert(taskComments)
-    .values({
-      taskId,
-      authorId: callerId,
-      body: data.body,
-    })
-    .returning();
+    const rows = await tx
+      .select({ userId: taskAssignees.userId })
+      .from(taskAssignees)
+      .where(eq(taskAssignees.taskId, taskId));
+    const recipients = rows
+      .map((r) => r.userId)
+      .filter((u) => u !== callerId);
 
-  return {
-    id: comment!.id,
-    authorId: comment!.authorId,
-    body: comment!.body,
-    createdAt: comment!.createdAt.toISOString(),
-    updatedAt: comment!.updatedAt.toISOString(),
-  };
+    if (recipients.length > 0) {
+      const ctx = await loadBoardAndActor(tx, task.boardId, callerId);
+      if (ctx) {
+        const preview = truncateForPreview(data.body);
+        await emitTaskEvent({
+          type: EVENT_TYPES.TASK_COMMENT_ADDED,
+          taskId: task.id,
+          boardId: task.boardId,
+          title: task.title,
+          boardName: ctx.boardName,
+          actor: callerId,
+          payloadExtras: {
+            commentId: comment!.id,
+            authorId: callerId,
+            authorName: ctx.actorName,
+            bodyPreview: preview,
+            recipientUserIds: recipients,
+          },
+          tx,
+        });
+      }
+    }
+
+    return {
+      id: comment!.id,
+      authorId: comment!.authorId,
+      body: comment!.body,
+      createdAt: comment!.createdAt.toISOString(),
+      updatedAt: comment!.updatedAt.toISOString(),
+    };
+  });
 }
 
 export async function updateComment(

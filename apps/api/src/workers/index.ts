@@ -3,7 +3,8 @@ import { eventWorker } from "./event.worker";
 import { digestWorker } from "./digest.worker";
 import { refereeReminderWorker } from "./referee-reminder.worker";
 import { pushReceiptWorker } from "./push-receipt.worker";
-import { initializeScheduledJobs, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue } from "./queues";
+import { taskReminderWorker } from "./task-reminder.worker";
+import { initializeScheduledJobs, initTaskReminders, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue } from "./queues";
 import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-poller";
 import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
 import { syncRefereeGames } from "../services/sync/referee-games.sync";
@@ -62,6 +63,13 @@ export async function initializeWorkers() {
 
   await initializeScheduledJobs();
 
+  // Task reminder sweep — every 15 minutes
+  try {
+    await initTaskReminders();
+  } catch (error) {
+    logger.warn({ err: error }, "Failed to initialize task reminders");
+  }
+
   // Start outbox poller for domain events
   startOutboxPoller();
 
@@ -96,6 +104,7 @@ export async function initializeWorkers() {
   logger.info("Digest worker started");
   logger.info("Referee reminder worker started");
   logger.info("Push receipt worker started");
+  logger.info("Task reminder worker started");
   logger.info("Workers initialized");
 }
 
@@ -256,6 +265,8 @@ export async function shutdownWorkers() {
   await refereeRemindersQueue.close();
   await pushReceiptWorker.close();
   await pushReceiptQueue.close();
+  await taskReminderWorker.close();
+  await taskRemindersQueue.close();
   await digestWorker.close();
   await eventWorker.close();
   await syncWorker.close();
@@ -271,4 +282,5 @@ export { eventWorker };
 export { digestWorker };
 export { refereeReminderWorker };
 export { pushReceiptWorker };
+export { taskReminderWorker };
 export * from "./queues";

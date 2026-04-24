@@ -20,6 +20,7 @@ const ALWAYS_IMMEDIATE = new Set<string>([
   EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION,
   EVENT_TYPES.OVERRIDE_CONFLICT,
   EVENT_TYPES.REFEREE_SLOTS_REMINDER,
+  EVENT_TYPES.TASK_DUE_REMINDER,
 ]);
 
 // Events whose urgency depends on whether affected dates are within 7 days
@@ -28,6 +29,7 @@ const DATE_DEPENDENT = new Set<string>([
   EVENT_TYPES.MATCH_VENUE_CHANGED,
   EVENT_TYPES.OVERRIDE_REVERTED,
   EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+  EVENT_TYPES.TASK_ASSIGNED,
 ]);
 
 /**
@@ -40,6 +42,7 @@ function extractRelevantDates(payload: Record<string, unknown>): string[] {
   // Check top-level date fields
   if (typeof payload.kickoffDate === "string") dates.push(payload.kickoffDate);
   if (typeof payload.date === "string") dates.push(payload.date);
+  if (typeof payload.dueDate === "string") dates.push(payload.dueDate);
 
   // Check changes array for date/time fields
   const changes = payload.changes;

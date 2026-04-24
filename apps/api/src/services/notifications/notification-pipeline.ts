@@ -79,9 +79,9 @@ export async function loadMutedEventTypes(
 ): Promise<Map<string, Set<string>>> {
   const result = new Map<string, Set<string>>();
 
-  // Only referee recipients have individual mute preferences
   const refereeRecipients = recipientIds.filter((r) => r.startsWith("referee:"));
-  if (refereeRecipients.length === 0) return result;
+  const userRecipients = recipientIds.filter((r) => r.startsWith("user:"));
+  if (refereeRecipients.length === 0 && userRecipients.length === 0) return result;
 
   try {
     const prefs = await db
@@ -91,7 +91,6 @@ export async function loadMutedEventTypes(
       })
       .from(userNotificationPreferences);
 
-    // Build a userId → mutedEventTypes map for users with non-empty muted lists
     const userMutedMap = new Map<string, Set<string>>();
     for (const pref of prefs) {
       if (pref.mutedEventTypes.length > 0) {
@@ -99,16 +98,15 @@ export async function loadMutedEventTypes(
       }
     }
 
-    // Map referee recipients to their user's muted types.
-    // Convention: recipientId "referee:77" corresponds to userId that has refereeId=77.
-    // Since we can't join here without the users table, we store by recipientId
-    // and match by userId pattern. In practice the userId IS the referee recipient.
     for (const rid of refereeRecipients) {
-      // Check if any user's muted types apply — for now, use recipientId as lookup key
       const muted = userMutedMap.get(rid);
-      if (muted) {
-        result.set(rid, muted);
-      }
+      if (muted) result.set(rid, muted);
+    }
+
+    for (const rid of userRecipients) {
+      const userId = rid.slice("user:".length);
+      const muted = userMutedMap.get(userId);
+      if (muted) result.set(rid, muted);
     }
   } catch {
     logger.debug("Could not load muted event types, skipping preference check");
@@ -224,7 +222,9 @@ function evaluateDefaults(
 
     const recipientId = defaultNotif.refereeId
       ? `referee:${defaultNotif.refereeId}`
-      : `audience:${defaultNotif.audience}`;
+      : defaultNotif.userId
+        ? `user:${defaultNotif.userId}`
+        : `audience:${defaultNotif.audience}`;
 
     for (const config of matchingConfigs) {
       matches.push({
@@ -256,6 +256,22 @@ async function bufferForDigest(eventId: string, channelConfigId: number): Promis
   }
 }
 
+async function resolveLocaleForRecipient(
+  recipientId: string,
+  configLocale: string | undefined,
+): Promise<string> {
+  if (recipientId.startsWith("user:")) {
+    const userId = recipientId.slice("user:".length);
+    const [pref] = await db
+      .select({ locale: userNotificationPreferences.locale })
+      .from(userNotificationPreferences)
+      .where(eq(userNotificationPreferences.userId, userId))
+      .limit(1);
+    return pref?.locale ?? configLocale ?? "de";
+  }
+  return configLocale ?? "de";
+}
+
 /**
  * Step 5: Dispatch an immediate notification via channel adapter.
  */
@@ -268,7 +284,8 @@ async function dispatchImmediate(params: {
 }): Promise<boolean> {
   const { event, config, watchRuleId, recipientId, channelType } = params;
   const payload = event.payload as Record<string, unknown>;
-  const locale = (config.config as Record<string, unknown>)?.locale as string ?? "de";
+  const configLocale = (config.config as Record<string, unknown>)?.locale as string | undefined;
+  const locale = await resolveLocaleForRecipient(recipientId, configLocale);
   const message = renderEventMessage(event.type, payload, event.entityName, locale);
 
   if (channelType === "in_app") {

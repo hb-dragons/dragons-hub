@@ -24,8 +24,12 @@ const mockDigestQueueRemoveRepeatableByKey = vi.fn().mockResolvedValue(undefined
 const mockRefereeRemindersQueueClose = vi.fn().mockResolvedValue(undefined);
 const mockPushReceiptQueueClose = vi.fn().mockResolvedValue(undefined);
 const mockSyncQueueAdd = vi.fn().mockResolvedValue({ id: "sync-job-1" });
+const mockInitTaskReminders = vi.fn().mockResolvedValue(undefined);
+const mockTaskRemindersQueueGetRepeatableJobs = vi.fn().mockResolvedValue([]);
+const mockTaskRemindersQueueClose = vi.fn().mockResolvedValue(undefined);
 vi.mock("./queues", () => ({
   initializeScheduledJobs: (...args: unknown[]) => mockInitScheduledJobs(...args),
+  initTaskReminders: (...args: unknown[]) => mockInitTaskReminders(...args),
   syncQueue: {
     close: (...args: unknown[]) => mockSyncQueueClose(...args),
     add: (...args: unknown[]) => mockSyncQueueAdd(...args),
@@ -33,6 +37,10 @@ vi.mock("./queues", () => ({
   domainEventsQueue: { close: (...args: unknown[]) => mockDomainEventsQueueClose(...args) },
   refereeRemindersQueue: { close: (...args: unknown[]) => mockRefereeRemindersQueueClose(...args) },
   pushReceiptQueue: { close: (...args: unknown[]) => mockPushReceiptQueueClose(...args) },
+  taskRemindersQueue: {
+    close: (...args: unknown[]) => mockTaskRemindersQueueClose(...args),
+    getRepeatableJobs: () => mockTaskRemindersQueueGetRepeatableJobs(),
+  },
   digestQueue: {
     close: (...args: unknown[]) => mockDigestQueueClose(...args),
     add: (...args: unknown[]) => mockDigestQueueAdd(...args),
@@ -63,6 +71,11 @@ vi.mock("./referee-reminder.worker", () => ({
 const mockPushReceiptWorkerClose = vi.fn().mockResolvedValue(undefined);
 vi.mock("./push-receipt.worker", () => ({
   pushReceiptWorker: { close: (...args: unknown[]) => mockPushReceiptWorkerClose(...args) },
+}));
+
+const mockTaskReminderWorkerClose = vi.fn().mockResolvedValue(undefined);
+vi.mock("./task-reminder.worker", () => ({
+  taskReminderWorker: { close: (...args: unknown[]) => mockTaskReminderWorkerClose(...args) },
 }));
 
 const mockStartOutboxPoller = vi.fn();
@@ -206,6 +219,16 @@ describe("initializeWorkers", () => {
     );
     expect(mockInitScheduledJobs).toHaveBeenCalled();
   });
+
+  it("initializes task reminder repeatable job", async () => {
+    mockTaskRemindersQueueGetRepeatableJobs.mockResolvedValue([
+      { id: "task-reminder-sweep-cron" },
+    ]);
+
+    await initializeWorkers();
+
+    expect(mockInitTaskReminders).toHaveBeenCalled();
+  });
 });
 
 describe("cleanupOldSyncRuns", () => {
@@ -338,6 +361,7 @@ describe("shutdownWorkers", () => {
     await shutdownWorkers();
 
     expect(mockWorkerClose).toHaveBeenCalled();
+    expect(mockTaskReminderWorkerClose).toHaveBeenCalled();
     expect(mockSyncQueueClose).toHaveBeenCalled();
     expect(mockDigestQueueClose).toHaveBeenCalled();
     expect(mockDomainEventsQueueClose).toHaveBeenCalled();

@@ -89,6 +89,8 @@ export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";
 export type { UserListItem } from "./users";
 export type { NotificationItem, NotificationListResult } from "./notifications";
+export type { UserToggleableEventType } from "./notification-events";
+export { USER_TOGGLEABLE_EVENTS, isUserToggleableEventType } from "./notification-events";
 export type { ClubConfig, BookingSettings } from "./settings";
 export { BOOKING_DEFAULTS } from "./settings";
 export type {

@@ -37,15 +37,6 @@ export const userNotificationPreferences = pgTable(
     userId: text("user_id").notNull().unique(),
     whatsappEnabled: boolean("whatsapp_enabled").notNull().default(false),
     whatsappNumber: varchar("whatsapp_number", { length: 20 }),
-    notifyOnTaskAssigned: boolean("notify_on_task_assigned")
-      .notNull()
-      .default(true),
-    notifyOnBookingNeedsAction: boolean("notify_on_booking_needs_action")
-      .notNull()
-      .default(true),
-    notifyOnTaskComment: boolean("notify_on_task_comment")
-      .notNull()
-      .default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

@@ -13,6 +13,10 @@ vi.mock("../../config/database", () => ({
   ),
 }));
 
+vi.mock("../../workers/queues", () => ({
+  domainEventsQueue: { add: vi.fn().mockResolvedValue(undefined) },
+}));
+
 // --- Imports (after mocks) ---
 
 import {
@@ -832,7 +836,7 @@ describe("task assignees", () => {
     const { taskId } = await setupTaskWithUsers();
     await addAssignee(taskId, "u_alice", "u_root");
     await addAssignee(taskId, "u_bob", "u_root");
-    await removeAssignee(taskId, "u_alice");
+    await removeAssignee(taskId, "u_alice", "u_root");
     const detail = await getTaskDetail(taskId);
     expect(detail!.assignees.map((a) => a.userId)).toEqual(["u_bob"]);
   });
@@ -864,5 +868,192 @@ describe("task assignees", () => {
     expect(filtered).toHaveLength(1);
     const empty = await listTasks(boardId, { assigneeId: "u_bob" });
     expect(empty).toHaveLength(0);
+  });
+});
+
+// --- Event emission tests ---
+
+async function seedTaskAndUsers(boardName = "Test Board") {
+  await ctx.client.exec(
+    `INSERT INTO "user" (id, name, email) VALUES ('caller-1', 'Caller Name', 'caller@test.local')
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await ctx.client.exec(
+    `INSERT INTO "user" (id, name, email) VALUES ('target-1', 'Target', 'target@test.local')
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await ctx.client.exec(`INSERT INTO boards (name) VALUES ('${boardName}')`);
+  await ctx.client.exec(
+    `INSERT INTO board_columns (board_id, name, position, is_done_column) VALUES (1, 'To Do', 0, false)`,
+  );
+  await ctx.client.exec(
+    `INSERT INTO tasks (board_id, column_id, title, created_by) VALUES (1, 1, 'T', 'caller-1')`,
+  );
+  return {
+    taskId: 1,
+    boardId: 1,
+    boardName,
+    callerId: "caller-1",
+    callerName: "Caller Name",
+    targetUserId: "target-1",
+  };
+}
+
+async function getTaskEvents(entityId: number) {
+  const res = await ctx.client.query(
+    `SELECT id, type, entity_type, entity_id, payload, deep_link_path
+     FROM domain_events
+     WHERE entity_type = 'task' AND entity_id = ${entityId}
+     ORDER BY created_at ASC`,
+  );
+  return res.rows as Array<{
+    id: string;
+    type: string;
+    entity_type: string;
+    entity_id: number;
+    payload: Record<string, unknown>;
+    deep_link_path: string;
+  }>;
+}
+
+async function seedBoardColumn() {
+  await ctx.client.exec(
+    `INSERT INTO "user" (id, name, email) VALUES ('caller-2', 'Caller', 'c2@test.local')
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await ctx.client.exec(
+    `INSERT INTO "user" (id, name, email) VALUES ('target-2', 'Target', 't2@test.local')
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await ctx.client.exec(`INSERT INTO boards (name) VALUES ('B')`);
+  await ctx.client.exec(
+    `INSERT INTO board_columns (board_id, name, position, is_done_column) VALUES (1, 'To Do', 0, false)`,
+  );
+  return { boardId: 1, columnId: 1, callerId: "caller-2", targetUserId: "target-2" };
+}
+
+describe("task event emission — createTask + updateTask diff", () => {
+  it("emits task.assigned for initial assignees when createTask includes assigneeIds", async () => {
+    const { boardId, columnId, callerId, targetUserId } = await seedBoardColumn();
+    const task = await createTask(
+      boardId,
+      { title: "X", assigneeIds: [targetUserId], columnId },
+      callerId,
+    );
+
+    const events = await getTaskEvents(task!.id);
+    expect(events).toHaveLength(1);
+    expect(events[0]!.type).toBe("task.assigned");
+    expect(events[0]!.payload.assigneeUserIds).toEqual([targetUserId]);
+  });
+
+  it("emits only for newly-added userIds when updateTask replaces assignees", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES ('other-1', 'Other', 'other@test.local')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+
+    await addAssignee(taskId, targetUserId, callerId);
+    await updateTask(taskId, { assigneeIds: ["other-1"] }, callerId);
+
+    const events = await getTaskEvents(taskId);
+    // 1: addAssignee target, 2: unassigned target in update, 3: assigned other in update
+    expect(events).toHaveLength(3);
+    expect(events[1]!.type).toBe("task.unassigned");
+    expect(events[1]!.payload.unassignedUserIds).toEqual([targetUserId]);
+    expect(events[2]!.type).toBe("task.assigned");
+    expect(events[2]!.payload.assigneeUserIds).toEqual(["other-1"]);
+  });
+
+  it("does not emit when updateTask leaves assigneeIds unchanged", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+    const before = (await getTaskEvents(taskId)).length;
+
+    await updateTask(taskId, { assigneeIds: [targetUserId] }, callerId);
+
+    const after = (await getTaskEvents(taskId)).length;
+    expect(after).toBe(before);
+  });
+});
+
+describe("task event emission — assign / unassign", () => {
+  it("emits task.assigned with the new userId when addAssignee is called", async () => {
+    const { taskId, boardId, boardName, callerId, targetUserId, callerName } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+
+    const events = await getTaskEvents(taskId);
+    expect(events).toHaveLength(1);
+    expect(events[0]!.type).toBe("task.assigned");
+    expect(events[0]!.entity_type).toBe("task");
+    expect(events[0]!.entity_id).toBe(taskId);
+    expect(events[0]!.deep_link_path).toBe(`/admin/boards/${boardId}?task=${taskId}`);
+    const payload = events[0]!.payload;
+    expect(payload.assigneeUserIds).toEqual([targetUserId]);
+    expect(payload.assignedBy).toBe(callerName);
+    expect(payload.boardName).toBe(boardName);
+  });
+
+  it("emits task.unassigned when removeAssignee is called", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+    await removeAssignee(taskId, targetUserId, callerId);
+
+    const events = await getTaskEvents(taskId);
+    expect(events).toHaveLength(2);
+    expect(events[1]!.type).toBe("task.unassigned");
+    expect(events[1]!.payload.unassignedUserIds).toEqual([targetUserId]);
+  });
+
+  it("does not emit on addAssignee when user is already assigned (conflict)", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+    await addAssignee(taskId, targetUserId, callerId);
+
+    const events = await getTaskEvents(taskId);
+    expect(events).toHaveLength(1);
+  });
+});
+
+describe("task event emission — comment", () => {
+  it("emits task.comment.added with assignees minus author as recipients", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+    await addAssignee(taskId, callerId, callerId);
+
+    await addComment(taskId, { body: "Hello, this is a test comment." }, callerId);
+
+    const events = await getTaskEvents(taskId);
+    const commentEvent = events.find((e) => e.type === "task.comment.added");
+    expect(commentEvent).toBeDefined();
+    const payload = commentEvent!.payload;
+    expect(payload.recipientUserIds).toEqual([targetUserId]);
+    expect(payload.authorId).toBe(callerId);
+    expect(payload.bodyPreview).toBe("Hello, this is a test comment.");
+  });
+
+  it("truncates long comment bodies to 140 chars with ellipsis in preview", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+
+    const longBody = "x".repeat(200);
+    await addComment(taskId, { body: longBody }, callerId);
+
+    const events = await getTaskEvents(taskId);
+    const commentEvent = events.find((e) => e.type === "task.comment.added");
+    const payload = commentEvent!.payload;
+    expect(payload.bodyPreview).toBe(`${"x".repeat(140)}…`);
+  });
+
+  it("does not emit when there are no assignees other than the author", async () => {
+    const { taskId, callerId } = await seedTaskAndUsers();
+    await addAssignee(taskId, callerId, callerId);
+
+    await addComment(taskId, { body: "Solo" }, callerId);
+
+    const events = await getTaskEvents(taskId);
+    const commentEvents = events.filter((e) => e.type === "task.comment.added");
+    expect(commentEvents).toHaveLength(0);
   });
 });
