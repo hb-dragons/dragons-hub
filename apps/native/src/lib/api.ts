@@ -5,6 +5,7 @@ import {
   publicEndpoints,
   deviceEndpoints,
   refereeEndpoints,
+  adminBoardEndpoints,
 } from "@dragons/api-client";
 import { authClient, resolveApiUrl } from "./auth-client";
 
@@ -53,3 +54,4 @@ export const apiClient = new ApiClient({
 export const publicApi = publicEndpoints(apiClient);
 export const deviceApi = deviceEndpoints(apiClient);
 export const refereeApi = refereeEndpoints(apiClient);
+export const adminBoardApi = adminBoardEndpoints(apiClient);

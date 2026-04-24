@@ -6,6 +6,8 @@ import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { SWRConfig } from "swr";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { swrConfig } from "@/lib/swr-config";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { LocaleProvider } from "@/hooks/useLocale";
@@ -60,6 +62,7 @@ function RootNavigator() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ title: "" }} />
+        <Stack.Screen name="admin" options={{ headerShown: false }} />
         <Stack.Screen name="team/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="game/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="referee-game/[id]" options={detailHeaderOptions} />
@@ -174,16 +177,20 @@ export default function RootLayout() {
   }
 
   return (
-    <ErrorBoundary>
-      <KeyboardProvider>
-        <SWRConfig value={swrConfig}>
-          <LocaleProvider>
-            <ThemeProvider>
-              <RootNavigator />
-            </ThemeProvider>
-          </LocaleProvider>
-        </SWRConfig>
-      </KeyboardProvider>
-    </ErrorBoundary>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <BottomSheetModalProvider>
+        <ErrorBoundary>
+          <KeyboardProvider>
+            <SWRConfig value={swrConfig}>
+              <LocaleProvider>
+                <ThemeProvider>
+                  <RootNavigator />
+                </ThemeProvider>
+              </LocaleProvider>
+            </SWRConfig>
+          </KeyboardProvider>
+        </ErrorBoundary>
+      </BottomSheetModalProvider>
+    </GestureHandlerRootView>
   );
 }

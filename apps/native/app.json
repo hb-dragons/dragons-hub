@@ -80,7 +80,8 @@
             "backgroundColor": "#131313"
           }
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

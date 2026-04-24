@@ -206,9 +206,96 @@
     "details": "Details",
     "cancel": "Abbrechen",
     "save": "Speichern",
+    "delete": "Löschen",
+    "clear": "Entfernen",
+    "edit": "Bearbeiten",
     "loading": "Laden…",
     "vs": "vs",
     "at": "@"
+  },
+  "admin": {
+    "boards": {
+      "title": "Boards",
+      "empty": "Noch keine Boards.",
+      "new": "Neues Board"
+    }
+  },
+  "board": {
+    "task": {
+      "assigneeCount": "%{count} Zuweisungen",
+      "unnamedUser": "Unbenannt",
+      "titlePlaceholder": "Aufgabentitel",
+      "descriptionPlaceholder": "Beschreibung hinzufügen",
+      "idLabel": "#%{id}",
+      "priority": "Priorität",
+      "due": "Fällig",
+      "noDue": "Kein Fälligkeitsdatum",
+      "deleteConfirmTitle": "Aufgabe löschen?",
+      "deleteConfirmMessage": "Das kann nicht rückgängig gemacht werden.",
+      "actions": {
+        "moveTo": "Verschieben nach…",
+        "setPriority": "Priorität setzen",
+        "setDue": "Fälligkeit setzen",
+        "delete": "Aufgabe löschen"
+      }
+    },
+    "priority": {
+      "low": "Niedrig",
+      "normal": "Normal",
+      "high": "Hoch",
+      "urgent": "Dringend"
+    },
+    "due": {
+      "clear": "Entfernen",
+      "set": "Setzen"
+    },
+    "assignees": {
+      "searchPlaceholder": "Benutzer suchen",
+      "empty": "Keine Benutzer gefunden.",
+      "none": "Nicht zugewiesen",
+      "title": "Zugewiesene",
+      "count": "%{count} zugewiesen"
+    },
+    "column": {
+      "addCard": "+ Karte",
+      "empty": "Aufgaben hier ablegen"
+    },
+    "filters": {
+      "mine": "Meine",
+      "priority": "Priorität",
+      "dueSoon": "Bald fällig",
+      "unassigned": "Nicht zugewiesen"
+    },
+    "refresh": "Aktualisieren",
+    "checklist": {
+      "title": "Checkliste",
+      "addPlaceholder": "Eintrag hinzufügen",
+      "add": "Hinzufügen",
+      "deleteTitle": "Eintrag löschen?",
+      "deleteMessage": "Das kann nicht rückgängig gemacht werden."
+    },
+    "comments": {
+      "title": "Kommentare",
+      "empty": "Noch keine Kommentare.",
+      "addPlaceholder": "Kommentar schreiben",
+      "send": "Senden",
+      "actions": "Kommentar-Aktionen",
+      "deleteTitle": "Kommentar löschen?",
+      "deleteMessage": "Das kann nicht rückgängig gemacht werden."
+    },
+    "moveTo": {
+      "title": "In Spalte verschieben",
+      "top": "Oben",
+      "bottom": "Unten",
+      "confirm": "Verschieben"
+    },
+    "quickCreate": {
+      "title": "Neue Aufgabe",
+      "titlePlaceholder": "Aufgabentitel",
+      "descriptionPlaceholder": "Beschreibung hinzufügen (optional)",
+      "submit": "Erstellen",
+      "fab": "Neue Aufgabe"
+    }
   },
   "error": {
     "boundary": {

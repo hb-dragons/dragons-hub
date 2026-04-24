@@ -206,9 +206,96 @@
     "details": "Details",
     "cancel": "Cancel",
     "save": "Save",
+    "delete": "Delete",
+    "clear": "Clear",
+    "edit": "Edit",
     "loading": "Loading…",
     "vs": "vs",
     "at": "@"
+  },
+  "admin": {
+    "boards": {
+      "title": "Boards",
+      "empty": "No boards yet.",
+      "new": "New board"
+    }
+  },
+  "board": {
+    "task": {
+      "assigneeCount": "%{count} assignees",
+      "unnamedUser": "Unnamed",
+      "titlePlaceholder": "Task title",
+      "descriptionPlaceholder": "Add a description",
+      "idLabel": "#%{id}",
+      "priority": "Priority",
+      "due": "Due",
+      "noDue": "No due date",
+      "deleteConfirmTitle": "Delete task?",
+      "deleteConfirmMessage": "This cannot be undone.",
+      "actions": {
+        "moveTo": "Move to…",
+        "setPriority": "Set priority",
+        "setDue": "Set due date",
+        "delete": "Delete task"
+      }
+    },
+    "priority": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High",
+      "urgent": "Urgent"
+    },
+    "due": {
+      "clear": "Clear",
+      "set": "Set"
+    },
+    "assignees": {
+      "searchPlaceholder": "Search users",
+      "empty": "No users found.",
+      "none": "Unassigned",
+      "title": "Assignees",
+      "count": "%{count} assignees"
+    },
+    "column": {
+      "addCard": "+ Add card",
+      "empty": "Drop tasks here"
+    },
+    "filters": {
+      "mine": "Mine",
+      "priority": "Priority",
+      "dueSoon": "Due soon",
+      "unassigned": "Unassigned"
+    },
+    "refresh": "Refresh",
+    "checklist": {
+      "title": "Checklist",
+      "addPlaceholder": "Add item",
+      "add": "Add",
+      "deleteTitle": "Delete item?",
+      "deleteMessage": "This cannot be undone."
+    },
+    "comments": {
+      "title": "Comments",
+      "empty": "No comments yet.",
+      "addPlaceholder": "Write a comment",
+      "send": "Send",
+      "actions": "Comment actions",
+      "deleteTitle": "Delete comment?",
+      "deleteMessage": "This cannot be undone."
+    },
+    "moveTo": {
+      "title": "Move to column",
+      "top": "Top",
+      "bottom": "Bottom",
+      "confirm": "Move"
+    },
+    "quickCreate": {
+      "title": "New task",
+      "titlePlaceholder": "Task title",
+      "descriptionPlaceholder": "Add a description (optional)",
+      "submit": "Create",
+      "fab": "New task"
+    }
   },
   "error": {
     "boundary": {
