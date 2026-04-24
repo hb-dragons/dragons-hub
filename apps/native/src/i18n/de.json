@@ -220,7 +220,10 @@
   "board": {
     "task": {
       "assigneeCount": "%{count} Zuweisungen",
-      "unnamedUser": "Unbenannt"
+      "unnamedUser": "Unbenannt",
+      "titlePlaceholder": "Aufgabentitel",
+      "descriptionPlaceholder": "Beschreibung hinzufügen",
+      "idLabel": "#%{id}"
     },
     "column": {
       "addCard": "+ Karte"

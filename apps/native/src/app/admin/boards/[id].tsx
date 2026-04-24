@@ -5,7 +5,9 @@ import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager";
+import { TaskDetailSheet, type TaskDetailSheetHandle } from "@/components/board/TaskDetailSheet";
 import { useTheme } from "@/hooks/useTheme";
+import type { TaskCardData } from "@dragons/shared";
 
 export default function BoardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -15,6 +17,7 @@ export default function BoardDetailScreen() {
   const { colors, spacing } = useTheme();
   const [activeIndex, setActiveIndex] = useState(0);
   const pagerRef = useRef<BoardPagerHandle | null>(null);
+  const taskSheetRef = useRef<TaskDetailSheetHandle | null>(null);
 
   const columns = useMemo(
     () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
@@ -59,8 +62,8 @@ export default function BoardDetailScreen() {
             columns={columns}
             tasks={tasks ?? []}
             onActiveColumnChange={setActiveIndex}
-            onTaskPress={() => {
-              /* wired in Phase 4 */
+            onTaskPress={(task: TaskCardData) => {
+              taskSheetRef.current?.open(task.id);
             }}
             onAddTask={() => {
               /* wired in Phase 10 */
@@ -68,6 +71,7 @@ export default function BoardDetailScreen() {
           />
         )}
       </View>
+      <TaskDetailSheet ref={taskSheetRef} boardId={boardId} />
     </View>
   );
 }

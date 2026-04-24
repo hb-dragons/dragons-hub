@@ -220,7 +220,10 @@
   "board": {
     "task": {
       "assigneeCount": "%{count} assignees",
-      "unnamedUser": "Unnamed"
+      "unnamedUser": "Unnamed",
+      "titlePlaceholder": "Task title",
+      "descriptionPlaceholder": "Add a description",
+      "idLabel": "#%{id}"
     },
     "column": {
       "addCard": "+ Add card"
