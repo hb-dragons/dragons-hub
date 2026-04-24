@@ -1,11 +1,51 @@
 import { createMiddleware } from "hono/factory";
 import { logger } from "../config/logger";
+import { runWithLogContext, type LogContext } from "../config/log-context";
 import type { AppEnv } from "../types";
 
 const REDACTED_HEADERS = new Set(["authorization", "cookie", "set-cookie"]);
 
+// https://cloud.google.com/trace/docs/setup#force-trace
+// Format: "TRACE_ID/SPAN_ID;o=TRACE_TRUE"
+const CLOUD_TRACE_RE = /^([a-f0-9]+)\/(\d+)(?:;o=([01]))?$/i;
+
+// W3C trace context: "version-traceid-parentid-flags"
+// https://www.w3.org/TR/trace-context/#traceparent-header-field-values
+const TRACEPARENT_RE =
+  /^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/;
+
+interface ParsedTrace {
+  traceId?: string;
+  spanId?: string;
+  traceSampled?: boolean;
+}
+
+function parseTraceContext(headers: Headers): ParsedTrace {
+  const gcp = headers.get("x-cloud-trace-context");
+  if (gcp) {
+    const m = CLOUD_TRACE_RE.exec(gcp);
+    if (m) return { traceId: m[1], spanId: m[2], traceSampled: m[3] === "1" };
+  }
+  const w3c = headers.get("traceparent");
+  if (w3c) {
+    const m = TRACEPARENT_RE.exec(w3c);
+    if (m) {
+      const flags = parseInt(m[4] ?? "00", 16);
+      return {
+        traceId: m[2],
+        spanId: m[3],
+        traceSampled: (flags & 1) === 1,
+      };
+    }
+  }
+  return {};
+}
+
 export const requestLogger = createMiddleware<AppEnv>(async (c, next) => {
   const requestId = crypto.randomUUID();
+  const trace = parseTraceContext(c.req.raw.headers);
+  const ctx: LogContext = { requestId, ...trace };
+
   const childLogger = logger.child({ requestId });
   const start = performance.now();
 
@@ -16,28 +56,48 @@ export const requestLogger = createMiddleware<AppEnv>(async (c, next) => {
   const { method, path } = c.req;
   const url = c.req.url;
 
-  // Debug-level: log incoming request details
-  if (childLogger.level === "debug" || childLogger.level === "trace") {
-    const headers: Record<string, string> = {};
-    c.req.raw.headers.forEach((value, key) => {
-      headers[key] = REDACTED_HEADERS.has(key) ? "[REDACTED]" : value;
-    });
-    childLogger.debug({ method, path, url, headers }, "→ incoming request");
-  }
+  await runWithLogContext(ctx, async () => {
+    if (childLogger.level === "debug" || childLogger.level === "trace") {
+      const headers: Record<string, string> = {};
+      c.req.raw.headers.forEach((value, key) => {
+        headers[key] = REDACTED_HEADERS.has(key) ? "[REDACTED]" : value;
+      });
+      childLogger.debug({ method, path, url, headers }, "→ incoming request");
+    }
 
-  await next();
+    await next();
 
-  const duration = Math.round(performance.now() - start);
-  const status = c.res.status;
+    const durationMs = performance.now() - start;
+    const duration = Math.round(durationMs);
+    const status = c.res.status;
+    const userAgent = c.req.header("user-agent");
+    const remoteIp =
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+      c.req.header("x-real-ip");
+    const responseSize = c.res.headers.get("content-length");
 
-  childLogger.info(
-    { method, path, status, duration },
-    `${method} ${path} → ${status} (${duration}ms)`,
-  );
+    // Cloud Logging renders this field as a proper HTTP row with status + latency.
+    // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#httprequest
+    const httpRequest: Record<string, unknown> = {
+      requestMethod: method,
+      requestUrl: url,
+      status,
+      latency: `${(durationMs / 1000).toFixed(3)}s`,
+    };
+    if (userAgent) httpRequest.userAgent = userAgent;
+    if (remoteIp) httpRequest.remoteIp = remoteIp;
+    if (responseSize) httpRequest.responseSize = responseSize;
 
-  // Debug-level: log response details
-  if (childLogger.level === "debug" || childLogger.level === "trace") {
-    const contentLength = c.res.headers.get("content-length");
-    childLogger.debug({ status, duration, contentLength }, "← response sent");
-  }
+    childLogger.info(
+      { method, path, status, duration, httpRequest },
+      `${method} ${path} → ${status} (${duration}ms)`,
+    );
+
+    if (childLogger.level === "debug" || childLogger.level === "trace") {
+      childLogger.debug(
+        { status, duration, contentLength: responseSize },
+        "← response sent",
+      );
+    }
+  });
 });

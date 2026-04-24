@@ -16,8 +16,18 @@ const mockLogger = {
 
 vi.mock("../config/logger", () => ({
   logger: {
-    child: (...args: Parameters<typeof mockLogger.child>) => mockLogger.child(...args),
+    child: (...args: Parameters<typeof mockLogger.child>) =>
+      mockLogger.child(...args),
   },
+}));
+
+const runWithLogContext = vi.fn(
+  async (_ctx: unknown, fn: () => unknown) => fn(),
+);
+
+vi.mock("../config/log-context", () => ({
+  runWithLogContext: (ctx: unknown, fn: () => unknown) =>
+    runWithLogContext(ctx, fn),
 }));
 
 import { requestLogger } from "./request-logger";
@@ -41,9 +51,8 @@ beforeEach(() => {
 });
 
 describe("requestLogger", () => {
-  it("logs request info at info level", async () => {
+  it("logs request info with httpRequest field", async () => {
     const app = createApp();
-
     await app.request("/test");
 
     expect(mockLogger.child).toHaveBeenCalledWith(
@@ -55,6 +64,12 @@ describe("requestLogger", () => {
         path: "/test",
         status: 200,
         duration: expect.any(Number),
+        httpRequest: expect.objectContaining({
+          requestMethod: "GET",
+          requestUrl: expect.stringContaining("/test"),
+          status: 200,
+          latency: expect.stringMatching(/^\d+\.\d{3}s$/),
+        }),
       }),
       expect.stringContaining("GET /test → 200"),
     );
@@ -62,12 +77,10 @@ describe("requestLogger", () => {
 
   it("sets x-request-id response header", async () => {
     const app = createApp();
-
     const res = await app.request("/test");
     const requestId = res.headers.get("x-request-id");
 
     expect(requestId).toBeTruthy();
-    // UUID v4 format
     expect(requestId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     );
@@ -75,7 +88,6 @@ describe("requestLogger", () => {
 
   it("sets logger and requestId on context", async () => {
     const app = createApp();
-
     const res = await app.request("/context");
     const body = await res.json();
 
@@ -85,9 +97,8 @@ describe("requestLogger", () => {
     );
   });
 
-  it("logs POST requests", async () => {
+  it("logs POST requests with their method and status", async () => {
     const app = createApp();
-
     await app.request("/items", { method: "POST" });
 
     expect(mockChildLogger.info).toHaveBeenCalledWith(
@@ -95,18 +106,20 @@ describe("requestLogger", () => {
         method: "POST",
         path: "/items",
         status: 201,
+        httpRequest: expect.objectContaining({
+          requestMethod: "POST",
+          status: 201,
+        }),
       }),
       expect.stringContaining("POST /items → 201"),
     );
   });
 
-  it("logs debug details when level is debug", async () => {
+  it("emits debug-level incoming + response when level=debug", async () => {
     mockChildLogger.level = "debug";
     const app = createApp();
-
     await app.request("/test");
 
-    // Incoming request logged at debug
     expect(mockChildLogger.debug).toHaveBeenCalledWith(
       expect.objectContaining({
         method: "GET",
@@ -117,7 +130,6 @@ describe("requestLogger", () => {
       "→ incoming request",
     );
 
-    // Response logged at debug
     const responseCall = mockChildLogger.debug.mock.calls.find(
       (call: unknown[]) => call[1] === "← response sent",
     );
@@ -129,29 +141,22 @@ describe("requestLogger", () => {
     expect(responseCall![0]).toHaveProperty("contentLength");
   });
 
-  it("logs debug details when level is trace", async () => {
+  it("emits debug-level details when level=trace", async () => {
     mockChildLogger.level = "trace";
     const app = createApp();
-
     await app.request("/test");
 
     expect(mockChildLogger.debug).toHaveBeenCalledWith(
-      expect.objectContaining({
-        method: "GET",
-        path: "/test",
-      }),
+      expect.objectContaining({ method: "GET", path: "/test" }),
       "→ incoming request",
     );
-
     expect(mockChildLogger.debug).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 200,
-      }),
+      expect.objectContaining({ status: 200 }),
       "← response sent",
     );
   });
 
-  it("redacts sensitive headers", async () => {
+  it("redacts sensitive headers at debug level", async () => {
     mockChildLogger.level = "debug";
     const app = createApp();
 
@@ -174,12 +179,144 @@ describe("requestLogger", () => {
     expect(headers["x-custom"]).toBe("visible");
   });
 
-  it("does not log debug details when level is info", async () => {
+  it("skips debug logs when level=info", async () => {
     mockChildLogger.level = "info";
     const app = createApp();
-
     await app.request("/test");
 
     expect(mockChildLogger.debug).not.toHaveBeenCalled();
+  });
+
+  it("parses X-Cloud-Trace-Context and passes it through ALS context", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: {
+        "x-cloud-trace-context": "abc123def456/9876543210;o=1",
+      },
+    });
+
+    expect(runWithLogContext).toHaveBeenCalledTimes(1);
+    const ctx = runWithLogContext.mock.calls[0]![0] as Record<string, unknown>;
+    expect(ctx).toMatchObject({
+      requestId: expect.any(String),
+      traceId: "abc123def456",
+      spanId: "9876543210",
+      traceSampled: true,
+    });
+  });
+
+  it("parses X-Cloud-Trace-Context without sampled flag", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: { "x-cloud-trace-context": "abc/111" },
+    });
+
+    const ctx = runWithLogContext.mock.calls[0]![0] as Record<string, unknown>;
+    expect(ctx).toMatchObject({
+      traceId: "abc",
+      spanId: "111",
+      traceSampled: false,
+    });
+  });
+
+  it("falls back to W3C traceparent header when x-cloud-trace is absent", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: {
+        traceparent:
+          "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+      },
+    });
+
+    const ctx = runWithLogContext.mock.calls[0]![0] as Record<string, unknown>;
+    expect(ctx).toMatchObject({
+      traceId: "0af7651916cd43dd8448eb211c80319c",
+      spanId: "b7ad6b7169203331",
+      traceSampled: true,
+    });
+  });
+
+  it("marks W3C traceparent as unsampled when flag bit is 0", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: {
+        traceparent:
+          "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-00",
+      },
+    });
+
+    const ctx = runWithLogContext.mock.calls[0]![0] as Record<string, unknown>;
+    expect(ctx.traceSampled).toBe(false);
+  });
+
+  it("ignores malformed x-cloud-trace-context header", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: { "x-cloud-trace-context": "garbage" },
+    });
+
+    const ctx = runWithLogContext.mock.calls[0]![0] as Record<string, unknown>;
+    expect(ctx.traceId).toBeUndefined();
+    expect(ctx.spanId).toBeUndefined();
+  });
+
+  it("ignores malformed traceparent header", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: { traceparent: "not-a-traceparent" },
+    });
+
+    const ctx = runWithLogContext.mock.calls[0]![0] as Record<string, unknown>;
+    expect(ctx.traceId).toBeUndefined();
+  });
+
+  it("prefers X-Cloud-Trace-Context over traceparent", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: {
+        "x-cloud-trace-context": "deadbeef/123;o=1",
+        traceparent:
+          "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+      },
+    });
+
+    const ctx = runWithLogContext.mock.calls[0]![0] as Record<string, unknown>;
+    expect(ctx.traceId).toBe("deadbeef");
+  });
+
+  it("leaves trace fields undefined when no trace headers are present", async () => {
+    const app = createApp();
+    await app.request("/test");
+
+    const ctx = runWithLogContext.mock.calls[0]![0] as Record<string, unknown>;
+    expect(ctx.traceId).toBeUndefined();
+    expect(ctx.spanId).toBeUndefined();
+    expect(ctx.traceSampled).toBeUndefined();
+  });
+
+  it("includes remoteIp from x-forwarded-for and userAgent in httpRequest", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: {
+        "x-forwarded-for": "203.0.113.5, 10.0.0.1",
+        "user-agent": "curl/8.0",
+      },
+    });
+
+    const infoCall = mockChildLogger.info.mock.calls[0]!;
+    expect(infoCall[0].httpRequest).toMatchObject({
+      remoteIp: "203.0.113.5",
+      userAgent: "curl/8.0",
+    });
+  });
+
+  it("falls back to x-real-ip when x-forwarded-for missing", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: { "x-real-ip": "198.51.100.9" },
+    });
+
+    const infoCall = mockChildLogger.info.mock.calls[0]!;
+    expect(infoCall[0].httpRequest.remoteIp).toBe("198.51.100.9");
   });
 });

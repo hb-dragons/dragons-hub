@@ -4,6 +4,11 @@ import { ZodError } from "zod";
 import { logger as rootLogger } from "../config/logger";
 import type { AppEnv } from "../types";
 
+// Marker that tells Cloud Error Reporting to ingest this log entry.
+// https://cloud.google.com/error-reporting/docs/formatting-error-messages
+const REPORTED_ERROR_TYPE =
+  "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent";
+
 export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
   if (error instanceof ZodError) {
     return c.json(
@@ -37,7 +42,10 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
 
   // Use request-scoped logger if available, otherwise root logger
   const log = c.get("logger") ?? rootLogger;
-  log.error({ err: error, stack }, message);
+  log.error(
+    { err: error, stack_trace: stack, "@type": REPORTED_ERROR_TYPE },
+    message,
+  );
 
   return c.json(
     {

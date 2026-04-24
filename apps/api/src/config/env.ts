@@ -20,6 +20,11 @@ const envSchema = z.object({
   GCS_BUCKET_NAME: z.string().min(1).optional(),
   GCS_PROJECT_ID: z.string().min(1).optional(),
 
+  // Logging / observability
+  SERVICE_NAME: z.string().min(1).default("api"),
+  SERVICE_VERSION: z.string().min(1).optional(),
+  GCP_PROJECT_ID: z.string().min(1).optional(),
+
   // WAHA (WhatsApp HTTP API - self-hosted)
   WAHA_BASE_URL: z.string().url().optional(),
   WAHA_SESSION: z.string().default("default"),

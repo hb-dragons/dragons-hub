@@ -18,6 +18,7 @@ import {
 import { getWeekendMatches } from "../../services/social/match-social.service";
 import { generatePostImage } from "../../services/social/social-image.service";
 import { requirePermission } from "../../middleware/rbac";
+import { logger as rootLogger } from "../../config/logger";
 import type { AppEnv } from "../../types";
 
 const socialRoutes = new Hono<AppEnv>();
@@ -175,7 +176,7 @@ socialRoutes.post("/generate", settingsUpdate, async (c) => {
       },
     });
   } catch (e) {
-    console.error("Image generation failed:", e);
+    (c.get("logger") ?? rootLogger).error({ err: e }, "Image generation failed");
     return c.json({ error: e instanceof Error ? e.message : "Image generation failed" }, 500);
   }
 });
