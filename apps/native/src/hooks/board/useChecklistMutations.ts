@@ -6,7 +6,7 @@ import { taskKey } from "./useTaskDetail";
 const tasksPrefix = (boardId: number) => `admin/boards/${boardId}/tasks`;
 
 export function useChecklistMutations(boardId: number) {
-  const { mutate } = useSWRConfig();
+  const { cache, mutate } = useSWRConfig();
 
   async function refresh(taskId: number) {
     await Promise.all([
@@ -21,8 +21,12 @@ export function useChecklistMutations(boardId: number) {
       await refresh(taskId);
     },
     toggle: async (taskId: number, itemId: number, isChecked: boolean) => {
+      const key = taskKey(taskId);
+      const entry = (cache as unknown as { get: (k: unknown) => { data?: unknown } | undefined }).get(key);
+      const snapshot = entry?.data as TaskDetail | undefined;
+
       await mutate(
-        taskKey(taskId),
+        key,
         (prev: TaskDetail | undefined) => {
           if (!prev) return prev;
           const nextChecklist = prev.checklist.map((i) =>
@@ -36,8 +40,16 @@ export function useChecklistMutations(boardId: number) {
         },
         { revalidate: false },
       );
-      await adminBoardApi.updateChecklistItem(taskId, itemId, { isChecked });
-      await refresh(taskId);
+
+      try {
+        await adminBoardApi.updateChecklistItem(taskId, itemId, { isChecked });
+        await refresh(taskId);
+      } catch (error) {
+        // Roll back to previous task detail and force a revalidation.
+        await mutate(key, snapshot, { revalidate: false });
+        void refresh(taskId);
+        throw error;
+      }
     },
     deleteItem: async (taskId: number, itemId: number) => {
       await adminBoardApi.deleteChecklistItem(taskId, itemId);
