@@ -14,6 +14,7 @@ interface Props {
   filters: BoardFilters;
   onToggleMine: () => void;
   onPressPriority: () => void;
+  onClearPriority?: () => void;
   onToggleDueSoon: () => void;
   onToggleUnassigned: () => void;
 }
@@ -22,6 +23,7 @@ export function FilterChips({
   filters,
   onToggleMine,
   onPressPriority,
+  onClearPriority,
   onToggleDueSoon,
   onToggleUnassigned,
 }: Props) {
@@ -75,6 +77,20 @@ export function FilterChips({
             ? i18n.t(`board.priority.${filters.priority}`)
             : i18n.t("board.filters.priority")}
         </Text>
+        {filters.priority != null && onClearPriority ? (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              onClearPriority();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={i18n.t("common.clear")}
+            hitSlop={8}
+            style={{ marginLeft: spacing.xs }}
+          >
+            <Text style={{ ...textStyle(true), fontSize: 14 }}>×</Text>
+          </Pressable>
+        ) : null}
       </Pressable>
 
       <Pressable
