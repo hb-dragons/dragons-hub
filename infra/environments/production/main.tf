@@ -220,6 +220,11 @@ module "api" {
     LOG_LEVEL       = "info"
     GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
     GCS_PROJECT_ID  = var.project_id
+    # Logging / Cloud Logging + Trace correlation.
+    # SERVICE_VERSION is left unset; the logger falls back to K_REVISION,
+    # which Cloud Run updates automatically on every revision.
+    SERVICE_NAME   = "api"
+    GCP_PROJECT_ID = var.project_id
   }
 
   secrets = {
@@ -287,6 +292,10 @@ module "worker" {
     LOG_LEVEL       = "info"
     GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
     GCS_PROJECT_ID  = var.project_id
+    # Logging / Cloud Logging + Trace correlation.
+    # SERVICE_NAME differs from the API so logs are filterable per workload.
+    SERVICE_NAME   = "worker"
+    GCP_PROJECT_ID = var.project_id
   }
 
   secrets = {
