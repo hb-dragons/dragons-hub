@@ -206,6 +206,8 @@
     "details": "Details",
     "cancel": "Abbrechen",
     "save": "Speichern",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
     "loading": "Laden…",
     "vs": "vs",
     "at": "@"
@@ -247,6 +249,22 @@
     },
     "column": {
       "addCard": "+ Karte"
+    },
+    "checklist": {
+      "title": "Checkliste",
+      "addPlaceholder": "Eintrag hinzufügen",
+      "add": "Hinzufügen",
+      "deleteTitle": "Eintrag löschen?",
+      "deleteMessage": "Das kann nicht rückgängig gemacht werden."
+    },
+    "comments": {
+      "title": "Kommentare",
+      "empty": "Noch keine Kommentare.",
+      "addPlaceholder": "Kommentar schreiben",
+      "send": "Senden",
+      "actions": "Kommentar-Aktionen",
+      "deleteTitle": "Kommentar löschen?",
+      "deleteMessage": "Das kann nicht rückgängig gemacht werden."
     }
   },
   "error": {

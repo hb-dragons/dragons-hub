@@ -7,6 +7,7 @@ import { useTaskMutations } from "@/hooks/board/useTaskMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { AssigneePickerSheet, type AssigneePickerHandle } from "./AssigneePickerSheet";
+import { ChecklistSection } from "./ChecklistSection";
 import { PriorityPickerSheet, type PriorityPickerHandle } from "./PriorityPickerSheet";
 import { DuePickerSheet, type DuePickerHandle } from "./DuePickerSheet";
 
@@ -150,6 +151,8 @@ export function TaskDetailBody({ task, boardId }: Props) {
               : i18n.t("board.task.noDue")}
           </Text>
         </Pressable>
+
+        <ChecklistSection task={task} boardId={boardId} />
       </BottomSheetScrollView>
 
       <AssigneePickerSheet ref={assigneePickerRef} />

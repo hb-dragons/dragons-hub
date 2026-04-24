@@ -206,6 +206,8 @@
     "details": "Details",
     "cancel": "Cancel",
     "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
     "loading": "Loading…",
     "vs": "vs",
     "at": "@"
@@ -247,6 +249,22 @@
     },
     "column": {
       "addCard": "+ Add card"
+    },
+    "checklist": {
+      "title": "Checklist",
+      "addPlaceholder": "Add item",
+      "add": "Add",
+      "deleteTitle": "Delete item?",
+      "deleteMessage": "This cannot be undone."
+    },
+    "comments": {
+      "title": "Comments",
+      "empty": "No comments yet.",
+      "addPlaceholder": "Write a comment",
+      "send": "Send",
+      "actions": "Comment actions",
+      "deleteTitle": "Delete comment?",
+      "deleteMessage": "This cannot be undone."
     }
   },
   "error": {
