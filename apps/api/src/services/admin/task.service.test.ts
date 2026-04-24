@@ -13,6 +13,10 @@ vi.mock("../../config/database", () => ({
   ),
 }));
 
+vi.mock("../../workers/queues", () => ({
+  domainEventsQueue: { add: vi.fn().mockResolvedValue(undefined) },
+}));
+
 // --- Imports (after mocks) ---
 
 import {
@@ -832,7 +836,7 @@ describe("task assignees", () => {
     const { taskId } = await setupTaskWithUsers();
     await addAssignee(taskId, "u_alice", "u_root");
     await addAssignee(taskId, "u_bob", "u_root");
-    await removeAssignee(taskId, "u_alice");
+    await removeAssignee(taskId, "u_alice", "u_root");
     const detail = await getTaskDetail(taskId);
     expect(detail!.assignees.map((a) => a.userId)).toEqual(["u_bob"]);
   });
@@ -864,5 +868,88 @@ describe("task assignees", () => {
     expect(filtered).toHaveLength(1);
     const empty = await listTasks(boardId, { assigneeId: "u_bob" });
     expect(empty).toHaveLength(0);
+  });
+});
+
+// --- Event emission tests ---
+
+async function seedTaskAndUsers(boardName = "Test Board") {
+  await ctx.client.exec(
+    `INSERT INTO "user" (id, name, email) VALUES ('caller-1', 'Caller Name', 'caller@test.local')
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await ctx.client.exec(
+    `INSERT INTO "user" (id, name, email) VALUES ('target-1', 'Target', 'target@test.local')
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await ctx.client.exec(`INSERT INTO boards (name) VALUES ('${boardName}')`);
+  await ctx.client.exec(
+    `INSERT INTO board_columns (board_id, name, position, is_done_column) VALUES (1, 'To Do', 0, false)`,
+  );
+  await ctx.client.exec(
+    `INSERT INTO tasks (board_id, column_id, title, created_by) VALUES (1, 1, 'T', 'caller-1')`,
+  );
+  return {
+    taskId: 1,
+    boardId: 1,
+    boardName,
+    callerId: "caller-1",
+    callerName: "Caller Name",
+    targetUserId: "target-1",
+  };
+}
+
+async function getTaskEvents(entityId: number) {
+  const res = await ctx.client.query(
+    `SELECT id, type, entity_type, entity_id, payload, deep_link_path
+     FROM domain_events
+     WHERE entity_type = 'task' AND entity_id = ${entityId}
+     ORDER BY created_at ASC`,
+  );
+  return res.rows as Array<{
+    id: string;
+    type: string;
+    entity_type: string;
+    entity_id: number;
+    payload: Record<string, unknown>;
+    deep_link_path: string;
+  }>;
+}
+
+describe("task event emission — assign / unassign", () => {
+  it("emits task.assigned with the new userId when addAssignee is called", async () => {
+    const { taskId, boardId, boardName, callerId, targetUserId, callerName } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+
+    const events = await getTaskEvents(taskId);
+    expect(events).toHaveLength(1);
+    expect(events[0]!.type).toBe("task.assigned");
+    expect(events[0]!.entity_type).toBe("task");
+    expect(events[0]!.entity_id).toBe(taskId);
+    expect(events[0]!.deep_link_path).toBe(`/admin/boards/${boardId}?task=${taskId}`);
+    const payload = events[0]!.payload;
+    expect(payload.assigneeUserIds).toEqual([targetUserId]);
+    expect(payload.assignedBy).toBe(callerName);
+    expect(payload.boardName).toBe(boardName);
+  });
+
+  it("emits task.unassigned when removeAssignee is called", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+    await removeAssignee(taskId, targetUserId, callerId);
+
+    const events = await getTaskEvents(taskId);
+    expect(events).toHaveLength(2);
+    expect(events[1]!.type).toBe("task.unassigned");
+    expect(events[1]!.payload.unassignedUserIds).toEqual([targetUserId]);
+  });
+
+  it("does not emit on addAssignee when user is already assigned (conflict)", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+    await addAssignee(taskId, targetUserId, callerId);
+
+    const events = await getTaskEvents(taskId);
+    expect(events).toHaveLength(1);
   });
 });

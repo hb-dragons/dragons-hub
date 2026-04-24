@@ -56,7 +56,7 @@ export function buildDomainEvent(params: BuildDomainEventParams): DomainEvent {
   };
 }
 
-type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * Insert a domain event into the database.

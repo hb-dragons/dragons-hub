@@ -16,7 +16,13 @@ import type {
   TaskComment,
   TaskPriority,
   TaskAssignee,
+  EventType,
 } from "@dragons/shared";
+import { EVENT_TYPES } from "@dragons/shared";
+import { publishDomainEvent, type TransactionClient } from "../events/event-publisher";
+import { logger } from "../../config/logger";
+
+const log = logger.child({ service: "task.service" });
 
 export interface TaskFilters {
   columnId?: number;
@@ -72,6 +78,52 @@ async function fetchAssigneesBatch(
     map.set(r.taskId, list);
   }
   return map;
+}
+
+async function loadBoardAndActor(
+  tx: TransactionClient,
+  boardId: number,
+  actorId: string,
+): Promise<{ boardName: string; actorName: string } | null> {
+  const [b] = await tx.select({ name: boards.name }).from(boards).where(eq(boards.id, boardId)).limit(1);
+  if (!b) return null;
+  const [u] = await tx.select({ name: user.name }).from(user).where(eq(user.id, actorId)).limit(1);
+  return { boardName: b.name, actorName: u?.name ?? actorId };
+}
+
+async function emitTaskEvent(params: {
+  type: EventType;
+  taskId: number;
+  boardId: number;
+  title: string;
+  boardName: string;
+  actor: string;
+  payloadExtras: Record<string, unknown>;
+  tx: TransactionClient;
+}): Promise<void> {
+  try {
+    await publishDomainEvent(
+      {
+        type: params.type,
+        source: "manual",
+        entityType: "task",
+        entityId: params.taskId,
+        entityName: params.title,
+        deepLinkPath: `/admin/boards/${params.boardId}?task=${params.taskId}`,
+        actor: params.actor,
+        payload: {
+          taskId: params.taskId,
+          boardId: params.boardId,
+          boardName: params.boardName,
+          title: params.title,
+          ...params.payloadExtras,
+        },
+      },
+      params.tx,
+    );
+  } catch (err) {
+    log.warn({ err, taskId: params.taskId, type: params.type }, "Failed to emit task event");
+  }
 }
 
 export async function listTasks(
@@ -478,50 +530,93 @@ export async function addAssignee(
   userId: string,
   callerId: string,
 ): Promise<TaskAssignee | null> {
-  const [task] = await db
-    .select({ id: tasks.id })
-    .from(tasks)
-    .where(eq(tasks.id, taskId))
-    .limit(1);
-  if (!task) return null;
+  return await db.transaction(async (tx) => {
+    const [task] = await tx
+      .select({ id: tasks.id, boardId: tasks.boardId, title: tasks.title, dueDate: tasks.dueDate, priority: tasks.priority })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+    if (!task) return null;
 
-  const [u] = await db
-    .select({ id: user.id, name: user.name })
-    .from(user)
-    .where(eq(user.id, userId))
-    .limit(1);
-  if (!u) return null;
+    const [u] = await tx
+      .select({ id: user.id, name: user.name })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1);
+    if (!u) return null;
 
-  await db
-    .insert(taskAssignees)
-    .values({ taskId, userId, assignedBy: callerId })
-    .onConflictDoNothing();
+    const insertResult = await tx
+      .insert(taskAssignees)
+      .values({ taskId, userId, assignedBy: callerId })
+      .onConflictDoNothing()
+      .returning({ userId: taskAssignees.userId });
+    const created = insertResult.length > 0;
 
-  const [row] = await db
-    .select({
-      userId: taskAssignees.userId,
-      assignedAt: taskAssignees.assignedAt,
-    })
-    .from(taskAssignees)
-    .where(
-      and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)),
-    );
-  return row
-    ? { userId, name: u.name, assignedAt: row.assignedAt.toISOString() }
-    : null;
+    const [row] = await tx
+      .select({ userId: taskAssignees.userId, assignedAt: taskAssignees.assignedAt })
+      .from(taskAssignees)
+      .where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)));
+
+    if (created) {
+      const ctx = await loadBoardAndActor(tx, task.boardId, callerId);
+      if (ctx) {
+        await emitTaskEvent({
+          type: EVENT_TYPES.TASK_ASSIGNED,
+          taskId: task.id,
+          boardId: task.boardId,
+          title: task.title,
+          boardName: ctx.boardName,
+          actor: callerId,
+          payloadExtras: {
+            assigneeUserIds: [userId],
+            assignedBy: ctx.actorName,
+            dueDate: task.dueDate,
+            priority: task.priority ?? "normal",
+          },
+          tx,
+        });
+      }
+    }
+
+    return row ? { userId, name: u.name, assignedAt: row.assignedAt.toISOString() } : null;
+  });
 }
 
 export async function removeAssignee(
   taskId: number,
   userId: string,
+  callerId: string,
 ): Promise<boolean> {
-  const result = await db
-    .delete(taskAssignees)
-    .where(
-      and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)),
-    )
-    .returning({ taskId: taskAssignees.taskId });
-  return result.length > 0;
+  return await db.transaction(async (tx) => {
+    const [task] = await tx
+      .select({ id: tasks.id, boardId: tasks.boardId, title: tasks.title, dueDate: tasks.dueDate, priority: tasks.priority })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+    if (!task) return false;
+
+    const deleted = await tx
+      .delete(taskAssignees)
+      .where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)))
+      .returning({ taskId: taskAssignees.taskId });
+
+    if (deleted.length === 0) return false;
+
+    const ctx = await loadBoardAndActor(tx, task.boardId, callerId);
+    if (ctx) {
+      await emitTaskEvent({
+        type: EVENT_TYPES.TASK_UNASSIGNED,
+        taskId: task.id,
+        boardId: task.boardId,
+        title: task.title,
+        boardName: ctx.boardName,
+        actor: callerId,
+        payloadExtras: { unassignedUserIds: [userId], unassignedBy: ctx.actorName },
+        tx,
+      });
+    }
+    return true;
+  });
 }
 
 // --- Checklist Items ---
