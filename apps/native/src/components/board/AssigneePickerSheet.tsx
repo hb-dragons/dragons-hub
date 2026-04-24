@@ -35,12 +35,11 @@ export interface AssigneePickerHandle {
 export const AssigneePickerSheet = forwardRef<AssigneePickerHandle>(
   function AssigneePickerSheet(_props, ref) {
     const sheetRef = useRef<BottomSheetModal>(null);
-    const currentRef = useRef<Set<string>>(new Set());
     const onToggleRef = useRef<(id: string, add: boolean) => void | Promise<void>>(
       () => {},
     );
     const [search, setSearch] = useState("");
-    const [assigneeVersion, setAssigneeVersion] = useState(0);
+    const [assignedIds, setAssignedIds] = useState<Set<string>>(() => new Set());
     const snapPoints = useMemo(() => ["92%"], []);
     const { colors, spacing, radius } = useTheme();
 
@@ -48,10 +47,9 @@ export const AssigneePickerSheet = forwardRef<AssigneePickerHandle>(
       ref,
       () => ({
         open: (_taskId, currentAssignees, onToggle) => {
-          currentRef.current = new Set(currentAssignees.map((a) => a.userId));
+          setAssignedIds(new Set(currentAssignees.map((a) => a.userId)));
           onToggleRef.current = onToggle;
           setSearch("");
-          setAssigneeVersion((v) => v + 1);
           sheetRef.current?.present();
         },
       }),
@@ -86,30 +84,35 @@ export const AssigneePickerSheet = forwardRef<AssigneePickerHandle>(
 
     const assignedFirst = useMemo(() => {
       return [...users].sort((a, b) => {
-        const aHas = currentRef.current.has(a.id) ? 0 : 1;
-        const bHas = currentRef.current.has(b.id) ? 0 : 1;
+        const aHas = assignedIds.has(a.id) ? 0 : 1;
+        const bHas = assignedIds.has(b.id) ? 0 : 1;
         return aHas - bHas;
       });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [users, assigneeVersion]);
+    }, [users, assignedIds]);
 
     const renderItem = useCallback(
       ({ item }: { item: PickableUser }) => {
-        const isAssigned = currentRef.current.has(item.id);
+        const isAssigned = assignedIds.has(item.id);
         return (
           <Pressable
             onPress={async () => {
               const next = !isAssigned;
-              if (next) currentRef.current.add(item.id);
-              else currentRef.current.delete(item.id);
-              setAssigneeVersion((v) => v + 1);
+              setAssignedIds((prev) => {
+                const nextSet = new Set(prev);
+                if (next) nextSet.add(item.id);
+                else nextSet.delete(item.id);
+                return nextSet;
+              });
               try {
                 await onToggleRef.current(item.id, next);
               } catch {
                 // rollback on failure
-                if (next) currentRef.current.delete(item.id);
-                else currentRef.current.add(item.id);
-                setAssigneeVersion((v) => v + 1);
+                setAssignedIds((prev) => {
+                  const rollback = new Set(prev);
+                  if (next) rollback.delete(item.id);
+                  else rollback.add(item.id);
+                  return rollback;
+                });
               }
             }}
             accessibilityRole="button"
@@ -162,9 +165,7 @@ export const AssigneePickerSheet = forwardRef<AssigneePickerHandle>(
           </Pressable>
         );
       },
-      // assigneeVersion drives re-render when assignment state changes
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      [colors, spacing, radius, assigneeVersion],
+      [colors, spacing, radius, assignedIds],
     );
 
     return (
