@@ -265,6 +265,12 @@
       "actions": "Comment actions",
       "deleteTitle": "Delete comment?",
       "deleteMessage": "This cannot be undone."
+    },
+    "moveTo": {
+      "title": "Move to column",
+      "top": "Top",
+      "bottom": "Bottom",
+      "confirm": "Move"
     }
   },
   "error": {

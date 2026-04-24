@@ -265,6 +265,12 @@
       "actions": "Kommentar-Aktionen",
       "deleteTitle": "Kommentar löschen?",
       "deleteMessage": "Das kann nicht rückgängig gemacht werden."
+    },
+    "moveTo": {
+      "title": "In Spalte verschieben",
+      "top": "Oben",
+      "bottom": "Unten",
+      "confirm": "Verschieben"
     }
   },
   "error": {
