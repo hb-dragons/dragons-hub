@@ -1,10 +1,12 @@
-import { useState } from "react";
-import { Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import type { TaskDetail } from "@dragons/shared";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { PriorityPickerSheet, type PriorityPickerHandle } from "./PriorityPickerSheet";
+import { DuePickerSheet, type DuePickerHandle } from "./DuePickerSheet";
 
 interface Props {
   task: TaskDetail;
@@ -12,8 +14,10 @@ interface Props {
 }
 
 export function TaskDetailBody({ task, boardId }: Props) {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, radius } = useTheme();
   const mutations = useTaskMutations(boardId);
+  const priorityRef = useRef<PriorityPickerHandle>(null);
+  const dueRef = useRef<DuePickerHandle>(null);
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -30,45 +34,93 @@ export function TaskDetailBody({ task, boardId }: Props) {
     await mutations.setDescription(task.id, next);
   };
 
+  const rowStyle = {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceBase,
+    borderWidth: 1,
+    borderColor: colors.border,
+  };
+
   return (
-    <BottomSheetScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
-      <BottomSheetTextInput
-        value={title}
-        onChangeText={setTitle}
-        onBlur={saveTitle}
-        style={{
-          color: colors.foreground,
-          fontSize: 20,
-          fontWeight: "700",
-          paddingVertical: spacing.xs,
-        }}
-        placeholder={i18n.t("board.task.titlePlaceholder")}
-        placeholderTextColor={colors.mutedForeground}
-        multiline
-      />
+    <>
+      <BottomSheetScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
+        <BottomSheetTextInput
+          value={title}
+          onChangeText={setTitle}
+          onBlur={saveTitle}
+          style={{
+            color: colors.foreground,
+            fontSize: 20,
+            fontWeight: "700",
+            paddingVertical: spacing.xs,
+          }}
+          placeholder={i18n.t("board.task.titlePlaceholder")}
+          placeholderTextColor={colors.mutedForeground}
+          multiline
+        />
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+            {i18n.t("board.task.idLabel", { id: task.id })}
+          </Text>
+        </View>
+        <BottomSheetTextInput
+          value={description}
+          onChangeText={setDescription}
+          onBlur={saveDescription}
+          multiline
+          style={{
+            color: colors.foreground,
+            fontSize: 15,
+            minHeight: 80,
+            paddingVertical: spacing.xs,
+          }}
+          placeholder={i18n.t("board.task.descriptionPlaceholder")}
+          placeholderTextColor={colors.mutedForeground}
+        />
 
-      <View style={{ flexDirection: "row", gap: spacing.sm }}>
-        <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
-          {i18n.t("board.task.idLabel", { id: task.id })}
-        </Text>
-      </View>
+        <Pressable
+          onPress={() =>
+            priorityRef.current?.open(task.priority, (p) => {
+              void mutations.setPriority(task.id, p);
+            })
+          }
+          accessibilityRole="button"
+          style={rowStyle}
+        >
+          <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>
+            {i18n.t("board.task.priority")}
+          </Text>
+          <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>
+            {i18n.t(`board.priority.${task.priority}`)}
+          </Text>
+        </Pressable>
 
-      <BottomSheetTextInput
-        value={description}
-        onChangeText={setDescription}
-        onBlur={saveDescription}
-        multiline
-        style={{
-          color: colors.foreground,
-          fontSize: 15,
-          minHeight: 80,
-          paddingVertical: spacing.xs,
-        }}
-        placeholder={i18n.t("board.task.descriptionPlaceholder")}
-        placeholderTextColor={colors.mutedForeground}
-      />
+        <Pressable
+          onPress={() =>
+            dueRef.current?.open(task.dueDate, (iso) => {
+              void mutations.setDueDate(task.id, iso);
+            })
+          }
+          accessibilityRole="button"
+          style={rowStyle}
+        >
+          <Text style={{ color: colors.mutedForeground, fontSize: 14 }}>
+            {i18n.t("board.task.due")}
+          </Text>
+          <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: "600" }}>
+            {task.dueDate
+              ? new Date(task.dueDate).toLocaleDateString()
+              : i18n.t("board.task.noDue")}
+          </Text>
+        </Pressable>
+      </BottomSheetScrollView>
 
-      {/* Priority / Due / Assignees / Checklist / Comments slots wired in later phases */}
-    </BottomSheetScrollView>
+      <PriorityPickerSheet ref={priorityRef} />
+      <DuePickerSheet ref={dueRef} />
+    </>
   );
 }
