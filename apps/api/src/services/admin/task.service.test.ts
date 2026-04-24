@@ -916,6 +916,68 @@ async function getTaskEvents(entityId: number) {
   }>;
 }
 
+async function seedBoardColumn() {
+  await ctx.client.exec(
+    `INSERT INTO "user" (id, name, email) VALUES ('caller-2', 'Caller', 'c2@test.local')
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await ctx.client.exec(
+    `INSERT INTO "user" (id, name, email) VALUES ('target-2', 'Target', 't2@test.local')
+     ON CONFLICT (id) DO NOTHING`,
+  );
+  await ctx.client.exec(`INSERT INTO boards (name) VALUES ('B')`);
+  await ctx.client.exec(
+    `INSERT INTO board_columns (board_id, name, position, is_done_column) VALUES (1, 'To Do', 0, false)`,
+  );
+  return { boardId: 1, columnId: 1, callerId: "caller-2", targetUserId: "target-2" };
+}
+
+describe("task event emission — createTask + updateTask diff", () => {
+  it("emits task.assigned for initial assignees when createTask includes assigneeIds", async () => {
+    const { boardId, columnId, callerId, targetUserId } = await seedBoardColumn();
+    const task = await createTask(
+      boardId,
+      { title: "X", assigneeIds: [targetUserId], columnId },
+      callerId,
+    );
+
+    const events = await getTaskEvents(task!.id);
+    expect(events).toHaveLength(1);
+    expect(events[0]!.type).toBe("task.assigned");
+    expect(events[0]!.payload.assigneeUserIds).toEqual([targetUserId]);
+  });
+
+  it("emits only for newly-added userIds when updateTask replaces assignees", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await ctx.client.exec(
+      `INSERT INTO "user" (id, name, email) VALUES ('other-1', 'Other', 'other@test.local')
+       ON CONFLICT (id) DO NOTHING`,
+    );
+
+    await addAssignee(taskId, targetUserId, callerId);
+    await updateTask(taskId, { assigneeIds: ["other-1"] }, callerId);
+
+    const events = await getTaskEvents(taskId);
+    // 1: addAssignee target, 2: unassigned target in update, 3: assigned other in update
+    expect(events).toHaveLength(3);
+    expect(events[1]!.type).toBe("task.unassigned");
+    expect(events[1]!.payload.unassignedUserIds).toEqual([targetUserId]);
+    expect(events[2]!.type).toBe("task.assigned");
+    expect(events[2]!.payload.assigneeUserIds).toEqual(["other-1"]);
+  });
+
+  it("does not emit when updateTask leaves assigneeIds unchanged", async () => {
+    const { taskId, callerId, targetUserId } = await seedTaskAndUsers();
+    await addAssignee(taskId, targetUserId, callerId);
+    const before = (await getTaskEvents(taskId)).length;
+
+    await updateTask(taskId, { assigneeIds: [targetUserId] }, callerId);
+
+    const after = (await getTaskEvents(taskId)).length;
+    expect(after).toBe(before);
+  });
+});
+
 describe("task event emission — assign / unassign", () => {
   it("emits task.assigned with the new userId when addAssignee is called", async () => {
     const { taskId, boardId, boardName, callerId, targetUserId, callerName } = await seedTaskAndUsers();
