@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef } from "react";
 import { View, Text, Pressable } from "react-native";
 import type { TaskCardData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
@@ -16,6 +17,14 @@ export interface TaskCardLayout {
   height: number;
 }
 
+export interface TaskRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  columnId: number;
+}
+
 interface TaskCardProps {
   task: TaskCardData;
   onPress: (task: TaskCardData) => void;
@@ -31,6 +40,8 @@ interface TaskCardProps {
   onDragEnd?: () => void;
   /** When true the card body is rendered transparent so only the ghost is visible. */
   isBeingDragged?: boolean;
+  /** Called with the card's screen rect after layout. Lets the parent track drop targets. */
+  onMeasure?: (taskId: number, rect: TaskRect) => void;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -43,6 +54,7 @@ export function TaskCard({
   onDragMove,
   onDragEnd,
   isBeingDragged = false,
+  onMeasure,
 }: TaskCardProps) {
   const { colors, spacing, radius } = useTheme();
 
@@ -54,6 +66,27 @@ export function TaskCard({
   const firstAssigneeName = task.assignees[0]?.name ?? null;
 
   const cardRef = useAnimatedRef<Animated.View>();
+  // Plain View ref for measureInWindow (works from JS thread)
+  const viewRef = useRef<View>(null);
+
+  const measureCard = useCallback(() => {
+    if (!onMeasure) return;
+    const t = setTimeout(() => {
+      viewRef.current?.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0) {
+          onMeasure(task.id, { x, y, width, height, columnId: task.columnId });
+        }
+      });
+    }, 50);
+    return t;
+  }, [onMeasure, task.id, task.columnId]);
+
+  useEffect(() => {
+    const t = measureCard();
+    return () => {
+      if (t !== undefined) clearTimeout(t);
+    };
+  }, [measureCard, task.position, task.columnId]);
 
   // Only build the drag gesture when callbacks are wired up.
   const dragGesture = (() => {
@@ -107,6 +140,7 @@ export function TaskCard({
       delayLongPress={350}
       accessibilityRole="button"
       accessibilityLabel={task.title}
+      onLayout={measureCard}
       style={({ pressed }) => ({
         padding: spacing.md,
         borderRadius: radius.md,
@@ -118,6 +152,12 @@ export function TaskCard({
         opacity: isBeingDragged ? 0 : 1,
       })}
     >
+      {/* Plain View for measureInWindow — Animated.View ref is for worklet measure */}
+      <View
+        ref={viewRef}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+        pointerEvents="none"
+      />
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
         {priorityDot ? (
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: priorityDot }} />

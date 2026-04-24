@@ -6,11 +6,12 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
-import { BoardColumn } from "./BoardColumn";
-import type { TaskCardLayout } from "./TaskCard";
+import { BoardColumn, type BoardColumnHandle, type ColumnRect } from "./BoardColumn";
+import type { TaskCardLayout, TaskRect } from "./TaskCard";
 
 export interface BoardPagerHandle {
   scrollToIndex: (i: number, animated?: boolean) => void;
+  getScrollRef: () => ScrollView | null;
 }
 
 interface BoardPagerProps {
@@ -27,6 +28,14 @@ interface BoardPagerProps {
   onTaskDragStart?: (task: TaskCardData, layout: TaskCardLayout) => void;
   onTaskDragMove?: (pageX: number, pageY: number) => void;
   onTaskDragEnd?: () => void;
+  /** Called when a column's outer rect is measured. */
+  onColumnMeasure?: (columnId: number, rect: ColumnRect) => void;
+  /** Called when a task card rect is measured. */
+  onTaskMeasure?: (taskId: number, rect: TaskRect) => void;
+  /** Called when a column's scroll offset changes. */
+  onScrollUpdate?: (columnId: number, y: number) => void;
+  /** Refs to individual column scroll views, keyed by column ID. */
+  columnRefs?: React.MutableRefObject<Map<number, BoardColumnHandle>>;
 }
 
 export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
@@ -43,6 +52,10 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
       onTaskDragStart,
       onTaskDragMove,
       onTaskDragEnd,
+      onColumnMeasure,
+      onTaskMeasure,
+      onScrollUpdate,
+      columnRefs,
     },
     ref,
   ) {
@@ -56,6 +69,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
         scrollToIndex: (i: number, animated = true) => {
           scrollRef.current?.scrollTo({ x: i * columnWidth, y: 0, animated });
         },
+        getScrollRef: () => scrollRef.current,
       }),
       [columnWidth],
     );
@@ -81,6 +95,14 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
         {columns.map((col) => (
           <BoardColumn
             key={col.id}
+            ref={(handle) => {
+              if (!columnRefs) return;
+              if (handle) {
+                columnRefs.current.set(col.id, handle);
+              } else {
+                columnRefs.current.delete(col.id);
+              }
+            }}
             column={col}
             tasks={tasks}
             width={columnWidth}
@@ -92,6 +114,9 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
             onTaskDragStart={onTaskDragStart}
             onTaskDragMove={onTaskDragMove}
             onTaskDragEnd={onTaskDragEnd}
+            onColumnMeasure={onColumnMeasure}
+            onTaskMeasure={onTaskMeasure}
+            onScrollUpdate={onScrollUpdate}
           />
         ))}
       </ScrollView>
