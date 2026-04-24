@@ -1,6 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { logger } from "../config/logger";
 import { runWithLogContext, type LogContext } from "../config/log-context";
+import { anonymizeIp, scrubUrl } from "../config/log-privacy";
 import type { AppEnv } from "../types";
 
 const REDACTED_HEADERS = new Set(["authorization", "cookie", "set-cookie"]);
@@ -54,7 +55,9 @@ export const requestLogger = createMiddleware<AppEnv>(async (c, next) => {
   c.header("x-request-id", requestId);
 
   const { method, path } = c.req;
-  const url = c.req.url;
+  // requestUrl / debug url have query values scrubbed so we never persist
+  // PII that the caller embedded in the URL (email, token, userId, ...).
+  const sanitizedUrl = scrubUrl(c.req.url);
 
   await runWithLogContext(ctx, async () => {
     if (childLogger.level === "debug" || childLogger.level === "trace") {
@@ -62,7 +65,10 @@ export const requestLogger = createMiddleware<AppEnv>(async (c, next) => {
       c.req.raw.headers.forEach((value, key) => {
         headers[key] = REDACTED_HEADERS.has(key) ? "[REDACTED]" : value;
       });
-      childLogger.debug({ method, path, url, headers }, "→ incoming request");
+      childLogger.debug(
+        { method, path, url: sanitizedUrl, headers },
+        "→ incoming request",
+      );
     }
 
     await next();
@@ -71,16 +77,19 @@ export const requestLogger = createMiddleware<AppEnv>(async (c, next) => {
     const duration = Math.round(durationMs);
     const status = c.res.status;
     const userAgent = c.req.header("user-agent");
-    const remoteIp =
+    const rawIp =
       c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
       c.req.header("x-real-ip");
+    // IP is anonymized (last IPv4 octet / last 64 IPv6 bits zeroed) so the
+    // logged value is no longer personal data under GDPR Art. 4(1).
+    const remoteIp = anonymizeIp(rawIp);
     const responseSize = c.res.headers.get("content-length");
 
     // Cloud Logging renders this field as a proper HTTP row with status + latency.
     // https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#httprequest
     const httpRequest: Record<string, unknown> = {
       requestMethod: method,
-      requestUrl: url,
+      requestUrl: sanitizedUrl,
       status,
       latency: `${(durationMs / 1000).toFixed(3)}s`,
     };

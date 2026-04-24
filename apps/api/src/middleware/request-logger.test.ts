@@ -294,7 +294,7 @@ describe("requestLogger", () => {
     expect(ctx.traceSampled).toBeUndefined();
   });
 
-  it("includes remoteIp from x-forwarded-for and userAgent in httpRequest", async () => {
+  it("anonymizes remoteIp (IPv4) sourced from x-forwarded-for", async () => {
     const app = createApp();
     await app.request("/test", {
       headers: {
@@ -305,18 +305,31 @@ describe("requestLogger", () => {
 
     const infoCall = mockChildLogger.info.mock.calls[0]!;
     expect(infoCall[0].httpRequest).toMatchObject({
-      remoteIp: "203.0.113.5",
+      remoteIp: "203.0.113.0",
       userAgent: "curl/8.0",
     });
   });
 
-  it("falls back to x-real-ip when x-forwarded-for missing", async () => {
+  it("falls back to x-real-ip and anonymizes it", async () => {
     const app = createApp();
     await app.request("/test", {
       headers: { "x-real-ip": "198.51.100.9" },
     });
 
     const infoCall = mockChildLogger.info.mock.calls[0]!;
-    expect(infoCall[0].httpRequest.remoteIp).toBe("198.51.100.9");
+    expect(infoCall[0].httpRequest.remoteIp).toBe("198.51.100.0");
+  });
+
+  it("redacts query-string values in requestUrl", async () => {
+    const app = createApp();
+    await app.request("/test?email=alice@example.com&token=xyz");
+
+    const infoCall = mockChildLogger.info.mock.calls[0]!;
+    const url = infoCall[0].httpRequest.requestUrl as string;
+    expect(url).toContain("/test");
+    expect(url).toContain("email=%5BREDACTED%5D");
+    expect(url).toContain("token=%5BREDACTED%5D");
+    expect(url).not.toContain("alice@example.com");
+    expect(url).not.toContain("xyz");
   });
 });
