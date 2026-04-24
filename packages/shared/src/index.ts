@@ -71,6 +71,8 @@ export type { BoardColumnData, BoardSummary, BoardData } from "./boards";
 export {
   computeDropTarget,
   buildColumnReorder,
+  applyTaskMove,
+  applyColumnReorder,
 } from "./board-dnd";
 export type { DragItem, DropTarget } from "./board-dnd";
 
