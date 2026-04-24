@@ -2,7 +2,7 @@
 
 export type EventSource = "sync" | "manual" | "reconciliation";
 export type EventUrgency = "immediate" | "routine";
-export type EventEntityType = "match" | "booking" | "referee";
+export type EventEntityType = "match" | "booking" | "referee" | "task";
 
 // ── Event type constants ─────────────────────────────────────────────────────
 
@@ -42,6 +42,12 @@ export const EVENT_TYPES = {
 
   // Sync events
   SYNC_COMPLETED: "sync.completed",
+
+  // Task events
+  TASK_ASSIGNED: "task.assigned",
+  TASK_UNASSIGNED: "task.unassigned",
+  TASK_COMMENT_ADDED: "task.comment.added",
+  TASK_DUE_REMINDER: "task.due.reminder",
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -278,6 +284,48 @@ export interface SyncCompletedPayload {
   eventsEmitted: number;
 }
 
+export interface TaskAssignedPayload {
+  taskId: number;
+  boardId: number;
+  boardName: string;
+  title: string;
+  assigneeUserIds: string[];   // recipient userIds
+  assignedBy: string;          // display name of the acting user (for templates)
+  dueDate: string | null;
+  priority: "low" | "normal" | "high";
+}
+
+export interface TaskUnassignedPayload {
+  taskId: number;
+  boardId: number;
+  boardName: string;
+  title: string;
+  unassignedUserIds: string[]; // recipient userIds
+  unassignedBy: string;        // display name of the acting user (for templates)
+}
+
+export interface TaskCommentAddedPayload {
+  taskId: number;
+  boardId: number;
+  boardName: string;
+  title: string;
+  commentId: number;
+  authorId: string;            // userId of comment author
+  authorName: string;          // display name (for templates)
+  bodyPreview: string;
+  recipientUserIds: string[];
+}
+
+export interface TaskDueReminderPayload {
+  taskId: number;
+  boardId: number;
+  boardName: string;
+  title: string;
+  dueDate: string;
+  reminderKind: "lead" | "day_of";
+  assigneeUserIds: string[];
+}
+
 // ── Union payload type ───────────────────────────────────────────────────────
 
 export type DomainEventPayload =
@@ -301,7 +349,11 @@ export type DomainEventPayload =
   | OverrideConflictPayload
   | OverrideAppliedPayload
   | OverrideRevertedPayload
-  | SyncCompletedPayload;
+  | SyncCompletedPayload
+  | TaskAssignedPayload
+  | TaskUnassignedPayload
+  | TaskCommentAddedPayload
+  | TaskDueReminderPayload;
 
 // ── API response types ───────────────────────────────────────────────────────
 
