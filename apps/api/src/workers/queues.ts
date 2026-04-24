@@ -60,6 +60,11 @@ export const pushReceiptQueue = new Queue("push-receipt", {
   },
 });
 
+export const taskRemindersQueue = new Queue("task-reminders", {
+  prefix: "{bull}",
+  connection: { url: env.REDIS_URL },
+});
+
 export async function triggerRefereeGamesSync(
   triggeredBy?: string,
 ): Promise<{ syncRunId: number; status: string } | null> {
@@ -297,4 +302,22 @@ export async function updateRefereeSyncSchedule(
   } else {
     logger.info("Referee sync schedule disabled");
   }
+}
+
+export async function initTaskReminders(): Promise<void> {
+  const existing = await taskRemindersQueue.getRepeatableJobs();
+  for (const job of existing) {
+    await taskRemindersQueue.removeRepeatableByKey(job.key);
+  }
+  await taskRemindersQueue.add(
+    "sweep",
+    {},
+    {
+      jobId: "task-reminder-sweep-cron",
+      repeat: { every: 15 * 60 * 1000 },
+      removeOnComplete: true,
+      removeOnFail: 100,
+    },
+  );
+  logger.info("Task reminder sweep scheduled (every 15m)");
 }
