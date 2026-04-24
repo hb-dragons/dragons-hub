@@ -8,6 +8,10 @@
 
 **Tech Stack:** TypeScript 6.0, Hono 4.12, Drizzle ORM 0.45, BullMQ 5.70, Redis 7, PostgreSQL 17, Zod 4.3, Vitest 4 (with PGlite), Next.js 16, next-intl 4.9, React 19, SWR 2.4.
 
+**Out of scope in this plan (pre-existing issues not introduced here):**
+- The existing `loadMutedEventTypes` in `notification-pipeline.ts` has a known bug where it tries to match referee recipients (`"referee:<id>"`) against a map keyed by `userId`. This plan extends the function to handle `user:*` recipients correctly and leaves the referee branch untouched. Do not attempt to fix the referee-mute path in this branch — it belongs to a separate PR.
+- `is_done_column` is already fully wired end-to-end (schema, service, API schemas, column-settings-dialog UI). This work only reads the flag in the reminder worker.
+
 ---
 
 ## Reference: files in scope
@@ -501,7 +505,7 @@ describe("renderTaskMessage", () => {
     });
   });
 
-  it("renders task.comment.added with preview", () => {
+  it("renders task.comment.added with preview (English)", () => {
     const payload = {
       taskId: 1,
       boardId: 10,
@@ -517,6 +521,25 @@ describe("renderTaskMessage", () => {
     expect(result).toEqual({
       title: "New comment: Write report",
       body: "Bob: Looks good to me.",
+    });
+  });
+
+  it("renders task.comment.added with preview (German)", () => {
+    const payload = {
+      taskId: 1,
+      boardId: 10,
+      boardName: "Board X",
+      title: "Bericht schreiben",
+      commentId: 7,
+      authorId: "u2",
+      authorName: "Bob",
+      bodyPreview: "Sieht gut aus.",
+      recipientUserIds: ["u1"],
+    };
+    const result = renderTaskMessage("task.comment.added", payload, "Bericht schreiben", "de");
+    expect(result).toEqual({
+      title: "Neuer Kommentar: Bericht schreiben",
+      body: "Bob: Sieht gut aus.",
     });
   });
 
@@ -563,7 +586,7 @@ describe("renderTaskMessage", () => {
 - [ ] **Step 2: Run tests, verify they fail**
 
 Run: `pnpm --filter @dragons/api test templates/task`
-Expected: all 8 tests fail with "Cannot find module './task'".
+Expected: all 9 tests fail with "Cannot find module './task'".
 
 - [ ] **Step 3: Implement the renderer**
 
@@ -728,7 +751,7 @@ export function renderEventMessage(
 - [ ] **Step 5: Run tests, verify they pass**
 
 Run: `pnpm --filter @dragons/api test templates/task`
-Expected: all 8 tests pass.
+Expected: all 9 tests pass.
 
 - [ ] **Step 6: Commit**
 
@@ -909,6 +932,10 @@ Add the following describe block to `apps/api/src/services/notifications/notific
 
 ```ts
 describe("task event dispatch", () => {
+  // Note: task events are in PUSH_ELIGIBLE_EVENTS, so every eligible dispatch
+  // produces ONE in_app row plus ONE push row in notification_log. Tests below
+  // filter by channel when they assert on a specific row shape.
+
   it("dispatches in-app notification to user:<id> recipient", async () => {
     const userId = await createTestUser(db, { name: "Alice", role: "admin" });
     const event = await insertTestTaskEvent(db, {
@@ -918,7 +945,10 @@ describe("task event dispatch", () => {
 
     await processEvent(event);
 
-    const [log] = await db.select().from(notificationLog).where(eq(notificationLog.eventId, event.id));
+    const [log] = await db
+      .select()
+      .from(notificationLog)
+      .where(and(eq(notificationLog.eventId, event.id), eq(notificationLog.channel, "in_app")));
     expect(log).toBeDefined();
     expect(log?.recipientId).toBe(`user:${userId}`);
     expect(log?.title).toContain("New task");
@@ -934,7 +964,10 @@ describe("task event dispatch", () => {
 
     await processEvent(event);
 
-    const [log] = await db.select().from(notificationLog).where(eq(notificationLog.eventId, event.id));
+    const [log] = await db
+      .select()
+      .from(notificationLog)
+      .where(and(eq(notificationLog.eventId, event.id), eq(notificationLog.channel, "in_app")));
     expect(log?.title).toBe("Neue Aufgabe: Test Task");
   });
 
@@ -1052,7 +1085,7 @@ Find the `evaluateDefaults` function. Replace the `recipientId` construction blo
 
 - [ ] **Step 5: Add locale lookup for user recipients**
 
-Add a helper above `dispatchImmediate`:
+Add a helper above `dispatchImmediate` (placement: just before the `async function dispatchImmediate(` declaration):
 
 ```ts
 async function resolveLocaleForRecipient(
@@ -1072,12 +1105,20 @@ async function resolveLocaleForRecipient(
 }
 ```
 
-In `dispatchImmediate`, replace the `locale` derivation line:
+In `dispatchImmediate`, the current code contains this line near the top of the function body (find it with grep):
+
+```ts
+  const locale = (config.config as Record<string, unknown>)?.locale as string ?? "de";
+```
+
+Replace that single line with:
 
 ```ts
   const configLocale = (config.config as Record<string, unknown>)?.locale as string | undefined;
   const locale = await resolveLocaleForRecipient(recipientId, configLocale);
 ```
+
+(The function must now be awaited because `resolveLocaleForRecipient` is async. `dispatchImmediate` is already async, so no signature change is needed.)
 
 - [ ] **Step 6: Run tests, verify they pass**
 
@@ -1266,20 +1307,32 @@ Expected: 3 new tests fail — no `domain_events` rows are inserted by the curre
 
 - [ ] **Step 3: Helper — `emitTaskEvent`**
 
-At the top of `apps/api/src/services/admin/task.service.ts`, after the existing imports, add:
+First, make `TransactionClient` importable. In `apps/api/src/services/events/event-publisher.ts` line 59, change:
 
 ```ts
-import { publishDomainEvent } from "../events/event-publisher";
-import { boards } from "@dragons/db/schema";
-import type { EventType } from "@dragons/shared";
+type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
+```
+
+to:
+
+```ts
+export type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
+```
+
+Then, at the top of `apps/api/src/services/admin/task.service.ts`, after the existing imports, add:
+
+```ts
+import { publishDomainEvent, type TransactionClient } from "../events/event-publisher";
+import { EVENT_TYPES } from "@dragons/shared";
 import { logger } from "../../config/logger";
 
-type TxClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
 const log = logger.child({ service: "task.service" });
+```
+
+(Note: `boards` and `user` tables and the `eq` helper are already imported at the top of the file — do not add them again.)
 
 async function loadBoardAndActor(
-  tx: TxClient,
+  tx: TransactionClient,
   boardId: number,
   actorId: string,
 ): Promise<{ boardName: string; actorName: string } | null> {
@@ -1297,7 +1350,7 @@ async function emitTaskEvent(params: {
   boardName: string;
   actor: string;
   payloadExtras: Record<string, unknown>;
-  tx: TxClient;
+  tx: TransactionClient;
 }): Promise<void> {
   try {
     await publishDomainEvent(
@@ -1368,7 +1421,7 @@ export async function addAssignee(
       const ctx = await loadBoardAndActor(tx, task.boardId, callerId);
       if (ctx) {
         await emitTaskEvent({
-          type: "task.assigned" as EventType,
+          type: EVENT_TYPES.TASK_ASSIGNED,
           taskId: task.id,
           boardId: task.boardId,
           title: task.title,
@@ -1424,7 +1477,7 @@ export async function removeAssignee(
     const ctx = await loadBoardAndActor(tx, task.boardId, callerId);
     if (ctx) {
       await emitTaskEvent({
-        type: "task.unassigned" as EventType,
+        type: EVENT_TYPES.TASK_UNASSIGNED,
         taskId: task.id,
         boardId: task.boardId,
         title: task.title,
@@ -1570,15 +1623,42 @@ Expected: 3 new tests fail.
 
 - [ ] **Step 3: Emit from `createTask`**
 
-In `task.service.ts`, inside the `createTask` function, right before the `return task!;` line at the end of the transaction callback, add:
+In `task.service.ts`, find the existing `createTask` body. The current code ends the transaction block like this:
 
 ```ts
     if (data.assigneeIds && data.assigneeIds.length > 0) {
       const uniq = [...new Set(data.assigneeIds)];
+      await tx
+        .insert(taskAssignees)
+        .values(uniq.map((uid) => ({
+          taskId: task!.id,
+          userId: uid,
+          assignedBy: callerId,
+        })))
+        .onConflictDoNothing();
+    }
+
+    return task!;
+```
+
+Replace that exact block with:
+
+```ts
+    if (data.assigneeIds && data.assigneeIds.length > 0) {
+      const uniq = [...new Set(data.assigneeIds)];
+      await tx
+        .insert(taskAssignees)
+        .values(uniq.map((uid) => ({
+          taskId: task!.id,
+          userId: uid,
+          assignedBy: callerId,
+        })))
+        .onConflictDoNothing();
+
       const ctx = await loadBoardAndActor(tx, boardId, callerId);
       if (ctx) {
         await emitTaskEvent({
-          type: "task.assigned" as EventType,
+          type: EVENT_TYPES.TASK_ASSIGNED,
           taskId: task!.id,
           boardId: task!.boardId,
           title: task!.title,
@@ -1597,8 +1677,6 @@ In `task.service.ts`, inside the `createTask` function, right before the `return
 
     return task!;
 ```
-
-(Position: after the `taskAssignees` insert, before `return task!`.) Remove duplicate assignee-insert logic if it was left over.
 
 - [ ] **Step 4: Emit diff from `updateTask`**
 
@@ -1659,7 +1737,7 @@ export async function updateTask(
         if (ctx) {
           if (removed.length > 0) {
             await emitTaskEvent({
-              type: "task.unassigned" as EventType,
+              type: EVENT_TYPES.TASK_UNASSIGNED,
               taskId: row.id,
               boardId: row.boardId,
               title: row.title,
@@ -1671,7 +1749,7 @@ export async function updateTask(
           }
           if (added.length > 0) {
             await emitTaskEvent({
-              type: "task.assigned" as EventType,
+              type: EVENT_TYPES.TASK_ASSIGNED,
               taskId: row.id,
               boardId: row.boardId,
               title: row.title,
@@ -1817,7 +1895,7 @@ export async function addComment(
       if (ctx) {
         const preview = data.body.length <= 140 ? data.body : `${data.body.slice(0, 140)}…`;
         await emitTaskEvent({
-          type: "task.comment.added" as EventType,
+          type: EVENT_TYPES.TASK_COMMENT_ADDED,
           taskId: task.id,
           boardId: task.boardId,
           title: task.title,
@@ -2066,6 +2144,31 @@ describe("runTaskReminderSweep", () => {
       .where(eq(domainEvents.entityId, taskId));
     expect(events).toHaveLength(0);
   });
+
+  it("re-fires lead reminder after dueDate is changed and timestamps are reset", async () => {
+    const dueIn20h = new Date(Date.now() + 20 * 60 * 60 * 1000);
+    const { taskId } = await setup({ dueDate: dueIn20h });
+
+    await runTaskReminderSweep();
+
+    const newDue = new Date(Date.now() + 10 * 60 * 60 * 1000);
+    await db
+      .update(tasks)
+      .set({
+        dueDate: newDue.toISOString().slice(0, 10),
+        leadReminderSentAt: null,
+        dueReminderSentAt: null,
+      })
+      .where(eq(tasks.id, taskId));
+
+    await runTaskReminderSweep();
+
+    const events = await db
+      .select()
+      .from(domainEvents)
+      .where(eq(domainEvents.entityId, taskId));
+    expect(events).toHaveLength(2);
+  });
 });
 ```
 
@@ -2091,7 +2194,7 @@ import {
   taskAssignees,
 } from "@dragons/db/schema";
 import { publishDomainEvent } from "../services/events/event-publisher";
-import type { EventType } from "@dragons/shared";
+import { EVENT_TYPES } from "@dragons/shared";
 
 const log = logger.child({ service: "task-reminder-worker" });
 
@@ -2169,7 +2272,7 @@ async function emitAndMark(task: TaskReminderRow, kind: "lead" | "day_of"): Prom
     // up the row after commit — do not call enqueueDomainEvent here.
     await publishDomainEvent(
       {
-        type: "task.due.reminder" as EventType,
+        type: EVENT_TYPES.TASK_DUE_REMINDER,
         source: "sync",
         entityType: "task",
         entityId: task.id,
@@ -2815,8 +2918,10 @@ describe("MyNotificationsCard", () => {
       locale: "en",
     });
     render(wrap(<MyNotificationsCard />));
-    await waitFor(() => expect(screen.getByLabelText("Assigned")).not.toBeChecked());
-    expect(screen.getByLabelText("Unassigned")).toBeChecked();
+    await waitFor(() =>
+      expect(screen.getByRole("checkbox", { name: "Assigned" })).not.toBeChecked(),
+    );
+    expect(screen.getByRole("checkbox", { name: "Unassigned" })).toBeChecked();
   });
 
   it("sends PATCH when toggling a checkbox", async () => {
@@ -2826,9 +2931,11 @@ describe("MyNotificationsCard", () => {
       locale: "en",
     });
     render(wrap(<MyNotificationsCard />));
-    await waitFor(() => expect(screen.getByLabelText("Assigned")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("checkbox", { name: "Assigned" })).toBeInTheDocument(),
+    );
 
-    fireEvent.click(screen.getByLabelText("Assigned"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Assigned" }));
 
     await waitFor(() => {
       expect(mocks.fetchAPI).toHaveBeenLastCalledWith("/admin/notifications/preferences", {
