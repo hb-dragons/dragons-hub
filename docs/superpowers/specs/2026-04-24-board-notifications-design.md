@@ -207,11 +207,10 @@ Default for every user is "all event types enabled". Opting out appends the even
 
 **Schema additions:**
 
-```ts
-// packages/db/src/schema/boards.ts — board_columns
-isDoneColumn: boolean("is_done_column").notNull().default(false),
+`board_columns.is_done_column` already exists in the schema (`packages/db/src/schema/boards.ts`) but is currently unused — surfacing it in the UI is part of this work.
 
-// packages/db/src/schema/tasks.ts — tasks
+```ts
+// packages/db/src/schema/tasks.ts — tasks (new)
 leadReminderSentAt: timestamp("lead_reminder_sent_at", { withTimezone: true }),
 dueReminderSentAt: timestamp("due_reminder_sent_at", { withTimezone: true }),
 ```
@@ -322,10 +321,6 @@ Frontend iterates to render; backend validates PATCH payloads against this list.
 Summary of all schema changes in one migration:
 
 ```sql
--- board_columns
-ALTER TABLE board_columns
-  ADD COLUMN is_done_column boolean NOT NULL DEFAULT false;
-
 -- tasks
 ALTER TABLE tasks
   ADD COLUMN lead_reminder_sent_at timestamptz,
@@ -338,7 +333,7 @@ ALTER TABLE user_notification_preferences
   DROP COLUMN notify_on_task_comment;
 ```
 
-No data migration needed — the three dropped columns were never wired into user-facing UI or the pipeline.
+No data migration needed — the three dropped columns were never wired into user-facing UI or the pipeline. `board_columns.is_done_column` already exists in the schema and requires no migration.
 
 ## Legacy cleanup
 
