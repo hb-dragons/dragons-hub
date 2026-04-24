@@ -61,6 +61,7 @@ function RootNavigator() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ title: "" }} />
+        <Stack.Screen name="admin" options={{ headerShown: false }} />
         <Stack.Screen name="team/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="game/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="referee-game/[id]" options={detailHeaderOptions} />
