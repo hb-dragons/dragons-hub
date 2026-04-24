@@ -157,3 +157,6 @@ export {
 export type { RoleName, Resource, Action } from "./rbac";
 
 export * from "./referee-history";
+
+// Notification events
+export * from "./notification-events";
