@@ -223,7 +223,20 @@
       "unnamedUser": "Unbenannt",
       "titlePlaceholder": "Aufgabentitel",
       "descriptionPlaceholder": "Beschreibung hinzufügen",
-      "idLabel": "#%{id}"
+      "idLabel": "#%{id}",
+      "priority": "Priorität",
+      "due": "Fällig",
+      "noDue": "Kein Fälligkeitsdatum"
+    },
+    "priority": {
+      "low": "Niedrig",
+      "normal": "Normal",
+      "high": "Hoch",
+      "urgent": "Dringend"
+    },
+    "due": {
+      "clear": "Entfernen",
+      "set": "Setzen"
     },
     "column": {
       "addCard": "+ Karte"
