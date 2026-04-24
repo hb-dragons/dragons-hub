@@ -19,6 +19,7 @@ vi.mock("@dragons/db/schema", () => ({
   userNotificationPreferences: {
     userId: "userId",
     mutedEventTypes: "mutedEventTypes",
+    locale: "locale",
   },
 }));
 
@@ -150,29 +151,38 @@ function setupDbMocks(opts: {
   rules?: Record<string, unknown>[];
   configs?: Record<string, unknown>[];
   prefs?: Record<string, unknown>[];
+  localePrefs?: Record<string, unknown>[];
 }) {
   const rules = opts.rules ?? [];
   const configs = opts.configs ?? [];
   const prefs = opts.prefs ?? [];
+  const localePrefs = opts.localePrefs ?? [];
 
   // db.select() is called for:
   // 1+2: rules and configs (via Promise.all in loadRulesAndConfigs)
   // 3: userNotificationPreferences (in loadMutedEventTypes)
+  // 4: userNotificationPreferences (in resolveLocaleForRecipient, per user recipient)
   let callIndex = 0;
-  const callSequence = [rules, configs, prefs];
+  const callSequence = [rules, configs, prefs, localePrefs];
 
   mockDbSelect.mockImplementation(() => {
     const idx = callIndex++;
     const data = callSequence[idx] ?? [];
-    // Some queries use .where() (rules, configs), others don't (prefs).
-    // Return a mock that resolves via either path.
+    // Some queries use .where() (rules, configs), some use .where().limit() (locale),
+    // others use no chaining (prefs). Return a mock that resolves via any path.
     const mockResult = Promise.resolve(data);
-    return {
-      from: vi.fn().mockReturnValue({
-        ...mockResult,
-        where: vi.fn().mockResolvedValue(data),
-        then: mockResult.then.bind(mockResult),
+    const withClause = {
+      ...mockResult,
+      where: vi.fn().mockReturnValue({
+        ...Promise.resolve(data),
+        limit: vi.fn().mockResolvedValue(data),
+        then: Promise.resolve(data).then.bind(Promise.resolve(data)),
       }),
+      limit: vi.fn().mockResolvedValue(data),
+      then: mockResult.then.bind(mockResult),
+    };
+    return {
+      from: vi.fn().mockReturnValue(withClause),
     };
   });
 
@@ -941,6 +951,73 @@ describe("processEvent", () => {
 
       expect(result.dispatched).toBe(0);
       expect(result.buffered).toBe(1);
+    });
+  });
+
+  describe("task event dispatch", () => {
+    // Note: task events are in PUSH_ELIGIBLE_EVENTS, so every eligible dispatch
+    // produces ONE in_app row plus ONE push row in notification_log. Tests below
+    // filter by channel when they assert on a specific row shape.
+
+    it("dispatches in-app notification to user:<id> recipient", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { locale: "de" } });
+      setupDbMocks({ rules: [], configs: [config], localePrefs: [{ locale: "de" }] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "user", channel: "in_app", userId: "user-alice" },
+      ]);
+
+      const result = await processEvent(
+        makeEvent({ type: "task.assigned", entityType: "task", entityId: 1, entityName: "Test Task" }),
+      );
+
+      expect(mockInAppSend).toHaveBeenCalledTimes(1);
+      expect(mockInAppSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipientId: "user:user-alice",
+        }),
+      );
+      expect(result.dispatched).toBe(1);
+    });
+
+    it("uses German locale when user preference is de", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { locale: "en" } });
+      // User preference locale overrides channel config locale
+      setupDbMocks({ rules: [], configs: [config], localePrefs: [{ locale: "de" }] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "user", channel: "in_app", userId: "user-anna" },
+      ]);
+      mockRenderEventMessage.mockReturnValue({ title: "Neue Aufgabe: Test Task", body: "..." });
+
+      await processEvent(
+        makeEvent({ type: "task.assigned", entityType: "task", entityId: 1, entityName: "Test Task" }),
+      );
+
+      expect(mockRenderEventMessage).toHaveBeenCalledWith(
+        "task.assigned",
+        expect.any(Object),
+        "Test Task",
+        "de",
+      );
+    });
+
+    it("skips dispatch when user has muted the event type", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { locale: "de" } });
+      setupDbMocks({
+        rules: [],
+        configs: [config],
+        prefs: [{ userId: "user-carl", mutedEventTypes: ["task.assigned"] }],
+      });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "user", channel: "in_app", userId: "user-carl" },
+      ]);
+
+      const result = await processEvent(
+        makeEvent({ type: "task.assigned", entityType: "task", entityId: 1, entityName: "Test Task" }),
+      );
+
+      expect(mockInAppSend).not.toHaveBeenCalled();
+      expect(result.muted).toBe(1);
+      expect(result.dispatched).toBe(0);
     });
   });
 });
