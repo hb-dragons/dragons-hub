@@ -179,11 +179,18 @@ describe("runTaskReminderSweep", () => {
 
     await runTaskReminderSweep();
 
+    // Filter to just lead events — a second sweep may also fire the day-of
+    // reminder if the updated dueDate happens to land on today's UTC date and
+    // the current UTC hour is >= 8. The property under test is that lead fires
+    // twice after the timestamp reset.
     const events = await (ctx.db as typeof import("../config/database").db)
       .select()
       .from(domainEvents)
       .where(eq(domainEvents.entityId, taskId));
-    expect(events).toHaveLength(2);
+    const leadEvents = events.filter(
+      (e) => (e.payload as Record<string, unknown>).reminderKind === "lead",
+    );
+    expect(leadEvents).toHaveLength(2);
   });
 
   it("emits day_of reminder when task is due today after 08:00 UTC", async () => {
