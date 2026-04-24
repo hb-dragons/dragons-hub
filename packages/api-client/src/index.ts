@@ -9,6 +9,7 @@ export {
   publicEndpoints,
   deviceEndpoints,
   refereeEndpoints,
+  adminBoardEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -16,4 +17,12 @@ export type {
   RegisterDeviceResponse,
   UnregisterDeviceResponse,
   RefereeGamesQueryParams,
+  TaskListFilters,
+  CreateBoardBody,
+  UpdateBoardBody,
+  CreateTaskBody,
+  UpdateTaskBody,
+  MoveTaskBody,
+  AddColumnBody,
+  UpdateColumnBody,
 } from "./endpoints";
