@@ -217,6 +217,15 @@
       "new": "New board"
     }
   },
+  "board": {
+    "task": {
+      "assigneeCount": "%{count} assignees",
+      "unnamedUser": "Unnamed"
+    },
+    "column": {
+      "addCard": "+ Add card"
+    }
+  },
   "error": {
     "boundary": {
       "title": "Something went wrong",

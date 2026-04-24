@@ -217,6 +217,15 @@
       "new": "Neues Board"
     }
   },
+  "board": {
+    "task": {
+      "assigneeCount": "%{count} Zuweisungen",
+      "unnamedUser": "Unbenannt"
+    },
+    "column": {
+      "addCard": "+ Karte"
+    }
+  },
   "error": {
     "boundary": {
       "title": "Etwas ist schiefgegangen",
