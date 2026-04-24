@@ -60,11 +60,7 @@ export const TaskContextMenu = forwardRef<TaskContextMenuHandle>(
               key={item.key}
               onPress={() => {
                 sheetRef.current?.dismiss();
-                // Defer action so the sheet finishes dismissing before the next
-                // bottom sheet (e.g. MoveToSheet) tries to present.
-                setTimeout(() => {
-                  args?.onAction(item.key);
-                }, 150);
+                args?.onAction(item.key);
               }}
               accessibilityRole="button"
               accessibilityLabel={item.label}

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import type { TaskDetail } from "@dragons/shared";
@@ -6,11 +6,9 @@ import { useAssigneeMutations } from "@/hooks/board/useAssigneeMutations";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
-import { AssigneePickerSheet, type AssigneePickerHandle } from "./AssigneePickerSheet";
+import { useBoardPickers } from "./BoardPickersProvider";
 import { ChecklistSection } from "./ChecklistSection";
 import { CommentsSection } from "./CommentsSection";
-import { PriorityPickerSheet, type PriorityPickerHandle } from "./PriorityPickerSheet";
-import { DuePickerSheet, type DuePickerHandle } from "./DuePickerSheet";
 
 interface Props {
   task: TaskDetail;
@@ -21,9 +19,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
   const { colors, spacing, radius } = useTheme();
   const mutations = useTaskMutations(boardId);
   const assigneeMutations = useAssigneeMutations(boardId);
-  const assigneePickerRef = useRef<AssigneePickerHandle>(null);
-  const priorityRef = useRef<PriorityPickerHandle>(null);
-  const dueRef = useRef<DuePickerHandle>(null);
+  const pickers = useBoardPickers();
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -97,7 +93,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
 
         <Pressable
           onPress={() =>
-            assigneePickerRef.current?.open(
+            pickers.openAssignees(
               task.id,
               task.assignees,
               async (userId, add) => {
@@ -119,7 +115,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
 
         <Pressable
           onPress={() =>
-            priorityRef.current?.open(task.priority, (p) => {
+            pickers.openPriority(task.priority, (p) => {
               void mutations.setPriority(task.id, p);
             })
           }
@@ -136,7 +132,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
 
         <Pressable
           onPress={() =>
-            dueRef.current?.open(task.dueDate, (iso) => {
+            pickers.openDue(task.dueDate, (iso) => {
               void mutations.setDueDate(task.id, iso);
             })
           }
@@ -158,9 +154,6 @@ export function TaskDetailBody({ task, boardId }: Props) {
         <CommentsSection task={task} />
       </BottomSheetScrollView>
 
-      <AssigneePickerSheet ref={assigneePickerRef} />
-      <PriorityPickerSheet ref={priorityRef} />
-      <DuePickerSheet ref={dueRef} />
     </>
   );
 }

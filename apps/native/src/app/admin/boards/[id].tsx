@@ -13,8 +13,7 @@ import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager
 import { TaskDetailSheet, type TaskDetailSheetHandle } from "@/components/board/TaskDetailSheet";
 import { TaskContextMenu, type TaskContextMenuHandle } from "@/components/board/TaskContextMenu";
 import { MoveToSheet, type MoveToSheetHandle } from "@/components/board/MoveToSheet";
-import { PriorityPickerSheet, type PriorityPickerHandle } from "@/components/board/PriorityPickerSheet";
-import { DuePickerSheet, type DuePickerHandle } from "@/components/board/DuePickerSheet";
+import { BoardPickersProvider, useBoardPickers } from "@/components/board/BoardPickersProvider";
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
@@ -24,7 +23,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 import { authClient } from "@/lib/auth-client";
-import type { TaskCardData } from "@dragons/shared";
+import type { TaskCardData, TaskPriority } from "@dragons/shared";
 import type { TaskListFilters } from "@dragons/api-client";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +31,14 @@ import type { TaskListFilters } from "@dragons/api-client";
 // ---------------------------------------------------------------------------
 
 export default function BoardDetailScreen() {
+  return (
+    <BoardPickersProvider>
+      <BoardDetailBody />
+    </BoardPickersProvider>
+  );
+}
+
+function BoardDetailBody() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = Number(id);
   const { data: board, isLoading: boardLoading, mutate: revalidateBoard } = useBoard(boardId);
@@ -82,12 +89,12 @@ export default function BoardDetailScreen() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
+  const pickers = useBoardPickers();
+  const lastPriorityRef = useRef<TaskPriority>("normal");
   const pagerRef = useRef<BoardPagerHandle | null>(null);
   const taskSheetRef = useRef<TaskDetailSheetHandle | null>(null);
   const contextMenuRef = useRef<TaskContextMenuHandle | null>(null);
   const moveToSheetRef = useRef<MoveToSheetHandle | null>(null);
-  const priorityPickerRef = useRef<PriorityPickerHandle | null>(null);
-  const duePickerRef = useRef<DuePickerHandle | null>(null);
   const quickCreateRef = useRef<QuickCreateSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
   const moveTask = useMoveTask(boardId);
@@ -170,11 +177,11 @@ export default function BoardDetailScreen() {
               },
             });
           } else if (action === "priority") {
-            priorityPickerRef.current?.open(task.priority, (p) => {
+            pickers.openPriority(task.priority, (p) => {
               void taskMutations.setPriority(task.id, p);
             });
           } else if (action === "due") {
-            duePickerRef.current?.open(task.dueDate, (iso) => {
+            pickers.openDue(task.dueDate, (iso) => {
               void taskMutations.setDueDate(task.id, iso);
             });
           } else if (action === "delete") {
@@ -197,18 +204,20 @@ export default function BoardDetailScreen() {
         },
       });
     },
-    [columns, countsByColumn, moveTask, taskMutations],
+    [columns, countsByColumn, moveTask, taskMutations, pickers],
   );
 
   const onPressPriorityChip = useCallback(() => {
-    if (filters.priority != null) {
-      setFilters((f) => ({ ...f, priority: null }));
-      return;
-    }
-    priorityPickerRef.current?.open("normal", (p) => {
+    const starting = filters.priority ?? lastPriorityRef.current;
+    pickers.openPriority(starting, (p) => {
+      lastPriorityRef.current = p;
       setFilters((f) => ({ ...f, priority: p }));
     });
-  }, [filters.priority]);
+  }, [filters.priority, pickers]);
+
+  const onClearPriorityFilter = useCallback(() => {
+    setFilters((f) => ({ ...f, priority: null }));
+  }, []);
 
   const openQuickCreate = useCallback(
     (columnId: number) => {
@@ -263,6 +272,7 @@ export default function BoardDetailScreen() {
         filters={filters}
         onToggleMine={() => setFilters((f) => ({ ...f, mine: !f.mine }))}
         onPressPriority={onPressPriorityChip}
+        onClearPriority={onClearPriorityFilter}
         onToggleDueSoon={() => setFilters((f) => ({ ...f, dueSoon: !f.dueSoon }))}
         onToggleUnassigned={() => setFilters((f) => ({ ...f, unassigned: !f.unassigned }))}
       />
@@ -354,8 +364,6 @@ export default function BoardDetailScreen() {
       <TaskDetailSheet ref={taskSheetRef} boardId={boardId} />
       <TaskContextMenu ref={contextMenuRef} />
       <MoveToSheet ref={moveToSheetRef} />
-      <PriorityPickerSheet ref={priorityPickerRef} />
-      <DuePickerSheet ref={duePickerRef} />
       <QuickCreateSheet ref={quickCreateRef} />
     </View>
   );
