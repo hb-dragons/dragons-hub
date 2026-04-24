@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useRouter, useSegments } from "expo-router";
-import { isReferee } from "@dragons/shared";
+import { canViewOpenGames } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
@@ -10,7 +10,9 @@ export default function TabLayout() {
   const { colors } = useTheme();
   const { data: session } = authClient.useSession();
   const user = session?.user;
-  const canRef = Boolean(user) && isReferee(user as { refereeId?: number | null });
+  const canRef = canViewOpenGames(
+    user as { role?: string | null; refereeId?: number | null } | null | undefined,
+  );
 
   const router = useRouter();
   const segments = useSegments();

@@ -110,3 +110,13 @@ export function isReferee(
 ): boolean {
   return typeof user?.refereeId === "number";
 }
+
+export function canViewOpenGames(
+  user:
+    | { role?: string | null; refereeId?: number | null }
+    | null
+    | undefined,
+): boolean {
+  if (!user) return false;
+  return isReferee(user) || can(user, "assignment", "view");
+}

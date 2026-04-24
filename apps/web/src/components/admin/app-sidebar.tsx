@@ -38,9 +38,11 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { UserButton } from "@daveyplate/better-auth-ui";
 import { Wordmark } from "@/components/brand/wordmark";
-import { can, type Resource, type Action } from "@dragons/shared";
+import { can, canViewOpenGames, type Resource, type Action } from "@dragons/shared";
 
 type Perm = { [R in Resource]: { resource: R; action: Action<R> } }[Resource];
+type GateUser = Parameters<typeof can>[0];
+type Gate = (user: GateUser) => boolean;
 
 const navGroups = [
   {
@@ -50,12 +52,12 @@ const navGroups = [
       {
         href: "/admin/referee/matches",
         labelKey: "nav.openAssignments" as const,
-        perm: { resource: "assignment", action: "view" } as const,
+        gate: canViewOpenGames as Gate,
       },
       {
         href: "/admin/referee/history",
         labelKey: "nav.refereeHistory" as const,
-        perm: { resource: "assignment", action: "view" } as const,
+        gate: canViewOpenGames as Gate,
       },
     ],
   },
@@ -172,14 +174,24 @@ const navGroups = [
 ] satisfies ReadonlyArray<{
   labelKey: string;
   icon: React.ComponentType;
-  items: ReadonlyArray<{ href: string; labelKey: string; perm: Perm }>;
+  items: ReadonlyArray<
+    { href: string; labelKey: string } & ({ perm: Perm } | { gate: Gate })
+  >;
 }>;
 
-function canPerm(
-  user: Parameters<typeof can>[0],
-  perm: { resource: Resource; action: string },
+function isItemVisible(
+  user: GateUser,
+  item: { perm?: Perm; gate?: Gate },
 ): boolean {
-  return can(user, perm.resource, perm.action as Action<typeof perm.resource>);
+  if (item.gate) return item.gate(user);
+  if (item.perm) {
+    return can(
+      user,
+      item.perm.resource,
+      item.perm.action as Action<typeof item.perm.resource>,
+    );
+  }
+  return false;
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -191,7 +203,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const visibleGroups = navGroups
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) => canPerm(user, i.perm)),
+      items: g.items.filter((i) => isItemVisible(user, i)),
     }))
     .filter((g) => g.items.length > 0);
 

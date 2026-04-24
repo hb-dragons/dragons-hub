@@ -7,6 +7,9 @@ import { fontFamilies } from "../theme/typography";
 interface RefereeGameCardProps {
   game: RefereeGameListItem;
   onPress?: () => void;
+  isAdmin?: boolean;
+  onAdminAssign?: (slotNumber: 1 | 2) => void;
+  onAdminUnassign?: (slotNumber: 1 | 2, refereeName: string) => void;
 }
 
 function formatCompactDate(kickoffDate: string, kickoffTime: string): string {
@@ -107,7 +110,95 @@ function SlotRow({ label, name, status, isMine, ourClub }: SlotRowProps) {
   );
 }
 
-export function RefereeGameCard({ game, onPress }: RefereeGameCardProps) {
+interface AdminSlotActionProps {
+  status: RefereeGameListItem["sr1Status"];
+  name: string | null;
+  slotNumber: 1 | 2;
+  onAssign: (slotNumber: 1 | 2) => void;
+  onUnassign: (slotNumber: 1 | 2, refereeName: string) => void;
+}
+
+function AdminSlotAction({
+  status,
+  name,
+  slotNumber,
+  onAssign,
+  onUnassign,
+}: AdminSlotActionProps) {
+  const { colors, spacing, radius } = useTheme();
+
+  if (status === "assigned" && name) {
+    return (
+      <Pressable
+        onPress={() => onUnassign(slotNumber, name)}
+        hitSlop={6}
+        style={({ pressed }) => ({
+          paddingHorizontal: spacing.sm,
+          paddingVertical: 4,
+          borderRadius: radius.md,
+          borderWidth: 1,
+          borderColor: colors.destructive + "55",
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: fontFamilies.bodySemiBold,
+            color: colors.destructive,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+          }}
+        >
+          {i18n.t("refereeGame.admin.remove")}
+        </Text>
+      </Pressable>
+    );
+  }
+
+  if (status === "open") {
+    const labelKey =
+      slotNumber === 1
+        ? "refereeGame.admin.assignSr1"
+        : "refereeGame.admin.assignSr2";
+    return (
+      <Pressable
+        onPress={() => onAssign(slotNumber)}
+        hitSlop={6}
+        style={({ pressed }) => ({
+          paddingHorizontal: spacing.sm,
+          paddingVertical: 4,
+          borderRadius: radius.md,
+          borderWidth: 1,
+          borderColor: colors.primary + "55",
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: fontFamilies.bodySemiBold,
+            color: colors.primary,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+          }}
+        >
+          {i18n.t(labelKey)}
+        </Text>
+      </Pressable>
+    );
+  }
+
+  return null;
+}
+
+export function RefereeGameCard({
+  game,
+  onPress,
+  isAdmin = false,
+  onAdminAssign,
+  onAdminUnassign,
+}: RefereeGameCardProps) {
   const { colors, radius, spacing, isDark } = useTheme();
 
   const isAssignedToMe = game.mySlot !== null;
@@ -216,20 +307,50 @@ export function RefereeGameCard({ game, onPress }: RefereeGameCardProps) {
           gap: spacing.xs,
         }}
       >
-        <SlotRow
-          label={i18n.t("refereeGame.sr1Short")}
-          name={game.sr1Name}
-          status={game.sr1Status}
-          isMine={game.mySlot === 1}
-          ourClub={game.sr1OurClub}
-        />
-        <SlotRow
-          label={i18n.t("refereeGame.sr2Short")}
-          name={game.sr2Name}
-          status={game.sr2Status}
-          isMine={game.mySlot === 2}
-          ourClub={game.sr2OurClub}
-        />
+        <View
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}
+        >
+          <View style={{ flex: 1 }}>
+            <SlotRow
+              label={i18n.t("refereeGame.sr1Short")}
+              name={game.sr1Name}
+              status={game.sr1Status}
+              isMine={game.mySlot === 1}
+              ourClub={game.sr1OurClub}
+            />
+          </View>
+          {isAdmin && !game.isCancelled && !game.isForfeited && onAdminAssign && onAdminUnassign ? (
+            <AdminSlotAction
+              status={game.sr1Status}
+              name={game.sr1Name}
+              slotNumber={1}
+              onAssign={onAdminAssign}
+              onUnassign={onAdminUnassign}
+            />
+          ) : null}
+        </View>
+        <View
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}
+        >
+          <View style={{ flex: 1 }}>
+            <SlotRow
+              label={i18n.t("refereeGame.sr2Short")}
+              name={game.sr2Name}
+              status={game.sr2Status}
+              isMine={game.mySlot === 2}
+              ourClub={game.sr2OurClub}
+            />
+          </View>
+          {isAdmin && !game.isCancelled && !game.isForfeited && onAdminAssign && onAdminUnassign ? (
+            <AdminSlotAction
+              status={game.sr2Status}
+              name={game.sr2Name}
+              slotNumber={2}
+              onAssign={onAdminAssign}
+              onUnassign={onAdminUnassign}
+            />
+          ) : null}
+        </View>
       </View>
     </View>
   );

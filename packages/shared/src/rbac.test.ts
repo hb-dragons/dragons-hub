@@ -3,6 +3,7 @@ import {
   ROLE_NAMES,
   can,
   canAll,
+  canViewOpenGames,
   hasRole,
   isReferee,
   parseRoles,
@@ -152,6 +153,31 @@ describe("isReferee", () => {
     expect(isReferee({ refereeId: undefined })).toBe(false);
     expect(isReferee({})).toBe(false);
     expect(isReferee(null)).toBe(false);
+  });
+});
+
+describe("canViewOpenGames", () => {
+  it("returns true for a linked referee with no role", () => {
+    expect(canViewOpenGames({ refereeId: 7, role: null })).toBe(true);
+  });
+
+  it("returns true for refereeAdmin even without a refereeId", () => {
+    expect(canViewOpenGames({ refereeId: null, role: "refereeAdmin" })).toBe(true);
+  });
+
+  it("returns true for admin even without a refereeId", () => {
+    expect(canViewOpenGames({ role: "admin" })).toBe(true);
+  });
+
+  it("returns false for a user with no referee link and no qualifying role", () => {
+    expect(canViewOpenGames({ refereeId: null, role: "venueManager" })).toBe(false);
+    expect(canViewOpenGames({ refereeId: null, role: "teamManager" })).toBe(false);
+    expect(canViewOpenGames({ refereeId: null, role: null })).toBe(false);
+  });
+
+  it("returns false for null/undefined user", () => {
+    expect(canViewOpenGames(null)).toBe(false);
+    expect(canViewOpenGames(undefined)).toBe(false);
   });
 });
 

@@ -161,7 +161,24 @@
     "dropSuccess": "You've been removed",
     "dropFailed": "Couldn't drop this game",
     "dropFailedNotAssigned": "You're no longer assigned to this game.",
-    "dropFailedFederation": "Federation rejected the change. Try again later."
+    "dropFailedFederation": "Federation rejected the change. Try again later.",
+    "admin": {
+      "assignSr1": "Assign SR1",
+      "assignSr2": "Assign SR2",
+      "remove": "Remove",
+      "removeConfirmTitle": "Remove referee?",
+      "removeConfirmMessage": "%{name} will be unassigned with the federation.",
+      "removeSuccess": "Referee removed",
+      "removeFailed": "Couldn't remove referee",
+      "assignTitle": "Assign %{slot}",
+      "searchPlaceholder": "Search by name…",
+      "noResults": "No qualified referees found",
+      "cancel": "Cancel",
+      "assign": "Assign",
+      "assigning": "Assigning…",
+      "assignSuccess": "Referee assigned",
+      "assignFailed": "Couldn't assign referee"
+    }
   },
   "auth": {
     "signIn": "Sign In",

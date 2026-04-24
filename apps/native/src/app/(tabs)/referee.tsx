@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -6,15 +6,19 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
-import type { RefereeGameListItem } from "@dragons/shared";
+import { APIError } from "@dragons/api-client";
+import { can, type RefereeGameListItem } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
 import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
 import { RefereeGameCard } from "@/components/RefereeGameCard";
+import { AssignRefereeModal } from "@/components/AssignRefereeModal";
+import { authClient } from "@/lib/auth-client";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { fontFamilies } from "@/theme/typography";
@@ -161,12 +165,64 @@ export default function RefereeScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
   const router = useRouter();
 
-  const [segment, setSegment] = useState<Segment>("mine");
+  const { data: session } = authClient.useSession();
+  const isAdmin = can(
+    (session?.user ?? null) as { role?: string | null } | null,
+    "assignment",
+    "view",
+  );
+
+  const [segment, setSegment] = useState<Segment>(isAdmin ? "open" : "mine");
+  const [assignModal, setAssignModal] = useState<{
+    game: RefereeGameListItem;
+    slotNumber: 1 | 2;
+  } | null>(null);
+
+  // Once we learn the user is admin, snap to "open" if still on default "mine".
+  useEffect(() => {
+    if (isAdmin && segment === "mine") setSegment("open");
+  }, [isAdmin, segment]);
 
   const { data, error, isLoading, mutate } = useSWR(
     "referee:games",
     () => refereeApi.getGames({ status: "active", limit: 500 }),
   );
+
+  async function handleUnassign(
+    game: RefereeGameListItem,
+    slotNumber: 1 | 2,
+    refereeName: string,
+  ) {
+    Alert.alert(
+      i18n.t("refereeGame.admin.removeConfirmTitle"),
+      i18n.t("refereeGame.admin.removeConfirmMessage", { name: refereeName }),
+      [
+        { text: i18n.t("refereeGame.admin.cancel"), style: "cancel" },
+        {
+          text: i18n.t("refereeGame.admin.remove"),
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                await refereeApi.unassignReferee(game.apiMatchId, slotNumber);
+                await mutate();
+                Alert.alert(i18n.t("refereeGame.admin.removeSuccess"));
+              } catch (e) {
+                const message =
+                  e instanceof APIError
+                    ? e.message
+                    : i18n.t("refereeGame.admin.removeFailed");
+                Alert.alert(
+                  i18n.t("refereeGame.admin.removeFailed"),
+                  message,
+                );
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
 
   const { refreshing, onRefresh } = useRefresh(() => mutate());
 
@@ -231,10 +287,14 @@ export default function RefereeScreen() {
         : "refereeTab.emptyPast";
 
   const segments: { key: Segment; label: string }[] = [
-    {
-      key: "mine",
-      label: `${i18n.t("refereeTab.segmentMine")}${mineCount > 0 ? ` (${mineCount})` : ""}`,
-    },
+    ...(isAdmin
+      ? []
+      : [
+          {
+            key: "mine" as const,
+            label: `${i18n.t("refereeTab.segmentMine")}${mineCount > 0 ? ` (${mineCount})` : ""}`,
+          },
+        ]),
     {
       key: "open",
       label: `${i18n.t("refereeTab.segmentOpen")}${openCount > 0 ? ` (${openCount})` : ""}`,
@@ -348,6 +408,19 @@ export default function RefereeScreen() {
             <View style={{ marginBottom: spacing.sm }}>
               <RefereeGameCard
                 game={item}
+                isAdmin={isAdmin}
+                onAdminAssign={
+                  isAdmin
+                    ? (slotNumber) =>
+                        setAssignModal({ game: item, slotNumber })
+                    : undefined
+                }
+                onAdminUnassign={
+                  isAdmin
+                    ? (slotNumber, name) =>
+                        handleUnassign(item, slotNumber, name)
+                    : undefined
+                }
                 onPress={() => {
                   const isOwnClubGame = item.isHomeGame || item.isGuestGame;
                   if (isOwnClubGame && item.matchId !== null) {
@@ -365,6 +438,15 @@ export default function RefereeScreen() {
           stickySectionHeadersEnabled={false}
         />
       )}
+      <AssignRefereeModal
+        visible={assignModal !== null}
+        game={assignModal?.game ?? null}
+        slotNumber={assignModal?.slotNumber ?? 1}
+        onClose={() => setAssignModal(null)}
+        onSuccess={async () => {
+          await mutate();
+        }}
+      />
     </Screen>
   );
 }

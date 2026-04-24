@@ -1,5 +1,6 @@
 import type {
   AssignRefereeResponse,
+  CandidateSearchResponse,
   PaginatedResponse,
   RefereeGameListItem,
   UnassignRefereeResponse,
@@ -18,6 +19,18 @@ export interface RefereeGamesQueryParams {
 
 export interface ClaimGameParams {
   slotNumber?: 1 | 2;
+}
+
+export interface CandidateSearchParams {
+  slotNumber: 1 | 2;
+  search?: string;
+  pageFrom?: number;
+  pageSize?: number;
+}
+
+export interface AssignRefereeParams {
+  slotNumber: 1 | 2;
+  refereeApiId: number;
 }
 
 export function refereeEndpoints(client: ApiClient) {
@@ -44,6 +57,35 @@ export function refereeEndpoints(client: ApiClient) {
     },
     unclaimGame(id: number): Promise<UnassignRefereeResponse> {
       return client.delete(`/referee/games/${id}/claim`);
+    },
+    searchAssignmentCandidates(
+      spielplanId: number,
+      params: CandidateSearchParams,
+    ): Promise<CandidateSearchResponse> {
+      return client.get(
+        `/admin/referee/games/${spielplanId}/candidates`,
+        params as unknown as Record<
+          string,
+          string | number | boolean | undefined
+        >,
+      );
+    },
+    assignReferee(
+      spielplanId: number,
+      params: AssignRefereeParams,
+    ): Promise<AssignRefereeResponse> {
+      return client.post(
+        `/admin/referee/games/${spielplanId}/assign`,
+        params,
+      );
+    },
+    unassignReferee(
+      spielplanId: number,
+      slotNumber: 1 | 2,
+    ): Promise<UnassignRefereeResponse> {
+      return client.delete(
+        `/admin/referee/games/${spielplanId}/assignment/${slotNumber}`,
+      );
     },
   };
 }

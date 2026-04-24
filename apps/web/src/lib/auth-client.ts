@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/react";
-import { adminClient } from "better-auth/client/plugins";
+import { adminClient, inferAdditionalFields } from "better-auth/client/plugins";
 import { ac, roles } from "@dragons/shared";
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -11,5 +11,12 @@ const adminPluginConfig = {
 
 export const authClient = createAuthClient({
   baseURL,
-  plugins: [adminClient(adminPluginConfig)],
+  plugins: [
+    inferAdditionalFields({
+      user: {
+        refereeId: { type: "number", required: false },
+      },
+    }),
+    adminClient(adminPluginConfig),
+  ],
 });

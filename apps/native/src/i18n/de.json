@@ -161,7 +161,24 @@
     "dropSuccess": "Du wurdest entfernt",
     "dropFailed": "Spiel konnte nicht abgegeben werden",
     "dropFailedNotAssigned": "Du bist nicht mehr für dieses Spiel eingeteilt.",
-    "dropFailedFederation": "Der Verband hat die Änderung abgelehnt. Bitte später erneut versuchen."
+    "dropFailedFederation": "Der Verband hat die Änderung abgelehnt. Bitte später erneut versuchen.",
+    "admin": {
+      "assignSr1": "SR1 zuweisen",
+      "assignSr2": "SR2 zuweisen",
+      "remove": "Entfernen",
+      "removeConfirmTitle": "Schiedsrichter entfernen?",
+      "removeConfirmMessage": "%{name} wird beim Verband aus der Einteilung entfernt.",
+      "removeSuccess": "Schiedsrichter entfernt",
+      "removeFailed": "Entfernen fehlgeschlagen",
+      "assignTitle": "%{slot} zuweisen",
+      "searchPlaceholder": "Nach Namen suchen…",
+      "noResults": "Keine geeigneten Schiedsrichter gefunden",
+      "cancel": "Abbrechen",
+      "assign": "Zuweisen",
+      "assigning": "Weise zu…",
+      "assignSuccess": "Schiedsrichter zugewiesen",
+      "assignFailed": "Zuweisung fehlgeschlagen"
+    }
   },
   "auth": {
     "signIn": "Anmelden",

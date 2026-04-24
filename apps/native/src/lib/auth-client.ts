@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/react";
-import { adminClient } from "better-auth/client/plugins";
+import { adminClient, inferAdditionalFields } from "better-auth/client/plugins";
 import { expoClient } from "@better-auth/expo/client";
 import * as SecureStore from "expo-secure-store";
 import { ac, roles } from "@dragons/shared";
@@ -24,6 +24,11 @@ const adminPluginConfig = {
 export const authClient = createAuthClient({
   baseURL,
   plugins: [
+    inferAdditionalFields({
+      user: {
+        refereeId: { type: "number", required: false },
+      },
+    }),
     adminClient(adminPluginConfig),
     expoClient({
       scheme: "dragons",

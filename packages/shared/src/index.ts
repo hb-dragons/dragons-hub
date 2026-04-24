@@ -155,6 +155,7 @@ export {
   canAll,
   hasRole,
   isReferee,
+  canViewOpenGames,
 } from "./rbac";
 export type { RoleName, Resource, Action } from "./rbac";
 
