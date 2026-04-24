@@ -210,6 +210,13 @@
     "vs": "vs",
     "at": "@"
   },
+  "admin": {
+    "boards": {
+      "title": "Boards",
+      "empty": "No boards yet.",
+      "new": "New board"
+    }
+  },
   "error": {
     "boundary": {
       "title": "Something went wrong",

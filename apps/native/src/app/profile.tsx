@@ -1,6 +1,6 @@
 import { View, Text, Pressable, Switch, StyleSheet } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { parseRoles, isReferee, type RoleName } from "@dragons/shared";
+import { parseRoles, isReferee, hasRole, type RoleName } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocale } from "@/hooks/useLocale";
 import type { LocalePref } from "@/hooks/useLocale";
@@ -301,6 +301,29 @@ export default function ProfileScreen() {
               })}
             </View>
           </View>
+
+          {/* Admin section */}
+          {hasRole(
+            session.user as { role?: string | null } | null | undefined,
+            "admin",
+          ) ? (
+            <View>
+              <SectionHeader title={i18n.t("profile.roleAdmin")} />
+              <Pressable
+                onPress={() => router.push("/admin/boards")}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: spacing.sm,
+                }}
+              >
+                <Text style={[textStyles.body, { color: colors.foreground }]}>
+                  {i18n.t("admin.boards.title")}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {/* Sign Out */}
           <Pressable
