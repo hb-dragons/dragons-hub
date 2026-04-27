@@ -76,6 +76,16 @@ export {
 } from "./board-dnd";
 export type { DragItem, DropTarget } from "./board-dnd";
 
+// Undo entries for destructive board operations
+export { buildUndoEntry } from "./board-undo";
+export type {
+  UndoEntry,
+  UndoableSnapshot,
+  UndoableTaskSnapshot,
+  UndoableChecklistSnapshot,
+  UndoableCommentSnapshot,
+} from "./board-undo";
+
 // Board drop-target resolution (pure, testable, no React deps)
 export { findDropTarget } from "./board-drop-target";
 export type {
