@@ -26,8 +26,7 @@ import { GripVertical } from "lucide-react";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { fetchAPI } from "@/lib/api";
-import { authClient } from "@/lib/auth-client";
-import { can, COLOR_PRESET_KEYS, getColorPreset } from "@dragons/shared";
+import { COLOR_PRESET_KEYS, getColorPreset } from "@dragons/shared";
 import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
 import { cn } from "@dragons/ui/lib/utils";
@@ -202,10 +201,12 @@ function TeamRowContent(props: TeamRowProps & TeamRowContentExtras) {
   );
 }
 
-export function TeamsTable() {
+interface TeamsTableProps {
+  canManage: boolean;
+}
+
+export function TeamsTable({ canManage }: TeamsTableProps) {
   const t = useTranslations();
-  const { data: session } = authClient.useSession();
-  const canManage = can(session?.user ?? null, "team", "manage");
   const { data: teams } = useSWR<OwnClubTeam[]>(SWR_KEYS.teams, apiFetcher);
   const { mutate } = useSWRConfig();
   const teamsList = teams ?? [];

@@ -18,6 +18,7 @@ interface OwnClubTeam {
 export default async function TeamsPage() {
   const session = await getServerSession();
   if (!can(session?.user ?? null, "team", "view")) notFound();
+  const canManage = can(session?.user ?? null, "team", "manage");
 
   const t = await getTranslations();
   let teams: OwnClubTeam[] | null = null;
@@ -37,7 +38,7 @@ export default async function TeamsPage() {
         <p className="text-destructive">{error}</p>
       ) : (
         <SWRConfig value={{ fallback: { [SWR_KEYS.teams]: teams } }}>
-          <TeamsTable />
+          <TeamsTable canManage={canManage} />
         </SWRConfig>
       )}
     </div>
