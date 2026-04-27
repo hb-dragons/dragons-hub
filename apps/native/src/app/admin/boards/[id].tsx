@@ -18,6 +18,7 @@ import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/boar
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
+import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
 import type { BoardColumnHandle } from "@/components/board/BoardColumn";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
@@ -101,6 +102,7 @@ function BoardDetailBody() {
   const contextMenuRef = useRef<TaskContextMenuHandle | null>(null);
   const moveToSheetRef = useRef<MoveToSheetHandle | null>(null);
   const quickCreateRef = useRef<QuickCreateSheetHandle | null>(null);
+  const settingsSheetRef = useRef<BoardSettingsSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
   const moveTask = useMoveTask(boardId);
 
@@ -266,7 +268,22 @@ function BoardDetailBody() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Stack.Screen options={{ title: board.name }} />
+      <Stack.Screen
+        options={{
+          title: board.name,
+          headerRight: () => (
+            <Pressable
+              onPress={() => settingsSheetRef.current?.open({ board })}
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t("admin.boards.settingsTitle")}
+              hitSlop={12}
+              style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}
+            >
+              <Text style={{ color: colors.primary, fontSize: 22, fontWeight: "700" }}>⋯</Text>
+            </Pressable>
+          ),
+        }}
+      />
       <BoardHeader
         columns={columns}
         tasks={rawTasks ?? []}
@@ -357,6 +374,7 @@ function BoardDetailBody() {
       <TaskContextMenu ref={contextMenuRef} />
       <MoveToSheet ref={moveToSheetRef} />
       <QuickCreateSheet ref={quickCreateRef} />
+      <BoardSettingsSheet ref={settingsSheetRef} />
     </View>
   );
 }
