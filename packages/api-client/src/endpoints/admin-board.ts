@@ -164,7 +164,7 @@ export function adminBoardEndpoints(client: ApiClient) {
 
     // Assignees
     addAssignee(taskId: number, userId: string): Promise<TaskAssignee> {
-      return client.post(`/admin/tasks/${taskId}/assignees/${userId}`, {});
+      return client.put(`/admin/tasks/${taskId}/assignees/${userId}`, {});
     },
     removeAssignee(taskId: number, userId: string): Promise<void> {
       return client.delete(`/admin/tasks/${taskId}/assignees/${userId}`);

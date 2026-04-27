@@ -222,7 +222,7 @@ describe("adminBoardEndpoints", () => {
 
   // ── Assignees ─────────────────────────────────────────────────────────────
 
-  it("POSTs /admin/tasks/:id/assignees/:userId with empty body for addAssignee", async () => {
+  it("PUTs /admin/tasks/:id/assignees/:userId with empty body for addAssignee", async () => {
     const assignee = { userId: "u42", name: "Alice", assignedAt: "2025-01-01" };
     const { client, mockFetch } = makeClient(assignee);
     const api = adminBoardEndpoints(client);
@@ -231,7 +231,7 @@ describe("adminBoardEndpoints", () => {
 
     const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe("https://example.test/admin/tasks/99/assignees/u42");
-    expect((init as RequestInit).method).toBe("POST");
+    expect((init as RequestInit).method).toBe("PUT");
     // Body must be {} not omitted
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({});
     expect(result.userId).toBe("u42");
