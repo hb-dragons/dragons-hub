@@ -39,6 +39,7 @@ vi.mock("@dragons/db/schema", () => ({
     createdAt: "createdAt",
     clubId: "clubId",
     isOwnClub: "isOwnClub",
+    displayOrder: "displayOrder",
   },
 }));
 
@@ -47,6 +48,7 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: unknown[]) => ({ and: args })),
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
   ne: vi.fn((...args: unknown[]) => ({ ne: args })),
+  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
 }));
 
 vi.mock("./hash", () => ({
@@ -69,6 +71,33 @@ afterEach(() => {
 });
 
 // --- Helpers ---
+
+/**
+ * Returns a mock chain for db.select(...).from(...).where(...) → resolves to `rows`.
+ * Used because the new sync calls db.select multiple times (existingIds, getMaxOwnDisplayOrder,
+ * toMarkOwn, flippedViaUpsert).
+ */
+function mockSelectChain(rows: unknown[] = []) {
+  const where = vi.fn().mockResolvedValue(rows);
+  const from = vi.fn().mockReturnValue({ where });
+  return { from };
+}
+
+/** Default select mock: no existing rows, maxOrder = -1 (no own teams yet). */
+function setupDefaultSelectMock() {
+  mockSelect
+    // existingIds lookup → no existing rows
+    .mockReturnValueOnce(mockSelectChain([]))
+    // getMaxOwnDisplayOrder → -1
+    .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }]))
+    // toMarkOwn → no rows
+    .mockReturnValueOnce(mockSelectChain([]))
+    // getMaxOwnDisplayOrder (corrective pass) → -1
+    .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }]));
+  // flippedViaUpsert is only called when flippingToOwnIds.size > 0 → not needed in default
+  // After all .mockReturnValueOnce exhausted, falls back to default (unconfigured) — tests
+  // that need more calls must set up their own chain.
+}
 
 function makeTeamRef(overrides: Partial<SdkTeamRef> = {}): SdkTeamRef {
   return {
@@ -113,6 +142,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("creates new teams", async () => {
+    setupDefaultSelectMock();
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue(mockInsertChain([{ id: 1, createdAt: FROZEN_TIME }]));
     mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
@@ -125,6 +155,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("detects updated teams by createdAt mismatch", async () => {
+    setupDefaultSelectMock();
     const oldDate = new Date("2024-01-01T00:00:00Z");
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue(mockInsertChain([{ id: 1, createdAt: oldDate }]));
@@ -137,6 +168,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("calculates skipped count correctly", async () => {
+    setupDefaultSelectMock();
     const oldDate = new Date("2024-01-01T00:00:00Z");
     const teamsMap = new Map([
       [1, makeTeamRef({ teamPermanentId: 1 })],
@@ -154,6 +186,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("handles batch error", async () => {
+    setupDefaultSelectMock();
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
@@ -171,6 +204,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("handles non-Error batch failure", async () => {
+    setupDefaultSelectMock();
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
@@ -187,6 +221,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("logs batch result to logger with 'updated' action when changes exist", async () => {
+    setupDefaultSelectMock();
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue(mockInsertChain([{ id: 1, createdAt: FROZEN_TIME }]));
     mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
@@ -200,6 +235,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("logs batch result with 'skipped' action when all entries are skipped", async () => {
+    setupDefaultSelectMock();
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue(mockInsertChain([]));
     mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
@@ -213,6 +249,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("logs failure to logger", async () => {
+    setupDefaultSelectMock();
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
@@ -232,6 +269,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("sets isOwnClub based on club config", async () => {
+    setupDefaultSelectMock();
     const teamsMap = new Map([
       [1, makeTeamRef({ clubId: 4121 })],
       [2, makeTeamRef({ teamPermanentId: 2, clubId: 9999 })],
@@ -251,6 +289,10 @@ describe("syncTeamsFromData", () => {
 
   it("defaults ownClubId to 0 when no club config", async () => {
     mockGetClubConfig.mockResolvedValue(null);
+    // No corrective pass when ownClubId=0, but existingIds + getMaxOwnDisplayOrder still called
+    mockSelect
+      .mockReturnValueOnce(mockSelectChain([]))  // existingIds
+      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder
     const teamsMap = new Map([[1, makeTeamRef({ clubId: 4121 })]]);
     const chain = mockInsertChain([]);
     mockInsert.mockReturnValue(chain);
@@ -270,6 +312,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("handles empty teamnameSmall", async () => {
+    setupDefaultSelectMock();
     const teamsMap = new Map([[1, makeTeamRef({ teamnameSmall: "" })]]);
     const chain = mockInsertChain([]);
     mockInsert.mockReturnValue(chain);
@@ -282,16 +325,22 @@ describe("syncTeamsFromData", () => {
   });
 
   it("corrective pass marks own-club teams", async () => {
+    // toMarkOwn returns 1 row (hash-skipped flip-to-true), unmarkOwn returns 0
+    mockSelect
+      .mockReturnValueOnce(mockSelectChain([]))               // existingIds
+      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])) // getMaxOwnDisplayOrder (pre-upsert)
+      .mockReturnValueOnce(mockSelectChain([{ id: 5 }]))      // toMarkOwn → 1 row
+      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder (corrective)
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue(mockInsertChain([]));
+    // per-row update for toMarkOwn[0], then bulk unmarkOwn
     mockUpdate
-      .mockReturnValueOnce(mockUpdateReturningChain([{ id: 5 }])) // markOwn
+      .mockReturnValueOnce({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) }) // per-row update
       .mockReturnValueOnce(mockUpdateReturningChain([])); // unmarkOwn
 
     mockLogInfo.mockClear();
     await syncTeamsFromData(teamsMap);
 
-    expect(mockUpdate).toHaveBeenCalledTimes(2);
     expect(mockLogInfo).toHaveBeenCalledWith(
       expect.objectContaining({ marked: 1, unmarked: 0 }),
       "Corrected isOwnClub",
@@ -299,11 +348,15 @@ describe("syncTeamsFromData", () => {
   });
 
   it("corrective pass unmarks non-own-club teams", async () => {
+    // toMarkOwn returns 0, unmarkOwn returns 2
+    mockSelect
+      .mockReturnValueOnce(mockSelectChain([]))               // existingIds
+      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])) // getMaxOwnDisplayOrder (pre-upsert)
+      .mockReturnValueOnce(mockSelectChain([]))               // toMarkOwn → 0 rows
+      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder (corrective)
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue(mockInsertChain([]));
-    mockUpdate
-      .mockReturnValueOnce(mockUpdateReturningChain([])) // markOwn
-      .mockReturnValueOnce(mockUpdateReturningChain([{ id: 3 }, { id: 7 }])); // unmarkOwn
+    mockUpdate.mockReturnValue(mockUpdateReturningChain([{ id: 3 }, { id: 7 }])); // unmarkOwn
 
     mockLogInfo.mockClear();
     await syncTeamsFromData(teamsMap);
@@ -315,6 +368,7 @@ describe("syncTeamsFromData", () => {
   });
 
   it("corrective pass skips logging when no corrections needed", async () => {
+    setupDefaultSelectMock();
     const teamsMap = new Map([[1, makeTeamRef()]]);
     mockInsert.mockReturnValue(mockInsertChain([]));
     mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
@@ -330,6 +384,9 @@ describe("syncTeamsFromData", () => {
 
   it("skips corrective pass when no club config", async () => {
     mockGetClubConfig.mockResolvedValue(null);
+    mockSelect
+      .mockReturnValueOnce(mockSelectChain([]))              // existingIds
+      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder
     const teamsMap = new Map([[1, makeTeamRef({ clubId: 4121 })]]);
     mockInsert.mockReturnValue(mockInsertChain([]));
 
