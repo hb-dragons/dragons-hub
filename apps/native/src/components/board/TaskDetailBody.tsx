@@ -9,6 +9,7 @@ import { i18n } from "@/lib/i18n";
 import { useBoardPickers } from "./BoardPickersProvider";
 import { ChecklistSection } from "./ChecklistSection";
 import { CommentsSection } from "./CommentsSection";
+import { formatDueShort } from "./TaskCard";
 
 interface Props {
   task: TaskDetail;
@@ -176,6 +177,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
           value={title}
           onChangeText={setTitle}
           onBlur={saveTitle}
+          maxLength={300}
           style={{
             color: colors.foreground,
             fontSize: 22,
@@ -186,6 +188,18 @@ export function TaskDetailBody({ task, boardId }: Props) {
           placeholderTextColor={colors.mutedForeground}
           multiline
         />
+        {title.length >= 270 ? (
+          <Text
+            style={{
+              color: title.length >= 300 ? colors.destructive : colors.mutedForeground,
+              fontSize: 11,
+              fontVariant: ["tabular-nums"],
+              alignSelf: "flex-end",
+            }}
+          >
+            {title.length}/300
+          </Text>
+        ) : null}
       </View>
 
       {/* Description */}
@@ -264,9 +278,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
         {divider}
         {propertyRow({
           label: i18n.t("board.task.due"),
-          value: task.dueDate
-            ? new Date(task.dueDate).toLocaleDateString()
-            : i18n.t("board.task.noDue"),
+          value: task.dueDate ? formatDueShort(task.dueDate) : i18n.t("board.task.noDue"),
           valueColor: task.dueDate ? dueColor : colors.mutedForeground,
           onPress: () =>
             pickers.openDue(task.dueDate, (iso) => {
