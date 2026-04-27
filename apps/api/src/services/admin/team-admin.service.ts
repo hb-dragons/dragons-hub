@@ -10,6 +10,7 @@ export interface OwnClubTeam {
   leagueName: string | null;
   estimatedGameDuration: number | null;
   badgeColor: string | null;
+  displayOrder: number;
 }
 
 export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
@@ -22,6 +23,7 @@ export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
       leagueName: leagues.name,
       estimatedGameDuration: teams.estimatedGameDuration,
       badgeColor: teams.badgeColor,
+      displayOrder: teams.displayOrder,
     })
     .from(teams)
     .leftJoin(standings, eq(standings.teamApiId, teams.apiTeamPermanentId))
@@ -29,7 +31,9 @@ export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
     .where(eq(teams.isOwnClub, true))
     .orderBy(teams.id, sql`${leagues.name} ASC NULLS LAST`);
 
-  return rows.sort((a, b) => a.name.localeCompare(b.name));
+  return rows.sort(
+    (a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
+  );
 }
 
 export async function updateTeam(
@@ -53,6 +57,7 @@ export async function updateTeam(
       customName: teams.customName,
       estimatedGameDuration: teams.estimatedGameDuration,
       badgeColor: teams.badgeColor,
+      displayOrder: teams.displayOrder,
     });
 
   if (!updated) return null;

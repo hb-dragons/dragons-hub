@@ -47,8 +47,8 @@ beforeEach(() => {
 describe("GET /teams", () => {
   it("returns list of own club teams", async () => {
     const teams = [
-      { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A", estimatedGameDuration: 90 },
-      { id: 2, name: "Dragons Herren 2", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null },
+      { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A", estimatedGameDuration: 90, badgeColor: null, displayOrder: 0 },
+      { id: 2, name: "Dragons Herren 2", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null, badgeColor: null, displayOrder: 1 },
     ];
     mocks.getOwnClubTeams.mockResolvedValue(teams);
 
@@ -71,7 +71,7 @@ describe("GET /teams", () => {
 
 describe("PATCH /teams/:id", () => {
   it("updates custom name and returns team", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A", estimatedGameDuration: null };
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A", estimatedGameDuration: null, badgeColor: null, displayOrder: 0 };
     mocks.updateTeam.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
@@ -86,7 +86,7 @@ describe("PATCH /teams/:id", () => {
   });
 
   it("clears custom name with null", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null };
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null, badgeColor: null, displayOrder: 0 };
     mocks.updateTeam.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
@@ -100,7 +100,7 @@ describe("PATCH /teams/:id", () => {
   });
 
   it("updates estimatedGameDuration", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: 120 };
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: 120, badgeColor: null, displayOrder: 0 };
     mocks.updateTeam.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
@@ -115,7 +115,7 @@ describe("PATCH /teams/:id", () => {
   });
 
   it("clears estimatedGameDuration with null", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null };
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null, badgeColor: null, displayOrder: 0 };
     mocks.updateTeam.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
@@ -129,7 +129,7 @@ describe("PATCH /teams/:id", () => {
   });
 
   it("updates both customName and estimatedGameDuration", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: "H1", leagueName: null, estimatedGameDuration: 90 };
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: "H1", leagueName: null, estimatedGameDuration: 90, badgeColor: null, displayOrder: 0 };
     mocks.updateTeam.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
@@ -189,7 +189,7 @@ describe("PATCH /teams/:id", () => {
   });
 
   it("accepts empty object (no fields to update)", async () => {
-    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null };
+    const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null, badgeColor: null, displayOrder: 0 };
     mocks.updateTeam.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
