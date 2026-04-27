@@ -1,5 +1,8 @@
 import { useSWRConfig } from "swr";
 import { adminBoardApi } from "@/lib/api";
+import { haptics } from "@/lib/haptics";
+import { useToast } from "@/hooks/useToast";
+import { i18n } from "@/lib/i18n";
 import type { TaskDetail } from "@dragons/shared";
 import { taskKey } from "./useTaskDetail";
 
@@ -7,6 +10,7 @@ const tasksPrefix = (boardId: number) => `admin/boards/${boardId}/tasks`;
 
 export function useChecklistMutations(boardId: number) {
   const { cache, mutate } = useSWRConfig();
+  const toast = useToast();
 
   async function refresh(taskId: number) {
     await Promise.all([
@@ -15,10 +19,20 @@ export function useChecklistMutations(boardId: number) {
     ]);
   }
 
+  function notifyError() {
+    haptics.warning();
+    toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
+  }
+
   return {
     addItem: async (taskId: number, label: string) => {
-      await adminBoardApi.addChecklistItem(taskId, label);
-      await refresh(taskId);
+      try {
+        await adminBoardApi.addChecklistItem(taskId, label);
+        await refresh(taskId);
+      } catch (error) {
+        notifyError();
+        throw error;
+      }
     },
     toggle: async (taskId: number, itemId: number, isChecked: boolean) => {
       const key = taskKey(taskId);
@@ -48,12 +62,19 @@ export function useChecklistMutations(boardId: number) {
         // Roll back to previous task detail and force a revalidation.
         await mutate(key, snapshot, { revalidate: false });
         void refresh(taskId);
+        notifyError();
         throw error;
       }
     },
     deleteItem: async (taskId: number, itemId: number) => {
-      await adminBoardApi.deleteChecklistItem(taskId, itemId);
-      await refresh(taskId);
+      try {
+        await adminBoardApi.deleteChecklistItem(taskId, itemId);
+        await refresh(taskId);
+      } catch (error) {
+        haptics.warning();
+        toast.show({ title: i18n.t("toast.deleteFailed"), variant: "error" });
+        throw error;
+      }
     },
   };
 }

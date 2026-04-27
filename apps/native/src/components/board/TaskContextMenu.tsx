@@ -46,7 +46,7 @@ export const TaskContextMenu = forwardRef<TaskContextMenuHandle>(
         enablePanDownToClose
         onDismiss={() => setArgs(null)}
       >
-        <BottomSheetView style={{ padding: spacing.lg, gap: spacing.xs }}>
+        <BottomSheetView style={{ padding: spacing.lg, gap: spacing.xs }} testID="task-context-menu">
           {args?.task ? (
             <Text
               numberOfLines={1}

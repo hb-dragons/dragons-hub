@@ -1,15 +1,21 @@
-import { useCallback, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 import type { TaskCardData, TaskAssignee, TaskPriority } from "@dragons/shared";
+import { dueDateBucket, type DueDateBucket } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
   measure,
   runOnJS,
   useAnimatedRef,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
 } from "react-native-reanimated";
 
 export interface TaskCardLayout {
@@ -39,6 +45,10 @@ interface TaskCardProps {
   onLongPress?: (task: TaskCardData) => void;
   onDrag?: TaskDragCallbacks;
   isBeingDragged?: boolean;
+  /** When true, fire a brief 1 → 1.05 → 1 pulse (consumes the flag once). */
+  recentlyDropped?: boolean;
+  /** Called when the user swipes the card right past the action threshold. */
+  onTaskDelete?: (task: TaskCardData) => void;
   onMeasure?: (taskId: number, rect: TaskContentRect) => void;
 }
 
@@ -66,7 +76,7 @@ function colorFromId(id: string): string {
   return `hsl(${hue}, 50%, 45%)`;
 }
 
-function formatDueShort(iso: string): string {
+export function formatDueShort(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
   const sameYear = date.getFullYear() === now.getFullYear();
@@ -75,6 +85,50 @@ function formatDueShort(iso: string): string {
     day: "numeric",
     year: sameYear ? undefined : "2-digit",
   });
+}
+
+/** Returns the user-visible due label for a bucket + raw iso. */
+export function formatDueWithBucket(
+  iso: string,
+  bucket: DueDateBucket | null,
+  t: (key: string) => string,
+): string {
+  if (bucket === "overdue") return t("board.task.dueOverdue");
+  if (bucket === "today") return t("board.task.dueToday");
+  if (bucket === "soon") {
+    // Distinguish tomorrow from "soon".
+    const due = new Date(iso);
+    const tomorrow = new Date();
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    if (
+      due.getUTCFullYear() === tomorrow.getUTCFullYear() &&
+      due.getUTCMonth() === tomorrow.getUTCMonth() &&
+      due.getUTCDate() === tomorrow.getUTCDate()
+    ) {
+      return t("board.task.dueTomorrow");
+    }
+  }
+  return formatDueShort(iso);
+}
+
+/** Returns the colour for a due-date bucket. Falls back to mutedForeground. */
+export function dueColorFor(
+  bucket: DueDateBucket | null,
+  colors: ReturnType<typeof useTheme>["colors"],
+): string {
+  switch (bucket) {
+    case "overdue":
+      return colors.destructive;
+    case "today":
+      // The theme's `warning` token may not exist on every codebase.
+      // We fall through to the explicit amber as the documented default.
+      return ((colors as unknown) as { warning?: string }).warning ?? "#f59e0b";
+    case "soon":
+      return colors.primary;
+    case "later":
+    default:
+      return colors.mutedForeground;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +177,26 @@ function CheckSquareIcon({ size = 12, color }: { size?: number; color: string })
 // ---------------------------------------------------------------------------
 // Priority Badge (matches web variant mapping)
 // ---------------------------------------------------------------------------
+
+/**
+ * Color of the 4px left-edge stripe.
+ * urgent → destructive, high → heat, low → mutedForeground, normal → transparent
+ */
+export function priorityStripeColor(
+  priority: TaskPriority,
+  colors: ReturnType<typeof useTheme>["colors"],
+): string {
+  switch (priority) {
+    case "urgent":
+      return colors.destructive;
+    case "high":
+      return colors.heat;
+    case "low":
+      return colors.mutedForeground;
+    default:
+      return "transparent";
+  }
+}
 
 function priorityBadgeStyle(
   priority: TaskPriority,
@@ -179,10 +253,12 @@ function AvatarStack({
   ring,
   mutedBg,
   mutedFg,
-  max = 3,
+  max,
 }: AvatarStackProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const effectiveMax = max ?? (windowWidth < 380 ? 2 : 3);
   if (assignees.length === 0) return null;
-  const visible = assignees.slice(0, max);
+  const visible = assignees.slice(0, effectiveMax);
   const overflow = assignees.length - visible.length;
   const overlap = Math.round(size * 0.3);
   return (
@@ -252,12 +328,28 @@ export function TaskCard({
   onLongPress,
   onDrag,
   isBeingDragged = false,
+  recentlyDropped = false,
+  onTaskDelete,
   onMeasure,
 }: TaskCardProps) {
   const { colors, spacing } = useTheme();
   const hasChecklist = task.checklistTotal > 0;
   const pri = priorityBadgeStyle(task.priority, colors);
   const [pressed, setPressed] = useState(false);
+
+  const dropPulse = useSharedValue(1);
+
+  useEffect(() => {
+    if (!recentlyDropped) return;
+    dropPulse.value = withSequence(
+      withTiming(1.05, { duration: 120 }),
+      withTiming(1, { duration: 120 }),
+    );
+  }, [recentlyDropped, dropPulse]);
+
+  const dropPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: dropPulse.value }],
+  }));
 
   const cardRef = useAnimatedRef<Animated.View>();
 
@@ -288,22 +380,41 @@ export function TaskCard({
       delayLongPress={350}
       accessibilityRole="button"
       accessibilityLabel={task.title}
+      accessibilityHint={i18n.t("a11y.doubleTapToOpen")}
+      testID={`task-card-${task.id}`}
       onLayout={handleLayout}
-      style={{
-        padding: spacing.md,
-        borderRadius: 8,
-        backgroundColor: pressed ? colors.surfaceHigh : colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        gap: spacing.sm,
-        opacity: isBeingDragged ? 0 : 1,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
-      }}
+      style={[
+        {
+          padding: spacing.md,
+          borderRadius: 8,
+          backgroundColor: pressed ? colors.surfaceHigh : colors.card,
+          borderWidth: 1,
+          borderColor: colors.border,
+          gap: spacing.sm,
+          opacity: isBeingDragged ? 0 : 1,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.1,
+          shadowRadius: 3,
+          elevation: 2,
+        },
+        dropPulseStyle,
+      ]}
     >
+      {/* Priority left-edge stripe */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          backgroundColor: priorityStripeColor(task.priority, colors),
+          borderTopLeftRadius: 8,
+          borderBottomLeftRadius: 8,
+        }}
+      />
       {/* Title row + priority badge */}
       <View
         style={{
@@ -367,26 +478,30 @@ export function TaskCard({
             flexShrink: 1,
           }}
         >
-          {task.dueDate ? (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <CalendarIcon size={12} color={colors.mutedForeground} />
-              <Text
+          {task.dueDate ? (() => {
+            const bucket = dueDateBucket(task.dueDate, new Date());
+            const dueColour = dueColorFor(bucket, colors);
+            return (
+              <View
                 style={{
-                  color: colors.mutedForeground,
-                  fontSize: 11,
-                  fontWeight: "500",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
                 }}
               >
-                {formatDueShort(task.dueDate)}
-              </Text>
-            </View>
-          ) : null}
+                <CalendarIcon size={12} color={dueColour} />
+                <Text
+                  style={{
+                    color: dueColour,
+                    fontSize: 11,
+                    fontWeight: bucket === "overdue" || bucket === "today" ? "700" : "500",
+                  }}
+                >
+                  {formatDueWithBucket(task.dueDate, bucket, i18n.t.bind(i18n))}
+                </Text>
+              </View>
+            );
+          })() : null}
 
           {hasChecklist ? (
             <View
@@ -422,8 +537,51 @@ export function TaskCard({
     </AnimatedPressable>
   );
 
+  // Right-swipe action: Delete (matches long-press menu's delete flow).
+  const renderRightActions = () => (
+    <View
+      style={{
+        backgroundColor: colors.destructive,
+        justifyContent: "center",
+        alignItems: "flex-end",
+        paddingHorizontal: spacing.lg,
+        borderRadius: 8,
+      }}
+    >
+      <Text
+        style={{
+          color: colors.destructiveForeground,
+          fontWeight: "700",
+          fontSize: 13,
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+        }}
+      >
+        {i18n.t("board.task.swipeDelete")}
+      </Text>
+    </View>
+  );
+
+  const swipeWrapped = onTaskDelete ? (
+    <Swipeable
+      friction={2}
+      rightThreshold={64}
+      renderRightActions={renderRightActions}
+      onSwipeableOpen={(direction) => {
+        if (direction === "right") {
+          onTaskDelete(task);
+        }
+      }}
+      testID={`task-card-swipeable-${task.id}`}
+    >
+      {cardContent}
+    </Swipeable>
+  ) : (
+    cardContent
+  );
+
   if (!onDrag) {
-    return cardContent;
+    return swipeWrapped;
   }
 
   const { start: safeStart, move: safeMove, end: safeEnd } = onDrag;
@@ -458,7 +616,7 @@ export function TaskCard({
 
   return (
     <GestureDetector gesture={dragGesture}>
-      {cardContent}
+      {swipeWrapped}
     </GestureDetector>
   );
 }

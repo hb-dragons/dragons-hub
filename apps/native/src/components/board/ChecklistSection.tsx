@@ -1,26 +1,148 @@
-import { useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import type { TaskDetail } from "@dragons/shared";
 import { useChecklistMutations } from "@/hooks/board/useChecklistMutations";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
+import { adminBoardApi } from "@/lib/api";
 
 interface Props {
   task: TaskDetail;
   boardId: number;
 }
 
+interface ChecklistRowProps {
+  label: string;
+  isChecked: boolean;
+  colors: ReturnType<typeof useTheme>["colors"];
+  spacing: ReturnType<typeof useTheme>["spacing"];
+  onToggle: () => void;
+  onLongPress: () => void;
+}
+
+function ChecklistRow({
+  label,
+  isChecked,
+  colors,
+  spacing,
+  onToggle,
+  onLongPress,
+}: ChecklistRowProps) {
+  const scale = useSharedValue(1);
+  const prevChecked = useRef(isChecked);
+
+  useEffect(() => {
+    if (prevChecked.current !== isChecked) {
+      scale.value = withSequence(
+        withSpring(1.18, { damping: 8, stiffness: 260, mass: 0.6 }),
+        withSpring(1, { damping: 12, stiffness: 220, mass: 0.6 }),
+      );
+      prevChecked.current = isChecked;
+    }
+  }, [isChecked, scale]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Pressable
+      onPress={onToggle}
+      onLongPress={onLongPress}
+      delayLongPress={500}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: isChecked }}
+      accessibilityLabel={label}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing.sm,
+        paddingVertical: spacing.xs,
+      }}
+    >
+      <Animated.View
+        style={[
+          {
+            width: 22,
+            height: 22,
+            borderRadius: 6,
+            borderWidth: 2,
+            borderColor: isChecked ? colors.primary : colors.border,
+            backgroundColor: isChecked ? colors.primary : "transparent",
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          animStyle,
+        ]}
+      >
+        {isChecked ? (
+          <Text style={{ color: colors.primaryForeground, fontSize: 14, fontWeight: "700" }}>
+            ✓
+          </Text>
+        ) : null}
+      </Animated.View>
+      <Text
+        style={{
+          flex: 1,
+          color: colors.foreground,
+          fontSize: 15,
+          textDecorationLine: isChecked ? "line-through" : "none",
+          opacity: isChecked ? 0.6 : 1,
+        }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 export function ChecklistSection({ task, boardId }: Props) {
   const { colors, spacing, radius } = useTheme();
   const mutations = useChecklistMutations(boardId);
+  const toast = useToast();
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
 
   const checked = task.checklistChecked;
   const total = task.checklistTotal;
   const percent = total === 0 ? 0 : Math.round((checked / total) * 100);
+
+  // Animated progress bar width.
+  const widthSV = useSharedValue(percent);
+  // Glow on completion: 0 = base color, 1 = primary flash.
+  const glowSV = useSharedValue(0);
+  // Track previous percent so we can detect the 99 → 100 transition.
+  const prevPercentRef = useRef(percent);
+
+  useEffect(() => {
+    widthSV.value = withTiming(percent, { duration: 280 });
+    if (prevPercentRef.current < 100 && percent === 100 && total > 0) {
+      haptics.success();
+      glowSV.value = withSequence(
+        withTiming(1, { duration: 180 }),
+        withTiming(0, { duration: 220 }),
+      );
+    }
+    prevPercentRef.current = percent;
+  }, [percent, total, widthSV, glowSV]);
+
+  const animatedFillStyle = useAnimatedStyle(() => ({
+    width: `${widthSV.value}%`,
+  }));
+
+  const animatedGlowStyle = useAnimatedStyle(() => ({
+    opacity: glowSV.value * 0.5,
+  }));
 
   const submit = async () => {
     const label = draft.trim();
@@ -35,21 +157,41 @@ export function ChecklistSection({ task, boardId }: Props) {
   };
 
   const confirmDelete = (itemId: number) => {
+    const item = task.checklist.find((i) => i.id === itemId);
+    if (!item) return;
     haptics.warning();
-    Alert.alert(
-      i18n.t("board.checklist.deleteTitle"),
-      i18n.t("board.checklist.deleteMessage"),
-      [
-        { text: i18n.t("common.cancel"), style: "cancel" },
-        {
-          text: i18n.t("common.delete"),
-          style: "destructive",
+    const snapshot = {
+      label: item.label,
+      isChecked: item.isChecked,
+    };
+    void mutations.deleteItem(task.id, itemId).then(() => {
+      toast.show({
+        title: i18n.t("toast.checklistItemDeleted"),
+        action: {
+          label: i18n.t("toast.undo"),
           onPress: () => {
-            void mutations.deleteItem(task.id, itemId);
+            void (async () => {
+              try {
+                const created = await adminBoardApi.addChecklistItem(
+                  task.id,
+                  snapshot.label,
+                );
+                if (snapshot.isChecked) {
+                  await adminBoardApi.updateChecklistItem(task.id, created.id, {
+                    isChecked: true,
+                  });
+                }
+              } catch {
+                toast.show({
+                  title: i18n.t("toast.saveFailed"),
+                  variant: "error",
+                });
+              }
+            })();
           },
         },
-      ],
-    );
+      });
+    });
   };
 
   return (
@@ -86,12 +228,28 @@ export function ChecklistSection({ task, boardId }: Props) {
             overflow: "hidden",
           }}
         >
-          <View
-            style={{
-              width: `${percent}%`,
-              height: "100%",
-              backgroundColor: colors.primary,
-            }}
+          <Animated.View
+            style={[
+              {
+                height: "100%",
+                backgroundColor: colors.primary,
+              },
+              animatedFillStyle,
+            ]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              {
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: colors.primary,
+              },
+              animatedGlowStyle,
+            ]}
           />
         </View>
       ) : null}
@@ -100,54 +258,18 @@ export function ChecklistSection({ task, boardId }: Props) {
         .slice()
         .sort((a, b) => a.position - b.position)
         .map((item) => (
-          <Pressable
+          <ChecklistRow
             key={item.id}
-            onPress={() => {
+            label={item.label}
+            isChecked={item.isChecked}
+            colors={colors}
+            spacing={spacing}
+            onToggle={() => {
               haptics.selection();
-              mutations.toggle(task.id, item.id, !item.isChecked);
+              void mutations.toggle(task.id, item.id, !item.isChecked);
             }}
             onLongPress={() => confirmDelete(item.id)}
-            delayLongPress={500}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: item.isChecked }}
-            accessibilityLabel={item.label}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: spacing.sm,
-              paddingVertical: spacing.xs,
-            }}
-          >
-            <View
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 6,
-                borderWidth: 2,
-                borderColor: item.isChecked ? colors.primary : colors.border,
-                backgroundColor: item.isChecked ? colors.primary : "transparent",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {item.isChecked ? (
-                <Text style={{ color: colors.primaryForeground, fontSize: 14, fontWeight: "700" }}>
-                  ✓
-                </Text>
-              ) : null}
-            </View>
-            <Text
-              style={{
-                flex: 1,
-                color: colors.foreground,
-                fontSize: 15,
-                textDecorationLine: item.isChecked ? "line-through" : "none",
-                opacity: item.isChecked ? 0.6 : 1,
-              }}
-            >
-              {item.label}
-            </Text>
-          </Pressable>
+          />
         ))}
 
       <View

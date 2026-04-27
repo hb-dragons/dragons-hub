@@ -1,6 +1,12 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { View, Text, ScrollView, Pressable, RefreshControl } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import type { TaskCardData, BoardColumnData } from "@dragons/shared";
 import { TaskCard, type TaskContentRect, type TaskDragCallbacks } from "./TaskCard";
 import { useTheme } from "@/hooks/useTheme";
@@ -17,11 +23,16 @@ interface BoardColumnProps {
   width: number;
   onTaskPress: (task: TaskCardData) => void;
   onTaskLongPress?: (task: TaskCardData) => void;
+  onColumnLongPress?: (column: BoardColumnData) => void;
   onAddTask: (columnId: number) => void;
   /** ID of the task currently being dragged, used to fade out its placeholder. */
   draggingTaskId?: number | null;
+  /** Task ID of the most recently dropped card (fires drop-pulse). */
+  recentlyDroppedTaskId?: number | null;
   /** Drag callbacks forwarded to each task card. */
   onTaskDrag?: TaskDragCallbacks;
+  /** Called when the user requests to delete a task (swipe right or context menu). */
+  onTaskDelete?: (task: TaskCardData) => void;
   /** When set, this column is highlighted as a potential drop target. */
   isDropTarget?: boolean;
   /** Called when a task card reports its column-local rect. */
@@ -53,9 +64,12 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
       width,
       onTaskPress,
       onTaskLongPress,
+      onColumnLongPress,
       onAddTask,
       draggingTaskId,
+      recentlyDroppedTaskId,
       onTaskDrag,
+      onTaskDelete,
       isDropTarget = false,
       onTaskMeasure,
       onScrollUpdate,
@@ -67,6 +81,22 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
     ref,
   ) {
     const { colors, spacing, radius, isDark } = useTheme();
+
+    // Drive drop-target tint + shadow with a single 0 → 1 progress value.
+    const dropProgress = useSharedValue(0);
+    useDerivedValue(() => {
+      dropProgress.value = withTiming(isDropTarget ? 1 : 0, { duration: 180 });
+    });
+
+    const baseBg = isDark ? colors.surfaceLow : colors.surfaceHigh;
+    const targetBg = isDark ? colors.surfaceHigh : colors.surfaceHighest;
+
+    const animatedColumnStyle = useAnimatedStyle(() => ({
+      shadowOpacity: 0.18 * dropProgress.value,
+      shadowRadius: 12 * dropProgress.value,
+      elevation: 8 * dropProgress.value,
+    }));
+
     const columnTasks = tasks
       .filter((t) => t.columnId === column.id)
       .sort((a, b) => a.position - b.position);
@@ -84,21 +114,31 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
     };
 
     return (
-      <View style={{ width, paddingHorizontal: spacing.sm }}>
-        <View
-          style={{
-            flex: 1,
-            // Dark: surfaceLow is darker than card #2a2a2a → card elevates.
-            // Light: surfaceHigh #e7e8e9 is darker than card #ffffff → card elevates.
-            backgroundColor: isDark ? colors.surfaceLow : colors.surfaceHigh,
-            borderRadius: radius.md,
-            overflow: "hidden",
-            borderWidth: isDropTarget ? 2 : 1,
-            borderColor: isDropTarget ? colors.primary : colors.border,
-          }}
+      <View
+        testID={`board-column-${column.id}`}
+        style={{ width, paddingHorizontal: spacing.sm }}
+      >
+        <Animated.View
+          style={[
+            {
+              flex: 1,
+              backgroundColor: isDropTarget ? targetBg : baseBg,
+              borderRadius: radius.md,
+              overflow: "hidden",
+              borderWidth: isDropTarget ? 2 : 1,
+              borderColor: isDropTarget ? colors.primary : colors.border,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+            },
+            animatedColumnStyle,
+          ]}
         >
-          <View
+          <Pressable
+            onLongPress={onColumnLongPress ? () => onColumnLongPress(column) : undefined}
+            delayLongPress={400}
             onLayout={handleHeaderLayout}
+            accessibilityRole="header"
+            accessibilityLabel={column.name}
             style={{
               paddingHorizontal: spacing.md,
               paddingTop: spacing.md,
@@ -130,7 +170,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
             <Text style={{ color: colors.mutedForeground, fontSize: 13, fontVariant: ["tabular-nums"] }}>
               {columnTasks.length}
             </Text>
-          </View>
+          </Pressable>
 
           <ScrollView
             ref={scrollRef}
@@ -168,7 +208,9 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
                 onPress={onTaskPress}
                 onLongPress={onTaskLongPress}
                 isBeingDragged={t.id === draggingTaskId}
+                recentlyDropped={t.id === recentlyDroppedTaskId}
                 onDrag={onTaskDrag}
+                onTaskDelete={onTaskDelete}
                 onMeasure={onTaskMeasure}
               />
             ))}
@@ -197,7 +239,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
               </Text>
             </Pressable>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     );
   },

@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, useWindowDimensions } from "react-native";
 import {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -23,7 +23,12 @@ export const TaskDetailSheet = forwardRef<TaskDetailSheetHandle, Props>(
     const sheetRef = useRef<BottomSheetModal>(null);
     const [taskId, setTaskId] = useState<number | null>(null);
     const { colors } = useTheme();
-    const snapPoints = useMemo(() => ["55%", "92%"], []);
+    const { width: winWidth, height: winHeight } = useWindowDimensions();
+    const isLandscape = winWidth > winHeight;
+    const snapPoints = useMemo(
+      () => (isLandscape ? ["75%", "95%"] : ["55%", "92%"]),
+      [isLandscape],
+    );
 
     useImperativeHandle(
       ref,
@@ -61,7 +66,7 @@ export const TaskDetailSheet = forwardRef<TaskDetailSheetHandle, Props>(
         onDismiss={() => setTaskId(null)}
         enablePanDownToClose
       >
-        <BottomSheetView style={{ flex: 1 }}>
+        <BottomSheetView style={{ flex: 1 }} testID="task-detail-sheet">
           {isLoading || !task ? (
             <View style={{ padding: 32, alignItems: "center" }}>
               <ActivityIndicator color={colors.foreground} />

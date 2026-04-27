@@ -5,8 +5,10 @@ import type { TaskDetail } from "@dragons/shared";
 import { useCommentMutations } from "@/hooks/board/useCommentMutations";
 import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
+import { adminBoardApi } from "@/lib/api";
 
 interface Props {
   task: TaskDetail;
@@ -17,6 +19,7 @@ export function CommentsSection({ task }: Props) {
   const { data: session } = authClient.useSession();
   const currentUserId = session?.user?.id ?? null;
   const mutations = useCommentMutations();
+  const toast = useToast();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -50,21 +53,30 @@ export function CommentsSection({ task }: Props) {
   };
 
   const confirmDelete = (id: number) => {
+    const comment = task.comments.find((c) => c.id === id);
+    if (!comment) return;
+    const snapshotBody = comment.body;
     haptics.warning();
-    Alert.alert(
-      i18n.t("board.comments.deleteTitle"),
-      i18n.t("board.comments.deleteMessage"),
-      [
-        { text: i18n.t("common.cancel"), style: "cancel" },
-        {
-          text: i18n.t("common.delete"),
-          style: "destructive",
+    void mutations.remove(task.id, id).then(() => {
+      toast.show({
+        title: i18n.t("toast.commentDeleted"),
+        action: {
+          label: i18n.t("toast.undo"),
           onPress: () => {
-            void mutations.remove(task.id, id);
+            void (async () => {
+              try {
+                await adminBoardApi.addComment(task.id, snapshotBody);
+              } catch {
+                toast.show({
+                  title: i18n.t("toast.saveFailed"),
+                  variant: "error",
+                });
+              }
+            })();
           },
         },
-      ],
-    );
+      });
+    });
   };
 
   const sorted = [...task.comments].sort(

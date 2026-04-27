@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AccessibilityInfo } from "react-native";
 import { useSharedValue, type SharedValue } from "react-native-reanimated";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
 import { findDropTarget } from "@dragons/shared";
@@ -7,6 +8,7 @@ import type { BoardColumnHandle } from "@/components/board/BoardColumn";
 import type { BoardPagerHandle, PagerLayout } from "@/components/board/BoardPager";
 import type { TaskCardLayout, TaskContentRect } from "@/components/board/TaskCard";
 import { haptics } from "@/lib/haptics";
+import { i18n } from "@/lib/i18n";
 import { useMoveTask } from "./useMoveTask";
 import { spacing } from "@/theme/spacing";
 
@@ -56,6 +58,8 @@ interface UseBoardDragReturn {
   onColumnHeaderHeight: (columnId: number, headerHeight: number) => void;
   /** The column ID currently highlighted (null when not dragging). */
   dropTargetColumnId: number | null;
+  /** Task ID of the most recently dropped card; clears 400ms after drop. */
+  recentlyDroppedTaskId: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +82,8 @@ export function useBoardDrag({
 
   // React state for render (task identity, sizes, drop highlight).
   const [dragState, setDragState] = useState<DragState>({ active: false });
+
+  const [recentlyDroppedTaskId, setRecentlyDroppedTaskId] = useState<number | null>(null);
 
   // Ref that mirrors dragState so gesture callbacks can read without stale closures.
   const dragStateRef = useRef<DragState>({ active: false });
@@ -213,6 +219,9 @@ export function useBoardDrag({
       };
       dragStateRef.current = next;
       setDragState(next);
+      AccessibilityInfo.announceForAccessibility(
+        i18n.t("a11y.pickedUpTask", { title: task.title }),
+      );
     },
     [pointerX, pointerY],
   );
@@ -258,7 +267,19 @@ export function useBoardDrag({
         dropTarget.position !== snapshot.task.position)
     ) {
       haptics.success();
+      setRecentlyDroppedTaskId(snapshot.task.id);
+      setTimeout(() => setRecentlyDroppedTaskId(null), 400);
       void moveTask(snapshot.task.id, dropTarget.columnId, dropTarget.position);
+      const targetColumn = columnsRef.current.find(
+        (c) => c.id === dropTarget.columnId,
+      );
+      AccessibilityInfo.announceForAccessibility(
+        i18n.t("a11y.droppedTaskInColumn", {
+          column: targetColumn?.name ?? "",
+        }),
+      );
+    } else {
+      AccessibilityInfo.announceForAccessibility(i18n.t("a11y.dropCancelled"));
     }
   }, [callFindDropTarget, moveTask]);
 
@@ -291,7 +312,8 @@ export function useBoardDrag({
 
       const { pageX: pagerOriginX, pageY: pagerOriginY, width: pagerWidth } = pagerLayout;
       const scrollX = pagerScrollXRef.current;
-      const columnWidth = Math.round(pagerWidth * 0.88);
+      // Must match BoardPager column width multiplier (0.85).
+      const columnWidth = Math.round(pagerWidth * 0.85);
 
       // --- Vertical autoscroll ---
       // Determine which column the pointer is over (geometric).
@@ -377,5 +399,6 @@ export function useBoardDrag({
     onTaskMeasure,
     onColumnHeaderHeight,
     dropTargetColumnId: dragState.active ? dragState.dropTargetColumnId : null,
+    recentlyDroppedTaskId,
   };
 }

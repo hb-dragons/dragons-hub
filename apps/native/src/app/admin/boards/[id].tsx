@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { Alert, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
+import { Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBoard } from "@/hooks/board/useBoard";
@@ -17,12 +17,27 @@ import { useBoardPickers } from "@/components/board/BoardPickersProvider";
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
+import { BoardSearchInput } from "@/components/board/BoardSearchInput";
+import {
+  AssigneeFilterSheet,
+  type AssigneeFilterSheetHandle,
+} from "@/components/board/AssigneeFilterSheet";
+import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
+import { SortSheet, type SortSheetHandle } from "@/components/board/SortSheet";
+import { boardTaskComparator } from "@dragons/shared";
+import { useColumnDrag } from "@/hooks/board/useColumnDrag";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
+import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
+import { ColumnSettingsSheet, type ColumnSettingsSheetHandle } from "@/components/board/ColumnSettingsSheet";
+import { AddColumnSheet, type AddColumnSheetHandle } from "@/components/board/AddColumnSheet";
 import type { BoardColumnHandle } from "@/components/board/BoardColumn";
+import type { BoardColumnData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 import { authClient } from "@/lib/auth-client";
+import { useToast } from "@/hooks/useToast";
+import { adminBoardApi } from "@/lib/api";
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
 import type { TaskListFilters } from "@dragons/api-client";
 
@@ -39,12 +54,14 @@ function BoardDetailBody() {
   const boardId = Number(id);
   const { data: board, isLoading: boardLoading, mutate: revalidateBoard } = useBoard(boardId);
 
-  const [filters, setFilters] = useState<BoardFilters>({
-    mine: false,
-    priority: null,
-    dueSoon: false,
-    unassigned: false,
-  });
+  const persistence = useBoardFilterPersistence(boardId);
+  const filters = persistence.filters as BoardFilters;
+  const setFilters = persistence.setFilters as (
+    next: BoardFilters | ((prev: BoardFilters) => BoardFilters),
+  ) => void;
+  const sort = persistence.sort;
+  const setSort = persistence.setSort;
+  const [searchQuery, setSearchQuery] = useState("");
 
   const currentUserId = authClient.useSession().data?.user?.id ?? null;
 
@@ -72,7 +89,11 @@ function BoardDetailBody() {
 
   const tasks = useMemo(() => {
     if (!rawTasks) return rawTasks;
-    return rawTasks.filter((t) => {
+    // NOTE: TaskCardData has no description field — board search matches
+    // task title only. Description-level search is server-side and deferred.
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = rawTasks.filter((t) => {
+      if (q.length > 0 && !t.title.toLowerCase().includes(q)) return false;
       if (filters.mine && currentUserId) {
         if (!t.assignees.some((a) => a.userId === currentUserId)) return false;
       }
@@ -86,9 +107,14 @@ function BoardDetailBody() {
       if (filters.unassigned) {
         if (t.assignees.length > 0) return false;
       }
+      if (filters.assigneeIds.size > 0) {
+        if (!t.assignees.some((a) => filters.assigneeIds.has(a.userId))) return false;
+      }
       return true;
     });
-  }, [rawTasks, filters, currentUserId]);
+    if (sort === "position") return filtered;
+    return [...filtered].sort(boardTaskComparator(sort));
+  }, [rawTasks, filters, currentUserId, searchQuery, sort]);
 
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
@@ -101,8 +127,14 @@ function BoardDetailBody() {
   const contextMenuRef = useRef<TaskContextMenuHandle | null>(null);
   const moveToSheetRef = useRef<MoveToSheetHandle | null>(null);
   const quickCreateRef = useRef<QuickCreateSheetHandle | null>(null);
+  const settingsSheetRef = useRef<BoardSettingsSheetHandle | null>(null);
+  const columnSettingsRef = useRef<ColumnSettingsSheetHandle | null>(null);
+  const addColumnRef = useRef<AddColumnSheetHandle | null>(null);
+  const assigneeFilterRef = useRef<AssigneeFilterSheetHandle | null>(null);
+  const sortSheetRef = useRef<SortSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
   const moveTask = useMoveTask(boardId);
+  const toast = useToast();
 
   // Per-column ScrollView handles for imperatively scrolling (autoscroll).
   const columnRefsMap = useRef<Map<number, BoardColumnHandle>>(new Map());
@@ -115,6 +147,8 @@ function BoardDetailBody() {
     () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
     [board],
   );
+
+  const columnDrag = useColumnDrag(boardId, columns);
 
   const countsByColumn = useMemo(() => {
     const m = new Map<number, number>();
@@ -149,6 +183,7 @@ function BoardDetailBody() {
     onTaskMeasure,
     onColumnHeaderHeight,
     dropTargetColumnId,
+    recentlyDroppedTaskId,
   } = useBoardDrag({
     boardId,
     columns,
@@ -166,6 +201,46 @@ function BoardDetailBody() {
     setActiveIndex(i);
     pagerRef.current?.scrollToIndex(i, true);
   }, []);
+
+  const handleTaskDelete = useCallback(
+    (task: TaskCardData) => {
+      haptics.warning();
+      const snapshotTitle = task.title;
+      const snapshotColumnId = task.columnId;
+      const snapshotDescription = task.description ?? null;
+      const snapshotPriority = task.priority;
+      const snapshotDueDate = task.dueDate;
+
+      void taskMutations.deleteTask(task.id).then(() => {
+        toast.show({
+          title: i18n.t("toast.taskDeleted"),
+          action: {
+            label: i18n.t("toast.undo"),
+            onPress: () => {
+              void (async () => {
+                try {
+                  await adminBoardApi.createTask(boardId, {
+                    columnId: snapshotColumnId,
+                    title: snapshotTitle,
+                    description: snapshotDescription,
+                    priority: snapshotPriority,
+                    dueDate: snapshotDueDate,
+                  });
+                  await revalidateTasks();
+                } catch {
+                  toast.show({
+                    title: i18n.t("toast.saveFailed"),
+                    variant: "error",
+                  });
+                }
+              })();
+            },
+          },
+        });
+      });
+    },
+    [boardId, taskMutations, toast, revalidateTasks],
+  );
 
   const handleTaskLongPress = useCallback(
     (task: TaskCardData) => {
@@ -190,26 +265,12 @@ function BoardDetailBody() {
               void taskMutations.setDueDate(task.id, iso);
             });
           } else if (action === "delete") {
-            haptics.warning();
-            Alert.alert(
-              i18n.t("board.task.deleteConfirmTitle"),
-              i18n.t("board.task.deleteConfirmMessage"),
-              [
-                { text: i18n.t("common.cancel"), style: "cancel" },
-                {
-                  text: i18n.t("common.delete"),
-                  style: "destructive",
-                  onPress: () => {
-                    void taskMutations.deleteTask(task.id);
-                  },
-                },
-              ],
-            );
+            handleTaskDelete(task);
           }
         },
       });
     },
-    [columns, countsByColumn, moveTask, taskMutations, pickers],
+    [columns, countsByColumn, moveTask, taskMutations, pickers, handleTaskDelete],
   );
 
   const onPressPriorityChip = useCallback(() => {
@@ -224,6 +285,16 @@ function BoardDetailBody() {
     setFilters((f) => ({ ...f, priority: null }));
   }, []);
 
+  const onPressAssignees = useCallback(() => {
+    assigneeFilterRef.current?.open(filters.assigneeIds, (next) => {
+      setFilters((f) => ({ ...f, assigneeIds: next }));
+    });
+  }, [filters.assigneeIds]);
+
+  const onClearAssignees = useCallback(() => {
+    setFilters((f) => ({ ...f, assigneeIds: new Set<string>() }));
+  }, []);
+
   const openQuickCreate = useCallback(
     (columnId: number) => {
       quickCreateRef.current?.open({
@@ -234,6 +305,17 @@ function BoardDetailBody() {
     },
     [boardId, columns],
   );
+
+  const onColumnLongPress = useCallback(
+    (col: BoardColumnData) => {
+      columnSettingsRef.current?.open({ boardId, column: col });
+    },
+    [boardId],
+  );
+
+  const onAddColumnPress = useCallback(() => {
+    addColumnRef.current?.open({ boardId });
+  }, [boardId]);
 
   const openQuickCreateFab = useCallback(() => {
     const active = columns[activeIndex] ?? columns[0];
@@ -266,12 +348,67 @@ function BoardDetailBody() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Stack.Screen options={{ title: board.name }} />
+      <Stack.Screen
+        options={{
+          title: board.name,
+          headerRight: () => (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.xs,
+                maxWidth: 280,
+              }}
+            >
+              <BoardSearchInput value={searchQuery} onChange={setSearchQuery} />
+              <Pressable
+                onPress={() => sortSheetRef.current?.open(sort, setSort)}
+                accessibilityRole="button"
+                accessibilityLabel={i18n.t("board.sort.open")}
+                hitSlop={12}
+                style={{
+                  width: 44,
+                  height: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: sort === "position" ? colors.foreground : colors.primary,
+                    fontSize: 18,
+                    fontWeight: "700",
+                  }}
+                >
+                  ⇅
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => settingsSheetRef.current?.open({ board })}
+                accessibilityRole="button"
+                accessibilityLabel={i18n.t("admin.boards.settingsTitle")}
+                hitSlop={12}
+                style={{ paddingHorizontal: spacing.sm, paddingVertical: spacing.sm }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 18, fontWeight: "700" }}>⋯</Text>
+              </Pressable>
+            </View>
+          ),
+        }}
+      />
       <BoardHeader
         columns={columns}
         tasks={rawTasks ?? []}
         activeColumnIndex={activeIndex}
         onPillPress={onPillPress}
+        onPillLongPress={columnDrag.reordering ? undefined : onColumnLongPress}
+        onAddColumnPress={onAddColumnPress}
+        liftedColumnId={columnDrag.liftedColumnId}
+        targetIndex={columnDrag.targetIndex}
+        onReorderStart={columnDrag.start}
+        onReorderTargetIndex={columnDrag.setTargetIndex}
+        onReorderCommit={columnDrag.commit}
+        onReorderCancel={columnDrag.cancel}
       />
       <FilterChips
         filters={filters}
@@ -280,9 +417,84 @@ function BoardDetailBody() {
         onClearPriority={onClearPriorityFilter}
         onToggleDueSoon={() => setFilters((f) => ({ ...f, dueSoon: !f.dueSoon }))}
         onToggleUnassigned={() => setFilters((f) => ({ ...f, unassigned: !f.unassigned }))}
+        onPressAssignees={onPressAssignees}
+        onClearAssignees={onClearAssignees}
       />
+      {searchQuery.trim().length > 0 ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: spacing.md,
+            paddingBottom: spacing.xs,
+          }}
+        >
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+            {i18n.t(
+              (tasks?.length ?? 0) === 1 ? "board.search.matches" : "board.search.matchesPlural",
+              { count: tasks?.length ?? 0 },
+            )}
+          </Text>
+          <Pressable
+            onPress={() => setSearchQuery("")}
+            accessibilityRole="button"
+            accessibilityLabel={i18n.t("common.clear")}
+            hitSlop={12}
+          >
+            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "600" }}>
+              {i18n.t("common.clear")}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
       <View style={{ flex: 1 }}>
-        {tasksLoading && !rawTasks ? (
+        {columns.length === 0 && !boardLoading ? (
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              padding: spacing.lg,
+              gap: spacing.md,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.foreground,
+                fontSize: 16,
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+            >
+              {i18n.t("board.empty.noColumns")}
+            </Text>
+            <Text
+              style={{
+                color: colors.mutedForeground,
+                fontSize: 14,
+                textAlign: "center",
+              }}
+            >
+              {i18n.t("board.empty.noColumnsHint")}
+            </Text>
+            <Pressable
+              onPress={onAddColumnPress}
+              accessibilityRole="button"
+              style={{
+                marginTop: spacing.sm,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.md,
+                borderRadius: 8,
+                backgroundColor: colors.primary,
+              }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>
+                {i18n.t("board.column.newColumn")}
+              </Text>
+            </Pressable>
+          </View>
+        ) : tasksLoading && !rawTasks ? (
           <View style={{ flex: 1, paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md }}>
             <TaskCardSkeleton />
             <TaskCardSkeleton />
@@ -300,9 +512,12 @@ function BoardDetailBody() {
               taskSheetRef.current?.open(task.id);
             }}
             onTaskLongPress={handleTaskLongPress}
+            onTaskDelete={handleTaskDelete}
+            onColumnLongPress={onColumnLongPress}
             onAddTask={openQuickCreate}
             draggingTaskId={dragState.active ? dragState.task.id : null}
             dropTargetColumnId={dropTargetColumnId}
+            recentlyDroppedTaskId={recentlyDroppedTaskId}
             onTaskDrag={onTaskDrag}
             onTaskMeasure={onTaskMeasure}
             onColumnScrollUpdate={onColumnScrollUpdate}
@@ -313,6 +528,7 @@ function BoardDetailBody() {
             columnRefs={columnRefsMap}
             refreshing={refreshing}
             onRefresh={onPullRefresh}
+            scrollEnabled={!columnDrag.reordering}
           />
         )}
       </View>
@@ -357,6 +573,11 @@ function BoardDetailBody() {
       <TaskContextMenu ref={contextMenuRef} />
       <MoveToSheet ref={moveToSheetRef} />
       <QuickCreateSheet ref={quickCreateRef} />
+      <BoardSettingsSheet ref={settingsSheetRef} />
+      <ColumnSettingsSheet ref={columnSettingsRef} />
+      <AddColumnSheet ref={addColumnRef} />
+      <AssigneeFilterSheet ref={assigneeFilterRef} />
+      <SortSheet ref={sortSheetRef} />
     </View>
   );
 }

@@ -34,13 +34,18 @@ interface BoardPagerProps {
   onActiveColumnChange: (i: number) => void;
   onTaskPress: (task: TaskCardData) => void;
   onTaskLongPress?: (task: TaskCardData) => void;
+  onColumnLongPress?: (column: BoardColumnData) => void;
   onAddTask: (columnId: number) => void;
   /** ID of the task being dragged — fades out its placeholder. */
   draggingTaskId?: number | null;
   /** Column ID that is currently a valid drop target. */
   dropTargetColumnId?: number | null;
+  /** Task ID of the most recently dropped card (fires drop-pulse). */
+  recentlyDroppedTaskId?: number | null;
   /** Drag callbacks forwarded to task cards. */
   onTaskDrag?: TaskDragCallbacks;
+  /** Called when the user requests to delete a task (swipe right or context menu). */
+  onTaskDelete?: (task: TaskCardData) => void;
   /** Called when a task card reports its column-local rect. */
   onTaskMeasure?: (taskId: number, rect: TaskContentRect) => void;
   /** Called when a column's scroll position changes. */
@@ -59,6 +64,8 @@ interface BoardPagerProps {
   refreshing?: boolean;
   /** Pull-to-refresh handler, forwarded to each column. */
   onRefresh?: () => void;
+  /** When false, the pager's horizontal scroll is disabled (used during column reorder). */
+  scrollEnabled?: boolean;
 }
 
 export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
@@ -69,10 +76,13 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
       onActiveColumnChange,
       onTaskPress,
       onTaskLongPress,
+      onColumnLongPress,
       onAddTask,
       draggingTaskId,
       dropTargetColumnId,
+      recentlyDroppedTaskId,
       onTaskDrag,
+      onTaskDelete,
       onTaskMeasure,
       onColumnScrollUpdate,
       onColumnContentSizeChange,
@@ -82,13 +92,14 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
       columnRefs,
       refreshing,
       onRefresh,
+      scrollEnabled = true,
     },
     ref,
   ) {
     const scrollRef = useRef<ScrollView | null>(null);
     const scrollXRef = useRef(0);
     const { width: winWidth } = useWindowDimensions();
-    const columnWidth = useMemo(() => Math.round(winWidth * 0.88), [winWidth]);
+    const columnWidth = useMemo(() => Math.round(winWidth * 0.85), [winWidth]);
 
     useImperativeHandle(
       ref,
@@ -144,7 +155,9 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
     return (
       <ScrollView
         ref={scrollRef}
+        testID="board-pager"
         horizontal
+        scrollEnabled={scrollEnabled}
         decelerationRate="fast"
         snapToInterval={columnWidth}
         snapToAlignment="start"
@@ -172,10 +185,13 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
             width={columnWidth}
             onTaskPress={onTaskPress}
             onTaskLongPress={onTaskLongPress}
+            onColumnLongPress={onColumnLongPress}
             onAddTask={onAddTask}
             draggingTaskId={draggingTaskId}
             isDropTarget={col.id === dropTargetColumnId}
+            recentlyDroppedTaskId={recentlyDroppedTaskId}
             onTaskDrag={onTaskDrag}
+            onTaskDelete={onTaskDelete}
             onTaskMeasure={onTaskMeasure}
             onScrollUpdate={onColumnScrollUpdate}
             onContentSizeChange={onColumnContentSizeChange}

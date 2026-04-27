@@ -36,7 +36,7 @@ export const DuePickerSheet = forwardRef<DuePickerHandle>(function DuePickerShee
       handleIndicatorStyle={{ backgroundColor: colors.mutedForeground }}
       enablePanDownToClose
     >
-      <BottomSheetView style={{ padding: spacing.lg, gap: spacing.lg }}>
+      <BottomSheetView style={{ padding: spacing.lg, gap: spacing.lg }} testID="due-picker-sheet">
         <DateTimePicker
           mode="date"
           display={Platform.OS === "ios" ? "inline" : "default"}

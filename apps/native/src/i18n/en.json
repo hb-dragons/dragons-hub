@@ -209,6 +209,7 @@
     "delete": "Delete",
     "clear": "Clear",
     "edit": "Edit",
+    "apply": "Apply",
     "loading": "Loading…",
     "vs": "vs",
     "at": "@"
@@ -217,7 +218,16 @@
     "boards": {
       "title": "Boards",
       "empty": "No boards yet.",
-      "new": "New board"
+      "emptyHint": "Create your first board to get started.",
+      "new": "New board",
+      "create": "Create",
+      "namePlaceholder": "Board name",
+      "descriptionPlaceholder": "Description (optional)",
+      "settingsTitle": "Board settings",
+      "rename": "Rename",
+      "delete": "Delete board",
+      "deleteConfirmTitle": "Delete board?",
+      "deleteConfirmMessage": "All columns and tasks will be deleted. This cannot be undone."
     }
   },
   "board": {
@@ -230,8 +240,14 @@
       "priority": "Priority",
       "due": "Due",
       "noDue": "No due date",
+      "dueOverdue": "Overdue",
+      "dueToday": "Today",
+      "dueTomorrow": "Tomorrow",
       "deleteConfirmTitle": "Delete task?",
       "deleteConfirmMessage": "This cannot be undone.",
+      "savingTitle": "Saving",
+      "savedTitle": "Saved",
+      "swipeDelete": "Delete",
       "actions": {
         "moveTo": "Move to…",
         "setPriority": "Set priority",
@@ -258,13 +274,42 @@
     },
     "column": {
       "addCard": "+ Add card",
-      "empty": "Drop tasks here"
+      "empty": "Drop tasks here",
+      "addTitle": "Add column",
+      "namePlaceholder": "Column name",
+      "add": "Add column",
+      "settingsTitle": "Column settings",
+      "delete": "Delete column",
+      "deleteConfirmTitle": "Delete column?",
+      "deleteConfirmMessage": "All tasks in this column will be deleted. This cannot be undone.",
+      "markAsDone": "Mark as done column",
+      "newColumn": "+ New column",
+      "reorderHint": "Long-press a column header to drag-reorder."
     },
     "filters": {
       "mine": "Mine",
       "priority": "Priority",
       "dueSoon": "Due soon",
-      "unassigned": "Unassigned"
+      "unassigned": "Unassigned",
+      "assignees": "Assignees"
+    },
+    "search": {
+      "open": "Search tasks",
+      "close": "Close search",
+      "placeholder": "Search by title…",
+      "matches": "%{count} match",
+      "matchesPlural": "%{count} matches"
+    },
+    "sort": {
+      "title": "Sort tasks",
+      "open": "Sort",
+      "modes": {
+        "position": "Position (default)",
+        "due-asc": "Due date (earliest first)",
+        "due-desc": "Due date (latest first)",
+        "priority-desc": "Priority (high to low)",
+        "updated-desc": "Recently updated"
+      }
     },
     "refresh": "Refresh",
     "checklist": {
@@ -273,6 +318,10 @@
       "add": "Add",
       "deleteTitle": "Delete item?",
       "deleteMessage": "This cannot be undone."
+    },
+    "empty": {
+      "noColumns": "No columns yet",
+      "noColumnsHint": "Add a column to start organising tasks."
     },
     "comments": {
       "title": "Comments",
@@ -302,5 +351,28 @@
       "title": "Something went wrong",
       "reload": "Reload"
     }
+  },
+  "toast": {
+    "saved": "Changes saved",
+    "saveFailed": "Couldn't save",
+    "deleteFailed": "Couldn't delete",
+    "moveFailed": "Couldn't move task",
+    "createFailed": "Couldn't create",
+    "undo": "Undo",
+    "taskDeleted": "Task deleted",
+    "checklistItemDeleted": "Item deleted",
+    "commentDeleted": "Comment deleted",
+    "boardCreated": "Board created",
+    "boardDeleted": "Board deleted",
+    "columnAdded": "Column added",
+    "columnDeleted": "Column deleted"
+  },
+  "a11y": {
+    "doubleTapToEdit": "Double tap to edit",
+    "doubleTapToOpen": "Double tap to open",
+    "dragHandle": "Drag handle. Long-press and drag to move.",
+    "pickedUpTask": "Picked up task: %{title}",
+    "droppedTaskInColumn": "Dropped task in column: %{column}",
+    "dropCancelled": "Drop cancelled"
   }
 }

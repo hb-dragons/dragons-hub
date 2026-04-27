@@ -24,6 +24,8 @@ import { spacing } from "@/theme/spacing";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { configureNotificationHandler } from "@/lib/push/handler";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
+import { ToastProvider } from "@/hooks/useToast";
+import { ToastHost } from "@/components/ui/ToastHost";
 
 SplashScreen.preventAutoHideAsync();
 configureNotificationHandler();
@@ -187,12 +189,15 @@ export default function RootLayout() {
           <SWRConfig value={swrConfig}>
             <LocaleProvider>
               <ThemeProvider>
-                <BoardPickersProvider>
-                  <BottomSheetModalProvider>
-                    <BoardPickersSheets />
-                    <RootNavigator />
-                  </BottomSheetModalProvider>
-                </BoardPickersProvider>
+                <ToastProvider>
+                  <BoardPickersProvider>
+                    <BottomSheetModalProvider>
+                      <BoardPickersSheets />
+                      <RootNavigator />
+                      <ToastHost />
+                    </BottomSheetModalProvider>
+                  </BoardPickersProvider>
+                </ToastProvider>
               </ThemeProvider>
             </LocaleProvider>
           </SWRConfig>

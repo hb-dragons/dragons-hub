@@ -209,6 +209,7 @@
     "delete": "Löschen",
     "clear": "Entfernen",
     "edit": "Bearbeiten",
+    "apply": "Anwenden",
     "loading": "Laden…",
     "vs": "vs",
     "at": "@"
@@ -217,7 +218,16 @@
     "boards": {
       "title": "Boards",
       "empty": "Noch keine Boards.",
-      "new": "Neues Board"
+      "emptyHint": "Erstelle dein erstes Board.",
+      "new": "Neues Board",
+      "create": "Erstellen",
+      "namePlaceholder": "Boardname",
+      "descriptionPlaceholder": "Beschreibung (optional)",
+      "settingsTitle": "Board-Einstellungen",
+      "rename": "Umbenennen",
+      "delete": "Board löschen",
+      "deleteConfirmTitle": "Board löschen?",
+      "deleteConfirmMessage": "Alle Spalten und Aufgaben werden gelöscht. Dies kann nicht rückgängig gemacht werden."
     }
   },
   "board": {
@@ -230,8 +240,14 @@
       "priority": "Priorität",
       "due": "Fällig",
       "noDue": "Kein Fälligkeitsdatum",
+      "dueOverdue": "Überfällig",
+      "dueToday": "Heute",
+      "dueTomorrow": "Morgen",
       "deleteConfirmTitle": "Aufgabe löschen?",
       "deleteConfirmMessage": "Das kann nicht rückgängig gemacht werden.",
+      "savingTitle": "Speichert",
+      "savedTitle": "Gespeichert",
+      "swipeDelete": "Löschen",
       "actions": {
         "moveTo": "Verschieben nach…",
         "setPriority": "Priorität setzen",
@@ -258,13 +274,42 @@
     },
     "column": {
       "addCard": "+ Karte",
-      "empty": "Aufgaben hier ablegen"
+      "empty": "Aufgaben hier ablegen",
+      "addTitle": "Spalte hinzufügen",
+      "namePlaceholder": "Spaltenname",
+      "add": "Spalte hinzufügen",
+      "settingsTitle": "Spalten-Einstellungen",
+      "delete": "Spalte löschen",
+      "deleteConfirmTitle": "Spalte löschen?",
+      "deleteConfirmMessage": "Alle Aufgaben in dieser Spalte werden gelöscht. Dies kann nicht rückgängig gemacht werden.",
+      "markAsDone": "Als Erledigt-Spalte markieren",
+      "newColumn": "+ Neue Spalte",
+      "reorderHint": "Spaltenkopf lange drücken, um neu anzuordnen."
     },
     "filters": {
       "mine": "Meine",
       "priority": "Priorität",
       "dueSoon": "Bald fällig",
-      "unassigned": "Nicht zugewiesen"
+      "unassigned": "Nicht zugewiesen",
+      "assignees": "Zuständige"
+    },
+    "search": {
+      "open": "Aufgaben suchen",
+      "close": "Suche schließen",
+      "placeholder": "Nach Titel suchen…",
+      "matches": "%{count} Treffer",
+      "matchesPlural": "%{count} Treffer"
+    },
+    "sort": {
+      "title": "Sortieren",
+      "open": "Sortieren",
+      "modes": {
+        "position": "Position (Standard)",
+        "due-asc": "Fälligkeit (früheste zuerst)",
+        "due-desc": "Fälligkeit (späteste zuerst)",
+        "priority-desc": "Priorität (hoch nach niedrig)",
+        "updated-desc": "Zuletzt aktualisiert"
+      }
     },
     "refresh": "Aktualisieren",
     "checklist": {
@@ -273,6 +318,10 @@
       "add": "Hinzufügen",
       "deleteTitle": "Eintrag löschen?",
       "deleteMessage": "Das kann nicht rückgängig gemacht werden."
+    },
+    "empty": {
+      "noColumns": "Noch keine Spalten",
+      "noColumnsHint": "Füge eine Spalte hinzu, um Aufgaben zu organisieren."
     },
     "comments": {
       "title": "Kommentare",
@@ -302,5 +351,28 @@
       "title": "Etwas ist schiefgegangen",
       "reload": "Neu laden"
     }
+  },
+  "toast": {
+    "saved": "Änderungen gespeichert",
+    "saveFailed": "Speichern fehlgeschlagen",
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "moveFailed": "Verschieben fehlgeschlagen",
+    "createFailed": "Erstellen fehlgeschlagen",
+    "undo": "Rückgängig",
+    "taskDeleted": "Aufgabe gelöscht",
+    "checklistItemDeleted": "Eintrag gelöscht",
+    "commentDeleted": "Kommentar gelöscht",
+    "boardCreated": "Board erstellt",
+    "boardDeleted": "Board gelöscht",
+    "columnAdded": "Spalte hinzugefügt",
+    "columnDeleted": "Spalte gelöscht"
+  },
+  "a11y": {
+    "doubleTapToEdit": "Doppeltippen zum Bearbeiten",
+    "doubleTapToOpen": "Doppeltippen zum Öffnen",
+    "dragHandle": "Ziehgriff. Lange drücken und ziehen, um zu verschieben.",
+    "pickedUpTask": "Aufgabe aufgenommen: %{title}",
+    "droppedTaskInColumn": "Aufgabe in Spalte abgelegt: %{column}",
+    "dropCancelled": "Ablegen abgebrochen"
   }
 }

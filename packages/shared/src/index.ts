@@ -76,6 +76,28 @@ export {
 } from "./board-dnd";
 export type { DragItem, DropTarget } from "./board-dnd";
 
+// Undo entries for destructive board operations
+export { buildUndoEntry } from "./board-undo";
+export type {
+  UndoEntry,
+  UndoableSnapshot,
+  UndoableTaskSnapshot,
+  UndoableChecklistSnapshot,
+  UndoableCommentSnapshot,
+} from "./board-undo";
+
+// Board filter persistence (pure, native side wraps with expo-secure-store)
+export { serializeFilters, parseFilters } from "./board-filter-storage";
+export type { SerialisableBoardFilters } from "./board-filter-storage";
+
+// Board task sort (pure comparator factory)
+export { boardTaskComparator } from "./board-task-sort";
+export type { BoardSortMode } from "./board-task-sort";
+
+// Board due-date bucketing (pure helper for native task card colouring)
+export { dueDateBucket } from "./board-due-date";
+export type { DueDateBucket } from "./board-due-date";
+
 // Board drop-target resolution (pure, testable, no React deps)
 export { findDropTarget } from "./board-drop-target";
 export type {

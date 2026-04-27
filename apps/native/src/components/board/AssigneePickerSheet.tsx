@@ -178,7 +178,7 @@ export const AssigneePickerSheet = forwardRef<AssigneePickerHandle>(
         keyboardBehavior="interactive"
         keyboardBlurBehavior="restore"
       >
-        <View style={{ padding: spacing.md, gap: spacing.sm }}>
+        <View style={{ padding: spacing.md, gap: spacing.sm }} testID="assignee-picker-sheet">
           <BottomSheetTextInput
             value={search}
             onChangeText={setSearch}
