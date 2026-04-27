@@ -94,6 +94,10 @@ export type { SerialisableBoardFilters } from "./board-filter-storage";
 export { boardTaskComparator } from "./board-task-sort";
 export type { BoardSortMode } from "./board-task-sort";
 
+// Board due-date bucketing (pure helper for native task card colouring)
+export { dueDateBucket } from "./board-due-date";
+export type { DueDateBucket } from "./board-due-date";
+
 // Board drop-target resolution (pure, testable, no React deps)
 export { findDropTarget } from "./board-drop-target";
 export type {

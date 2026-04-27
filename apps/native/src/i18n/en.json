@@ -240,6 +240,9 @@
       "priority": "Priority",
       "due": "Due",
       "noDue": "No due date",
+      "dueOverdue": "Overdue",
+      "dueToday": "Today",
+      "dueTomorrow": "Tomorrow",
       "deleteConfirmTitle": "Delete task?",
       "deleteConfirmMessage": "This cannot be undone.",
       "actions": {

@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 import type { TaskCardData, TaskAssignee, TaskPriority } from "@dragons/shared";
+import { dueDateBucket, type DueDateBucket } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -75,6 +76,50 @@ export function formatDueShort(iso: string): string {
     day: "numeric",
     year: sameYear ? undefined : "2-digit",
   });
+}
+
+/** Returns the user-visible due label for a bucket + raw iso. */
+export function formatDueWithBucket(
+  iso: string,
+  bucket: DueDateBucket | null,
+  t: (key: string) => string,
+): string {
+  if (bucket === "overdue") return t("board.task.dueOverdue");
+  if (bucket === "today") return t("board.task.dueToday");
+  if (bucket === "soon") {
+    // Distinguish tomorrow from "soon".
+    const due = new Date(iso);
+    const tomorrow = new Date();
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    if (
+      due.getUTCFullYear() === tomorrow.getUTCFullYear() &&
+      due.getUTCMonth() === tomorrow.getUTCMonth() &&
+      due.getUTCDate() === tomorrow.getUTCDate()
+    ) {
+      return t("board.task.dueTomorrow");
+    }
+  }
+  return formatDueShort(iso);
+}
+
+/** Returns the colour for a due-date bucket. Falls back to mutedForeground. */
+export function dueColorFor(
+  bucket: DueDateBucket | null,
+  colors: ReturnType<typeof useTheme>["colors"],
+): string {
+  switch (bucket) {
+    case "overdue":
+      return colors.destructive;
+    case "today":
+      // The theme's `warning` token may not exist on every codebase.
+      // We fall through to the explicit amber as the documented default.
+      return ((colors as unknown) as { warning?: string }).warning ?? "#f59e0b";
+    case "soon":
+      return colors.primary;
+    case "later":
+    default:
+      return colors.mutedForeground;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -179,10 +224,12 @@ function AvatarStack({
   ring,
   mutedBg,
   mutedFg,
-  max = 3,
+  max,
 }: AvatarStackProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const effectiveMax = max ?? (windowWidth < 380 ? 2 : 3);
   if (assignees.length === 0) return null;
-  const visible = assignees.slice(0, max);
+  const visible = assignees.slice(0, effectiveMax);
   const overflow = assignees.length - visible.length;
   const overlap = Math.round(size * 0.3);
   return (
@@ -367,26 +414,30 @@ export function TaskCard({
             flexShrink: 1,
           }}
         >
-          {task.dueDate ? (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <CalendarIcon size={12} color={colors.mutedForeground} />
-              <Text
+          {task.dueDate ? (() => {
+            const bucket = dueDateBucket(task.dueDate, new Date());
+            const dueColour = dueColorFor(bucket, colors);
+            return (
+              <View
                 style={{
-                  color: colors.mutedForeground,
-                  fontSize: 11,
-                  fontWeight: "500",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
                 }}
               >
-                {formatDueShort(task.dueDate)}
-              </Text>
-            </View>
-          ) : null}
+                <CalendarIcon size={12} color={dueColour} />
+                <Text
+                  style={{
+                    color: dueColour,
+                    fontSize: 11,
+                    fontWeight: bucket === "overdue" || bucket === "today" ? "700" : "500",
+                  }}
+                >
+                  {formatDueWithBucket(task.dueDate, bucket, i18n.t.bind(i18n))}
+                </Text>
+              </View>
+            );
+          })() : null}
 
           {hasChecklist ? (
             <View
