@@ -9,16 +9,21 @@ interface BoardHeaderProps {
   onPillPress: (index: number) => void;
 }
 
+const PILL_HEIGHT = 32;
+
 export function BoardHeader({ columns, tasks, activeColumnIndex, onPillPress }: BoardHeaderProps) {
   const { colors, spacing, radius } = useTheme();
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={{ flexGrow: 0, flexShrink: 0 }}
       contentContainerStyle={{
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.xs,
         gap: spacing.xs,
+        alignItems: "center",
       }}
     >
       {columns.map((col, i) => {
@@ -31,10 +36,10 @@ export function BoardHeader({ columns, tasks, activeColumnIndex, onPillPress }: 
             accessibilityRole="button"
             accessibilityLabel={col.name}
             style={{
+              height: PILL_HEIGHT,
               paddingHorizontal: spacing.md,
-              paddingVertical: spacing.xs,
               borderRadius: radius.pill,
-              backgroundColor: active ? colors.primary : colors.surfaceBase,
+              backgroundColor: active ? colors.primary : "transparent",
               borderWidth: 1,
               borderColor: active ? colors.primary : colors.border,
               flexDirection: "row",
@@ -66,6 +71,7 @@ export function BoardHeader({ columns, tasks, activeColumnIndex, onPillPress }: 
                 color: active ? colors.primaryForeground : colors.mutedForeground,
                 fontSize: 12,
                 fontVariant: ["tabular-nums"],
+                opacity: active ? 0.85 : 1,
               }}
             >
               {count}

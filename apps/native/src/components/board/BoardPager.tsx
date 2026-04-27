@@ -55,6 +55,10 @@ interface BoardPagerProps {
   onPagerLayout?: (layout: PagerLayout) => void;
   /** Refs to individual column scroll views, keyed by column ID. */
   columnRefs?: React.MutableRefObject<Map<number, BoardColumnHandle>>;
+  /** Pull-to-refresh active state, forwarded to each column. */
+  refreshing?: boolean;
+  /** Pull-to-refresh handler, forwarded to each column. */
+  onRefresh?: () => void;
 }
 
 export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
@@ -76,6 +80,8 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
       onPagerScrollUpdate,
       onPagerLayout,
       columnRefs,
+      refreshing,
+      onRefresh,
     },
     ref,
   ) {
@@ -147,6 +153,8 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
         onScroll={handleScroll}
         onMomentumScrollEnd={handleMomentumEnd}
         onLayout={handlePagerLayout}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ alignItems: "stretch" }}
       >
         {columns.map((col) => (
           <BoardColumn
@@ -172,6 +180,8 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
             onScrollUpdate={onColumnScrollUpdate}
             onContentSizeChange={onColumnContentSizeChange}
             onHeaderHeight={onColumnHeaderHeight}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
           />
         ))}
       </ScrollView>

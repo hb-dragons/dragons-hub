@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import { View, Text, ScrollView, Pressable, RefreshControl } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
 import type { TaskCardData, BoardColumnData } from "@dragons/shared";
 import { TaskCard, type TaskContentRect, type TaskDragCallbacks } from "./TaskCard";
@@ -36,6 +36,10 @@ interface BoardColumnProps {
   onContentSizeChange?: (columnId: number, contentHeight: number) => void;
   /** Called once with the pixel height of the column header above the ScrollView. */
   onHeaderHeight?: (columnId: number, headerHeight: number) => void;
+  /** Pull-to-refresh active state. */
+  refreshing?: boolean;
+  /** Pull-to-refresh handler. */
+  onRefresh?: () => void;
 }
 
 // Re-export so BoardPager can forward it without importing TaskCard directly.
@@ -57,10 +61,12 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
       onScrollUpdate,
       onContentSizeChange,
       onHeaderHeight,
+      refreshing,
+      onRefresh,
     },
     ref,
   ) {
-    const { colors, spacing, radius } = useTheme();
+    const { colors, spacing, radius, isDark } = useTheme();
     const columnTasks = tasks
       .filter((t) => t.columnId === column.id)
       .sort((a, b) => a.position - b.position);
@@ -82,11 +88,13 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
         <View
           style={{
             flex: 1,
-            backgroundColor: colors.surfaceLow,
+            // Dark: surfaceLow is darker than card #2a2a2a → card elevates.
+            // Light: surfaceHigh #e7e8e9 is darker than card #ffffff → card elevates.
+            backgroundColor: isDark ? colors.surfaceLow : colors.surfaceHigh,
             borderRadius: radius.md,
             overflow: "hidden",
-            borderWidth: isDropTarget ? 2 : 0,
-            borderColor: isDropTarget ? colors.primary : "transparent",
+            borderWidth: isDropTarget ? 2 : 1,
+            borderColor: isDropTarget ? colors.primary : colors.border,
           }}
         >
           <View
@@ -133,6 +141,15 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
             }}
             showsVerticalScrollIndicator={false}
             scrollEventThrottle={16}
+            refreshControl={
+              onRefresh ? (
+                <RefreshControl
+                  refreshing={!!refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={colors.mutedForeground}
+                />
+              ) : undefined
+            }
             onScroll={(e) => {
               onScrollUpdate?.(
                 column.id,

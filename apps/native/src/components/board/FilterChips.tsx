@@ -19,6 +19,8 @@ interface Props {
   onToggleUnassigned: () => void;
 }
 
+const CHIP_HEIGHT = 28;
+
 export function FilterChips({
   filters,
   onToggleMine,
@@ -30,31 +32,33 @@ export function FilterChips({
   const { colors, spacing, radius } = useTheme();
 
   const chipStyle = (active: boolean) => ({
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    height: CHIP_HEIGHT,
+    paddingHorizontal: spacing.sm + 2,
     borderRadius: radius.pill,
-    backgroundColor: active ? colors.primary : colors.surfaceBase,
+    backgroundColor: active ? colors.secondary : "transparent",
     borderWidth: 1,
-    borderColor: active ? colors.primary : colors.border,
+    borderColor: active ? colors.secondary : colors.border,
     flexDirection: "row" as const,
     alignItems: "center" as const,
     gap: spacing.xs,
   });
 
   const textStyle = (active: boolean) => ({
-    color: active ? colors.primaryForeground : colors.foreground,
-    fontSize: 13,
-    fontWeight: "600" as const,
+    color: active ? colors.secondaryForeground : colors.mutedForeground,
+    fontSize: 12,
+    fontWeight: "500" as const,
   });
 
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={{ flexGrow: 0, flexShrink: 0 }}
       contentContainerStyle={{
         paddingHorizontal: spacing.md,
         paddingBottom: spacing.sm,
         gap: spacing.xs,
+        alignItems: "center",
       }}
     >
       <Pressable
@@ -86,9 +90,9 @@ export function FilterChips({
             accessibilityRole="button"
             accessibilityLabel={i18n.t("common.clear")}
             hitSlop={8}
-            style={{ marginLeft: spacing.xs }}
+            style={{ marginLeft: 2 }}
           >
-            <Text style={{ ...textStyle(true), fontSize: 14 }}>×</Text>
+            <Text style={{ ...textStyle(true), fontSize: 14, lineHeight: 14 }}>×</Text>
           </Pressable>
         ) : null}
       </Pressable>

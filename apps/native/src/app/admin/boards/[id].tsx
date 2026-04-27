@@ -13,7 +13,7 @@ import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager
 import { TaskDetailSheet, type TaskDetailSheetHandle } from "@/components/board/TaskDetailSheet";
 import { TaskContextMenu, type TaskContextMenuHandle } from "@/components/board/TaskContextMenu";
 import { MoveToSheet, type MoveToSheetHandle } from "@/components/board/MoveToSheet";
-import { BoardPickersProvider, useBoardPickers } from "@/components/board/BoardPickersProvider";
+import { useBoardPickers } from "@/components/board/BoardPickersProvider";
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
@@ -31,11 +31,7 @@ import type { TaskListFilters } from "@dragons/api-client";
 // ---------------------------------------------------------------------------
 
 export default function BoardDetailScreen() {
-  return (
-    <BoardPickersProvider>
-      <BoardDetailBody />
-    </BoardPickersProvider>
-  );
+  return <BoardDetailBody />;
 }
 
 function BoardDetailBody() {
@@ -61,9 +57,18 @@ function BoardDetailBody() {
   const {
     data: rawTasks,
     isLoading: tasksLoading,
-    isValidating: validatingTasks,
     mutate: revalidateTasks,
   } = useBoardTasks(boardId, apiFilters);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onPullRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([revalidateBoard(), revalidateTasks()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [revalidateBoard, revalidateTasks]);
 
   const tasks = useMemo(() => {
     if (!rawTasks) return rawTasks;
@@ -276,21 +281,6 @@ function BoardDetailBody() {
         onToggleDueSoon={() => setFilters((f) => ({ ...f, dueSoon: !f.dueSoon }))}
         onToggleUnassigned={() => setFilters((f) => ({ ...f, unassigned: !f.unassigned }))}
       />
-      <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: spacing.md, paddingVertical: spacing.xs }}>
-        <Pressable
-          onPress={() => { void revalidateTasks(); void revalidateBoard(); }}
-          accessibilityRole="button"
-          accessibilityLabel={i18n.t("board.refresh")}
-          style={{ flexDirection: "row", gap: spacing.xs, alignItems: "center", padding: spacing.xs }}
-        >
-          {validatingTasks ? (
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-          ) : null}
-          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
-            {i18n.t("board.refresh")}
-          </Text>
-        </Pressable>
-      </View>
       <View style={{ flex: 1 }}>
         {tasksLoading && !rawTasks ? (
           <View style={{ flex: 1, paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md }}>
@@ -321,6 +311,8 @@ function BoardDetailBody() {
             onPagerScrollUpdate={onPagerScrollUpdate}
             onPagerLayout={onPagerLayout}
             columnRefs={columnRefsMap}
+            refreshing={refreshing}
+            onRefresh={onPullRefresh}
           />
         )}
       </View>
