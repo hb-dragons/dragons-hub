@@ -217,7 +217,16 @@
     "boards": {
       "title": "Boards",
       "empty": "No boards yet.",
-      "new": "New board"
+      "emptyHint": "Create your first board to get started.",
+      "new": "New board",
+      "create": "Create",
+      "namePlaceholder": "Board name",
+      "descriptionPlaceholder": "Description (optional)",
+      "settingsTitle": "Board settings",
+      "rename": "Rename",
+      "delete": "Delete board",
+      "deleteConfirmTitle": "Delete board?",
+      "deleteConfirmMessage": "All columns and tasks will be deleted. This cannot be undone."
     }
   },
   "board": {

@@ -217,7 +217,16 @@
     "boards": {
       "title": "Boards",
       "empty": "Noch keine Boards.",
-      "new": "Neues Board"
+      "emptyHint": "Erstelle dein erstes Board.",
+      "new": "Neues Board",
+      "create": "Erstellen",
+      "namePlaceholder": "Boardname",
+      "descriptionPlaceholder": "Beschreibung (optional)",
+      "settingsTitle": "Board-Einstellungen",
+      "rename": "Umbenennen",
+      "delete": "Board löschen",
+      "deleteConfirmTitle": "Board löschen?",
+      "deleteConfirmMessage": "Alle Spalten und Aufgaben werden gelöscht. Dies kann nicht rückgängig gemacht werden."
     }
   },
   "board": {
