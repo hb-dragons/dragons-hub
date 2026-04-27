@@ -3,10 +3,15 @@ import { describeRoute } from "hono-openapi";
 import {
   getOwnClubTeams,
   updateTeam,
+  reorderOwnClubTeams,
 } from "../../services/admin/team-admin.service";
 import { requirePermission } from "../../middleware/rbac";
 import type { AppEnv } from "../../types";
-import { teamIdParamSchema, teamUpdateBodySchema } from "./team.schemas";
+import {
+  teamIdParamSchema,
+  teamUpdateBodySchema,
+  teamReorderBodySchema,
+} from "./team.schemas";
 
 const teamRoutes = new Hono<AppEnv>();
 
@@ -22,6 +27,33 @@ teamRoutes.get(
   async (c) => {
     const teams = await getOwnClubTeams();
     return c.json(teams);
+  },
+);
+
+// PUT /admin/teams/order - Reorder own club teams
+teamRoutes.put(
+  "/teams/order",
+  requirePermission("team", "manage"),
+  describeRoute({
+    description: "Reorder own club teams",
+    tags: ["Teams"],
+    responses: {
+      200: { description: "Success" },
+      400: { description: "Invalid team set or duplicate id" },
+    },
+  }),
+  async (c) => {
+    const { teamIds } = teamReorderBodySchema.parse(await c.req.json());
+    try {
+      const result = await reorderOwnClubTeams(teamIds);
+      return c.json(result);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "REORDER_FAILED";
+      if (code === "INVALID_TEAM_SET" || code === "DUPLICATE_TEAM_ID") {
+        return c.json({ error: code, code }, 400);
+      }
+      throw err;
+    }
   },
 );
 

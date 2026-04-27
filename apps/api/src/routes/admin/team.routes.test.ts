@@ -7,11 +7,13 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   getOwnClubTeams: vi.fn(),
   updateTeam: vi.fn(),
+  reorderOwnClubTeams: vi.fn(),
 }));
 
 vi.mock("../../services/admin/team-admin.service", () => ({
   getOwnClubTeams: mocks.getOwnClubTeams,
   updateTeam: mocks.updateTeam,
+  reorderOwnClubTeams: mocks.reorderOwnClubTeams,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -233,5 +235,65 @@ describe("PATCH /teams/:id", () => {
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("PUT /teams/order", () => {
+  it("returns the reordered list", async () => {
+    const reordered = [
+      { id: 3, name: "C", displayOrder: 0 },
+      { id: 1, name: "A", displayOrder: 1 },
+      { id: 2, name: "B", displayOrder: 2 },
+    ];
+    mocks.reorderOwnClubTeams.mockResolvedValue(reordered);
+
+    const res = await app.request("/teams/order", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teamIds: [3, 1, 2] }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(reordered);
+    expect(mocks.reorderOwnClubTeams).toHaveBeenCalledWith([3, 1, 2]);
+  });
+
+  it("rejects empty teamIds with 400", async () => {
+    const res = await app.request("/teams/order", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teamIds: [] }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(mocks.reorderOwnClubTeams).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when service throws INVALID_TEAM_SET", async () => {
+    mocks.reorderOwnClubTeams.mockRejectedValue(new Error("INVALID_TEAM_SET"));
+
+    const res = await app.request("/teams/order", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teamIds: [1, 2] }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await json(res)) as { code: string };
+    expect(body.code).toBe("INVALID_TEAM_SET");
+  });
+
+  it("returns 400 when service throws DUPLICATE_TEAM_ID", async () => {
+    mocks.reorderOwnClubTeams.mockRejectedValue(new Error("DUPLICATE_TEAM_ID"));
+
+    const res = await app.request("/teams/order", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teamIds: [1, 1] }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await json(res)) as { code: string };
+    expect(body.code).toBe("DUPLICATE_TEAM_ID");
   });
 });
