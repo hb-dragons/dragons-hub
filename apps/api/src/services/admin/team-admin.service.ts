@@ -1,6 +1,6 @@
 import { db } from "../../config/database";
 import { teams, standings, leagues } from "@dragons/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 
 export interface OwnClubTeam {
   id: number;
@@ -71,4 +71,63 @@ export async function updateTeam(
     .limit(1);
 
   return { ...updated, leagueName: standing?.leagueName ?? null };
+}
+
+export interface ReorderedTeam {
+  id: number;
+  name: string;
+  displayOrder: number;
+}
+
+export async function reorderOwnClubTeams(
+  teamIds: number[],
+): Promise<ReorderedTeam[]> {
+  // Reject duplicates
+  const unique = new Set(teamIds);
+  if (unique.size !== teamIds.length) {
+    throw new Error("DUPLICATE_TEAM_ID");
+  }
+
+  return await db.transaction(async (tx) => {
+    // Load current own-club team IDs
+    const ownClub = await tx
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.isOwnClub, true));
+
+    const ownClubIds = new Set(ownClub.map((t) => t.id));
+
+    // Validate exact set match
+    if (
+      ownClubIds.size !== teamIds.length ||
+      teamIds.some((id) => !ownClubIds.has(id))
+    ) {
+      throw new Error("INVALID_TEAM_SET");
+    }
+
+    // Single UPDATE with CASE for atomic reorder
+    const cases = teamIds
+      .map((id, idx) => sql`WHEN ${id} THEN ${idx}::integer`)
+      .reduce((acc, frag) => sql`${acc} ${frag}`);
+
+    await tx
+      .update(teams)
+      .set({
+        displayOrder: sql`CASE ${teams.id} ${cases} END`,
+        updatedAt: new Date(),
+      })
+      .where(inArray(teams.id, teamIds));
+
+    // Return the new ordered list
+    const updated = await tx
+      .select({
+        id: teams.id,
+        name: teams.name,
+        displayOrder: teams.displayOrder,
+      })
+      .from(teams)
+      .where(inArray(teams.id, teamIds));
+
+    return updated.sort((a, b) => a.displayOrder - b.displayOrder);
+  });
 }

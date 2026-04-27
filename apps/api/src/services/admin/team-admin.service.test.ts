@@ -15,7 +15,7 @@ vi.mock("../../config/database", () => ({
 
 // --- Imports (after mocks) ---
 
-import { getOwnClubTeams, updateTeam } from "./team-admin.service";
+import { getOwnClubTeams, updateTeam, reorderOwnClubTeams } from "./team-admin.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- PGlite setup ---
@@ -188,7 +188,7 @@ describe("getOwnClubTeams", () => {
     const result = await getOwnClubTeams();
 
     expect(Object.keys(result[0]!).sort()).toEqual([
-      "badgeColor", "customName", "estimatedGameDuration", "id", "leagueName", "name", "nameShort",
+      "badgeColor", "customName", "displayOrder", "estimatedGameDuration", "id", "leagueName", "name", "nameShort",
     ]);
   });
 
@@ -360,5 +360,86 @@ describe("updateTeam", () => {
     expect(new Date(afterTime as unknown as string).getTime()).toBeGreaterThanOrEqual(
       new Date(beforeTime as unknown as string).getTime(),
     );
+  });
+});
+
+// Helper with own-club defaults for reorder tests
+async function insertOwnClubTeam(overrides: Record<string, unknown> = {}) {
+  const defaults = {
+    api_team_permanent_id: 100,
+    season_team_id: 200,
+    team_competition_id: 300,
+    name: "Dragons Test",
+    club_id: 999,
+    is_own_club: true,
+    display_order: 0,
+  };
+  const data = { ...defaults, ...overrides };
+  const cols = Object.keys(data);
+  const vals = Object.values(data);
+  const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
+  const result = await ctx.client.query<{ id: number }>(
+    `INSERT INTO teams (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
+    vals,
+  );
+  return result.rows[0]!.id;
+}
+
+describe("reorderOwnClubTeams", () => {
+  it("persists dense positions 0..n-1 in given order", async () => {
+    const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
+    const b = await insertOwnClubTeam({ api_team_permanent_id: 2, name: "B" });
+    const c = await insertOwnClubTeam({ api_team_permanent_id: 3, name: "C" });
+
+    const result = await reorderOwnClubTeams([c, a, b]);
+
+    expect(result.map((t) => t.id)).toEqual([c, a, b]);
+    expect(result.map((t) => t.displayOrder)).toEqual([0, 1, 2]);
+  });
+
+  it("rejects when teamIds is missing an own-club team", async () => {
+    const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
+    await insertOwnClubTeam({ api_team_permanent_id: 2, name: "B" });
+
+    await expect(reorderOwnClubTeams([a])).rejects.toThrow(/INVALID_TEAM_SET/);
+  });
+
+  it("rejects when teamIds contains a non-own-club team", async () => {
+    const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
+    const foreign = await insertOwnClubTeam({
+      api_team_permanent_id: 9,
+      name: "Foreign",
+      is_own_club: false,
+    });
+
+    await expect(reorderOwnClubTeams([a, foreign])).rejects.toThrow(/INVALID_TEAM_SET/);
+  });
+
+  it("rejects duplicate teamIds", async () => {
+    const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
+    const b = await insertOwnClubTeam({ api_team_permanent_id: 2, name: "B" });
+
+    await expect(reorderOwnClubTeams([a, b, a])).rejects.toThrow(/DUPLICATE_TEAM_ID/);
+  });
+});
+
+describe("getOwnClubTeams ordering", () => {
+  it("returns teams sorted by displayOrder then name", async () => {
+    await insertOwnClubTeam({ api_team_permanent_id: 1, name: "Charlie", display_order: 2 });
+    await insertOwnClubTeam({ api_team_permanent_id: 2, name: "Alpha", display_order: 0 });
+    await insertOwnClubTeam({ api_team_permanent_id: 3, name: "Bravo", display_order: 1 });
+
+    const result = await getOwnClubTeams();
+
+    expect(result.map((t) => t.name)).toEqual(["Alpha", "Bravo", "Charlie"]);
+  });
+
+  it("uses name as tiebreaker when displayOrder is equal", async () => {
+    await insertOwnClubTeam({ api_team_permanent_id: 1, name: "Bravo", display_order: 0 });
+    await insertOwnClubTeam({ api_team_permanent_id: 2, name: "Alpha", display_order: 0 });
+
+    const result = await getOwnClubTeams();
+
+    expect(result.map((t) => t.name)).toEqual(["Alpha", "Bravo"]);
   });
 });
