@@ -61,11 +61,12 @@ export function FilterChips({
   return (
     <ScrollView
       horizontal
-      showsHorizontalScrollIndicator={false}
+      showsHorizontalScrollIndicator={true}
+      persistentScrollbar={true}
       style={{ flexGrow: 0, flexShrink: 0 }}
       contentContainerStyle={{
         paddingHorizontal: spacing.md,
-        paddingBottom: spacing.sm,
+        paddingBottom: spacing.md,
         gap: spacing.xs,
         alignItems: "center",
       }}

@@ -96,7 +96,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
     const scrollRef = useRef<ScrollView | null>(null);
     const scrollXRef = useRef(0);
     const { width: winWidth } = useWindowDimensions();
-    const columnWidth = useMemo(() => Math.round(winWidth * 0.88), [winWidth]);
+    const columnWidth = useMemo(() => Math.round(winWidth * 0.85), [winWidth]);
 
     useImperativeHandle(
       ref,

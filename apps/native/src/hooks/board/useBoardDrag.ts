@@ -297,7 +297,8 @@ export function useBoardDrag({
 
       const { pageX: pagerOriginX, pageY: pagerOriginY, width: pagerWidth } = pagerLayout;
       const scrollX = pagerScrollXRef.current;
-      const columnWidth = Math.round(pagerWidth * 0.88);
+      // Must match BoardPager column width multiplier (0.85).
+      const columnWidth = Math.round(pagerWidth * 0.85);
 
       // --- Vertical autoscroll ---
       // Determine which column the pointer is over (geometric).
