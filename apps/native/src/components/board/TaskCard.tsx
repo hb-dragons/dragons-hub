@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
@@ -11,6 +11,10 @@ import Animated, {
   measure,
   runOnJS,
   useAnimatedRef,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
 } from "react-native-reanimated";
 
 export interface TaskCardLayout {
@@ -40,6 +44,8 @@ interface TaskCardProps {
   onLongPress?: (task: TaskCardData) => void;
   onDrag?: TaskDragCallbacks;
   isBeingDragged?: boolean;
+  /** When true, fire a brief 1 → 1.05 → 1 pulse (consumes the flag once). */
+  recentlyDropped?: boolean;
   onMeasure?: (taskId: number, rect: TaskContentRect) => void;
 }
 
@@ -299,12 +305,27 @@ export function TaskCard({
   onLongPress,
   onDrag,
   isBeingDragged = false,
+  recentlyDropped = false,
   onMeasure,
 }: TaskCardProps) {
   const { colors, spacing } = useTheme();
   const hasChecklist = task.checklistTotal > 0;
   const pri = priorityBadgeStyle(task.priority, colors);
   const [pressed, setPressed] = useState(false);
+
+  const dropPulse = useSharedValue(1);
+
+  useEffect(() => {
+    if (!recentlyDropped) return;
+    dropPulse.value = withSequence(
+      withTiming(1.05, { duration: 120 }),
+      withTiming(1, { duration: 120 }),
+    );
+  }, [recentlyDropped, dropPulse]);
+
+  const dropPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: dropPulse.value }],
+  }));
 
   const cardRef = useAnimatedRef<Animated.View>();
 
@@ -336,20 +357,23 @@ export function TaskCard({
       accessibilityRole="button"
       accessibilityLabel={task.title}
       onLayout={handleLayout}
-      style={{
-        padding: spacing.md,
-        borderRadius: 8,
-        backgroundColor: pressed ? colors.surfaceHigh : colors.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        gap: spacing.sm,
-        opacity: isBeingDragged ? 0 : 1,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
-      }}
+      style={[
+        {
+          padding: spacing.md,
+          borderRadius: 8,
+          backgroundColor: pressed ? colors.surfaceHigh : colors.card,
+          borderWidth: 1,
+          borderColor: colors.border,
+          gap: spacing.sm,
+          opacity: isBeingDragged ? 0 : 1,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.1,
+          shadowRadius: 3,
+          elevation: 2,
+        },
+        dropPulseStyle,
+      ]}
     >
       {/* Title row + priority badge */}
       <View

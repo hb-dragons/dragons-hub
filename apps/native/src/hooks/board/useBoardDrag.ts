@@ -56,6 +56,8 @@ interface UseBoardDragReturn {
   onColumnHeaderHeight: (columnId: number, headerHeight: number) => void;
   /** The column ID currently highlighted (null when not dragging). */
   dropTargetColumnId: number | null;
+  /** Task ID of the most recently dropped card; clears 400ms after drop. */
+  recentlyDroppedTaskId: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +80,8 @@ export function useBoardDrag({
 
   // React state for render (task identity, sizes, drop highlight).
   const [dragState, setDragState] = useState<DragState>({ active: false });
+
+  const [recentlyDroppedTaskId, setRecentlyDroppedTaskId] = useState<number | null>(null);
 
   // Ref that mirrors dragState so gesture callbacks can read without stale closures.
   const dragStateRef = useRef<DragState>({ active: false });
@@ -258,6 +262,8 @@ export function useBoardDrag({
         dropTarget.position !== snapshot.task.position)
     ) {
       haptics.success();
+      setRecentlyDroppedTaskId(snapshot.task.id);
+      setTimeout(() => setRecentlyDroppedTaskId(null), 400);
       void moveTask(snapshot.task.id, dropTarget.columnId, dropTarget.position);
     }
   }, [callFindDropTarget, moveTask]);
@@ -377,5 +383,6 @@ export function useBoardDrag({
     onTaskMeasure,
     onColumnHeaderHeight,
     dropTargetColumnId: dragState.active ? dragState.dropTargetColumnId : null,
+    recentlyDroppedTaskId,
   };
 }

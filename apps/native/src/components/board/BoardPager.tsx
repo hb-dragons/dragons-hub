@@ -40,6 +40,8 @@ interface BoardPagerProps {
   draggingTaskId?: number | null;
   /** Column ID that is currently a valid drop target. */
   dropTargetColumnId?: number | null;
+  /** Task ID of the most recently dropped card (fires drop-pulse). */
+  recentlyDroppedTaskId?: number | null;
   /** Drag callbacks forwarded to task cards. */
   onTaskDrag?: TaskDragCallbacks;
   /** Called when a task card reports its column-local rect. */
@@ -76,6 +78,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
       onAddTask,
       draggingTaskId,
       dropTargetColumnId,
+      recentlyDroppedTaskId,
       onTaskDrag,
       onTaskMeasure,
       onColumnScrollUpdate,
@@ -182,6 +185,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
             onAddTask={onAddTask}
             draggingTaskId={draggingTaskId}
             isDropTarget={col.id === dropTargetColumnId}
+            recentlyDroppedTaskId={recentlyDroppedTaskId}
             onTaskDrag={onTaskDrag}
             onTaskMeasure={onTaskMeasure}
             onScrollUpdate={onColumnScrollUpdate}

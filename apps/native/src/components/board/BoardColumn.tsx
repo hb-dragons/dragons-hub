@@ -21,6 +21,8 @@ interface BoardColumnProps {
   onAddTask: (columnId: number) => void;
   /** ID of the task currently being dragged, used to fade out its placeholder. */
   draggingTaskId?: number | null;
+  /** Task ID of the most recently dropped card (fires drop-pulse). */
+  recentlyDroppedTaskId?: number | null;
   /** Drag callbacks forwarded to each task card. */
   onTaskDrag?: TaskDragCallbacks;
   /** When set, this column is highlighted as a potential drop target. */
@@ -57,6 +59,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
       onColumnLongPress,
       onAddTask,
       draggingTaskId,
+      recentlyDroppedTaskId,
       onTaskDrag,
       isDropTarget = false,
       onTaskMeasure,
@@ -174,6 +177,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
                 onPress={onTaskPress}
                 onLongPress={onTaskLongPress}
                 isBeingDragged={t.id === draggingTaskId}
+                recentlyDropped={t.id === recentlyDroppedTaskId}
                 onDrag={onTaskDrag}
                 onMeasure={onTaskMeasure}
               />

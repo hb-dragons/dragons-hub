@@ -183,6 +183,7 @@ function BoardDetailBody() {
     onTaskMeasure,
     onColumnHeaderHeight,
     dropTargetColumnId,
+    recentlyDroppedTaskId,
   } = useBoardDrag({
     boardId,
     columns,
@@ -508,6 +509,7 @@ function BoardDetailBody() {
             onAddTask={openQuickCreate}
             draggingTaskId={dragState.active ? dragState.task.id : null}
             dropTargetColumnId={dropTargetColumnId}
+            recentlyDroppedTaskId={recentlyDroppedTaskId}
             onTaskDrag={onTaskDrag}
             onTaskMeasure={onTaskMeasure}
             onColumnScrollUpdate={onColumnScrollUpdate}
