@@ -18,7 +18,12 @@ export default async function AdminLayout({
   return (
     <TooltipProvider>
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar
+        user={{
+          role: session.user.role,
+          refereeId: session.user.refereeId,
+        }}
+      />
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-6">
           <SidebarTrigger />

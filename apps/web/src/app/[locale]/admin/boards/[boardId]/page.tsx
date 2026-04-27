@@ -1,8 +1,13 @@
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { SWRConfig } from "swr";
-import { can } from "@dragons/shared";
-import type { BoardData, TaskCardData } from "@dragons/shared";
+import { can, TASK_PRIORITIES } from "@dragons/shared";
+import type {
+  BoardData,
+  BoardSummary,
+  TaskCardData,
+  TaskPriority,
+} from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
 import { fetchAPIServer } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
@@ -11,8 +16,10 @@ import { SWR_KEYS } from "@/lib/swr-keys";
 
 export default async function BoardDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ boardId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await getServerSession();
   if (!can(session?.user ?? null, "board", "view")) notFound();
@@ -21,15 +28,37 @@ export default async function BoardDetailPage({
   const boardId = Number(boardIdParam);
   if (!Number.isInteger(boardId) || boardId <= 0) notFound();
 
+  const sp = await searchParams;
+  const assigneeRaw = sp.assignee;
+  const assigneeIds = Array.isArray(assigneeRaw)
+    ? assigneeRaw
+    : assigneeRaw
+      ? [assigneeRaw]
+      : [];
+  const priorityRaw = typeof sp.priority === "string" ? sp.priority : null;
+  const priority: TaskPriority | null =
+    priorityRaw && (TASK_PRIORITIES as readonly string[]).includes(priorityRaw)
+      ? (priorityRaw as TaskPriority)
+      : null;
+
+  // Match the client SWR key: server-side filter only fires for a single assignee
+  // (multi-assignee filtering happens client-side in BoardView).
+  const tasksKey = SWR_KEYS.boardTasks(boardId, {
+    ...(assigneeIds.length === 1 ? { assigneeId: assigneeIds[0] } : {}),
+    ...(priority ? { priority } : {}),
+  });
+
   const t = await getTranslations();
   let board: BoardData | null = null;
   let tasks: TaskCardData[] = [];
+  let boards: BoardSummary[] = [];
   let error: string | null = null;
 
   try {
-    [board, tasks] = await Promise.all([
+    [board, tasks, boards] = await Promise.all([
       fetchAPIServer<BoardData>(`/admin/boards/${boardId}`),
-      fetchAPIServer<TaskCardData[]>(`/admin/boards/${boardId}/tasks`),
+      fetchAPIServer<TaskCardData[]>(tasksKey),
+      fetchAPIServer<BoardSummary[]>(SWR_KEYS.boards),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load board";
@@ -53,7 +82,8 @@ export default async function BoardDetailPage({
         value={{
           fallback: {
             [SWR_KEYS.boardDetail(boardId)]: board,
-            [SWR_KEYS.boardTasks(boardId)]: tasks,
+            [tasksKey]: tasks,
+            [SWR_KEYS.boards]: boards,
           },
         }}
       >

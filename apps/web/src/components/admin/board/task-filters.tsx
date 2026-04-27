@@ -52,7 +52,14 @@ export function TaskFilters() {
         }
       >
         <SelectTrigger className="h-8 w-36 text-sm">
-          <SelectValue placeholder={t("filters.priority")} />
+          {/* Explicit children required: Radix SelectValue only resolves the
+              selected item's text after mount, leaving the trigger blank during
+              SSR. */}
+          <SelectValue placeholder={t("filters.priority")}>
+            {filters.priority
+              ? t(`priority.${filters.priority}`)
+              : t("filters.all")}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="_all">{t("filters.all")}</SelectItem>

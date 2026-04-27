@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/lib/navigation";
-import { authClient } from "@/lib/auth-client";
 import {
   Collapsible,
   CollapsibleContent,
@@ -194,12 +193,18 @@ function isItemVisible(
   return false;
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export type AppSidebarUser = {
+  role: string | null;
+  refereeId: number | null;
+};
+
+export function AppSidebar({
+  user,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & { user: AppSidebarUser | null }) {
   const pathname = usePathname();
   const t = useTranslations();
   const { setOpenMobile } = useSidebar();
-  const { data: session } = authClient.useSession();
-  const user = session?.user ?? null;
   const visibleGroups = navGroups
     .map((g) => ({
       ...g,
