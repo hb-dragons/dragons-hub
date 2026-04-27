@@ -267,7 +267,16 @@
     },
     "column": {
       "addCard": "+ Add card",
-      "empty": "Drop tasks here"
+      "empty": "Drop tasks here",
+      "addTitle": "Add column",
+      "namePlaceholder": "Column name",
+      "add": "Add column",
+      "settingsTitle": "Column settings",
+      "delete": "Delete column",
+      "deleteConfirmTitle": "Delete column?",
+      "deleteConfirmMessage": "All tasks in this column will be deleted. This cannot be undone.",
+      "markAsDone": "Mark as done column",
+      "newColumn": "+ New column"
     },
     "filters": {
       "mine": "Mine",

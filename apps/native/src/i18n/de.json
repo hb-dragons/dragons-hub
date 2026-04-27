@@ -267,7 +267,16 @@
     },
     "column": {
       "addCard": "+ Karte",
-      "empty": "Aufgaben hier ablegen"
+      "empty": "Aufgaben hier ablegen",
+      "addTitle": "Spalte hinzufügen",
+      "namePlaceholder": "Spaltenname",
+      "add": "Spalte hinzufügen",
+      "settingsTitle": "Spalten-Einstellungen",
+      "delete": "Spalte löschen",
+      "deleteConfirmTitle": "Spalte löschen?",
+      "deleteConfirmMessage": "Alle Aufgaben in dieser Spalte werden gelöscht. Dies kann nicht rückgängig gemacht werden.",
+      "markAsDone": "Als Erledigt-Spalte markieren",
+      "newColumn": "+ Neue Spalte"
     },
     "filters": {
       "mine": "Meine",
