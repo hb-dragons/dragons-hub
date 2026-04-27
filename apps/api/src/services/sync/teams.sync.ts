@@ -118,7 +118,11 @@ export async function syncTeamsFromData(
           clubId: sql`excluded.club_id`,
           isOwnClub: sql`excluded.is_own_club`,
           verzicht: sql`excluded.verzicht`,
-          // Reset displayOrder to 0 when flipping from own to non-own; otherwise keep existing
+          // Spec says federation never owns display_order — but we still write here in
+          // exactly one case: when a team flips from own to non-own (clubId moved away
+          // from us, so the row's hash changed and the upsert fires). All other paths
+          // hit the ELSE arm and preserve the column. Flip-to-true via the upsert path
+          // emerges with display_order=0 and is corrected below by `flippedViaUpsert`.
           displayOrder: sql`CASE WHEN excluded.is_own_club = false AND ${teams.isOwnClub} = true THEN 0 ELSE ${teams.displayOrder} END`,
           dataHash: sql`excluded.data_hash`,
           updatedAt: now,
@@ -175,6 +179,7 @@ export async function syncTeamsFromData(
       : [];
 
     let nextCorrectionOrder = (await getMaxOwnDisplayOrder()) + 1;
+    const markedByToMarkOwn = new Set<number>();
 
     // Process hash-skipped flip-to-true rows (set isOwnClub + displayOrder)
     for (const row of toMarkOwn) {
@@ -186,10 +191,14 @@ export async function syncTeamsFromData(
           updatedAt: now,
         })
         .where(eq(teams.id, row.id));
+      markedByToMarkOwn.add(row.id);
     }
 
-    // Process upsert-flipped-to-true rows (isOwnClub already true, just set displayOrder)
+    // Process upsert-flipped-to-true rows (isOwnClub already true, just set displayOrder).
+    // Skip any row already handled by toMarkOwn — flippingToOwnIds is built from the
+    // pre-upsert state and can overlap with toMarkOwn when the row's hash didn't change.
     for (const row of flippedViaUpsert) {
+      if (markedByToMarkOwn.has(row.id)) continue;
       await db
         .update(teams)
         .set({

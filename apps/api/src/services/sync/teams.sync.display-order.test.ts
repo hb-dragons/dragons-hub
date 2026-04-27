@@ -81,7 +81,7 @@ describe("syncTeamsFromData displayOrder behavior", () => {
 
     const rows = await fetchTeams();
     expect(rows).toHaveLength(3);
-    const orders = rows.map((r) => r.display_order).sort();
+    const orders = rows.map((r) => r.display_order).sort((a, b) => a - b);
     expect(orders).toEqual([0, 1, 2]);
   });
 
@@ -154,7 +154,7 @@ describe("syncTeamsFromData displayOrder behavior", () => {
     expect(rows[0]!.display_order).toBe(0);
   });
 
-  it("assigns max+1 when isOwnClub flips to true via the corrective pass", async () => {
+  it("assigns max+1 when isOwnClub flips to true (hash-changed path)", async () => {
     // Seed an own-club team to establish a max
     await syncTeamsFromData(
       new Map([[1, makeRef({ teamPermanentId: 1, teamname: "A", clubId: 999 })]]),
@@ -166,7 +166,7 @@ describe("syncTeamsFromData displayOrder behavior", () => {
       new Map([[2, makeRef({ teamPermanentId: 2, teamname: "Foreign", clubId: 12345 })]]),
     );
 
-    // Now flip team 2's club to ours
+    // Now flip team 2's club to ours — clubId changes, hash changes, upsert fires
     await syncTeamsFromData(
       new Map([
         [1, makeRef({ teamPermanentId: 1, teamname: "A", clubId: 999 })],
@@ -178,5 +178,38 @@ describe("syncTeamsFromData displayOrder behavior", () => {
     const flipped = rows.find((r) => r.name === "Foreign")!;
     expect(flipped.is_own_club).toBe(true);
     expect(flipped.display_order).toBe(4);
+  });
+
+  it("assigns max+1 when isOwnClub flips to true (hash-unchanged corrective pass)", async () => {
+    // Seed an own-club team to establish a max
+    await syncTeamsFromData(
+      new Map([[1, makeRef({ teamPermanentId: 1, teamname: "A", clubId: 999 })]]),
+    );
+    await setDisplayOrder(1, 3);
+
+    // Insert a team as own-club so its hash records clubId=999
+    await syncTeamsFromData(
+      new Map([[2, makeRef({ teamPermanentId: 2, teamname: "Drift", clubId: 999 })]]),
+    );
+
+    // Manually corrupt is_own_club to false WITHOUT changing the recorded hash.
+    // Re-syncing the same SDK ref will skip the upsert (setWhere fails on equal hash),
+    // so the corrective `toMarkOwn` loop must be the one that re-marks the row.
+    await ctx.client.query(
+      `UPDATE teams SET is_own_club = false, display_order = 0 WHERE api_team_permanent_id = $1`,
+      [2],
+    );
+
+    await syncTeamsFromData(
+      new Map([
+        [1, makeRef({ teamPermanentId: 1, teamname: "A", clubId: 999 })],
+        [2, makeRef({ teamPermanentId: 2, teamname: "Drift", clubId: 999 })],
+      ]),
+    );
+
+    const rows = await fetchTeams();
+    const drift = rows.find((r) => r.name === "Drift")!;
+    expect(drift.is_own_club).toBe(true);
+    expect(drift.display_order).toBe(4);
   });
 });
