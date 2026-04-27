@@ -1,17 +1,20 @@
 // Note: this hook's rollback path is not unit-tested because @dragons/native
 // has no test harness yet. The pure reorder logic it calls (applyTaskMove)
-// is covered by @dragons/shared's test suite. Adding a vitest + mocked RN
-// harness is tracked as a follow-up infrastructure task.
+// is covered by @dragons/shared's test suite.
 import { useSWRConfig } from "swr";
 import type { Arguments } from "swr";
 import { adminBoardApi } from "@/lib/api";
 import { applyTaskMove } from "@dragons/shared";
 import type { TaskCardData } from "@dragons/shared";
+import { haptics } from "@/lib/haptics";
+import { useToast } from "@/hooks/useToast";
+import { i18n } from "@/lib/i18n";
 
 const tasksPrefix = (boardId: number) => `admin/boards/${boardId}/tasks`;
 
 export function useMoveTask(boardId: number) {
   const { cache, mutate } = useSWRConfig();
+  const toast = useToast();
 
   return async function moveTask(
     taskId: number,
@@ -52,6 +55,8 @@ export function useMoveTask(boardId: number) {
       }
       // Also try to revalidate so we eventually get server truth.
       void mutate((key) => Array.isArray(key) && key[0] === prefix);
+      haptics.warning();
+      toast.show({ title: i18n.t("toast.moveFailed"), variant: "error" });
       throw error;
     }
   };
