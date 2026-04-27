@@ -225,6 +225,13 @@
       "when": 1777012352919,
       "tag": "0031_free_talon",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1777304168681,
+      "tag": "0032_early_sauron",
+      "breakpoints": true
     }
   ]
 }
