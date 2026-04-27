@@ -4,6 +4,7 @@ import { View, Text } from "react-native";
 import type { TaskCardData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { formatDueShort } from "./TaskCard";
 
 interface TaskCardDragGhostProps {
   task: TaskCardData;
@@ -82,7 +83,7 @@ export function TaskCardDragGhost({
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" }}>
           {task.dueDate ? (
             <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
-              {new Date(task.dueDate).toLocaleDateString()}
+              {formatDueShort(task.dueDate)}
             </Text>
           ) : null}
           {hasChecklist ? (

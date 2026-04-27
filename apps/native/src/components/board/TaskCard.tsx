@@ -66,7 +66,7 @@ function colorFromId(id: string): string {
   return `hsl(${hue}, 50%, 45%)`;
 }
 
-function formatDueShort(iso: string): string {
+export function formatDueShort(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
   const sameYear = date.getFullYear() === now.getFullYear();

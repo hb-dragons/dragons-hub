@@ -19,7 +19,7 @@ interface Props {
   onToggleUnassigned: () => void;
 }
 
-const CHIP_HEIGHT = 28;
+const CHIP_HEIGHT = 44;
 
 export function FilterChips({
   filters,
@@ -45,7 +45,7 @@ export function FilterChips({
 
   const textStyle = (active: boolean) => ({
     color: active ? colors.secondaryForeground : colors.mutedForeground,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "500" as const,
   });
 
@@ -89,10 +89,16 @@ export function FilterChips({
             }}
             accessibilityRole="button"
             accessibilityLabel={i18n.t("common.clear")}
-            hitSlop={8}
-            style={{ marginLeft: 2 }}
+            hitSlop={16}
+            style={{
+              marginLeft: 4,
+              width: 18,
+              height: 18,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
-            <Text style={{ ...textStyle(true), fontSize: 14, lineHeight: 14 }}>×</Text>
+            <Text style={{ ...textStyle(true), fontSize: 16, lineHeight: 16 }}>×</Text>
           </Pressable>
         ) : null}
       </Pressable>
