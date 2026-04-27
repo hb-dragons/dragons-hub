@@ -209,6 +209,7 @@
     "delete": "Löschen",
     "clear": "Entfernen",
     "edit": "Bearbeiten",
+    "apply": "Anwenden",
     "loading": "Laden…",
     "vs": "vs",
     "at": "@"
@@ -282,7 +283,15 @@
       "mine": "Meine",
       "priority": "Priorität",
       "dueSoon": "Bald fällig",
-      "unassigned": "Nicht zugewiesen"
+      "unassigned": "Nicht zugewiesen",
+      "assignees": "Zuständige"
+    },
+    "search": {
+      "open": "Aufgaben suchen",
+      "close": "Suche schließen",
+      "placeholder": "Nach Titel suchen…",
+      "matches": "%{count} Treffer",
+      "matchesPlural": "%{count} Treffer"
     },
     "refresh": "Aktualisieren",
     "checklist": {

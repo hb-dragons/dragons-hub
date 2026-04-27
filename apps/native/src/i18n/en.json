@@ -209,6 +209,7 @@
     "delete": "Delete",
     "clear": "Clear",
     "edit": "Edit",
+    "apply": "Apply",
     "loading": "Loading…",
     "vs": "vs",
     "at": "@"
@@ -282,7 +283,15 @@
       "mine": "Mine",
       "priority": "Priority",
       "dueSoon": "Due soon",
-      "unassigned": "Unassigned"
+      "unassigned": "Unassigned",
+      "assignees": "Assignees"
+    },
+    "search": {
+      "open": "Search tasks",
+      "close": "Close search",
+      "placeholder": "Search by title…",
+      "matches": "%{count} match",
+      "matchesPlural": "%{count} matches"
     },
     "refresh": "Refresh",
     "checklist": {

@@ -17,6 +17,7 @@ import { useBoardPickers } from "@/components/board/BoardPickersProvider";
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
+import { BoardSearchInput } from "@/components/board/BoardSearchInput";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
 import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
 import { ColumnSettingsSheet, type ColumnSettingsSheetHandle } from "@/components/board/ColumnSettingsSheet";
@@ -51,6 +52,7 @@ function BoardDetailBody() {
     dueSoon: false,
     unassigned: false,
   });
+  const [searchQuery, setSearchQuery] = useState("");
 
   const currentUserId = authClient.useSession().data?.user?.id ?? null;
 
@@ -78,7 +80,11 @@ function BoardDetailBody() {
 
   const tasks = useMemo(() => {
     if (!rawTasks) return rawTasks;
+    // NOTE: TaskCardData has no description field — board search matches
+    // task title only. Description-level search is server-side and deferred.
+    const q = searchQuery.trim().toLowerCase();
     return rawTasks.filter((t) => {
+      if (q.length > 0 && !t.title.toLowerCase().includes(q)) return false;
       if (filters.mine && currentUserId) {
         if (!t.assignees.some((a) => a.userId === currentUserId)) return false;
       }
@@ -94,7 +100,7 @@ function BoardDetailBody() {
       }
       return true;
     });
-  }, [rawTasks, filters, currentUserId]);
+  }, [rawTasks, filters, currentUserId, searchQuery]);
 
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
@@ -310,15 +316,25 @@ function BoardDetailBody() {
         options={{
           title: board.name,
           headerRight: () => (
-            <Pressable
-              onPress={() => settingsSheetRef.current?.open({ board })}
-              accessibilityRole="button"
-              accessibilityLabel={i18n.t("admin.boards.settingsTitle")}
-              hitSlop={12}
-              style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.xs,
+                maxWidth: 240,
+              }}
             >
-              <Text style={{ color: colors.primary, fontSize: 22, fontWeight: "700" }}>⋯</Text>
-            </Pressable>
+              <BoardSearchInput value={searchQuery} onChange={setSearchQuery} />
+              <Pressable
+                onPress={() => settingsSheetRef.current?.open({ board })}
+                accessibilityRole="button"
+                accessibilityLabel={i18n.t("admin.boards.settingsTitle")}
+                hitSlop={12}
+                style={{ paddingHorizontal: spacing.sm, paddingVertical: spacing.sm }}
+              >
+                <Text style={{ color: colors.primary, fontSize: 18, fontWeight: "700" }}>⋯</Text>
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -338,6 +354,34 @@ function BoardDetailBody() {
         onToggleDueSoon={() => setFilters((f) => ({ ...f, dueSoon: !f.dueSoon }))}
         onToggleUnassigned={() => setFilters((f) => ({ ...f, unassigned: !f.unassigned }))}
       />
+      {searchQuery.trim().length > 0 ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: spacing.md,
+            paddingBottom: spacing.xs,
+          }}
+        >
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+            {i18n.t(
+              (tasks?.length ?? 0) === 1 ? "board.search.matches" : "board.search.matchesPlural",
+              { count: tasks?.length ?? 0 },
+            )}
+          </Text>
+          <Pressable
+            onPress={() => setSearchQuery("")}
+            accessibilityRole="button"
+            accessibilityLabel={i18n.t("common.clear")}
+            hitSlop={12}
+          >
+            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "600" }}>
+              {i18n.t("common.clear")}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
       <View style={{ flex: 1 }}>
         {columns.length === 0 && !boardLoading ? (
           <View
