@@ -578,6 +578,8 @@
     "description": "Eigene Teamnamen zuweisen",
     "empty": "Keine eigenen Teams gefunden.",
     "dragHandle": "Zum Sortieren ziehen",
+    "reorder": "Sortieren",
+    "reorderDone": "Fertig",
     "columns": {
       "apiName": "API-Name",
       "league": "Liga",

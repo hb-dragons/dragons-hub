@@ -578,6 +578,8 @@
     "description": "Assign custom names to your club's teams",
     "empty": "No own-club teams found.",
     "dragHandle": "Drag to reorder",
+    "reorder": "Reorder",
+    "reorderDone": "Done",
     "columns": {
       "apiName": "API Name",
       "league": "League",
