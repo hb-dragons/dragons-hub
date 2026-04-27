@@ -245,6 +245,8 @@
       "dueTomorrow": "Morgen",
       "deleteConfirmTitle": "Aufgabe löschen?",
       "deleteConfirmMessage": "Das kann nicht rückgängig gemacht werden.",
+      "savingTitle": "Speichert",
+      "savedTitle": "Gespeichert",
       "actions": {
         "moveTo": "Verschieben nach…",
         "setPriority": "Priorität setzen",

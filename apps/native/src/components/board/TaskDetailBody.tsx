@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import type { TaskDetail, TaskPriority } from "@dragons/shared";
@@ -10,6 +10,7 @@ import { useBoardPickers } from "./BoardPickersProvider";
 import { ChecklistSection } from "./ChecklistSection";
 import { CommentsSection } from "./CommentsSection";
 import { formatDueShort } from "./TaskCard";
+import { SaveIndicator, type SaveState } from "./SaveIndicator";
 
 interface Props {
   task: TaskDetail;
@@ -51,16 +52,38 @@ export function TaskDetailBody({ task, boardId }: Props) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
 
+  const [titleSave, setTitleSave] = useState<SaveState>("idle");
+  const [descriptionSave, setDescriptionSave] = useState<SaveState>("idle");
+  const titleSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const descriptionSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const saveTitle = async () => {
     const trimmed = title.trim();
     if (!trimmed || trimmed === task.title) return;
-    await mutations.setTitle(task.id, trimmed);
+    setTitleSave("saving");
+    try {
+      await mutations.setTitle(task.id, trimmed);
+      setTitleSave("saved");
+      if (titleSavedTimer.current) clearTimeout(titleSavedTimer.current);
+      titleSavedTimer.current = setTimeout(() => setTitleSave("idle"), 1000);
+    } catch {
+      // useTaskMutations already toasts on failure.
+      setTitleSave("idle");
+    }
   };
 
   const saveDescription = async () => {
     const next = description.trim() === "" ? null : description;
     if (next === task.description) return;
-    await mutations.setDescription(task.id, next);
+    setDescriptionSave("saving");
+    try {
+      await mutations.setDescription(task.id, next);
+      setDescriptionSave("saved");
+      if (descriptionSavedTimer.current) clearTimeout(descriptionSavedTimer.current);
+      descriptionSavedTimer.current = setTimeout(() => setDescriptionSave("idle"), 1000);
+    } catch {
+      setDescriptionSave("idle");
+    }
   };
 
   const priColors = priorityBadge(task.priority, colors);
@@ -175,21 +198,42 @@ export function TaskDetailBody({ task, boardId }: Props) {
           </View>
         </View>
 
-        <BottomSheetTextInput
-          value={title}
-          onChangeText={setTitle}
-          onBlur={saveTitle}
-          maxLength={300}
+        <View
           style={{
-            color: colors.foreground,
-            fontSize: 22,
-            fontWeight: "700",
-            lineHeight: 28,
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: spacing.sm,
           }}
-          placeholder={i18n.t("board.task.titlePlaceholder")}
-          placeholderTextColor={colors.mutedForeground}
-          multiline
-        />
+        >
+          <BottomSheetTextInput
+            value={title}
+            onChangeText={setTitle}
+            onBlur={saveTitle}
+            maxLength={300}
+            style={{
+              flex: 1,
+              color: colors.foreground,
+              fontSize: 22,
+              fontWeight: "700",
+              lineHeight: 28,
+            }}
+            placeholder={i18n.t("board.task.titlePlaceholder")}
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+          />
+          <View style={{ paddingTop: 6 }}>
+            <SaveIndicator
+              state={titleSave}
+              label={
+                titleSave === "saving"
+                  ? i18n.t("board.task.savingTitle")
+                  : titleSave === "saved"
+                    ? i18n.t("board.task.savedTitle")
+                    : undefined
+              }
+            />
+          </View>
+        </View>
         {title.length >= 270 ? (
           <Text
             style={{
@@ -211,27 +255,45 @@ export function TaskDetailBody({ task, boardId }: Props) {
           paddingBottom: spacing.md,
         }}
       >
-        <BottomSheetTextInput
-          value={description}
-          onChangeText={setDescription}
-          onBlur={saveDescription}
-          multiline
-          style={{
-            color: colors.foreground,
-            fontSize: 15,
-            lineHeight: 21,
-            minHeight: 80,
-            paddingVertical: spacing.sm,
-            paddingHorizontal: spacing.md,
-            backgroundColor: colors.surfaceLow,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            textAlignVertical: "top",
-          }}
-          placeholder={i18n.t("board.task.descriptionPlaceholder")}
-          placeholderTextColor={colors.mutedForeground}
-        />
+        <View style={{ position: "relative" }}>
+          <BottomSheetTextInput
+            value={description}
+            onChangeText={setDescription}
+            onBlur={saveDescription}
+            multiline
+            style={{
+              color: colors.foreground,
+              fontSize: 15,
+              lineHeight: 21,
+              minHeight: 80,
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.md,
+              paddingRight: spacing.md + 22,
+              backgroundColor: colors.surfaceLow,
+              borderRadius: radius.md,
+              borderWidth: 1,
+              borderColor: colors.border,
+              textAlignVertical: "top",
+            }}
+            placeholder={i18n.t("board.task.descriptionPlaceholder")}
+            placeholderTextColor={colors.mutedForeground}
+          />
+          <View
+            pointerEvents="none"
+            style={{ position: "absolute", top: 8, right: 8 }}
+          >
+            <SaveIndicator
+              state={descriptionSave}
+              label={
+                descriptionSave === "saving"
+                  ? i18n.t("board.task.savingTitle")
+                  : descriptionSave === "saved"
+                    ? i18n.t("board.task.savedTitle")
+                    : undefined
+              }
+            />
+          </View>
+        </View>
       </View>
 
       {/* Properties card */}
