@@ -25,6 +25,7 @@ import {
 import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
 import { SortSheet, type SortSheetHandle } from "@/components/board/SortSheet";
 import { boardTaskComparator } from "@dragons/shared";
+import { useColumnDrag } from "@/hooks/board/useColumnDrag";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
 import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
 import { ColumnSettingsSheet, type ColumnSettingsSheetHandle } from "@/components/board/ColumnSettingsSheet";
@@ -146,6 +147,8 @@ function BoardDetailBody() {
     () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
     [board],
   );
+
+  const columnDrag = useColumnDrag(boardId, columns);
 
   const countsByColumn = useMemo(() => {
     const m = new Map<number, number>();
@@ -390,8 +393,14 @@ function BoardDetailBody() {
         tasks={rawTasks ?? []}
         activeColumnIndex={activeIndex}
         onPillPress={onPillPress}
-        onPillLongPress={onColumnLongPress}
+        onPillLongPress={columnDrag.reordering ? undefined : onColumnLongPress}
         onAddColumnPress={onAddColumnPress}
+        liftedColumnId={columnDrag.liftedColumnId}
+        targetIndex={columnDrag.targetIndex}
+        onReorderStart={columnDrag.start}
+        onReorderTargetIndex={columnDrag.setTargetIndex}
+        onReorderCommit={columnDrag.commit}
+        onReorderCancel={columnDrag.cancel}
       />
       <FilterChips
         filters={filters}
@@ -509,6 +518,7 @@ function BoardDetailBody() {
             columnRefs={columnRefsMap}
             refreshing={refreshing}
             onRefresh={onPullRefresh}
+            scrollEnabled={!columnDrag.reordering}
           />
         )}
       </View>

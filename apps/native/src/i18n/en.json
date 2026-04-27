@@ -277,7 +277,8 @@
       "deleteConfirmTitle": "Delete column?",
       "deleteConfirmMessage": "All tasks in this column will be deleted. This cannot be undone.",
       "markAsDone": "Mark as done column",
-      "newColumn": "+ New column"
+      "newColumn": "+ New column",
+      "reorderHint": "Long-press a column header to drag-reorder."
     },
     "filters": {
       "mine": "Mine",

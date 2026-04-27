@@ -277,7 +277,8 @@
       "deleteConfirmTitle": "Spalte löschen?",
       "deleteConfirmMessage": "Alle Aufgaben in dieser Spalte werden gelöscht. Dies kann nicht rückgängig gemacht werden.",
       "markAsDone": "Als Erledigt-Spalte markieren",
-      "newColumn": "+ Neue Spalte"
+      "newColumn": "+ Neue Spalte",
+      "reorderHint": "Spaltenkopf lange drücken, um neu anzuordnen."
     },
     "filters": {
       "mine": "Meine",

@@ -60,6 +60,8 @@ interface BoardPagerProps {
   refreshing?: boolean;
   /** Pull-to-refresh handler, forwarded to each column. */
   onRefresh?: () => void;
+  /** When false, the pager's horizontal scroll is disabled (used during column reorder). */
+  scrollEnabled?: boolean;
 }
 
 export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
@@ -84,6 +86,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
       columnRefs,
       refreshing,
       onRefresh,
+      scrollEnabled = true,
     },
     ref,
   ) {
@@ -147,6 +150,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
       <ScrollView
         ref={scrollRef}
         horizontal
+        scrollEnabled={scrollEnabled}
         decelerationRate="fast"
         snapToInterval={columnWidth}
         snapToAlignment="start"
