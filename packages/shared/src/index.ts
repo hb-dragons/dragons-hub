@@ -86,6 +86,10 @@ export type {
   UndoableCommentSnapshot,
 } from "./board-undo";
 
+// Board filter persistence (pure, native side wraps with expo-secure-store)
+export { serializeFilters, parseFilters } from "./board-filter-storage";
+export type { SerialisableBoardFilters } from "./board-filter-storage";
+
 // Board drop-target resolution (pure, testable, no React deps)
 export { findDropTarget } from "./board-drop-target";
 export type {

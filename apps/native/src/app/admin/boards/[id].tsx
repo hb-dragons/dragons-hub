@@ -22,6 +22,7 @@ import {
   AssigneeFilterSheet,
   type AssigneeFilterSheetHandle,
 } from "@/components/board/AssigneeFilterSheet";
+import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
 import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
 import { ColumnSettingsSheet, type ColumnSettingsSheetHandle } from "@/components/board/ColumnSettingsSheet";
@@ -50,13 +51,11 @@ function BoardDetailBody() {
   const boardId = Number(id);
   const { data: board, isLoading: boardLoading, mutate: revalidateBoard } = useBoard(boardId);
 
-  const [filters, setFilters] = useState<BoardFilters>({
-    mine: false,
-    priority: null,
-    dueSoon: false,
-    unassigned: false,
-    assigneeIds: new Set<string>(),
-  });
+  const persistence = useBoardFilterPersistence(boardId);
+  const filters = persistence.filters as BoardFilters;
+  const setFilters = persistence.setFilters as (
+    next: BoardFilters | ((prev: BoardFilters) => BoardFilters),
+  ) => void;
   const [searchQuery, setSearchQuery] = useState("");
 
   const currentUserId = authClient.useSession().data?.user?.id ?? null;
