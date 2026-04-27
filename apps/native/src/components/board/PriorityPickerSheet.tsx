@@ -4,6 +4,7 @@ import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { TASK_PRIORITIES, type TaskPriority } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { priorityStripeColor } from "./TaskCard";
 
 export interface PriorityPickerHandle {
   open: (current: TaskPriority, onPick: (p: TaskPriority) => void) => void;
@@ -58,17 +59,31 @@ export const PriorityPickerSheet = forwardRef<PriorityPickerHandle>(
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  gap: spacing.sm,
                 }}
               >
-                <Text
-                  style={{
-                    color: selected ? colors.primaryForeground : colors.foreground,
-                    fontSize: 16,
-                    fontWeight: "600",
-                  }}
-                >
-                  {i18n.t(`board.priority.${p}`)}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor:
+                        priorityStripeColor(p, colors) === "transparent"
+                          ? selected ? colors.primaryForeground : colors.border
+                          : priorityStripeColor(p, colors),
+                    }}
+                  />
+                  <Text
+                    style={{
+                      color: selected ? colors.primaryForeground : colors.foreground,
+                      fontSize: 16,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {i18n.t(`board.priority.${p}`)}
+                  </Text>
+                </View>
                 {selected ? (
                   <View
                     style={{

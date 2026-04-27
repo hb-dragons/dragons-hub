@@ -175,6 +175,26 @@ function CheckSquareIcon({ size = 12, color }: { size?: number; color: string })
 // Priority Badge (matches web variant mapping)
 // ---------------------------------------------------------------------------
 
+/**
+ * Color of the 4px left-edge stripe.
+ * urgent → destructive, high → heat, low → mutedForeground, normal → transparent
+ */
+export function priorityStripeColor(
+  priority: TaskPriority,
+  colors: ReturnType<typeof useTheme>["colors"],
+): string {
+  switch (priority) {
+    case "urgent":
+      return colors.destructive;
+    case "high":
+      return colors.heat;
+    case "low":
+      return colors.mutedForeground;
+    default:
+      return "transparent";
+  }
+}
+
 function priorityBadgeStyle(
   priority: TaskPriority,
   colors: ReturnType<typeof useTheme>["colors"],
@@ -375,6 +395,20 @@ export function TaskCard({
         dropPulseStyle,
       ]}
     >
+      {/* Priority left-edge stripe */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          backgroundColor: priorityStripeColor(task.priority, colors),
+          borderTopLeftRadius: 8,
+          borderBottomLeftRadius: 8,
+        }}
+      />
       {/* Title row + priority badge */}
       <View
         style={{
