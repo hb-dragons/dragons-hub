@@ -23,6 +23,8 @@ import {
   type AssigneeFilterSheetHandle,
 } from "@/components/board/AssigneeFilterSheet";
 import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
+import { SortSheet, type SortSheetHandle } from "@/components/board/SortSheet";
+import { boardTaskComparator } from "@dragons/shared";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
 import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
 import { ColumnSettingsSheet, type ColumnSettingsSheetHandle } from "@/components/board/ColumnSettingsSheet";
@@ -56,6 +58,8 @@ function BoardDetailBody() {
   const setFilters = persistence.setFilters as (
     next: BoardFilters | ((prev: BoardFilters) => BoardFilters),
   ) => void;
+  const sort = persistence.sort;
+  const setSort = persistence.setSort;
   const [searchQuery, setSearchQuery] = useState("");
 
   const currentUserId = authClient.useSession().data?.user?.id ?? null;
@@ -87,7 +91,7 @@ function BoardDetailBody() {
     // NOTE: TaskCardData has no description field — board search matches
     // task title only. Description-level search is server-side and deferred.
     const q = searchQuery.trim().toLowerCase();
-    return rawTasks.filter((t) => {
+    const filtered = rawTasks.filter((t) => {
       if (q.length > 0 && !t.title.toLowerCase().includes(q)) return false;
       if (filters.mine && currentUserId) {
         if (!t.assignees.some((a) => a.userId === currentUserId)) return false;
@@ -107,7 +111,9 @@ function BoardDetailBody() {
       }
       return true;
     });
-  }, [rawTasks, filters, currentUserId, searchQuery]);
+    if (sort === "position") return filtered;
+    return [...filtered].sort(boardTaskComparator(sort));
+  }, [rawTasks, filters, currentUserId, searchQuery, sort]);
 
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
@@ -124,6 +130,7 @@ function BoardDetailBody() {
   const columnSettingsRef = useRef<ColumnSettingsSheetHandle | null>(null);
   const addColumnRef = useRef<AddColumnSheetHandle | null>(null);
   const assigneeFilterRef = useRef<AssigneeFilterSheetHandle | null>(null);
+  const sortSheetRef = useRef<SortSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
   const moveTask = useMoveTask(boardId);
   const toast = useToast();
@@ -339,10 +346,32 @@ function BoardDetailBody() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: spacing.xs,
-                maxWidth: 240,
+                maxWidth: 280,
               }}
             >
               <BoardSearchInput value={searchQuery} onChange={setSearchQuery} />
+              <Pressable
+                onPress={() => sortSheetRef.current?.open(sort, setSort)}
+                accessibilityRole="button"
+                accessibilityLabel={i18n.t("board.sort.open")}
+                hitSlop={12}
+                style={{
+                  width: 44,
+                  height: 44,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: sort === "position" ? colors.foreground : colors.primary,
+                    fontSize: 18,
+                    fontWeight: "700",
+                  }}
+                >
+                  ⇅
+                </Text>
+              </Pressable>
               <Pressable
                 onPress={() => settingsSheetRef.current?.open({ board })}
                 accessibilityRole="button"
@@ -528,6 +557,7 @@ function BoardDetailBody() {
       <ColumnSettingsSheet ref={columnSettingsRef} />
       <AddColumnSheet ref={addColumnRef} />
       <AssigneeFilterSheet ref={assigneeFilterRef} />
+      <SortSheet ref={sortSheetRef} />
     </View>
   );
 }

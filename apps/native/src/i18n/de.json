@@ -293,6 +293,17 @@
       "matches": "%{count} Treffer",
       "matchesPlural": "%{count} Treffer"
     },
+    "sort": {
+      "title": "Sortieren",
+      "open": "Sortieren",
+      "modes": {
+        "position": "Position (Standard)",
+        "due-asc": "Fälligkeit (früheste zuerst)",
+        "due-desc": "Fälligkeit (späteste zuerst)",
+        "priority-desc": "Priorität (hoch nach niedrig)",
+        "updated-desc": "Zuletzt aktualisiert"
+      }
+    },
     "refresh": "Aktualisieren",
     "checklist": {
       "title": "Checkliste",

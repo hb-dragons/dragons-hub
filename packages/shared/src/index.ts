@@ -90,6 +90,10 @@ export type {
 export { serializeFilters, parseFilters } from "./board-filter-storage";
 export type { SerialisableBoardFilters } from "./board-filter-storage";
 
+// Board task sort (pure comparator factory)
+export { boardTaskComparator } from "./board-task-sort";
+export type { BoardSortMode } from "./board-task-sort";
+
 // Board drop-target resolution (pure, testable, no React deps)
 export { findDropTarget } from "./board-drop-target";
 export type {

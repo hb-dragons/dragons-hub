@@ -293,6 +293,17 @@
       "matches": "%{count} match",
       "matchesPlural": "%{count} matches"
     },
+    "sort": {
+      "title": "Sort tasks",
+      "open": "Sort",
+      "modes": {
+        "position": "Position (default)",
+        "due-asc": "Due date (earliest first)",
+        "due-desc": "Due date (latest first)",
+        "priority-desc": "Priority (high to low)",
+        "updated-desc": "Recently updated"
+      }
+    },
     "refresh": "Refresh",
     "checklist": {
       "title": "Checklist",

@@ -14,12 +14,8 @@ import {
  * tuples so screens can reuse the same hot-path memoisation.
  */
 
-export type BoardSortMode =
-  | "position"
-  | "due-asc"
-  | "due-desc"
-  | "priority-desc"
-  | "updated-desc";
+import type { BoardSortMode } from "@dragons/shared";
+export type { BoardSortMode };
 
 const SORT_MODES: readonly BoardSortMode[] = [
   "position",
