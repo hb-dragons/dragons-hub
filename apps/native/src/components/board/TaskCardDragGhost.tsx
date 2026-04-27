@@ -1,4 +1,12 @@
-import Animated, { useAnimatedStyle } from "react-native-reanimated";
+import { useEffect } from "react";
+import Animated, {
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withSpring,
+  interpolate,
+  Extrapolation,
+} from "react-native-reanimated";
 import type { SharedValue } from "react-native-reanimated";
 import { View, Text } from "react-native";
 import type { TaskCardData } from "@dragons/shared";
@@ -34,23 +42,46 @@ export function TaskCardDragGhost({
   const hasChecklist = task.checklistTotal > 0;
   const firstAssigneeName = task.assignees[0]?.name ?? null;
 
-  const ghostStyle = useAnimatedStyle(() => ({
-    position: "absolute",
-    left: pointerX.value - cardWidth / 2,
-    top: pointerY.value - cardHeight / 2,
-    width: cardWidth,
-    height: cardHeight,
-    transform: [{ scale: 1.04 }],
-    opacity: 0.92,
-    // Pointer events disabled — ghost is purely visual
-    pointerEvents: "none",
-  }));
+  // Spring scale: 1 → 1.04, slight bounce.
+  const scale = useSharedValue(1);
+  // Track previous pointer X on the worklet thread for velocity derivation.
+  const prevX = useSharedValue(pointerX.value);
+  const velocityX = useSharedValue(0);
+
+  useEffect(() => {
+    scale.value = withSpring(1.04, { damping: 12, stiffness: 220, mass: 0.6 });
+  }, [scale]);
+
+  // Worklet-derived horizontal velocity (px per frame, smoothed).
+  useDerivedValue(() => {
+    const dx = pointerX.value - prevX.value;
+    // Low-pass filter so a single jitter doesn't flip the tilt.
+    velocityX.value = velocityX.value * 0.7 + dx * 0.3;
+    prevX.value = pointerX.value;
+  });
+
+  const ghostStyle = useAnimatedStyle(() => {
+    // Map -20..20 px/frame velocity to -2..2 degrees.
+    const rotateDeg = interpolate(
+      velocityX.value,
+      [-20, 0, 20],
+      [-2, 0, 2],
+      Extrapolation.CLAMP,
+    );
+    return {
+      position: "absolute",
+      left: pointerX.value - cardWidth / 2,
+      top: pointerY.value - cardHeight / 2,
+      width: cardWidth,
+      height: cardHeight,
+      transform: [{ scale: scale.value }, { rotate: `${rotateDeg}deg` }],
+      opacity: 0.92,
+      pointerEvents: "none",
+    };
+  });
 
   return (
-    <Animated.View
-      style={ghostStyle}
-      pointerEvents="none"
-    >
+    <Animated.View style={ghostStyle} pointerEvents="none">
       <View
         style={{
           flex: 1,
@@ -62,10 +93,10 @@ export function TaskCardDragGhost({
           gap: spacing.xs,
           minHeight: 72,
           shadowColor: "#000",
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.22,
-          shadowRadius: 10,
-          elevation: 12,
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.28,
+          shadowRadius: 14,
+          elevation: 16,
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
