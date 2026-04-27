@@ -292,6 +292,10 @@
       "deleteTitle": "Eintrag löschen?",
       "deleteMessage": "Das kann nicht rückgängig gemacht werden."
     },
+    "empty": {
+      "noColumns": "Noch keine Spalten",
+      "noColumnsHint": "Füge eine Spalte hinzu, um Aufgaben zu organisieren."
+    },
     "comments": {
       "title": "Kommentare",
       "empty": "Noch keine Kommentare.",

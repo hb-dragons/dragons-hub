@@ -17,6 +17,7 @@ interface BoardColumnProps {
   width: number;
   onTaskPress: (task: TaskCardData) => void;
   onTaskLongPress?: (task: TaskCardData) => void;
+  onColumnLongPress?: (column: BoardColumnData) => void;
   onAddTask: (columnId: number) => void;
   /** ID of the task currently being dragged, used to fade out its placeholder. */
   draggingTaskId?: number | null;
@@ -53,6 +54,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
       width,
       onTaskPress,
       onTaskLongPress,
+      onColumnLongPress,
       onAddTask,
       draggingTaskId,
       onTaskDrag,
@@ -97,8 +99,12 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
             borderColor: isDropTarget ? colors.primary : colors.border,
           }}
         >
-          <View
+          <Pressable
+            onLongPress={onColumnLongPress ? () => onColumnLongPress(column) : undefined}
+            delayLongPress={400}
             onLayout={handleHeaderLayout}
+            accessibilityRole="header"
+            accessibilityLabel={column.name}
             style={{
               paddingHorizontal: spacing.md,
               paddingTop: spacing.md,
@@ -130,7 +136,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
             <Text style={{ color: colors.mutedForeground, fontSize: 13, fontVariant: ["tabular-nums"] }}>
               {columnTasks.length}
             </Text>
-          </View>
+          </Pressable>
 
           <ScrollView
             ref={scrollRef}

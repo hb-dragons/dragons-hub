@@ -19,7 +19,10 @@ import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
 import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
+import { ColumnSettingsSheet, type ColumnSettingsSheetHandle } from "@/components/board/ColumnSettingsSheet";
+import { AddColumnSheet, type AddColumnSheetHandle } from "@/components/board/AddColumnSheet";
 import type { BoardColumnHandle } from "@/components/board/BoardColumn";
+import type { BoardColumnData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
@@ -103,6 +106,8 @@ function BoardDetailBody() {
   const moveToSheetRef = useRef<MoveToSheetHandle | null>(null);
   const quickCreateRef = useRef<QuickCreateSheetHandle | null>(null);
   const settingsSheetRef = useRef<BoardSettingsSheetHandle | null>(null);
+  const columnSettingsRef = useRef<ColumnSettingsSheetHandle | null>(null);
+  const addColumnRef = useRef<AddColumnSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
   const moveTask = useMoveTask(boardId);
 
@@ -237,6 +242,17 @@ function BoardDetailBody() {
     [boardId, columns],
   );
 
+  const onColumnLongPress = useCallback(
+    (col: BoardColumnData) => {
+      columnSettingsRef.current?.open({ boardId, column: col });
+    },
+    [boardId],
+  );
+
+  const onAddColumnPress = useCallback(() => {
+    addColumnRef.current?.open({ boardId });
+  }, [boardId]);
+
   const openQuickCreateFab = useCallback(() => {
     const active = columns[activeIndex] ?? columns[0];
     if (!active) return;
@@ -289,6 +305,8 @@ function BoardDetailBody() {
         tasks={rawTasks ?? []}
         activeColumnIndex={activeIndex}
         onPillPress={onPillPress}
+        onPillLongPress={onColumnLongPress}
+        onAddColumnPress={onAddColumnPress}
       />
       <FilterChips
         filters={filters}
@@ -299,7 +317,52 @@ function BoardDetailBody() {
         onToggleUnassigned={() => setFilters((f) => ({ ...f, unassigned: !f.unassigned }))}
       />
       <View style={{ flex: 1 }}>
-        {tasksLoading && !rawTasks ? (
+        {columns.length === 0 && !boardLoading ? (
+          <View
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              padding: spacing.lg,
+              gap: spacing.md,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.foreground,
+                fontSize: 16,
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+            >
+              {i18n.t("board.empty.noColumns")}
+            </Text>
+            <Text
+              style={{
+                color: colors.mutedForeground,
+                fontSize: 14,
+                textAlign: "center",
+              }}
+            >
+              {i18n.t("board.empty.noColumnsHint")}
+            </Text>
+            <Pressable
+              onPress={onAddColumnPress}
+              accessibilityRole="button"
+              style={{
+                marginTop: spacing.sm,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.md,
+                borderRadius: 8,
+                backgroundColor: colors.primary,
+              }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>
+                {i18n.t("board.column.newColumn")}
+              </Text>
+            </Pressable>
+          </View>
+        ) : tasksLoading && !rawTasks ? (
           <View style={{ flex: 1, paddingHorizontal: spacing.md, paddingTop: spacing.md, gap: spacing.md }}>
             <TaskCardSkeleton />
             <TaskCardSkeleton />
@@ -317,6 +380,7 @@ function BoardDetailBody() {
               taskSheetRef.current?.open(task.id);
             }}
             onTaskLongPress={handleTaskLongPress}
+            onColumnLongPress={onColumnLongPress}
             onAddTask={openQuickCreate}
             draggingTaskId={dragState.active ? dragState.task.id : null}
             dropTargetColumnId={dropTargetColumnId}
@@ -375,6 +439,8 @@ function BoardDetailBody() {
       <MoveToSheet ref={moveToSheetRef} />
       <QuickCreateSheet ref={quickCreateRef} />
       <BoardSettingsSheet ref={settingsSheetRef} />
+      <ColumnSettingsSheet ref={columnSettingsRef} />
+      <AddColumnSheet ref={addColumnRef} />
     </View>
   );
 }

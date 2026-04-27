@@ -292,6 +292,10 @@
       "deleteTitle": "Delete item?",
       "deleteMessage": "This cannot be undone."
     },
+    "empty": {
+      "noColumns": "No columns yet",
+      "noColumnsHint": "Add a column to start organising tasks."
+    },
     "comments": {
       "title": "Comments",
       "empty": "No comments yet.",

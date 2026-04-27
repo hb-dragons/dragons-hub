@@ -34,6 +34,7 @@ interface BoardPagerProps {
   onActiveColumnChange: (i: number) => void;
   onTaskPress: (task: TaskCardData) => void;
   onTaskLongPress?: (task: TaskCardData) => void;
+  onColumnLongPress?: (column: BoardColumnData) => void;
   onAddTask: (columnId: number) => void;
   /** ID of the task being dragged — fades out its placeholder. */
   draggingTaskId?: number | null;
@@ -69,6 +70,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
       onActiveColumnChange,
       onTaskPress,
       onTaskLongPress,
+      onColumnLongPress,
       onAddTask,
       draggingTaskId,
       dropTargetColumnId,
@@ -172,6 +174,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
             width={columnWidth}
             onTaskPress={onTaskPress}
             onTaskLongPress={onTaskLongPress}
+            onColumnLongPress={onColumnLongPress}
             onAddTask={onAddTask}
             draggingTaskId={draggingTaskId}
             isDropTarget={col.id === dropTargetColumnId}
