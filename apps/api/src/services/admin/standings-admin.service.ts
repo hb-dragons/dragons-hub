@@ -15,6 +15,7 @@ export async function getStandings(): Promise<LeagueStandings[]> {
       teamName: teams.name,
       teamNameShort: teams.nameShort,
       isOwnClub: teams.isOwnClub,
+      displayOrder: teams.displayOrder,
       played: standings.played,
       won: standings.won,
       lost: standings.lost,
@@ -30,6 +31,7 @@ export async function getStandings(): Promise<LeagueStandings[]> {
     .orderBy(asc(leagues.name), asc(standings.position));
 
   const grouped = new Map<number, LeagueStandings>();
+  const leagueOrder = new Map<number, number>();
 
   for (const row of rows) {
     let league = grouped.get(row.leagueId);
@@ -57,7 +59,25 @@ export async function getStandings(): Promise<LeagueStandings[]> {
       pointsDiff: row.pointsDiff,
       leaguePoints: row.leaguePoints,
     });
+
+    if (row.isOwnClub) {
+      const current = leagueOrder.get(row.leagueId);
+      if (current === undefined || row.displayOrder < current) {
+        leagueOrder.set(row.leagueId, row.displayOrder);
+      }
+    }
   }
 
-  return Array.from(grouped.values());
+  // Sort leagues by their own-club team's displayOrder (leagues without an
+  // own-club team fall to the end alphabetically).
+  return Array.from(grouped.values()).sort((a, b) => {
+    const aOrder = leagueOrder.get(a.leagueId);
+    const bOrder = leagueOrder.get(b.leagueId);
+    if (aOrder !== undefined && bOrder !== undefined) {
+      return aOrder - bOrder || a.leagueName.localeCompare(b.leagueName);
+    }
+    if (aOrder !== undefined) return -1;
+    if (bOrder !== undefined) return 1;
+    return a.leagueName.localeCompare(b.leagueName);
+  });
 }

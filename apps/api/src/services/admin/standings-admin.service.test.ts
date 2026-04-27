@@ -216,4 +216,44 @@ describe("getStandings", () => {
     expect(result).toHaveLength(2);
     expect(result.map((r) => r.leagueName).sort()).toEqual(["Liga A", "Liga B"]);
   });
+
+  it("orders leagues by own-club team displayOrder", async () => {
+    const ligaA = await insertLeague({ api_liga_id: 1, name: "Liga A" });
+    const ligaB = await insertLeague({ api_liga_id: 2, liga_nr: 4103, name: "Liga B" });
+    const ligaC = await insertLeague({ api_liga_id: 3, liga_nr: 4104, name: "Liga C" });
+
+    // Liga A has own team with displayOrder=2
+    await insertTeam({ api_team_permanent_id: 1000, name: "Own A", is_own_club: true, display_order: 2 });
+    // Liga B has own team with displayOrder=0
+    await insertTeam({ api_team_permanent_id: 2000, name: "Own B", is_own_club: true, display_order: 0, season_team_id: 2, team_competition_id: 2 });
+    // Liga C has own team with displayOrder=1
+    await insertTeam({ api_team_permanent_id: 3000, name: "Own C", is_own_club: true, display_order: 1, season_team_id: 3, team_competition_id: 3 });
+
+    await insertStanding(ligaA, 1000, { position: 1 });
+    await insertStanding(ligaB, 2000, { position: 1 });
+    await insertStanding(ligaC, 3000, { position: 1 });
+
+    const result = await getStandings();
+
+    expect(result.map((r) => r.leagueName)).toEqual(["Liga B", "Liga C", "Liga A"]);
+  });
+
+  it("places leagues without an own-club team after own-club leagues", async () => {
+    const ownLiga = await insertLeague({ api_liga_id: 1, name: "Own Liga" });
+    const fooLiga = await insertLeague({ api_liga_id: 2, liga_nr: 4103, name: "Foo Liga" });
+    const barLiga = await insertLeague({ api_liga_id: 3, liga_nr: 4104, name: "Bar Liga" });
+
+    await insertTeam({ api_team_permanent_id: 1000, name: "Own Team", is_own_club: true, display_order: 5 });
+    await insertTeam({ api_team_permanent_id: 2000, name: "Foreign 1", is_own_club: false, season_team_id: 2, team_competition_id: 2 });
+    await insertTeam({ api_team_permanent_id: 3000, name: "Foreign 2", is_own_club: false, season_team_id: 3, team_competition_id: 3 });
+
+    await insertStanding(ownLiga, 1000, { position: 1 });
+    await insertStanding(fooLiga, 2000, { position: 1 });
+    await insertStanding(barLiga, 3000, { position: 1 });
+
+    const result = await getStandings();
+
+    // Own-club league first, foreign leagues alphabetical after
+    expect(result.map((r) => r.leagueName)).toEqual(["Own Liga", "Bar Liga", "Foo Liga"]);
+  });
 });
