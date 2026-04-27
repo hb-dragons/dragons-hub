@@ -4,7 +4,6 @@ import {
   Pressable,
   Text,
   View,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { Stack, router } from "expo-router";
@@ -15,6 +14,7 @@ import {
   CreateBoardSheet,
   type CreateBoardSheetHandle,
 } from "@/components/board/CreateBoardSheet";
+import { BoardListSkeleton } from "@/components/board/BoardListSkeleton";
 
 export default function BoardListScreen() {
   const { colors, spacing, radius } = useTheme();
@@ -56,9 +56,7 @@ export default function BoardListScreen() {
             headerRight: renderHeaderRight,
           }}
         />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={colors.foreground} />
-        </View>
+        <BoardListSkeleton />
         <CreateBoardSheet ref={createRef} />
       </>
     );
