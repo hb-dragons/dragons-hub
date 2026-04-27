@@ -11,3 +11,9 @@ export const teamUpdateBodySchema = z.object({
 });
 
 export type TeamUpdateBody = z.infer<typeof teamUpdateBodySchema>;
+
+export const teamReorderBodySchema = z.object({
+  teamIds: z.array(z.number().int().positive()).min(1),
+});
+
+export type TeamReorderBody = z.infer<typeof teamReorderBodySchema>;

@@ -17,10 +17,12 @@ vi.mock("../../config/database", () => ({
   db: {
     select: (...args: unknown[]) => {
       mockSelect(...args);
-      return { from: (...fArgs: unknown[]) => {
-        mockFrom(...fArgs);
-        return mocks.from();
-      }};
+      return {
+        from: (...fArgs: unknown[]) => {
+          mockFrom(...fArgs);
+          return { orderBy: () => mocks.from() };
+        },
+      };
     },
   },
 }));

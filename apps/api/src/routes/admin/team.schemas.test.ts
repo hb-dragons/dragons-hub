@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { teamIdParamSchema, teamUpdateBodySchema } from "./team.schemas";
+import {
+  teamIdParamSchema,
+  teamReorderBodySchema,
+  teamUpdateBodySchema,
+} from "./team.schemas";
 
 describe("teamIdParamSchema", () => {
   it("coerces string id to positive integer", () => {
@@ -86,5 +90,32 @@ describe("teamUpdateBodySchema", () => {
         estimatedGameDuration: 120,
       }),
     ).toEqual({ customName: "H1", estimatedGameDuration: 120 });
+  });
+});
+
+describe("teamReorderBodySchema", () => {
+  it("accepts a non-empty array of positive integers", () => {
+    const result = teamReorderBodySchema.safeParse({ teamIds: [3, 1, 2] });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an empty array", () => {
+    const result = teamReorderBodySchema.safeParse({ teamIds: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects non-positive ids", () => {
+    const result = teamReorderBodySchema.safeParse({ teamIds: [1, 0, 2] });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects non-integer ids", () => {
+    const result = teamReorderBodySchema.safeParse({ teamIds: [1, 1.5] });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing teamIds", () => {
+    const result = teamReorderBodySchema.safeParse({});
+    expect(result.success).toBe(false);
   });
 });

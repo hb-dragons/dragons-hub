@@ -577,6 +577,7 @@
     "title": "Teams",
     "description": "Eigene Teamnamen zuweisen",
     "empty": "Keine eigenen Teams gefunden.",
+    "dragHandle": "Zum Sortieren ziehen",
     "columns": {
       "apiName": "API-Name",
       "league": "Liga",
