@@ -18,6 +18,10 @@ import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/boar
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
 import { BoardSearchInput } from "@/components/board/BoardSearchInput";
+import {
+  AssigneeFilterSheet,
+  type AssigneeFilterSheetHandle,
+} from "@/components/board/AssigneeFilterSheet";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
 import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
 import { ColumnSettingsSheet, type ColumnSettingsSheetHandle } from "@/components/board/ColumnSettingsSheet";
@@ -51,6 +55,7 @@ function BoardDetailBody() {
     priority: null,
     dueSoon: false,
     unassigned: false,
+    assigneeIds: new Set<string>(),
   });
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -98,6 +103,9 @@ function BoardDetailBody() {
       if (filters.unassigned) {
         if (t.assignees.length > 0) return false;
       }
+      if (filters.assigneeIds.size > 0) {
+        if (!t.assignees.some((a) => filters.assigneeIds.has(a.userId))) return false;
+      }
       return true;
     });
   }, [rawTasks, filters, currentUserId, searchQuery]);
@@ -116,6 +124,7 @@ function BoardDetailBody() {
   const settingsSheetRef = useRef<BoardSettingsSheetHandle | null>(null);
   const columnSettingsRef = useRef<ColumnSettingsSheetHandle | null>(null);
   const addColumnRef = useRef<AddColumnSheetHandle | null>(null);
+  const assigneeFilterRef = useRef<AssigneeFilterSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
   const moveTask = useMoveTask(boardId);
   const toast = useToast();
@@ -259,6 +268,16 @@ function BoardDetailBody() {
     setFilters((f) => ({ ...f, priority: null }));
   }, []);
 
+  const onPressAssignees = useCallback(() => {
+    assigneeFilterRef.current?.open(filters.assigneeIds, (next) => {
+      setFilters((f) => ({ ...f, assigneeIds: next }));
+    });
+  }, [filters.assigneeIds]);
+
+  const onClearAssignees = useCallback(() => {
+    setFilters((f) => ({ ...f, assigneeIds: new Set<string>() }));
+  }, []);
+
   const openQuickCreate = useCallback(
     (columnId: number) => {
       quickCreateRef.current?.open({
@@ -353,6 +372,8 @@ function BoardDetailBody() {
         onClearPriority={onClearPriorityFilter}
         onToggleDueSoon={() => setFilters((f) => ({ ...f, dueSoon: !f.dueSoon }))}
         onToggleUnassigned={() => setFilters((f) => ({ ...f, unassigned: !f.unassigned }))}
+        onPressAssignees={onPressAssignees}
+        onClearAssignees={onClearAssignees}
       />
       {searchQuery.trim().length > 0 ? (
         <View
@@ -507,6 +528,7 @@ function BoardDetailBody() {
       <BoardSettingsSheet ref={settingsSheetRef} />
       <ColumnSettingsSheet ref={columnSettingsRef} />
       <AddColumnSheet ref={addColumnRef} />
+      <AssigneeFilterSheet ref={assigneeFilterRef} />
     </View>
   );
 }
