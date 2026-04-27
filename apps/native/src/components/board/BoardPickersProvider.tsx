@@ -20,10 +20,16 @@ import type { TaskPriority, TaskAssignee } from "@dragons/shared";
 interface BoardPickersContextValue {
   openPriority: (current: TaskPriority, onPick: (p: TaskPriority) => void) => void;
   openDue: (current: string | null, onPick: (iso: string | null) => void) => void;
+  /**
+   * Opens the assignee picker. Selections are batched locally — `onApply`
+   * fires once when the user taps Apply (with the final Set of user IDs).
+   * The caller is responsible for diffing against `currentAssignees` and
+   * running add/remove mutations.
+   */
   openAssignees: (
     taskId: number,
     currentAssignees: TaskAssignee[],
-    onToggle: (userId: string, add: boolean) => void | Promise<void>,
+    onApply: (selected: Set<string>) => void | Promise<void>,
   ) => void;
 }
 
@@ -65,8 +71,8 @@ export function BoardPickersProvider({ children }: { children: ReactNode }) {
       openPriority: (current, onPick) =>
         priorityRef.current?.open(current, onPick),
       openDue: (current, onPick) => dueRef.current?.open(current, onPick),
-      openAssignees: (taskId, currentAssignees, onToggle) =>
-        assigneesRef.current?.open(taskId, currentAssignees, onToggle),
+      openAssignees: (taskId, currentAssignees, onApply) =>
+        assigneesRef.current?.open(taskId, currentAssignees, onApply),
     }),
     [],
   );

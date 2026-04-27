@@ -8,6 +8,7 @@ import {
 import { useBoardMutations } from "@/hooks/board/useBoardMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { multilineInput, singleLineInput } from "@/components/ui/inputStyles";
 
 export interface CreateBoardSheetHandle {
   open: (onCreated?: (boardId: number) => void) => void;
@@ -20,8 +21,9 @@ export const CreateBoardSheet = forwardRef<CreateBoardSheetHandle>(
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [submitting, setSubmitting] = useState(false);
-    const snapPoints = useMemo(() => ["50%"], []);
-    const { colors, spacing, radius } = useTheme();
+    const snapPoints = useMemo(() => ["85%"], []);
+    const theme = useTheme();
+    const { colors, spacing, radius } = theme;
     const mutations = useBoardMutations();
 
     useImperativeHandle(ref, () => ({
@@ -57,11 +59,13 @@ export const CreateBoardSheet = forwardRef<CreateBoardSheetHandle>(
       <BottomSheetModal
         ref={sheetRef}
         snapPoints={snapPoints}
+        enableDynamicSizing={false}
         backgroundStyle={{ backgroundColor: colors.background }}
         handleIndicatorStyle={{ backgroundColor: colors.mutedForeground }}
         enablePanDownToClose
-        keyboardBehavior="interactive"
+        keyboardBehavior="extend"
         keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
       >
         <BottomSheetView style={{ padding: spacing.lg, gap: spacing.md }}>
           <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "700" }}>
@@ -76,16 +80,7 @@ export const CreateBoardSheet = forwardRef<CreateBoardSheetHandle>(
             autoFocus
             maxLength={120}
             returnKeyType="next"
-            style={{
-              padding: spacing.md,
-              borderRadius: radius.md,
-              backgroundColor: colors.surfaceLow,
-              borderWidth: 1,
-              borderColor: colors.border,
-              color: colors.foreground,
-              fontSize: 16,
-              fontWeight: "600",
-            }}
+            style={singleLineInput(theme, { fontSize: 16, fontWeight: "600" })}
           />
 
           <BottomSheetTextInput
@@ -95,17 +90,7 @@ export const CreateBoardSheet = forwardRef<CreateBoardSheetHandle>(
             placeholderTextColor={colors.mutedForeground}
             multiline
             maxLength={500}
-            style={{
-              padding: spacing.md,
-              minHeight: 80,
-              borderRadius: radius.md,
-              backgroundColor: colors.surfaceLow,
-              borderWidth: 1,
-              borderColor: colors.border,
-              color: colors.foreground,
-              fontSize: 14,
-              textAlignVertical: "top",
-            }}
+            style={multilineInput(theme, { fontSize: 14 })}
           />
 
           <Pressable

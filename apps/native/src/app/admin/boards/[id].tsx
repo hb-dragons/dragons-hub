@@ -211,7 +211,9 @@ function BoardDetailBody() {
       const snapshotPriority = task.priority;
       const snapshotDueDate = task.dueDate;
 
-      void taskMutations.deleteTask(task.id).then(() => {
+      taskMutations
+        .deleteTask(task.id)
+        .then(() => {
         toast.show({
           title: i18n.t("toast.taskDeleted"),
           action: {
@@ -237,6 +239,9 @@ function BoardDetailBody() {
             },
           },
         });
+      })
+      .catch(() => {
+        // Delete failed: useTaskMutations.deleteTask already shows an error toast.
       });
     },
     [boardId, taskMutations, toast, revalidateTasks],
@@ -258,11 +263,12 @@ function BoardDetailBody() {
             });
           } else if (action === "priority") {
             pickers.openPriority(task.priority, (p) => {
-              void taskMutations.setPriority(task.id, p);
+              // Mutation hook surfaces failures via toast; swallow rejection.
+              taskMutations.setPriority(task.id, p).catch(() => {});
             });
           } else if (action === "due") {
             pickers.openDue(task.dueDate, (iso) => {
-              void taskMutations.setDueDate(task.id, iso);
+              taskMutations.setDueDate(task.id, iso).catch(() => {});
             });
           } else if (action === "delete") {
             handleTaskDelete(task);

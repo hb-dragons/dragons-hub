@@ -16,6 +16,7 @@ import type { BoardData } from "@dragons/shared";
 import { useBoardMutations } from "@/hooks/board/useBoardMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { multilineInput, singleLineInput } from "@/components/ui/inputStyles";
 
 interface OpenArgs {
   board: BoardData;
@@ -32,8 +33,9 @@ export const BoardSettingsSheet = forwardRef<BoardSettingsSheetHandle>(
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [submitting, setSubmitting] = useState(false);
-    const snapPoints = useMemo(() => ["55%"], []);
-    const { colors, spacing, radius } = useTheme();
+    const snapPoints = useMemo(() => ["88%"], []);
+    const theme = useTheme();
+    const { colors, spacing, radius } = theme;
     const mutations = useBoardMutations();
 
     useImperativeHandle(ref, () => ({
@@ -98,11 +100,13 @@ export const BoardSettingsSheet = forwardRef<BoardSettingsSheetHandle>(
       <BottomSheetModal
         ref={sheetRef}
         snapPoints={snapPoints}
+        enableDynamicSizing={false}
         backgroundStyle={{ backgroundColor: colors.background }}
         handleIndicatorStyle={{ backgroundColor: colors.mutedForeground }}
         enablePanDownToClose
-        keyboardBehavior="interactive"
+        keyboardBehavior="extend"
         keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
         onDismiss={() => setBoard(null)}
       >
         <BottomSheetView style={{ padding: spacing.lg, gap: spacing.md }}>
@@ -116,16 +120,7 @@ export const BoardSettingsSheet = forwardRef<BoardSettingsSheetHandle>(
             placeholder={i18n.t("admin.boards.namePlaceholder")}
             placeholderTextColor={colors.mutedForeground}
             maxLength={120}
-            style={{
-              padding: spacing.md,
-              borderRadius: radius.md,
-              backgroundColor: colors.surfaceLow,
-              borderWidth: 1,
-              borderColor: colors.border,
-              color: colors.foreground,
-              fontSize: 16,
-              fontWeight: "600",
-            }}
+            style={singleLineInput(theme, { fontSize: 16, fontWeight: "600" })}
           />
 
           <BottomSheetTextInput
@@ -135,17 +130,7 @@ export const BoardSettingsSheet = forwardRef<BoardSettingsSheetHandle>(
             placeholderTextColor={colors.mutedForeground}
             multiline
             maxLength={500}
-            style={{
-              padding: spacing.md,
-              minHeight: 64,
-              borderRadius: radius.md,
-              backgroundColor: colors.surfaceLow,
-              borderWidth: 1,
-              borderColor: colors.border,
-              color: colors.foreground,
-              fontSize: 14,
-              textAlignVertical: "top",
-            }}
+            style={multilineInput(theme, { fontSize: 14, minHeight: 64 })}
           />
 
           <Pressable

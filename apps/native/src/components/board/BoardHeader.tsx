@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ScrollView, Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -177,14 +177,12 @@ function ColumnPill({
   const scale = useSharedValue(1);
   const elevation = useSharedValue(0);
 
-  // When lifted state flips, animate.
-  if (lifted && scale.value !== 1.05) {
-    scale.value = withTiming(1.05, { duration: 120 });
-    elevation.value = withTiming(8, { duration: 120 });
-  } else if (!lifted && scale.value !== 1) {
-    scale.value = withTiming(1, { duration: 120 });
-    elevation.value = withTiming(0, { duration: 120 });
-  }
+  // Reanimated forbids reading shared values during render. Drive the
+  // lifted-state animation from an effect instead.
+  useEffect(() => {
+    scale.value = withTiming(lifted ? 1.05 : 1, { duration: 120 });
+    elevation.value = withTiming(lifted ? 8 : 0, { duration: 120 });
+  }, [lifted, scale, elevation]);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -286,16 +284,21 @@ function ColumnPill({
 
   return (
     <GestureDetector gesture={reorderGesture}>
-      <Pressable
-        onPress={onPress}
-        onLongPress={onLongPress ? () => onLongPress(column) : undefined}
-        delayLongPress={400}
-        accessibilityRole="button"
-        accessibilityLabel={column.name}
-        testID={`board-header-pill-${column.id}`}
-      >
-        {pill}
-      </Pressable>
+      {/* collapsable=false: stops RN from view-flattening the GestureDetector
+          host away. Without this, the gesture system warns about a flattened
+          child. */}
+      <View collapsable={false}>
+        <Pressable
+          onPress={onPress}
+          onLongPress={onLongPress ? () => onLongPress(column) : undefined}
+          delayLongPress={400}
+          accessibilityRole="button"
+          accessibilityLabel={column.name}
+          testID={`board-header-pill-${column.id}`}
+        >
+          {pill}
+        </Pressable>
+      </View>
     </GestureDetector>
   );
 }

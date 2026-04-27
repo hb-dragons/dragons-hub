@@ -616,7 +616,9 @@ export function TaskCard({
 
   return (
     <GestureDetector gesture={dragGesture}>
-      {swipeWrapped}
+      {/* collapsable=false: keeps the GestureDetector host alive so RN doesn't
+          flatten Swipeable/Animated.Pressable away. */}
+      <View collapsable={false}>{swipeWrapped}</View>
     </GestureDetector>
   );
 }

@@ -9,13 +9,17 @@ import {
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import {
   BottomSheetFlatList,
+  BottomSheetFooter,
   BottomSheetModal,
   BottomSheetTextInput,
+  type BottomSheetFooterProps,
 } from "@gorhom/bottom-sheet";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import useSWR from "swr";
 import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { singleLineInput } from "@/components/ui/inputStyles";
 
 interface PickableUser {
   id: string;
@@ -37,20 +41,9 @@ export const AssigneeFilterSheet = forwardRef<AssigneeFilterSheetHandle>(
     const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<Set<string>>(() => new Set());
     const snapPoints = useMemo(() => ["92%"], []);
-    const { colors, spacing, radius } = useTheme();
-
-    useImperativeHandle(
-      ref,
-      () => ({
-        open: (initialSelected, onApply) => {
-          setSelected(new Set(initialSelected));
-          onApplyRef.current = onApply;
-          setSearch("");
-          sheetRef.current?.present();
-        },
-      }),
-      [],
-    );
+    const theme = useTheme();
+    const { colors, spacing, radius } = theme;
+    const insets = useSafeAreaInsets();
 
     const { data: userPage, isLoading } = useSWR(
       ["admin/users", search],
@@ -78,13 +71,36 @@ export const AssigneeFilterSheet = forwardRef<AssigneeFilterSheetHandle>(
       }));
     }, [userPage]);
 
+    // Snapshot the selected-first ordering exactly once when the sheet opens
+    // (and again when the underlying user list arrives). Without the snapshot,
+    // sorting on every toggle made the just-tapped row jump under the user's
+    // finger.
+    const [orderToken, setOrderToken] = useState(0);
+    useImperativeHandle(
+      ref,
+      () => ({
+        open: (initialSelected, onApply) => {
+          setSelected(new Set(initialSelected));
+          onApplyRef.current = onApply;
+          setSearch("");
+          setOrderToken((n) => n + 1);
+          sheetRef.current?.present();
+        },
+      }),
+      [],
+    );
+
     const sortedUsers = useMemo(() => {
+      // Selected first, by name. Order is snapshotted via orderToken so that
+      // toggling within a session does not re-sort the visible list.
       return [...users].sort((a, b) => {
         const aHas = selected.has(a.id) ? 0 : 1;
         const bHas = selected.has(b.id) ? 0 : 1;
-        return aHas - bHas;
+        if (aHas !== bHas) return aHas - bHas;
+        return (a.name ?? a.email).localeCompare(b.name ?? b.email);
       });
-    }, [users, selected]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [users, orderToken]);
 
     const toggle = useCallback((id: string) => {
       setSelected((prev) => {
@@ -103,6 +119,42 @@ export const AssigneeFilterSheet = forwardRef<AssigneeFilterSheetHandle>(
     const clearAll = () => {
       setSelected(new Set());
     };
+
+    const renderFooter = useCallback(
+      (props: BottomSheetFooterProps) => (
+        <BottomSheetFooter {...props} bottomInset={insets.bottom}>
+          <View
+            style={{
+              paddingHorizontal: spacing.md,
+              paddingTop: spacing.md,
+              paddingBottom: spacing.md,
+              backgroundColor: colors.background,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+            }}
+          >
+            <Pressable
+              onPress={apply}
+              accessibilityRole="button"
+              accessibilityLabel={i18n.t("common.apply")}
+              style={{
+                padding: spacing.md,
+                borderRadius: radius.md,
+                backgroundColor: colors.primary,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>
+                {i18n.t("common.apply")}
+              </Text>
+            </Pressable>
+          </View>
+        </BottomSheetFooter>
+      ),
+      // `apply` reads selected via closure; rebuild when it changes.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [selected, colors, spacing, radius, insets.bottom],
+    );
 
     const renderItem = useCallback(
       ({ item }: { item: PickableUser }) => {
@@ -159,11 +211,14 @@ export const AssigneeFilterSheet = forwardRef<AssigneeFilterSheetHandle>(
       <BottomSheetModal
         ref={sheetRef}
         snapPoints={snapPoints}
+        enableDynamicSizing={false}
         backgroundStyle={{ backgroundColor: colors.background }}
         handleIndicatorStyle={{ backgroundColor: colors.mutedForeground }}
         enablePanDownToClose
-        keyboardBehavior="interactive"
+        keyboardBehavior="extend"
         keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
+        footerComponent={renderFooter}
       >
         <View style={{ padding: spacing.md, gap: spacing.sm }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
@@ -190,15 +245,7 @@ export const AssigneeFilterSheet = forwardRef<AssigneeFilterSheetHandle>(
             placeholderTextColor={colors.mutedForeground}
             autoCapitalize="none"
             autoCorrect={false}
-            style={{
-              padding: spacing.md,
-              borderRadius: radius.md,
-              backgroundColor: colors.surfaceLow,
-              borderWidth: 1,
-              borderColor: colors.border,
-              color: colors.foreground,
-              fontSize: 15,
-            }}
+            style={singleLineInput(theme)}
           />
         </View>
 
@@ -210,7 +257,10 @@ export const AssigneeFilterSheet = forwardRef<AssigneeFilterSheetHandle>(
           <BottomSheetFlatList
             data={sortedUsers}
             keyExtractor={(u) => u.id}
-            contentContainerStyle={{ padding: spacing.md, paddingBottom: 120 }}
+            contentContainerStyle={{
+              padding: spacing.md,
+              paddingBottom: 96 + insets.bottom,
+            }}
             renderItem={renderItem}
             ListEmptyComponent={
               <Text style={{ color: colors.mutedForeground, textAlign: "center", marginTop: spacing.lg }}>
@@ -220,34 +270,6 @@ export const AssigneeFilterSheet = forwardRef<AssigneeFilterSheetHandle>(
           />
         )}
 
-        <View
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: spacing.md,
-            backgroundColor: colors.background,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-          }}
-        >
-          <Pressable
-            onPress={apply}
-            accessibilityRole="button"
-            accessibilityLabel={i18n.t("common.apply")}
-            style={{
-              padding: spacing.md,
-              borderRadius: radius.md,
-              backgroundColor: colors.primary,
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>
-              {i18n.t("common.apply")}
-            </Text>
-          </Pressable>
-        </View>
       </BottomSheetModal>
     );
   },

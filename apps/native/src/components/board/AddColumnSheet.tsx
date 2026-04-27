@@ -8,6 +8,7 @@ import {
 import { useColumnMutations } from "@/hooks/board/useColumnMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { singleLineInput } from "@/components/ui/inputStyles";
 
 const COLOR_PRESETS = [
   null,
@@ -34,8 +35,9 @@ export const AddColumnSheet = forwardRef<AddColumnSheetHandle>(function AddColum
   const [name, setName] = useState("");
   const [color, setColor] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const snapPoints = useMemo(() => ["55%"], []);
-  const { colors, spacing, radius } = useTheme();
+  const snapPoints = useMemo(() => ["92%"], []);
+  const theme = useTheme();
+  const { colors, spacing, radius } = theme;
 
   // Hooks must be called unconditionally; pass 0 when no board is selected.
   // The hook returns no-op-ish behaviour because mutations are only invoked
@@ -72,11 +74,13 @@ export const AddColumnSheet = forwardRef<AddColumnSheetHandle>(function AddColum
     <BottomSheetModal
       ref={sheetRef}
       snapPoints={snapPoints}
+      enableDynamicSizing={false}
       backgroundStyle={{ backgroundColor: colors.background }}
       handleIndicatorStyle={{ backgroundColor: colors.mutedForeground }}
       enablePanDownToClose
-      keyboardBehavior="interactive"
+      keyboardBehavior="extend"
       keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
       onDismiss={() => setArgs(null)}
     >
       <BottomSheetView style={{ padding: spacing.lg, gap: spacing.md }}>
@@ -93,16 +97,7 @@ export const AddColumnSheet = forwardRef<AddColumnSheetHandle>(function AddColum
           maxLength={64}
           returnKeyType="done"
           onSubmitEditing={submit}
-          style={{
-            padding: spacing.md,
-            borderRadius: radius.md,
-            backgroundColor: colors.surfaceLow,
-            borderWidth: 1,
-            borderColor: colors.border,
-            color: colors.foreground,
-            fontSize: 16,
-            fontWeight: "600",
-          }}
+          style={singleLineInput(theme, { fontSize: 16, fontWeight: "600" })}
         />
 
         <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" }}>

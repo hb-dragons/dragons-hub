@@ -48,9 +48,13 @@ export function BoardSearchInput({ value, onChange }: Props) {
     );
   }
 
-  const collapse = () => {
-    onChange("");
-    setExpanded(false);
+  // Single dismiss button: clears while typed, collapses when empty.
+  const onDismiss = () => {
+    if (value.length > 0) {
+      onChange("");
+    } else {
+      setExpanded(false);
+    }
   };
 
   return (
@@ -78,18 +82,25 @@ export function BoardSearchInput({ value, onChange }: Props) {
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
-        clearButtonMode="while-editing"
+        // No clearButtonMode: avoids the iOS-native ✕ overlapping the manual one.
+        // No lineHeight / paddingVertical: the parent View enforces the 44pt
+        // height and TextInput centers its single line vertically. Setting
+        // lineHeight here would shift the placeholder and typed text down on
+        // iOS (a long-standing RN quirk).
         style={{
           flex: 1,
           color: colors.foreground,
           fontSize: 15,
-          paddingVertical: 0,
         }}
       />
       <Pressable
-        onPress={collapse}
+        onPress={onDismiss}
         accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.search.close")}
+        accessibilityLabel={
+          value.length > 0
+            ? i18n.t("common.clear")
+            : i18n.t("board.search.close")
+        }
         hitSlop={12}
         style={{
           width: 28,

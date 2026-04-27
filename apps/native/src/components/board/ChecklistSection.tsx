@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 import { adminBoardApi } from "@/lib/api";
+import { singleLineInput } from "@/components/ui/inputStyles";
 
 interface Props {
   task: TaskDetail;
@@ -107,7 +108,8 @@ function ChecklistRow({
 }
 
 export function ChecklistSection({ task, boardId }: Props) {
-  const { colors, spacing, radius } = useTheme();
+  const theme = useTheme();
+  const { colors, spacing, radius } = theme;
   const mutations = useChecklistMutations(boardId);
   const toast = useToast();
   const [draft, setDraft] = useState("");
@@ -164,7 +166,7 @@ export function ChecklistSection({ task, boardId }: Props) {
       label: item.label,
       isChecked: item.isChecked,
     };
-    void mutations.deleteItem(task.id, itemId).then(() => {
+    mutations.deleteItem(task.id, itemId).then(() => {
       toast.show({
         title: i18n.t("toast.checklistItemDeleted"),
         action: {
@@ -191,6 +193,8 @@ export function ChecklistSection({ task, boardId }: Props) {
           },
         },
       });
+    }).catch(() => {
+      // Mutation hook already toasts on failure.
     });
   };
 
@@ -266,7 +270,9 @@ export function ChecklistSection({ task, boardId }: Props) {
             spacing={spacing}
             onToggle={() => {
               haptics.selection();
-              void mutations.toggle(task.id, item.id, !item.isChecked);
+              mutations
+                .toggle(task.id, item.id, !item.isChecked)
+                .catch(() => {});
             }}
             onLongPress={() => confirmDelete(item.id)}
           />
@@ -286,16 +292,7 @@ export function ChecklistSection({ task, boardId }: Props) {
           returnKeyType="done"
           placeholder={i18n.t("board.checklist.addPlaceholder")}
           placeholderTextColor={colors.mutedForeground}
-          style={{
-            flex: 1,
-            padding: spacing.sm,
-            borderRadius: radius.md,
-            backgroundColor: colors.surfaceLow,
-            borderWidth: 1,
-            borderColor: colors.border,
-            color: colors.foreground,
-            fontSize: 14,
-          }}
+          style={[singleLineInput(theme, { fontSize: 14 }), { flex: 1 }]}
         />
         <Pressable
           onPress={submit}

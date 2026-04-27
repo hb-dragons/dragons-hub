@@ -9,13 +9,15 @@ import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 import { adminBoardApi } from "@/lib/api";
+import { multilineInput } from "@/components/ui/inputStyles";
 
 interface Props {
   task: TaskDetail;
 }
 
 export function CommentsSection({ task }: Props) {
-  const { colors, spacing, radius } = useTheme();
+  const theme = useTheme();
+  const { colors, spacing, radius } = theme;
   const { data: session } = authClient.useSession();
   const currentUserId = session?.user?.id ?? null;
   const mutations = useCommentMutations();
@@ -57,26 +59,31 @@ export function CommentsSection({ task }: Props) {
     if (!comment) return;
     const snapshotBody = comment.body;
     haptics.warning();
-    void mutations.remove(task.id, id).then(() => {
-      toast.show({
-        title: i18n.t("toast.commentDeleted"),
-        action: {
-          label: i18n.t("toast.undo"),
-          onPress: () => {
-            void (async () => {
-              try {
-                await adminBoardApi.addComment(task.id, snapshotBody);
-              } catch {
-                toast.show({
-                  title: i18n.t("toast.saveFailed"),
-                  variant: "error",
-                });
-              }
-            })();
+    mutations
+      .remove(task.id, id)
+      .then(() => {
+        toast.show({
+          title: i18n.t("toast.commentDeleted"),
+          action: {
+            label: i18n.t("toast.undo"),
+            onPress: () => {
+              void (async () => {
+                try {
+                  await adminBoardApi.addComment(task.id, snapshotBody);
+                } catch {
+                  toast.show({
+                    title: i18n.t("toast.saveFailed"),
+                    variant: "error",
+                  });
+                }
+              })();
+            },
           },
-        },
-      });
-    });
+        });
+      })
+      // Mutation hook already shows an error toast; swallow rejection so it
+      // doesn't surface as an uncaught promise.
+      .catch(() => {});
   };
 
   const sorted = [...task.comments].sort(
@@ -137,16 +144,7 @@ export function CommentsSection({ task }: Props) {
                   value={editDraft}
                   onChangeText={setEditDraft}
                   multiline
-                  style={{
-                    color: colors.foreground,
-                    fontSize: 14,
-                    minHeight: 40,
-                    padding: spacing.xs,
-                    borderRadius: radius.md,
-                    backgroundColor: colors.surfaceLow,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
+                  style={multilineInput(theme, { fontSize: 14, minHeight: 56 })}
                 />
                 <View style={{ flexDirection: "row", gap: spacing.sm }}>
                   <Pressable
@@ -187,17 +185,10 @@ export function CommentsSection({ task }: Props) {
           placeholder={i18n.t("board.comments.addPlaceholder")}
           placeholderTextColor={colors.mutedForeground}
           multiline
-          style={{
-            flex: 1,
-            padding: spacing.sm,
-            minHeight: 40,
-            borderRadius: radius.md,
-            backgroundColor: colors.surfaceLow,
-            borderWidth: 1,
-            borderColor: colors.border,
-            color: colors.foreground,
-            fontSize: 14,
-          }}
+          style={[
+            multilineInput(theme, { fontSize: 14, minHeight: 56 }),
+            { flex: 1 },
+          ]}
         />
         <Pressable
           onPress={submit}

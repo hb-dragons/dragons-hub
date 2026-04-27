@@ -11,6 +11,7 @@ import { ChecklistSection } from "./ChecklistSection";
 import { CommentsSection } from "./CommentsSection";
 import { formatDueShort } from "./TaskCard";
 import { SaveIndicator, type SaveState } from "./SaveIndicator";
+import { multilineInput } from "@/components/ui/inputStyles";
 
 interface Props {
   task: TaskDetail;
@@ -44,7 +45,8 @@ function dueState(iso: string | null): "overdue" | "soon" | "later" | null {
 }
 
 export function TaskDetailBody({ task, boardId }: Props) {
-  const { colors, spacing, radius } = useTheme();
+  const theme = useTheme();
+  const { colors, spacing, radius } = theme;
   const mutations = useTaskMutations(boardId);
   const assigneeMutations = useAssigneeMutations(boardId);
   const pickers = useBoardPickers();
@@ -210,12 +212,14 @@ export function TaskDetailBody({ task, boardId }: Props) {
             onChangeText={setTitle}
             onBlur={saveTitle}
             maxLength={300}
+            // Inline title — no surface, no lineHeight (lineHeight on a
+            // TextInput shifts placeholder/text down on iOS).
             style={{
               flex: 1,
               color: colors.foreground,
               fontSize: 22,
               fontWeight: "700",
-              lineHeight: 28,
+              padding: 0,
             }}
             placeholder={i18n.t("board.task.titlePlaceholder")}
             placeholderTextColor={colors.mutedForeground}
@@ -261,20 +265,12 @@ export function TaskDetailBody({ task, boardId }: Props) {
             onChangeText={setDescription}
             onBlur={saveDescription}
             multiline
-            style={{
-              color: colors.foreground,
-              fontSize: 15,
-              lineHeight: 21,
-              minHeight: 80,
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.md,
-              paddingRight: spacing.md + 22,
-              backgroundColor: colors.surfaceLow,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: colors.border,
-              textAlignVertical: "top",
-            }}
+            // Reserve room on the right for the absolute SaveIndicator
+            // overlay (22pt icon + 8pt gap).
+            style={[
+              multilineInput(theme, { fontSize: 15 }),
+              { paddingRight: spacing.md + 22 },
+            ]}
             placeholder={i18n.t("board.task.descriptionPlaceholder")}
             placeholderTextColor={colors.mutedForeground}
           />
@@ -324,9 +320,24 @@ export function TaskDetailBody({ task, boardId }: Props) {
             pickers.openAssignees(
               task.id,
               task.assignees,
-              async (userId, add) => {
-                if (add) await assigneeMutations.add(task.id, userId);
-                else await assigneeMutations.remove(task.id, userId);
+              async (selected) => {
+                // Diff against the original set: anything new is added,
+                // anything missing is removed. Errors surface as toasts via
+                // the mutation hook; rejections are swallowed here so a
+                // partial failure doesn't bubble as an unhandled rejection.
+                const initial = new Set(task.assignees.map((a) => a.userId));
+                const added: string[] = [];
+                const removed: string[] = [];
+                selected.forEach((id) => {
+                  if (!initial.has(id)) added.push(id);
+                });
+                initial.forEach((id) => {
+                  if (!selected.has(id)) removed.push(id);
+                });
+                await Promise.allSettled([
+                  ...added.map((id) => assigneeMutations.add(task.id, id)),
+                  ...removed.map((id) => assigneeMutations.remove(task.id, id)),
+                ]);
               },
             ),
         })}
@@ -336,7 +347,8 @@ export function TaskDetailBody({ task, boardId }: Props) {
           value: i18n.t(`board.priority.${task.priority}`),
           onPress: () =>
             pickers.openPriority(task.priority, (p) => {
-              void mutations.setPriority(task.id, p);
+              // Mutation hook surfaces failures via toast; swallow rejection.
+              mutations.setPriority(task.id, p).catch(() => {});
             }),
         })}
         {divider}
@@ -346,7 +358,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
           valueColor: task.dueDate ? dueColor : colors.mutedForeground,
           onPress: () =>
             pickers.openDue(task.dueDate, (iso) => {
-              void mutations.setDueDate(task.id, iso);
+              mutations.setDueDate(task.id, iso).catch(() => {});
             }),
         })}
       </View>

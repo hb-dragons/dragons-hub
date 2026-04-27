@@ -6,21 +6,41 @@ import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 
 export interface DuePickerHandle {
-  open: (current: string | null, onPick: (iso: string | null) => void) => void;
+  /** `current` and `onPick` use YYYY-MM-DD strings — the server's `date` column. */
+  open: (current: string | null, onPick: (date: string | null) => void) => void;
+}
+
+/**
+ * Parse "YYYY-MM-DD" as a local-midnight Date, so the picker shows the same
+ * day the user picked regardless of timezone. `new Date("2026-04-27")` would
+ * parse as UTC midnight and shift left of UTC by a day.
+ */
+function parseLocalDate(iso: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return new Date(iso);
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** Format a Date as local YYYY-MM-DD — what the server's date column expects. */
+function formatLocalDate(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export const DuePickerSheet = forwardRef<DuePickerHandle>(function DuePickerSheet(_p, ref) {
   const sheetRef = useRef<BottomSheetModal>(null);
-  const onPickRef = useRef<(iso: string | null) => void>(() => {});
+  const onPickRef = useRef<(date: string | null) => void>(() => {});
   const [value, setValue] = useState<Date>(new Date());
-  const snapPoints = useMemo(() => ["50%"], []);
+  const snapPoints = useMemo(() => ["75%"], []);
   const { colors, spacing, radius, isDark } = useTheme();
 
   useImperativeHandle(
     ref,
     () => ({
       open: (current, onPick) => {
-        setValue(current ? new Date(current) : new Date());
+        setValue(current ? parseLocalDate(current) : new Date());
         onPickRef.current = onPick;
         sheetRef.current?.present();
       },
@@ -37,15 +57,23 @@ export const DuePickerSheet = forwardRef<DuePickerHandle>(function DuePickerShee
       enablePanDownToClose
     >
       <BottomSheetView style={{ padding: spacing.lg, gap: spacing.lg }} testID="due-picker-sheet">
-        <DateTimePicker
-          mode="date"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          value={value}
-          onChange={(_e, d) => {
-            if (d) setValue(d);
-          }}
-          themeVariant={isDark ? "dark" : "light"}
-        />
+        {/*
+          iOS inline DateTimePicker collapses to 0 height inside a flex
+          container — wrap it in a fixed-height View so the calendar is
+          visible. ~360pt fits a month grid + month nav comfortably.
+        */}
+        <View style={Platform.OS === "ios" ? { height: 360, alignItems: "stretch" } : undefined}>
+          <DateTimePicker
+            mode="date"
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            value={value}
+            onChange={(_e, d) => {
+              if (d) setValue(d);
+            }}
+            themeVariant={isDark ? "dark" : "light"}
+            style={Platform.OS === "ios" ? { flex: 1 } : undefined}
+          />
+        </View>
         <View style={{ flexDirection: "row", gap: spacing.sm }}>
           <Pressable
             onPress={() => {
@@ -70,7 +98,7 @@ export const DuePickerSheet = forwardRef<DuePickerHandle>(function DuePickerShee
           </Pressable>
           <Pressable
             onPress={() => {
-              onPickRef.current(value.toISOString());
+              onPickRef.current(formatLocalDate(value));
               sheetRef.current?.dismiss();
             }}
             accessibilityRole="button"
