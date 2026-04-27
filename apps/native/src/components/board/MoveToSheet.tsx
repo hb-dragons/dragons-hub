@@ -54,7 +54,7 @@ export const MoveToSheet = forwardRef<MoveToSheetHandle>(function MoveToSheet(_p
       enablePanDownToClose
       onDismiss={() => setArgs(null)}
     >
-      <BottomSheetScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
+      <BottomSheetScrollView testID="move-to-sheet" contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
         <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "700" }}>
           {i18n.t("board.moveTo.title")}
         </Text>

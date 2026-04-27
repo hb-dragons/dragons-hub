@@ -78,6 +78,7 @@ export const QuickCreateSheet = forwardRef<QuickCreateSheetHandle>(
         keyboardBlurBehavior="restore"
       >
         <BottomSheetScrollView
+          testID="quick-create-sheet"
           contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
         >
           <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "700" }}>

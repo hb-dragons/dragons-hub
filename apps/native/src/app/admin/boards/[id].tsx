@@ -202,6 +202,46 @@ function BoardDetailBody() {
     pagerRef.current?.scrollToIndex(i, true);
   }, []);
 
+  const handleTaskDelete = useCallback(
+    (task: TaskCardData) => {
+      haptics.warning();
+      const snapshotTitle = task.title;
+      const snapshotColumnId = task.columnId;
+      const snapshotDescription = task.description ?? null;
+      const snapshotPriority = task.priority;
+      const snapshotDueDate = task.dueDate;
+
+      void taskMutations.deleteTask(task.id).then(() => {
+        toast.show({
+          title: i18n.t("toast.taskDeleted"),
+          action: {
+            label: i18n.t("toast.undo"),
+            onPress: () => {
+              void (async () => {
+                try {
+                  await adminBoardApi.createTask(boardId, {
+                    columnId: snapshotColumnId,
+                    title: snapshotTitle,
+                    description: snapshotDescription,
+                    priority: snapshotPriority,
+                    dueDate: snapshotDueDate,
+                  });
+                  await revalidateTasks();
+                } catch {
+                  toast.show({
+                    title: i18n.t("toast.saveFailed"),
+                    variant: "error",
+                  });
+                }
+              })();
+            },
+          },
+        });
+      });
+    },
+    [boardId, taskMutations, toast, revalidateTasks],
+  );
+
   const handleTaskLongPress = useCallback(
     (task: TaskCardData) => {
       contextMenuRef.current?.open({
@@ -225,45 +265,12 @@ function BoardDetailBody() {
               void taskMutations.setDueDate(task.id, iso);
             });
           } else if (action === "delete") {
-            haptics.warning();
-            const snapshotTitle = task.title;
-            const snapshotColumnId = task.columnId;
-            const snapshotDescription = task.description ?? null;
-            const snapshotPriority = task.priority;
-            const snapshotDueDate = task.dueDate;
-
-            void taskMutations.deleteTask(task.id).then(() => {
-              toast.show({
-                title: i18n.t("toast.taskDeleted"),
-                action: {
-                  label: i18n.t("toast.undo"),
-                  onPress: () => {
-                    void (async () => {
-                      try {
-                        await adminBoardApi.createTask(boardId, {
-                          columnId: snapshotColumnId,
-                          title: snapshotTitle,
-                          description: snapshotDescription,
-                          priority: snapshotPriority,
-                          dueDate: snapshotDueDate,
-                        });
-                        await revalidateTasks();
-                      } catch {
-                        toast.show({
-                          title: i18n.t("toast.saveFailed"),
-                          variant: "error",
-                        });
-                      }
-                    })();
-                  },
-                },
-              });
-            });
+            handleTaskDelete(task);
           }
         },
       });
     },
-    [columns, countsByColumn, moveTask, taskMutations, pickers],
+    [columns, countsByColumn, moveTask, taskMutations, pickers, handleTaskDelete],
   );
 
   const onPressPriorityChip = useCallback(() => {
@@ -505,6 +512,7 @@ function BoardDetailBody() {
               taskSheetRef.current?.open(task.id);
             }}
             onTaskLongPress={handleTaskLongPress}
+            onTaskDelete={handleTaskDelete}
             onColumnLongPress={onColumnLongPress}
             onAddTask={openQuickCreate}
             draggingTaskId={dragState.active ? dragState.task.id : null}

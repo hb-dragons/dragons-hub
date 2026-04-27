@@ -66,7 +66,7 @@ export const TaskDetailSheet = forwardRef<TaskDetailSheetHandle, Props>(
         onDismiss={() => setTaskId(null)}
         enablePanDownToClose
       >
-        <BottomSheetView style={{ flex: 1 }}>
+        <BottomSheetView style={{ flex: 1 }} testID="task-detail-sheet">
           {isLoading || !task ? (
             <View style={{ padding: 32, alignItems: "center" }}>
               <ActivityIndicator color={colors.foreground} />

@@ -44,6 +44,8 @@ interface BoardPagerProps {
   recentlyDroppedTaskId?: number | null;
   /** Drag callbacks forwarded to task cards. */
   onTaskDrag?: TaskDragCallbacks;
+  /** Called when the user requests to delete a task (swipe right or context menu). */
+  onTaskDelete?: (task: TaskCardData) => void;
   /** Called when a task card reports its column-local rect. */
   onTaskMeasure?: (taskId: number, rect: TaskContentRect) => void;
   /** Called when a column's scroll position changes. */
@@ -80,6 +82,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
       dropTargetColumnId,
       recentlyDroppedTaskId,
       onTaskDrag,
+      onTaskDelete,
       onTaskMeasure,
       onColumnScrollUpdate,
       onColumnContentSizeChange,
@@ -152,6 +155,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
     return (
       <ScrollView
         ref={scrollRef}
+        testID="board-pager"
         horizontal
         scrollEnabled={scrollEnabled}
         decelerationRate="fast"
@@ -187,6 +191,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
             isDropTarget={col.id === dropTargetColumnId}
             recentlyDroppedTaskId={recentlyDroppedTaskId}
             onTaskDrag={onTaskDrag}
+            onTaskDelete={onTaskDelete}
             onTaskMeasure={onTaskMeasure}
             onScrollUpdate={onColumnScrollUpdate}
             onContentSizeChange={onColumnContentSizeChange}

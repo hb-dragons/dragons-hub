@@ -31,6 +31,8 @@ interface BoardColumnProps {
   recentlyDroppedTaskId?: number | null;
   /** Drag callbacks forwarded to each task card. */
   onTaskDrag?: TaskDragCallbacks;
+  /** Called when the user requests to delete a task (swipe right or context menu). */
+  onTaskDelete?: (task: TaskCardData) => void;
   /** When set, this column is highlighted as a potential drop target. */
   isDropTarget?: boolean;
   /** Called when a task card reports its column-local rect. */
@@ -67,6 +69,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
       draggingTaskId,
       recentlyDroppedTaskId,
       onTaskDrag,
+      onTaskDelete,
       isDropTarget = false,
       onTaskMeasure,
       onScrollUpdate,
@@ -111,7 +114,10 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
     };
 
     return (
-      <View style={{ width, paddingHorizontal: spacing.sm }}>
+      <View
+        testID={`board-column-${column.id}`}
+        style={{ width, paddingHorizontal: spacing.sm }}
+      >
         <Animated.View
           style={[
             {
@@ -204,6 +210,7 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
                 isBeingDragged={t.id === draggingTaskId}
                 recentlyDropped={t.id === recentlyDroppedTaskId}
                 onDrag={onTaskDrag}
+                onTaskDelete={onTaskDelete}
                 onMeasure={onTaskMeasure}
               />
             ))}

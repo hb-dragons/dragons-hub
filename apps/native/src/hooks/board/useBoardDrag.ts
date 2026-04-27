@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AccessibilityInfo } from "react-native";
 import { useSharedValue, type SharedValue } from "react-native-reanimated";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
 import { findDropTarget } from "@dragons/shared";
@@ -7,6 +8,7 @@ import type { BoardColumnHandle } from "@/components/board/BoardColumn";
 import type { BoardPagerHandle, PagerLayout } from "@/components/board/BoardPager";
 import type { TaskCardLayout, TaskContentRect } from "@/components/board/TaskCard";
 import { haptics } from "@/lib/haptics";
+import { i18n } from "@/lib/i18n";
 import { useMoveTask } from "./useMoveTask";
 import { spacing } from "@/theme/spacing";
 
@@ -217,6 +219,9 @@ export function useBoardDrag({
       };
       dragStateRef.current = next;
       setDragState(next);
+      AccessibilityInfo.announceForAccessibility(
+        i18n.t("a11y.pickedUpTask", { title: task.title }),
+      );
     },
     [pointerX, pointerY],
   );
@@ -265,6 +270,16 @@ export function useBoardDrag({
       setRecentlyDroppedTaskId(snapshot.task.id);
       setTimeout(() => setRecentlyDroppedTaskId(null), 400);
       void moveTask(snapshot.task.id, dropTarget.columnId, dropTarget.position);
+      const targetColumn = columnsRef.current.find(
+        (c) => c.id === dropTarget.columnId,
+      );
+      AccessibilityInfo.announceForAccessibility(
+        i18n.t("a11y.droppedTaskInColumn", {
+          column: targetColumn?.name ?? "",
+        }),
+      );
+    } else {
+      AccessibilityInfo.announceForAccessibility(i18n.t("a11y.dropCancelled"));
     }
   }, [callFindDropTarget, moveTask]);
 

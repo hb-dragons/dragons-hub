@@ -247,6 +247,7 @@
       "deleteConfirmMessage": "Das kann nicht rückgängig gemacht werden.",
       "savingTitle": "Speichert",
       "savedTitle": "Gespeichert",
+      "swipeDelete": "Löschen",
       "actions": {
         "moveTo": "Verschieben nach…",
         "setPriority": "Priorität setzen",

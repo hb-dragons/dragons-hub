@@ -67,6 +67,7 @@ export function BoardHeader({
 
   return (
     <ScrollView
+      testID="board-header"
       horizontal
       showsHorizontalScrollIndicator={false}
       style={{ flexGrow: 0, flexShrink: 0 }}
@@ -291,6 +292,7 @@ function ColumnPill({
         delayLongPress={400}
         accessibilityRole="button"
         accessibilityLabel={column.name}
+        testID={`board-header-pill-${column.id}`}
       >
         {pill}
       </Pressable>

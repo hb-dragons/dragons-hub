@@ -60,6 +60,7 @@ export function FilterChips({
 
   return (
     <ScrollView
+      testID="filter-chips"
       horizontal
       showsHorizontalScrollIndicator={true}
       persistentScrollbar={true}

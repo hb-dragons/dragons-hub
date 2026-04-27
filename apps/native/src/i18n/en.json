@@ -247,6 +247,7 @@
       "deleteConfirmMessage": "This cannot be undone.",
       "savingTitle": "Saving",
       "savedTitle": "Saved",
+      "swipeDelete": "Delete",
       "actions": {
         "moveTo": "Move to…",
         "setPriority": "Set priority",

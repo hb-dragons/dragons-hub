@@ -7,6 +7,7 @@ import { dueDateBucket, type DueDateBucket } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
   measure,
   runOnJS,
@@ -46,6 +47,8 @@ interface TaskCardProps {
   isBeingDragged?: boolean;
   /** When true, fire a brief 1 → 1.05 → 1 pulse (consumes the flag once). */
   recentlyDropped?: boolean;
+  /** Called when the user swipes the card right past the action threshold. */
+  onTaskDelete?: (task: TaskCardData) => void;
   onMeasure?: (taskId: number, rect: TaskContentRect) => void;
 }
 
@@ -326,6 +329,7 @@ export function TaskCard({
   onDrag,
   isBeingDragged = false,
   recentlyDropped = false,
+  onTaskDelete,
   onMeasure,
 }: TaskCardProps) {
   const { colors, spacing } = useTheme();
@@ -376,6 +380,8 @@ export function TaskCard({
       delayLongPress={350}
       accessibilityRole="button"
       accessibilityLabel={task.title}
+      accessibilityHint={i18n.t("a11y.doubleTapToOpen")}
+      testID={`task-card-${task.id}`}
       onLayout={handleLayout}
       style={[
         {
@@ -531,8 +537,51 @@ export function TaskCard({
     </AnimatedPressable>
   );
 
+  // Right-swipe action: Delete (matches long-press menu's delete flow).
+  const renderRightActions = () => (
+    <View
+      style={{
+        backgroundColor: colors.destructive,
+        justifyContent: "center",
+        alignItems: "flex-end",
+        paddingHorizontal: spacing.lg,
+        borderRadius: 8,
+      }}
+    >
+      <Text
+        style={{
+          color: colors.destructiveForeground,
+          fontWeight: "700",
+          fontSize: 13,
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+        }}
+      >
+        {i18n.t("board.task.swipeDelete")}
+      </Text>
+    </View>
+  );
+
+  const swipeWrapped = onTaskDelete ? (
+    <Swipeable
+      friction={2}
+      rightThreshold={64}
+      renderRightActions={renderRightActions}
+      onSwipeableOpen={(direction) => {
+        if (direction === "right") {
+          onTaskDelete(task);
+        }
+      }}
+      testID={`task-card-swipeable-${task.id}`}
+    >
+      {cardContent}
+    </Swipeable>
+  ) : (
+    cardContent
+  );
+
   if (!onDrag) {
-    return cardContent;
+    return swipeWrapped;
   }
 
   const { start: safeStart, move: safeMove, end: safeEnd } = onDrag;
@@ -567,7 +616,7 @@ export function TaskCard({
 
   return (
     <GestureDetector gesture={dragGesture}>
-      {cardContent}
+      {swipeWrapped}
     </GestureDetector>
   );
 }

@@ -38,7 +38,7 @@ export const PriorityPickerSheet = forwardRef<PriorityPickerHandle>(
         handleIndicatorStyle={{ backgroundColor: colors.mutedForeground }}
         enablePanDownToClose
       >
-        <BottomSheetView style={{ padding: spacing.lg, gap: spacing.sm }}>
+        <BottomSheetView style={{ padding: spacing.lg, gap: spacing.sm }} testID="priority-picker-sheet">
           {TASK_PRIORITIES.map((p) => {
             const selected = p === currentRef.current;
             return (
