@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import type { TaskDetail } from "@dragons/shared";
 import { useChecklistMutations } from "@/hooks/board/useChecklistMutations";
 import { useTheme } from "@/hooks/useTheme";
+import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
+import { adminBoardApi } from "@/lib/api";
 
 interface Props {
   task: TaskDetail;
@@ -15,6 +17,7 @@ interface Props {
 export function ChecklistSection({ task, boardId }: Props) {
   const { colors, spacing, radius } = useTheme();
   const mutations = useChecklistMutations(boardId);
+  const toast = useToast();
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -35,21 +38,41 @@ export function ChecklistSection({ task, boardId }: Props) {
   };
 
   const confirmDelete = (itemId: number) => {
+    const item = task.checklist.find((i) => i.id === itemId);
+    if (!item) return;
     haptics.warning();
-    Alert.alert(
-      i18n.t("board.checklist.deleteTitle"),
-      i18n.t("board.checklist.deleteMessage"),
-      [
-        { text: i18n.t("common.cancel"), style: "cancel" },
-        {
-          text: i18n.t("common.delete"),
-          style: "destructive",
+    const snapshot = {
+      label: item.label,
+      isChecked: item.isChecked,
+    };
+    void mutations.deleteItem(task.id, itemId).then(() => {
+      toast.show({
+        title: i18n.t("toast.checklistItemDeleted"),
+        action: {
+          label: i18n.t("toast.undo"),
           onPress: () => {
-            void mutations.deleteItem(task.id, itemId);
+            void (async () => {
+              try {
+                const created = await adminBoardApi.addChecklistItem(
+                  task.id,
+                  snapshot.label,
+                );
+                if (snapshot.isChecked) {
+                  await adminBoardApi.updateChecklistItem(task.id, created.id, {
+                    isChecked: true,
+                  });
+                }
+              } catch {
+                toast.show({
+                  title: i18n.t("toast.saveFailed"),
+                  variant: "error",
+                });
+              }
+            })();
           },
         },
-      ],
-    );
+      });
+    });
   };
 
   return (
