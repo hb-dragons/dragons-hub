@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { Alert, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
+import { Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBoard } from "@/hooks/board/useBoard";
@@ -27,6 +27,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 import { authClient } from "@/lib/auth-client";
+import { useToast } from "@/hooks/useToast";
+import { adminBoardApi } from "@/lib/api";
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
 import type { TaskListFilters } from "@dragons/api-client";
 
@@ -110,6 +112,7 @@ function BoardDetailBody() {
   const addColumnRef = useRef<AddColumnSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
   const moveTask = useMoveTask(boardId);
+  const toast = useToast();
 
   // Per-column ScrollView handles for imperatively scrolling (autoscroll).
   const columnRefsMap = useRef<Map<number, BoardColumnHandle>>(new Map());
@@ -198,20 +201,39 @@ function BoardDetailBody() {
             });
           } else if (action === "delete") {
             haptics.warning();
-            Alert.alert(
-              i18n.t("board.task.deleteConfirmTitle"),
-              i18n.t("board.task.deleteConfirmMessage"),
-              [
-                { text: i18n.t("common.cancel"), style: "cancel" },
-                {
-                  text: i18n.t("common.delete"),
-                  style: "destructive",
+            const snapshotTitle = task.title;
+            const snapshotColumnId = task.columnId;
+            const snapshotDescription = task.description ?? null;
+            const snapshotPriority = task.priority;
+            const snapshotDueDate = task.dueDate;
+
+            void taskMutations.deleteTask(task.id).then(() => {
+              toast.show({
+                title: i18n.t("toast.taskDeleted"),
+                action: {
+                  label: i18n.t("toast.undo"),
                   onPress: () => {
-                    void taskMutations.deleteTask(task.id);
+                    void (async () => {
+                      try {
+                        await adminBoardApi.createTask(boardId, {
+                          columnId: snapshotColumnId,
+                          title: snapshotTitle,
+                          description: snapshotDescription,
+                          priority: snapshotPriority,
+                          dueDate: snapshotDueDate,
+                        });
+                        await revalidateTasks();
+                      } catch {
+                        toast.show({
+                          title: i18n.t("toast.saveFailed"),
+                          variant: "error",
+                        });
+                      }
+                    })();
                   },
                 },
-              ],
-            );
+              });
+            });
           }
         },
       });
