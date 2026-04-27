@@ -1,4 +1,5 @@
 import { Inter, Space_Grotesk } from "next/font/google";
+import { ThemeProvider } from "@wrksz/themes/next";
 import "@dragons/ui/globals.css";
 import "@daveyplate/better-auth-ui/css";
 import "./social-fonts.css";
@@ -28,7 +29,9 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}
       >
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
-import { useTheme } from "next-themes";
+import { useTheme } from "@wrksz/themes/client";
 import {
   Card,
   CardContent,
