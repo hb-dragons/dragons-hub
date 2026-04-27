@@ -363,5 +363,13 @@
     "boardDeleted": "Board deleted",
     "columnAdded": "Column added",
     "columnDeleted": "Column deleted"
+  },
+  "a11y": {
+    "doubleTapToEdit": "Double tap to edit",
+    "doubleTapToOpen": "Double tap to open",
+    "dragHandle": "Drag handle. Long-press and drag to move.",
+    "pickedUpTask": "Picked up task: %{title}",
+    "droppedTaskInColumn": "Dropped task in column: %{column}",
+    "dropCancelled": "Drop cancelled"
   }
 }

@@ -86,12 +86,14 @@ export function TaskDetailBody({ task, boardId }: Props) {
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityHint={i18n.t("a11y.doubleTapToEdit")}
       style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm + 2,
+        opacity: pressed ? 0.7 : 1,
         backgroundColor: pressed ? colors.surfaceHigh : "transparent",
       })}
     >

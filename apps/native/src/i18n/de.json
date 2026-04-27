@@ -363,5 +363,13 @@
     "boardDeleted": "Board gelöscht",
     "columnAdded": "Spalte hinzugefügt",
     "columnDeleted": "Spalte gelöscht"
+  },
+  "a11y": {
+    "doubleTapToEdit": "Doppeltippen zum Bearbeiten",
+    "doubleTapToOpen": "Doppeltippen zum Öffnen",
+    "dragHandle": "Ziehgriff. Lange drücken und ziehen, um zu verschieben.",
+    "pickedUpTask": "Aufgabe aufgenommen: %{title}",
+    "droppedTaskInColumn": "Aufgabe in Spalte abgelegt: %{column}",
+    "dropCancelled": "Ablegen abgebrochen"
   }
 }
