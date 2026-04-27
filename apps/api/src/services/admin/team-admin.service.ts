@@ -105,7 +105,8 @@ export async function reorderOwnClubTeams(
       throw new Error("INVALID_TEAM_SET");
     }
 
-    // Single UPDATE with CASE for atomic reorder
+    // ::integer cast forces the bound parameter type — without it, node-postgres sends
+    // the index as text and Postgres can't infer the column type inside CASE.
     const cases = teamIds
       .map((id, idx) => sql`WHEN ${id} THEN ${idx}::integer`)
       .reduce((acc, frag) => sql`${acc} ${frag}`);
