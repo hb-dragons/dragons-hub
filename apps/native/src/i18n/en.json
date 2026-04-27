@@ -302,5 +302,20 @@
       "title": "Something went wrong",
       "reload": "Reload"
     }
+  },
+  "toast": {
+    "saved": "Changes saved",
+    "saveFailed": "Couldn't save",
+    "deleteFailed": "Couldn't delete",
+    "moveFailed": "Couldn't move task",
+    "createFailed": "Couldn't create",
+    "undo": "Undo",
+    "taskDeleted": "Task deleted",
+    "checklistItemDeleted": "Item deleted",
+    "commentDeleted": "Comment deleted",
+    "boardCreated": "Board created",
+    "boardDeleted": "Board deleted",
+    "columnAdded": "Column added",
+    "columnDeleted": "Column deleted"
   }
 }

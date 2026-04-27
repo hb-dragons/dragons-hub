@@ -302,5 +302,20 @@
       "title": "Etwas ist schiefgegangen",
       "reload": "Neu laden"
     }
+  },
+  "toast": {
+    "saved": "Änderungen gespeichert",
+    "saveFailed": "Speichern fehlgeschlagen",
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "moveFailed": "Verschieben fehlgeschlagen",
+    "createFailed": "Erstellen fehlgeschlagen",
+    "undo": "Rückgängig",
+    "taskDeleted": "Aufgabe gelöscht",
+    "checklistItemDeleted": "Eintrag gelöscht",
+    "commentDeleted": "Kommentar gelöscht",
+    "boardCreated": "Board erstellt",
+    "boardDeleted": "Board gelöscht",
+    "columnAdded": "Spalte hinzugefügt",
+    "columnDeleted": "Spalte gelöscht"
   }
 }
