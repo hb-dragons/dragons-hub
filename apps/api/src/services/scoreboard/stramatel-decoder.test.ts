@@ -38,6 +38,19 @@ describe("findScoreFrames", () => {
     expect(findScoreFrames(f)).toHaveLength(1);
   });
 
+  it("returns one frame from a single E8 E8 E4 ... 0D sequence", () => {
+    const f = Buffer.concat([
+      Buffer.from([0xe8, 0xe8, 0xe4]),
+      Buffer.from(" 0  6 1 0   0   0  0 0 0  1  0", "ascii"),
+      Buffer.from([0x0d]),
+    ]);
+    const frames = findScoreFrames(f);
+    expect(frames).toHaveLength(1);
+    const frame0 = frames[0]!;
+    expect(frame0[0]).toBe(0xe8);
+    expect(frame0[frame0.length - 1]).toBe(0x0d);
+  });
+
   it("extracts many frames from the captured fixture", () => {
     const buf = readFileSync(fixturePath);
     const frames = findScoreFrames(buf);
@@ -141,6 +154,50 @@ describe("decodeScoreFrame", () => {
 
   it("returns null for too-short frames", () => {
     expect(decodeScoreFrame(frame("  10  00 0"))).toBeNull();
+  });
+
+  it("decodes a frame with the E8 E8 E4 alt header", () => {
+    // Same payload layout as the MM:SS test, but wrapped with the 3-byte alt start token.
+    const payload =
+      "  " + // 0..2 filler
+      "10" + // 2..4 mm
+      "00" + // 4..6 ss -> MM:SS branch
+      " 45" + // 6..9 scoreHome
+      " 32" + // 9..12 scoreGuest
+      "2" + // 12 period
+      "3" + // 13 foulsHome
+      "2" + // 14 foulsGuest
+      "1" + // 15 timeoutsHome
+      "0" + // 16 timeoutsGuest
+      " " + // 17 filler
+      " " + // 18 status (running)
+      " " + // 19 timeout (inactive)
+      "                        " + // 20..44 filler (24 chars)
+      "  " + // 44..46 timeoutDuration
+      "14"; // 46..48 shotClock
+
+    const altFrame = Buffer.concat([
+      Buffer.from([0xe8, 0xe8, 0xe4]),
+      Buffer.from(payload, "ascii"),
+      Buffer.from([0x0d]),
+    ]);
+
+    const snapshot = decodeScoreFrame(altFrame);
+    expect(snapshot).not.toBeNull();
+    expect(snapshot).toMatchObject({
+      scoreHome: 45,
+      scoreGuest: 32,
+      period: 2,
+      foulsHome: 3,
+      foulsGuest: 2,
+      timeoutsHome: 1,
+      timeoutsGuest: 0,
+      shotClock: 14,
+      clockRunning: true,
+      timeoutActive: false,
+      clockText: "10:00",
+      clockSeconds: 600,
+    });
   });
 
   it("treats non-numeric numeric fields as zero", () => {

@@ -1,15 +1,30 @@
-const START_TOKEN = Buffer.from([0xf8, 0x33]);
+const START_TOKEN_PRIMARY = Buffer.from([0xf8, 0x33]);
+const START_TOKEN_ALT = Buffer.from([0xe8, 0xe8, 0xe4]);
 const END_TOKEN = 0x0d;
+
+function nextStart(
+  input: Buffer,
+  from: number,
+): { index: number; len: number } | null {
+  const a = input.indexOf(START_TOKEN_PRIMARY, from);
+  const b = input.indexOf(START_TOKEN_ALT, from);
+  if (a === -1 && b === -1) return null;
+  if (a === -1) return { index: b, len: START_TOKEN_ALT.length };
+  if (b === -1) return { index: a, len: START_TOKEN_PRIMARY.length };
+  return a < b
+    ? { index: a, len: START_TOKEN_PRIMARY.length }
+    : { index: b, len: START_TOKEN_ALT.length };
+}
 
 export function findScoreFrames(input: Buffer): Buffer[] {
   const frames: Buffer[] = [];
   let cursor = 0;
   while (cursor < input.length) {
-    const start = input.indexOf(START_TOKEN, cursor);
-    if (start === -1) break;
-    const end = input.indexOf(END_TOKEN, start + START_TOKEN.length);
+    const start = nextStart(input, cursor);
+    if (!start) break;
+    const end = input.indexOf(END_TOKEN, start.index + start.len);
     if (end === -1) break;
-    frames.push(input.subarray(start, end + 1));
+    frames.push(input.subarray(start.index, end + 1));
     cursor = end + 1;
   }
   return frames;
@@ -45,10 +60,16 @@ function parseInt0(input: string): number {
 }
 
 export function decodeScoreFrame(frame: Buffer): StramatelSnapshot | null {
-  // Frame starts with F8 33 (2 bytes) and ends with 0D (1 byte).
-  // The PHP reference operates on the substring between those markers.
-  const payload = frame.subarray(2, frame.length - 1);
+  // Frame starts with either F8 33 (2 bytes) or E8 E8 E4 (3 bytes), ends with 0D (1 byte).
+  // The payload is the bytes between the start token and the end byte.
+  const payloadOffset = frame[0] === 0xe8 ? 3 : 2;
+  const payload = frame.subarray(payloadOffset, frame.length - 1);
   if (payload.length < PAYLOAD_MIN_LENGTH) return null;
+
+  // Stramatel payloads are ASCII-encoded. Any non-ASCII byte means a malformed frame.
+  for (let i = 0; i < payload.length; i++) {
+    if ((payload[i] as number) > 0x7e) return null;
+  }
 
   const testCond = readSlice(payload, 4, 2).trim();
   let clockText: string;
