@@ -29,6 +29,9 @@ import { refereeGamesRoutes } from "./referee/games.routes";
 import { refereeAssignmentRoutes } from "./referee/assignment.routes";
 import { adminRefereeAssignmentRoutes } from "./admin/referee-assignment.routes";
 import { adminRefereeHistoryRoutes } from "./admin/referee-history.routes";
+import { apiScoreboardRoutes } from "./api/scoreboard.routes";
+import { publicScoreboardRoutes } from "./public/scoreboard.routes";
+import { adminScoreboardRoutes } from "./admin/scoreboard.routes";
 
 const routes = new Hono();
 
@@ -53,14 +56,17 @@ routes.route("/admin", channelConfigRoutes);
 routes.route("/admin", userRoutes);
 routes.route("/admin/social", socialRoutes);
 routes.route("/api/devices", deviceRoutes);
+routes.route("/api/scoreboard", apiScoreboardRoutes);
 routes.route("/public", publicMatchRoutes);
 routes.route("/public", publicStandingsRoutes);
 routes.route("/public", publicTeamRoutes);
 routes.route("/public", publicHomeRoutes);
 routes.route("/public", publicAssetsRoutes);
+routes.route("/public/scoreboard", publicScoreboardRoutes);
 routes.route("/referee", refereeGamesRoutes);
 routes.route("/referee", refereeAssignmentRoutes);
 routes.route("/admin", adminRefereeAssignmentRoutes);
 routes.route("/admin", adminRefereeHistoryRoutes);
+routes.route("/admin/scoreboard", adminScoreboardRoutes);
 
 export { routes };

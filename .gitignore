@@ -26,3 +26,7 @@ apps/web/src/messages/*.d.json.ts
 
 # Mobile app secrets
 apps/mobile/android/app/google-services.json
+
+# Python bytecode
+**/__pycache__/
+*.pyc

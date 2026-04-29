@@ -43,6 +43,10 @@ const envSchema = z.object({
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASSWORD: z.string().min(1).optional(),
   SMTP_FROM: z.string().min(1).optional(),
+
+  // Scoreboard ingest (Raspberry Pi -> API)
+  SCOREBOARD_INGEST_KEY: z.string().min(32),
+  SCOREBOARD_DEVICE_ID: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

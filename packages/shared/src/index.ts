@@ -204,3 +204,10 @@ export * from "./referee-history";
 
 // Notification events
 export * from "./notification-events";
+
+// Scoreboard types
+export type {
+  StramatelSnapshot,
+  PublicLiveSnapshot,
+  ScoreboardSnapshotRow,
+} from "./scoreboard";

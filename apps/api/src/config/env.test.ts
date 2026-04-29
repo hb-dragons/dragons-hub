@@ -15,6 +15,8 @@ describe("env config", () => {
     vi.stubEnv("PORT", "3001");
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("TRUSTED_ORIGINS", "http://localhost:3000,http://localhost:3001");
+    vi.stubEnv("SCOREBOARD_INGEST_KEY", "k".repeat(32));
+    vi.stubEnv("SCOREBOARD_DEVICE_ID", "dragons-1");
 
     const { env } = await import("./env");
 
@@ -29,6 +31,8 @@ describe("env config", () => {
     vi.stubEnv("SDK_USERNAME", "user");
     vi.stubEnv("SDK_PASSWORD", "pass");
     vi.stubEnv("BETTER_AUTH_SECRET", "a".repeat(32));
+    vi.stubEnv("SCOREBOARD_INGEST_KEY", "k".repeat(32));
+    vi.stubEnv("SCOREBOARD_DEVICE_ID", "dragons-1");
     // Remove optional envs
     delete process.env.PORT;
     delete process.env.NODE_ENV;
@@ -48,6 +52,8 @@ describe("env config", () => {
     vi.stubEnv("SDK_USERNAME", "user");
     vi.stubEnv("SDK_PASSWORD", "pass");
     vi.stubEnv("BETTER_AUTH_SECRET", "a".repeat(32));
+    vi.stubEnv("SCOREBOARD_INGEST_KEY", "k".repeat(32));
+    vi.stubEnv("SCOREBOARD_DEVICE_ID", "dragons-1");
     vi.stubEnv("RUN_MODE", "worker");
 
     const { env } = await import("./env");
@@ -85,6 +91,8 @@ describe("env config", () => {
     vi.stubEnv("SDK_USERNAME", "user");
     vi.stubEnv("SDK_PASSWORD", "pass");
     vi.stubEnv("BETTER_AUTH_SECRET", "a".repeat(32));
+    vi.stubEnv("SCOREBOARD_INGEST_KEY", "k".repeat(32));
+    vi.stubEnv("SCOREBOARD_DEVICE_ID", "dragons-1");
 
     const { env } = await import("./env");
 

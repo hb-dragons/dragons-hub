@@ -1,0 +1,15 @@
+[Unit]
+Description=Panel2Net Stramatel ingest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/Panel2Net
+ExecStart=/usr/bin/python3 /home/pi/Panel2Net/Panel2Net.py
+Restart=always
+RestartSec=10
+User=pi
+
+[Install]
+WantedBy=multi-user.target

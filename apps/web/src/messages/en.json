@@ -1075,6 +1075,18 @@
       "noMatches": "No matches found"
     }
   },
+  "scoreboard": {
+    "live": {
+      "title": "Live",
+      "period": "Q",
+      "shotClock": "SC",
+      "fouls": "F",
+      "timeouts": "TO",
+      "online": "Live",
+      "connecting": "Connecting…",
+      "offline": "Waiting for data…"
+    }
+  },
   "notifications": {
     "title": "Notifications",
     "description": "All changes and notification deliveries at a glance",

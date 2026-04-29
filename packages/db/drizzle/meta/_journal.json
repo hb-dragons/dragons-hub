@@ -232,6 +232,13 @@
       "when": 1777304168681,
       "tag": "0032_early_sauron",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1777454244065,
+      "tag": "0033_tired_blob",
+      "breakpoints": true
     }
   ]
 }
