@@ -22,8 +22,9 @@ describe("findScoreFrames", () => {
     ]);
     const frames = findScoreFrames(f);
     expect(frames).toHaveLength(1);
-    expect(frames[0][0]).toBe(0xf8);
-    expect(frames[0][frames[0].length - 1]).toBe(0x0d);
+    const frame0 = frames[0]!;
+    expect(frame0[0]).toBe(0xf8);
+    expect(frame0[frame0.length - 1]).toBe(0x0d);
   });
 
   it("ignores incomplete trailing data", () => {

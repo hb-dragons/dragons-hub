@@ -91,7 +91,7 @@ describe("processIngest", () => {
     expect(snaps).toHaveLength(1);
     const live = await ctx.db.select().from(liveScoreboards);
     expect(live).toHaveLength(1);
-    expect(live[0].scoreHome).toBe(5);
+    expect(live[0]!.scoreHome).toBe(5);
     expect(mocks.publishSnapshot).toHaveBeenCalledTimes(1);
   });
 

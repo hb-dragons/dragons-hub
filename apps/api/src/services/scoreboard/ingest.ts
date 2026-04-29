@@ -56,7 +56,7 @@ export async function processIngest({
   if (frames.length === 0) {
     return { ok: true, changed: false, snapshotId: null };
   }
-  const frame = frames[frames.length - 1];
+  const frame = frames[frames.length - 1]!; // length checked above
   const decoded = decodeScoreFrame(frame);
   if (!decoded) {
     return { ok: true, changed: false, snapshotId: null };
@@ -84,7 +84,7 @@ export async function processIngest({
           rawHex: frame.toString("hex"),
         })
         .returning({ id: scoreboardSnapshots.id });
-      snapshotId = row.id;
+      snapshotId = row!.id;
     }
 
     await tx

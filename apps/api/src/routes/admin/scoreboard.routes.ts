@@ -74,7 +74,7 @@ adminScoreboardRoutes.get(
         online: false,
       });
     }
-    const row = rows[0];
+    const row = rows[0]!; // length checked above
     const secondsSinceLastFrame = Math.floor(
       (Date.now() - new Date(row.lastFrameAt).getTime()) / 1000,
     );

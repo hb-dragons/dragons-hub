@@ -42,9 +42,9 @@ describe("pubsub", () => {
   });
 
   it("subscribes and forwards messages on the right channel", async () => {
-    let messageHandler: ((channel: string, message: string) => void) | null =
-      null;
-    mocks.on.mockImplementation((event: string, fn: typeof messageHandler) => {
+    type MessageHandler = (channel: string, message: string) => void;
+    let messageHandler: MessageHandler | null = null;
+    mocks.on.mockImplementation((event: string, fn: MessageHandler) => {
       if (event === "message") messageHandler = fn;
     });
     mocks.subscribe.mockResolvedValue(undefined);
@@ -53,8 +53,8 @@ describe("pubsub", () => {
       received.push(snap);
     });
     expect(mocks.subscribe).toHaveBeenCalledWith("scoreboard:dragons-1");
-    messageHandler?.("scoreboard:other", JSON.stringify({ skip: true }));
-    messageHandler?.("scoreboard:dragons-1", JSON.stringify({ keep: true }));
+    (messageHandler as MessageHandler | null)?.("scoreboard:other", JSON.stringify({ skip: true }));
+    (messageHandler as MessageHandler | null)?.("scoreboard:dragons-1", JSON.stringify({ keep: true }));
     expect(received).toEqual([{ keep: true }]);
     await close();
     expect(mocks.unsubscribe).toHaveBeenCalledWith("scoreboard:dragons-1");

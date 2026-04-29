@@ -31,7 +31,7 @@ publicScoreboardRoutes.get(
     if (rows.length === 0) {
       return c.json({ error: "No data", code: "NO_DATA" }, 404);
     }
-    const row = rows[0];
+    const row = rows[0]!; // length checked above
     const secondsSinceLastFrame = Math.max(
       0,
       Math.floor((Date.now() - new Date(row.lastFrameAt).getTime()) / 1000),
