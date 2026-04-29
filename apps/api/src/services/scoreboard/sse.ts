@@ -14,8 +14,13 @@ export interface CreateStreamArgs {
   lastEventId: number | undefined;
 }
 
-function sseEvent(id: number | string, name: string, data: unknown): string {
-  return `id: ${id}\nevent: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
+function sseEvent(
+  id: number | undefined,
+  name: string,
+  data: unknown,
+): string {
+  const idLine = typeof id === "number" ? `id: ${id}\n` : "";
+  return `${idLine}event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 export function createScoreboardStream({
@@ -25,6 +30,7 @@ export function createScoreboardStream({
   const encoder = new TextEncoder();
   let heartbeat: ReturnType<typeof setInterval> | undefined;
   let unsubscribe: (() => Promise<void>) | undefined;
+  let cancelled = false;
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -50,6 +56,7 @@ export function createScoreboardStream({
           )
           .orderBy(asc(scoreboardSnapshots.id))
           .limit(REPLAY_LIMIT);
+        if (cancelled) return;
         for (const row of rows) {
           safeEnqueue(sseEvent(row.id, "snapshot", row));
         }
@@ -59,21 +66,30 @@ export function createScoreboardStream({
           .from(liveScoreboards)
           .where(eq(liveScoreboards.deviceId, deviceId))
           .limit(1);
+        if (cancelled) return;
         if (live.length > 0) {
-          safeEnqueue(sseEvent(0, "snapshot", live[0]));
+          // No snapshot id is known on a fresh fetch from the live row alone;
+          // omit the id line so the browser keeps its prior Last-Event-ID.
+          safeEnqueue(sseEvent(undefined, "snapshot", live[0]));
         }
       }
 
-      unsubscribe = await subscribeSnapshots(deviceId, (snap) => {
-        const payload = snap as { snapshotId?: number };
-        safeEnqueue(
-          sseEvent(payload.snapshotId ?? 0, "snapshot", snap),
-        );
+      const sub = await subscribeSnapshots(deviceId, (snap) => {
+        const payload = snap as { snapshotId?: number | null };
+        const id =
+          typeof payload.snapshotId === "number" ? payload.snapshotId : undefined;
+        safeEnqueue(sseEvent(id, "snapshot", snap));
       });
+      if (cancelled) {
+        await sub();
+        return;
+      }
+      unsubscribe = sub;
 
       heartbeat = setInterval(() => safeEnqueue(": ping\n\n"), HEARTBEAT_MS);
     },
     async cancel() {
+      cancelled = true;
       if (heartbeat) clearInterval(heartbeat);
       if (unsubscribe) await unsubscribe();
     },
