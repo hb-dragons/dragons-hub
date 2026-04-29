@@ -163,6 +163,7 @@ while True:
                         response_hex = remainder_hex + response_hex
 
                         # Evaluate if the received data matches the panel format or not
+                        should_post = False
                         if ((response_hex.find(b'017F0247') != -1) and (response_hex.rfind(b'03') != -1)):
                             # found mobatime panel data
                             # print("Mobatime: " + str(response_hex) + " - " + str(response_hex.find(b'017F0247')))
@@ -173,11 +174,11 @@ while True:
                             remainder_hex = response_hex[EndToken + 4:]
                             response_hex = response_hex[StartToken:EndToken + 4] + b'017F0247'
                             # print("Mobatime: ST:" + str(StartToken) + " - ET: " + str(EndToken) + "\n" + str(response_hex) + "\n" + str(remainder_hex))
-                            RequestURL = '/api/scoreboard/ingest'
+                            should_post = False
                             RetryCount = 0
-                            
+
                         elif (((response_hex.find(b'F83320') != -1) or (response_hex.find(b'E8E8E4') != -1)) and (response_hex.rfind(b'0D'))):
-                            # found stramatel panel data
+                            # found stramatel panel data - ours to forward
                             # print("Stramatel: " + str(response_hex) + " - " + str(response_hex.find(b'F83320')))
                             StartToken = max(response_hex.find(b'F83320'), response_hex.find(b'E8E8E4'))
                             EndToken = response_hex.rfind(b'0D')
@@ -186,8 +187,9 @@ while True:
                             response_hex = response_hex[StartToken:EndToken + 2] + b'F83320'
                             # print("Stramatel: ST:" + str(StartToken) + " - ET: " + str(EndToken) + "\n" + str(response_hex) + "\n" + str(remainder_hex))
                             RequestURL = '/api/scoreboard/ingest'
+                            should_post = True
                             RetryCount = 0
-                                             
+
                         elif (((response_hex.find(b'0254') != -1) or (response_hex.find(b'0244') != -1)) and (response_hex.rfind(b'03'))):
                             # found SwissTiming panel data
                             # print("SwissTiming: " + str(response_hex) + " - " + str(response_hex.find(b'0244')))
@@ -197,7 +199,7 @@ while True:
                             remainder_hex = response_hex[EndToken + 4:]
                             response_hex = response_hex[StartToken:EndToken + 4] + b'0254'
                             # print("SwissTiming: ST:" + str(StartToken) + " - ET: " + str(EndToken) + "\n" + str(response_hex) + "\n" + str(remainder_hex))
-                            RequestURL = '/api/scoreboard/ingest'
+                            should_post = False
                             RetryCount = 0
                         else:
                             # if not known format found, then retry as long there are retries left, otherwise change baudrate
@@ -241,7 +243,7 @@ while True:
 
                         # End Evaluation Block
 
-                        if response != b'':
+                        if response != b'' and should_post:
                             # Make and Evaluate HTTP Request
                             headers = {}
                             headers['Content-type'] = 'application/x-www-form-urlencoded'
