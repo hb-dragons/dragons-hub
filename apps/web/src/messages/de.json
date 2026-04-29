@@ -1078,10 +1078,14 @@
   "scoreboard": {
     "live": {
       "title": "Live",
+      "home": "Heim",
+      "guest": "Gast",
       "period": "Q",
-      "shotClock": "SC",
-      "fouls": "F",
-      "timeouts": "TO",
+      "shotClock": "Wurf",
+      "fouls": "Fouls",
+      "timeouts": "Auszeiten",
+      "bonus": "Bonus",
+      "timeoutActive": "Auszeit",
       "online": "Live",
       "connecting": "Verbinde…",
       "offline": "Warte auf Daten…"
