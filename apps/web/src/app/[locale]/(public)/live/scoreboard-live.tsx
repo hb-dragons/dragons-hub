@@ -28,7 +28,7 @@ function Pips({
       {Array.from({ length: total }, (_, i) => (
         <span
           key={i}
-          className={`size-3 rounded-full ${
+          className={`size-2.5 rounded-full sm:size-3 ${
             i < value ? toneActive : "bg-white/10"
           }`}
         />
@@ -62,32 +62,36 @@ function TeamPanel({
   timeoutsLabel: string;
   bonusLabel: string;
 }) {
-  const align = side === "left" ? "items-start" : "items-end";
-  const text = side === "left" ? "text-left" : "text-right";
+  // Numbers face inward toward the center clock (traditional scoreboard look).
+  const align = side === "left" ? "items-end" : "items-start";
+  const labelTextAlign = side === "left" ? "text-right" : "text-left";
+
   return (
-    <div className={`flex flex-col ${align} gap-4`}>
-      <div className={`flex flex-col ${align} gap-2 ${text}`}>
-        <span className={`text-2xl font-bold uppercase tracking-widest ${accent}`}>
+    <div className={`flex flex-col gap-3 sm:gap-5 ${align}`}>
+      <div className={`flex items-center gap-2 ${labelTextAlign}`}>
+        <span
+          className={`text-base font-bold uppercase tracking-[0.25em] sm:text-xl ${accent}`}
+        >
           {name}
         </span>
         {bonus && (
-          <span className="rounded-sm bg-amber-400 px-2 py-0.5 text-xs font-black uppercase tracking-wider text-black">
+          <span className="rounded-sm bg-amber-400 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-black sm:text-xs">
             {bonusLabel}
           </span>
         )}
       </div>
-      <span className="font-black leading-none tabular-nums tracking-tighter [font-size:clamp(6rem,18vw,18rem)]">
+      <span className="text-7xl font-black leading-none tabular-nums tracking-tighter sm:text-8xl md:text-9xl lg:text-[12rem]">
         {score}
       </span>
-      <div className={`flex flex-col gap-3 ${align}`}>
-        <div className={`flex items-center gap-3 ${align}`}>
-          <span className="w-20 text-xs uppercase tracking-wider text-white/50">
+      <div className={`flex flex-col gap-2 ${align}`}>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="w-16 text-[10px] uppercase tracking-wider text-white/50 sm:w-20 sm:text-xs">
             {foulsLabel}
           </span>
           <Pips value={fouls} total={MAX_FOUL_PIPS} toneActive={pipTone} />
         </div>
-        <div className={`flex items-center gap-3 ${align}`}>
-          <span className="w-20 text-xs uppercase tracking-wider text-white/50">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="w-16 text-[10px] uppercase tracking-wider text-white/50 sm:w-20 sm:text-xs">
             {timeoutsLabel}
           </span>
           <Pips
@@ -154,21 +158,21 @@ export function ScoreboardLive({ deviceId, initialSnapshot }: Props) {
 
   const homeBonus = snap.foulsHome >= 5;
   const guestBonus = snap.foulsGuest >= 5;
-  const periodLabel = snap.period > 0 ? `${t("period")}${snap.period}` : t("period");
+  const periodLabel =
+    snap.period > 0 ? `${t("period")}${snap.period}` : t("period");
 
   return (
-    <div className="relative flex w-full max-w-7xl flex-col gap-10 p-6 sm:p-10">
-      {/* Top bar */}
-      <div className="flex items-center justify-between text-white/60">
-        <span className="text-xs uppercase tracking-[0.3em]">{t("title")}</span>
+    <div className="relative flex w-full max-w-7xl flex-col gap-6 p-4 sm:gap-10 sm:p-10">
+      {/* Top bar — only the connection status pill */}
+      <div className="flex items-center justify-end text-white/60">
         <span className="flex items-center gap-2">
           <span className={`inline-block size-2 rounded-full ${dot}`} />
           <span className="text-xs uppercase tracking-wider">{t(status)}</span>
         </span>
       </div>
 
-      {/* Main board */}
-      <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-[1fr_auto_1fr]">
+      {/* Main board — three columns at every size: home | center | guest */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-8">
         <TeamPanel
           side="left"
           name={t("home")}
@@ -184,27 +188,27 @@ export function ScoreboardLive({ deviceId, initialSnapshot }: Props) {
         />
 
         {/* Center cluster */}
-        <div className="flex flex-col items-center gap-4">
-          <span className="rounded-full bg-white/10 px-4 py-1 text-sm font-bold uppercase tracking-widest text-white/80">
+        <div className="flex flex-col items-center gap-2 sm:gap-4">
+          <span className="rounded-full bg-white/10 px-3 py-0.5 text-xs font-bold uppercase tracking-widest text-white/80 sm:px-4 sm:py-1 sm:text-sm">
             {periodLabel}
           </span>
           <span
-            className={`font-black leading-none tabular-nums tracking-tighter [font-size:clamp(5rem,14vw,12rem)] ${
+            className={`text-5xl font-black leading-none tabular-nums tracking-tighter sm:text-7xl md:text-8xl lg:text-[10rem] ${
               snap.clockRunning ? "text-white" : "text-white/40"
             }`}
           >
             {snap.clockText || "--:--"}
           </span>
-          <div className="flex items-center gap-3">
-            <span className="text-xs uppercase tracking-wider text-white/50">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="text-[10px] uppercase tracking-wider text-white/50 sm:text-xs">
               {t("shotClock")}
             </span>
-            <span className="rounded-md border border-rose-500/60 bg-rose-500/10 px-3 py-1 font-mono text-3xl font-black tabular-nums text-rose-400">
+            <span className="rounded-md border border-rose-500/60 bg-rose-500/10 px-2 py-0.5 font-mono text-xl font-black tabular-nums text-rose-400 sm:px-3 sm:py-1 sm:text-3xl">
               {String(snap.shotClock).padStart(2, "0")}
             </span>
           </div>
           {snap.timeoutActive && (
-            <span className="mt-2 animate-pulse rounded-md bg-amber-400 px-3 py-1 text-sm font-black uppercase tracking-widest text-black">
+            <span className="mt-1 animate-pulse rounded-md bg-amber-400 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-black sm:mt-2 sm:px-3 sm:py-1 sm:text-sm">
               {t("timeoutActive")}
             </span>
           )}
