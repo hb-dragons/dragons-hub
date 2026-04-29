@@ -2,6 +2,10 @@ import Redis from "ioredis";
 import { env } from "./env";
 import { logger } from "./logger";
 
+export function createRedisClient(): Redis {
+  return new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
+}
+
 let _redis: Redis | undefined;
 
 export const redis: Redis = new Proxy({} as Redis, {
