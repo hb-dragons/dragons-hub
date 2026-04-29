@@ -1,16 +1,22 @@
+import type { Redis } from "ioredis";
 import { createRedisClient } from "../../config/redis";
+
+let publisher: Redis | undefined;
+
+function getPublisher(): Redis {
+  publisher ??= createRedisClient();
+  return publisher;
+}
 
 export function channelFor(deviceId: string): string {
   return `scoreboard:${deviceId}`;
 }
 
-const publisher = createRedisClient();
-
 export async function publishSnapshot(
   deviceId: string,
   payload: unknown,
 ): Promise<void> {
-  await publisher.publish(channelFor(deviceId), JSON.stringify(payload));
+  await getPublisher().publish(channelFor(deviceId), JSON.stringify(payload));
 }
 
 export async function subscribeSnapshots(
