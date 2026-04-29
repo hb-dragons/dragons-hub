@@ -93,6 +93,7 @@ export async function processIngest({
       .values({
         deviceId,
         ...decoded,
+        panelName: deviceId,
         lastFrameAt: now,
         updatedAt: now,
       })
@@ -100,6 +101,7 @@ export async function processIngest({
         target: liveScoreboards.deviceId,
         set: {
           ...decoded,
+          panelName: deviceId,
           lastFrameAt: now,
           updatedAt: now,
         },
