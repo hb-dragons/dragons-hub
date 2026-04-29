@@ -56,9 +56,20 @@ export async function processIngest({
   if (frames.length === 0) {
     return { ok: true, changed: false, snapshotId: null };
   }
-  const frame = frames[frames.length - 1]!; // length checked above
-  const decoded = decodeScoreFrame(frame);
-  if (!decoded) {
+  // Pick the latest frame that actually decodes. The capture stream
+  // contains E8 E8 E4 preamble bursts that look like frames but fail the
+  // ASCII guard; iterate from the end so we land on the most recent real
+  // Stramatel frame.
+  let decoded: ReturnType<typeof decodeScoreFrame> = null;
+  let frame: Buffer | undefined;
+  for (let i = frames.length - 1; i >= 0; i--) {
+    decoded = decodeScoreFrame(frames[i]!);
+    if (decoded) {
+      frame = frames[i]!;
+      break;
+    }
+  }
+  if (!decoded || !frame) {
     return { ok: true, changed: false, snapshotId: null };
   }
 

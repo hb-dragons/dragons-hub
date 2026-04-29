@@ -28,6 +28,8 @@ vi.mock("./pubsub", () => ({
   publishSnapshot: (...a: unknown[]) => mocks.publishSnapshot(...a),
 }));
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { processIngest } from "./ingest";
 import { setupTestDb, resetTestDb, closeTestDb } from "../../test/setup-test-db";
 import type { TestDbContext } from "../../test/setup-test-db";
@@ -117,5 +119,23 @@ describe("processIngest", () => {
     expect(r.changed).toBe(true);
     const snaps = await ctx.db.select().from(scoreboardSnapshots);
     expect(snaps).toHaveLength(2);
+  });
+
+  // Regression: a real serial capture contains long runs of E8 E8 E4 preamble
+  // bursts that look like frames to findScoreFrames but fail the ASCII guard
+  // in decodeScoreFrame. Picking the literal last frame would always land on
+  // preamble noise. processIngest must walk back to find the latest frame
+  // that actually decodes.
+  it("decodes the latest real frame in a multi-frame capture window", async () => {
+    const fixture = readFileSync(
+      resolve(import.meta.dirname, "__fixtures__/stramatel-sample.bin"),
+    );
+    const window = fixture.subarray(0, 1000).toString("hex");
+    const r = await processIngest({ deviceId: "d1", hex: window });
+    expect(r.ok).toBe(true);
+    expect(r.snapshotId).toEqual(expect.any(Number));
+    const live = await ctx.db.select().from(liveScoreboards);
+    expect(live).toHaveLength(1);
+    expect(mocks.publishSnapshot).toHaveBeenCalledTimes(1);
   });
 });
