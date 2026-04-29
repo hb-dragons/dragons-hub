@@ -5,12 +5,24 @@
  * Usage:
  *   INGEST_KEY=<bearer> node apps/pi/scripts/replay-fixture.mjs
  *
- * Optional env:
+ * Optional env (CLI flags override):
  *   INGEST_URL   default http://localhost:3001/api/scoreboard/ingest
  *   DEVICE_ID    default dragons-1
- *   INTERVAL_MS  default 1000  (delay between POSTs)
+ *   INTERVAL_MS  default 200   (delay between POSTs; min 35 — API rate limit)
  *   MAX_FRAMES   default 0     (0 = unlimited until end of fixture)
  *   FIXTURE      default ../api/src/services/scoreboard/__fixtures__/stramatel-sample.bin
+ *
+ * CLI flags:
+ *   --interval=<ms>    same as INTERVAL_MS
+ *   --rate=<fps>       frames per second (converts to interval = 1000/rate)
+ *   --max=<n>          same as MAX_FRAMES
+ *   --device=<id>      same as DEVICE_ID
+ *   --url=<url>        same as INGEST_URL
+ *
+ * Examples:
+ *   node replay-fixture.mjs --rate=10           # ten frames per second
+ *   node replay-fixture.mjs --interval=100      # 100 ms between POSTs
+ *   node replay-fixture.mjs --rate=20 --max=200 # short fast demo run
  *
  * Behaviour:
  *  - Walks every decodable F8 33 frame in order.
@@ -27,13 +39,33 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+function parseFlags(argv) {
+  const out = {};
+  for (const a of argv.slice(2)) {
+    const m = /^--([^=]+)=(.+)$/.exec(a);
+    if (m) out[m[1]] = m[2];
+  }
+  return out;
+}
+
+const flags = parseFlags(process.argv);
+
 const INGEST_URL =
-  process.env.INGEST_URL ?? "http://localhost:3001/api/scoreboard/ingest";
+  flags.url ?? process.env.INGEST_URL ?? "http://localhost:3001/api/scoreboard/ingest";
 const INGEST_KEY = process.env.INGEST_KEY;
-const DEVICE_ID = process.env.DEVICE_ID ?? "dragons-1";
-const INTERVAL_MS = Number.parseInt(process.env.INTERVAL_MS ?? "1000", 10);
-const MAX_FRAMES = Number.parseInt(process.env.MAX_FRAMES ?? "0", 10);
+const DEVICE_ID = flags.device ?? process.env.DEVICE_ID ?? "dragons-1";
+
+// CLI: --rate (fps) > --interval (ms) > INTERVAL_MS > default 200 ms.
+// API enforces 30 req/s per device, so floor at 35 ms (~28 fps).
+const RATE_LIMIT_MIN_MS = 35;
+const intervalRaw = flags.rate
+  ? Math.round(1000 / Number.parseFloat(flags.rate))
+  : Number.parseInt(flags.interval ?? process.env.INTERVAL_MS ?? "200", 10);
+const INTERVAL_MS = Math.max(RATE_LIMIT_MIN_MS, intervalRaw);
+
+const MAX_FRAMES = Number.parseInt(flags.max ?? process.env.MAX_FRAMES ?? "0", 10);
 const FIXTURE =
+  flags.fixture ??
   process.env.FIXTURE ??
   resolve(
     __dirname,
@@ -151,9 +183,15 @@ async function main() {
   console.log(
     `loaded ${allFrames.length} raw frames, ${decoded.length} decodable, ${replay.length} state changes`,
   );
+  const fps = (1000 / INTERVAL_MS).toFixed(1);
   console.log(
-    `posting to ${INGEST_URL} as device ${DEVICE_ID} every ${INTERVAL_MS} ms`,
+    `posting to ${INGEST_URL} as device ${DEVICE_ID} every ${INTERVAL_MS} ms (~${fps} fps)`,
   );
+  if (intervalRaw < RATE_LIMIT_MIN_MS) {
+    console.log(
+      `note: requested ${intervalRaw} ms clamped to ${RATE_LIMIT_MIN_MS} ms (API rate limit is 30 req/s)`,
+    );
+  }
 
   let stopped = false;
   process.on("SIGINT", () => {
