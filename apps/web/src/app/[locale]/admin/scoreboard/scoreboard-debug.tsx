@@ -2,18 +2,8 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
+import type { ScoreboardSnapshotRow } from "@dragons/shared";
 import { fetchAPI } from "@/lib/api";
-
-interface Snapshot {
-  id: number;
-  capturedAt: string;
-  scoreHome: number;
-  scoreGuest: number;
-  period: number;
-  clockText: string;
-  shotClock: number;
-  rawHex?: string | null;
-}
 
 interface Health {
   deviceId: string;
@@ -25,7 +15,7 @@ interface Health {
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
-  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+  const [snapshots, setSnapshots] = useState<ScoreboardSnapshotRow[]>([]);
   const [paused, setPaused] = useState(false);
 
   const { data: health } = useSWR<Health>(
@@ -37,7 +27,7 @@ export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
   useEffect(() => {
     if (!deviceId) return;
     let cancelled = false;
-    fetchAPI<Snapshot[]>(
+    fetchAPI<ScoreboardSnapshotRow[]>(
       `/admin/scoreboard/snapshots?deviceId=${encodeURIComponent(deviceId)}&limit=200`,
     ).then((rows) => {
       if (!cancelled) setSnapshots(rows);
@@ -55,7 +45,7 @@ export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
     const onSnap = (ev: MessageEvent) => {
       if (paused) return;
       try {
-        const snap = JSON.parse(ev.data) as Snapshot;
+        const snap = JSON.parse(ev.data) as ScoreboardSnapshotRow;
         setSnapshots((curr) => [snap, ...curr].slice(0, 500));
       } catch {
         // ignore

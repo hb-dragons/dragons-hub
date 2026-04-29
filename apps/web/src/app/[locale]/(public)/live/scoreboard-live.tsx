@@ -2,33 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-
-interface Snapshot {
-  scoreHome: number;
-  scoreGuest: number;
-  foulsHome: number;
-  foulsGuest: number;
-  timeoutsHome: number;
-  timeoutsGuest: number;
-  period: number;
-  clockText: string;
-  clockSeconds: number | null;
-  clockRunning: boolean;
-  shotClock: number;
-  timeoutActive: boolean;
-  timeoutDuration: string;
-}
+import type { StramatelSnapshot } from "@dragons/shared";
 
 interface Props {
   deviceId: string;
-  initialSnapshot: Snapshot | null;
+  initialSnapshot: StramatelSnapshot | null;
 }
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export function ScoreboardLive({ deviceId, initialSnapshot }: Props) {
   const t = useTranslations("scoreboard.live");
-  const [snap, setSnap] = useState<Snapshot | null>(initialSnapshot);
+  const [snap, setSnap] = useState<StramatelSnapshot | null>(initialSnapshot);
   const [status, setStatus] = useState<"connecting" | "online" | "offline">(
     initialSnapshot ? "online" : "connecting",
   );
@@ -41,7 +26,7 @@ export function ScoreboardLive({ deviceId, initialSnapshot }: Props) {
     esRef.current = es;
     const onSnap = (ev: MessageEvent) => {
       try {
-        const next = JSON.parse(ev.data) as Snapshot;
+        const next = JSON.parse(ev.data) as StramatelSnapshot;
         setSnap(next);
         setStatus("online");
       } catch {

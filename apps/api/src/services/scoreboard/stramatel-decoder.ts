@@ -30,21 +30,8 @@ export function findScoreFrames(input: Buffer): Buffer[] {
   return frames;
 }
 
-export interface StramatelSnapshot {
-  scoreHome: number;
-  scoreGuest: number;
-  foulsHome: number;
-  foulsGuest: number;
-  timeoutsHome: number;
-  timeoutsGuest: number;
-  period: number;
-  clockText: string;
-  clockSeconds: number | null;
-  clockRunning: boolean;
-  shotClock: number;
-  timeoutActive: boolean;
-  timeoutDuration: string;
-}
+import type { StramatelSnapshot } from "@dragons/shared";
+export type { StramatelSnapshot };
 
 const PAYLOAD_MIN_LENGTH = 48;
 
