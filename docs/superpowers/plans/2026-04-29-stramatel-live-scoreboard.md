@@ -773,44 +773,51 @@ git commit -m "scoreboard: add Redis pub/sub helper"
 
 - [ ] **Step 1: Write the failing test (pglite + mocked publisher)**
 
+This follows the same pattern used elsewhere in the repo (see `apps/api/src/services/venue-booking/venue-booking.service.test.ts:1-15`): a `vi.hoisted` holder + `vi.mock` returning a `Proxy` that forwards `db.*` to the live pglite-backed instance. **No changes to `apps/api/src/config/database.ts` are required.**
+
 Create `apps/api/src/services/scoreboard/ingest.test.ts`:
 
 ```ts
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { setupTestDb, resetTestDb, closeTestDb } from "../../test/setup-test-db";
-import type { TestDbContext } from "../../test/setup-test-db";
 
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
   publishSnapshot: vi.fn(),
+}));
+
+vi.mock("../../config/database", () => ({
+  db: new Proxy(
+    {},
+    {
+      get: (_target, prop) =>
+        (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+    },
+  ),
+}));
+
+vi.mock("../../config/logger", () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 vi.mock("./pubsub", () => ({
   publishSnapshot: (...a: unknown[]) => mocks.publishSnapshot(...a),
 }));
 
-vi.mock("../../config/database", async () => {
-  const ctx: { db?: unknown } = {};
-  return {
-    setDbForTest(db: unknown) {
-      ctx.db = db;
-    },
-    get db() {
-      return ctx.db;
-    },
-  };
-});
-
 import { processIngest } from "./ingest";
-import * as dbModule from "../../config/database";
+import { setupTestDb, resetTestDb, closeTestDb } from "../../test/setup-test-db";
+import type { TestDbContext } from "../../test/setup-test-db";
 import { liveScoreboards, scoreboardSnapshots } from "@dragons/db/schema";
 
 let ctx: TestDbContext;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
-  (dbModule as unknown as { setDbForTest(db: unknown): void }).setDbForTest(
-    ctx.db,
-  );
+  dbHolder.ref = ctx.db;
 });
 
 beforeEach(async () => {
@@ -887,55 +894,24 @@ describe("processIngest", () => {
 });
 ```
 
-> Note: this test introduces `setDbForTest` on the database module for test injection. If the existing `apps/api/src/config/database.ts` does not already expose such a hook, add a tiny test-only setter as part of this task. The setter is used **only** in test setup and must be guarded to no-op outside tests.
-
-- [ ] **Step 2: Add the test-injection hook to the database module if absent**
-
-Read `apps/api/src/config/database.ts`. If it exports a constant `db`, replace it with a mutable export and add `setDbForTest`:
-
-```ts
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-import { env } from "./env";
-
-let _db: ReturnType<typeof drizzle> | unknown = drizzle(
-  new Pool({ connectionString: env.DATABASE_URL }),
-);
-
-export function setDbForTest(replacement: unknown): void {
-  if (process.env.NODE_ENV === "production") return;
-  _db = replacement;
-}
-
-export const db = new Proxy({} as ReturnType<typeof drizzle>, {
-  get: (_t, p) => (_db as Record<string | symbol, unknown>)[p as string],
-});
-
-export async function closeDb(): Promise<void> {
-  // existing behaviour preserved
-}
-```
-
-If the module already follows a different pattern, follow that pattern instead — the goal is "tests can swap in a pglite-backed db".
-
-- [ ] **Step 3: Run the test, confirm it fails**
+- [ ] **Step 2: Run the test, confirm it fails**
 
 Run: `pnpm --filter @dragons/api test -- ingest.test.ts`
 Expected: FAIL — `./ingest` not found.
 
-- [ ] **Step 4: Implement `ingest.ts`**
+- [ ] **Step 3: Implement `ingest.ts`**
 
 Create `apps/api/src/services/scoreboard/ingest.ts`:
 
 ```ts
 import { eq } from "drizzle-orm";
 import { db } from "../../config/database";
+import { liveScoreboards, scoreboardSnapshots } from "@dragons/db/schema";
 import {
-  liveScoreboards,
-  scoreboardSnapshots,
+  decodeScoreFrame,
+  findScoreFrames,
   type StramatelSnapshot,
-} from "@dragons/db/schema";
-import { decodeScoreFrame, findScoreFrames } from "./stramatel-decoder";
+} from "./stramatel-decoder";
 import { publishSnapshot } from "./pubsub";
 import { logger } from "../../config/logger";
 
@@ -1054,27 +1030,17 @@ export async function processIngest({
 }
 ```
 
-The `StramatelSnapshot` type-only import via `@dragons/db/schema` is a re-export below. Add it.
+`StramatelSnapshot` is imported directly from `./stramatel-decoder` (no cross-package re-export through `@dragons/db/schema`).
 
-- [ ] **Step 5: Re-export `StramatelSnapshot` from the db schema barrel for convenience**
-
-Append to `packages/db/src/schema/scoreboard.ts`:
-
-```ts
-export type { StramatelSnapshot } from "../../../../apps/api/src/services/scoreboard/stramatel-decoder";
-```
-
-If cross-package type imports are not allowed in the workspace, drop this re-export and import directly from the decoder in `ingest.ts`.
-
-- [ ] **Step 6: Run the test, confirm it passes**
+- [ ] **Step 4: Run the test, confirm it passes**
 
 Run: `pnpm --filter @dragons/api test -- ingest.test.ts`
 Expected: 4 tests pass.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add apps/api/src/services/scoreboard apps/api/src/config/database.ts packages/db/src/schema/scoreboard.ts
+git add apps/api/src/services/scoreboard
 git commit -m "scoreboard: add ingest service with dedupe + history"
 ```
 
