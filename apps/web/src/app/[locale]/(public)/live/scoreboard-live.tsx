@@ -172,7 +172,10 @@ export function ScoreboardLive({ deviceId, initialSnapshot }: Props) {
       </div>
 
       {/* Main board — three columns at every size: home | center | guest */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-8">
+      <div
+        className="grid items-center gap-3 sm:gap-8"
+        style={{ gridTemplateColumns: "1fr auto 1fr" }}
+      >
         <TeamPanel
           side="left"
           name={t("home")}
