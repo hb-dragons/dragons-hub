@@ -9,3 +9,5 @@ process.env.BETTER_AUTH_SECRET =
 process.env.BETTER_AUTH_URL = "http://localhost:3001";
 process.env.NODE_ENV = "test";
 process.env.TRUSTED_ORIGINS = "http://localhost:3000";
+process.env.SCOREBOARD_INGEST_KEY = "k".repeat(48);
+process.env.SCOREBOARD_DEVICE_ID = "dragons-1";
