@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { findScoreFrames, decodeScoreFrame } from "./stramatel-decoder";
+import type { StramatelSnapshot } from "./stramatel-decoder";
 
 const fixturePath = resolve(
   import.meta.dirname,
@@ -167,5 +168,77 @@ describe("decodeScoreFrame", () => {
     expect(snapshot?.scoreGuest).toBe(0);
     expect(snapshot?.period).toBe(0);
     expect(snapshot?.shotClock).toBe(0);
+  });
+});
+
+describe("fixture", () => {
+  const buf = readFileSync(fixturePath);
+  const frames = findScoreFrames(buf);
+
+  it("has at least 1000 frames", () => {
+    expect(frames.length).toBeGreaterThan(1000);
+  });
+
+  it("decodes every frame within sane ranges", { timeout: 30000 }, () => {
+    for (const f of frames) {
+      const s = decodeScoreFrame(f);
+      if (!s) continue;
+      expect(s.scoreHome).toBeGreaterThanOrEqual(0);
+      expect(s.scoreHome).toBeLessThanOrEqual(200);
+      expect(s.scoreGuest).toBeGreaterThanOrEqual(0);
+      expect(s.scoreGuest).toBeLessThanOrEqual(200);
+      expect(s.period).toBeGreaterThanOrEqual(0);
+      expect(s.period).toBeLessThanOrEqual(10);
+      expect(s.foulsHome).toBeGreaterThanOrEqual(0);
+      expect(s.foulsHome).toBeLessThanOrEqual(9);
+      expect(s.foulsGuest).toBeGreaterThanOrEqual(0);
+      expect(s.foulsGuest).toBeLessThanOrEqual(9);
+      expect(s.timeoutsHome).toBeGreaterThanOrEqual(0);
+      expect(s.timeoutsHome).toBeLessThanOrEqual(9);
+      expect(s.timeoutsGuest).toBeGreaterThanOrEqual(0);
+      expect(s.timeoutsGuest).toBeLessThanOrEqual(9);
+      expect(s.shotClock).toBeGreaterThanOrEqual(0);
+      expect(s.shotClock).toBeLessThanOrEqual(99);
+      if (s.clockSeconds !== null) {
+        expect(s.clockSeconds).toBeGreaterThanOrEqual(0);
+        // The Stramatel timer field is 4 ASCII digits (max 99:99 = 6039 s);
+        // 9999 is a generous sanity bound that catches sign/garbage bugs
+        // without rejecting between-period or warm-up clocks above 10:00.
+        expect(s.clockSeconds).toBeLessThanOrEqual(9999);
+      }
+    }
+  });
+
+  it("dedupe rule reduces total to a smaller change set", () => {
+    const dedupeKeys: ReadonlyArray<keyof StramatelSnapshot> = [
+      "scoreHome",
+      "scoreGuest",
+      "foulsHome",
+      "foulsGuest",
+      "timeoutsHome",
+      "timeoutsGuest",
+      "period",
+      "clockSeconds",
+      "clockRunning",
+      "shotClock",
+      "timeoutActive",
+    ];
+    let prev: StramatelSnapshot | null = null;
+    let changes = 0;
+    let total = 0;
+    for (const f of frames) {
+      const s = decodeScoreFrame(f);
+      if (!s) continue;
+      total += 1;
+      if (
+        prev === null ||
+        dedupeKeys.some((k) => prev?.[k] !== s[k])
+      ) {
+        changes += 1;
+      }
+      prev = s;
+    }
+    expect(total).toBeGreaterThan(0);
+    expect(changes).toBeLessThan(total);
   });
 });
