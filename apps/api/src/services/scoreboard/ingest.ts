@@ -87,24 +87,25 @@ export async function processIngest({
       snapshotId = row!.id;
     }
 
+    const now = new Date();
     await tx
       .insert(liveScoreboards)
       .values({
         deviceId,
         ...decoded,
-        lastFrameAt: new Date(),
-        updatedAt: new Date(),
+        lastFrameAt: now,
+        updatedAt: now,
       })
       .onConflictDoUpdate({
         target: liveScoreboards.deviceId,
         set: {
           ...decoded,
-          lastFrameAt: new Date(),
-          updatedAt: new Date(),
+          lastFrameAt: now,
+          updatedAt: now,
         },
       });
 
-    return { changed, snapshotId };
+    return { changed, snapshotId, lastFrameAt: now.toISOString() };
   });
 
   try {
@@ -113,6 +114,7 @@ export async function processIngest({
       deviceId,
       snapshotId: result.snapshotId,
       changed: result.changed,
+      lastFrameAt: result.lastFrameAt,
     });
   } catch (err) {
     logger.warn(
