@@ -90,6 +90,8 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `syncRuns` | `packages/db/src/schema/sync-runs.ts` | syncType, status, triggeredBy, records*, durationMs, summary JSONB |
 | `syncRunEntries` | `packages/db/src/schema/sync-runs.ts` | syncRunId FK (cascade), entityType, action, metadata JSONB |
 | `syncSchedule` | `packages/db/src/schema/sync-runs.ts` | enabled, cronExpression, timezone |
+| `live_scoreboards` | `packages/db/src/schema/scoreboards.ts` | One row per Pi; latest decoded scoreboard state. |
+| `scoreboard_snapshots` | `packages/db/src/schema/scoreboards.ts` | Append-only history of dedupe'd state changes. |
 | `user` | `packages/db/src/schema/auth.ts` | id (text PK), email (unique), name, role, refereeId FK, banned, banReason, banExpires |
 | `session` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), token (unique), expiresAt, ipAddress, userAgent, impersonatedBy |
 | `account` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), providerId, accountId, password |
@@ -407,6 +409,16 @@ Match list and detail responses include associated venue booking data when avail
 ### Admin - Bull Board
 
 | GET | `/admin/queues/*` | Bull Board web UI for queue monitoring |
+
+### Scoreboard ingest
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/scoreboard/ingest` | Stramatel raw-hex ingest (Bearer key) |
+| GET | `/public/scoreboard/latest` | Current snapshot for a device (no auth) |
+| GET | `/public/scoreboard/stream` | SSE stream of decoded snapshots (no auth) |
+| GET | `/admin/scoreboard/snapshots` | Paginated snapshot history (admin) |
+| GET | `/admin/scoreboard/health` | Ingest health (admin) |
 
 ### Public
 
