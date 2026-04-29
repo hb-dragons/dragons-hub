@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import type { ScoreboardSnapshotRow } from "@dragons/shared";
+import type {
+  ScoreboardSnapshotRow,
+  StramatelSnapshot,
+} from "@dragons/shared";
 import { fetchAPI } from "@/lib/api";
+
+interface PublishEvent extends StramatelSnapshot {
+  deviceId: string;
+  snapshotId: number | null;
+  changed: boolean;
+  lastFrameAt: string;
+}
 
 interface Health {
   deviceId: string;
@@ -45,8 +55,33 @@ export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
     const onSnap = (ev: MessageEvent) => {
       if (paused) return;
       try {
-        const snap = JSON.parse(ev.data) as ScoreboardSnapshotRow;
-        setSnapshots((curr) => [snap, ...curr].slice(0, 500));
+        const event = JSON.parse(ev.data) as PublishEvent;
+        // Only events that produced a real DB row belong in the history table.
+        // Unchanged frames carry snapshotId=null and would render as blank rows.
+        if (!event.changed || event.snapshotId === null) return;
+        const row: ScoreboardSnapshotRow = {
+          id: event.snapshotId,
+          deviceId: event.deviceId,
+          scoreHome: event.scoreHome,
+          scoreGuest: event.scoreGuest,
+          foulsHome: event.foulsHome,
+          foulsGuest: event.foulsGuest,
+          timeoutsHome: event.timeoutsHome,
+          timeoutsGuest: event.timeoutsGuest,
+          period: event.period,
+          clockText: event.clockText,
+          clockSeconds: event.clockSeconds,
+          clockRunning: event.clockRunning,
+          shotClock: event.shotClock,
+          timeoutActive: event.timeoutActive,
+          timeoutDuration: event.timeoutDuration,
+          rawHex: null,
+          capturedAt: event.lastFrameAt,
+        };
+        setSnapshots((curr) => {
+          if (curr.some((s) => s.id === row.id)) return curr;
+          return [row, ...curr].slice(0, 500);
+        });
       } catch {
         // ignore
       }
