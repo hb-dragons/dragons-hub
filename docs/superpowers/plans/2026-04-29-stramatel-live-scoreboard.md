@@ -48,9 +48,9 @@ Each file gets a co-located `*.test.ts` per the repo convention.
 | `apps/web/src/app/[locale]/admin/scoreboard/scoreboard-debug.tsx` | Client component: health bar, snapshots table, pause toggle. |
 | `apps/web/src/messages/{en,de}.json` | i18n strings (uses whichever locales the repo currently ships). |
 
-### External (`Panel2Net` repo)
+### Pi ingest script (`apps/pi`)
 
-`Panel2Net.py` edits land on a new `hbdragons-ingest` branch in `/Users/jn/git/Panel2Net`. No changes to the dragons-all repo.
+A new `apps/pi/` app folder holds the slim Pi-side payload. We copy only the files the Raspberry Pi needs (`Panel2Net.py`, an example device id file and a requirements file) out of the upstream `/Users/jn/git/Panel2Net` repo, modify them for our API, and add a setup README + systemd unit. The rest of that repo (Mobatime/SwissTiming code, docs, test captures, photos) stays out — those concerns are not ours.
 
 ---
 
@@ -2723,51 +2723,60 @@ git commit -m "scoreboard: document new endpoints, tables, and env vars"
 
 ---
 
-### Task 19: Raspberry Pi script changes (separate repo)
+### Task 19: Add `apps/pi` (Raspberry Pi ingest script)
 
-This task lands in `/Users/jn/git/Panel2Net`, not in `dragons-all`. Open that repo before running the steps.
+This task lives inside the monorepo. Only the files the Pi actually needs are copied; the rest of the upstream `/Users/jn/git/Panel2Net` repo stays out.
 
-- [ ] **Step 1: Create the integration branch**
+**Files (all created under `apps/pi/`):**
+- `apps/pi/Panel2Net.py` — modified copy of `/Users/jn/git/Panel2Net/Panel2Net.py`.
+- `apps/pi/Panel2Net.id.example` — one-line example for the device id file.
+- `apps/pi/scoreboard.key.example` — placeholder; real key is provisioned out-of-band.
+- `apps/pi/requirements.txt` — `pyserial`.
+- `apps/pi/panel2net.service` — example systemd unit.
+- `apps/pi/README.md` — setup, install, key-rotation steps.
+
+- [ ] **Step 1: Create the directory and copy the upstream script**
 
 Run:
 
 ```bash
-cd /Users/jn/git/Panel2Net
-git checkout -b hbdragons-ingest
+mkdir -p apps/pi
+cp /Users/jn/git/Panel2Net/Panel2Net.py apps/pi/Panel2Net.py
 ```
 
-- [ ] **Step 2: Update server, port, URL, baud rate, and HTTPS**
+- [ ] **Step 2: Edit server, port, URL, baud rate, HTTPS**
 
-Edit `Panel2Net.py`. Replace these four lines:
+Open `apps/pi/Panel2Net.py` and apply:
 
-- Line 41 stays as `SerialPort = '/dev/ttyUSB0'` (no change).
-- Line 43: `BaudRate = 19200`
-- Line 54: `RequestServer = 'api.app.hbdragons.de'`
-- Line 56: `RequestPort = 443`
+- After `import http.client` (around line 11) add `import ssl`.
+- Line that sets `BaudRate = 9600` → `BaudRate = 19200`.
+- Line that sets `RequestServer = '3.120.213.249'` → `RequestServer = 'api.app.hbdragons.de'`.
+- Line that sets `RequestPort = 80` → `RequestPort = 443`.
+- Replace each of the three `RequestURL = '/abcd/<panel>.php'` assignments inside the protocol-detection block with a single fixed:
 
-Replace the per-protocol URL assignments at lines 164, 176, 188 with a single fixed URL:
+  ```python
+  RequestURL = '/api/scoreboard/ingest'
+  ```
+
+  The Mobatime / SwissTiming branches keep doing their own framing detection but route to the same URL — the API just ignores frames that don't decode.
+
+- [ ] **Step 3: Switch the HTTP client to HTTPS with TLS verification**
+
+Replace the existing line `conn = http.client.HTTPConnection(RequestServer,RequestPort)` with:
 
 ```python
-RequestURL = '/api/scoreboard/ingest'
-```
-
-Replace the `http.client.HTTPConnection(...)` call at line 241 with:
-
-```python
-import ssl
 context = ssl.create_default_context()
 conn = http.client.HTTPSConnection(
     RequestServer, RequestPort, timeout=RequestTimeOut, context=context,
 )
 ```
 
-Add the import at the top of the file alongside the existing imports.
+- [ ] **Step 4: Add bearer-key loading**
 
-- [ ] **Step 3: Add bearer-key loading**
-
-Near the top of `Panel2Net.py`, after the `Device_ID` block, add:
+Just after the `Device_ID` block at the top of the file, add:
 
 ```python
+# Load the bearer key (provisioned out-of-band, file mode 0600)
 SCOREBOARD_KEY = ''
 try:
     with open('/home/pi/Panel2Net/scoreboard.key', 'r') as kf:
@@ -2777,19 +2786,21 @@ except OSError:
     raise SystemExit(1)
 ```
 
-In the request headers block (around line 234), add:
+In the headers block where the request is built, add:
 
 ```python
 headers['Authorization'] = 'Bearer ' + SCOREBOARD_KEY
 ```
 
-- [ ] **Step 4: Add light back-off after 5 consecutive non-2xx responses**
+- [ ] **Step 5: Add 5-strike back-off**
 
-Around the existing reply-status check (~line 244), maintain a counter:
+Around the existing `httpreply.status == 200` branch, maintain a counter so a sustained non-2xx run sleeps:
 
 ```python
+# at module scope, near the other counters
 fail_streak = 0
-# ...
+
+# in the response-handling block
 if httpreply.status == 200:
     fail_streak = 0
     logging.debug(str(httpreply.status) + ' ' + str(httpreply.reason))
@@ -2800,18 +2811,106 @@ else:
         time.sleep(5)
 ```
 
-- [ ] **Step 5: Smoke test against staging**
+- [ ] **Step 6: Add example data files**
 
-If a staging API is available, run `Panel2Net.py` with the staging URL, supply a fake serial port (`socat -d -d pty,raw,echo=0 pty,raw,echo=0`) and pipe `Stramatel_GEN_HEL_20171125.txt` into one side. Confirm 200 OK responses in the script's stdout.
+Create `apps/pi/Panel2Net.id.example` with the single line:
 
-- [ ] **Step 6: Commit on the integration branch**
-
-```bash
-git add Panel2Net.py
-git commit -m "feat: target dragons-all API with bearer auth (hbdragons-ingest fork)"
+```
+Device_ID:dragons-1
 ```
 
-Do not push to upstream `Panel2Net` master.
+Create `apps/pi/scoreboard.key.example` with the single line:
+
+```
+replace-with-bearer-token-from-server-env
+```
+
+Create `apps/pi/requirements.txt`:
+
+```
+pyserial>=3.5
+```
+
+- [ ] **Step 7: Add the systemd unit**
+
+Create `apps/pi/panel2net.service`:
+
+```ini
+[Unit]
+Description=Panel2Net Stramatel ingest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/Panel2Net
+ExecStart=/usr/bin/python3 /home/pi/Panel2Net/Panel2Net.py
+Restart=always
+RestartSec=10
+User=pi
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- [ ] **Step 8: Add the README**
+
+Create `apps/pi/README.md`:
+
+```markdown
+# Pi ingest (`@dragons/pi`)
+
+Slim payload that runs on a Raspberry Pi connected via USB-RS485 to a
+Stramatel basketball console. Captures serial frames and POSTs raw hex to
+`api.app.hbdragons.de/api/scoreboard/ingest`.
+
+## Hardware
+
+- Raspberry Pi (3 B+ or 4 B), 5.1 V / 3 A PSU, microSD ≥ 16 GB.
+- USB to RS-485 adapter (FTDI, CH340 or CP2102 chipset).
+- Cable tapping the data line between the Stramatel console and its LED panel.
+- `pyserial` is the only Python dependency.
+
+## Install
+
+```bash
+sudo apt install -y python3-pip
+sudo mkdir -p /home/pi/Panel2Net
+sudo cp Panel2Net.py /home/pi/Panel2Net/
+sudo cp panel2net.service /etc/systemd/system/
+sudo cp Panel2Net.id.example /home/pi/Panel2Net/Panel2Net.id  # then edit
+sudo install -m 0600 scoreboard.key.example /home/pi/Panel2Net/scoreboard.key  # then paste real key
+sudo pip3 install -r requirements.txt
+sudo systemctl daemon-reload
+sudo systemctl enable --now panel2net.service
+```
+
+## Key rotation
+
+1. On the API host: regenerate `SCOREBOARD_INGEST_KEY` and redeploy.
+2. On the Pi: replace the contents of `/home/pi/Panel2Net/scoreboard.key` and run `sudo systemctl restart panel2net.service`.
+
+## Logs
+
+`/tmp/Panel2Net.log` (rotates on every start). For live tailing run `journalctl -u panel2net.service -f`.
+```
+
+- [ ] **Step 9: Sanity-compile the Python**
+
+Run:
+
+```bash
+python3 -m py_compile apps/pi/Panel2Net.py
+```
+
+Expected: no output (compile succeeded).
+
+- [ ] **Step 10: Commit**
+
+```bash
+git add apps/pi
+git commit -m "pi: add Panel2Net ingest app for Stramatel scoreboard"
+```
 
 ---
 
@@ -2882,7 +2981,7 @@ Spec coverage walkthrough:
 - Public live page (server fetch + client EventSource): Tasks 15, 16.
 - Admin debug page (health bar, snapshots table, pause toggle, SSE feed): Task 17.
 - Documentation: Task 18.
-- Pi script changes (URL, port, HTTPS, key, baud, back-off): Task 19.
+- Pi ingest app inside the monorepo (`apps/pi`): Task 19.
 - Manual smoke test: Task 20.
 
 Type consistency: `StramatelSnapshot` defined once in `stramatel-decoder.ts` and reused by `ingest.ts`, `sse.ts`, `scoreboard-live.tsx`. `IngestResult` defined once in `ingest.ts` and reused by the route. Field names (`scoreHome`, `clockSeconds`, etc.) are consistent across schema, decoder, services, routes, and components.
