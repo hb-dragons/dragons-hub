@@ -28,7 +28,7 @@ function Pips({
       {Array.from({ length: total }, (_, i) => (
         <span
           key={i}
-          className={`size-2.5 rounded-full sm:size-3 ${
+          className={`h-2.5 w-2.5 rounded-full sm:h-3 sm:w-3 ${
             i < value ? toneActive : "bg-white/10"
           }`}
         />
@@ -85,14 +85,22 @@ function TeamPanel({
       </span>
       <div className={`flex flex-col gap-2 ${align}`}>
         <div className="flex items-center gap-2 sm:gap-3">
-          <span className="w-16 text-[10px] uppercase tracking-wider text-white/50 sm:w-20 sm:text-xs">
+          <span className="text-[10px] uppercase tracking-wider text-white/50 sm:text-xs">
             {foulsLabel}
+          </span>
+          <span
+            className={`min-w-[1.25rem] text-center font-mono text-base font-black tabular-nums sm:text-xl ${accent}`}
+          >
+            {fouls}
           </span>
           <Pips value={fouls} total={MAX_FOUL_PIPS} toneActive={pipTone} />
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          <span className="w-16 text-[10px] uppercase tracking-wider text-white/50 sm:w-20 sm:text-xs">
+          <span className="text-[10px] uppercase tracking-wider text-white/50 sm:text-xs">
             {timeoutsLabel}
+          </span>
+          <span className="min-w-[1.25rem] text-center font-mono text-base font-black tabular-nums text-white sm:text-xl">
+            {timeouts}
           </span>
           <Pips
             value={timeouts}

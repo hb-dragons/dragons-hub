@@ -122,6 +122,9 @@ export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
             <th className="px-2">Q</th>
             <th className="px-2">clock</th>
             <th className="px-2">SC</th>
+            <th className="px-2" title="Fouls home / guest">F H/G</th>
+            <th className="px-2" title="Timeouts home / guest">TO H/G</th>
+            <th className="px-2" title="Timeout active / clock running">flags</th>
             <th className="px-2">hex</th>
           </tr>
         </thead>
@@ -135,6 +138,16 @@ export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
               <td className="px-2 tabular-nums">{s.period}</td>
               <td className="px-2 tabular-nums">{s.clockText}</td>
               <td className="px-2 tabular-nums">{s.shotClock}</td>
+              <td className="px-2 tabular-nums">
+                {s.foulsHome}/{s.foulsGuest}
+              </td>
+              <td className="px-2 tabular-nums">
+                {s.timeoutsHome}/{s.timeoutsGuest}
+              </td>
+              <td className="px-2 text-xs">
+                {s.clockRunning ? "▶" : "⏸"}
+                {s.timeoutActive ? " TO" : ""}
+              </td>
               <td className="px-2 font-mono text-xs text-zinc-500">
                 {s.rawHex ?? ""}
               </td>
