@@ -25,3 +25,4 @@ export * from "./notification-log";
 export * from "./digest-buffer";
 export * from "./referee-games";
 export * from "./scoreboard";
+export * from "./broadcast-configs";
