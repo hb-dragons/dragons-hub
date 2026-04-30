@@ -15,9 +15,5 @@ export default async function LivePage() {
       initial = null;
     }
   }
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-zinc-950 via-black to-zinc-950 text-white">
-      <ScoreboardLive deviceId={deviceId} initialSnapshot={initial} />
-    </main>
-  );
+  return <ScoreboardLive deviceId={deviceId} initialSnapshot={initial} />;
 }
