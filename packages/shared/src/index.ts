@@ -211,3 +211,13 @@ export type {
   PublicLiveSnapshot,
   ScoreboardSnapshotRow,
 } from "./scoreboard";
+
+// Broadcast types
+export type {
+  BroadcastPhase,
+  BroadcastMatchTeam,
+  BroadcastMatch,
+  BroadcastState,
+  BroadcastConfig,
+  AdminBroadcastMatchListItem,
+} from "./broadcast";
