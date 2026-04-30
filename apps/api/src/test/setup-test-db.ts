@@ -43,6 +43,7 @@ export async function resetTestDb(ctx: TestDbContext): Promise<void> {
       push_devices, player_photos, social_backgrounds,
       app_settings,
       scoreboard_snapshots, live_scoreboards,
+      broadcast_configs,
       "user", session, account, verification
     CASCADE
   `);
