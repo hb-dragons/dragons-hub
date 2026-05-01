@@ -1115,6 +1115,7 @@
     "kickoff": "Anwurf",
     "league": "Liga",
     "noMatchesToday": "Heute keine Spiele angesetzt.",
+    "noMatchesFound": "Keine Spiele gefunden.",
     "pickerTitle": "Spiel wählen",
     "useDefault": "(Standard)",
     "errors": {

@@ -27,7 +27,9 @@ export function proxy(request: NextRequest) {
     logicalPathname.startsWith("/api/auth") ||
     logicalPathname.startsWith("/schedule") ||
     logicalPathname.startsWith("/standings") ||
-    logicalPathname.startsWith("/teams")
+    logicalPathname.startsWith("/teams") ||
+    logicalPathname.startsWith("/overlay") ||
+    logicalPathname.startsWith("/live")
   ) {
     return intlMiddleware(request);
   }

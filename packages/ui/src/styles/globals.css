@@ -1,7 +1,10 @@
 @import "tailwindcss";
-@source "../../../../apps/**/*.{ts,tsx}";
-@source "../../../../packages/shared/src/**/*.ts";
-@source "../**/*.{ts,tsx}";
+/* Bare directory paths — Tailwind auto-detection handles Next.js bracket routes
+   like [locale]; explicit globs treat `[` as a glob character class and skip
+   them. */
+@source "../../../../apps";
+@source "../../../../packages/shared/src";
+@source "..";
 
 @import "tw-animate-css";
 

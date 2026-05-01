@@ -67,14 +67,19 @@ export function decodeScoreFrame(frame: Buffer): StramatelSnapshot | null {
     const f = Number.parseFloat(clockText);
     clockSeconds = Number.isFinite(f) ? Math.floor(f) : null;
   } else {
-    // MM:SS: payload[2..4] + ":" + payload[4..6]
+    // MM:SS: Stramatel space-pads single-digit minutes (" 1:23"); always
+    // emit zero-padded MM:SS so the UI doesn't have to re-format.
     const mm = readSlice(payload, 2, 2);
     const ss = readSlice(payload, 4, 2);
-    clockText = `${mm}:${ss}`;
     const m = Number.parseInt(mm.trim(), 10);
     const s = Number.parseInt(ss.trim(), 10);
-    clockSeconds =
-      Number.isFinite(m) && Number.isFinite(s) ? m * 60 + s : null;
+    if (Number.isFinite(m) && Number.isFinite(s)) {
+      clockText = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      clockSeconds = m * 60 + s;
+    } else {
+      clockText = `${mm}:${ss}`;
+      clockSeconds = null;
+    }
   }
 
   const scoreHome = parseInt0(readSlice(payload, 6, 3));

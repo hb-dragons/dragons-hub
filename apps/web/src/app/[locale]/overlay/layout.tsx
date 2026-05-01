@@ -7,7 +7,7 @@ export default function OverlayLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-transparent text-white">
+    <div className="h-screen w-screen flex bg-transparent">
       {children}
     </div>
   );

@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { Check, Copy, Pencil, Play, Radio, Square } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@dragons/ui/components/card";
+import { Button } from "@dragons/ui/components/button";
+import { Input } from "@dragons/ui/components/input";
+import { Field, FieldLabel } from "@dragons/ui/components/field";
+import { Badge } from "@dragons/ui/components/badge";
+import { PageHeader } from "@/components/admin/shared/page-header";
 import type { BroadcastConfig, BroadcastMatch } from "@dragons/shared";
 import { MatchPicker } from "./match-picker";
 
@@ -17,6 +29,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
   const [match, setMatch] = useState<BroadcastMatch | null>(initial.match);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const isLive = config?.isLive ?? false;
   const overlayUrl =
@@ -64,166 +77,187 @@ export function BroadcastControl({ deviceId, initial }: Props) {
     await reload();
   }
 
+  async function copyOverlayUrl() {
+    await navigator.clipboard.writeText(overlayUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{t("title")}</h1>
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-block size-2 rounded-full ${
-              isLive ? "bg-emerald-500" : "bg-zinc-500"
-            }`}
-          />
-          <span>{isLive ? t("live") : t("idle")}</span>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={t("title")}
+        subtitle={deviceId ? `${t("device")}: ${deviceId}` : undefined}
+      >
+        <Badge
+          variant={isLive ? "default" : "outline"}
+          className={isLive ? "bg-heat text-heat-foreground" : ""}
+        >
+          <Radio className={isLive ? "animate-pulse" : ""} />
+          {isLive ? t("live") : t("idle")}
+        </Badge>
+      </PageHeader>
 
-      <section className="rounded border border-zinc-800 p-4">
-        <div className="mb-2 text-sm uppercase text-zinc-400">
-          {t("selectedMatch")}
-        </div>
-        {match ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-lg font-medium">
-                {match.home.name} vs {match.guest.name}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-display text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("selectedMatch")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {match ? (
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1 min-w-0">
+                  <p className="font-display text-lg font-bold leading-tight">
+                    {match.home.name}
+                    <span className="px-2 text-muted-foreground">vs</span>
+                    {match.guest.name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {match.kickoffDate} · {match.kickoffTime.slice(0, 5)}
+                    {match.league?.name ? ` · ${match.league.name}` : ""}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <Pencil />
+                  {t("changeMatch")}
+                </Button>
               </div>
-              <div className="text-sm text-zinc-400">
-                {match.kickoffDate} — {match.kickoffTime.slice(0, 5)} —{" "}
-                {match.league?.name ?? ""}
+            ) : (
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm text-muted-foreground">{t("noMatch")}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  {t("changeMatch")}
+                </Button>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-display text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("config")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <Field>
+                <FieldLabel>{t("homeAbbr")}</FieldLabel>
+                <Input
+                  defaultValue={config?.homeAbbr ?? ""}
+                  maxLength={8}
+                  onBlur={(e) => save({ homeAbbr: e.target.value || null })}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>{t("guestAbbr")}</FieldLabel>
+                <Input
+                  defaultValue={config?.guestAbbr ?? ""}
+                  maxLength={8}
+                  onBlur={(e) => save({ guestAbbr: e.target.value || null })}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>{t("homeColor")}</FieldLabel>
+                <Input
+                  placeholder={t("useDefault")}
+                  defaultValue={config?.homeColorOverride ?? ""}
+                  onBlur={(e) =>
+                    save({ homeColorOverride: e.target.value || null })
+                  }
+                />
+              </Field>
+              <Field>
+                <FieldLabel>{t("guestColor")}</FieldLabel>
+                <Input
+                  placeholder={t("useDefault")}
+                  defaultValue={config?.guestColorOverride ?? ""}
+                  onBlur={(e) =>
+                    save({ guestColorOverride: e.target.value || null })
+                  }
+                />
+              </Field>
             </div>
-            <button
-              type="button"
-              className="rounded border border-zinc-700 px-3 py-1"
-              onClick={() => setPickerOpen(true)}
-            >
-              {t("changeMatch")}
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="rounded border border-zinc-700 px-3 py-1"
-            onClick={() => setPickerOpen(true)}
-          >
-            {t("changeMatch")}
-          </button>
-        )}
-      </section>
-
-      <section className="rounded border border-zinc-800 p-4">
-        <div className="mb-2 text-sm uppercase text-zinc-400">{t("config")}</div>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col">
-            <span className="text-xs text-zinc-400">{t("homeAbbr")}</span>
-            <input
-              type="text"
-              defaultValue={config?.homeAbbr ?? ""}
-              maxLength={8}
-              className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1"
-              onBlur={(e) =>
-                save({ homeAbbr: e.target.value || null })
-              }
-            />
-          </label>
-          <label className="flex flex-col">
-            <span className="text-xs text-zinc-400">{t("guestAbbr")}</span>
-            <input
-              type="text"
-              defaultValue={config?.guestAbbr ?? ""}
-              maxLength={8}
-              className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1"
-              onBlur={(e) =>
-                save({ guestAbbr: e.target.value || null })
-              }
-            />
-          </label>
-          <label className="flex flex-col">
-            <span className="text-xs text-zinc-400">{t("homeColor")}</span>
-            <input
-              type="text"
-              placeholder={t("useDefault")}
-              defaultValue={config?.homeColorOverride ?? ""}
-              className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1"
-              onBlur={(e) =>
-                save({ homeColorOverride: e.target.value || null })
-              }
-            />
-          </label>
-          <label className="flex flex-col">
-            <span className="text-xs text-zinc-400">{t("guestColor")}</span>
-            <input
-              type="text"
-              placeholder={t("useDefault")}
-              defaultValue={config?.guestColorOverride ?? ""}
-              className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1"
-              onBlur={(e) =>
-                save({ guestColorOverride: e.target.value || null })
-              }
-            />
-          </label>
-        </div>
-      </section>
+          </CardContent>
+        </Card>
+      </div>
 
       {deviceId && (
-        <section className="rounded border border-zinc-800 p-4">
-          <div className="mb-2 text-sm uppercase text-zinc-400">Preview</div>
-          <div
-            className="overflow-hidden rounded border border-dashed border-zinc-700"
-            style={{ aspectRatio: "16 / 9", background: "#222" }}
-          >
-            <iframe
-              src="/overlay"
-              title="overlay-preview"
-              className="size-full"
-            />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="font-display text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Preview
+            </CardTitle>
+            <Badge variant="outline" className="font-mono">
+              16:9
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="overflow-hidden rounded-md bg-surface-low"
+              style={{ aspectRatio: "16 / 9" }}
+            >
+              <iframe
+                src="/overlay"
+                title="overlay-preview"
+                className="size-full"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-3 py-4">
+          {!isLive ? (
+            <Button disabled={!match} onClick={goLive} size="lg">
+              <Play />
+              {t("goLive")}
+            </Button>
+          ) : (
+            <Button variant="destructive" onClick={endBroadcast} size="lg">
+              <Square />
+              {t("endBroadcast")}
+            </Button>
+          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <div className="ml-auto flex min-w-0 max-w-full items-center gap-2">
+            <span className="shrink-0 font-display text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("obsUrl")}
+            </span>
+            <code className="bg-surface-low truncate rounded-md px-2 py-1 font-mono text-xs">
+              {overlayUrl}
+            </code>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={copyOverlayUrl}
+              aria-label={t("copy")}
+            >
+              {copied ? <Check /> : <Copy />}
+            </Button>
           </div>
-        </section>
-      )}
+        </CardContent>
+      </Card>
 
-      <div className="flex items-center gap-3">
-        {!isLive ? (
-          <button
-            type="button"
-            disabled={!match}
-            onClick={goLive}
-            className="rounded bg-emerald-600 px-4 py-2 font-semibold text-white disabled:opacity-50"
-          >
-            ▶ {t("goLive")}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={endBroadcast}
-            className="rounded bg-rose-600 px-4 py-2 font-semibold text-white"
-          >
-            ■ {t("endBroadcast")}
-          </button>
-        )}
-        {error && <span className="text-sm text-rose-400">{error}</span>}
-      </div>
-
-      <div className="text-sm text-zinc-400">
-        {t("obsUrl")}: <code className="text-zinc-200">{overlayUrl}</code>
-        <button
-          type="button"
-          className="ml-2 rounded border border-zinc-700 px-2 py-0.5"
-          onClick={() => navigator.clipboard.writeText(overlayUrl)}
-        >
-          {t("copy")}
-        </button>
-      </div>
-
-      {pickerOpen && (
-        <MatchPicker
-          onClose={() => setPickerOpen(false)}
-          onPick={async (matchId) => {
-            await save({ matchId });
-            setPickerOpen(false);
-          }}
-        />
-      )}
+      <MatchPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onPick={async (matchId) => {
+          await save({ matchId });
+          setPickerOpen(false);
+        }}
+      />
     </div>
   );
 }

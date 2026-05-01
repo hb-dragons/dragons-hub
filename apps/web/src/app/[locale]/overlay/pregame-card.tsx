@@ -1,43 +1,49 @@
 "use client";
 
+import { useMemo } from "react";
+import { useLocale } from "next-intl";
 import type { BroadcastMatch } from "@dragons/shared";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 function logoUrl(clubId: number): string {
-  return `${apiBase}/assets/clubs/${clubId}.webp`;
+  return `${apiBase}/public/assets/clubs/${clubId}.webp`;
 }
 
 export function PregameCard({ match }: { match: BroadcastMatch }) {
+  const locale = useLocale();
+  const dateLabel = useMemo(
+    () => formatDate(locale, match.kickoffDate),
+    [locale, match.kickoffDate],
+  );
+  const time = match.kickoffTime.slice(0, 5);
+
   return (
-    <div
-      className="absolute left-1/2 -translate-x-1/2"
-      style={{ bottom: "8vh", width: "min(720px, 80vw)" }}
-    >
-      <div
-        className="flex items-center gap-6 rounded-xl px-8 py-6 backdrop-blur"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0.7), rgba(0,0,0,0.85))",
-          borderTop: `6px solid ${match.home.color}`,
-          borderBottom: `6px solid ${match.guest.color}`,
-        }}
-      >
-        <TeamSide team={match.home} side="left" />
-        <div className="flex flex-1 flex-col items-center gap-2">
-          <div className="text-sm uppercase tracking-widest text-white/70">
-            {match.league?.name ?? ""}
-          </div>
-          <div
-            className="font-black tabular-nums"
-            style={{ fontSize: "clamp(2rem, 4vw, 3rem)" }}
-          >
-            {match.kickoffTime.slice(0, 5)}
-          </div>
-          <div className="text-sm text-white/60">{match.kickoffDate}</div>
+    <div className="absolute bottom-[8vh] left-1/2 w-[min(820px,80vw)] -translate-x-1/2">
+      <div className="relative overflow-hidden rounded-md bg-black/85 backdrop-blur-md drop-shadow-[0_16px_40px_rgba(0,0,0,0.55)]">
+        <ColorBars home={match.home.color} guest={match.guest.color} />
+
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+          <TeamSide team={match.home} side="left" />
+          <CenterInfo
+            league={match.league?.name ?? ""}
+            time={time}
+            dateLabel={dateLabel}
+          />
+          <TeamSide team={match.guest} side="right" />
         </div>
-        <TeamSide team={match.guest} side="right" />
+
+        <ColorBars home={match.home.color} guest={match.guest.color} />
       </div>
+    </div>
+  );
+}
+
+function ColorBars({ home, guest }: { home: string; guest: string }) {
+  return (
+    <div aria-hidden className="grid h-1.5 grid-cols-2">
+      <div style={{ background: home }} />
+      <div style={{ background: guest }} />
     </div>
   );
 }
@@ -49,20 +55,63 @@ function TeamSide({
   team: BroadcastMatch["home"];
   side: "left" | "right";
 }) {
-  const align = side === "left" ? "items-start" : "items-end";
+  const align = side === "left" ? "items-start text-left" : "items-end text-right";
   return (
-    <div className={`flex flex-col gap-3 ${align}`}>
+    <div className={`flex flex-col gap-3 px-8 py-7 ${align}`}>
       <img
         src={logoUrl(team.clubId)}
         alt={team.name}
-        style={{ width: "96px", height: "96px", objectFit: "contain" }}
+        className="size-[104px] object-contain"
       />
-      <div
-        className="font-black uppercase"
-        style={{ fontSize: "clamp(1rem, 1.6vw, 1.5rem)" }}
-      >
+      <div className="font-display text-[clamp(1.25rem,2vw,1.75rem)] font-black uppercase leading-[1.05] tracking-tight text-white">
         {team.name}
+      </div>
+      <div className="font-display text-xs font-bold uppercase tracking-[0.25em] text-white/55">
+        {team.abbr}
       </div>
     </div>
   );
+}
+
+function CenterInfo({
+  league,
+  time,
+  dateLabel,
+}: {
+  league: string;
+  time: string;
+  dateLabel: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 px-6 py-7">
+      {league && (
+        <span className="font-display text-xs font-bold uppercase tracking-[0.3em] text-white/65">
+          {league}
+        </span>
+      )}
+      <span className="font-display text-[clamp(2.25rem,4.5vw,3.5rem)] font-black leading-none tabular-nums text-white">
+        {time}
+      </span>
+      <span className="font-display text-xs font-medium uppercase tracking-[0.25em] text-white/65">
+        {dateLabel}
+      </span>
+      <span className="bg-heat text-heat-foreground mt-1 rounded-sm px-2 py-0.5 font-display text-[0.7rem] font-black uppercase tracking-widest">
+        Tip-off
+      </span>
+    </div>
+  );
+}
+
+function formatDate(locale: string, isoDate: string): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  if (!y || !m || !d) return isoDate;
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    }).format(new Date(y, m - 1, d));
+  } catch {
+    return isoDate;
+  }
 }

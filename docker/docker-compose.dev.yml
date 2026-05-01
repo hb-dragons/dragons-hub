@@ -13,15 +13,15 @@ services:
     image: redis:7-alpine
     ports: ["6379:6379"]
 
-  waha:
-    image: devlikeapro/waha
-    ports: ["3002:3000"]
-    environment:
-      WHATSAPP_DEFAULT_ENGINE: WEBJS
-      WAHA_PRINT_QR: "true"
-    volumes:
-      - waha_sessions:/app/.sessions
+#  waha:
+ #   image: devlikeapro/waha
+ #   ports: ["3002:3000"]
+ #   environment:
+ #     WHATSAPP_DEFAULT_ENGINE: WEBJS
+ #     WAHA_PRINT_QR: "true"
+ #   volumes:
+ #     - waha_sessions:/app/.sessions
 
 volumes:
   pgdata:
-  waha_sessions:
+ # waha_sessions:

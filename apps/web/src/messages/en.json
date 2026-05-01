@@ -1115,6 +1115,7 @@
     "kickoff": "Kickoff",
     "league": "League",
     "noMatchesToday": "No matches scheduled for today.",
+    "noMatchesFound": "No matches found.",
     "pickerTitle": "Pick match",
     "useDefault": "(default)",
     "errors": {

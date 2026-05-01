@@ -20,9 +20,5 @@ export default async function AdminBroadcastPage() {
       initial = { config: null, match: null };
     }
   }
-  return (
-    <div className="flex flex-col gap-4 p-6">
-      <BroadcastControl deviceId={deviceId} initial={initial} />
-    </div>
-  );
+  return <BroadcastControl deviceId={deviceId} initial={initial} />;
 }
