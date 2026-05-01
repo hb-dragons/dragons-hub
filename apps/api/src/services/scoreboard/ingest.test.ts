@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
   publishSnapshot: vi.fn(),
+  publishBroadcastForDevice: vi.fn(),  // NEW
 }));
 
 vi.mock("../../config/database", () => ({
@@ -28,12 +29,17 @@ vi.mock("./pubsub", () => ({
   publishSnapshot: (...a: unknown[]) => mocks.publishSnapshot(...a),
 }));
 
+vi.mock("../broadcast/publisher", () => ({
+  publishBroadcastForDevice: (...a: unknown[]) =>
+    mocks.publishBroadcastForDevice(...a),
+}));
+
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { processIngest } from "./ingest";
 import { setupTestDb, resetTestDb, closeTestDb } from "../../test/setup-test-db";
 import type { TestDbContext } from "../../test/setup-test-db";
-import { liveScoreboards, scoreboardSnapshots } from "@dragons/db/schema";
+import { broadcastConfigs, liveScoreboards, scoreboardSnapshots } from "@dragons/db/schema";
 
 let ctx: TestDbContext;
 
@@ -46,6 +52,8 @@ beforeEach(async () => {
   await resetTestDb(ctx);
   mocks.publishSnapshot.mockReset();
   mocks.publishSnapshot.mockResolvedValue(undefined);
+  mocks.publishBroadcastForDevice.mockReset();
+  mocks.publishBroadcastForDevice.mockResolvedValue(undefined);
 });
 
 afterAll(async () => {
@@ -137,5 +145,33 @@ describe("processIngest", () => {
     const live = await ctx.db.select().from(liveScoreboards);
     expect(live).toHaveLength(1);
     expect(mocks.publishSnapshot).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("processIngest broadcast publish", () => {
+  it("publishes broadcast state when isLive=true", async () => {
+    await ctx.db.insert(broadcastConfigs).values({
+      deviceId: "d1",
+      isLive: true,
+      matchId: null, // intentionally null — broadcast still publishes idle
+    });
+    await processIngest({ deviceId: "d1", hex: frameOk });
+    // The publish helper is mocked at module scope below in Step 2.
+    expect(mocks.publishBroadcastForDevice).toHaveBeenCalledWith("d1");
+  });
+
+  it("does not publish broadcast when isLive=false", async () => {
+    await ctx.db.insert(broadcastConfigs).values({
+      deviceId: "d1",
+      isLive: false,
+      matchId: null,
+    });
+    await processIngest({ deviceId: "d1", hex: frameOk });
+    expect(mocks.publishBroadcastForDevice).not.toHaveBeenCalled();
+  });
+
+  it("does not publish broadcast when no config row exists", async () => {
+    await processIngest({ deviceId: "d1", hex: frameOk });
+    expect(mocks.publishBroadcastForDevice).not.toHaveBeenCalled();
   });
 });

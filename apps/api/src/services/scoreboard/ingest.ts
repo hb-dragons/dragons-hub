@@ -1,12 +1,17 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../config/database";
-import { liveScoreboards, scoreboardSnapshots } from "@dragons/db/schema";
+import {
+  broadcastConfigs,
+  liveScoreboards,
+  scoreboardSnapshots,
+} from "@dragons/db/schema";
 import {
   decodeScoreFrame,
   findScoreFrames,
   type StramatelSnapshot,
 } from "./stramatel-decoder";
 import { publishSnapshot } from "./pubsub";
+import { publishBroadcastForDevice } from "../broadcast/publisher";
 import { logger } from "../../config/logger";
 
 export interface IngestResult {
@@ -133,6 +138,22 @@ export async function processIngest({
     logger.warn(
       { err, deviceId, snapshotId: result.snapshotId },
       "scoreboard.publish failed",
+    );
+  }
+
+  try {
+    const [cfg] = await db
+      .select({ isLive: broadcastConfigs.isLive })
+      .from(broadcastConfigs)
+      .where(eq(broadcastConfigs.deviceId, deviceId))
+      .limit(1);
+    if (cfg?.isLive === true) {
+      await publishBroadcastForDevice(deviceId);
+    }
+  } catch (err) {
+    logger.warn(
+      { err, deviceId, snapshotId: result.snapshotId },
+      "broadcast.publish failed",
     );
   }
 
