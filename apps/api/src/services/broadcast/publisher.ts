@@ -9,7 +9,7 @@ import type {
 } from "@dragons/shared";
 import { publishBroadcast } from "../scoreboard/pubsub";
 import { computePhase } from "./phase";
-import { loadJoinedMatch } from "./config";
+import { loadJoinedMatch, rowToConfig } from "./config";
 
 const STALE_MS = 30_000;
 
@@ -66,23 +66,6 @@ async function getCachedMatch(
     });
   }
   return match;
-}
-
-function rowToConfig(
-  row: typeof broadcastConfigs.$inferSelect,
-): BroadcastConfig {
-  return {
-    deviceId: row.deviceId,
-    matchId: row.matchId,
-    isLive: row.isLive,
-    homeAbbr: row.homeAbbr,
-    guestAbbr: row.guestAbbr,
-    homeColorOverride: row.homeColorOverride,
-    guestColorOverride: row.guestColorOverride,
-    startedAt: row.startedAt ? row.startedAt.toISOString() : null,
-    endedAt: row.endedAt ? row.endedAt.toISOString() : null,
-    updatedAt: row.updatedAt.toISOString(),
-  };
 }
 
 function rowToScoreboard(

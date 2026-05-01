@@ -20,7 +20,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
 
   const isLive = config?.isLive ?? false;
   const overlayUrl =
-    typeof window !== "undefined" ? `${window.location.origin}/de/overlay` : "";
+    typeof window !== "undefined" ? `${window.location.origin}/overlay` : "";
 
   async function reload() {
     const next = await fetchAPI<{
@@ -174,7 +174,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
             style={{ aspectRatio: "16 / 9", background: "#222" }}
           >
             <iframe
-              src="/de/overlay"
+              src="/overlay"
               title="overlay-preview"
               className="size-full"
             />

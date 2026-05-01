@@ -35,12 +35,13 @@ export function MatchPicker({ onClose, onPick }: Props) {
       <div className="w-full max-w-xl rounded border border-zinc-700 bg-zinc-900 p-4">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t("pickerTitle")}</h2>
-          <button onClick={onClose} className="px-2">
+          <button type="button" onClick={onClose} className="px-2">
             ✕
           </button>
         </div>
         <div className="mb-2 flex gap-2">
           <button
+            type="button"
             className={`rounded px-3 py-1 ${
               tab === "today" ? "bg-zinc-700" : "border border-zinc-700"
             }`}
@@ -49,6 +50,7 @@ export function MatchPicker({ onClose, onPick }: Props) {
             {t("today")}
           </button>
           <button
+            type="button"
             className={`rounded px-3 py-1 ${
               tab === "search" ? "bg-zinc-700" : "border border-zinc-700"
             }`}

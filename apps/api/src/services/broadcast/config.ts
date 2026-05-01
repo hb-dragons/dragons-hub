@@ -20,7 +20,7 @@ function deriveAbbr(team: { nameShort: string | null; name: string }): string {
   return src.slice(0, 3).toUpperCase();
 }
 
-function rowToConfig(
+export function rowToConfig(
   row: typeof broadcastConfigs.$inferSelect,
 ): BroadcastConfig {
   return {
@@ -110,14 +110,29 @@ export async function setBroadcastLive(
       .update(broadcastConfigs)
       .set({
         isLive,
-        startedAt: isLive ? now : undefined,
-        endedAt: isLive ? undefined : now,
+        startedAt: isLive ? now : null,
+        endedAt: isLive ? null : now,
         updatedAt: now,
       })
       .where(eq(broadcastConfigs.deviceId, deviceId));
   });
   const out = await getBroadcastConfig(deviceId);
-  if (!out) throw new Error("config row missing");
+  if (!out) {
+    if (isLive) throw new Error("config row missing");
+    // Stopping a broadcast that was never started — no-op, return empty config.
+    return {
+      deviceId,
+      matchId: null,
+      isLive: false,
+      homeAbbr: null,
+      guestAbbr: null,
+      homeColorOverride: null,
+      guestColorOverride: null,
+      startedAt: null,
+      endedAt: null,
+      updatedAt: new Date().toISOString(),
+    };
+  }
   return out;
 }
 
