@@ -39,3 +39,38 @@ export async function subscribeSnapshots(
     await subscriber.quit();
   };
 }
+
+export function broadcastChannelFor(deviceId: string): string {
+  return `broadcast:${deviceId}`;
+}
+
+export async function publishBroadcast(
+  deviceId: string,
+  payload: unknown,
+): Promise<void> {
+  await getPublisher().publish(
+    broadcastChannelFor(deviceId),
+    JSON.stringify(payload),
+  );
+}
+
+export async function subscribeBroadcast(
+  deviceId: string,
+  onMessage: (state: unknown) => void,
+): Promise<() => Promise<void>> {
+  const subscriber = createRedisClient();
+  const channel = broadcastChannelFor(deviceId);
+  await subscriber.subscribe(channel);
+  subscriber.on("message", (received: string, message: string) => {
+    if (received !== channel) return;
+    try {
+      onMessage(JSON.parse(message));
+    } catch {
+      // discard non-JSON
+    }
+  });
+  return async () => {
+    await subscriber.unsubscribe(channel);
+    await subscriber.quit();
+  };
+}
