@@ -17,6 +17,6 @@
     "basketball-bund-sdk": "github:dirkdrutschmann/basketball-bund-sdk",
     "dotenv": "^17.4.2",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   }
 }
