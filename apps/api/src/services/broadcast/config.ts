@@ -94,22 +94,28 @@ export async function setBroadcastLive(
   deviceId: string,
   isLive: boolean,
 ): Promise<BroadcastConfig> {
-  if (isLive) {
-    const existing = await getBroadcastConfig(deviceId);
-    if (!existing || existing.matchId === null) {
-      throw new Error("Cannot go live without matchId");
-    }
-  }
   const now = new Date();
-  await db
-    .update(broadcastConfigs)
-    .set({
-      isLive,
-      startedAt: isLive ? now : undefined,
-      endedAt: isLive ? undefined : now,
-      updatedAt: now,
-    })
-    .where(eq(broadcastConfigs.deviceId, deviceId));
+  await db.transaction(async (tx) => {
+    if (isLive) {
+      const [existing] = await tx
+        .select()
+        .from(broadcastConfigs)
+        .where(eq(broadcastConfigs.deviceId, deviceId))
+        .limit(1);
+      if (!existing || existing.matchId === null) {
+        throw new Error("Cannot go live without matchId");
+      }
+    }
+    await tx
+      .update(broadcastConfigs)
+      .set({
+        isLive,
+        startedAt: isLive ? now : undefined,
+        endedAt: isLive ? undefined : now,
+        updatedAt: now,
+      })
+      .where(eq(broadcastConfigs.deviceId, deviceId));
+  });
   const out = await getBroadcastConfig(deviceId);
   if (!out) throw new Error("config row missing");
   return out;
