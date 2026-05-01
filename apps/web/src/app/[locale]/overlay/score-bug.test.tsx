@@ -47,7 +47,7 @@ describe("ScoreBug", () => {
     expect(txt).toContain("13");
   });
 
-  it("shows TIMEOUT when timeoutActive", () => {
+  it("shows TIMEOUT indicator when timeoutActive", () => {
     const { container } = render(
       <ScoreBug
         match={match}
@@ -55,7 +55,7 @@ describe("ScoreBug", () => {
         stale={false}
       />,
     );
-    expect(container.textContent ?? "").toMatch(/Timeout/i);
+    expect(container.querySelector('[aria-label="Timeout"]')).not.toBeNull();
   });
 
   it("formats overtime periods", () => {

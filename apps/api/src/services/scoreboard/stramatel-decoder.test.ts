@@ -225,6 +225,34 @@ describe("decodeScoreFrame", () => {
     });
   });
 
+  it("falls back to raw MM:SS when minute/second bytes are non-numeric", () => {
+    // testCond ("??".trim()) length 2 puts us in the MM:SS branch, but
+    // parseInt yields NaN, so the decoder must keep the raw slice and
+    // emit clockSeconds=null instead of zero-padding garbage.
+    const payload =
+      "  " + // 0..2 filler
+      "??" + // 2..4 mm (non-numeric)
+      "??" + // 4..6 ss (non-numeric) -> length 2 -> MM:SS branch
+      "   " + // 6..9 scoreHome
+      "   " + // 9..12 scoreGuest
+      "1" + // 12 period
+      "0" + // 13 foulsHome
+      "0" + // 14 foulsGuest
+      "0" + // 15 timeoutsHome
+      "0" + // 16 timeoutsGuest
+      " " + // 17 filler
+      " " + // 18 status
+      " " + // 19 timeout
+      "                        " + // 20..44
+      "  " + // 44..46 timeoutDuration
+      "00"; // 46..48 shotClock
+
+    const snapshot = decodeScoreFrame(frame(payload));
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.clockText).toBe("??:??");
+    expect(snapshot?.clockSeconds).toBeNull();
+  });
+
   it("treats non-numeric numeric fields as zero", () => {
     // Same overall layout as the MM:SS test, but score/foul/period bytes are non-numeric.
     const payload =
