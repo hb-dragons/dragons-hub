@@ -20,3 +20,8 @@ sdk_password = "your-sdk-password"
 # Referee assignment SDK credentials (separate federation account)
 referee_sdk_username = "your-referee-sdk-username"
 referee_sdk_password = "your-referee-sdk-password"
+
+# Stramatel scoreboard panel id. Must match the GitHub repo variable
+# SCOREBOARD_DEVICE_ID (used as Docker build-arg for the web image) so the
+# admin/overlay UI talks to the same device the API ingest is bound to.
+scoreboard_device_id = "dragons-1"

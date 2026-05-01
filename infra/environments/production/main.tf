@@ -95,6 +95,13 @@ resource "random_password" "turbo_signature_key" {
   special = false
 }
 
+# Bearer token the Raspberry Pi includes when posting raw Stramatel frames to
+# /api/scoreboard/ingest. Validated by SCOREBOARD_INGEST_KEY in env.ts.
+resource "random_password" "scoreboard_ingest_key" {
+  length  = 48
+  special = false
+}
+
 # Dedicated service accounts for Cloud Run
 resource "google_service_account" "api" {
   account_id   = "dragons-api"
@@ -196,15 +203,17 @@ module "secrets" {
     "referee-sdk-username-production",
     "referee-sdk-password-production",
     "auth-secret-production",
+    "scoreboard-ingest-key-production",
   ]
   secret_values = {
-    "database-url-production"         = module.database.database_url
-    "redis-url-production"            = module.valkey.connection_url
-    "sdk-username-production"         = var.sdk_username
-    "sdk-password-production"         = var.sdk_password
-    "referee-sdk-username-production" = var.referee_sdk_username
-    "referee-sdk-password-production" = var.referee_sdk_password
-    "auth-secret-production"          = random_password.auth_secret.result
+    "database-url-production"          = module.database.database_url
+    "redis-url-production"             = module.valkey.connection_url
+    "sdk-username-production"          = var.sdk_username
+    "sdk-password-production"          = var.sdk_password
+    "referee-sdk-username-production"  = var.referee_sdk_username
+    "referee-sdk-password-production"  = var.referee_sdk_password
+    "auth-secret-production"           = random_password.auth_secret.result
+    "scoreboard-ingest-key-production" = random_password.scoreboard_ingest_key.result
   }
 
   depends_on = [google_project_service.apis]
@@ -240,8 +249,9 @@ module "api" {
     # Logging / Cloud Logging + Trace correlation.
     # SERVICE_VERSION is left unset; the logger falls back to K_REVISION,
     # which Cloud Run updates automatically on every revision.
-    SERVICE_NAME   = "api"
-    GCP_PROJECT_ID = var.project_id
+    SERVICE_NAME         = "api"
+    GCP_PROJECT_ID       = var.project_id
+    SCOREBOARD_DEVICE_ID = var.scoreboard_device_id
   }
 
   secrets = {
@@ -271,6 +281,10 @@ module "api" {
     }
     BETTER_AUTH_SECRET = {
       secret_name = "auth-secret-production"
+      version     = "latest"
+    }
+    SCOREBOARD_INGEST_KEY = {
+      secret_name = "scoreboard-ingest-key-production"
       version     = "latest"
     }
   }
@@ -311,8 +325,9 @@ module "worker" {
     GCS_PROJECT_ID  = var.project_id
     # Logging / Cloud Logging + Trace correlation.
     # SERVICE_NAME differs from the API so logs are filterable per workload.
-    SERVICE_NAME   = "worker"
-    GCP_PROJECT_ID = var.project_id
+    SERVICE_NAME         = "worker"
+    GCP_PROJECT_ID       = var.project_id
+    SCOREBOARD_DEVICE_ID = var.scoreboard_device_id
   }
 
   secrets = {
@@ -342,6 +357,10 @@ module "worker" {
     }
     BETTER_AUTH_SECRET = {
       secret_name = "auth-secret-production"
+      version     = "latest"
+    }
+    SCOREBOARD_INGEST_KEY = {
+      secret_name = "scoreboard-ingest-key-production"
       version     = "latest"
     }
   }

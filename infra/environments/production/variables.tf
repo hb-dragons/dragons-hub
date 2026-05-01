@@ -65,6 +65,11 @@ variable "referee_sdk_password" {
   sensitive   = true
 }
 
+variable "scoreboard_device_id" {
+  description = "Stramatel scoreboard panel id (Panel2Net.id). Must match the value built into the web bundle as NEXT_PUBLIC_SCOREBOARD_DEVICE_ID."
+  type        = string
+}
+
 variable "log_retention_days" {
   description = "Retention for the Cloud Logging _Default bucket. Documented explicitly for GDPR transparency + DSAR handling."
   type        = number

@@ -17,9 +17,12 @@ COPY apps/web/ ./apps/web/
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Build argument: NEXT_PUBLIC_API_URL is inlined at build time
+# Build arguments: NEXT_PUBLIC_* values are inlined into the client bundle at
+# build time, so they must be passed via --build-arg, not Cloud Run env vars.
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ARG NEXT_PUBLIC_SCOREBOARD_DEVICE_ID
+ENV NEXT_PUBLIC_SCOREBOARD_DEVICE_ID=${NEXT_PUBLIC_SCOREBOARD_DEVICE_ID}
 
 # Build
 ENV NODE_ENV=production

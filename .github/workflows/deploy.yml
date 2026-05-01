@@ -176,6 +176,7 @@ jobs:
             ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dragons/web:latest
           build-args: |
             NEXT_PUBLIC_API_URL=https://${{ vars.API_DOMAIN }}
+            NEXT_PUBLIC_SCOREBOARD_DEVICE_ID=${{ vars.SCOREBOARD_DEVICE_ID }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
