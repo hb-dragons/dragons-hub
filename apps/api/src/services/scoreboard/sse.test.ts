@@ -80,4 +80,54 @@ describe("createScoreboardStream", () => {
     expect(joined).toContain('"scoreHome":2');
     expect(mocks.selectLive).not.toHaveBeenCalled();
   });
+
+  it("skips the initial snapshot when no live row exists", async () => {
+    mocks.selectLive.mockResolvedValue([]);
+    const res = createScoreboardStream({
+      deviceId: "d1",
+      lastEventId: undefined,
+    });
+    const reader = res.body!.getReader();
+    const { value } = await reader.read();
+    expect(new TextDecoder().decode(value!)).toContain("retry: 2000");
+    // Let start() advance past the empty-live branch into subscribe.
+    await new Promise((r) => setTimeout(r, 20));
+    expect(mocks.subscribe).toHaveBeenCalled();
+    await reader.cancel();
+  });
+
+  it("forwards published snapshots and emits an id when snapshotId is set", async () => {
+    type PubsubHandler = (snap: unknown) => void;
+    let handler: PubsubHandler | null = null;
+    mocks.subscribe.mockImplementation(
+      async (_deviceId: string, fn: PubsubHandler) => {
+        handler = fn;
+        return async () => mocks.closeSub();
+      },
+    );
+    const res = createScoreboardStream({
+      deviceId: "d1",
+      lastEventId: undefined,
+    });
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    // Drain frames until the subscribe handler is wired up.
+    for (let i = 0; i < 4 && handler === null; i++) {
+      await reader.read();
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(handler).not.toBeNull();
+    (handler as PubsubHandler | null)?.({ snapshotId: 42, scoreHome: 7 });
+    (handler as PubsubHandler | null)?.({ scoreHome: 9 });
+    let joined = "";
+    for (let i = 0; i < 6; i++) {
+      const { value } = await reader.read();
+      if (value) joined += decoder.decode(value);
+      if (joined.includes('"scoreHome":9')) break;
+    }
+    expect(joined).toContain("id: 42");
+    expect(joined).toContain('"scoreHome":7');
+    expect(joined).toContain('"scoreHome":9');
+    await reader.cancel();
+  });
 });

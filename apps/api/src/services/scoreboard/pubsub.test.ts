@@ -18,7 +18,14 @@ vi.mock("../../config/redis", () => ({
   }),
 }));
 
-import { publishSnapshot, subscribeSnapshots, channelFor } from "./pubsub";
+import {
+  publishSnapshot,
+  subscribeSnapshots,
+  channelFor,
+  publishBroadcast,
+  subscribeBroadcast,
+  broadcastChannelFor,
+} from "./pubsub";
 
 describe("pubsub", () => {
   beforeEach(() => {
@@ -59,5 +66,69 @@ describe("pubsub", () => {
     await close();
     expect(mocks.unsubscribe).toHaveBeenCalledWith("scoreboard:dragons-1");
     expect(mocks.quit).toHaveBeenCalled();
+  });
+
+  it("discards malformed JSON without invoking the handler", async () => {
+    type MessageHandler = (channel: string, message: string) => void;
+    let messageHandler: MessageHandler | null = null;
+    mocks.on.mockImplementation((event: string, fn: MessageHandler) => {
+      if (event === "message") messageHandler = fn;
+    });
+    mocks.subscribe.mockResolvedValue(undefined);
+    const received: unknown[] = [];
+    await subscribeSnapshots("dragons-1", (snap) => received.push(snap));
+    (messageHandler as MessageHandler | null)?.(
+      "scoreboard:dragons-1",
+      "not-json",
+    );
+    expect(received).toEqual([]);
+  });
+
+  it("namespaces broadcast channels separately from snapshots", () => {
+    expect(broadcastChannelFor("d1")).toBe("broadcast:d1");
+  });
+
+  it("publishes broadcast payloads on the broadcast channel", async () => {
+    mocks.publish.mockResolvedValue(1);
+    await publishBroadcast("d1", { phase: "live" });
+    expect(mocks.publish).toHaveBeenCalledWith(
+      "broadcast:d1",
+      JSON.stringify({ phase: "live" }),
+    );
+  });
+
+  it("subscribeBroadcast forwards JSON and ignores other channels and bad JSON", async () => {
+    type MessageHandler = (channel: string, message: string) => void;
+    let messageHandler: MessageHandler | null = null;
+    mocks.on.mockImplementation((event: string, fn: MessageHandler) => {
+      if (event === "message") messageHandler = fn;
+    });
+    mocks.subscribe.mockResolvedValue(undefined);
+    const received: unknown[] = [];
+    const close = await subscribeBroadcast("d1", (state) => received.push(state));
+    expect(mocks.subscribe).toHaveBeenCalledWith("broadcast:d1");
+    (messageHandler as MessageHandler | null)?.(
+      "broadcast:other",
+      JSON.stringify({ skip: true }),
+    );
+    (messageHandler as MessageHandler | null)?.(
+      "broadcast:d1",
+      "not-json",
+    );
+    (messageHandler as MessageHandler | null)?.(
+      "broadcast:d1",
+      JSON.stringify({ keep: true }),
+    );
+    expect(received).toEqual([{ keep: true }]);
+    await close();
+    expect(mocks.unsubscribe).toHaveBeenCalledWith("broadcast:d1");
+  });
+
+  it("publishSnapshot reuses a single publisher across calls", async () => {
+    mocks.publish.mockResolvedValue(1);
+    await publishSnapshot("d1", { a: 1 });
+    await publishSnapshot("d2", { b: 2 });
+    await publishBroadcast("d3", { c: 3 });
+    expect(mocks.publish).toHaveBeenCalledTimes(3);
   });
 });

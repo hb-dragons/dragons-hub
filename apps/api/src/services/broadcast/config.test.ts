@@ -165,4 +165,102 @@ describe("broadcast/config", () => {
     expect(m!.home.color).toBe("#000000");
     expect(m!.guest.abbr).toBe("OPP");
   });
+
+  it("loadJoinedMatch returns null when matchId is null", async () => {
+    const m = await loadJoinedMatch({
+      matchId: null,
+      homeAbbr: null,
+      guestAbbr: null,
+      homeColorOverride: null,
+      guestColorOverride: null,
+    });
+    expect(m).toBeNull();
+  });
+
+  it("loadJoinedMatch returns null when match row is missing", async () => {
+    const m = await loadJoinedMatch({
+      matchId: 999_999,
+      homeAbbr: null,
+      guestAbbr: null,
+      homeColorOverride: null,
+      guestColorOverride: null,
+    });
+    expect(m).toBeNull();
+  });
+
+it("loadJoinedMatch falls back to default colors when teams have none", async () => {
+    // Seed teams without badgeColor; ensure DEFAULT_HOME_COLOR / GUEST_COLOR are used.
+    await ctx.db.insert(teams).values([
+      {
+        apiTeamPermanentId: 11,
+        seasonTeamId: 11,
+        teamCompetitionId: 11,
+        name: "Alpha",
+        nameShort: "Alpha",
+        clubId: 1,
+        isOwnClub: false,
+      },
+      {
+        apiTeamPermanentId: 22,
+        seasonTeamId: 22,
+        teamCompetitionId: 22,
+        name: "Beta",
+        nameShort: "Beta",
+        clubId: 2,
+        isOwnClub: false,
+      },
+    ]);
+    const [m] = await ctx.db
+      .insert(matches)
+      .values({
+        apiMatchId: 7777,
+        matchNo: 7,
+        matchDay: 1,
+        kickoffDate: "2026-05-04",
+        kickoffTime: "20:00:00",
+        leagueId: null,
+        homeTeamApiId: 11,
+        guestTeamApiId: 22,
+      })
+      .returning({ id: matches.id });
+    const out = await loadJoinedMatch({
+      matchId: m!.id,
+      homeAbbr: null,
+      guestAbbr: null,
+      homeColorOverride: null,
+      guestColorOverride: null,
+    });
+    expect(out).not.toBeNull();
+    expect(out!.league).toBeNull();
+    // Defaults from config.ts.
+    expect(out!.home.color).toBe("#1e90ff");
+    expect(out!.guest.color).toBe("#dc2626");
+  });
+
+  it("setBroadcastLive(false) on a never-started config returns an empty stopped row", async () => {
+    // No prior upsert: the config row does not exist yet, so the read after
+    // the no-op transaction returns null and the function falls back to a
+    // synthesized empty stopped config.
+    const out = await setBroadcastLive("ghost", false);
+    expect(out.deviceId).toBe("ghost");
+    expect(out.isLive).toBe(false);
+    expect(out.matchId).toBeNull();
+  });
+
+  it("upsert updates color overrides without touching matchId", async () => {
+    const { matchId } = await seed();
+    const initial = await upsertBroadcastConfig({
+      deviceId: "d1",
+      matchId,
+      homeColorOverride: "#aabbcc",
+    });
+    expect(initial.homeColorOverride).toBe("#aabbcc");
+    const updated = await upsertBroadcastConfig({
+      deviceId: "d1",
+      guestColorOverride: "#ddeeff",
+    });
+    expect(updated.guestColorOverride).toBe("#ddeeff");
+    expect(updated.homeColorOverride).toBe("#aabbcc"); // preserved
+    expect(updated.matchId).toBe(matchId); // preserved
+  });
 });
