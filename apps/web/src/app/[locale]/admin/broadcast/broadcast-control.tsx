@@ -166,6 +166,22 @@ export function BroadcastControl({ deviceId, initial }: Props) {
         </div>
       </section>
 
+      {deviceId && (
+        <section className="rounded border border-zinc-800 p-4">
+          <div className="mb-2 text-sm uppercase text-zinc-400">Preview</div>
+          <div
+            className="overflow-hidden rounded border border-dashed border-zinc-700"
+            style={{ aspectRatio: "16 / 9", background: "#222" }}
+          >
+            <iframe
+              src="/de/overlay"
+              title="overlay-preview"
+              className="size-full"
+            />
+          </div>
+        </section>
+      )}
+
       <div className="flex items-center gap-3">
         {!isLive ? (
           <button
