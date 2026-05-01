@@ -30,7 +30,8 @@
     "channels": "Kanäle",
     "domainEvents": "Events",
     "pushTest": "Push-Test",
-    "groupSystem": "System"
+    "groupSystem": "System",
+    "broadcast": "Übertragung"
   },
   "dashboard": {
     "title": "Kommandozentrale",
@@ -1089,6 +1090,40 @@
       "online": "Live",
       "connecting": "Verbinde…",
       "offline": "Warte auf Daten…"
+    }
+  },
+  "broadcast": {
+    "title": "Übertragungs-Steuerung",
+    "device": "Gerät",
+    "live": "Live",
+    "idle": "Aus",
+    "selectedMatch": "Ausgewähltes Spiel",
+    "changeMatch": "Spiel ändern…",
+    "config": "Übertragungs-Konfiguration",
+    "homeAbbr": "Heim-Kürzel",
+    "guestAbbr": "Gast-Kürzel",
+    "homeColor": "Heim-Farbe",
+    "guestColor": "Gast-Farbe",
+    "save": "Speichern",
+    "goLive": "Live gehen",
+    "endBroadcast": "Übertragung beenden",
+    "obsUrl": "OBS-URL",
+    "copy": "Kopieren",
+    "noMatch": "Kein Spiel ausgewählt",
+    "today": "Heute",
+    "search": "Suche",
+    "kickoff": "Anwurf",
+    "league": "Liga",
+    "noMatchesToday": "Heute keine Spiele angesetzt.",
+    "pickerTitle": "Spiel wählen",
+    "useDefault": "(Standard)",
+    "errors": {
+      "matchRequired": "Vor dem Live-Gang ein Spiel auswählen."
+    },
+    "overlay": {
+      "live": "Live",
+      "offline": "Aus",
+      "stale": "Verbindung instabil"
     }
   },
   "notifications": {

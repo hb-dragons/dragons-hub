@@ -105,6 +105,11 @@ const navGroups = [
         labelKey: "nav.venues" as const,
         perm: { resource: "venue", action: "view" } as const,
       },
+      {
+        href: "/admin/broadcast",
+        labelKey: "nav.broadcast" as const,
+        perm: { resource: "settings", action: "view" } as const,
+      },
     ],
   },
   {

@@ -30,7 +30,8 @@
     "channels": "Channels",
     "domainEvents": "Events",
     "pushTest": "Push Test",
-    "groupSystem": "System"
+    "groupSystem": "System",
+    "broadcast": "Broadcast"
   },
   "dashboard": {
     "title": "Command Center",
@@ -1089,6 +1090,40 @@
       "online": "Live",
       "connecting": "Connecting…",
       "offline": "Waiting for data…"
+    }
+  },
+  "broadcast": {
+    "title": "Broadcast Control",
+    "device": "Device",
+    "live": "Live",
+    "idle": "Idle",
+    "selectedMatch": "Selected Match",
+    "changeMatch": "Change match…",
+    "config": "Broadcast Config",
+    "homeAbbr": "Home abbr",
+    "guestAbbr": "Guest abbr",
+    "homeColor": "Home color",
+    "guestColor": "Guest color",
+    "save": "Save",
+    "goLive": "Go Live",
+    "endBroadcast": "End broadcast",
+    "obsUrl": "OBS URL",
+    "copy": "Copy",
+    "noMatch": "No match selected",
+    "today": "Today",
+    "search": "Search",
+    "kickoff": "Kickoff",
+    "league": "League",
+    "noMatchesToday": "No matches scheduled for today.",
+    "pickerTitle": "Pick match",
+    "useDefault": "(default)",
+    "errors": {
+      "matchRequired": "Pick a match before going live."
+    },
+    "overlay": {
+      "live": "Live",
+      "offline": "Off air",
+      "stale": "Connection stalled"
     }
   },
   "notifications": {

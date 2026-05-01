@@ -32,6 +32,8 @@ import { adminRefereeHistoryRoutes } from "./admin/referee-history.routes";
 import { apiScoreboardRoutes } from "./api/scoreboard.routes";
 import { publicScoreboardRoutes } from "./public/scoreboard.routes";
 import { adminScoreboardRoutes } from "./admin/scoreboard.routes";
+import { publicBroadcastRoutes } from "./public/broadcast.routes";
+import { adminBroadcastRoutes } from "./admin/broadcast.routes";
 
 const routes = new Hono();
 
@@ -68,5 +70,7 @@ routes.route("/referee", refereeAssignmentRoutes);
 routes.route("/admin", adminRefereeAssignmentRoutes);
 routes.route("/admin", adminRefereeHistoryRoutes);
 routes.route("/admin/scoreboard", adminScoreboardRoutes);
+routes.route("/public/broadcast", publicBroadcastRoutes);
+routes.route("/admin/broadcast", adminBroadcastRoutes);
 
 export { routes };
