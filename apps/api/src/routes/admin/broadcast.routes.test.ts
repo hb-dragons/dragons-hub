@@ -216,3 +216,126 @@ describe("POST /admin/broadcast/stop", () => {
     expect(mocks.publishBroadcastForDevice).toHaveBeenCalledWith("d1");
   });
 });
+
+describe("GET /admin/broadcast/matches", () => {
+  it("returns own-club matches scheduled today by default", async () => {
+    await ctx.db.insert(leagues).values({
+      id: 100,
+      apiLigaId: 100,
+      ligaNr: 1,
+      name: "Liga",
+      seasonId: 2026,
+      seasonName: "2025/26",
+    });
+    await ctx.db.insert(teams).values([
+      {
+        apiTeamPermanentId: 1,
+        seasonTeamId: 1,
+        teamCompetitionId: 1,
+        name: "Dragons",
+        nameShort: "Dragons",
+        clubId: 42,
+        isOwnClub: true,
+      },
+      {
+        apiTeamPermanentId: 2,
+        seasonTeamId: 2,
+        teamCompetitionId: 2,
+        name: "Visitors",
+        nameShort: "Visitors",
+        clubId: 99,
+        isOwnClub: false,
+      },
+      {
+        apiTeamPermanentId: 3,
+        seasonTeamId: 3,
+        teamCompetitionId: 3,
+        name: "Other A",
+        nameShort: "OtherA",
+        clubId: 80,
+        isOwnClub: false,
+      },
+      {
+        apiTeamPermanentId: 4,
+        seasonTeamId: 4,
+        teamCompetitionId: 4,
+        name: "Other B",
+        nameShort: "OtherB",
+        clubId: 81,
+        isOwnClub: false,
+      },
+    ]);
+    const today = new Date().toISOString().slice(0, 10);
+    await ctx.db.insert(matches).values([
+      {
+        apiMatchId: 10,
+        matchNo: 1,
+        matchDay: 1,
+        kickoffDate: today,
+        kickoffTime: "19:30:00",
+        leagueId: 100,
+        homeTeamApiId: 1,
+        guestTeamApiId: 2,
+      },
+      {
+        apiMatchId: 11,
+        matchNo: 2,
+        matchDay: 1,
+        kickoffDate: today,
+        kickoffTime: "21:00:00",
+        leagueId: 100,
+        homeTeamApiId: 3,
+        guestTeamApiId: 4, // own-club not involved
+      },
+    ]);
+    const res = await app().request("/admin/broadcast/matches?scope=today");
+    const body = (await res.json()) as { matches: Array<{ id: number }> };
+    expect(body.matches).toHaveLength(1);
+  });
+
+  it("scope=all with q filters by team name", async () => {
+    await ctx.db.insert(leagues).values({
+      id: 100,
+      apiLigaId: 100,
+      ligaNr: 1,
+      name: "Liga",
+      seasonId: 2026,
+      seasonName: "2025/26",
+    });
+    await ctx.db.insert(teams).values([
+      {
+        apiTeamPermanentId: 1,
+        seasonTeamId: 1,
+        teamCompetitionId: 1,
+        name: "Dragons",
+        nameShort: "Dragons",
+        clubId: 42,
+        isOwnClub: true,
+      },
+      {
+        apiTeamPermanentId: 2,
+        seasonTeamId: 2,
+        teamCompetitionId: 2,
+        name: "Visitors X",
+        nameShort: "VisX",
+        clubId: 99,
+        isOwnClub: false,
+      },
+    ]);
+    await ctx.db.insert(matches).values({
+      apiMatchId: 12,
+      matchNo: 3,
+      matchDay: 2,
+      kickoffDate: "2026-06-15",
+      kickoffTime: "20:00:00",
+      leagueId: 100,
+      homeTeamApiId: 1,
+      guestTeamApiId: 2,
+    });
+    const res = await app().request(
+      "/admin/broadcast/matches?scope=all&q=Visitors",
+    );
+    const body = (await res.json()) as { matches: Array<{ id: number }> };
+    expect(body.matches).toHaveLength(1);
+  });
+});
