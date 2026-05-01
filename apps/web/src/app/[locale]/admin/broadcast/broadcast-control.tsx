@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Copy, Pencil, Play, Radio, Square } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
@@ -23,6 +23,8 @@ interface Props {
   initial: { config: BroadcastConfig | null; match: BroadcastMatch | null };
 }
 
+const subscribeNoop = () => () => {};
+
 export function BroadcastControl({ deviceId, initial }: Props) {
   const t = useTranslations("broadcast");
   const [config, setConfig] = useState<BroadcastConfig | null>(initial.config);
@@ -32,8 +34,11 @@ export function BroadcastControl({ deviceId, initial }: Props) {
   const [copied, setCopied] = useState(false);
 
   const isLive = config?.isLive ?? false;
-  const overlayUrl =
-    typeof window !== "undefined" ? `${window.location.origin}/overlay` : "";
+  const overlayUrl = useSyncExternalStore(
+    subscribeNoop,
+    () => `${window.location.origin}/overlay`,
+    () => "",
+  );
 
   async function reload() {
     const next = await fetchAPI<{
