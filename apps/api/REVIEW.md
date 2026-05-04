@@ -100,6 +100,11 @@ After-fix baseline (2026-05-04, fourth pass):
 - L1 production cookie prefix is `__Secure-dragons` (must-be-secure semantics encoded in the name)
 - L10 `GET /admin/sync/jobs` accepts a `limit` query param (1–500, default 100)
 
+### Round 10 follow-ups (2026-05-04)
+
+- M6f templates `render-chain.ts` extracts the renderer chain; both `index.ts` (renderEventMessage) and `digest.ts` (renderDigestMessage) consume the same `tryRenderEvent`. Digest now includes task events (was a silent feature gap)
+- M2d `reorderColumns` issues parallel UPDATEs inside a single transaction instead of sequential awaits
+
 ### Deferred (still in this doc)
 
 The unchecked items below are real issues but lower priority than what was fixed. They are preserved so a future pass can pick them up:
