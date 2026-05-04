@@ -1,5 +1,6 @@
 import type { Locale, PushTemplateOutput } from "./types";
 import { BODY_MAX, TITLE_MAX } from "./types";
+import { formatDate, truncate } from "./_utils";
 
 export interface RefereeSlotsPushPayload {
   matchId: number;
@@ -62,11 +63,3 @@ function bodyFor(
     : `In ${days} days: ${slotText} still open — ${matchup}`;
 }
 
-function formatDate(iso: string, locale: Locale): string {
-  const [y, m, d] = iso.split("-");
-  return locale === "de" ? `${d}.${m}.${y}` : `${y}-${m}-${d}`;
-}
-
-function truncate(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 1) + "…";
-}

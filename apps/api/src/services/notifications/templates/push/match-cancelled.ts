@@ -1,5 +1,6 @@
 import type { Locale, PushTemplateOutput } from "./types";
 import { BODY_MAX, TITLE_MAX } from "./types";
+import { formatDe, truncate } from "./_utils";
 
 export interface MatchCancelledPayload {
   matchId: number;
@@ -34,11 +35,3 @@ export function renderMatchCancelledPush(
   };
 }
 
-function truncate(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 1) + "…";
-}
-
-function formatDe(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
-}

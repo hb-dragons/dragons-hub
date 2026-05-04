@@ -127,19 +127,28 @@ export async function reconcilePushReceipts(
       .where(inArray(notificationLog.id, bumpOnlyIds));
   }
 
+  const failuresByCode = new Map<string, number[]>();
   for (const f of failures) {
+    let bucket = failuresByCode.get(f.errorCode);
+    if (!bucket) {
+      bucket = [];
+      failuresByCode.set(f.errorCode, bucket);
+    }
+    bucket.push(f.id);
+    result.failed++;
+    if (f.errorCode.includes("DeviceNotRegistered") && f.recipientToken) {
+      tokensToPurge.push(f.recipientToken);
+    }
+  }
+  for (const [errorCode, ids] of failuresByCode) {
     await db
       .update(notificationLog)
       .set({
         status: "failed",
         providerReceiptCheckedAt: now,
-        errorMessage: f.errorCode,
+        errorMessage: errorCode,
       })
-      .where(eq(notificationLog.id, f.id));
-    result.failed++;
-    if (f.errorCode.includes("DeviceNotRegistered") && f.recipientToken) {
-      tokensToPurge.push(f.recipientToken);
-    }
+      .where(inArray(notificationLog.id, ids));
   }
 
   if (tokensToPurge.length > 0) {

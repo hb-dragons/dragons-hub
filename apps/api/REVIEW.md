@@ -92,6 +92,14 @@ After-fix baseline (2026-05-04, fourth pass):
 - L13 stramatel-decoder ASCII validation uses `for (const byte of payload)` instead of indexed `payload[i] as number`
 - L20 `snapshotsDiffer` typed via `Pick<typeof liveScoreboards.$inferSelect, DedupeKey>` so callers no longer cast through `Record<string, unknown>`
 
+### Round 9 follow-ups (2026-05-04)
+
+- M2b match-admin: `tx.insert(matchChanges).values([...])` and `tx.insert(matchOverrides).values([...]).onConflictDoUpdate(...)` replace per-row inserts inside the transaction
+- M2f push-receipt worker groups failures by errorCode and runs one UPDATE per distinct code (was N updates for N failures)
+- M6b push templates: `_utils.ts` consolidates `truncate` + `formatDate` + `formatDe`; six template files now import them instead of defining their own copies
+- L1 production cookie prefix is `__Secure-dragons` (must-be-secure semantics encoded in the name)
+- L10 `GET /admin/sync/jobs` accepts a `limit` query param (1–500, default 100)
+
 ### Deferred (still in this doc)
 
 The unchecked items below are real issues but lower priority than what was fixed. They are preserved so a future pass can pick them up:

@@ -1,5 +1,6 @@
 import type { Locale, PushTemplateOutput } from "./types";
 import { BODY_MAX, TITLE_MAX } from "./types";
+import { truncate } from "./_utils";
 import type { RefereeAssignedPayload } from "./referee-assigned";
 
 const TITLE = {
@@ -29,6 +30,3 @@ export function renderRefereeUnassignedPush(
   };
 }
 
-function truncate(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 1) + "…";
-}

@@ -56,7 +56,7 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    cookiePrefix: "dragons",
+    cookiePrefix: env.NODE_ENV === "production" ? "__Secure-dragons" : "dragons",
     crossSubDomainCookies:
       env.NODE_ENV === "production"
         ? { enabled: true, domain: ".app.hbdragons.de" }

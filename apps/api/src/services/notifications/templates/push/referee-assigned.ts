@@ -1,5 +1,6 @@
 import type { Locale, PushTemplateOutput } from "./types";
 import { BODY_MAX, TITLE_MAX } from "./types";
+import { formatDate, formatDe, truncate } from "./_utils";
 
 export interface RefereeAssignedPayload {
   matchId: number;
@@ -21,7 +22,7 @@ const BODY = {
   de: (p: RefereeAssignedPayload) =>
     `Du wurdest als ${p.slot} für ${p.homeTeam} vs. ${p.guestTeam} am ${formatDe(p.kickoffDate)} um ${p.kickoffTime} eingesetzt.`,
   en: (p: RefereeAssignedPayload) =>
-    `You've been assigned as ${p.slot} for ${p.homeTeam} vs. ${p.guestTeam} on ${formatEn(p.kickoffDate)} at ${p.kickoffTime}.`,
+    `You've been assigned as ${p.slot} for ${p.homeTeam} vs. ${p.guestTeam} on ${formatDate(p.kickoffDate, "en")} at ${p.kickoffTime}.`,
 };
 
 export function renderRefereeAssignedPush(
@@ -39,16 +40,3 @@ export function renderRefereeAssignedPush(
   };
 }
 
-function truncate(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 1) + "…";
-}
-
-function formatDe(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
-}
-
-function formatEn(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${y}-${m}-${d}`;
-}

@@ -152,31 +152,35 @@ export async function updateMatchLocal(
       baseRemoteVersion: locked.currentRemoteVersion,
     });
 
-    for (const change of fieldChanges) {
-      await tx.insert(matchChanges).values({
+    await tx.insert(matchChanges).values(
+      fieldChanges.map((change) => ({
         matchId: id,
-        track: "local",
+        track: "local" as const,
         versionNumber: newVersion,
         fieldName: change.field,
         oldValue: change.oldValue,
         newValue: change.newValue,
         changedBy,
-      });
-    }
-
-    // Upsert override rows for overridable fields
-    const overridableChanges = fieldChanges.filter((c) =>
-      (OVERRIDABLE_FIELDS as readonly string[]).includes(c.field),
+      })),
     );
-    for (const change of overridableChanges) {
-      if (!clearedOverrides.has(change.field)) {
-        // Upsert: create or update the override row
-        await tx.insert(matchOverrides).values({
-          matchId: id,
-          fieldName: change.field,
-          reason: data.changeReason ?? null,
-          changedBy,
-        }).onConflictDoUpdate({
+
+    const overridableChanges = fieldChanges.filter(
+      (c) =>
+        (OVERRIDABLE_FIELDS as readonly string[]).includes(c.field) &&
+        !clearedOverrides.has(c.field),
+    );
+    if (overridableChanges.length > 0) {
+      await tx
+        .insert(matchOverrides)
+        .values(
+          overridableChanges.map((change) => ({
+            matchId: id,
+            fieldName: change.field,
+            reason: data.changeReason ?? null,
+            changedBy,
+          })),
+        )
+        .onConflictDoUpdate({
           target: [matchOverrides.matchId, matchOverrides.fieldName],
           set: {
             reason: data.changeReason ?? null,
@@ -184,7 +188,6 @@ export async function updateMatchLocal(
             updatedAt: new Date(),
           },
         });
-      }
     }
 
     await tx

@@ -99,9 +99,11 @@ syncRoutes.get(
     const { statuses } = jobStatusesQuerySchema.parse({
       statuses: c.req.query("statuses"),
     });
+    const limitRaw = Number(c.req.query("limit"));
+    const limit = Number.isInteger(limitRaw) && limitRaw > 0 && limitRaw <= 500 ? limitRaw : 100;
 
     const jobStatuses: JobType[] = statuses && statuses.length > 0 ? statuses : DEFAULT_JOB_STATUSES;
-    const jobs = await syncQueue.getJobs(jobStatuses, 0, 100, false);
+    const jobs = await syncQueue.getJobs(jobStatuses, 0, limit, false);
 
     const formattedJobs = await Promise.all(
       jobs.map(async (job) => ({
