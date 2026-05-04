@@ -143,6 +143,11 @@ export type {
 
 // Domain events
 export * from "./domain-events";
+export {
+  eventPayloadSchemas,
+  validateEventPayload,
+  type PayloadValidation,
+} from "./domain-event-schemas";
 
 // Watch rules
 export * from "./watch-rules";

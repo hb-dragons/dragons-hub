@@ -3,6 +3,7 @@ import { db } from "../../config/database";
 import { domainEvents } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import type { EventSource, EventEntityType, EventType } from "@dragons/shared";
+import { validateEventPayload } from "@dragons/shared";
 import { classifyUrgency } from "./event-types";
 import { domainEventsQueue } from "../../workers/queues";
 import { logger } from "../../config/logger";
@@ -40,6 +41,13 @@ export interface DomainEvent {
  * Does not persist or enqueue -- pure data construction.
  */
 export function buildDomainEvent(params: BuildDomainEventParams): DomainEvent {
+  const validation = validateEventPayload(params.type, params.payload);
+  if (!validation.valid) {
+    logger.warn(
+      { type: params.type, issues: validation.issues, entityId: params.entityId },
+      "Domain event payload failed schema validation; publishing anyway",
+    );
+  }
   return {
     id: ulid(),
     type: params.type,
