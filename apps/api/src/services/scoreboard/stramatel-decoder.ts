@@ -53,9 +53,8 @@ export function decodeScoreFrame(frame: Buffer): StramatelSnapshot | null {
   const payload = frame.subarray(payloadOffset, frame.length - 1);
   if (payload.length < PAYLOAD_MIN_LENGTH) return null;
 
-  // Stramatel payloads are ASCII-encoded. Any non-ASCII byte means a malformed frame.
-  for (let i = 0; i < payload.length; i++) {
-    if ((payload[i] as number) > 0x7e) return null;
+  for (const byte of payload) {
+    if (byte > 0x7e) return null;
   }
 
   const testCond = readSlice(payload, 4, 2).trim();

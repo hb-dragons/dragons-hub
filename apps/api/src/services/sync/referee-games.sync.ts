@@ -157,15 +157,6 @@ function buildPayload(row: ReturnType<typeof mapApiResultToRow> & { matchId?: nu
   };
 }
 
-async function findMatchId(apiMatchId: number): Promise<number | null> {
-  const [row] = await db
-    .select({ id: matches.id })
-    .from(matches)
-    .where(eq(matches.apiMatchId, apiMatchId))
-    .limit(1);
-  return row?.id ?? null;
-}
-
 // --- Main sync ---
 
 export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: number | null): Promise<{
@@ -225,6 +216,29 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
     }
   }
 
+  // Batch-load existing referee_games rows + matches lookup to avoid N+1
+  const apiMatchIds = response.results
+    .map((r) => mapApiResultToRow(r).apiMatchId)
+    .filter((id): id is number => typeof id === "number" && id > 0);
+
+  const existingRefRows = apiMatchIds.length > 0
+    ? await db
+        .select()
+        .from(refereeGames)
+        .where(inArray(refereeGames.apiMatchId, apiMatchIds))
+    : [];
+  const existingByApiMatchId = new Map(
+    existingRefRows.map((r) => [r.apiMatchId, r]),
+  );
+
+  const matchRows = apiMatchIds.length > 0
+    ? await db
+        .select({ id: matches.id, apiMatchId: matches.apiMatchId })
+        .from(matches)
+        .where(inArray(matches.apiMatchId, apiMatchIds))
+    : [];
+  const matchIdByApiMatchId = new Map(matchRows.map((r) => [r.apiMatchId, r.id]));
+
   let created = 0;
   let updated = 0;
   let unchanged = 0;
@@ -239,15 +253,8 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
       const guestTeamId = teamByClubId.get(mapped.guestClubId) ?? null;
       const hash = computeRefereeGameHash(mapped);
 
-      // Look up existing referee_games row
-      const [existing] = await db
-        .select()
-        .from(refereeGames)
-        .where(eq(refereeGames.apiMatchId, mapped.apiMatchId))
-        .limit(1);
-
-      // Look up matches row for matchId
-      const matchId = await findMatchId(mapped.apiMatchId);
+      const existing = existingByApiMatchId.get(mapped.apiMatchId);
+      const matchId = matchIdByApiMatchId.get(mapped.apiMatchId) ?? null;
 
       if (!existing) {
         // INSERT

@@ -9,9 +9,9 @@ This document tracks every finding from the review, ordered for sequential fixin
 
 ## Progress
 
-After-fix baseline (2026-05-04, third pass):
+After-fix baseline (2026-05-04, fourth pass):
 - 158 test files, 2731 tests passing (was 153 / 2673 pre-review)
-- Coverage: 96.79% stmts / 90.04% branches / 96.15% funcs / 97.4% lines
+- Coverage: 96.92% stmts / 90.08% branches / 96.18% funcs / 97.45% lines
 - Lint clean. Typecheck clean. AI-slop check passed.
 
 ### Fixed in this pass
@@ -82,6 +82,15 @@ After-fix baseline (2026-05-04, third pass):
 - M7f `sync-logger` Redis publish failure now uses a 30s recovery cooldown instead of permanently disabling streaming for the run
 - M7i magic thresholds split between scoreboard ↔ broadcast unified through the constants module
 - New tests: env-schema validation (production URL rules + VERBOSE_ERRORS coercion), scoreboard constants
+
+### Round 8 follow-ups (2026-05-04)
+
+- M2a `referee-games.sync` batches existing-row + matches-id lookups via `inArray`; replaces N+1 per-game query pattern (drops ~2N round-trips per sync run)
+- M6c `services/scoreboard/sse-helper.ts` extracts the SSE plumbing (encoder, controller, heartbeat, cancel cleanup); `services/scoreboard/sse.ts` and `routes/public/broadcast.routes.ts` both consume it
+- M7g `services/notifications/channel-config-parsers.ts` adds Zod-backed `parseWhatsAppGroupConfig` / `parseInAppConfig` / `readLocale`; `notification-pipeline` and `digest.worker` use them, replacing `as unknown as WhatsAppGroupConfig` and `(config.config as Record<string, unknown>)?.locale as string` casts
+- L9 `[lastSync, runningSync].filter(Boolean) as ...` → typed predicate
+- L13 stramatel-decoder ASCII validation uses `for (const byte of payload)` instead of indexed `payload[i] as number`
+- L20 `snapshotsDiffer` typed via `Pick<typeof liveScoreboards.$inferSelect, DedupeKey>` so callers no longer cast through `Record<string, unknown>`
 
 ### Deferred (still in this doc)
 

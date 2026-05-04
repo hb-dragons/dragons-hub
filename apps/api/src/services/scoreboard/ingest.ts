@@ -39,9 +39,11 @@ const DEDUPE_KEYS = [
   "timeoutActive",
 ] as const satisfies ReadonlyArray<keyof StramatelSnapshot>;
 
+type DedupeKey = (typeof DEDUPE_KEYS)[number];
+
 function snapshotsDiffer(
-  prev: Record<string, unknown> | null,
-  next: Record<string, unknown>,
+  prev: Pick<typeof liveScoreboards.$inferSelect, DedupeKey> | null,
+  next: Pick<StramatelSnapshot, DedupeKey>,
 ): boolean {
   if (!prev) return true;
   return DEDUPE_KEYS.some((k) => prev[k] !== next[k]);
@@ -85,10 +87,7 @@ export async function processIngest({
       .where(eq(liveScoreboards.deviceId, deviceId))
       .limit(1);
 
-    const changed = snapshotsDiffer(
-      existing as unknown as Record<string, unknown> | null,
-      decoded as unknown as Record<string, unknown>,
-    );
+    const changed = snapshotsDiffer(existing ?? null, decoded);
 
     let snapshotId: number | null = null;
     if (changed) {

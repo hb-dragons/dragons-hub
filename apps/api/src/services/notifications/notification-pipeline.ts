@@ -17,8 +17,8 @@ import { ExpoPushClient } from "./expo-push.client";
 import { resolveRecipientUserIds } from "./recipient-resolver";
 import { renderRefereeSlotsWhatsApp } from "./templates/referee-slots";
 import { env } from "../../config/env";
-import type { WhatsAppGroupConfig } from "@dragons/shared";
 import type { RefereeSlotsPayload } from "@dragons/shared";
+import { parseWhatsAppGroupConfig, readLocale } from "./channel-config-parsers";
 import { logger } from "../../config/logger";
 
 // ── Config type alias ────────────────────────────────────────────────────────
@@ -284,7 +284,7 @@ async function dispatchImmediate(params: {
 }): Promise<boolean> {
   const { event, config, watchRuleId, recipientId, channelType } = params;
   const payload = event.payload as Record<string, unknown>;
-  const configLocale = (config.config as Record<string, unknown>)?.locale as string | undefined;
+  const configLocale = readLocale(config.config);
   const locale = await resolveLocaleForRecipient(recipientId, configLocale);
   const message = renderEventMessage(event.type, payload, event.entityName, locale);
 
@@ -302,14 +302,12 @@ async function dispatchImmediate(params: {
   }
 
   if (channelType === "whatsapp_group") {
-    // Extract groupId from the channel config (WhatsAppGroupConfig from @dragons/shared)
-    const channelCfg = config.config as unknown as WhatsAppGroupConfig;
-    const groupChatId = channelCfg.groupId;
-
-    if (!groupChatId) {
-      logger.warn({ channelConfigId: config.id }, "WhatsApp group config missing groupId");
+    const channelCfg = parseWhatsAppGroupConfig(config.config);
+    if (!channelCfg) {
+      logger.warn({ channelConfigId: config.id }, "WhatsApp group config invalid or missing groupId");
       return false;
     }
+    const groupChatId = channelCfg.groupId;
 
     // For referee slot events, use the rich WhatsApp template
     const isSlotEvent =

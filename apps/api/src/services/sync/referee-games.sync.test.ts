@@ -371,8 +371,6 @@ describe("syncRefereeGames", () => {
     mockSelect.mockImplementation(() => {
       const currentCall = selectCallIndex++;
       if (currentCall === 0) {
-        // League lookup: select({...}).from(leagues).where(inArray(...))
-        // Returns thenable (no .limit())
         return {
           from: vi.fn().mockReturnValue({
             where: vi.fn().mockResolvedValue([]),
@@ -380,20 +378,17 @@ describe("syncRefereeGames", () => {
         };
       }
       if (currentCall === 1) {
-        // Teams lookup: select({...}).from(teams).where(inArray(...))
         return {
           from: vi.fn().mockReturnValue({
             where: vi.fn().mockResolvedValue(teamRows),
           }),
         };
       }
-      // Per-game queries: select().from(table).where(eq(...)).limit(1)
-      const perGameIndex = currentCall - 2;
+      // Batch lookups: refereeGames (call 2) then matches (call 3)
+      const batchIndex = currentCall - 2;
       return {
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockImplementation(() => perGameFn(perGameIndex)),
-          }),
+          where: vi.fn().mockImplementation(() => perGameFn(batchIndex)),
         }),
       };
     });
@@ -521,32 +516,30 @@ describe("syncRefereeGames", () => {
     expect(mockCancelReminderJobs).toHaveBeenCalledWith(1001);
   });
 
-  it("continues processing when a single game throws", async () => {
+  it("continues processing when a single game's insert throws", async () => {
     const result1 = makeApiResult();
     const result2 = makeApiResult();
     result2.sp.spielplanId = 2002;
     result2.sp.spielnr = 99;
     mockFetchOffeneSpiele.mockResolvedValue({ total: 2, results: [result1, result2] });
 
-    // First game: referee_games select throws
-    // Second game: works fine (no existing row, no matches row)
-    let perGameCall = 0;
-    setupSelectMock(async () => {
-      perGameCall++;
-      if (perGameCall === 1) {
-        throw new Error("DB connection lost");
-      }
-      return []; // no existing referee_games row / no matches row
-    });
+    setupSelectMock(async () => []);
 
-    const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 2, apiMatchId: 2002 }]),
-    });
-    mockInsert.mockReturnValue({ values: mockValues });
+    let insertCall = 0;
+    mockInsert.mockImplementation(() => ({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockImplementation(() => {
+          insertCall++;
+          if (insertCall === 1) {
+            return Promise.reject(new Error("DB connection lost"));
+          }
+          return Promise.resolve([{ id: 2, apiMatchId: 2002 }]);
+        }),
+      }),
+    }));
 
     const counts = await syncRefereeGames();
 
-    // First failed, second created
     expect(counts.created).toBe(1);
   });
 

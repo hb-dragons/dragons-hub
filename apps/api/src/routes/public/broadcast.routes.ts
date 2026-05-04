@@ -7,8 +7,10 @@ import {
   tryAcquire,
   release,
 } from "../../services/scoreboard/connection-cap";
-
-const HEARTBEAT_MS = 15_000;
+import {
+  createSseResponse,
+  sseEvent,
+} from "../../services/scoreboard/sse-helper";
 
 const publicBroadcastRoutes = new Hono();
 
@@ -53,56 +55,16 @@ publicBroadcastRoutes.get(
       return c.json({ error: "Too many connections", code: "BUSY" }, 503);
     }
 
-    const encoder = new TextEncoder();
-    let heartbeat: ReturnType<typeof setInterval> | undefined;
-    let unsubscribe: (() => Promise<void>) | undefined;
-    let cancelled = false;
-    let released = false;
-    const releaseOnce = () => {
-      if (released) return;
-      released = true;
-      release(deviceId);
-    };
-
-    const stream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        function safe(text: string) {
-          try {
-            controller.enqueue(encoder.encode(text));
-          } catch {
-            // closed
-          }
-        }
-        safe("retry: 2000\n\n");
-
+    return createSseResponse({
+      onClose: () => release(deviceId),
+      onStart: async (enqueue, isCancelled) => {
         const initial = await buildBroadcastState(deviceId);
-        if (cancelled) return;
-        safe(`event: snapshot\ndata: ${JSON.stringify(initial)}\n\n`);
+        if (isCancelled()) return undefined;
+        enqueue(sseEvent(undefined, "snapshot", initial));
 
-        const sub = await subscribeBroadcast(deviceId, (state) => {
-          safe(`event: snapshot\ndata: ${JSON.stringify(state)}\n\n`);
+        return subscribeBroadcast(deviceId, (state) => {
+          enqueue(sseEvent(undefined, "snapshot", state));
         });
-        if (cancelled) {
-          await sub();
-          return;
-        }
-        unsubscribe = sub;
-
-        heartbeat = setInterval(() => safe(": ping\n\n"), HEARTBEAT_MS);
-      },
-      async cancel() {
-        cancelled = true;
-        if (heartbeat) clearInterval(heartbeat);
-        if (unsubscribe) await unsubscribe();
-        releaseOnce();
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-store",
-        Connection: "keep-alive",
       },
     });
   },

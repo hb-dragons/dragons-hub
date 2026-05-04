@@ -4,6 +4,7 @@ import { digestBuffer, domainEvents, channelConfigs, notificationLog } from "@dr
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { db } from "../config/database";
+import { readLocale } from "../services/notifications/channel-config-parsers";
 import { renderDigestMessage, type DigestItem } from "../services/notifications/templates/digest";
 
 interface DigestJobData {
@@ -68,8 +69,7 @@ export const digestWorker = new Worker<DigestJobData>(
       occurredAt: row.occurredAt,
     }));
 
-    // 4. Render digest message — read locale from channel config, fall back to German
-    const locale = (config.config as unknown as Record<string, unknown>)?.locale as string ?? "de";
+    const locale = readLocale(config.config) ?? "de";
     const message = renderDigestMessage(items, locale);
 
     // 5. Deliver and clear buffer atomically in a transaction.

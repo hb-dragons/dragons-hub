@@ -77,7 +77,9 @@ export async function getSyncStatus(syncType?: string) {
     )
     .limit(1);
 
-  const runs = [lastSync, runningSync].filter(Boolean) as (typeof syncRuns.$inferSelect)[];
+  const runs = [lastSync, runningSync].filter(
+    (r): r is typeof syncRuns.$inferSelect => r !== undefined,
+  );
   const nameMap = await resolveTriggeredByNames(runs);
 
   return {
