@@ -575,6 +575,10 @@ app/
 - `apps/web/src/middleware.ts` — Next.js middleware redirects unauthenticated users from `/admin/*` to `/auth/sign-in`
 - Auth UI: `@daveyplate/better-auth-ui` provides `AuthView`, `UserButton`, `SignedIn`, `SignedOut` components
 - Session cookie: `dragons.session_token` (or `__Secure-dragons.session_token` in production)
+- Production cookie domain is `.app.hbdragons.de` so any subdomain of that
+  host can read the session. Make sure every `*.app.hbdragons.de` record is
+  controlled by a service we operate; a delegated subdomain would receive
+  the session cookie on every authenticated request.
 
 ### Client Components
 

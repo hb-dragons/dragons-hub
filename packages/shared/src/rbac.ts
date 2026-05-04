@@ -105,9 +105,9 @@ export function hasRole(
   return parseRoles(user.role).includes(role);
 }
 
-export function isReferee(
-  user: { refereeId?: number | null } | null | undefined,
-): boolean {
+export function isReferee<U extends { refereeId?: number | null }>(
+  user: U | null | undefined,
+): user is U & { refereeId: number } {
   return typeof user?.refereeId === "number";
 }
 

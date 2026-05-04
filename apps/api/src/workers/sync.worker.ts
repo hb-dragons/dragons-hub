@@ -18,9 +18,10 @@ export const syncWorker = new Worker<SyncJobData>(
     const log = logger.child({ jobId: job.id });
     log.info({ jobName: job.name }, "Starting sync job");
 
-    const triggeredBy = (job.name === "daily-sync" || job.name === "referee-games-sync-scheduled")
-      ? "cron"
-      : ("manual" as const);
+    const triggeredBy: "cron" | "manual" =
+      job.name === "daily-sync" || job.name === "referee-games-sync-scheduled"
+        ? "cron"
+        : "manual";
 
     try {
       const jobLogger = async (msg: string) => {

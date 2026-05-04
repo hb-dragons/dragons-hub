@@ -113,6 +113,7 @@ beforeEach(() => {
   mockCreateSyncLogger.mockReturnValue({
     close: vi.fn().mockResolvedValue(undefined),
     log: vi.fn().mockResolvedValue(undefined),
+    getDroppedEntryCount: vi.fn().mockReturnValue(0),
   });
 
   mockSyncLeagues.mockResolvedValue({
@@ -312,7 +313,11 @@ describe("fullSync", () => {
     });
 
     it("closes sync logger on success", async () => {
-      const mockLogger = { close: vi.fn().mockResolvedValue(undefined), log: vi.fn() };
+      const mockLogger = {
+        close: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        getDroppedEntryCount: vi.fn().mockReturnValue(0),
+      };
       mockCreateSyncLogger.mockReturnValue(mockLogger);
 
       await fullSync("manual");
@@ -321,7 +326,11 @@ describe("fullSync", () => {
     });
 
     it("closes sync logger on failure", async () => {
-      const mockLogger = { close: vi.fn().mockResolvedValue(undefined), log: vi.fn() };
+      const mockLogger = {
+        close: vi.fn().mockResolvedValue(undefined),
+        log: vi.fn(),
+        getDroppedEntryCount: vi.fn().mockReturnValue(0),
+      };
       mockCreateSyncLogger.mockReturnValue(mockLogger);
       mockSyncLeagues.mockRejectedValue(new Error("crash"));
 

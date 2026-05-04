@@ -128,7 +128,7 @@ notificationRoutes.post(
   },
 );
 
-// GET /admin/notifications/preferences - fetch caller's notification preferences
+// Caller-self: any authenticated user reads/writes their own row.
 notificationRoutes.get(
   "/notifications/preferences",
   describeRoute({

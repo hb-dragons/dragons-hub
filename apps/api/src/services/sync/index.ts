@@ -169,6 +169,10 @@ export async function fullSync(
 
     // Close sync logger (flushes remaining entries)
     await syncLogger.close();
+    const droppedEntries = syncLogger.getDroppedEntryCount();
+    if (droppedEntries > 0) {
+      allErrors.push(`Dropped ${droppedEntries} log entries after flush retries exhausted`);
+    }
 
     const completedAt = new Date();
     const durationMs = completedAt.getTime() - startedAt.getTime();

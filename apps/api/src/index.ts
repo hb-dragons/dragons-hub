@@ -12,7 +12,11 @@ const { logger, flushLogger } = await import("./config/logger");
 const mode = env.RUN_MODE;
 const port = Number(process.env.PORT ?? 3001);
 
-let httpServer: ReturnType<typeof import("@hono/node-server").serve> | undefined;
+interface Closable {
+  close(cb?: (err?: Error) => void): void;
+}
+
+let httpServer: Closable | undefined;
 let shutdownWorkersFn: (() => Promise<void>) | undefined;
 
 if (mode === "api" || mode === "both") {
@@ -29,7 +33,6 @@ if (mode === "worker" || mode === "both") {
   shutdownWorkersFn = shutdownWorkers;
   await initializeWorkers();
 
-  // Worker-only mode: start a minimal health-check server for Cloud Run
   if (mode === "worker") {
     const { createServer } = await import("node:http");
     const healthServer = createServer((_req, res) => {
@@ -39,14 +42,14 @@ if (mode === "worker" || mode === "both") {
     healthServer.listen(port, () => {
       logger.info(`Worker health check running at http://localhost:${port}`);
     });
-    httpServer = healthServer as unknown as typeof httpServer;
+    httpServer = healthServer;
   }
 }
 
 async function shutdown() {
   logger.info("Shutting down...");
   if (shutdownWorkersFn) await shutdownWorkersFn();
-  if (httpServer) (httpServer as { close: () => void }).close();
+  httpServer?.close();
   const { closeDb } = await import("./config/database");
   await closeDb();
   await flushLogger();

@@ -29,8 +29,13 @@ export class SyncLogger {
   private channelName: string;
   private redisFailedAt = 0;
   private flushRetries = 0;
+  private droppedEntries = 0;
   private static readonly MAX_FLUSH_RETRIES = 3;
   private static readonly REDIS_RECOVERY_COOLDOWN_MS = 30_000;
+
+  getDroppedEntryCount(): number {
+    return this.droppedEntries;
+  }
 
   private shouldAttemptRedis(): boolean {
     if (this.redisFailedAt === 0) return true;
@@ -103,8 +108,9 @@ export class SyncLogger {
         log.error({ err: error, retry: this.flushRetries }, "Failed to flush entries, will retry");
         this.entries.push(...toInsert);
       } else {
+        this.droppedEntries += toInsert.length;
         log.error(
-          { err: error, droppedCount: toInsert.length },
+          { err: error, droppedCount: toInsert.length, totalDropped: this.droppedEntries, syncRunId: this.syncRunId },
           "Failed to flush entries after max retries, dropping batch",
         );
         this.flushRetries = 0;

@@ -104,14 +104,13 @@ export function requireRefereeSelfOrPermission<R extends Resource>(
     }
     const user = session.user as { refereeId?: number | null; role?: string | null };
     const hasPerm = can(user, resource, action);
-    const linked = isReferee(user);
-    if (!hasPerm && !linked) {
+    if (!hasPerm && !isReferee(user)) {
       return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
     }
     c.set("user", session.user);
     c.set("session", session.session);
-    if (!hasPerm && linked) {
-      c.set("refereeId", user.refereeId as number);
+    if (!hasPerm && isReferee(user)) {
+      c.set("refereeId", user.refereeId);
     }
     await next();
   };
