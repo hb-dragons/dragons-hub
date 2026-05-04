@@ -9,6 +9,10 @@ import {
 
 const refereeGamesRoutes = new Hono<AppEnv>();
 
+// Any role with `assignment.view` (admin, refereeAdmin) gets cross-referee
+// visibility; a referee without that permission is scoped to their own games
+// via c.get("refereeId"). To restrict cross-referee visibility to a smaller
+// allowlist, swap to a role-based guard rather than a permission-based one.
 const gate = requireRefereeSelfOrPermission("assignment", "view");
 
 refereeGamesRoutes.get("/games", gate, async (c) => {

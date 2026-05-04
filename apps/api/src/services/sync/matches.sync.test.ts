@@ -83,7 +83,8 @@ vi.mock("@dragons/shared", () => ({
   },
 }));
 
-import { syncMatchesFromData, extractPeriodScores, extractOvertimeDeltas, buildMatchEntityName } from "./matches.sync";
+import { syncMatchesFromData, buildMatchEntityName } from "./matches.sync";
+import { extractPeriodScores, extractOvertimeDeltas } from "./period-scores";
 import { computeEntityHash } from "./hash";
 
 beforeEach(() => {

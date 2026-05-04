@@ -661,6 +661,16 @@ Located in `apps/api/src/workers/`. Queues configured in `workers/queues.ts`.
 - Singleton: `apps/api/src/config/database.ts`
 - Connection: `DATABASE_URL` env var
 
+### Data access conventions
+
+- Inline Drizzle queries in the service that owns the operation. There is no
+  `repositories/` layer, intentionally.
+- When the same SELECT (or join + row mapper) is duplicated across 3 or more
+  services, extract it into a `*-query.service.ts` companion file alongside
+  the owning service. Existing example: `services/admin/match-query.service.ts`.
+- `*-query.service.ts` files only hold reads + row mappers. Mutations stay in
+  the domain service file (e.g. `match-admin.service.ts`).
+
 ### Docker (dev)
 
 `docker/docker-compose.dev.yml`: postgres:17 (port 5432), redis:7-alpine (port 6379)

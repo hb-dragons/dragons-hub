@@ -105,17 +105,24 @@ After-fix baseline (2026-05-04, fourth pass):
 - M6f templates `render-chain.ts` extracts the renderer chain; both `index.ts` (renderEventMessage) and `digest.ts` (renderDigestMessage) consume the same `tryRenderEvent`. Digest now includes task events (was a silent feature gap)
 - M2d `reorderColumns` issues parallel UPDATEs inside a single transaction instead of sequential awaits
 
-### Deferred (still in this doc)
+### Decisions made (2026-05-04)
 
-The unchecked items below are real issues but lower priority than what was fixed. They are preserved so a future pass can pick them up:
+- **H5** Bull Board exposure → keep as-is (admin-gated). Acceptable risk for a small admin team. If admin pool grows, revisit and either gate behind a `superadmin` role or move behind IAP.
+- **H6** `requireRefereeSelfOrPermission` widening → keep current behavior. `refereeAdmin` is an oversight role; cross-referee visibility is intended. `rbac.test.ts` covers all cases (linked-referee / admin / refereeAdmin / neither / both); route-level comment in `routes/referee/games.routes.ts` documents the contract.
+- **H14** Sync orchestrator partial-failure → accept current behavior. Hash-skip makes re-running cheap. `failed` status means at least one step failed; check `syncRunEntries` for granular per-item log.
+- **M5b** Service file gigantism → split `task.service.ts` into table-affinity files + extract pure functions out of `matches.sync.ts`. _(implementation pending)_
+- **M5c** Domain event payload typing → per-event-type Zod schemas in `@dragons/shared`. Producers and consumers parse at the boundary. _(implementation pending)_
+- **M5e** Data access layer → codify the pragmatic rule: queries repeated in 3+ places get a `*-query.service.ts` helper; otherwise inline Drizzle in the consuming service. Documented in `AGENTS.md`.
 
-- N+1 batching in sync hot paths (M2a-f) — performance, not correctness
-- Service file gigantism (M5b) — cognitive load, not bugs
-- Domain-event payload typing (M5c) — type-drift risk
-- Service→route schema imports (M5a) — layering smell
-- Push template helper dedup (M6b) and renderer-chain dedup (M6f) — UI consistency
-- SSE plumbing helper extraction (M6c) — done implicitly via shared-subscriber refactor; routes still duplicate stream wiring
-- Various Lows: cookie `__Secure-` prefix, BETTER_AUTH_URL prod refinement, etc.
+### Remaining low-priority items
+
+- L5 OpenAPI spec rebuild per request (verify caching)
+- L6 `httpServer = healthServer as unknown as typeof httpServer` cast in `index.ts`
+- L7 Proxy-based lazy singletons for `db`/`redis` (loses Symbol.iterator semantics)
+- L14 sync.worker `as const` consistency on ternary branches
+- L15 admin-test emoji `🏀` violates anti-emoji rule (cosmetic)
+- L16 `/admin/notifications/preferences` semantic mismatch (endpoint serves caller-self under admin/* path)
+- L18-19, L21-24 misc cosmetic / docstring items
 
 ## Baseline at review time
 
