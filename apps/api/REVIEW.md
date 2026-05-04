@@ -114,15 +114,22 @@ After-fix baseline (2026-05-04, fourth pass):
 - **M5c** Domain event payload typing → per-event-type Zod schemas in `@dragons/shared`. Producers and consumers parse at the boundary. _(implementation pending)_
 - **M5e** Data access layer → codify the pragmatic rule: queries repeated in 3+ places get a `*-query.service.ts` helper; otherwise inline Drizzle in the consuming service. Documented in `AGENTS.md`.
 
+### Cleanup pass (2026-05-04, commit 85794e2)
+
+- L3 `.env.example` BETTER_AUTH_SECRET recommendation bumped to 48 chars
+- L5 verified via reading hono-openapi: `openAPIRouteHandler` caches the spec in a closure-scoped variable. No code change.
+- L6 `index.ts` replaces the double-cast with a `Closable` interface satisfied by both `serve()` and `createServer()`
+- L14 sync.worker `triggeredBy` uses an explicit `"cron" | "manual"` type rather than `as const` on one arm
+- L16 comment on `/notifications/preferences` documents the caller-self semantics
+- L18 sync-logger tracks `droppedEntries` count; orchestrator surfaces it on `syncRuns.errorMessage`
+- L21 `isReferee` in `@dragons/shared` narrows to `user is U & { refereeId: number }`; `rbac.ts` drops the `as number` cast
+- L23 `AGENTS.md` documents the subdomain-takeover risk on `.app.hbdragons.de` cookie domain
+- L24 push template `TITLE_MAX` / `BODY_MAX` comment cites APNs/Android limits
+
 ### Remaining low-priority items
 
-- L5 OpenAPI spec rebuild per request (verify caching)
-- L6 `httpServer = healthServer as unknown as typeof httpServer` cast in `index.ts`
-- L7 Proxy-based lazy singletons for `db`/`redis` (loses Symbol.iterator semantics)
-- L14 sync.worker `as const` consistency on ternary branches
-- L15 admin-test emoji `🏀` violates anti-emoji rule (cosmetic)
-- L16 `/admin/notifications/preferences` semantic mismatch (endpoint serves caller-self under admin/* path)
-- L18-19, L21-24 misc cosmetic / docstring items
+- L7 Proxy-based lazy singletons for `db`/`redis` — refactor risk too high; left in place
+- L15 admin-test emoji `🏀` — left as human-authored product copy
 
 ## Baseline at review time
 
