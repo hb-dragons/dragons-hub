@@ -129,11 +129,11 @@ describe("broadcast/config", () => {
     const { matchId } = await seed();
     await upsertBroadcastConfig({ deviceId: "d1", matchId });
     const onRow = await setBroadcastLive("d1", true);
-    expect(onRow.isLive).toBe(true);
-    expect(onRow.startedAt).not.toBeNull();
+    expect(onRow!.isLive).toBe(true);
+    expect(onRow!.startedAt).not.toBeNull();
     const offRow = await setBroadcastLive("d1", false);
-    expect(offRow.isLive).toBe(false);
-    expect(offRow.endedAt).not.toBeNull();
+    expect(offRow!.isLive).toBe(false);
+    expect(offRow!.endedAt).not.toBeNull();
   });
 
   it("loadJoinedMatch returns home/guest with abbr fallback", async () => {
@@ -237,14 +237,9 @@ it("loadJoinedMatch falls back to default colors when teams have none", async ()
     expect(out!.guest.color).toBe("#dc2626");
   });
 
-  it("setBroadcastLive(false) on a never-started config returns an empty stopped row", async () => {
-    // No prior upsert: the config row does not exist yet, so the read after
-    // the no-op transaction returns null and the function falls back to a
-    // synthesized empty stopped config.
+  it("setBroadcastLive(false) on a never-started config returns null", async () => {
     const out = await setBroadcastLive("ghost", false);
-    expect(out.deviceId).toBe("ghost");
-    expect(out.isLive).toBe(false);
-    expect(out.matchId).toBeNull();
+    expect(out).toBeNull();
   });
 
   it("upsert updates color overrides without touching matchId", async () => {

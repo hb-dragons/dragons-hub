@@ -2,8 +2,32 @@ import { db } from "../../config/database";
 import { syncRuns, syncRunEntries, syncSchedule, matches, matchRemoteVersions, matchChanges, user } from "@dragons/db/schema";
 import { desc, eq, sql, and, or, ilike, inArray } from "drizzle-orm";
 import { updateSyncSchedule, updateRefereeSyncSchedule } from "../../workers/queues";
-import type { SyncLogsQuery, SyncEntriesQuery, UpdateScheduleBody } from "../../routes/admin/sync.schemas";
 import { escapeLikePattern } from "../utils/sql";
+import type { EntityType, EntryAction } from "@dragons/shared";
+
+export interface SyncLogsQuery {
+  limit: number;
+  offset: number;
+  status?: "running" | "completed" | "failed";
+  syncType?: string;
+}
+
+export interface SyncEntriesQuery {
+  limit: number;
+  offset: number;
+  entityType?: EntityType;
+  action?: EntryAction;
+  search?: string;
+}
+
+export interface UpdateScheduleBody {
+  syncType?: string;
+  enabled?: boolean;
+  cronExpression?: string | null;
+  intervalMinutes?: number;
+  timezone?: string;
+  updatedBy?: string;
+}
 
 /**
  * Resolve triggeredBy user IDs to display names.

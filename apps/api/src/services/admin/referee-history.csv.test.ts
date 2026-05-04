@@ -21,6 +21,22 @@ describe("toCsv", () => {
   it("throws when row length does not match header length", () => {
     expect(() => toCsv(["a", "b"], [["1"]])).toThrow(/row length/);
   });
+
+  it.each([
+    ["=2+5", "'=2+5"],
+    ["+1", "'+1"],
+    ["-cmd", "'-cmd"],
+    ["@evil", "'@evil"],
+    ["\tx", "'\tx"],
+  ])("prefixes formula-injection char %s with apostrophe", (input, expected) => {
+    const csv = toCsv(["h"], [[input]]);
+    expect(csv).toBe(`h\r\n${expected}\r\n`);
+  });
+
+  it("formula-prefixed value is also quoted when it contains commas", () => {
+    const csv = toCsv(["h"], [["=a,b"]]);
+    expect(csv).toBe(`h\r\n"'=a,b"\r\n`);
+  });
 });
 
 describe("gamesToCsvRows", () => {

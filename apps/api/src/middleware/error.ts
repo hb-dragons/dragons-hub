@@ -1,6 +1,7 @@
 import type { ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
+import { env } from "../config/env";
 import { logger as rootLogger } from "../config/logger";
 import type { AppEnv } from "../types";
 
@@ -36,11 +37,10 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
     return c.json({ error: error.message, code }, error.status);
   }
 
-  const isProd = process.env.NODE_ENV === "production";
+  const verbose = env.VERBOSE_ERRORS;
   const message = error instanceof Error ? error.message : "Unknown error";
   const stack = error instanceof Error ? error.stack : undefined;
 
-  // Use request-scoped logger if available, otherwise root logger
   const log = c.get("logger") ?? rootLogger;
   log.error(
     { err: error, stack_trace: stack, "@type": REPORTED_ERROR_TYPE },
@@ -49,7 +49,7 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
 
   return c.json(
     {
-      error: isProd ? "Internal server error" : message,
+      error: verbose ? message : "Internal server error",
       code: "INTERNAL_ERROR",
     },
     500,

@@ -216,6 +216,16 @@ describe("uploadPlayerPhoto", () => {
     expect(path).toMatch(/\.png$/);
   });
 
+  it("derives extension from validated content-type, ignoring attacker filename", async () => {
+    mockDb.setResult([samplePhoto]);
+
+    await uploadPlayerPhoto(validBuffer, "evil.svg", "image/png");
+
+    const [path] = mockGcs.uploadToGcs.mock.calls[0]!;
+    expect(path).toMatch(/\.png$/);
+    expect(path).not.toMatch(/\.svg$/);
+  });
+
   it("inserts record into DB and returns it", async () => {
     mockDb.setResult([samplePhoto]);
 

@@ -129,9 +129,9 @@ export async function publishDomainEvent(
   await insertDomainEvent(event, tx);
 
   if (!tx) {
-    // Fire-and-forget: enqueue immediately. If it fails, the outbox
-    // poller picks it up.
-    void enqueueDomainEvent(event);
+    enqueueDomainEvent(event).catch(() => {
+      // logged inside enqueueDomainEvent; outbox poller will retry
+    });
   }
   // When tx is provided the row isn't committed yet — the outbox poller
   // (every 30s) will find the un-enqueued event and process it.

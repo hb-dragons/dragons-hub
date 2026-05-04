@@ -227,6 +227,7 @@ describe("initializeScheduledJobs", () => {
 
 describe("triggerManualSync", () => {
   it("adds a manual sync job", async () => {
+    mockGetJob.mockResolvedValue(null);
     mockGetJobs.mockResolvedValue([]);
 
     const result = await triggerManualSync("user-1");
@@ -238,15 +239,16 @@ describe("triggerManualSync", () => {
       message: "Sync job has been queued",
     });
     expect(mockInsert).toHaveBeenCalled();
-    expect(mockAdd).toHaveBeenCalledWith("manual-sync", {
-      type: "full",
-      triggeredBy: "user-1",
-      syncRunId: 42,
-    });
+    expect(mockAdd).toHaveBeenCalledWith(
+      "manual-sync",
+      { type: "full", triggeredBy: "user-1", syncRunId: 42 },
+      { jobId: "manual-sync" },
+    );
   });
 
-  it("prevents duplicate manual sync", async () => {
-    mockGetJobs.mockResolvedValue([{ name: "manual-sync" }]);
+  it("prevents duplicate manual sync when one is queued", async () => {
+    mockGetJob.mockResolvedValue({ getState: vi.fn().mockResolvedValue("waiting") });
+    mockGetJobs.mockResolvedValue([]);
 
     const result = await triggerManualSync();
 
@@ -258,7 +260,23 @@ describe("triggerManualSync", () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
+  it("removes a completed manual job before queueing another", async () => {
+    const remove = vi.fn().mockResolvedValue(undefined);
+    mockGetJob.mockResolvedValue({
+      getState: vi.fn().mockResolvedValue("completed"),
+      remove,
+    });
+    mockGetJobs.mockResolvedValue([]);
+
+    const result = await triggerManualSync();
+
+    expect(remove).toHaveBeenCalled();
+    expect(mockAdd).toHaveBeenCalled();
+    expect(result).toMatchObject({ status: "queued" });
+  });
+
   it("prevents duplicate when daily-sync is running", async () => {
+    mockGetJob.mockResolvedValue(null);
     mockGetJobs.mockResolvedValue([{ name: "daily-sync", data: { type: "full" } }]);
 
     const result = await triggerManualSync();

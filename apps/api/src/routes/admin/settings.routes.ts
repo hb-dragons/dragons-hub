@@ -99,7 +99,14 @@ settingsRoutes.get(
   }),
   async (c) => {
     const value = await getSetting("referee_reminder_days");
-    const days = value ? JSON.parse(value) : [7, 3, 1];
+    let days: unknown = [7, 3, 1];
+    if (value) {
+      try {
+        days = JSON.parse(value);
+      } catch {
+        days = [7, 3, 1];
+      }
+    }
     return c.json({ days });
   },
 );

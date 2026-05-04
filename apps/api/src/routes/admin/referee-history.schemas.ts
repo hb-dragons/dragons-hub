@@ -46,5 +46,7 @@ export const historyGamesQuerySchema = historyFilterSchema.extend({
   refereeApiId: z.coerce.number().int().positive().optional(),
 });
 
-export type HistoryFilterParams = z.infer<typeof historyFilterSchema>;
-export type HistoryGamesQueryParams = z.infer<typeof historyGamesQuerySchema>;
+export type {
+  HistoryFilterParams,
+  HistoryGamesQueryParams,
+} from "../../services/admin/referee-history.service";

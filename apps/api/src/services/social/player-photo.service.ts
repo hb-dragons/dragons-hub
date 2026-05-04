@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { extname } from "node:path";
 import { db } from "../../config/database";
 import { playerPhotos } from "@dragons/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -8,7 +7,12 @@ import { uploadToGcs, downloadFromGcs, deleteFromGcs } from "./gcs-storage.servi
 
 const UPLOAD_PREFIX = "player-photos";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const EXT_BY_CONTENT_TYPE: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/webp": ".webp",
+};
+const ALLOWED_TYPES = Object.keys(EXT_BY_CONTENT_TYPE);
 
 export async function listPlayerPhotos() {
   return db.select().from(playerPhotos).orderBy(desc(playerPhotos.createdAt));
@@ -26,7 +30,7 @@ export async function uploadPlayerPhoto(buffer: Buffer, originalName: string, co
   const metadata = await sharp(buffer).metadata();
   if (!metadata.width || !metadata.height) throw new Error("Could not read image dimensions");
 
-  const ext = extname(originalName) || ".png";
+  const ext = EXT_BY_CONTENT_TYPE[contentType] ?? ".png";
   const filename = `${randomUUID()}${ext}`;
   await uploadToGcs(`${UPLOAD_PREFIX}/${filename}`, buffer, contentType);
 

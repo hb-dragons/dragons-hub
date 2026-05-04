@@ -9,6 +9,7 @@ import {
   releaseOverride,
 } from "../../services/admin/match-admin.service";
 import { requirePermission } from "../../middleware/rbac";
+import { reconcileMatch } from "../../services/venue-booking/venue-booking.service";
 import {
   matchListQuerySchema,
   matchIdParamSchema,
@@ -113,15 +114,12 @@ matchRoutes.patch(
       return c.json({ error: "Match not found", code: "NOT_FOUND" }, 404);
     }
 
-    // Fire-and-forget: reconcile venue booking for this match
-    import("../../services/venue-booking/venue-booking.service")
-      .then(({ reconcileMatch }) => reconcileMatch(id))
-      .catch((err) => {
-        const log = c.get("logger");
-        if (log) {
-          log.error({ err, matchId: id }, "Venue booking reconciliation failed after match update");
-        }
-      });
+    reconcileMatch(id).catch((err) => {
+      const log = c.get("logger");
+      if (log) {
+        log.error({ err, matchId: id }, "Venue booking reconciliation failed after match update");
+      }
+    });
 
     return c.json(result);
   },

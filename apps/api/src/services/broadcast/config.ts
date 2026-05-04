@@ -100,7 +100,7 @@ export class BroadcastError extends Error {
 export async function setBroadcastLive(
   deviceId: string,
   isLive: boolean,
-): Promise<BroadcastConfig> {
+): Promise<BroadcastConfig | null> {
   const now = new Date();
   await db.transaction(async (tx) => {
     if (isLive) {
@@ -127,19 +127,7 @@ export async function setBroadcastLive(
   const out = await getBroadcastConfig(deviceId);
   if (!out) {
     if (isLive) throw new BroadcastError("ROW_MISSING");
-    // Stopping a broadcast that was never started — no-op, return empty config.
-    return {
-      deviceId,
-      matchId: null,
-      isLive: false,
-      homeAbbr: null,
-      guestAbbr: null,
-      homeColorOverride: null,
-      guestColorOverride: null,
-      startedAt: null,
-      endedAt: null,
-      updatedAt: new Date().toISOString(),
-    };
+    return null;
   }
   return out;
 }

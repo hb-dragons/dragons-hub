@@ -9,9 +9,9 @@ This document tracks every finding from the review, ordered for sequential fixin
 
 ## Progress
 
-After-fix baseline (2026-05-04):
-- 155 test files, 2708 tests passing (was 153 / 2673)
-- Coverage: 96.86% stmts / 90.02% branches / 96.41% funcs / 97.44% lines
+After-fix baseline (2026-05-04, second pass):
+- 155 test files, 2710 tests passing (was 153 / 2673 pre-review)
+- Coverage: 96.89% stmts / 90.01% branches / 96.32% funcs / 97.47% lines
 - Lint clean. Typecheck clean. AI-slop check passed.
 
 ### Fixed in this pass
@@ -55,6 +55,21 @@ After-fix baseline (2026-05-04):
 - L4 duplicate `dragons://` in trustedOrigins removed
 - L8 dead `security: []` on health route removed
 - Misc: BroadcastError class for typed error handling
+
+### Round 6 follow-ups (2026-05-04)
+
+- H12 `triggerManualSync` race — deterministic `jobId: "manual-sync"` so concurrent triggers cannot create two parallel syncs
+- M3c settings.routes referee-reminders parses `JSON.parse` in try/catch with sane fallback
+- M4c player photo extension derived from validated content-type (not attacker filename)
+- M4g `VERBOSE_ERRORS` env flag replaces `NODE_ENV !== production` check; staging that runs as development can no longer leak error messages
+- M5a sync-admin + referee-history types moved out of `routes/admin/*.schemas.ts` into the service layer; route schemas re-export the types — services no longer import from routes
+- M7l `releaseOverride` + `updateMatchLocal` resolve team names via `loadTeamNames` instead of stringifying API IDs
+- M7n match.routes static `reconcileMatch` import (replaces dynamic import + `.then().catch`)
+- M7o `setBroadcastLive` returns `null` for "no config existed" instead of synthesizing an empty stopped config
+- M7p `enqueueDomainEvent` fire-and-forget now has `.catch` to satisfy strict-mode unhandled-rejection
+- M7r SDK login deduplicates concurrent calls via `loginInFlight` promise
+- M7s SDK `withRetry` wraps the final attempt's error with `cause` + attempt count
+- Tests added: CSV formula prefix, player photo extension, settings malformed JSON, sdk-client login dedupe, broadcast race, queue manual sync state machine
 
 ### Deferred (still in this doc)
 

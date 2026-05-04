@@ -75,7 +75,13 @@ async function withRetry<T>(
     try {
       return await fn();
     } catch (error) {
-      if (attempt === maxAttempts) throw error;
+      if (attempt === maxAttempts) {
+        const cause = error instanceof Error ? error : new Error(String(error));
+        throw new Error(
+          `${label} failed after ${maxAttempts} attempts: ${cause.message}`,
+          { cause },
+        );
+      }
       const baseDelay = Math.pow(2, attempt - 1) * 1000;
       const jitter = baseDelay * Math.random() * 0.5;
       const delay = baseDelay + jitter;
@@ -93,6 +99,7 @@ class AuthenticatedClient {
   private sessionCookie: string | null = null;
   private isAuthenticated = false;
   private lastAuthenticatedAt: number = 0;
+  private loginInFlight: Promise<boolean> | null = null;
   private readonly username: string;
   private readonly password: string;
   private readonly label: string;
@@ -106,7 +113,15 @@ class AuthenticatedClient {
     this.label = label;
   }
 
-  async login(): Promise<boolean> {
+  login(): Promise<boolean> {
+    if (this.loginInFlight) return this.loginInFlight;
+    this.loginInFlight = this.performLogin().finally(() => {
+      this.loginInFlight = null;
+    });
+    return this.loginInFlight;
+  }
+
+  private async performLogin(): Promise<boolean> {
     const loginUrl = `${BASE_URL}/login.do?reqCode=login`;
     const body = new URLSearchParams({
       username: this.username,

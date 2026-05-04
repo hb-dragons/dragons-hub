@@ -63,6 +63,8 @@ export const matchChangesParamSchema = z.object({
   apiMatchId: z.coerce.number().int().positive(),
 });
 
-export type SyncLogsQuery = z.infer<typeof syncLogsQuerySchema>;
-export type SyncEntriesQuery = z.infer<typeof syncEntriesQuerySchema>;
-export type UpdateScheduleBody = z.infer<typeof updateScheduleBodySchema>;
+export type {
+  SyncLogsQuery,
+  SyncEntriesQuery,
+  UpdateScheduleBody,
+} from "../../services/admin/sync-admin.service";

@@ -5,17 +5,38 @@ import {
   matchRemoteVersions,
   matchLocalVersions,
   matchChanges,
+  teams,
 } from "@dragons/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
 import type { MatchDetailResponse } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
-import type { MatchUpdateData } from "./match-query.service";
+import type { MatchUpdateData, TransactionClient } from "./match-query.service";
 import { buildDetailResponse, loadRemoteSnapshot } from "./match-query.service";
 import { publishDomainEvent } from "../events/event-publisher";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "match-admin" });
+
+async function loadTeamNames(
+  tx: TransactionClient,
+  homeApiId: number,
+  guestApiId: number,
+): Promise<{ home: string; guest: string }> {
+  const rows = await tx
+    .select({
+      apiId: teams.apiTeamPermanentId,
+      name: teams.name,
+      customName: teams.customName,
+    })
+    .from(teams)
+    .where(inArray(teams.apiTeamPermanentId, [homeApiId, guestApiId]));
+  const byId = new Map(rows.map((r) => [r.apiId, r.customName ?? r.name]));
+  return {
+    home: byId.get(homeApiId) ?? `Team ${homeApiId}`,
+    guest: byId.get(guestApiId) ?? `Team ${guestApiId}`,
+  };
+}
 
 // ── Re-exports ──────────────────────────────────────────────────────────────
 
@@ -180,6 +201,7 @@ export async function updateMatchLocal(
     const entityName = `Match #${locked.matchNo}`;
 
     const teamIds = [locked.homeTeamApiId, locked.guestTeamApiId];
+    const teamNames = await loadTeamNames(tx, locked.homeTeamApiId, locked.guestTeamApiId);
     const emitEvent = async (eventType: string, extraPayload: Record<string, unknown>) => {
       try {
         await publishDomainEvent({
@@ -192,8 +214,8 @@ export async function updateMatchLocal(
           deepLinkPath: `/admin/matches/${id}`,
           payload: {
             matchNo: locked.matchNo,
-            homeTeam: String(locked.homeTeamApiId),
-            guestTeam: String(locked.guestTeamApiId),
+            homeTeam: teamNames.home,
+            guestTeam: teamNames.guest,
             leagueId: locked.leagueId,
             teamIds,
             ...extraPayload,
@@ -353,11 +375,11 @@ export async function releaseOverride(
       ),
     );
 
-    // Emit override.reverted event
+    const teamNames = await loadTeamNames(tx, locked.homeTeamApiId, locked.guestTeamApiId);
     const basePayload = {
       matchNo: locked.matchNo,
-      homeTeam: String(locked.homeTeamApiId),
-      guestTeam: String(locked.guestTeamApiId),
+      homeTeam: teamNames.home,
+      guestTeam: teamNames.guest,
       leagueId: locked.leagueId,
       teamIds: [locked.homeTeamApiId, locked.guestTeamApiId],
     };

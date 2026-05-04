@@ -703,8 +703,26 @@ describe("SdkClient", () => {
       failedVerifyPair();
 
       await expect(withTimers(client.ensureAuthenticated())).rejects.toThrow(
-        "Login did not persist",
+        /Login did not persist/,
       );
+    });
+
+    it("dedupes concurrent login() calls", async () => {
+      const ok = () => ({
+        text: vi.fn().mockResolvedValue("OK"),
+        headers: { getSetCookie: () => ["SESSION=abc; Path=/"] },
+      });
+      const verify = () => ({
+        json: vi.fn().mockResolvedValue({ data: { loginName: "tester" } }),
+      });
+      mockFetch.mockResolvedValueOnce(ok()).mockResolvedValueOnce(verify());
+      const [a, b] = await withTimers(
+        Promise.all([client.ensureAuthenticated(), client.ensureAuthenticated()]),
+      );
+      expect(a).toBeUndefined();
+      expect(b).toBeUndefined();
+      // Only one login round-trip (1 login + 1 verify) despite 2 concurrent callers.
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
   });
 

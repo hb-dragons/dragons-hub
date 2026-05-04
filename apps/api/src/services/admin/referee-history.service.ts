@@ -8,11 +8,23 @@ import type {
   HistorySummaryResponse,
   HistoryLeaderboardEntry,
 } from "@dragons/shared";
-import type {
-  HistoryFilterParams,
-  HistoryGamesQueryParams,
-} from "../../routes/admin/referee-history.schemas";
 import { escapeLikePattern } from "../utils/sql";
+
+export type HistoryStatusValue = "played" | "cancelled" | "forfeited";
+
+export interface HistoryFilterParams {
+  dateFrom?: string;
+  dateTo?: string;
+  league?: string;
+  status: HistoryStatusValue[];
+}
+
+export interface HistoryGamesQueryParams extends HistoryFilterParams {
+  search?: string;
+  limit: number;
+  offset: number;
+  refereeApiId?: number;
+}
 
 const REFEREE_SLOT_OPEN_STATUS = "open";
 

@@ -234,6 +234,15 @@ describe("GET /settings/referee-reminders", () => {
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ days: [7, 3, 1] });
   });
+
+  it("falls back to default when stored value is malformed JSON", async () => {
+    mocks.getSetting.mockResolvedValue("not json");
+
+    const res = await app.request("/settings/referee-reminders");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ days: [7, 3, 1] });
+  });
 });
 
 describe("PUT /settings/referee-reminders", () => {

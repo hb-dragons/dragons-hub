@@ -24,6 +24,15 @@ vi.mock("../config/logger", () => ({
   logger: mocks.rootLogger,
 }));
 
+const envMock = vi.hoisted(() => ({ verbose: false }));
+vi.mock("../config/env", () => ({
+  env: {
+    get VERBOSE_ERRORS() {
+      return envMock.verbose;
+    },
+  },
+}));
+
 // --- Imports (after mocks) ---
 
 import { errorHandler } from "./error";
@@ -109,10 +118,8 @@ describe("errorHandler", () => {
     expect(mocks.rootLogger.error).not.toHaveBeenCalled();
   });
 
-  it("returns 500 with message in non-production", async () => {
-    const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "test";
-
+  it("returns the error message when VERBOSE_ERRORS is enabled", async () => {
+    envMock.verbose = true;
     const app = createBareApp();
     const res = await app.request("/throw-error");
 
@@ -120,22 +127,17 @@ describe("errorHandler", () => {
     const body = await res.json();
     expect(body.error).toBe("Something broke");
     expect(body.code).toBe("INTERNAL_ERROR");
-
-    process.env.NODE_ENV = originalEnv;
+    envMock.verbose = false;
   });
 
-  it("returns generic message in production", async () => {
-    const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
-
+  it("returns generic message when VERBOSE_ERRORS is disabled", async () => {
+    envMock.verbose = false;
     const app = createBareApp();
     const res = await app.request("/throw-error");
 
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe("Internal server error");
-
-    process.env.NODE_ENV = originalEnv;
   });
 
   it("handles Error instances with stack trace", async () => {
@@ -153,7 +155,9 @@ describe("errorHandler", () => {
       json: vi.fn().mockReturnValue(new Response("{}", { status: 500 })),
     };
 
+    envMock.verbose = true;
     errorHandler("string error" as never, mockContext as never);
+    envMock.verbose = false;
 
     expect(mockContext.json).toHaveBeenCalledWith(
       expect.objectContaining({ error: "Unknown error" }),

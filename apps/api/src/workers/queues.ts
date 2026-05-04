@@ -198,14 +198,23 @@ export async function initializeScheduledJobs() {
   logger.info("Push receipt reconcile scheduled (every 15m)");
 }
 
-export async function triggerManualSync(userId?: string) {
-  // Prevent duplicate sync jobs
-  const activeJobs = await syncQueue.getJobs(["active", "waiting"], 0, 100, false);
-  const hasPendingSync = activeJobs.some(
-    (job) => job.name === "manual-sync" || (job.name === "daily-sync" && job.data?.type === "full"),
-  );
+const MANUAL_SYNC_JOB_ID = "manual-sync";
 
-  if (hasPendingSync) {
+export async function triggerManualSync(userId?: string) {
+  const existing = await syncQueue.getJob(MANUAL_SYNC_JOB_ID);
+  if (existing) {
+    const state = await existing.getState();
+    if (state === "active" || state === "waiting" || state === "delayed") {
+      return {
+        error: "Sync already in progress or queued",
+        code: "SYNC_ALREADY_QUEUED",
+      };
+    }
+    await existing.remove();
+  }
+
+  const dailyActive = await syncQueue.getJobs(["active", "waiting"], 0, 100, false);
+  if (dailyActive.some((j) => j.name === "daily-sync" && j.data?.type === "full")) {
     return {
       error: "Sync already in progress or queued",
       code: "SYNC_ALREADY_QUEUED",
@@ -217,11 +226,11 @@ export async function triggerManualSync(userId?: string) {
     .values({ syncType: "full", triggeredBy: userId ?? "manual", status: "pending", startedAt: new Date() })
     .returning();
 
-  const job = await syncQueue.add("manual-sync", {
-    type: "full",
-    triggeredBy: userId,
-    syncRunId: syncRun!.id,
-  });
+  const job = await syncQueue.add(
+    "manual-sync",
+    { type: "full", triggeredBy: userId, syncRunId: syncRun!.id },
+    { jobId: MANUAL_SYNC_JOB_ID },
+  );
 
   return {
     jobId: job.id,

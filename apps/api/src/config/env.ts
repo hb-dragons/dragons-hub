@@ -50,6 +50,10 @@ const envSchema = z.object({
 
   SYNC_RUN_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   DOMAIN_EVENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+  VERBOSE_ERRORS: z
+    .union([z.literal("true"), z.literal("false")])
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 export type Env = z.infer<typeof envSchema>;
