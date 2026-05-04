@@ -6,7 +6,9 @@ import { errorHandler } from "./middleware/error";
 import { corsMiddleware } from "./middleware/cors";
 import { requestLogger } from "./middleware/request-logger";
 import { requireAuth, requireAnyRole } from "./middleware/rbac";
+import { trustForwardedFor, signInLockout } from "./middleware/auth-protect";
 import { auth } from "./config/auth";
+import { env } from "./config/env";
 import { openApiSpec } from "./config/openapi";
 import { routes } from "./routes/index";
 import { createBullBoard } from "@bull-board/api";
@@ -29,11 +31,18 @@ app.use("*", corsMiddleware);
 app.use("*", requestLogger);
 app.onError(errorHandler);
 
-// OpenAPI spec and interactive docs (public, before auth)
-app.get("/openapi.json", openAPIRouteHandler(app, { documentation: openApiSpec }));
-app.get("/docs", Scalar({ url: "/openapi.json" }));
+const docsHandler = openAPIRouteHandler(app, { documentation: openApiSpec });
+const scalarHandler = Scalar({ url: "/openapi.json" });
+if (env.NODE_ENV === "production") {
+  app.get("/openapi.json", requireAuth, requireAnyRole("admin"), docsHandler);
+  app.get("/docs", requireAuth, requireAnyRole("admin"), scalarHandler);
+} else {
+  app.get("/openapi.json", docsHandler);
+  app.get("/docs", scalarHandler);
+}
 
-// Better Auth handler
+app.use("/api/auth/*", trustForwardedFor);
+app.use("/api/auth/sign-in/email", signInLockout);
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 // Require authentication on all admin routes; per-route guards check granular permissions.

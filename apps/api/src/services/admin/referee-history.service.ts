@@ -12,6 +12,7 @@ import type {
   HistoryFilterParams,
   HistoryGamesQueryParams,
 } from "../../routes/admin/referee-history.schemas";
+import { escapeLikePattern } from "../utils/sql";
 
 const REFEREE_SLOT_OPEN_STATUS = "open";
 
@@ -252,7 +253,7 @@ export async function getRefereeHistoryGames(
   if (params.search) {
     const words = params.search.split(/\s+/).filter(Boolean);
     for (const word of words) {
-      const p = `%${word}%`;
+      const p = `%${escapeLikePattern(word)}%`;
       conds.push(or(
         ilike(refereeGames.homeTeamName, p),
         ilike(refereeGames.guestTeamName, p),

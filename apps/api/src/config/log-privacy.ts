@@ -94,3 +94,15 @@ function redactSearchParams(params: URLSearchParams): string {
   }
   return redacted.toString();
 }
+
+const PATH_REDACTIONS: Array<{ pattern: RegExp; replacement: string }> = [
+  { pattern: /^\/api\/devices\/[^/?]+/, replacement: "/api/devices/[REDACTED]" },
+  { pattern: /^\/devices\/[^/?]+/, replacement: "/devices/[REDACTED]" },
+];
+
+export function scrubPath(path: string): string {
+  for (const { pattern, replacement } of PATH_REDACTIONS) {
+    if (pattern.test(path)) return path.replace(pattern, replacement);
+  }
+  return path;
+}

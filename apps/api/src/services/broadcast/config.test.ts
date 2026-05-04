@@ -122,7 +122,7 @@ describe("broadcast/config", () => {
 
   it("setBroadcastLive(true) requires a matchId", async () => {
     await upsertBroadcastConfig({ deviceId: "d1" });
-    await expect(setBroadcastLive("d1", true)).rejects.toThrow(/matchId/);
+    await expect(setBroadcastLive("d1", true)).rejects.toThrow(/MISSING_MATCH/);
   });
 
   it("setBroadcastLive sets startedAt/endedAt timestamps", async () => {

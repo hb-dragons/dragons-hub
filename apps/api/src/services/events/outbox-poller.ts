@@ -1,95 +1,102 @@
 import { db } from "../../config/database";
 import { domainEvents } from "@dragons/db/schema";
-import { isNull, eq, and, lte, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { domainEventsQueue } from "../../workers/queues";
 import { logger } from "../../config/logger";
 
-/**
- * Poll the domain_events table for events that have not yet been enqueued
- * to BullMQ (enqueuedAt IS NULL) and enqueue them.
- *
- * Uses a transaction with FOR UPDATE SKIP LOCKED to prevent concurrent
- * poller instances (multiple API servers) from processing the same events.
- *
- * Returns the number of events successfully enqueued.
- */
-export async function pollOutbox(): Promise<number> {
-  // Use a 1-second delay to avoid picking up rows from uncommitted transactions.
+interface ClaimedEvent extends Record<string, unknown> {
+  id: string;
+  type: string;
+  urgency: string;
+  entity_type: string;
+  entity_id: number;
+}
+
+const BATCH_LIMIT = 100;
+const ENQUEUE_CONCURRENCY = 10;
+
+async function claimBatch(): Promise<ClaimedEvent[]> {
   const oneSecondAgo = new Date(Date.now() - 1000);
-
   return await db.transaction(async (tx) => {
-    // SELECT ... FOR UPDATE SKIP LOCKED prevents concurrent pollers from
-    // grabbing the same rows. Drizzle doesn't support this natively, so
-    // we use a raw query for the selection and then process with the ORM.
-    const pending = await tx.execute<{
-      id: string;
-      type: string;
-      urgency: string;
-      entity_type: string;
-      entity_id: number;
-    }>(sql`
-      SELECT id, type, urgency, entity_type, entity_id
-      FROM domain_events
-      WHERE enqueued_at IS NULL
-        AND created_at <= ${oneSecondAgo}
-      ORDER BY created_at ASC
-      LIMIT 100
-      FOR UPDATE SKIP LOCKED
+    const result = await tx.execute<ClaimedEvent>(sql`
+      WITH claimed AS (
+        SELECT id
+        FROM domain_events
+        WHERE enqueued_at IS NULL
+          AND created_at <= ${oneSecondAgo}
+        ORDER BY created_at ASC
+        LIMIT ${BATCH_LIMIT}
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE domain_events
+      SET enqueued_at = NOW()
+      FROM claimed
+      WHERE domain_events.id = claimed.id
+      RETURNING domain_events.id, domain_events.type, domain_events.urgency,
+                domain_events.entity_type, domain_events.entity_id
     `);
+    return [...result.rows];
+  });
+}
 
-    if (pending.rows.length === 0) return 0;
+async function releaseClaim(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db.execute(sql`
+    UPDATE domain_events
+    SET enqueued_at = NULL
+    WHERE id IN ${sql.raw(`(${ids.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")})`)}
+  `);
+}
 
-    // Process in batches of 10 for better throughput
-    const BATCH_SIZE = 10;
-    let enqueued = 0;
-    const rows = pending.rows;
+export async function pollOutbox(): Promise<number> {
+  const claimed = await claimBatch();
+  if (claimed.length === 0) return 0;
 
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE);
-      const results = await Promise.allSettled(
-        batch.map(async (event) => {
-          await domainEventsQueue.add(event.type, {
-            eventId: event.id,
-            type: event.type,
-            urgency: event.urgency,
-            entityType: event.entity_type,
-            entityId: event.entity_id,
-          });
+  const failed: string[] = [];
+  let enqueued = 0;
 
-          await tx
-            .update(domainEvents)
-            .set({ enqueuedAt: new Date() })
-            .where(eq(domainEvents.id, event.id));
-
-          return event.id;
+  for (let i = 0; i < claimed.length; i += ENQUEUE_CONCURRENCY) {
+    const batch = claimed.slice(i, i + ENQUEUE_CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map((event) =>
+        domainEventsQueue.add(event.type, {
+          eventId: event.id,
+          type: event.type,
+          urgency: event.urgency,
+          entityType: event.entity_type,
+          entityId: event.entity_id,
         }),
-      );
-
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          enqueued++;
-        } else {
-          logger.error(
-            { error: result.reason },
-            "Outbox poller failed to enqueue event",
-          );
-        }
+      ),
+    );
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j]!;
+      if (result.status === "fulfilled") {
+        enqueued++;
+      } else {
+        failed.push(batch[j]!.id);
+        logger.error(
+          { error: result.reason, eventId: batch[j]!.id },
+          "Outbox poller failed to enqueue event",
+        );
       }
     }
+  }
 
-    if (enqueued > 0) {
-      logger.info({ enqueued, total: rows.length }, "Outbox poller processed events");
-    }
+  if (failed.length > 0) {
+    await releaseClaim(failed).catch((error) => {
+      logger.error({ error, failedCount: failed.length }, "Outbox poller failed to release claim");
+    });
+  }
 
-    return enqueued;
-  });
+  if (enqueued > 0 || failed.length > 0) {
+    logger.info({ enqueued, failed: failed.length, total: claimed.length }, "Outbox poller processed events");
+  }
+
+  return enqueued;
 }
 
 let pollerInterval: ReturnType<typeof setInterval> | null = null;
 
-/**
- * Start the outbox poller on a fixed interval.
- */
 export function startOutboxPoller(intervalMs = 30_000): void {
   if (pollerInterval) {
     logger.warn("Outbox poller already running");
@@ -104,9 +111,6 @@ export function startOutboxPoller(intervalMs = 30_000): void {
   }, intervalMs);
 }
 
-/**
- * Stop the outbox poller.
- */
 export function stopOutboxPoller(): void {
   if (pollerInterval) {
     clearInterval(pollerInterval);
@@ -114,3 +118,5 @@ export function stopOutboxPoller(): void {
     logger.info("Outbox poller stopped");
   }
 }
+
+export { domainEvents };

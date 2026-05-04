@@ -2,6 +2,11 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { buildBroadcastState } from "../../services/broadcast/publisher";
 import { subscribeBroadcast } from "../../services/scoreboard/pubsub";
+import { env } from "../../config/env";
+import {
+  tryAcquire,
+  release,
+} from "../../services/scoreboard/connection-cap";
 
 const HEARTBEAT_MS = 15_000;
 
@@ -40,11 +45,24 @@ publicBroadcastRoutes.get(
     if (!deviceId) {
       return c.json({ error: "deviceId required", code: "BAD_REQUEST" }, 400);
     }
+    if (deviceId !== env.SCOREBOARD_DEVICE_ID) {
+      return c.json({ error: "Unknown device", code: "UNKNOWN_DEVICE" }, 404);
+    }
+    if (!tryAcquire(deviceId)) {
+      c.header("Retry-After", "5");
+      return c.json({ error: "Too many connections", code: "BUSY" }, 503);
+    }
 
     const encoder = new TextEncoder();
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let unsubscribe: (() => Promise<void>) | undefined;
     let cancelled = false;
+    let released = false;
+    const releaseOnce = () => {
+      if (released) return;
+      released = true;
+      release(deviceId);
+    };
 
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -76,6 +94,7 @@ publicBroadcastRoutes.get(
         cancelled = true;
         if (heartbeat) clearInterval(heartbeat);
         if (unsubscribe) await unsubscribe();
+        releaseOnce();
       },
     });
 

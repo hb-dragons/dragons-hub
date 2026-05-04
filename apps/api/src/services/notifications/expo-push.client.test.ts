@@ -77,15 +77,30 @@ describe("ExpoPushClient", () => {
       expect((init.headers as Record<string, string>)["Authorization"]).toBeUndefined();
     });
 
-    it("throws on non-ok HTTP response", async () => {
-      fetchMock.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        text: async () => "boom",
-      });
+    it("throws on non-ok HTTP response after retries are exhausted", async () => {
+      const ok500 = { ok: false, status: 500, text: async () => "boom" };
+      fetchMock.mockResolvedValueOnce(ok500);
+      fetchMock.mockResolvedValueOnce(ok500);
+      fetchMock.mockResolvedValueOnce(ok500);
       await expect(
         client.sendBatch([{ to: "ExponentPushToken[a]", title: "t", body: "b" }]),
       ).rejects.toThrow(/500/);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it("retries 5xx and succeeds on third attempt", async () => {
+      const ok500 = { ok: false, status: 503, text: async () => "boom" };
+      fetchMock.mockResolvedValueOnce(ok500);
+      fetchMock.mockResolvedValueOnce(ok500);
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ status: "ok", id: "tok" }] }),
+      });
+      const tickets = await client.sendBatch([
+        { to: "ExponentPushToken[a]", title: "t", body: "b" },
+      ]);
+      expect(tickets).toEqual([{ status: "ok", id: "tok" }]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
     it("throws on network error", async () => {

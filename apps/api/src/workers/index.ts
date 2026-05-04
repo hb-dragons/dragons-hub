@@ -9,6 +9,7 @@ import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-p
 import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
 import { syncRefereeGames } from "../services/sync/referee-games.sync";
 import { db } from "../config/database";
+import { env } from "../config/env";
 import { logger } from "../config/logger";
 import {
   syncRuns,
@@ -41,9 +42,8 @@ export async function initializeWorkers() {
     );
   }
 
-  // Cleanup old sync runs (retention policy)
   try {
-    const cleaned = await cleanupOldSyncRuns();
+    const cleaned = await cleanupOldSyncRuns(env.SYNC_RUN_RETENTION_DAYS);
     if (cleaned > 0) {
       logger.info({ count: cleaned }, "Cleaned up old sync runs");
     }
@@ -51,9 +51,8 @@ export async function initializeWorkers() {
     logger.warn({ err: error }, "Failed to cleanup old sync runs");
   }
 
-  // Cleanup old domain events (1 year retention)
   try {
-    const cleaned = await cleanupOldDomainEvents(365);
+    const cleaned = await cleanupOldDomainEvents(env.DOMAIN_EVENT_RETENTION_DAYS);
     if (cleaned.events > 0) {
       logger.info(cleaned, "Cleaned up old domain events");
     }

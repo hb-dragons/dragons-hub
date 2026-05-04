@@ -4,10 +4,15 @@ import type {
 } from "@dragons/shared";
 
 const NEEDS_QUOTES = /[",\r\n]/;
+const FORMULA_PREFIXES = new Set(["=", "+", "-", "@", "\t", "\r"]);
 
 function escape(field: string): string {
-  if (!NEEDS_QUOTES.test(field)) return field;
-  return `"${field.replace(/"/g, '""')}"`;
+  let value = field;
+  if (value.length > 0 && FORMULA_PREFIXES.has(value[0]!)) {
+    value = `'${value}`;
+  }
+  if (!NEEDS_QUOTES.test(value)) return value;
+  return `"${value.replace(/"/g, '""')}"`;
 }
 
 export function toCsv(headers: string[], rows: string[][]): string {

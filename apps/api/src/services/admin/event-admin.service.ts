@@ -1,5 +1,5 @@
 import { db } from "../../config/database";
-import { domainEvents, notificationLog, channelConfigs } from "@dragons/db/schema";
+import { domainEvents, notificationLog } from "@dragons/db/schema";
 import { and, desc, eq, gte, lte, ilike, count } from "drizzle-orm";
 import type { DomainEventListResult, EventType, EventEntityType } from "@dragons/shared";
 import {
@@ -7,15 +7,7 @@ import {
   insertDomainEvent,
   enqueueDomainEvent,
 } from "../events/event-publisher";
-import { renderEventMessage } from "../notifications/templates/index";
-import { InAppChannelAdapter } from "../notifications/channels/in-app";
-import { logger } from "../../config/logger";
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function escapeLikePattern(str: string): string {
-  return str.replace(/[%_\\]/g, "\\$&");
-}
+import { escapeLikePattern } from "../utils/sql";
 
 // ── listDomainEvents ────────────────────────────────────────────────────────
 

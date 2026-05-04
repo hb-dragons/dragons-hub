@@ -7,6 +7,15 @@ import { getPublicMatchDetail } from "../../services/admin/match-query.service";
 import { getMatchContext } from "../../services/public/match-context.service";
 import { buildCalendarFeed } from "../../services/public/calendar.service";
 import { matchListQuerySchema } from "../admin/match.schemas";
+import { env } from "../../config/env";
+
+function resolveIcsHostname(): string {
+  try {
+    return new URL(env.BETTER_AUTH_URL).hostname;
+  } catch {
+    return "dragons.local";
+  }
+}
 
 const publicMatchRoutes = new Hono();
 
@@ -90,14 +99,8 @@ publicMatchRoutes.get(
       dateTo: query.dateTo ?? toDateStr(defaultTo),
     });
 
-    const hostname = new URL(
-      c.req.header("x-forwarded-host")
-        ? `https://${c.req.header("x-forwarded-host")}`
-        : c.req.url,
-    ).hostname;
-
     const ics = buildCalendarFeed(result.items, {
-      hostname,
+      hostname: resolveIcsHostname(),
       calendarName: "Dragons Spielplan",
     });
 

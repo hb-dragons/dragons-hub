@@ -90,6 +90,13 @@ export async function upsertBroadcastConfig(
   return out;
 }
 
+export class BroadcastError extends Error {
+  constructor(public readonly code: "MISSING_MATCH" | "ROW_MISSING") {
+    super(code);
+    this.name = "BroadcastError";
+  }
+}
+
 export async function setBroadcastLive(
   deviceId: string,
   isLive: boolean,
@@ -101,9 +108,10 @@ export async function setBroadcastLive(
         .select()
         .from(broadcastConfigs)
         .where(eq(broadcastConfigs.deviceId, deviceId))
+        .for("update")
         .limit(1);
       if (!existing || existing.matchId === null) {
-        throw new Error("Cannot go live without matchId");
+        throw new BroadcastError("MISSING_MATCH");
       }
     }
     await tx
@@ -118,7 +126,7 @@ export async function setBroadcastLive(
   });
   const out = await getBroadcastConfig(deviceId);
   if (!out) {
-    if (isLive) throw new Error("config row missing");
+    if (isLive) throw new BroadcastError("ROW_MISSING");
     // Stopping a broadcast that was never started — no-op, return empty config.
     return {
       deviceId,

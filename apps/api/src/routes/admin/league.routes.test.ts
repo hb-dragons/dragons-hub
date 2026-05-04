@@ -188,4 +188,23 @@ describe("PATCH /settings/leagues/:id/own-club-refs", () => {
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
+
+  it("returns 400 for non-numeric id", async () => {
+    const res = await app.request("/settings/leagues/abc/own-club-refs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ownClubRefs: true }),
+    });
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("returns 400 for negative id", async () => {
+    const res = await app.request("/settings/leagues/-1/own-club-refs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ownClubRefs: true }),
+    });
+    expect(res.status).toBe(400);
+  });
 });

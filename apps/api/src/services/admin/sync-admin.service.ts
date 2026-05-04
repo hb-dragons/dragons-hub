@@ -3,6 +3,7 @@ import { syncRuns, syncRunEntries, syncSchedule, matches, matchRemoteVersions, m
 import { desc, eq, sql, and, or, ilike, inArray } from "drizzle-orm";
 import { updateSyncSchedule, updateRefereeSyncSchedule } from "../../workers/queues";
 import type { SyncLogsQuery, SyncEntriesQuery, UpdateScheduleBody } from "../../routes/admin/sync.schemas";
+import { escapeLikePattern } from "../utils/sql";
 
 /**
  * Resolve triggeredBy user IDs to display names.
@@ -126,7 +127,7 @@ export async function getSyncRunEntries(syncRunId: number, params: SyncEntriesQu
   if (search) {
     const words = search.split(/\s+/).filter(Boolean);
     for (const word of words) {
-      const pattern = `%${word}%`;
+      const pattern = `%${escapeLikePattern(word)}%`;
       conditions.push(
         or(
           ilike(syncRunEntries.entityName, pattern),

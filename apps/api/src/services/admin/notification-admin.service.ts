@@ -2,7 +2,6 @@ import { db } from "../../config/database";
 import { notificationLog, domainEvents } from "@dragons/db/schema";
 import { eq, and, desc, sql, count, ne } from "drizzle-orm";
 import { renderEventMessage } from "../notifications/templates/index";
-import { InAppChannelAdapter } from "../notifications/channels/in-app";
 import { logger } from "../../config/logger";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -142,8 +141,6 @@ export async function getUnreadCount(userId: string): Promise<number> {
 }
 
 // ── retryFailedNotification ─────────────────────────────────────────────────
-
-const inAppAdapter = new InAppChannelAdapter();
 
 export async function retryFailedNotification(
   notificationId: number,

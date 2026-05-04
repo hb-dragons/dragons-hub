@@ -60,7 +60,9 @@ async function fetchLeagueData(
   log.info({ leagueApiId }, "Fetching data for league");
 
   const spielplan = await sdkClient.getSpielplan(leagueApiId);
-  const matchIds = spielplan.map((m) => m.matchId).filter((id): id is number => !!id);
+  const matchIds = spielplan
+    .map((m) => m.matchId)
+    .filter((id): id is number => typeof id === "number" && id > 0);
 
   const [tabelle, gameDetails] = await Promise.all([
     sdkClient.getTabelle(leagueApiId),

@@ -7,6 +7,24 @@ const mocks = vi.hoisted(() => ({
   dbInsert: vi.fn(),
   dbTransaction: vi.fn(),
   sendBatch: vi.fn(),
+  redisStore: new Map<string, string>(),
+}));
+
+vi.mock("../../config/redis", () => ({
+  redis: {
+    async set(key: string, value: string, _ex?: string, _ttl?: number, mode?: string) {
+      if (mode === "NX" && mocks.redisStore.has(key)) return null;
+      mocks.redisStore.set(key, value);
+      return "OK";
+    },
+    async ttl(_key: string) {
+      return 9;
+    },
+    async del(...keys: string[]) {
+      for (const k of keys) mocks.redisStore.delete(k);
+      return 0;
+    },
+  },
 }));
 
 vi.mock("../../config/database", () => ({
@@ -81,10 +99,7 @@ vi.mock("../../middleware/rbac", () => ({
     },
 }));
 
-import {
-  notificationTestRoutes,
-  __resetTestPushRateLimitForTests,
-} from "./notification-test.routes";
+import { notificationTestRoutes } from "./notification-test.routes";
 
 function makeApp(user: { id: string; role: string } | null) {
   const app = new Hono<AppEnv>();
@@ -126,7 +141,7 @@ beforeEach(() => {
   mocks.dbInsert.mockReset();
   mocks.dbTransaction.mockReset();
   mocks.sendBatch.mockReset();
-  __resetTestPushRateLimitForTests();
+  mocks.redisStore.clear();
 
   // Default: transaction simulator that delegates tx.insert -> mocks.dbInsert
   mocks.dbTransaction.mockImplementation(

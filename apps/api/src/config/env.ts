@@ -47,6 +47,9 @@ const envSchema = z.object({
   // Scoreboard ingest (Raspberry Pi -> API)
   SCOREBOARD_INGEST_KEY: z.string().min(32),
   SCOREBOARD_DEVICE_ID: z.string().min(1),
+
+  SYNC_RUN_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  DOMAIN_EVENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
 });
 
 export type Env = z.infer<typeof envSchema>;

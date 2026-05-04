@@ -4,6 +4,8 @@ import { describeRoute } from "hono-openapi";
 import { db } from "../../config/database";
 import { liveScoreboards } from "@dragons/db/schema";
 import { createScoreboardStream } from "../../services/scoreboard/sse";
+import { env } from "../../config/env";
+import { tryAcquire, release } from "../../services/scoreboard/connection-cap";
 
 const publicScoreboardRoutes = new Hono();
 
@@ -53,10 +55,21 @@ publicScoreboardRoutes.get(
     if (!deviceId) {
       return c.json({ error: "deviceId required", code: "BAD_REQUEST" }, 400);
     }
+    if (deviceId !== env.SCOREBOARD_DEVICE_ID) {
+      return c.json({ error: "Unknown device", code: "UNKNOWN_DEVICE" }, 404);
+    }
+    if (!tryAcquire(deviceId)) {
+      c.header("Retry-After", "5");
+      return c.json({ error: "Too many connections", code: "BUSY" }, 503);
+    }
     const lastHeader = c.req.header("Last-Event-ID");
     const parsed = lastHeader ? Number.parseInt(lastHeader, 10) : Number.NaN;
     const lastEventId = Number.isFinite(parsed) ? parsed : undefined;
-    return createScoreboardStream({ deviceId, lastEventId });
+    return createScoreboardStream({
+      deviceId,
+      lastEventId,
+      onClose: () => release(deviceId),
+    });
   },
 );
 

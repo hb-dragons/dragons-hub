@@ -13,6 +13,8 @@ import { loadJoinedMatch, rowToConfig } from "./config";
 
 const STALE_MS = 30_000;
 
+const MATCH_CACHE_TTL_MS = 30_000;
+
 interface CacheEntry {
   matchId: number;
   homeAbbr: string | null;
@@ -20,6 +22,7 @@ interface CacheEntry {
   homeColorOverride: string | null;
   guestColorOverride: string | null;
   match: BroadcastMatch;
+  expiresAt: number;
 }
 
 const matchCache = new Map<string, CacheEntry>();
@@ -37,9 +40,11 @@ async function getCachedMatch(
   config: BroadcastConfig,
 ): Promise<BroadcastMatch | null> {
   if (config.matchId === null) return null;
+  const now = Date.now();
   const cached = matchCache.get(deviceId);
   if (
     cached &&
+    cached.expiresAt > now &&
     cached.matchId === config.matchId &&
     cached.homeAbbr === config.homeAbbr &&
     cached.guestAbbr === config.guestAbbr &&
@@ -63,6 +68,7 @@ async function getCachedMatch(
       homeColorOverride: config.homeColorOverride,
       guestColorOverride: config.guestColorOverride,
       match,
+      expiresAt: now + MATCH_CACHE_TTL_MS,
     });
   }
   return match;

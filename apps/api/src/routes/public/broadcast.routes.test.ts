@@ -15,6 +15,20 @@ const mocks = vi.hoisted(() => ({
   closeSub: vi.fn(),
 }));
 
+vi.mock("../../config/env", async () => {
+  const actual = await vi.importActual<typeof import("../../config/env")>(
+    "../../config/env",
+  );
+  return {
+    env: new Proxy(actual.env, {
+      get(target, prop) {
+        if (prop === "SCOREBOARD_DEVICE_ID") return "d1";
+        return Reflect.get(target, prop);
+      },
+    }),
+  };
+});
+
 vi.mock("../../config/database", () => ({
   db: new Proxy(
     {},
@@ -103,5 +117,12 @@ describe("GET /public/broadcast/stream", () => {
   it("returns 400 without deviceId", async () => {
     const res = await makeApp().request("/public/broadcast/stream");
     expect(res.status).toBe(400);
+  });
+
+  it("returns 404 for unknown deviceId", async () => {
+    const res = await makeApp().request(
+      "/public/broadcast/stream?deviceId=other",
+    );
+    expect(res.status).toBe(404);
   });
 });

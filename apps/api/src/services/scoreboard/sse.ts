@@ -12,6 +12,7 @@ const REPLAY_LIMIT = 100;
 export interface CreateStreamArgs {
   deviceId: string;
   lastEventId: number | undefined;
+  onClose?: () => void;
 }
 
 function sseEvent(
@@ -26,6 +27,7 @@ function sseEvent(
 export function createScoreboardStream({
   deviceId,
   lastEventId,
+  onClose,
 }: CreateStreamArgs): Response {
   const encoder = new TextEncoder();
   let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -92,6 +94,7 @@ export function createScoreboardStream({
       cancelled = true;
       if (heartbeat) clearInterval(heartbeat);
       if (unsubscribe) await unsubscribe();
+      if (onClose) onClose();
     },
   });
 

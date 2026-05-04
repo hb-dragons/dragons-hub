@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => ({
   createStream: vi.fn(),
 }));
 
+vi.mock("../../config/env", () => ({
+  env: { SCOREBOARD_DEVICE_ID: "d1" },
+}));
+
 vi.mock("../../config/database", () => ({
   db: {
     select: () => ({
@@ -72,9 +76,16 @@ describe("GET /public/scoreboard/stream", () => {
       },
     );
     expect(r.headers.get("Content-Type")).toBe("text/event-stream");
-    expect(mocks.createStream).toHaveBeenCalledWith({
-      deviceId: "d1",
-      lastEventId: 42,
-    });
+    expect(mocks.createStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deviceId: "d1",
+        lastEventId: 42,
+      }),
+    );
+  });
+
+  it("rejects unknown deviceId with 404", async () => {
+    const r = await app.request("/public/scoreboard/stream?deviceId=other");
+    expect(r.status).toBe(404);
   });
 });

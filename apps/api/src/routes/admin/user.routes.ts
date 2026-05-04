@@ -1,18 +1,26 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { db } from "../../config/database";
 import { user as userTable, referees } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
-import { requirePermission } from "../../middleware/rbac";
+import { requireAnyRole } from "../../middleware/rbac";
 
 const userRoutes = new Hono();
 
-// PATCH /users/:id/referee-link - Link or unlink a referee to a user account
+const refereeLinkBodySchema = z.object({
+  refereeId: z.number().int().positive().nullable(),
+});
+
 userRoutes.patch(
   "/users/:id/referee-link",
-  requirePermission("user", "update"),
+  requireAnyRole("admin"),
   async (c) => {
     const userId = c.req.param("id");
-    const body = await c.req.json<{ refereeId: number | null }>();
+    const parsed = refereeLinkBodySchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) {
+      return c.json({ error: "Invalid body", code: "BAD_REQUEST" }, 400);
+    }
+    const body = parsed.data;
 
     // Validate referee exists if linking
     if (body.refereeId !== null) {

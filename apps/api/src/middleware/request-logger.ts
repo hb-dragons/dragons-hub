@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { logger } from "../config/logger";
 import { runWithLogContext, type LogContext } from "../config/log-context";
-import { anonymizeIp, scrubUrl } from "../config/log-privacy";
+import { anonymizeIp, scrubPath, scrubUrl } from "../config/log-privacy";
 import type { AppEnv } from "../types";
 
 const REDACTED_HEADERS = new Set(["authorization", "cookie", "set-cookie"]);
@@ -54,10 +54,9 @@ export const requestLogger = createMiddleware<AppEnv>(async (c, next) => {
   c.set("logger", childLogger);
   c.header("x-request-id", requestId);
 
-  const { method, path } = c.req;
-  // requestUrl / debug url have query values scrubbed so we never persist
-  // PII that the caller embedded in the URL (email, token, userId, ...).
-  const sanitizedUrl = scrubUrl(c.req.url);
+  const { method } = c.req;
+  const path = scrubPath(c.req.path);
+  const sanitizedUrl = scrubPath(scrubUrl(c.req.url));
 
   await runWithLogContext(ctx, async () => {
     if (childLogger.level === "debug" || childLogger.level === "trace") {

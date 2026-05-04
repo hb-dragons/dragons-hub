@@ -6,7 +6,9 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "../../config/database";
 import { matches, leagues, teams } from "@dragons/db/schema";
 import { requireAnyRole } from "../../middleware/rbac";
+import { escapeLikePattern } from "../../services/utils/sql";
 import {
+  BroadcastError,
   getBroadcastConfig,
   loadJoinedMatch,
   setBroadcastLive,
@@ -102,10 +104,13 @@ adminBroadcastRoutes.post(
       await publishBroadcastForDevice(parsed.data.deviceId);
       return c.json({ config });
     } catch (err) {
-      return c.json(
-        { error: (err as Error).message, code: "BAD_REQUEST" },
-        400,
-      );
+      if (err instanceof BroadcastError && err.code === "MISSING_MATCH") {
+        return c.json(
+          { error: "Cannot go live without matchId", code: "MISSING_MATCH" },
+          400,
+        );
+      }
+      throw err;
     }
   },
 );
@@ -175,7 +180,7 @@ adminBroadcastRoutes.get(
 
     let textFilter = undefined;
     if (q && q.trim().length > 0) {
-      const pattern = `%${q.trim()}%`;
+      const pattern = `%${escapeLikePattern(q.trim())}%`;
       const matchedTeams = await db
         .select({ id: teams.apiTeamPermanentId })
         .from(teams)

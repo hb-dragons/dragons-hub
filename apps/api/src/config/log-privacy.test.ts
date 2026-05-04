@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anonymizeIp, scrubUrl } from "./log-privacy";
+import { anonymizeIp, scrubPath, scrubUrl } from "./log-privacy";
 
 describe("anonymizeIp", () => {
   it("returns undefined for undefined", () => {
@@ -112,6 +112,28 @@ describe("scrubUrl", () => {
   it("scrubs path?query even when the leading part isn't a valid URL", () => {
     expect(scrubUrl("weird path?secret=abc")).toBe(
       "weird path?secret=%5BREDACTED%5D",
+    );
+  });
+});
+
+describe("scrubPath", () => {
+  it("redacts /api/devices/<token>", () => {
+    expect(scrubPath("/api/devices/ExponentPushToken[abc]")).toBe(
+      "/api/devices/[REDACTED]",
+    );
+  });
+
+  it("redacts /devices/<token>", () => {
+    expect(scrubPath("/devices/abc")).toBe("/devices/[REDACTED]");
+  });
+
+  it("leaves unrelated paths alone", () => {
+    expect(scrubPath("/admin/users")).toBe("/admin/users");
+  });
+
+  it("preserves trailing query separator", () => {
+    expect(scrubPath("/api/devices/abc?x=1")).toBe(
+      "/api/devices/[REDACTED]?x=1",
     );
   });
 });

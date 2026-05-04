@@ -5,6 +5,9 @@ import { admin } from "better-auth/plugins/admin";
 import { ac, roles } from "@dragons/shared";
 import { db } from "./database";
 import { env } from "./env";
+import { redis } from "./redis";
+
+const SECONDARY_STORAGE_PREFIX = "ba:";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
@@ -12,18 +15,27 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   trustedOrigins: [
     ...env.TRUSTED_ORIGINS,
-    "dragons://",
     "dragons://*",
     ...(env.NODE_ENV === "development" ? ["exp://*"] : []),
   ],
   emailAndPassword: {
     enabled: true,
-    // Accounts are admin-created via the admin plugin; close the self-serve endpoint.
     disableSignUp: true,
     minPasswordLength: 12,
   },
-  // Memory storage is single-instance only. Wire up secondary storage (Redis)
-  // before horizontally scaling the API.
+  secondaryStorage: {
+    async get(key) {
+      return redis.get(`${SECONDARY_STORAGE_PREFIX}${key}`);
+    },
+    async set(key, value, ttl) {
+      const k = `${SECONDARY_STORAGE_PREFIX}${key}`;
+      if (ttl && ttl > 0) await redis.set(k, value, "EX", ttl);
+      else await redis.set(k, value);
+    },
+    async delete(key) {
+      await redis.del(`${SECONDARY_STORAGE_PREFIX}${key}`);
+    },
+  },
   rateLimit: {
     enabled: true,
     window: 60,

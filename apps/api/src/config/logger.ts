@@ -38,8 +38,29 @@ function logContextMixin(): Record<string, string | boolean> {
   return fields;
 }
 
-// Redact sensitive fields across the log tree. Cheaper and safer than
-// per-caller sanitization.
+const SENSITIVE_KEYS = [
+  "password",
+  "token",
+  "accessToken",
+  "refreshToken",
+  "apiKey",
+  "api_key",
+  "secret",
+  "authorization",
+  "cookie",
+];
+
+const SENSITIVE_CONTAINERS = [
+  "body",
+  "form",
+  "data",
+  "payload",
+  "params",
+  "input",
+  "config",
+  "env",
+];
+
 const REDACT_PATHS = [
   "req.headers.authorization",
   "req.headers.cookie",
@@ -47,12 +68,13 @@ const REDACT_PATHS = [
   "headers.authorization",
   "headers.cookie",
   'headers["set-cookie"]',
-  "*.password",
-  "*.token",
-  "*.accessToken",
-  "*.refreshToken",
-  "*.apiKey",
-  "*.api_key",
+  "SDK_PASSWORD",
+  "SDK_USERNAME",
+  "BETTER_AUTH_SECRET",
+  "SCOREBOARD_INGEST_KEY",
+  "REFEREE_SDK_PASSWORD",
+  "EXPO_ACCESS_TOKEN",
+  ...SENSITIVE_KEYS.flatMap((k) => [`*.${k}`, ...SENSITIVE_CONTAINERS.map((c) => `*.${c}.${k}`)]),
 ];
 
 const prodOptions: LoggerOptions = {

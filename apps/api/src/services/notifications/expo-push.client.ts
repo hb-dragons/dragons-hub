@@ -7,6 +7,8 @@ const RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
 const SEND_BATCH_LIMIT = 100;
 const RECEIPTS_BATCH_LIMIT = 1000;
 const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_ATTEMPTS = 3;
+const RETRY_BASE_MS = 500;
 
 export interface ExpoPushMessage {
   to: string;
@@ -74,37 +76,54 @@ export class ExpoPushClient {
   }
 
   private async postSend(chunk: ExpoPushMessage[]): Promise<ExpoPushTicket[]> {
-    const res = await this.fetchWithTimeout(SEND_URL, {
+    const res = await this.fetchWithRetry(SEND_URL, {
       method: "POST",
       headers: this.buildHeaders(),
       body: JSON.stringify(chunk),
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      log.error({ status: res.status, text }, "Expo push send failed");
-      throw new Error(`Expo push send failed: ${res.status} ${text}`);
-    }
+    }, "Expo push send");
 
     const json = (await res.json()) as { data: ExpoPushTicket[] };
     return json.data ?? [];
   }
 
   private async postReceipts(chunk: string[]): Promise<Record<string, ExpoPushReceipt>> {
-    const res = await this.fetchWithTimeout(RECEIPTS_URL, {
+    const res = await this.fetchWithRetry(RECEIPTS_URL, {
       method: "POST",
       headers: this.buildHeaders(),
       body: JSON.stringify({ ids: chunk }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      log.error({ status: res.status, text }, "Expo push getReceipts failed");
-      throw new Error(`Expo push getReceipts failed: ${res.status} ${text}`);
-    }
+    }, "Expo push getReceipts");
 
     const json = (await res.json()) as { data: Record<string, ExpoPushReceipt> };
     return json.data ?? {};
+  }
+
+  private async fetchWithRetry(
+    url: string,
+    init: RequestInit,
+    label: string,
+  ): Promise<Response> {
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const res = await this.fetchWithTimeout(url, init);
+        if (res.ok) return res;
+        if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+          await sleep(RETRY_BASE_MS * 2 ** (attempt - 1));
+          continue;
+        }
+        const text = await res.text().catch(() => "");
+        log.error({ status: res.status, text, attempt }, `${label} failed`);
+        throw new Error(`${label} failed: ${res.status} ${text}`);
+      } catch (err) {
+        lastErr = err;
+        const isRetryable =
+          err instanceof Error &&
+          (err.name === "AbortError" || err.message.includes("ECONNRESET") || err.message.includes("ETIMEDOUT") || err.message.includes("fetch failed"));
+        if (!isRetryable || attempt === MAX_ATTEMPTS) throw err;
+        await sleep(RETRY_BASE_MS * 2 ** (attempt - 1));
+      }
+    }
+    throw lastErr ?? new Error(`${label} failed`);
   }
 
   private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -116,4 +135,8 @@ export class ExpoPushClient {
       clearTimeout(timer);
     }
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

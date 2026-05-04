@@ -23,6 +23,20 @@ vi.mock("./database", () => ({
   db: {},
 }));
 
+const redisMocks = vi.hoisted(() => ({
+  get: vi.fn(),
+  set: vi.fn(),
+  del: vi.fn(),
+}));
+
+vi.mock("./redis", () => ({
+  redis: {
+    get: (...a: unknown[]) => redisMocks.get(...a),
+    set: (...a: unknown[]) => redisMocks.set(...a),
+    del: (...a: unknown[]) => redisMocks.del(...a),
+  },
+}));
+
 vi.mock("better-auth", () => ({
   betterAuth: (...args: unknown[]) => mocks.betterAuth(...args),
 }));
@@ -177,6 +191,59 @@ describe("auth config", () => {
         emailVerified: true,
         role: null,
       });
+    });
+  });
+
+  describe("secondaryStorage", () => {
+    type Storage = {
+      get(key: string): Promise<unknown>;
+      set(key: string, value: string, ttl?: number): Promise<void>;
+      delete(key: string): Promise<void>;
+    };
+
+    async function getStorage(): Promise<Storage> {
+      await import("./auth");
+      const config = mocks.betterAuth.mock.calls[0]![0] as {
+        secondaryStorage: Storage;
+      };
+      return config.secondaryStorage;
+    }
+
+    beforeEach(() => {
+      redisMocks.get.mockReset();
+      redisMocks.set.mockReset();
+      redisMocks.del.mockReset();
+    });
+
+    it("get prefixes the key", async () => {
+      redisMocks.get.mockResolvedValue("v");
+      const storage = await getStorage();
+      await storage.get("session:abc");
+      expect(redisMocks.get).toHaveBeenCalledWith("ba:session:abc");
+    });
+
+    it("set with ttl uses EX expiry", async () => {
+      const storage = await getStorage();
+      await storage.set("k", "v", 60);
+      expect(redisMocks.set).toHaveBeenCalledWith("ba:k", "v", "EX", 60);
+    });
+
+    it("set without ttl omits EX", async () => {
+      const storage = await getStorage();
+      await storage.set("k", "v");
+      expect(redisMocks.set).toHaveBeenCalledWith("ba:k", "v");
+    });
+
+    it("set with ttl=0 omits EX", async () => {
+      const storage = await getStorage();
+      await storage.set("k", "v", 0);
+      expect(redisMocks.set).toHaveBeenCalledWith("ba:k", "v");
+    });
+
+    it("delete prefixes the key", async () => {
+      const storage = await getStorage();
+      await storage.delete("k");
+      expect(redisMocks.del).toHaveBeenCalledWith("ba:k");
     });
   });
 });

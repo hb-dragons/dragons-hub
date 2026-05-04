@@ -63,6 +63,9 @@ leagueRoutes.patch(
   }),
   async (c) => {
     const leagueId = parseInt(c.req.param("id"), 10);
+    if (!Number.isInteger(leagueId) || leagueId <= 0) {
+      return c.json({ error: "Invalid id", code: "BAD_REQUEST" }, 400);
+    }
     const { ownClubRefs } = ownClubRefsSchema.parse(await c.req.json());
     await setLeagueOwnClubRefs(leagueId, ownClubRefs);
     return c.json({ ok: true });

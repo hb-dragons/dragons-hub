@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 import { eq, like, desc } from "drizzle-orm";
+import { ulid } from "ulid";
 import { db } from "../../config/database";
 import {
   pushDevices,
@@ -12,7 +13,9 @@ import {
 import { ExpoPushClient } from "../../services/notifications/expo-push.client";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
+import { redis } from "../../config/redis";
 import { requirePermission } from "../../middleware/rbac";
+import { escapeLikePattern } from "../../services/utils/sql";
 import type { AppEnv } from "../../types";
 
 const log = logger.child({ service: "admin-notification-test" });
@@ -28,17 +31,8 @@ const expoPushClient = new ExpoPushClient({
   accessToken: env.EXPO_ACCESS_TOKEN,
 });
 
-// Per-user cooldown for the test-push endpoint. A 10s window is enough to
-// stop accidental double-taps or impatient debugging without forcing admins
-// to wait out a real notification round-trip. Process-local map is fine
-// because the endpoint is admin-only and traffic is tiny.
-const TEST_PUSH_COOLDOWN_MS = 10_000;
-const lastSendByUser = new Map<string, number>();
-
-/** @internal — exposed for tests to reset rate-limit state between cases. */
-export function __resetTestPushRateLimitForTests(): void {
-  lastSendByUser.clear();
-}
+const TEST_PUSH_COOLDOWN_SEC = 10;
+const TEST_PUSH_COOLDOWN_KEY_PREFIX = "rl:test-push:";
 
 notificationTestRoutes.post(
   "/notifications/test-push",
@@ -62,16 +56,14 @@ notificationTestRoutes.post(
     const body = sendBodySchema.parse(raw);
     const callerId = user.id;
 
-    const last = lastSendByUser.get(callerId);
-    const nowMs = Date.now();
-    if (last !== undefined && nowMs - last < TEST_PUSH_COOLDOWN_MS) {
-      const retryAfter = Math.ceil(
-        (TEST_PUSH_COOLDOWN_MS - (nowMs - last)) / 1000,
-      );
+    const cooldownKey = `${TEST_PUSH_COOLDOWN_KEY_PREFIX}${callerId}`;
+    const claim = await redis.set(cooldownKey, "1", "EX", TEST_PUSH_COOLDOWN_SEC, "NX");
+    if (claim !== "OK") {
+      const ttl = await redis.ttl(cooldownKey);
+      const retryAfter = ttl > 0 ? ttl : TEST_PUSH_COOLDOWN_SEC;
       c.header("Retry-After", String(retryAfter));
       return c.json({ error: "rate_limited", retryAfter }, 429);
     }
-    lastSendByUser.set(callerId, nowMs);
 
     const devices = await db
       .select()
@@ -99,7 +91,7 @@ notificationTestRoutes.post(
     }
 
     const sentAt = new Date();
-    const eventId = `admin_test:${callerId}:${sentAt.getTime()}`;
+    const eventId = `admin_test:${callerId}:${ulid()}`;
     const text = body.message ?? "Test push from Dragons admin";
     const messages = devices.map((d) => ({
       to: d.token,
@@ -195,7 +187,7 @@ notificationTestRoutes.get(
     const rows = await db
       .select()
       .from(notificationLog)
-      .where(like(notificationLog.eventId, `admin_test:${callerId}:%`))
+      .where(like(notificationLog.eventId, `admin_test:${escapeLikePattern(callerId)}:%`))
       .orderBy(desc(notificationLog.createdAt))
       .limit(10);
 

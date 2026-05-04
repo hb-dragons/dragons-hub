@@ -516,7 +516,7 @@ export async function syncMatchesFromData(
   // Batch-load all existing matches to avoid N+1 SELECTs
   const allApiMatchIds = leagueData
     .flatMap((d) => d.spielplan.map((m) => m.matchId))
-    .filter((id): id is number => !!id);
+    .filter((id): id is number => typeof id === "number" && id > 0);
 
   const existingMatchesByApiId = new Map<number, typeof matches.$inferSelect>();
   if (allApiMatchIds.length > 0) {
@@ -739,25 +739,27 @@ export async function syncMatchesFromData(
                     ),
                   );
               } else {
-                // Remote diverges from local override — emit conflict event
                 try {
-                  await publishDomainEvent({
-                    type: EVENT_TYPES.OVERRIDE_CONFLICT,
-                    source: "sync",
-                    entityType: "match",
-                    entityId: existing.id,
-                    entityName,
-                    deepLinkPath: `/admin/matches/${existing.id}`,
-                    payload: {
-                      matchNo: basicMatch.matchNo,
-                      homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
-                      guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
-                      fieldName,
-                      localValue: lockedVal,
-                      newRemoteValue: remoteVal,
+                  await publishDomainEvent(
+                    {
+                      type: EVENT_TYPES.OVERRIDE_CONFLICT,
+                      source: "sync",
+                      entityType: "match",
+                      entityId: existing.id,
+                      entityName,
+                      deepLinkPath: `/admin/matches/${existing.id}`,
+                      payload: {
+                        matchNo: basicMatch.matchNo,
+                        homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
+                        guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
+                        fieldName,
+                        localValue: lockedVal,
+                        newRemoteValue: remoteVal,
+                      },
+                      syncRunId,
                     },
-                    syncRunId,
-                  });
+                    tx,
+                  );
                 } catch (error) {
                   log.warn({ err: error, matchId: existing.id, fieldName }, "Failed to emit override.conflict event");
                 }

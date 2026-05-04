@@ -16,6 +16,18 @@ vi.mock("../../config/env", () => ({
   },
 }));
 
+const counters = new Map<string, number>();
+vi.mock("../../config/redis", () => ({
+  redis: {
+    async incr(key: string) {
+      const next = (counters.get(key) ?? 0) + 1;
+      counters.set(key, next);
+      return next;
+    },
+    async expire() {},
+  },
+}));
+
 import { apiScoreboardRoutes } from "./scoreboard.routes";
 
 const app = new Hono();
@@ -27,7 +39,10 @@ const headers = {
   "Content-Type": "text/plain",
 };
 
-beforeEach(() => mocks.processIngest.mockReset());
+beforeEach(() => {
+  mocks.processIngest.mockReset();
+  counters.clear();
+});
 
 describe("POST /api/scoreboard/ingest", () => {
   it("returns 200 and the result from processIngest", async () => {
