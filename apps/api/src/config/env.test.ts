@@ -85,6 +85,65 @@ describe("env config", () => {
     expect(() => env.DATABASE_URL).toThrow("Invalid environment variables");
   });
 
+  it("rejects production with localhost BETTER_AUTH_URL", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test");
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
+    vi.stubEnv("SDK_USERNAME", "user");
+    vi.stubEnv("SDK_PASSWORD", "pass");
+    vi.stubEnv("BETTER_AUTH_SECRET", "a".repeat(32));
+    vi.stubEnv("SCOREBOARD_INGEST_KEY", "k".repeat(32));
+    vi.stubEnv("SCOREBOARD_DEVICE_ID", "dragons-1");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3001");
+
+    const { env } = await import("./env");
+    expect(() => env.DATABASE_URL).toThrow(/Invalid environment variables/);
+  });
+
+  it("rejects production with 127.0.0.1 BETTER_AUTH_URL", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test");
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
+    vi.stubEnv("SDK_USERNAME", "user");
+    vi.stubEnv("SDK_PASSWORD", "pass");
+    vi.stubEnv("BETTER_AUTH_SECRET", "a".repeat(32));
+    vi.stubEnv("SCOREBOARD_INGEST_KEY", "k".repeat(32));
+    vi.stubEnv("SCOREBOARD_DEVICE_ID", "dragons-1");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BETTER_AUTH_URL", "http://127.0.0.1:3001");
+
+    const { env } = await import("./env");
+    expect(() => env.DATABASE_URL).toThrow(/Invalid environment variables/);
+  });
+
+  it("accepts production with public BETTER_AUTH_URL", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test");
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
+    vi.stubEnv("SDK_USERNAME", "user");
+    vi.stubEnv("SDK_PASSWORD", "pass");
+    vi.stubEnv("BETTER_AUTH_SECRET", "a".repeat(32));
+    vi.stubEnv("SCOREBOARD_INGEST_KEY", "k".repeat(32));
+    vi.stubEnv("SCOREBOARD_DEVICE_ID", "dragons-1");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BETTER_AUTH_URL", "https://api.app.hbdragons.de");
+
+    const { env } = await import("./env");
+    expect(env.BETTER_AUTH_URL).toBe("https://api.app.hbdragons.de");
+  });
+
+  it("VERBOSE_ERRORS coerces string to boolean", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test");
+    vi.stubEnv("REDIS_URL", "redis://localhost:6379");
+    vi.stubEnv("SDK_USERNAME", "user");
+    vi.stubEnv("SDK_PASSWORD", "pass");
+    vi.stubEnv("BETTER_AUTH_SECRET", "a".repeat(32));
+    vi.stubEnv("SCOREBOARD_INGEST_KEY", "k".repeat(32));
+    vi.stubEnv("SCOREBOARD_DEVICE_ID", "dragons-1");
+    vi.stubEnv("VERBOSE_ERRORS", "true");
+
+    const { env } = await import("./env");
+    expect(env.VERBOSE_ERRORS).toBe(true);
+  });
+
   it("caches env after first parse", async () => {
     vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test");
     vi.stubEnv("REDIS_URL", "redis://localhost:6379");

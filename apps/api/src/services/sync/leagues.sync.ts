@@ -1,11 +1,14 @@
 import { db } from "../../config/database";
 import { leagues } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
+import pLimit from "p-limit";
 import { sdkClient } from "./sdk-client";
 import { computeEntityHash } from "./hash";
 import type { SdkLigaData } from "@dragons/sdk";
 import type { SyncLogger } from "./sync-logger";
 import { logger } from "../../config/logger";
+
+const LEAGUE_SYNC_CONCURRENCY = 5;
 
 const log = logger.child({ service: "leagues-sync" });
 
@@ -34,7 +37,7 @@ function ligaDataHashData(ligaData: SdkLigaData): Record<string, unknown> {
   };
 }
 
-export async function syncLeagues(logger?: SyncLogger): Promise<LeagueSyncResult> {
+export async function syncLeagues(syncLogger?: SyncLogger): Promise<LeagueSyncResult> {
   const startedAt = Date.now();
   const result: LeagueSyncResult = {
     total: 0,
@@ -54,77 +57,12 @@ export async function syncLeagues(logger?: SyncLogger): Promise<LeagueSyncResult
 
     log.info({ count: trackedLeagues.length }, "Refreshing metadata for tracked leagues");
 
-    for (const league of trackedLeagues) {
-      result.total++;
-
-      try {
-        const tabelleResponse = await sdkClient.getTabelleResponse(league.apiLigaId);
-        const ligaData = tabelleResponse?.ligaData;
-
-        if (!ligaData) {
-          result.skipped++;
-          await logger?.log({
-            entityType: "league",
-            entityId: String(league.apiLigaId),
-            entityName: league.name,
-            action: "skipped",
-            message: "No ligaData in tabelle response",
-          });
-          continue;
-        }
-
-        const hash = computeEntityHash(ligaDataHashData(ligaData));
-
-        if (league.dataHash === hash) {
-          result.skipped++;
-          await logger?.log({
-            entityType: "league",
-            entityId: String(league.apiLigaId),
-            entityName: league.name,
-            action: "skipped",
-            message: "No changes detected",
-          });
-          continue;
-        }
-
-        await db
-          .update(leagues)
-          .set({
-            ligaNr: ligaData.liganr,
-            name: ligaData.liganame || league.name,
-            seasonId: ligaData.seasonId,
-            seasonName: ligaData.seasonName || league.seasonName,
-            skName: ligaData.skName || null,
-            akName: ligaData.akName || null,
-            geschlecht: ligaData.geschlecht || null,
-            verbandId: ligaData.verbandId || null,
-            verbandName: ligaData.verbandName || null,
-            dataHash: hash,
-            updatedAt: new Date(),
-          })
-          .where(eq(leagues.id, league.id));
-
-        result.updated++;
-        await logger?.log({
-          entityType: "league",
-          entityId: String(league.apiLigaId),
-          entityName: ligaData.liganame,
-          action: "updated",
-          message: `Updated league ${ligaData.liganame}`,
-        });
-      } catch (error) {
-        result.failed++;
-        const message = error instanceof Error ? error.message : "Unknown error";
-        result.errors.push(`Failed to sync league ${league.apiLigaId}: ${message}`);
-        await logger?.log({
-          entityType: "league",
-          entityId: String(league.apiLigaId),
-          entityName: league.name,
-          action: "failed",
-          message: `Failed to sync league: ${message}`,
-        });
-      }
-    }
+    const limit = pLimit(LEAGUE_SYNC_CONCURRENCY);
+    await Promise.all(
+      trackedLeagues.map((league) =>
+        limit(() => syncOneLeague(league, result, syncLogger)),
+      ),
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     result.errors.push(`Failed to fetch tracked leagues: ${message}`);
@@ -133,9 +71,90 @@ export async function syncLeagues(logger?: SyncLogger): Promise<LeagueSyncResult
 
   result.durationMs = Date.now() - startedAt;
   log.info(
-    { durationMs: result.durationMs, created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length },
+    {
+      durationMs: result.durationMs,
+      created: result.created,
+      updated: result.updated,
+      skipped: result.skipped,
+      errors: result.errors.length,
+    },
     "Leagues sync completed",
   );
-
   return result;
+}
+
+async function syncOneLeague(
+  league: typeof leagues.$inferSelect,
+  result: LeagueSyncResult,
+  syncLogger?: SyncLogger,
+): Promise<void> {
+  result.total++;
+
+  try {
+    const tabelleResponse = await sdkClient.getTabelleResponse(league.apiLigaId);
+    const ligaData = tabelleResponse?.ligaData;
+
+    if (!ligaData) {
+      result.skipped++;
+      await syncLogger?.log({
+        entityType: "league",
+        entityId: String(league.apiLigaId),
+        entityName: league.name,
+        action: "skipped",
+        message: "No ligaData in tabelle response",
+      });
+      return;
+    }
+
+    const hash = computeEntityHash(ligaDataHashData(ligaData));
+
+    if (league.dataHash === hash) {
+      result.skipped++;
+      await syncLogger?.log({
+        entityType: "league",
+        entityId: String(league.apiLigaId),
+        entityName: league.name,
+        action: "skipped",
+        message: "No changes detected",
+      });
+      return;
+    }
+
+    await db
+      .update(leagues)
+      .set({
+        ligaNr: ligaData.liganr,
+        name: ligaData.liganame || league.name,
+        seasonId: ligaData.seasonId,
+        seasonName: ligaData.seasonName || league.seasonName,
+        skName: ligaData.skName || null,
+        akName: ligaData.akName || null,
+        geschlecht: ligaData.geschlecht || null,
+        verbandId: ligaData.verbandId || null,
+        verbandName: ligaData.verbandName || null,
+        dataHash: hash,
+        updatedAt: new Date(),
+      })
+      .where(eq(leagues.id, league.id));
+
+    result.updated++;
+    await syncLogger?.log({
+      entityType: "league",
+      entityId: String(league.apiLigaId),
+      entityName: ligaData.liganame,
+      action: "updated",
+      message: `Updated league ${ligaData.liganame}`,
+    });
+  } catch (error) {
+    result.failed++;
+    const message = error instanceof Error ? error.message : "Unknown error";
+    result.errors.push(`Failed to sync league ${league.apiLigaId}: ${message}`);
+    await syncLogger?.log({
+      entityType: "league",
+      entityId: String(league.apiLigaId),
+      entityName: league.name,
+      action: "failed",
+      message: `Failed to sync league: ${message}`,
+    });
+  }
 }

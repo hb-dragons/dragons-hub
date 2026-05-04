@@ -206,7 +206,8 @@ notificationTestRoutes.get(
 
 function maskToken(token: string | null): string | null {
   if (!token) return null;
-  return token.length > 6 ? "..." + token.slice(-6) : token;
+  if (token.length > 6) return "..." + token.slice(-6);
+  return "..." + token.slice(-2);
 }
 
 export { notificationTestRoutes };

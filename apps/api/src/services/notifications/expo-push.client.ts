@@ -1,4 +1,26 @@
+import { z } from "zod";
 import { logger } from "../../config/logger";
+
+const ticketSchema = z.object({
+  status: z.enum(["ok", "error"]),
+  id: z.string().optional(),
+  message: z.string().optional(),
+  details: z.object({ error: z.string().optional() }).optional(),
+});
+
+const sendResponseSchema = z.object({
+  data: z.array(ticketSchema),
+});
+
+const receiptSchema = z.object({
+  status: z.enum(["ok", "error"]),
+  message: z.string().optional(),
+  details: z.object({ error: z.string().optional() }).optional(),
+});
+
+const receiptsResponseSchema = z.object({
+  data: z.record(z.string(), receiptSchema),
+});
 
 const log = logger.child({ service: "expo-push" });
 
@@ -82,8 +104,13 @@ export class ExpoPushClient {
       body: JSON.stringify(chunk),
     }, "Expo push send");
 
-    const json = (await res.json()) as { data: ExpoPushTicket[] };
-    return json.data ?? [];
+    const raw = await res.json().catch(() => null);
+    const parsed = sendResponseSchema.safeParse(raw);
+    if (!parsed.success) {
+      log.error({ raw }, "Expo push send: unexpected response shape");
+      throw new Error("Expo push send: unexpected response shape");
+    }
+    return parsed.data.data;
   }
 
   private async postReceipts(chunk: string[]): Promise<Record<string, ExpoPushReceipt>> {
@@ -93,8 +120,13 @@ export class ExpoPushClient {
       body: JSON.stringify({ ids: chunk }),
     }, "Expo push getReceipts");
 
-    const json = (await res.json()) as { data: Record<string, ExpoPushReceipt> };
-    return json.data ?? {};
+    const raw = await res.json().catch(() => null);
+    const parsed = receiptsResponseSchema.safeParse(raw);
+    if (!parsed.success) {
+      log.error({ raw }, "Expo push getReceipts: unexpected response shape");
+      throw new Error("Expo push getReceipts: unexpected response shape");
+    }
+    return parsed.data.data;
   }
 
   private async fetchWithRetry(

@@ -476,7 +476,7 @@ describe("GET /notifications/test-push/recent", () => {
     expect(body.results[0].recipientToken).toBeNull();
   });
 
-  it("maskToken returns token as-is when 6 chars or fewer", async () => {
+  it("maskToken always masks short tokens (no plaintext leak)", async () => {
     const app = makeApp({ id: "u_admin", role: "admin" });
     mocks.dbSelect.mockReturnValueOnce({
       from: vi.fn().mockReturnValue({
@@ -500,6 +500,7 @@ describe("GET /notifications/test-push/recent", () => {
 
     const res = await app.request("/notifications/test-push/recent");
     const body = await res.json();
-    expect(body.results[0].recipientToken).toBe("abc");
+    expect(body.results[0].recipientToken).toMatch(/^\.\.\./);
+    expect(body.results[0].recipientToken).not.toBe("abc");
   });
 });

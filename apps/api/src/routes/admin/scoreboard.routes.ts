@@ -8,6 +8,10 @@ import {
   liveScoreboards,
   scoreboardSnapshots,
 } from "@dragons/db/schema";
+import {
+  computeSecondsSince,
+  SCOREBOARD_ONLINE_THRESHOLD_MS,
+} from "../../services/scoreboard/constants";
 import type { AppEnv } from "../../types";
 
 const adminScoreboardRoutes = new Hono<AppEnv>();
@@ -74,15 +78,13 @@ adminScoreboardRoutes.get(
         online: false,
       });
     }
-    const row = rows[0]!; // length checked above
-    const secondsSinceLastFrame = Math.floor(
-      (Date.now() - new Date(row.lastFrameAt).getTime()) / 1000,
-    );
+    const row = rows[0]!;
+    const secondsSinceLastFrame = computeSecondsSince(row.lastFrameAt);
     return c.json({
       deviceId,
       lastFrameAt: row.lastFrameAt,
       secondsSinceLastFrame,
-      online: secondsSinceLastFrame < 10,
+      online: secondsSinceLastFrame * 1000 < SCOREBOARD_ONLINE_THRESHOLD_MS,
     });
   },
 );

@@ -8,10 +8,12 @@ import type {
   PublicLiveSnapshot,
 } from "@dragons/shared";
 import { publishBroadcast } from "../scoreboard/pubsub";
+import {
+  BROADCAST_STALE_THRESHOLD_MS,
+  computeSecondsSince,
+} from "../scoreboard/constants";
 import { computePhase } from "./phase";
 import { loadJoinedMatch, rowToConfig } from "./config";
-
-const STALE_MS = 30_000;
 
 const MATCH_CACHE_TTL_MS = 30_000;
 
@@ -77,10 +79,7 @@ async function getCachedMatch(
 function rowToScoreboard(
   row: typeof liveScoreboards.$inferSelect,
 ): PublicLiveSnapshot {
-  const seconds = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(row.lastFrameAt).getTime()) / 1000),
-  );
+  const seconds = computeSecondsSince(row.lastFrameAt);
   return {
     scoreHome: row.scoreHome,
     scoreGuest: row.scoreGuest,
@@ -143,7 +142,7 @@ export async function buildBroadcastState(
   const stale =
     config.isLive &&
     scoreRow !== undefined &&
-    Date.now() - new Date(scoreRow.lastFrameAt).getTime() > STALE_MS;
+    Date.now() - new Date(scoreRow.lastFrameAt).getTime() > BROADCAST_STALE_THRESHOLD_MS;
 
   return {
     deviceId,

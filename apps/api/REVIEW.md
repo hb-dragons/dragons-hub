@@ -9,9 +9,9 @@ This document tracks every finding from the review, ordered for sequential fixin
 
 ## Progress
 
-After-fix baseline (2026-05-04, second pass):
-- 155 test files, 2710 tests passing (was 153 / 2673 pre-review)
-- Coverage: 96.89% stmts / 90.01% branches / 96.32% funcs / 97.47% lines
+After-fix baseline (2026-05-04, third pass):
+- 158 test files, 2731 tests passing (was 153 / 2673 pre-review)
+- Coverage: 96.79% stmts / 90.04% branches / 96.15% funcs / 97.4% lines
 - Lint clean. Typecheck clean. AI-slop check passed.
 
 ### Fixed in this pass
@@ -70,6 +70,18 @@ After-fix baseline (2026-05-04, second pass):
 - M7r SDK login deduplicates concurrent calls via `loginInFlight` promise
 - M7s SDK `withRetry` wraps the final attempt's error with `cause` + attempt count
 - Tests added: CSV formula prefix, player photo extension, settings malformed JSON, sdk-client login dedupe, broadcast race, queue manual sync state machine
+
+### Round 7 follow-ups (2026-05-04)
+
+- L2 env superRefine rejects `localhost` / `127.0.0.1` for `BETTER_AUTH_URL` when `NODE_ENV=production`
+- L11 Expo client validates send + receipts response shapes via Zod; logs and aborts on drift
+- L12 `maskToken` always masks, never returns plaintext for short tokens
+- M2e `leagues.sync` parallelizes via `p-limit(5)` (was sequential)
+- M3d `permission-coverage.test.ts` static-walks `routes/admin/*` and asserts every handler has an explicit `requirePermission` / `requireAnyRole` / `requireRefereeSelf` guard (with documented self-service exceptions)
+- M6e `services/scoreboard/constants.ts` extracts `SCOREBOARD_ONLINE_THRESHOLD_MS`, `BROADCAST_STALE_THRESHOLD_MS`, and `computeSecondsSince`; consumed by admin/scoreboard, public/scoreboard, broadcast/publisher
+- M7f `sync-logger` Redis publish failure now uses a 30s recovery cooldown instead of permanently disabling streaming for the run
+- M7i magic thresholds split between scoreboard ↔ broadcast unified through the constants module
+- New tests: env-schema validation (production URL rules + VERBOSE_ERRORS coercion), scoreboard constants
 
 ### Deferred (still in this doc)
 

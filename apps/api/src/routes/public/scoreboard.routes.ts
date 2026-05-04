@@ -6,6 +6,7 @@ import { liveScoreboards } from "@dragons/db/schema";
 import { createScoreboardStream } from "../../services/scoreboard/sse";
 import { env } from "../../config/env";
 import { tryAcquire, release } from "../../services/scoreboard/connection-cap";
+import { computeSecondsSince } from "../../services/scoreboard/constants";
 
 const publicScoreboardRoutes = new Hono();
 
@@ -33,13 +34,9 @@ publicScoreboardRoutes.get(
     if (rows.length === 0) {
       return c.json({ error: "No data", code: "NO_DATA" }, 404);
     }
-    const row = rows[0]!; // length checked above
-    const secondsSinceLastFrame = Math.max(
-      0,
-      Math.floor((Date.now() - new Date(row.lastFrameAt).getTime()) / 1000),
-    );
+    const row = rows[0]!;
     c.header("Cache-Control", "no-store");
-    return c.json({ ...row, secondsSinceLastFrame });
+    return c.json({ ...row, secondsSinceLastFrame: computeSecondsSince(row.lastFrameAt) });
   },
 );
 

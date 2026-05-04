@@ -27,9 +27,15 @@ export class SyncLogger {
   private eventEmitter: EventEmitter;
   private redis: Redis | null = null;
   private channelName: string;
-  private redisPublishFailed = false;
+  private redisFailedAt = 0;
   private flushRetries = 0;
   private static readonly MAX_FLUSH_RETRIES = 3;
+  private static readonly REDIS_RECOVERY_COOLDOWN_MS = 30_000;
+
+  private shouldAttemptRedis(): boolean {
+    if (this.redisFailedAt === 0) return true;
+    return Date.now() - this.redisFailedAt > SyncLogger.REDIS_RECOVERY_COOLDOWN_MS;
+  }
 
   constructor(syncRunId: number, redisInstance?: Redis | null) {
     this.syncRunId = syncRunId;
@@ -58,15 +64,16 @@ export class SyncLogger {
 
     this.eventEmitter.emit("entry", entry);
 
-    if (this.redis && !this.redisPublishFailed) {
+    if (this.redis && this.shouldAttemptRedis()) {
       try {
         await this.redis.publish(
           this.channelName,
           JSON.stringify({ ...entry, timestamp: new Date().toISOString() }),
         );
+        this.redisFailedAt = 0;
       } catch {
-        this.redisPublishFailed = true;
-        log.warn("Redis publish failed, streaming disabled for this run");
+        this.redisFailedAt = Date.now();
+        log.warn("Redis publish failed, streaming paused");
       }
     }
 
