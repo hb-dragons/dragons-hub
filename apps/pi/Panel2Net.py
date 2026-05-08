@@ -5,6 +5,7 @@
 # Version 1.4 / 10-05-2018
 
 # imports
+import os
 import serial
 from serial import SerialException
 
@@ -16,40 +17,46 @@ import time
 import binascii
 import random
 
+# Resolve sibling files relative to this script so it works under any user account
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+ID_FILE  = os.path.join(SCRIPT_DIR, 'Panel2Net.id')
+KEY_FILE = os.path.join(SCRIPT_DIR, 'scoreboard.key')
+
 # THIS RETRIEVES THE UNIQUE DEVICENAME IN PANEL2NET.ID
 Device_ID = ''
 try:
-    f = open('/home/pi/Panel2Net/Panel2Net.id', 'r')
-    for line in f:
-        if line[0:9] == 'Device_ID':
-            Device_ID = line[10:]
-    f.close()
-except:
+    with open(ID_FILE, 'r') as f:
+        for line in f:
+            if line.startswith('Device_ID'):
+                Device_ID = line[10:].strip()
+except OSError:
     # If unique device name not given, try first with processor serial, then with random number
     try:
-        f = open('/proc/cpuinfo', 'r')
-        for line in f:
-            if line[0:6] == 'Serial':
-                Device_ID = line[20:26]
-        f.close()
-    except:
+        with open('/proc/cpuinfo', 'r') as f:
+            for line in f:
+                if line.startswith('Serial'):
+                    Device_ID = line[20:26]
+    except OSError:
         # if no serial number could be picked up, then take a random number
-        Device_ID = "SB_" + str(random.randint(100000,999999))
+        Device_ID = "SB_" + str(random.randint(100000, 999999))
 
 print("Hello. I'm Scorebug: " + Device_ID)
 
 # Load the bearer key (provisioned out-of-band, file mode 0600)
 SCOREBOARD_KEY = ''
 try:
-    with open('/home/pi/Panel2Net/scoreboard.key', 'r') as kf:
+    with open(KEY_FILE, 'r') as kf:
         SCOREBOARD_KEY = kf.read().strip()
 except OSError:
-    print('scoreboard.key missing — refusing to start')
+    print('scoreboard.key missing at ' + KEY_FILE + ' — refusing to start')
+    raise SystemExit(1)
+if not SCOREBOARD_KEY:
+    print('scoreboard.key is empty — refusing to start')
     raise SystemExit(1)
 
 # Configuration Data (later to be put in Panel2Net.conf)
 # SerialPort: Name of RPi serial port receiving the panel data
-SerialPort = '/dev/ttyUSB0'
+SerialPort = '/dev/ttyACM0'
 # BaudRate: Serial port speed (Baud, Default will be adjusted later)
 BaudRate = 19200
 # PackageByTime: Time Duration until a package is closed
@@ -275,8 +282,8 @@ while True:
                             
                             # Calculate Time used for Request Handling
                             ElapserTime = int(EnderTime - StarterTime)
-                            print("\r#: " + str(RequestCount) + ", Bd: " + str(BaudRate) + ", Panel: " + str(RequestURL[6:-4]) + ", Len#: "
-                             + str (PackageByLength) + ", HT: " + str(ElapserTime)
+                            print("\r#: " + str(RequestCount) + ", Bd: " + str(BaudRate) + ", Panel: stramatel, Len#: "
+                             + str(PackageByLength) + ", HT: " + str(ElapserTime)
                              + " ms: " + str(httpreply.status) + ", Buf: " + str(ser.inWaiting()), end='          ', flush=True)
                             logging.debug("\rRequestCount: " + str(RequestCount) + ", Package Length: "
                              + str (PackageByLength) + ", Handling Time: " + str(ElapserTime)
