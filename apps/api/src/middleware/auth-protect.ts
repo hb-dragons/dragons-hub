@@ -45,7 +45,7 @@ export async function recordAuthFailure(email: string): Promise<void> {
 }
 
 export async function clearAuthFailures(email: string): Promise<void> {
-  await redis.del(failKey(email), lockKey(email));
+  await Promise.all([redis.del(failKey(email)), redis.del(lockKey(email))]);
 }
 
 export const signInLockout: MiddlewareHandler<AppEnv> = async (c, next) => {
