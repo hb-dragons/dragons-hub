@@ -197,6 +197,21 @@ while True:
                             should_post = True
                             RetryCount = 0
 
+                        elif ((response_hex.find(b'00F8E1C3') != -1) and (response_hex.rfind(b'E5') != -1)):
+                            # found Stramatel 452 M segment protocol - ours to forward
+                            StartToken = response_hex.find(b'00F8E1C3')
+                            EndToken = response_hex.rfind(b'E5')
+                            # End Token + 2: the 'E5' terminator is two hex chars, no checksum follows
+                            remainder_hex = response_hex[EndToken + 2:]
+                            response_hex = response_hex[StartToken:EndToken + 2]
+                            # Forward HEX text: the API route does Buffer.from(hex, "hex").
+                            # The other Stramatel branch posts the raw bytes instead;
+                            # that path is the API-side fallback only and is left as-is.
+                            response = response_hex
+                            RequestURL = '/api/scoreboard/ingest'
+                            should_post = True
+                            RetryCount = 0
+
                         elif (((response_hex.find(b'0254') != -1) or (response_hex.find(b'0244') != -1)) and (response_hex.rfind(b'03'))):
                             # found SwissTiming panel data
                             # print("SwissTiming: " + str(response_hex) + " - " + str(response_hex.find(b'0244')))
