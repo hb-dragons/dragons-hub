@@ -162,6 +162,13 @@ describe("decodeSegmentBlock — fields", () => {
     expect(snapshot.clockText).toBe("10:00");
   });
 
+  it("emits clockSeconds null in sub-minute mode when a clock byte is unparseable", () => {
+    const block = buildTypeCBlock({ 7: 0x00, 10: BLANK_CELL });
+    const snapshot = decodeSegmentBlock(block)!;
+    expect(snapshot.clockSeconds).toBeNull();
+    expect(snapshot.clockText).toBe("0.0");
+  });
+
   it("decodes a two-digit timeout countdown", () => {
     const block = buildTypeCBlock({
       24: 0x9f,

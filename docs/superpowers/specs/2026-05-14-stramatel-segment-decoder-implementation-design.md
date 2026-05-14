@@ -250,7 +250,7 @@ from the protocol spec's Provenance table:
 | `segment-foul-h3` | `foulsHome 3` |
 | `segment-clock-0059` | `clockText "57.9"`, `clockSeconds 57` (sub-minute) |
 | `segment-clock-run-0930` | MM:SS clock, `clockRunning true` |
-| `segment-to-running` | `timeoutActive true`, `timeoutsGuest 1`, `timeoutDuration "41"` |
+| `segment-to-running` | `timeoutActive true`, `timeoutsGuest 1`, `timeoutDuration "40"` (countdown was at 40 s in the block decoded) |
 | `segment-poss-left` | decodes cleanly; `timeoutsGuest 1` (stale, documented) |
 
 Plus unit cases:
