@@ -130,10 +130,10 @@ describe("processIngest", () => {
   });
 
   // Regression: a real serial capture contains long runs of E8 E8 E4 preamble
-  // bursts that look like frames to findScoreFrames but fail the ASCII guard
-  // in decodeScoreFrame. Picking the literal last frame would always land on
-  // preamble noise. processIngest must walk back to find the latest frame
-  // that actually decodes.
+  // bursts that look like frames but fail the old decoder's ASCII guard.
+  // The walk-back-to-the-latest-decodable-frame logic now lives in
+  // decodeLatestFrame (scoreboard-decoder.ts); this test confirms the full
+  // ingest path still rejects that preamble noise and lands on a real frame.
   it("decodes the latest real frame in a multi-frame capture window", async () => {
     const fixture = readFileSync(
       resolve(import.meta.dirname, "__fixtures__/stramatel-sample.bin"),

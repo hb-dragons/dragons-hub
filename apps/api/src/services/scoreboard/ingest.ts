@@ -63,6 +63,7 @@ export async function processIngest({
   if (!decodedResult) {
     return { ok: true, changed: false, snapshotId: null };
   }
+  // `decoded` (= snapshot) is non-null here — the null case returned above.
   const { frame, snapshot: decoded } = decodedResult;
 
   const result = await db.transaction(async (tx) => {
