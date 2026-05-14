@@ -252,11 +252,11 @@ git commit -m "pi: add capture analyzer for protocol RE"
 
 This is an interactive runbook task: it needs the operator at the console.
 
-- [ ] **Step 1: Operator sets the fixed reference state**
+- [x] **Step 1: Operator sets the fixed reference state**
 
 Ask the operator to set the panel to: **Basketball, Home 0 – Guest 0, period 1, game clock stopped at 10:00, no fouls, no timeouts.** Confirm it is displayed and stable.
 
-- [ ] **Step 2: Run the 36-capture sweep**
+- [x] **Step 2: Run the 36-capture sweep**
 
 Run from the dev machine:
 ```bash
@@ -270,7 +270,7 @@ ssh dragonspi 'sudo systemctl start panel2net.service'
 ```
 Expected: 36 `captured <N> bytes` lines. Some combinations may capture 0 bytes — that is itself a signal (wrong baud → no readable framing).
 
-- [ ] **Step 3: Pull captures to the scratch directory**
+- [x] **Step 3: Pull captures to the scratch directory**
 
 Run:
 ```bash
@@ -279,7 +279,7 @@ scp 'dragonspi:~/captures/gate_*.bin' apps/pi/research/captures/
 ```
 Expected: 36 `.bin` files in `apps/pi/research/captures/`.
 
-- [ ] **Step 4: Analyze every capture**
+- [x] **Step 4: Analyze every capture**
 
 Run:
 ```bash
@@ -290,13 +290,20 @@ done
 ```
 Expected: a report per file.
 
-- [ ] **Step 5: Decide the branch**
+- [x] **Step 5: Decide the branch**
 
 Inspect the reports:
 - **If any capture shows `verdict : LIKELY OLD PROTOCOL`** (or an obviously ASCII-heavy, structured stream): the protocol was a serial mis-framing. Record the winning `baud` and `framing`. **Branch 1** — skip Tasks 5 and 6, go to Task 7 and write a short `STRAMATEL-PROTOCOL.md` stating the correct serial parameters and that the existing `stramatel-decoder.ts` format applies (subject to offset re-verification in the follow-up decoder plan).
 - **If every capture is `UNRECOGNIZED`**: confirmed new protocol. Note which baud/framing produced the cleanest, most stable stream (highest non-zero size with a detected `period`) — that is the native framing. **Branch 2** — continue to Task 5.
 
-- [ ] **Step 6: Commit the decision note**
+**Decision (2026-05-14): Branch 2 — confirmed new protocol.** All 36 captures returned
+`UNRECOGNIZED`; no `F833` token and no ASCII-structured stream appeared at any
+baud/framing. Native framing: **19200 8N1** — produces a stable period-228 refresh
+cycle with a clean, well-delimited frame structure (`00 f8 e1 c3` header bytes,
+`e5` terminators), and matches the documented SL Video System serial settings
+(19200 8N1 over RS485). Proceeding to Task 5 at 19200 8N1.
+
+- [x] **Step 6: Commit the decision note**
 
 Record the outcome so far in the plan or a scratch note, then:
 ```bash
