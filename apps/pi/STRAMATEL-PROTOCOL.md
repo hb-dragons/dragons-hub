@@ -96,10 +96,10 @@ Offsets are byte positions **within the 57-byte block**.
 | 4–5 | block type | `1E 66` for type C |
 | 6 | possession arrow | `FB` none · `EB` left · `DB` right |
 | 7–10 | clock | see **Clock format** |
-| 11 | unused | `BF` in every capture |
+| 11 | home score hundreds | blank (`BF`) when score < 100 |
 | 12 | home score tens | blank (`BF`) when score < 10 |
 | 13 | home score units | digit |
-| 14 | separator | `BF` in every capture |
+| 14 | guest score hundreds | blank (`BF`) when score < 100 |
 | 15 | guest score tens | blank (`BF`) when score < 10 |
 | 16 | guest score units | digit |
 | 17 | period | digit |
@@ -122,8 +122,8 @@ Offsets are byte positions **within the 57-byte block**.
 
 | `StramatelSnapshot` field | Source | Notes |
 |---------------------------|--------|-------|
-| `scoreHome` | bytes 12–13 | `tens × 10 + units`; byte 12 blank ⇒ tens 0 |
-| `scoreGuest` | bytes 15–16 | `tens × 10 + units`; byte 15 blank ⇒ tens 0 |
+| `scoreHome` | bytes 11–13 | `hundreds × 100 + tens × 10 + units`; blank cells ⇒ 0 |
+| `scoreGuest` | bytes 14–16 | `hundreds × 100 + tens × 10 + units`; blank cells ⇒ 0 |
 | `foulsHome` | byte 18 | digit |
 | `foulsGuest` | byte 19 | digit |
 | `timeoutsHome` | byte 20 | digit |
@@ -202,6 +202,7 @@ for the decoder plan's tests:
 | `segment-to-running.bin` | guest timeout 1, a timeout countdown running | timeout-active flag (byte 24), timeout countdown (bytes 49–50) |
 | `segment-poss-left.bin` | possession arrow left (guest timeout 1 also set) | possession (byte 6) |
 | `segment-score-g10.bin` | Home 0, Guest 12 | guest-score tens (byte 15) |
+| `segment-score-3digit.bin` | Home 101, Guest 117 | score hundreds (bytes 11, 14) |
 
 Other claims are backed by the matching capture in the scratch directory:
 serial parameters by the `gate_*` sweep; the full 0–9 segment table by

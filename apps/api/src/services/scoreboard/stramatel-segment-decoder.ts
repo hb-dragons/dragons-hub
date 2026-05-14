@@ -99,8 +99,17 @@ export function decodeSegmentBlock(block: Buffer): StramatelSnapshot | null {
   );
 
   return {
-    scoreHome: digitOrZero(block[12]!) * 10 + digitOrZero(block[13]!),
-    scoreGuest: digitOrZero(block[15]!) * 10 + digitOrZero(block[16]!),
+    // Scores are three digit cells: hundreds (11/14), tens (12/15), units
+    // (13/16). A blank cell decodes to 0 via digitOrZero, so leading-zero
+    // blanking is handled with no special-casing.
+    scoreHome:
+      digitOrZero(block[11]!) * 100 +
+      digitOrZero(block[12]!) * 10 +
+      digitOrZero(block[13]!),
+    scoreGuest:
+      digitOrZero(block[14]!) * 100 +
+      digitOrZero(block[15]!) * 10 +
+      digitOrZero(block[16]!),
     foulsHome: digitOrZero(block[18]!),
     foulsGuest: digitOrZero(block[19]!),
     timeoutsHome: digitOrZero(block[20]!),

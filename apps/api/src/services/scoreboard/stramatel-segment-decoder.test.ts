@@ -119,6 +119,31 @@ describe("decodeSegmentBlock — fields", () => {
     expect(decodeSegmentBlock(block)!.scoreHome).toBe(17);
   });
 
+  it("decodes three-digit scores (hundreds in bytes 11 and 14)", () => {
+    const block = buildTypeCBlock({
+      11: segmentDigit(2),
+      12: segmentDigit(4),
+      13: segmentDigit(5),
+      14: segmentDigit(1),
+      15: segmentDigit(0),
+      16: segmentDigit(8),
+    });
+    const snapshot = decodeSegmentBlock(block)!;
+    expect(snapshot.scoreHome).toBe(245);
+    expect(snapshot.scoreGuest).toBe(108);
+  });
+
+  it("decodes a score of exactly 100 (the wrap boundary)", () => {
+    // The reported bug: at 100 the tens/units cells read digit 0, so a
+    // two-digit decoder returned 0. The hundreds cell (byte 11) carries the 1.
+    const block = buildTypeCBlock({
+      11: segmentDigit(1),
+      12: segmentDigit(0),
+      13: segmentDigit(0),
+    });
+    expect(decodeSegmentBlock(block)!.scoreHome).toBe(100);
+  });
+
   it("treats an invalid digit byte as 0", () => {
     const block = buildTypeCBlock({ 13: 0x00 });
     expect(decodeSegmentBlock(block)!.scoreHome).toBe(0);
@@ -269,6 +294,16 @@ describe("decodeSegmentBlock — fixtures", () => {
     expect(decodeFixture("segment-score-g10.bin")).toMatchObject({
       scoreHome: 0,
       scoreGuest: 12,
+    });
+  });
+
+  it("segment-score-3digit.bin → home 101, guest 117 (hundreds digit)", () => {
+    // Live capture with both scores ≥ 100. Bytes 11 (home) and 14 (guest)
+    // carry the hundreds digit — labelled "unused" / "separator" in the
+    // original reverse engineering because no capture exceeded 99.
+    expect(decodeFixture("segment-score-3digit.bin")).toMatchObject({
+      scoreHome: 101,
+      scoreGuest: 117,
     });
   });
 });
