@@ -324,35 +324,35 @@ ssh dragonspi 'sudo systemctl start panel2net.service'
 ```
 and pull with `scp 'dragonspi:~/captures/<label>.bin' apps/pi/research/captures/`.
 
-- [ ] **Step 1: Baseline**
+- [x] **Step 1: Baseline**
 
 Capture `base` — Basketball, 0–0, period 1, clock stopped at 10:00, no fouls, no timeouts.
 
-- [ ] **Step 2: Score, one digit at a time**
+- [x] **Step 2: Score, one digit at a time**
 
 Captures: `score_h1` (Home 1), `score_h2` (Home 2), `score_h3` (Home 3), `score_g1` (Home 3, Guest 1), `score_h10` (Home 10, Guest 1 — exercises tens carry). Operator returns to baseline between the home and guest series if needed.
 
-- [ ] **Step 3: Game clock**
+- [x] **Step 3: Game clock**
 
-Captures: `clock_stop_1000` (stopped at 10:00 — same as baseline, recapture for cross-check), `clock_run_0930` (running, caught near 9:30), `clock_stop_0500` (stopped at 5:00), `clock_stop_0059` (stopped at 0:59 — sub-minute format), `clock_run_0045` (running, caught near 0:45).
+Captures: `clock_stop_1000` (stopped at 10:00 — same as baseline, recapture for cross-check), `clock_run_0930` (running, caught near 9:30), `clock_stop_0500` (stopped at 5:00), `clock_stop_0059` (stopped at 0:59 — sub-minute format; **actual displayed value 0:57.9**), `clock_run_0045` (running, caught near 0:45).
 
-- [ ] **Step 4: Period**
+- [x] **Step 4: Period**
 
 Captures: `period_2`, `period_3`, `period_4` (clock stopped, scores 0–0).
 
-- [ ] **Step 5: Team fouls**
+- [x] **Step 5: Team fouls**
 
 Captures: `foul_h1` … `foul_h5` (Home fouls 1–5), then `foul_g1` … `foul_g5` (Guest fouls 1–5). Scores 0–0, clock stopped.
 
-- [ ] **Step 6: Timeouts**
+- [x] **Step 6: Timeouts**
 
 Captures: `to_h1` (Home 1 timeout used), `to_g1` (Guest 1 timeout used), `to_running` (a timeout countdown actively running).
 
-- [ ] **Step 7: Shot clock and possession**
+- [x] **Step 7: Shot clock and possession**
 
-Captures: `shot_24` (shot clock at 24 if the panel has the SC24 module), `shot_run` (shot clock running), `poss_left`, `poss_right` (possession arrow). If the panel has no shot-clock module, note that and skip the `shot_*` captures.
+Captures: `shot_24` (shot clock at 24 if the panel has the SC24 module), `shot_run` (shot clock running), `poss_left`, `poss_right` (possession arrow). If the panel has no shot-clock module, note that and skip the `shot_*` captures. **Outcome: the SC24 module exists but is not currently connected — `shot_24` and `shot_run` skipped; `poss_left` and `poss_right` captured.**
 
-- [ ] **Step 8: Verify the capture set**
+- [x] **Step 8: Verify the capture set**
 
 Run:
 ```bash
@@ -363,7 +363,7 @@ done
 ```
 Expected: every labelled capture present and non-empty, with a consistent detected `period` across them (same frame length).
 
-- [ ] **Step 9: Commit the capture-set note**
+- [x] **Step 9: Commit the capture-set note**
 
 ```bash
 git commit --allow-empty -m "pi: phase-2 labelled capture matrix recorded"
