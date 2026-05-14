@@ -30,3 +30,7 @@ apps/mobile/android/app/google-services.json
 # Python bytecode
 **/__pycache__/
 *.pyc
+
+# Protocol reverse-engineering scratch captures (not committed; promote
+# curated fixtures to apps/api/src/services/scoreboard/__fixtures__/ instead)
+apps/pi/research/
