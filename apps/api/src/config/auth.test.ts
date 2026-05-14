@@ -194,6 +194,41 @@ describe("auth config", () => {
     });
   });
 
+  describe("rateLimit", () => {
+    async function getRateLimit(): Promise<{
+      enabled: boolean;
+      window: number;
+      max: number;
+      customRules: Record<string, unknown>;
+    }> {
+      await import("./auth");
+      const config = mocks.betterAuth.mock.calls[0]![0] as {
+        rateLimit: {
+          enabled: boolean;
+          window: number;
+          max: number;
+          customRules: Record<string, unknown>;
+        };
+      };
+      return config.rateLimit;
+    }
+
+    it("exempts /get-session so the web tier's shared egress IP is not throttled", async () => {
+      const rateLimit = await getRateLimit();
+      // `false` makes better-auth skip the limiter for this path entirely;
+      // a numeric ceiling would only postpone the shared-bucket exhaustion.
+      expect(rateLimit.customRules["/get-session"]).toBe(false);
+    });
+
+    it("keeps strict per-IP limits on credential endpoints", async () => {
+      const rateLimit = await getRateLimit();
+      expect(rateLimit.customRules["/sign-in/email"]).toEqual({ window: 60, max: 5 });
+      expect(rateLimit.customRules["/sign-up/email"]).toEqual({ window: 60, max: 3 });
+      expect(rateLimit.customRules["/forget-password"]).toEqual({ window: 60, max: 3 });
+      expect(rateLimit.customRules["/reset-password"]).toEqual({ window: 60, max: 5 });
+    });
+  });
+
   describe("secondaryStorage", () => {
     type Storage = {
       get(key: string): Promise<unknown>;

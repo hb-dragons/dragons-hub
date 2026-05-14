@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { headers } from "next/headers";
 
 export type ServerSessionUser = {
@@ -16,21 +17,26 @@ export type ServerSession = {
 
 // Fetches the current session from the API by forwarding the request cookie.
 // Returns null for unauthenticated requests or network/auth failures.
-export async function getServerSession(): Promise<ServerSession | null> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-  const cookie = (await headers()).get("cookie");
-  if (!cookie) return null;
+//
+// Wrapped in React `cache()` so the layout and the page it renders dedupe to a
+// single API round-trip per request instead of one fetch each.
+export const getServerSession = cache(
+  async (): Promise<ServerSession | null> => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+    const cookie = (await headers()).get("cookie");
+    if (!cookie) return null;
 
-  try {
-    const res = await fetch(`${apiUrl}/api/auth/get-session`, {
-      headers: { cookie },
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as unknown;
-    if (!json || typeof json !== "object" || !("user" in json)) return null;
-    return json as ServerSession;
-  } catch {
-    return null;
-  }
-}
+    try {
+      const res = await fetch(`${apiUrl}/api/auth/get-session`, {
+        headers: { cookie },
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as unknown;
+      if (!json || typeof json !== "object" || !("user" in json)) return null;
+      return json as ServerSession;
+    } catch {
+      return null;
+    }
+  },
+);

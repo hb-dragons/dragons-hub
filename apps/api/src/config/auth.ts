@@ -45,6 +45,12 @@ export const auth = betterAuth({
       "/sign-up/email": { window: 60, max: 3 },
       "/forget-password": { window: 60, max: 3 },
       "/reset-password": { window: 60, max: 5 },
+      // The web tier calls /get-session server-side (getServerSession) on every
+      // admin page load. Those fetches all originate from one Cloud Run egress
+      // IP, so the IP-keyed limiter buckets every user together and 429s the
+      // whole tier. Exempt it: /get-session is an authenticated, idempotent
+      // read — the session token is the credential, nothing to brute-force.
+      "/get-session": false,
     },
   },
   session: {
