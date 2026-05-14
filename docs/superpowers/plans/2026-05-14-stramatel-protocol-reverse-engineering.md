@@ -377,11 +377,13 @@ git commit --allow-empty -m "pi: phase-2 labelled capture matrix recorded"
 
 Analysis runbook task. Work in a Python session (`python3`) loading captures with `data = open("apps/pi/research/captures/<label>.bin", "rb").read()`.
 
-- [ ] **Step 1: Establish the frame structure**
+- [x] **Step 1: Establish the frame structure**
 
 Using the `period` reported by the analyzer on `base.bin`, slice the stream into repeating frames. Confirm the frame length is stable across `base.bin`, `period_2.bin`, and `score_h2.bin`. Identify the start marker and per-block terminators. Record: frame length, block boundaries, marker bytes.
 
-- [ ] **Step 2: Locate dynamic byte positions per field**
+**Result:** 57-byte blocks, marker `00 F8 E1 C3`, terminator `E5`. Bytes 4–5 = block type (`0F 64`=A, `0F EC`=B, `1E 66`=C); refresh cycle A C B C. Type C carries every field; the decoder uses type C only.
+
+- [x] **Step 2: Locate dynamic byte positions per field**
 
 For each varied capture, align one stable frame against the corresponding frame of `base.bin` and list the byte indices that differ. Example:
 ```python
@@ -394,19 +396,27 @@ print(diffs, [(fb[i], fh[i]) for i in diffs])
 ```
 Record which byte index(es) move for: home score, guest score, period, home fouls, guest fouls, home timeouts, guest timeouts, clock digits, clock-running flag, shot clock, possession.
 
-- [ ] **Step 3: Build the segment table**
+**Result:** type-C byte offsets — possession 6, clock 7–10, home score 12/13, guest score 15/16 (15 inferred), period 17, fouls 18/19, timeouts 20/21, clock-running flag 23, timeout-active flag 24, timeout countdown 49/50. Full map in `apps/pi/research/FINDINGS.md`.
+
+- [x] **Step 3: Build the segment table**
 
 From `base` (digit 0), `score_h1` (1), `score_h2` (2), `score_h3` (3), and the clock-tick captures, read the byte value at the home-score units position for each known digit. Extend coverage using the clock digit positions (which cycle 0–9). Record the byte → digit map. Flag any digit value not observed in a capture as `unknown`.
 
-- [ ] **Step 4: Decode the clock format**
+**Result:** linear encoding `byte = 0x9F - 2*digit` (digits 0–9 = `9F 9D 9B 99 97 95 93 91 8F 8D`), blank cell = `0xBF`. All of 0–9 confirmed from the running-clock captures; consistent across score / period / foul / clock positions.
+
+- [x] **Step 4: Decode the clock format**
 
 Compare `clock_stop_1000`, `clock_stop_0500`, `clock_stop_0059`, and `clock_run_0930`. Determine the byte layout for minutes/seconds, the sub-minute format (per Stramatel docs the <1:00 representation differs), and which byte/bit indicates clock running vs stopped.
 
-- [ ] **Step 5: Cross-check against an independent capture**
+**Result:** MM:SS = `C[7]C[8]:C[9]C[10]` (`C[7]` blank when minutes < 10). Sub-minute = `C[7]C[8].C[9]` with `C[10]` blank — discriminator is `C[10] == 0xBF`. Clock-running flag = `C[23]` (`9D` stopped, `9F` running).
+
+- [x] **Step 5: Cross-check against an independent capture**
 
 Pick a capture not used to build the table (e.g. `foul_h3` or `period_3`), decode it by hand using the draft table and offsets, and confirm it yields the known state. If it does not, revise the table/offsets and repeat.
 
-- [ ] **Step 6: Commit the analysis note**
+**Result:** `foul_h3` → fouls 3/0, `period_3` → period 3, `score_h2` → 2-0, `to_running` → timeout active + countdown 41 — all decode to their labelled state.
+
+- [x] **Step 6: Commit the analysis note**
 
 ```bash
 git commit --allow-empty -m "pi: phase-2 protocol analysis complete"
