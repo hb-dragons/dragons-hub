@@ -430,7 +430,7 @@ git commit --allow-empty -m "pi: phase-2 protocol analysis complete"
 - Create: `apps/pi/STRAMATEL-PROTOCOL.md`
 - Create: `apps/api/src/services/scoreboard/__fixtures__/segment-*.bin` (curated copies)
 
-- [ ] **Step 1: Write the protocol spec**
+- [x] **Step 1: Write the protocol spec**
 
 Create `apps/pi/STRAMATEL-PROTOCOL.md` with these sections, filled from the Task 4/6 findings:
 - **Serial parameters** — port, baud, framing (the values confirmed in Task 4).
@@ -443,7 +443,7 @@ Create `apps/pi/STRAMATEL-PROTOCOL.md` with these sections, filled from the Task
 
 For Branch 1, the spec is short: it states the correct serial parameters and that the existing `stramatel-decoder.ts` frame format applies, with offset re-verification deferred to the decoder plan.
 
-- [ ] **Step 2: Promote curated fixtures**
+- [x] **Step 2: Promote curated fixtures**
 
 Copy a labelled, representative subset of captures into the committed fixtures directory so the follow-up decoder plan can write tests against them:
 ```bash
@@ -455,7 +455,7 @@ cp apps/pi/research/captures/clock_stop_0059.bin apps/api/src/services/scoreboar
 ```
 Add any others the spec relies on. Each promoted fixture's known state must be written in `STRAMATEL-PROTOCOL.md` so tests can assert against it.
 
-- [ ] **Step 3: Verify no scratch files leak into the commit**
+- [x] **Step 3: Verify no scratch files leak into the commit**
 
 Run:
 ```bash
@@ -463,14 +463,14 @@ git status --short
 ```
 Expected: only `apps/pi/STRAMATEL-PROTOCOL.md` and the `__fixtures__/segment-*.bin` files are staged/untracked — nothing under `apps/pi/research/`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/pi/STRAMATEL-PROTOCOL.md apps/api/src/services/scoreboard/__fixtures__/segment-*.bin
 git commit -m "pi: document reverse-engineered Stramatel 452 M protocol"
 ```
 
-- [ ] **Step 5: Hand off to the decoder plan**
+- [x] **Step 5: Hand off to the decoder plan**
 
 The protocol spec and labelled fixtures now exist. The follow-up plan — the decoder implementation (`Panel2Net.py` frame detection, `stramatel-segment-decoder.ts`, `ingest.ts` routing, Vitest tests) — should be written next via the brainstorming/writing-plans flow, using `STRAMATEL-PROTOCOL.md` as its input.
 
