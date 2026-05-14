@@ -5,11 +5,8 @@ import {
   liveScoreboards,
   scoreboardSnapshots,
 } from "@dragons/db/schema";
-import {
-  decodeScoreFrame,
-  findScoreFrames,
-  type StramatelSnapshot,
-} from "./stramatel-decoder";
+import { decodeLatestFrame } from "./scoreboard-decoder";
+import type { StramatelSnapshot } from "@dragons/shared";
 import { publishSnapshot } from "./pubsub";
 import { publishBroadcastForDevice } from "../broadcast/publisher";
 import { logger } from "../../config/logger";
@@ -59,26 +56,14 @@ export async function processIngest({
   } catch {
     return { ok: true, changed: false, snapshotId: null };
   }
-  const frames = findScoreFrames(buf);
-  if (frames.length === 0) {
+  // Decode the latest frame from whichever protocol the buffer carries — the
+  // segment protocol is tried first, the old F8 33 decoder is the fallback.
+  // See scoreboard-decoder.ts.
+  const decodedResult = decodeLatestFrame(buf);
+  if (!decodedResult) {
     return { ok: true, changed: false, snapshotId: null };
   }
-  // Pick the latest frame that actually decodes. The capture stream
-  // contains E8 E8 E4 preamble bursts that look like frames but fail the
-  // ASCII guard; iterate from the end so we land on the most recent real
-  // Stramatel frame.
-  let decoded: ReturnType<typeof decodeScoreFrame> = null;
-  let frame: Buffer | undefined;
-  for (let i = frames.length - 1; i >= 0; i--) {
-    decoded = decodeScoreFrame(frames[i]!);
-    if (decoded) {
-      frame = frames[i]!;
-      break;
-    }
-  }
-  if (!decoded || !frame) {
-    return { ok: true, changed: false, snapshotId: null };
-  }
+  const { frame, snapshot: decoded } = decodedResult;
 
   const result = await db.transaction(async (tx) => {
     const [existing] = await tx

@@ -146,6 +146,24 @@ describe("processIngest", () => {
     expect(live).toHaveLength(1);
     expect(mocks.publishSnapshot).toHaveBeenCalledTimes(1);
   });
+
+  it("decodes a segment-protocol (00 F8 E1 C3) capture", async () => {
+    const fixture = readFileSync(
+      resolve(import.meta.dirname, "__fixtures__/segment-score-h2.bin"),
+    );
+    const r = await processIngest({
+      deviceId: "d1",
+      hex: fixture.toString("hex"),
+    });
+    expect(r.ok).toBe(true);
+    expect(r.changed).toBe(true);
+    expect(r.snapshotId).toEqual(expect.any(Number));
+    const live = await ctx.db.select().from(liveScoreboards);
+    expect(live).toHaveLength(1);
+    expect(live[0]!.scoreHome).toBe(2);
+    expect(live[0]!.scoreGuest).toBe(0);
+    expect(mocks.publishSnapshot).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("processIngest broadcast publish", () => {
