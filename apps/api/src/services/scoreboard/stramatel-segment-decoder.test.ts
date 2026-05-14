@@ -260,4 +260,15 @@ describe("decodeSegmentBlock — fixtures", () => {
       timeoutsGuest: 1,
     });
   });
+
+  it("segment-score-g10.bin → guest score 12 confirms byte 15", () => {
+    // Live capture with the panel set to guest score 12. Byte 15 (guest score
+    // tens) was unconfirmed in the original reverse engineering — no capture
+    // had a guest score ≥ 10. This fixture closes that gap: byte 15 carries the
+    // tens digit with the same linear encoding as the home-score pair.
+    expect(decodeFixture("segment-score-g10.bin")).toMatchObject({
+      scoreHome: 0,
+      scoreGuest: 12,
+    });
+  });
 });
