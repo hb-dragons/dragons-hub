@@ -4,7 +4,7 @@ export const refereeRulesParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
-const ruleItemSchema = z
+export const ruleItemSchema = z
   .object({
     teamId: z.number().int().positive(),
     deny: z.boolean(),
@@ -15,14 +15,16 @@ const ruleItemSchema = z
     message: "Deny must be true, or at least one of allowSr1/allowSr2 must be true",
   });
 
+export const rulesArraySchema = z.array(ruleItemSchema).refine(
+  (rules) => {
+    const teamIds = rules.map((r) => r.teamId);
+    return new Set(teamIds).size === teamIds.length;
+  },
+  { message: "Duplicate teamId entries are not allowed" },
+);
+
 export const updateRefereeRulesBodySchema = z.object({
-  rules: z.array(ruleItemSchema).refine(
-    (rules) => {
-      const teamIds = rules.map((r) => r.teamId);
-      return new Set(teamIds).size === teamIds.length;
-    },
-    { message: "Duplicate teamId entries are not allowed" },
-  ),
+  rules: rulesArraySchema,
 });
 
 export type RefereeRulesParam = z.infer<typeof refereeRulesParamSchema>;

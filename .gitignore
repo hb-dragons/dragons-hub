@@ -17,6 +17,7 @@ apps/*/tsconfig.tsbuildinfo
 
 # Worktrees
 .worktrees/
+.claude/worktrees/
 
 # Superpowers brainstorm sessions
 .superpowers/

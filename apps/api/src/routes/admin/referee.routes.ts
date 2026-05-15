@@ -4,10 +4,13 @@ import { describeRoute } from "hono-openapi";
 import {
   getReferees,
   updateRefereeVisibility,
+  updateRefereeSettings,
+  RefereeSettingsError,
 } from "../../services/admin/referee-admin.service";
 import { requirePermission } from "../../middleware/rbac";
 import type { AppEnv } from "../../types";
 import { refereeListQuerySchema } from "./referee.schemas";
+import { rulesArraySchema } from "./referee-rules.schemas";
 
 const refereeRoutes = new Hono<AppEnv>();
 
@@ -37,6 +40,48 @@ const visibilityBodySchema = z.object({
   allowAwayGames: z.boolean(),
   isOwnClub: z.boolean(),
 });
+
+const settingsBodySchema = z.object({
+  visibility: visibilityBodySchema.optional(),
+  rules: rulesArraySchema.optional(),
+});
+
+refereeRoutes.patch(
+  "/referees/:id",
+  requirePermission("referee", "update"),
+  describeRoute({
+    description:
+      "Update referee settings (visibility + assignment rules) atomically in a single transaction",
+    tags: ["Referees"],
+    responses: {
+      200: { description: "Updated settings" },
+      400: { description: "Invalid request" },
+      404: { description: "Referee not found" },
+    },
+  }),
+  async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id <= 0) {
+      return c.json(
+        { error: "Invalid referee ID", code: "VALIDATION_ERROR" },
+        400,
+      );
+    }
+
+    const body = settingsBodySchema.parse(await c.req.json());
+
+    try {
+      const result = await updateRefereeSettings(id, body);
+      return c.json(result);
+    } catch (error) {
+      if (error instanceof RefereeSettingsError) {
+        const status = error.code === "NOT_FOUND" ? 404 : 400;
+        return c.json({ error: error.message, code: error.code }, status);
+      }
+      throw error;
+    }
+  },
+);
 
 // PATCH /admin/referees/:id/visibility - Update referee game visibility flags
 refereeRoutes.patch(

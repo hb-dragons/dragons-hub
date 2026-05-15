@@ -125,7 +125,15 @@ export type {
 export type {
   RefereeGameListItem,
 } from "./referee-games";
-export type { RefereeListItem, RefereeRule, RefereeRulesResponse, UpdateRefereeRulesBody, UpdateRefereeVisibilityBody } from "./referees";
+export type {
+  RefereeListItem,
+  RefereeRule,
+  RefereeRulesResponse,
+  UpdateRefereeRulesBody,
+  UpdateRefereeVisibilityBody,
+  UpdateRefereeSettingsBody,
+  UpdateRefereeSettingsResponse,
+} from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";
 export type { UserListItem } from "./users";

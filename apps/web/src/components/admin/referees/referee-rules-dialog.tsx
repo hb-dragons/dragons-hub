@@ -134,25 +134,19 @@ export function RefereeRulesDialog({
 
     setSubmitting(true)
     try {
-      await Promise.all([
-        fetchAPI(`/admin/referees/${referee.id}/rules`, {
-          method: "PUT",
-          body: JSON.stringify({
-            rules: validRules.map((r) => ({
-              teamId: r.teamId,
-              deny: r.deny,
-              allowSr1: r.deny ? false : r.allowSr1,
-              allowSr2: r.deny ? false : r.allowSr2,
-            })),
-          }),
+      await fetchAPI(`/admin/referees/${referee.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          visibility,
+          rules: validRules.map((r) => ({
+            teamId: r.teamId,
+            deny: r.deny,
+            allowSr1: r.deny ? false : r.allowSr1,
+            allowSr2: r.deny ? false : r.allowSr2,
+          })),
         }),
-        fetchAPI(`/admin/referees/${referee.id}/visibility`, {
-          method: "PATCH",
-          body: JSON.stringify(visibility),
-        }),
-      ])
+      })
 
-      toast.success(t("rules.saved"))
       await Promise.all([
         mutate(SWR_KEYS.refereeRules(referee.id)),
         mutate(
@@ -161,6 +155,7 @@ export function RefereeRulesDialog({
           { revalidate: true },
         ),
       ])
+      toast.success(t("rules.saved"))
       onOpenChange(false)
     } catch {
       toast.error(t("rules.saveFailed"))

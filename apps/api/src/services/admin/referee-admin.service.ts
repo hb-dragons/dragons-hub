@@ -1,11 +1,32 @@
 import { db } from "../../config/database";
-import { referees, refereeRoles, matchReferees } from "@dragons/db/schema";
-import { sql, asc, ilike, and, or, eq } from "drizzle-orm";
+import {
+  referees,
+  refereeRoles,
+  matchReferees,
+  refereeAssignmentRules,
+  teams,
+} from "@dragons/db/schema";
+import { sql, asc, ilike, and, or, eq, inArray } from "drizzle-orm";
 import type {
   RefereeListItem,
   PaginatedResponse,
   UpdateRefereeVisibilityBody,
+  UpdateRefereeSettingsBody,
+  UpdateRefereeSettingsResponse,
 } from "@dragons/shared";
+
+export class RefereeSettingsError extends Error {
+  constructor(
+    message: string,
+    public readonly code:
+      | "NOT_FOUND"
+      | "NOT_OWN_CLUB"
+      | "VALIDATION_ERROR",
+  ) {
+    super(message);
+    this.name = "RefereeSettingsError";
+  }
+}
 
 export interface RefereeListParams {
   limit: number;
@@ -104,6 +125,119 @@ export async function getReferees(
   }));
 
   return { items, total, limit, offset, hasMore: offset + items.length < total };
+}
+
+export async function updateRefereeSettings(
+  refereeId: number,
+  body: UpdateRefereeSettingsBody,
+): Promise<UpdateRefereeSettingsResponse> {
+  return db.transaction(async (tx) => {
+    let visibility: {
+      allowAllHomeGames: boolean;
+      allowAwayGames: boolean;
+      isOwnClub: boolean;
+    };
+
+    if (body.visibility) {
+      const [updated] = await tx
+        .update(referees)
+        .set({
+          allowAllHomeGames: body.visibility.allowAllHomeGames,
+          allowAwayGames: body.visibility.allowAwayGames,
+          isOwnClub: body.visibility.isOwnClub,
+          updatedAt: new Date(),
+        })
+        .where(eq(referees.id, refereeId))
+        .returning({
+          allowAllHomeGames: referees.allowAllHomeGames,
+          allowAwayGames: referees.allowAwayGames,
+          isOwnClub: referees.isOwnClub,
+        });
+      if (!updated) {
+        throw new RefereeSettingsError(
+          `Referee ${refereeId} not found`,
+          "NOT_FOUND",
+        );
+      }
+      visibility = updated;
+    } else {
+      const [row] = await tx
+        .select({
+          allowAllHomeGames: referees.allowAllHomeGames,
+          allowAwayGames: referees.allowAwayGames,
+          isOwnClub: referees.isOwnClub,
+        })
+        .from(referees)
+        .where(eq(referees.id, refereeId))
+        .limit(1);
+      if (!row) {
+        throw new RefereeSettingsError(
+          `Referee ${refereeId} not found`,
+          "NOT_FOUND",
+        );
+      }
+      visibility = row;
+    }
+
+    if (body.rules !== undefined) {
+      if (!visibility.isOwnClub) {
+        throw new RefereeSettingsError(
+          "Referee is not an own-club referee",
+          "NOT_OWN_CLUB",
+        );
+      }
+
+      if (body.rules.length > 0) {
+        const teamIds = body.rules.map((r) => r.teamId);
+        const validTeams = await tx
+          .select({ id: teams.id })
+          .from(teams)
+          .where(and(inArray(teams.id, teamIds), eq(teams.isOwnClub, true)));
+        const validTeamIds = new Set(validTeams.map((t) => t.id));
+        const invalidIds = teamIds.filter((id) => !validTeamIds.has(id));
+        if (invalidIds.length > 0) {
+          throw new RefereeSettingsError(
+            `Invalid or non-own-club team IDs: ${invalidIds.join(", ")}`,
+            "VALIDATION_ERROR",
+          );
+        }
+      }
+
+      await tx
+        .delete(refereeAssignmentRules)
+        .where(eq(refereeAssignmentRules.refereeId, refereeId));
+
+      if (body.rules.length > 0) {
+        const now = new Date();
+        await tx.insert(refereeAssignmentRules).values(
+          body.rules.map((rule) => ({
+            refereeId,
+            teamId: rule.teamId,
+            deny: rule.deny,
+            allowSr1: rule.deny ? false : rule.allowSr1,
+            allowSr2: rule.deny ? false : rule.allowSr2,
+            createdAt: now,
+            updatedAt: now,
+          })),
+        );
+      }
+    }
+
+    const rules = await tx
+      .select({
+        id: refereeAssignmentRules.id,
+        teamId: refereeAssignmentRules.teamId,
+        teamName: teams.name,
+        deny: refereeAssignmentRules.deny,
+        allowSr1: refereeAssignmentRules.allowSr1,
+        allowSr2: refereeAssignmentRules.allowSr2,
+      })
+      .from(refereeAssignmentRules)
+      .innerJoin(teams, eq(refereeAssignmentRules.teamId, teams.id))
+      .where(eq(refereeAssignmentRules.refereeId, refereeId));
+
+    return { visibility, rules };
+  });
 }
 
 export async function updateRefereeVisibility(

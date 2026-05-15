@@ -40,3 +40,17 @@ export interface UpdateRefereeRulesBody {
     allowSr2: boolean;
   }>;
 }
+
+export interface UpdateRefereeSettingsBody {
+  visibility?: UpdateRefereeVisibilityBody;
+  rules?: UpdateRefereeRulesBody["rules"];
+}
+
+export interface UpdateRefereeSettingsResponse {
+  visibility: {
+    allowAllHomeGames: boolean;
+    allowAwayGames: boolean;
+    isOwnClub: boolean;
+  };
+  rules: RefereeRule[];
+}
