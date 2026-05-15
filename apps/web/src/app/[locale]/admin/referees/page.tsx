@@ -1,41 +1,30 @@
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { SWRConfig } from "swr";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { PageHeader } from "@/components/admin/shared/page-header";
-import { fetchAPIServer } from "@/lib/api.server"
-import { SWRConfig } from "swr";
+import { fetchAPIServer } from "@/lib/api.server";
 import { SWR_KEYS } from "@/lib/swr-keys";
-import { RefereeListTable } from "@/components/admin/referees/referee-list-table"
-import type { PaginatedResponse, RefereeListItem } from "@/components/admin/referees/types"
+import { RefereeHubPage } from "@/components/admin/referee-hub/referee-hub";
 
 export default async function RefereesPage() {
   const session = await getServerSession();
   if (!can(session?.user ?? null, "referee", "view")) notFound();
 
-  const t = await getTranslations();
-  let data: PaginatedResponse<RefereeListItem> | null = null
-  let error: string | null = null
+  const fallback: Record<string, unknown> = {};
 
   try {
-    data = await fetchAPIServer<PaginatedResponse<RefereeListItem>>("/admin/referees")
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Failed to connect to API"
-  }
+    const referees = await fetchAPIServer<unknown>("/admin/referees");
+    fallback[SWR_KEYS.referees(true)] = referees;
+  } catch {}
+
+  try {
+    const refereeGames = await fetchAPIServer<unknown>(SWR_KEYS.refereeGames);
+    fallback[SWR_KEYS.refereeGames] = refereeGames;
+  } catch {}
 
   return (
-    <div className="space-y-6">
-      <PageHeader title={t("referees.title")} />
-
-      {error ? (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
-      ) : (
-        <SWRConfig value={{ fallback: { [SWR_KEYS.referees()]: data } }}>
-          <RefereeListTable />
-        </SWRConfig>
-      )}
-    </div>
-  )
+    <SWRConfig value={{ fallback }}>
+      <RefereeHubPage />
+    </SWRConfig>
+  );
 }
