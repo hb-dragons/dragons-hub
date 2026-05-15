@@ -84,7 +84,7 @@ GitHub Actions authenticates to GCP via OIDC (no service account keys stored as 
 | PostgreSQL | 17 (Cloud SQL)       |
 | Valkey     | 8.0 (Memorystore)    |
 | OpenTofu   | >= 1.6.0             |
-| pnpm       | 10.30.3              |
+| pnpm       | 11.1.2               |
 
 ## File Structure
 

@@ -6,7 +6,7 @@
 
 **Architecture:** Two Cloud Run services (API + Web) behind a Global HTTPS Load Balancer with subdomain routing. Cloud SQL PostgreSQL 17 for the database, Memorystore Valkey 8.0 for BullMQ/pub-sub. Workload Identity Federation for keyless GitHub Actions auth. Automated deploy on push to main after CI passes.
 
-**Tech Stack:** OpenTofu >= 1.6.0, Google Cloud Provider ~> 5.0, Docker (node:24-alpine), GitHub Actions, pnpm 10.30.3
+**Tech Stack:** OpenTofu >= 1.6.0, Google Cloud Provider ~> 5.0, Docker (node:24-alpine), GitHub Actions, pnpm 11.1.2
 
 **Reference project:** `/Users/jn/git/kvizme-mono-v2` — proven patterns for all modules and workflows.
 
@@ -1451,7 +1451,7 @@ docs
 
 ```dockerfile
 FROM node:24-alpine AS base
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 FROM base AS builder
 WORKDIR /app
@@ -1536,7 +1536,7 @@ Next.js standalone output is already configured in `apps/web/next.config.ts` (`o
 
 ```dockerfile
 FROM node:24-alpine AS base
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 FROM base AS builder
 WORKDIR /app
@@ -1703,7 +1703,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.30.3
+          version: 11.1.2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -1917,7 +1917,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.30.3
+          version: 11.1.2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
