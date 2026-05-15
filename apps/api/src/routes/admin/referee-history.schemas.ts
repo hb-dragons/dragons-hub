@@ -12,7 +12,8 @@ export type HistoryStatusValue = z.infer<typeof statusValue>;
 //   - "active"                 → ["played"]  (legacy alias)
 //   - "played,cancelled,..."   → parsed array, each value validated
 const statusField = z
-  .union([z.string(), z.undefined()])
+  .string()
+  .optional()
   .transform((raw, ctx) => {
     if (raw === undefined || raw === "" || raw === "all") return [];
     if (raw === "active") return ["played"] as HistoryStatusValue[];

@@ -68,7 +68,7 @@ function DatePicker({
           defaultMonth={date}
           onSelect={handleSelect}
           locale={de}
-          initialFocus
+          autoFocus
         />
       </PopoverContent>
     </Popover>
