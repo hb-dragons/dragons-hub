@@ -1299,6 +1299,14 @@
         "eligibleOpen": "Eligible open slots",
         "assignedEmpty": "No upcoming assignments",
         "eligibleOpenEmpty": "No eligible open slots"
+      },
+      "history": {
+        "total": "{n} games",
+        "exportCsv": "Export CSV",
+        "empty": "No history in selected range",
+        "statusPlayed": "Played",
+        "statusCancelled": "Cancelled",
+        "statusForfeited": "Forfeited"
       }
     }
   },

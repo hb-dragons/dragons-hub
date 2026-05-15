@@ -1299,6 +1299,14 @@
         "eligibleOpen": "Verfügbare offene Slots",
         "assignedEmpty": "Keine bevorstehenden Einsätze",
         "eligibleOpenEmpty": "Keine verfügbaren offenen Slots"
+      },
+      "history": {
+        "total": "{n} Spiele",
+        "exportCsv": "CSV-Export",
+        "empty": "Keine Spielhistorie im gewählten Zeitraum",
+        "statusPlayed": "Gespielt",
+        "statusCancelled": "Abgesagt",
+        "statusForfeited": "Forfeit"
       }
     }
   },
