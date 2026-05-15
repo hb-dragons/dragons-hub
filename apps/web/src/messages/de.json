@@ -1282,6 +1282,13 @@
           "blocked": "Blockiert"
         }
       }
+    },
+    "referees": {
+      "kpi": { "total": "Spiele gesamt", "refs": "Schiedsrichter", "workload": "Ø Auslastung" },
+      "columns": { "ref": "Schiedsrichter", "own": "Vereinseigen", "games": "Spiele" },
+      "search": "Schiedsrichter suchen…",
+      "sort": { "name": "Sortieren: Name", "workloadDesc": "Spiele (hoch → niedrig)", "workloadAsc": "Spiele (niedrig → hoch)" },
+      "empty": "Keine Schiedsrichter passen zu den Filtern"
     }
   },
   "errors": {

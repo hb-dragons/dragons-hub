@@ -1282,6 +1282,13 @@
           "blocked": "Blocked"
         }
       }
+    },
+    "referees": {
+      "kpi": { "total": "Total games", "refs": "Referees", "workload": "Avg workload" },
+      "columns": { "ref": "Referee", "own": "Own-club", "games": "Games" },
+      "search": "Search referees…",
+      "sort": { "name": "Sort: Name", "workloadDesc": "Games (high → low)", "workloadAsc": "Games (low → high)" },
+      "empty": "No referees match your filters"
     }
   },
   "errors": {
