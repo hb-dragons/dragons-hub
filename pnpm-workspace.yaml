@@ -1,5 +1,12 @@
 packages:
   - apps/*
   - packages/*
-onlyBuiltDependencies:
-  - basketball-bund-sdk
+allowBuilds:
+  basketball-bund-sdk: true
+  esbuild: true
+  '@swc/core': true
+  '@parcel/watcher': true
+  core-js: false
+  msgpackr-extract: false
+  sharp: false
+  unrs-resolver: false
