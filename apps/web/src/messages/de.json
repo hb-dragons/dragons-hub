@@ -1293,6 +1293,12 @@
         "visibility": { "title": "Sichtbarkeit", "ownClub": "Vereinseigener Schiedsrichter", "allHome": "Alle Heimspiele erlauben", "away": "Auswärtsspiele erlauben" },
         "rules": { "title": "Team-Regeln", "add": "Regel hinzufügen", "deny": "Ablehnen", "allow": "Erlauben", "selectTeam": "Team", "none": "Keine Team-Regeln — Standard gilt" },
         "save": { "saving": "Speichern…", "saved": "Vor {n}s gespeichert", "dirty": "Nicht gespeichert", "error": "Speichern fehlgeschlagen", "now": "Jetzt speichern" }
+      },
+      "upcoming": {
+        "assigned": "Zugewiesen",
+        "eligibleOpen": "Verfügbare offene Slots",
+        "assignedEmpty": "Keine bevorstehenden Einsätze",
+        "eligibleOpenEmpty": "Keine verfügbaren offenen Slots"
       }
     }
   },
