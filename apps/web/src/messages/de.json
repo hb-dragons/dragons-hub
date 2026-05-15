@@ -1288,7 +1288,12 @@
       "columns": { "ref": "Schiedsrichter", "own": "Vereinseigen", "games": "Spiele" },
       "search": "Schiedsrichter suchen…",
       "sort": { "name": "Sortieren: Name", "workloadDesc": "Spiele (hoch → niedrig)", "workloadAsc": "Spiele (niedrig → hoch)" },
-      "empty": "Keine Schiedsrichter passen zu den Filtern"
+      "empty": "Keine Schiedsrichter passen zu den Filtern",
+      "profile": {
+        "visibility": { "title": "Sichtbarkeit", "ownClub": "Vereinseigener Schiedsrichter", "allHome": "Alle Heimspiele erlauben", "away": "Auswärtsspiele erlauben" },
+        "rules": { "title": "Team-Regeln", "add": "Regel hinzufügen", "deny": "Ablehnen", "allow": "Erlauben", "selectTeam": "Team", "none": "Keine Team-Regeln — Standard gilt" },
+        "save": { "saving": "Speichern…", "saved": "Vor {n}s gespeichert", "dirty": "Nicht gespeichert", "error": "Speichern fehlgeschlagen", "now": "Jetzt speichern" }
+      }
     }
   },
   "errors": {

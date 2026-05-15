@@ -1288,7 +1288,12 @@
       "columns": { "ref": "Referee", "own": "Own-club", "games": "Games" },
       "search": "Search referees…",
       "sort": { "name": "Sort: Name", "workloadDesc": "Games (high → low)", "workloadAsc": "Games (low → high)" },
-      "empty": "No referees match your filters"
+      "empty": "No referees match your filters",
+      "profile": {
+        "visibility": { "title": "Visibility", "ownClub": "Own-club referee", "allHome": "Allow all home games", "away": "Allow away games" },
+        "rules": { "title": "Per-team rules", "add": "Add rule", "deny": "Deny", "allow": "Allow", "selectTeam": "Team", "none": "No team rules — federation defaults apply" },
+        "save": { "saving": "Saving…", "saved": "Saved {n}s ago", "dirty": "Unsaved changes", "error": "Save failed", "now": "Save now" }
+      }
     }
   },
   "errors": {
