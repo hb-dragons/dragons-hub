@@ -1307,7 +1307,11 @@
         "statusPlayed": "Gespielt",
         "statusCancelled": "Abgesagt",
         "statusForfeited": "Forfeit"
-      }
+      },
+      "notFound": "Schiedsrichter nicht gefunden",
+      "ownClubBadge": "Vereinseigen",
+      "subtabs": { "profile": "Profil", "upcoming": "Bevorstehend", "history": "Historie" },
+      "selectPrompt": "Schiedsrichter wählen, um Konfiguration und Historie zu sehen"
     }
   },
   "errors": {

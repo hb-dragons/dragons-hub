@@ -1307,7 +1307,11 @@
         "statusPlayed": "Played",
         "statusCancelled": "Cancelled",
         "statusForfeited": "Forfeited"
-      }
+      },
+      "notFound": "Referee not found",
+      "ownClubBadge": "Own-club",
+      "subtabs": { "profile": "Profile", "upcoming": "Upcoming", "history": "History" },
+      "selectPrompt": "Pick a referee to see their config + history"
     }
   },
   "errors": {
