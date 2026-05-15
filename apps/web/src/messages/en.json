@@ -1238,6 +1238,20 @@
       "reconciliation": "Reconciliation"
     }
   },
+  "refereeHub": {
+    "title": "Referees",
+    "tabs": {
+      "openSlots": "Open Slots",
+      "referees": "Referees"
+    },
+    "range": {
+      "label": "Range",
+      "season": "Season",
+      "30d": "Last 30 days",
+      "month": "This month",
+      "custom": "Custom"
+    }
+  },
   "errors": {
     "title": "Something went wrong",
     "description": "An unexpected error occurred. Please try again.",

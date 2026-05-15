@@ -1238,6 +1238,20 @@
       "reconciliation": "Abgleich"
     }
   },
+  "refereeHub": {
+    "title": "Schiedsrichter",
+    "tabs": {
+      "openSlots": "Offene Spiele",
+      "referees": "Schiedsrichter"
+    },
+    "range": {
+      "label": "Zeitraum",
+      "season": "Saison",
+      "30d": "Letzte 30 Tage",
+      "month": "Diesen Monat",
+      "custom": "Benutzerdefiniert"
+    }
+  },
   "errors": {
     "title": "Etwas ist schiefgelaufen",
     "description": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.",
