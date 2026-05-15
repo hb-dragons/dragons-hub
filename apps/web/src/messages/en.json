@@ -1253,6 +1253,10 @@
     },
     "openSlots": {
       "searchPlaceholder": "Search game…",
+      "detail": {
+        "notFound": "Game not found or no longer needs referees",
+        "selectGamePrompt": "Select a game on the left to see its open slots"
+      },
       "slot": {
         "label": "Slot {n} (SR{n})",
         "open": "⚠ Open",

@@ -1253,6 +1253,10 @@
     },
     "openSlots": {
       "searchPlaceholder": "Spiel suchen…",
+      "detail": {
+        "notFound": "Spiel nicht gefunden oder benötigt keine Schiedsrichter mehr",
+        "selectGamePrompt": "Spiel links auswählen, um offene Slots zu sehen"
+      },
       "slot": {
         "label": "Slot {n} (SR{n})",
         "open": "⚠ Offen",
