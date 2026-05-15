@@ -116,6 +116,31 @@ describe("auth config", () => {
     expect(config.advanced.defaultCookieAttributes.secure).toBe(true);
   });
 
+  it("does not pre-bake __Secure- into the cookie prefix", async () => {
+    // better-auth prepends `__Secure-` for HTTPS baseURLs on its own. Baking
+    // it into `cookiePrefix` produces `__Secure-__Secure-dragons.*` cookies
+    // that break get-session in production.
+    mocks.env.NODE_ENV = "production";
+    await import("./auth");
+    const config = mocks.betterAuth.mock.calls[0]![0] as {
+      advanced: { cookiePrefix: string };
+    };
+    expect(config.advanced.cookiePrefix).toBe("dragons");
+    expect(config.advanced.cookiePrefix).not.toMatch(/^__Secure-/);
+  });
+
+  it("mirrors sessions to the database as a Valkey safety net", async () => {
+    // Memorystore for Valkey is cluster-mode; ioredis runs against it in
+    // standalone mode. A MOVED redirect or transient hiccup must not silently
+    // drop sessions — findSession falls back to the session table when the
+    // secondaryStorage read returns null, so writes have to land in both.
+    await import("./auth");
+    const config = mocks.betterAuth.mock.calls[0]![0] as {
+      session: { storeSessionInDatabase?: boolean };
+    };
+    expect(config.session.storeSessionInDatabase).toBe(true);
+  });
+
   describe("databaseHooks.user.create.before", () => {
     type UserCreateHook = (user: {
       role?: string | null;

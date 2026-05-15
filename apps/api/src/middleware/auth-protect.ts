@@ -6,17 +6,28 @@ const FAIL_WINDOW_SEC = 15 * 60;
 const FAIL_THRESHOLD = 10;
 const LOCKOUT_SEC = 30 * 60;
 
-function lastForwardedFor(value: string | undefined): string | null {
+// GCP's external HTTPS load balancer appends "<client-ip>, <lb-forwarding-ip>"
+// to whatever X-Forwarded-For the client sent. The trusted client IP is the
+// entry GLB inserted just before its own — the second-to-last. Anything to
+// the left of it is client-supplied and untrusted (a malicious caller can set
+// their own XFF, GLB preserves it then appends). better-auth's getIp reads
+// XFF[0], so we replace the whole header with the one trusted value.
+//
+// If only one entry is present (no trusted proxy in front, e.g. local dev),
+// fall back to using it as-is rather than dropping the header.
+function clientFromForwardedFor(value: string | undefined): string | null {
   if (!value) return null;
   const parts = value.split(",").map((s) => s.trim()).filter(Boolean);
-  return parts.length === 0 ? null : parts[parts.length - 1]!;
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0]!;
+  return parts[parts.length - 2]!;
 }
 
 export const trustForwardedFor: MiddlewareHandler<AppEnv> = async (c, next) => {
   const xff = c.req.header("x-forwarded-for");
-  const last = lastForwardedFor(xff);
-  if (last !== null) {
-    c.req.raw.headers.set("x-forwarded-for", last);
+  const client = clientFromForwardedFor(xff);
+  if (client !== null) {
+    c.req.raw.headers.set("x-forwarded-for", client);
   }
   await next();
 };

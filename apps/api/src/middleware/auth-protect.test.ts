@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 
 describe("trustForwardedFor", () => {
-  it("rewrites x-forwarded-for to the last segment", async () => {
+  function captureXff(): { app: Hono; getXff: () => string | undefined } {
     const app = new Hono();
     app.use("*", trustForwardedFor);
     let captured: string | undefined;
@@ -54,34 +54,46 @@ describe("trustForwardedFor", () => {
       captured = c.req.header("x-forwarded-for");
       return c.text("ok");
     });
+    return { app, getXff: () => captured };
+  }
+
+  it("rewrites x-forwarded-for to the second-to-last segment (real client behind GLB)", async () => {
+    // GCP HTTPS LB appends "<client>, <lb-ip>". The trusted client IP is the
+    // entry just before GLB's own — second-to-last. Anything left of it is
+    // client-supplied and untrusted.
+    const { app, getXff } = captureXff();
     await app.request("/x", {
       headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8, 9.10.11.12" },
     });
-    expect(captured).toBe("9.10.11.12");
+    expect(getXff()).toBe("5.6.7.8");
+  });
+
+  it("rewrites a 2-entry chain to the first (no client-supplied XFF, just GLB)", async () => {
+    const { app, getXff } = captureXff();
+    await app.request("/x", {
+      headers: { "x-forwarded-for": "203.0.113.5, 35.191.0.1" },
+    });
+    expect(getXff()).toBe("203.0.113.5");
+  });
+
+  it("passes a single entry through unchanged (no proxy in front, e.g. local dev)", async () => {
+    const { app, getXff } = captureXff();
+    await app.request("/x", {
+      headers: { "x-forwarded-for": "203.0.113.5" },
+    });
+    expect(getXff()).toBe("203.0.113.5");
   });
 
   it("is a no-op when x-forwarded-for is absent", async () => {
-    const app = new Hono();
-    app.use("*", trustForwardedFor);
-    let captured: string | undefined;
-    app.get("/x", (c) => {
-      captured = c.req.header("x-forwarded-for");
-      return c.text("ok");
-    });
+    const { app, getXff } = captureXff();
     await app.request("/x");
-    expect(captured).toBeUndefined();
+    expect(getXff()).toBeUndefined();
   });
 
   it("is a no-op when x-forwarded-for is whitespace-only commas", async () => {
-    const app = new Hono();
-    app.use("*", trustForwardedFor);
-    let captured: string | undefined;
-    app.get("/x", (c) => {
-      captured = c.req.header("x-forwarded-for");
-      return c.text("ok");
-    });
+    const { app, getXff } = captureXff();
     await app.request("/x", { headers: { "x-forwarded-for": " , , " } });
-    expect(captured).toBeDefined();
+    expect(getXff()).toBeDefined();
   });
 });
 

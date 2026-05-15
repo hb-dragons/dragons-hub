@@ -60,9 +60,23 @@ export const auth = betterAuth({
       enabled: true,
       maxAge: 60 * 5, // 5 minutes
     },
+    // With secondaryStorage configured, better-auth would otherwise store
+    // sessions only in Valkey. Memorystore for Valkey is a cluster product
+    // and our ioredis client runs in standalone mode against it — single-key
+    // ops mostly work but any MOVED redirect or transient failure means a
+    // session that briefly appears valid then evaporates on the next read.
+    // Mirroring to Postgres gives findSession a fallback (internal-adapter
+    // checks Redis first, falls through to the session table when missing).
+    storeSessionInDatabase: true,
   },
   advanced: {
-    cookiePrefix: env.NODE_ENV === "production" ? "__Secure-dragons" : "dragons",
+    // better-auth auto-prepends `__Secure-` whenever the baseURL is HTTPS
+    // (cookies/index.mjs:20,29). Setting that prefix here would double it to
+    // `__Secure-__Secure-dragons.session_token` — accepted by browsers but a
+    // landmine: the chunked session_data cookie name + payload bumps against
+    // header-size ceilings on Cloud Run / GCLB, and cookieCache decode flips
+    // to null on the next request.
+    cookiePrefix: "dragons",
     crossSubDomainCookies:
       env.NODE_ENV === "production"
         ? { enabled: true, domain: ".app.hbdragons.de" }
