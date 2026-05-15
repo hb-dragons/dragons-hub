@@ -33,6 +33,7 @@ export function ProfileSubtab({ referee }: Props) {
   const { data: teamsData = [] } = useSWR<Team[]>(SWR_KEYS.teams, apiFetcher);
   const { data: rulesData } = useSWR<RulesResp>(SWR_KEYS.refereeRules(referee.id), apiFetcher);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (rulesData?.rules) setRules(rulesData.rules);
   }, [rulesData]);
@@ -44,6 +45,7 @@ export function ProfileSubtab({ referee }: Props) {
       allowAwayGames: referee.allowAwayGames,
     });
   }, [referee.id, referee.isOwnClub, referee.allowAllHomeGames, referee.allowAwayGames]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const { status, lastSavedAt, markDirty, saveNow } = useAutoSave({
     save: async () => {
@@ -160,6 +162,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function SaveStatusBar({ status, lastSavedAt, onSaveNow }: { status: string; lastSavedAt: number | null; onSaveNow: () => void }) {
   const t = useTranslations("refereeHub.referees.profile.save");
+  // eslint-disable-next-line react-hooks/purity
   const secondsAgo = lastSavedAt ? Math.max(1, Math.floor((Date.now() - lastSavedAt) / 1000)) : 0;
   const text =
     status === "saving" ? t("saving") :
