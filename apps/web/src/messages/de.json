@@ -1252,7 +1252,32 @@
       "custom": "Benutzerdefiniert"
     },
     "openSlots": {
-      "searchPlaceholder": "Spiel suchen…"
+      "searchPlaceholder": "Spiel suchen…",
+      "slot": {
+        "label": "Slot {n} (SR{n})",
+        "open": "⚠ Offen",
+        "unassign": "Aufheben"
+      },
+      "toast": {
+        "assigned": "Schiedsrichter zugewiesen",
+        "assignFailed": "Zuweisung fehlgeschlagen",
+        "unassigned": "Zuweisung aufgehoben",
+        "unassignFailed": "Aufheben fehlgeschlagen"
+      },
+      "picker": {
+        "searchPlaceholder": "Schiedsrichter suchen…",
+        "assign": "SR{n} zuweisen",
+        "empty": "Keine passenden Schiedsrichter",
+        "loadMore": "Mehr laden",
+        "workload": "{n} Spiele",
+        "disposition": {
+          "notQualifiedSr1": "Keine SR1-Lizenz",
+          "notQualifiedSr2": "Keine SR2-Lizenz",
+          "modeMismatchSr1": "SR1-Modus passt nicht",
+          "modeMismatchSr2": "SR2-Modus passt nicht",
+          "blocked": "Blockiert"
+        }
+      }
     }
   },
   "errors": {

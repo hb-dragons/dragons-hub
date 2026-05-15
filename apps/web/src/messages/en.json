@@ -1252,7 +1252,32 @@
       "custom": "Custom"
     },
     "openSlots": {
-      "searchPlaceholder": "Search game…"
+      "searchPlaceholder": "Search game…",
+      "slot": {
+        "label": "Slot {n} (SR{n})",
+        "open": "⚠ Open",
+        "unassign": "Unassign"
+      },
+      "toast": {
+        "assigned": "Referee assigned",
+        "assignFailed": "Could not assign referee",
+        "unassigned": "Referee unassigned",
+        "unassignFailed": "Could not unassign referee"
+      },
+      "picker": {
+        "searchPlaceholder": "Search referees…",
+        "assign": "Assign SR{n}",
+        "empty": "No eligible referees",
+        "loadMore": "Load more",
+        "workload": "{n} games",
+        "disposition": {
+          "notQualifiedSr1": "Not qualified as SR1",
+          "notQualifiedSr2": "Not qualified as SR2",
+          "modeMismatchSr1": "SR1 mode mismatch",
+          "modeMismatchSr2": "SR2 mode mismatch",
+          "blocked": "Blocked"
+        }
+      }
     }
   },
   "errors": {

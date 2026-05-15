@@ -66,4 +66,6 @@ export const SWR_KEYS = {
     `/admin/referee/history/games.csv${qs ? `?${qs}` : ""}`,
   refereeHistoryLeaderboardCsv: (qs: string) =>
     `/admin/referee/history/leaderboard.csv${qs ? `?${qs}` : ""}`,
+  refereeCandidates: (spielplanId: number, search: string, pageFrom: number) =>
+    `/admin/referee/games/${spielplanId}/candidates?search=${encodeURIComponent(search)}&pageFrom=${pageFrom}&pageSize=15`,
 } as const;
