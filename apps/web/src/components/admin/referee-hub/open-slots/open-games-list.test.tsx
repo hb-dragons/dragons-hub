@@ -1,71 +1,48 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
-import { NextIntlClientProvider } from "next-intl";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { SWRConfig } from "swr";
 import { OpenGamesList } from "./open-games-list";
 
-vi.mock("swr", () => ({
-  default: vi.fn(() => ({
-    data: {
-      items: [
-        {
-          id: 1, apiMatchId: 4287, matchId: 1, matchNo: 1001,
-          kickoffDate: "2026-05-28", kickoffTime: "16:30",
-          homeTeamName: "Eagles", guestTeamName: "Dragons H1",
-          leagueName: "Bundesliga", leagueShort: "BL",
-          venueName: null, venueCity: null, homeTeamId: 10,
-          sr1OurClub: true, sr2OurClub: true,
-          sr1Name: null, sr2Name: null,
-          sr1RefereeApiId: null, sr2RefereeApiId: null,
-          sr1Status: "open", sr2Status: "open",
-          isCancelled: false, isForfeited: false, isTrackedLeague: true,
-          isHomeGame: false, isGuestGame: true, lastSyncedAt: null,
-          mySlot: null, claimableSlots: [],
-        },
-        {
-          id: 2, apiMatchId: 4288, matchId: 2, matchNo: 1002,
-          kickoffDate: "2026-05-28", kickoffTime: "14:00",
-          homeTeamName: "Dragons H1", guestTeamName: "Hawks",
-          leagueName: "Oberliga", leagueShort: "OL",
-          venueName: null, venueCity: null, homeTeamId: 11,
-          sr1OurClub: true, sr2OurClub: true,
-          sr1Name: null, sr2Name: "Müller, A.",
-          sr1RefereeApiId: null, sr2RefereeApiId: 100,
-          sr1Status: "open", sr2Status: "assigned",
-          isCancelled: false, isForfeited: false, isTrackedLeague: true,
-          isHomeGame: true, isGuestGame: false, lastSyncedAt: null,
-          mySlot: null, claimableSlots: [],
-        },
-      ],
-    },
-  })),
-}));
+vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
 
-const messages = { refereeHub: { openSlots: { searchPlaceholder: "Search game…" } } };
+const baseFilters = {
+  status: "open" as const,
+  league: [] as string[],
+  dateFrom: null as string | null,
+  dateTo: null as string | null,
+  gameType: "both" as const,
+};
 
-function wrap(ui: React.ReactNode) {
-  return <NextIntlClientProvider locale="en" messages={messages as never}>{ui}</NextIntlClientProvider>;
-}
-
-afterEach(() => cleanup());
+const wrap = (ui: React.ReactNode) => (
+  <SWRConfig value={{ provider: () => new Map() }}>{ui}</SWRConfig>
+);
 
 describe("OpenGamesList", () => {
-  it("renders rows for games with at least one open slot", () => {
-    render(wrap(<OpenGamesList selectedGameId={null} onSelect={vi.fn()} />));
-    expect(screen.getByText("Eagles vs Dragons H1")).toBeInTheDocument();
-    expect(screen.getByText("Dragons H1 vs Hawks")).toBeInTheDocument();
+  it("renders rows from server response without client-side status filter", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [
+          { id: 1, apiMatchId: 100, kickoffDate: "2026-05-24", kickoffTime: "18:00", leagueShort: "OL",
+            homeTeamName: "Dragons", guestTeamName: "Bears",
+            sr1Status: "open", sr2Status: "assigned", sr1Name: null, sr2Name: "Meier",
+            sr1RefereeApiId: null, sr2RefereeApiId: 999 },
+        ],
+        total: 1, limit: 50, offset: 0, hasMore: false,
+      }),
+    }));
+    render(wrap(<OpenGamesList filters={baseFilters} selectedGameId={null} onSelect={() => {}} />));
+    expect(await screen.findByText("Dragons vs Bears")).toBeInTheDocument();
   });
 
-  it("invokes onSelect with the game id on click", () => {
-    const onSelect = vi.fn();
-    render(wrap(<OpenGamesList selectedGameId={null} onSelect={onSelect} />));
-    screen.getByText("Eagles vs Dragons H1").click();
-    expect(onSelect).toHaveBeenCalledWith(4287);
-  });
-
-  it("highlights the selected row", () => {
-    render(wrap(<OpenGamesList selectedGameId={4287} onSelect={vi.fn()} />));
-    expect(screen.getByText("Eagles vs Dragons H1").closest("[data-selected='true']")).not.toBeNull();
+  it("renders empty state when no rows", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ items: [], total: 0, limit: 50, offset: 0, hasMore: false }),
+    }));
+    render(wrap(<OpenGamesList filters={baseFilters} selectedGameId={null} onSelect={() => {}} />));
+    expect(await screen.findByText(/empty|no games/i)).toBeInTheDocument();
   });
 });

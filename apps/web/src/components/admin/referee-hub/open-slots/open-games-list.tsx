@@ -1,37 +1,90 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import useSWR from "swr";
+import { FixedSizeList as List, type ListChildComponentProps } from "react-window";
 import { useTranslations } from "next-intl";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { Input } from "@dragons/ui/components/input";
 import { Badge } from "@dragons/ui/components/badge";
 import { cn } from "@dragons/ui/lib/utils";
+import { useDebounce } from "@/hooks/use-debounce";
 import type { RefereeGameListItem } from "@dragons/shared";
+import type { HubFilters } from "../use-referee-hub-url";
 
 interface Props {
+  filters: HubFilters;
   selectedGameId: number | null;
   onSelect: (gameId: number) => void;
 }
 
-interface ApiResponse { items: RefereeGameListItem[] }
+interface ApiResponse {
+  items: RefereeGameListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
 
-export function OpenGamesList({ selectedGameId, onSelect }: Props) {
+const ROW_HEIGHT = 64;
+
+export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
   const t = useTranslations("refereeHub.openSlots");
   const [search, setSearch] = useState("");
-  const { data } = useSWR<ApiResponse>(SWR_KEYS.refereeGames, apiFetcher);
+  const debouncedSearch = useDebounce(search, 300);
 
-  const rows = useMemo(() => {
-    const items = data?.items ?? [];
-    const term = search.trim().toLowerCase();
-    return items
-      .filter((g) => g.sr1Status === "open" || g.sr2Status === "open")
-      .filter((g) => !term ||
-        g.homeTeamName.toLowerCase().includes(term) ||
-        g.guestTeamName.toLowerCase().includes(term) ||
-        (g.leagueShort?.toLowerCase().includes(term) ?? false));
-  }, [data, search]);
+  // Map our status to server's expected status param
+  const serverStatus =
+    filters.status === "any" ? "all" : "active";
+
+  const key = SWR_KEYS.refereeGamesFiltered({
+    status: serverStatus,
+    league: filters.league,
+    dateFrom: filters.dateFrom ?? undefined,
+    dateTo: filters.dateTo ?? undefined,
+    gameType: filters.gameType,
+    search: debouncedSearch.length >= 3 ? debouncedSearch : undefined,
+    limit: 200,
+    offset: 0,
+  });
+
+  const { data, error, isLoading } = useSWR<ApiResponse>(key, apiFetcher, {
+    dedupingInterval: 5000,
+  });
+
+  // Client-side post-filter for slot-level open/offered distinction
+  const rows = (data?.items ?? []).filter((g) => {
+    if (filters.status === "open") return g.sr1Status === "open" || g.sr2Status === "open";
+    if (filters.status === "offered") return g.sr1Status === "offered" || g.sr2Status === "offered" || g.sr1Status === "open" || g.sr2Status === "open";
+    return true;
+  });
+
+  const Row = ({ index, style }: ListChildComponentProps) => {
+    const g = rows[index]!;
+    const selected = selectedGameId === g.apiMatchId;
+    return (
+      <button
+        type="button"
+        style={style}
+        data-selected={selected}
+        onClick={() => onSelect(g.apiMatchId)}
+        className={cn(
+          "w-full text-left px-3 py-2 border-b hover:bg-muted/50 transition-colors block",
+          selected && "bg-primary text-primary-foreground hover:bg-primary",
+        )}
+      >
+        <div className="text-xs opacity-70">
+          {g.kickoffDate} · {g.kickoffTime} · {g.leagueShort ?? ""}
+        </div>
+        <div className="text-sm font-medium truncate">{g.homeTeamName} vs {g.guestTeamName}</div>
+        <div className="flex gap-1 mt-1">
+          <SlotBadge status={g.sr1Status} who={g.sr1Name} prefix="SR1" />
+          <SlotBadge status={g.sr2Status} who={g.sr2Name} prefix="SR2" />
+        </div>
+      </button>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -43,41 +96,29 @@ export function OpenGamesList({ selectedGameId, onSelect }: Props) {
           aria-label={t("searchPlaceholder")}
         />
       </div>
-      <div className="flex-1 overflow-auto">
-        {rows.map((g) => (
-          <button
-            key={g.apiMatchId}
-            type="button"
-            data-selected={selectedGameId === g.apiMatchId}
-            onClick={() => onSelect(g.apiMatchId)}
-            className={cn(
-              "w-full text-left px-3 py-2 border-b hover:bg-muted/50 transition-colors",
-              selectedGameId === g.apiMatchId && "bg-primary text-primary-foreground hover:bg-primary",
-            )}
+      <div className="flex-1 min-h-0">
+        {error && <div className="p-4 text-sm text-destructive">{t("loadError")}</div>}
+        {isLoading && !data && <div className="p-4 text-sm text-muted-foreground">{t("loading")}</div>}
+        {!isLoading && rows.length === 0 && (
+          <div className="p-4 text-sm text-muted-foreground text-center">{t("empty")}</div>
+        )}
+        {rows.length > 0 && (
+          <List
+            height={600}
+            itemCount={rows.length}
+            itemSize={ROW_HEIGHT}
+            width="100%"
           >
-            <div className="text-xs opacity-70">
-              {g.kickoffDate} · {g.kickoffTime} · {g.leagueShort ?? ""}
-            </div>
-            <div className="text-sm font-medium">
-              {g.homeTeamName} vs {g.guestTeamName}
-            </div>
-            <div className="flex gap-1 mt-1">
-              <SlotBadge status={g.sr1Status} who={g.sr1Name} prefix="SR1" />
-              <SlotBadge status={g.sr2Status} who={g.sr2Name} prefix="SR2" />
-            </div>
-          </button>
-        ))}
+            {Row}
+          </List>
+        )}
       </div>
     </div>
   );
 }
 
 function SlotBadge({ status, who, prefix }: { status: string; who: string | null; prefix: string }) {
-  if (status === "assigned") {
-    return <Badge variant="secondary">{prefix} {who ?? "?"}</Badge>;
-  }
-  if (status === "offered") {
-    return <Badge variant="outline">{prefix} offered</Badge>;
-  }
+  if (status === "assigned") return <Badge variant="secondary">{prefix} {who ?? "?"}</Badge>;
+  if (status === "offered") return <Badge variant="outline">{prefix} offered</Badge>;
   return <Badge variant="destructive">{prefix} open</Badge>;
 }

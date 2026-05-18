@@ -1250,6 +1250,9 @@
     },
     "openSlots": {
       "searchPlaceholder": "Search game…",
+      "loading": "Loading…",
+      "loadError": "Failed to load games.",
+      "empty": "No games match your filters.",
       "detail": {
         "notFound": "Game not found or no longer needs referees",
         "selectGamePrompt": "Select a game on the left to see its open slots"

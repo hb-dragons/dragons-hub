@@ -13,6 +13,7 @@ export function OpenSlotsTab() {
     <div className="grid grid-cols-[minmax(260px,1fr)_2fr] border rounded-md overflow-hidden min-h-[600px]">
       <div className="border-r">
         <OpenGamesList
+          filters={state.filters}
           selectedGameId={state.gameId}
           onSelect={(gameId) => update({ gameId })}
         />

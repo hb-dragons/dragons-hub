@@ -1250,6 +1250,9 @@
     },
     "openSlots": {
       "searchPlaceholder": "Spiel suchen…",
+      "loading": "Lädt…",
+      "loadError": "Spiele konnten nicht geladen werden.",
+      "empty": "Keine Spiele entsprechen Ihren Filtern.",
       "detail": {
         "notFound": "Spiel nicht gefunden oder benötigt keine Schiedsrichter mehr",
         "selectGamePrompt": "Spiel links auswählen, um offene Slots zu sehen"
