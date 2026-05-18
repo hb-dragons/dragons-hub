@@ -5,7 +5,6 @@ export interface RefereeListItem {
   lastName: string | null;
   licenseNumber: number | null;
   matchCount: number;
-  roles: string[];
   allowAllHomeGames: boolean;
   allowAwayGames: boolean;
   isOwnClub: boolean;
@@ -41,16 +40,7 @@ export interface UpdateRefereeRulesBody {
   }>;
 }
 
-export interface UpdateRefereeSettingsBody {
-  visibility?: UpdateRefereeVisibilityBody;
-  rules?: UpdateRefereeRulesBody["rules"];
-}
-
-export interface UpdateRefereeSettingsResponse {
-  visibility: {
-    allowAllHomeGames: boolean;
-    allowAwayGames: boolean;
-    isOwnClub: boolean;
-  };
-  rules: RefereeRule[];
+export interface RefereeCountsResponse {
+  own: number;
+  all: number;
 }
