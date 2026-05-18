@@ -1238,6 +1238,82 @@
       "reconciliation": "Reconciliation"
     }
   },
+  "refereeHub": {
+    "title": "Referees",
+    "tabs": {
+      "openSlots": "Open Slots",
+      "referees": "Referees"
+    },
+    "range": {
+      "label": "Range",
+      "season": "Season",
+      "30d": "Last 30 days",
+      "month": "This month",
+      "custom": "Custom"
+    },
+    "openSlots": {
+      "searchPlaceholder": "Search game…",
+      "detail": {
+        "notFound": "Game not found or no longer needs referees",
+        "selectGamePrompt": "Select a game on the left to see its open slots"
+      },
+      "slot": {
+        "label": "Slot {n} (SR{n})",
+        "open": "⚠ Open",
+        "unassign": "Unassign"
+      },
+      "toast": {
+        "assigned": "Referee assigned",
+        "assignFailed": "Could not assign referee",
+        "unassigned": "Referee unassigned",
+        "unassignFailed": "Could not unassign referee"
+      },
+      "picker": {
+        "searchPlaceholder": "Search referees…",
+        "assign": "Assign SR{n}",
+        "empty": "No eligible referees",
+        "loadMore": "Load more",
+        "workload": "{n} games",
+        "disposition": {
+          "notQualifiedSr1": "Not qualified as SR1",
+          "notQualifiedSr2": "Not qualified as SR2",
+          "modeMismatchSr1": "SR1 mode mismatch",
+          "modeMismatchSr2": "SR2 mode mismatch",
+          "blocked": "Blocked"
+        }
+      }
+    },
+    "referees": {
+      "kpi": { "total": "Total games", "refs": "Referees", "workload": "Avg workload" },
+      "columns": { "ref": "Referee", "own": "Own-club", "games": "Games" },
+      "search": "Search referees…",
+      "sort": { "name": "Sort: Name", "workloadDesc": "Games (high → low)", "workloadAsc": "Games (low → high)" },
+      "empty": "No referees match your filters",
+      "profile": {
+        "visibility": { "title": "Visibility", "ownClub": "Own-club referee", "allHome": "Allow all home games", "away": "Allow away games" },
+        "rules": { "title": "Per-team rules", "add": "Add rule", "deny": "Deny", "allow": "Allow", "selectTeam": "Team", "none": "No team rules — federation defaults apply" },
+        "save": { "saving": "Saving…", "saved": "Saved {n}s ago", "dirty": "Unsaved changes", "error": "Save failed", "now": "Save now" }
+      },
+      "upcoming": {
+        "assigned": "Assigned",
+        "eligibleOpen": "Eligible open slots",
+        "assignedEmpty": "No upcoming assignments",
+        "eligibleOpenEmpty": "No eligible open slots"
+      },
+      "history": {
+        "total": "{n} games",
+        "exportCsv": "Export CSV",
+        "empty": "No history in selected range",
+        "statusPlayed": "Played",
+        "statusCancelled": "Cancelled",
+        "statusForfeited": "Forfeited"
+      },
+      "notFound": "Referee not found",
+      "ownClubBadge": "Own-club",
+      "subtabs": { "profile": "Profile", "upcoming": "Upcoming", "history": "History" },
+      "selectPrompt": "Pick a referee to see their config + history"
+    }
+  },
   "errors": {
     "title": "Something went wrong",
     "description": "An unexpected error occurred. Please try again.",
