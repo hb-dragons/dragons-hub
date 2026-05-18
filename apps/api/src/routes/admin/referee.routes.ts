@@ -3,23 +3,22 @@ import { z } from "zod";
 import { describeRoute } from "hono-openapi";
 import {
   getReferees,
+  getRefereeCounts,
   updateRefereeVisibility,
-  updateRefereeSettings,
+  updateRefereeRules,
   RefereeSettingsError,
 } from "../../services/admin/referee-admin.service";
 import { requirePermission } from "../../middleware/rbac";
 import type { AppEnv } from "../../types";
 import { refereeListQuerySchema } from "./referee.schemas";
-import { rulesArraySchema } from "./referee-rules.schemas";
 
 const refereeRoutes = new Hono<AppEnv>();
 
-// GET /admin/referees - List all referees
 refereeRoutes.get(
   "/referees",
   requirePermission("referee", "view"),
   describeRoute({
-    description: "List all referees with pagination and search",
+    description: "List referees with pagination, search, and sort",
     tags: ["Referees"],
     responses: { 200: { description: "Success" } },
   }),
@@ -28,9 +27,24 @@ refereeRoutes.get(
       limit: c.req.query("limit"),
       offset: c.req.query("offset"),
       search: c.req.query("search"),
-      ownClub: c.req.query("ownClub"),
+      scope: c.req.query("scope"),
+      sort: c.req.query("sort"),
     });
     const result = await getReferees(query);
+    return c.json(result);
+  },
+);
+
+refereeRoutes.get(
+  "/referees/counts",
+  requirePermission("referee", "view"),
+  describeRoute({
+    description: "Returns own-club and total referee counts",
+    tags: ["Referees"],
+    responses: { 200: { description: "Counts" } },
+  }),
+  async (c) => {
+    const result = await getRefereeCounts();
     return c.json(result);
   },
 );
@@ -41,80 +55,74 @@ const visibilityBodySchema = z.object({
   isOwnClub: z.boolean(),
 });
 
-const settingsBodySchema = z.object({
-  visibility: visibilityBodySchema.optional(),
-  rules: rulesArraySchema.optional(),
-});
-
-refereeRoutes.patch(
-  "/referees/:id",
-  requirePermission("referee", "update"),
-  describeRoute({
-    description:
-      "Update referee settings (visibility + assignment rules) atomically in a single transaction",
-    tags: ["Referees"],
-    responses: {
-      200: { description: "Updated settings" },
-      400: { description: "Invalid request" },
-      404: { description: "Referee not found" },
-    },
-  }),
-  async (c) => {
-    const id = Number(c.req.param("id"));
-    if (!Number.isInteger(id) || id <= 0) {
-      return c.json(
-        { error: "Invalid referee ID", code: "VALIDATION_ERROR" },
-        400,
-      );
-    }
-
-    const body = settingsBodySchema.parse(await c.req.json());
-
-    try {
-      const result = await updateRefereeSettings(id, body);
-      return c.json(result);
-    } catch (error) {
-      if (error instanceof RefereeSettingsError) {
-        const status = error.code === "NOT_FOUND" ? 404 : 400;
-        return c.json({ error: error.message, code: error.code }, status);
-      }
-      throw error;
-    }
-  },
-);
-
-// PATCH /admin/referees/:id/visibility - Update referee game visibility flags
 refereeRoutes.patch(
   "/referees/:id/visibility",
   requirePermission("referee", "update"),
   describeRoute({
-    description: "Update referee game visibility flags",
+    description: "Update referee visibility flags (own-club, all home, away)",
     tags: ["Referees"],
     responses: {
-      200: { description: "Updated visibility flags" },
+      200: { description: "Updated" },
       400: { description: "Invalid request" },
-      404: { description: "Referee not found" },
+      404: { description: "Not found" },
     },
   }),
   async (c) => {
     const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      return c.json(
-        { error: "Invalid referee ID", code: "VALIDATION_ERROR" },
-        400,
-      );
+      return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
     }
-
     const body = visibilityBodySchema.parse(await c.req.json());
-
     try {
       const result = await updateRefereeVisibility(id, body);
       return c.json(result);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("not found")) {
-        return c.json({ error: error.message, code: "NOT_FOUND" }, 404);
+    } catch (err) {
+      if (err instanceof RefereeSettingsError) {
+        return c.json({ error: err.message, code: err.code }, err.code === "NOT_FOUND" ? 404 : 400);
       }
-      throw error;
+      throw err;
+    }
+  },
+);
+
+const rulesBodySchema = z.object({
+  rules: z.array(
+    z.object({
+      teamId: z.number().int().positive(),
+      deny: z.boolean(),
+      allowSr1: z.boolean(),
+      allowSr2: z.boolean(),
+    }),
+  ),
+});
+
+refereeRoutes.patch(
+  "/referees/:id/rules",
+  requirePermission("referee", "update"),
+  describeRoute({
+    description: "Replace all assignment rules for a referee",
+    tags: ["Referees"],
+    responses: {
+      200: { description: "Updated" },
+      400: { description: "Invalid request" },
+      404: { description: "Not found" },
+    },
+  }),
+  async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id <= 0) {
+      return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
+    }
+    const body = rulesBodySchema.parse(await c.req.json());
+    try {
+      const result = await updateRefereeRules(id, body);
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof RefereeSettingsError) {
+        const status = err.code === "NOT_FOUND" ? 404 : 400;
+        return c.json({ error: err.message, code: err.code }, status);
+      }
+      throw err;
     }
   },
 );
