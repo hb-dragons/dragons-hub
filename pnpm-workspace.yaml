@@ -26,3 +26,8 @@ auditConfig:
     - GHSA-9ppj-qmqm-q256  # tar symlink path traversal
     - GHSA-qffp-2rhf-9h96  # tar hardlink path traversal (drive-relative)
     - GHSA-r6q2-hw4h-h46w  # tar race condition (APFS Unicode)
+    - GHSA-2v35-w6hq-6mfw  # @xmldom/xmldom (@trapezedev/project chain)
+    - GHSA-f6ww-3ggp-fr8h  # @xmldom/xmldom (@trapezedev/project chain)
+    - GHSA-j759-j44w-7fr8  # @xmldom/xmldom (@trapezedev/project chain)
+    - GHSA-wh4c-j3r5-mjhp  # @xmldom/xmldom (@trapezedev/project chain)
+    - GHSA-x6wf-f3px-wcqx  # @xmldom/xmldom (@trapezedev/project chain)
