@@ -6,8 +6,8 @@ import { NextIntlClientProvider } from "next-intl";
 import { RefereeList } from "./referee-list";
 
 const refs = [
-  { id: 1, apiId: 100, firstName: "Anna", lastName: "Müller", licenseNumber: 12345, matchCount: 14, roles: ["SR1", "SR2"], allowAllHomeGames: true, allowAwayGames: true, isOwnClub: true, createdAt: "", updatedAt: "" },
-  { id: 2, apiId: 101, firstName: "Karl", lastName: "Schmidt", licenseNumber: 33122, matchCount: 9, roles: ["SR1", "SR2"], allowAllHomeGames: false, allowAwayGames: true, isOwnClub: true, createdAt: "", updatedAt: "" },
+  { id: 1, apiId: 100, firstName: "Anna", lastName: "Müller", licenseNumber: 12345, matchCount: 14, allowAllHomeGames: true, allowAwayGames: true, isOwnClub: true, createdAt: "", updatedAt: "" },
+  { id: 2, apiId: 101, firstName: "Karl", lastName: "Schmidt", licenseNumber: 33122, matchCount: 9, allowAllHomeGames: false, allowAwayGames: true, isOwnClub: true, createdAt: "", updatedAt: "" },
 ];
 
 vi.mock("swr", () => ({
@@ -55,8 +55,14 @@ describe("RefereeList", () => {
     const toggles = screen.getAllByRole("checkbox", { name: /own/i });
     fireEvent.click(toggles[0]!);
     await waitFor(() => expect(fetchAPI).toHaveBeenCalledWith(
-      "/admin/referees/1",
+      "/admin/referees/1/visibility",
       expect.objectContaining({ method: "PATCH" }),
     ));
+  });
+
+  it("does not render role labels", () => {
+    render(wrap(<RefereeList selectedId={null} onSelect={() => {}} />));
+    expect(screen.getByText("Müller, Anna")).toBeInTheDocument();
+    expect(screen.queryByText(/Schiedsrichter|SR1|SR2/)).toBeNull();
   });
 });

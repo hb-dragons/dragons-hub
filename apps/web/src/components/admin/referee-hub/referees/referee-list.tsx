@@ -25,7 +25,7 @@ export function RefereeList({ selectedId, onSelect }: Props) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<Sort>("name");
 
-  const { data } = useSWR<PaginatedResponse<RefereeListItem>>(SWR_KEYS.referees(true), apiFetcher);
+  const { data } = useSWR<PaginatedResponse<RefereeListItem>>(SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 }), apiFetcher);
   const items = data?.items ?? [];
 
   const visible = useMemo(() => {
@@ -51,17 +51,11 @@ export function RefereeList({ selectedId, onSelect }: Props) {
 
   async function toggleOwnClub(ref: RefereeListItem, checked: boolean) {
     try {
-      await fetchAPI(`/admin/referees/${ref.id}`, {
+      await fetchAPI(`/admin/referees/${ref.id}/visibility`, {
         method: "PATCH",
-        body: JSON.stringify({
-          visibility: {
-            allowAllHomeGames: ref.allowAllHomeGames,
-            allowAwayGames: ref.allowAwayGames,
-            isOwnClub: checked,
-          },
-        }),
+        body: JSON.stringify({ isOwnClub: checked, allowAllHomeGames: ref.allowAllHomeGames, allowAwayGames: ref.allowAwayGames }),
       });
-      await mutate(SWR_KEYS.referees(true));
+      await mutate(SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 }));
     } catch (err) {
       const msg = err instanceof APIError ? err.message : "Failed";
       toast.error(msg);
@@ -100,7 +94,7 @@ export function RefereeList({ selectedId, onSelect }: Props) {
           >
             <div>
               <div className="text-sm font-medium">{r.lastName}, {r.firstName}</div>
-              <div className="text-xs opacity-70">Lic {r.licenseNumber ?? "—"} · {r.roles.join(", ")}</div>
+              <div className="text-xs opacity-70">Lic {r.licenseNumber ?? "—"}</div>
             </div>
             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
               <Checkbox
