@@ -3,7 +3,6 @@
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
 import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
 import { SlotCard } from "./slot-card";
 import type { RefereeGameListItem } from "@dragons/shared";
 
@@ -11,12 +10,10 @@ interface Props {
   selectedGameId: number;
 }
 
-interface ApiResponse { items: RefereeGameListItem[] }
-
 export function OpenSlotDetail({ selectedGameId }: Props) {
   const t = useTranslations("refereeHub.openSlots");
-  const { data, mutate } = useSWR<ApiResponse>(SWR_KEYS.refereeGames, apiFetcher);
-  const game = data?.items.find((g) => g.apiMatchId === selectedGameId);
+  const key = `/referee/matches/${selectedGameId}`;
+  const { data: game, mutate } = useSWR<RefereeGameListItem>(key, apiFetcher);
 
   if (!game) {
     return (
@@ -37,21 +34,13 @@ export function OpenSlotDetail({ selectedGameId }: Props) {
       <SlotCard
         gameApiId={game.apiMatchId}
         slotNumber={1}
-        assignment={{
-          refereeApiId: game.sr1RefereeApiId,
-          refereeName: game.sr1Name,
-          status: game.sr1Status,
-        }}
+        assignment={{ refereeApiId: game.sr1RefereeApiId, refereeName: game.sr1Name, status: game.sr1Status }}
         onChange={() => mutate()}
       />
       <SlotCard
         gameApiId={game.apiMatchId}
         slotNumber={2}
-        assignment={{
-          refereeApiId: game.sr2RefereeApiId,
-          refereeName: game.sr2Name,
-          status: game.sr2Status,
-        }}
+        assignment={{ refereeApiId: game.sr2RefereeApiId, refereeName: game.sr2Name, status: game.sr2Status }}
         onChange={() => mutate()}
       />
     </div>
