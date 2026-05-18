@@ -69,6 +69,8 @@ describe("GET /games", () => {
       league: undefined,
       dateFrom: undefined,
       dateTo: undefined,
+      gameType: undefined,
+      assignedRefereeApiId: undefined,
     });
   });
 
@@ -87,6 +89,8 @@ describe("GET /games", () => {
       league: "BBL",
       dateFrom: "2026-03-01",
       dateTo: "2026-05-31",
+      gameType: undefined,
+      assignedRefereeApiId: undefined,
     });
   });
 
@@ -246,5 +250,29 @@ describe("GET /matches/:matchId", () => {
 
     expect(res.status).toBe(200);
     expect(mocks.getVisibleRefereeGameByMatchId).toHaveBeenCalledWith(null, 500);
+  });
+});
+
+describe("GET /referee/games new query params", () => {
+  it("passes gameType to the service", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValueOnce({
+      items: [], total: 0, limit: 100, offset: 0, hasMore: false,
+    });
+    await app.request("/games?gameType=home");
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ gameType: "home" }),
+    );
+  });
+
+  it("passes assignedRefereeApiId to the service", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValueOnce({
+      items: [], total: 0, limit: 100, offset: 0, hasMore: false,
+    });
+    await app.request("/games?assignedRefereeApiId=12345");
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ assignedRefereeApiId: 12345 }),
+    );
   });
 });

@@ -24,8 +24,12 @@ refereeGamesRoutes.get("/games", gate, async (c) => {
   const dateFrom = c.req.query("dateFrom") || undefined;
   const dateTo = c.req.query("dateTo") || undefined;
 
+  const gameType = c.req.query("gameType") as "home" | "away" | "both" | undefined;
+  const assignedRefereeApiIdRaw = c.req.query("assignedRefereeApiId");
+  const assignedRefereeApiId = assignedRefereeApiIdRaw ? Number(assignedRefereeApiIdRaw) : undefined;
+
   const refereeId = c.get("refereeId") ?? null;
-  const params = { limit, offset, search, status, league, dateFrom, dateTo };
+  const params = { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId };
   const result = await getVisibleRefereeGames(refereeId, params);
   return c.json(result);
 });

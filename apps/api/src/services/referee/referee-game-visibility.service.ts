@@ -34,6 +34,8 @@ interface GetVisibleRefereeGamesParams {
   league?: string;
   dateFrom?: string;
   dateTo?: string;
+  gameType?: "home" | "away" | "both";
+  assignedRefereeApiId?: number;
 }
 
 export async function getVisibleRefereeGames(
@@ -46,7 +48,7 @@ export async function getVisibleRefereeGames(
   offset: number;
   hasMore: boolean;
 }> {
-  const { limit, offset, search, status, league, dateFrom, dateTo } = params;
+  const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId } = params;
 
   if (refereeId === null) {
     const openOurClubSlot = or(
@@ -65,6 +67,16 @@ export async function getVisibleRefereeGames(
     if (league) conditions.push(eq(refereeGames.leagueShort, league));
     if (dateFrom) conditions.push(gte(refereeGames.kickoffDate, dateFrom));
     if (dateTo) conditions.push(lte(refereeGames.kickoffDate, dateTo));
+
+    if (gameType === "home") conditions.push(eq(refereeGames.isHomeGame, true));
+    else if (gameType === "away") conditions.push(eq(refereeGames.isGuestGame, true));
+
+    if (assignedRefereeApiId != null) {
+      conditions.push(or(
+        eq(refereeGames.sr1RefereeApiId, assignedRefereeApiId),
+        eq(refereeGames.sr2RefereeApiId, assignedRefereeApiId),
+      )!);
+    }
 
     if (search) {
       const words = search.split(/\s+/).filter(Boolean);
@@ -206,6 +218,18 @@ export async function getVisibleRefereeGames(
         ilike(refereeGames.leagueName, pattern),
       )!);
     }
+  }
+
+  // Game type
+  if (gameType === "home") conditions.push(eq(refereeGames.isHomeGame, true));
+  else if (gameType === "away") conditions.push(eq(refereeGames.isGuestGame, true));
+
+  // Assigned referee
+  if (assignedRefereeApiId != null) {
+    conditions.push(or(
+      eq(refereeGames.sr1RefereeApiId, assignedRefereeApiId),
+      eq(refereeGames.sr2RefereeApiId, assignedRefereeApiId),
+    )!);
   }
 
   const whereClause = and(...conditions)!;
