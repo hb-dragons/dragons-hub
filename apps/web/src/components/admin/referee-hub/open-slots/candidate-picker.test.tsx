@@ -19,17 +19,22 @@ function makeCandidate(over: Record<string, unknown> = {}) {
   };
 }
 
+let swrReturnValue: any = null;
+
 vi.mock("swr", () => ({
-  default: vi.fn(() => ({
-    data: {
-      total: 3,
-      results: [
-        makeCandidate({ srId: 1, vorname: "Tom", nachName: "Wagner", meta: { ...makeCandidate().meta, total: 3 } }),
-        makeCandidate({ srId: 2, vorname: "Lisa", nachName: "Klein", qualiSr2: false, meta: { ...makeCandidate().meta, total: 7 } }),
-        makeCandidate({ srId: 3, vorname: "Anna", nachName: "Müller", blocktermin: true, meta: { ...makeCandidate().meta, total: 14 } }),
-      ],
-    },
-  })),
+  default: vi.fn(() => {
+    if (swrReturnValue) return swrReturnValue;
+    return {
+      data: {
+        total: 3,
+        results: [
+          makeCandidate({ srId: 1, vorname: "Tom", nachName: "Wagner", meta: { ...makeCandidate().meta, total: 3 } }),
+          makeCandidate({ srId: 2, vorname: "Lisa", nachName: "Klein", qualiSr2: false, meta: { ...makeCandidate().meta, total: 7 } }),
+          makeCandidate({ srId: 3, vorname: "Anna", nachName: "Müller", blocktermin: true, meta: { ...makeCandidate().meta, total: 14 } }),
+        ],
+      },
+    };
+  }),
 }));
 
 vi.mock("@/hooks/use-debounce", () => ({ useDebounce: (v: string) => v }));
@@ -95,5 +100,26 @@ describe("CandidatePicker", () => {
     const button = wagnerRow.querySelector("button")!;
     fireEvent.click(button);
     expect(onPick).toHaveBeenCalledWith(1);
+  });
+
+  it("renders candidates in the order returned by the server (no client re-sort)", async () => {
+    // Temporarily override swrReturnValue with custom data
+    swrReturnValue = {
+      data: {
+        total: 2,
+        results: [
+          makeCandidate({ srId: 2, vorname: "Lower", nachName: "Workload", meta: { ...makeCandidate().meta, total: 3 } }),
+          makeCandidate({ srId: 1, vorname: "Higher", nachName: "Workload", meta: { ...makeCandidate().meta, total: 10 } }),
+        ],
+      },
+    };
+
+    render(wrap(<CandidatePicker gameApiId={1} slotNumber={1} onPick={() => {}} />));
+    const items = await screen.findAllByTestId("candidate-row");
+    expect(items[0]).toHaveTextContent("Lower Workload");
+    expect(items[1]).toHaveTextContent("Higher Workload");
+
+    // Clean up
+    swrReturnValue = null;
   });
 });

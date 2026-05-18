@@ -72,6 +72,7 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
           return (
             <div
               key={c.srId}
+              data-testid="candidate-row"
               data-candidate
               data-disabled={blocked}
               className={cn(
