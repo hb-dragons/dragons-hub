@@ -46,7 +46,7 @@ export function DashboardView() {
   const canViewSync = can(user, "sync", "view");
 
   const { data: referees } = useSWR<PaginatedResponse<RefereeListItem>>(
-    canViewReferees ? SWR_KEYS.referees() : null,
+    canViewReferees ? SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 }) : null,
     apiFetcher,
   );
   const { data: upcoming } = useSWR<PaginatedResponse<MatchListItem>>(
