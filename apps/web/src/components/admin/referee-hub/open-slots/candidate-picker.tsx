@@ -82,7 +82,7 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate">{displayName}</div>
                 <div className="text-xs text-muted-foreground flex gap-2 items-center flex-wrap">
-                  <Badge variant="outline">{t("workload", { n: c.meta.total })}</Badge>
+                  <Badge variant="outline">{t("workload", { n: String(c.meta.total) })}</Badge>
                   {blocked && (
                     <span className="text-destructive">{blockReason}</span>
                   )}
@@ -94,7 +94,7 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
                 disabled={blocked || disabled}
                 onClick={() => onPick(c.srId)}
               >
-                {t("assign", { n: slotNumber })}
+                {t("assign", { n: String(slotNumber) })}
               </Button>
             </div>
           );

@@ -168,7 +168,7 @@ function SaveStatusBar({ status, lastSavedAt, onSaveNow }: { status: string; las
     status === "saving" ? t("saving") :
     status === "dirty" ? t("dirty") :
     status === "error" ? t("error") :
-    status === "saved" ? t("saved", { n: secondsAgo }) :
+    status === "saved" ? t("saved", { n: String(secondsAgo) }) :
     "";
   return (
     <div className="flex items-center justify-between text-xs text-muted-foreground">

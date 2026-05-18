@@ -17,8 +17,7 @@
     },
     "packages/ui": {
       "entry": ["src/components/*.{ts,tsx}"],
-      "project": ["src/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["@tailwindcss/postcss"]
+      "project": ["src/**/*.{ts,tsx}"]
     },
     "packages/db": {
       "project": ["src/**/*.ts"]
@@ -31,7 +30,7 @@
     },
     "apps/native": {
       "project": ["src/**/*.{ts,tsx}"],
-      "ignoreDependencies": ["expo-updates", "expo-system-ui", "expo-notifications"]
+      "ignoreDependencies": ["expo-system-ui"]
     }
   },
   "ignore": [

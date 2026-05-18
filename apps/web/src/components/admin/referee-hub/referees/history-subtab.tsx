@@ -30,7 +30,7 @@ export function HistorySubtab({ referee }: Props) {
   return (
     <div className="p-4 space-y-3">
       <div className="flex justify-between items-center">
-        <div className="text-sm text-muted-foreground">{t("total", { n: data?.total ?? items.length })}</div>
+        <div className="text-sm text-muted-foreground">{t("total", { n: String(data?.total ?? items.length) })}</div>
         <Button asChild size="sm" variant="outline">
           <a href={`/api/admin/referee/history/games.csv?${qs}`} download>{t("exportCsv")}</a>
         </Button>

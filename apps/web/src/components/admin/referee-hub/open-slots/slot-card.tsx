@@ -66,7 +66,7 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
       <div className="flex justify-between items-start">
         <div>
           <div className="text-xs text-muted-foreground">
-            {t("slot.label", { n: slotNumber })}
+            {t("slot.label", { n: String(slotNumber) })}
           </div>
           {isOpen ? (
             <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">
