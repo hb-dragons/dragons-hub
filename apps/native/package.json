@@ -43,7 +43,7 @@
     "react-native-keyboard-controller": "1.21.7",
     "react-native-reanimated": "4.3.1",
     "react-native-safe-area-context": "5.7.0",
-    "react-native-screens": "4.25.0",
+    "react-native-screens": "~4.23.0",
     "react-native-svg": "^15.15.5",
     "react-native-svg-transformer": "^1.5.3",
     "swr": "^2.4.1"
