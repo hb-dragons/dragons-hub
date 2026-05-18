@@ -1278,6 +1278,19 @@
           "modeMismatchSr2": "SR2-Modus passt nicht",
           "blocked": "Blockiert"
         }
+      },
+      "filters": {
+        "status": "Status",
+        "statusValue": { "open": "Nur offen", "offered": "Offen + Angeboten", "any": "Beliebig" },
+        "league": "Liga",
+        "noLeagues": "Keine Ligen geladen",
+        "date": "Datum",
+        "datePreset": { "14d": "Nächste 14 Tage", "30d": "Nächste 30 Tage", "season": "Ganze Saison", "custom": "Benutzerdefiniert" },
+        "dateFrom": "Von",
+        "dateTo": "Bis",
+        "gameType": "Spielart",
+        "gameTypeValue": { "home": "Heim", "away": "Auswärts" },
+        "reset": "Filter zurücksetzen"
       }
     },
     "referees": {

@@ -1278,6 +1278,19 @@
           "modeMismatchSr2": "SR2 mode mismatch",
           "blocked": "Blocked"
         }
+      },
+      "filters": {
+        "status": "Status",
+        "statusValue": { "open": "Open only", "offered": "Open + Offered", "any": "Any" },
+        "league": "League",
+        "noLeagues": "No leagues loaded",
+        "date": "Date",
+        "datePreset": { "14d": "Next 14 days", "30d": "Next 30 days", "season": "Whole season", "custom": "Custom range" },
+        "dateFrom": "From",
+        "dateTo": "To",
+        "gameType": "Game type",
+        "gameTypeValue": { "home": "Home", "away": "Away" },
+        "reset": "Reset filters"
       }
     },
     "referees": {
