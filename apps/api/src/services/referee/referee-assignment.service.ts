@@ -175,7 +175,7 @@ export async function assignReferee(
     entityType: "referee",
     entityId: referee.id,
     entityName: refereeName,
-    deepLinkPath: "/admin/referee/matches",
+    deepLinkPath: "/admin/referees",
     payload: {
       matchNo: game.matchNo,
       homeTeam: game.homeTeamName,
@@ -281,7 +281,7 @@ export async function unassignReferee(
     entityType: "referee",
     entityId: refereeEntityId,
     entityName: refereeName,
-    deepLinkPath: "/admin/referee/matches",
+    deepLinkPath: "/admin/referees",
     payload: {
       matchNo: game.matchNo,
       homeTeam: game.homeTeamName,
