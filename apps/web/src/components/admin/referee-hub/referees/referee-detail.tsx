@@ -18,7 +18,7 @@ export function RefereeDetail({ refereeId }: Props) {
   const t = useTranslations("refereeHub.referees");
   const { state, update } = useRefereeHubUrl();
 
-  const { data } = useSWR<PaginatedResponse<RefereeListItem>>(SWR_KEYS.referees(true), apiFetcher);
+  const { data } = useSWR<PaginatedResponse<RefereeListItem>>(SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 }), apiFetcher);
   const ref = data?.items.find((r) => r.id === refereeId);
 
   if (!ref) return <div className="p-6 text-sm text-muted-foreground">{t("notFound")}</div>;
@@ -28,7 +28,7 @@ export function RefereeDetail({ refereeId }: Props) {
       <div className="p-4 border-b flex justify-between items-start">
         <div>
           <h2 className="text-xl font-semibold">{ref.lastName}, {ref.firstName}</h2>
-          <div className="text-xs text-muted-foreground">Lic {ref.licenseNumber ?? "—"} · API {ref.apiId} · {ref.roles.join(", ")}</div>
+          <div className="text-xs text-muted-foreground">Lic {ref.licenseNumber ?? "—"} · API {ref.apiId}</div>
         </div>
         {ref.isOwnClub && <Badge variant="secondary">{t("ownClubBadge")}</Badge>}
       </div>
