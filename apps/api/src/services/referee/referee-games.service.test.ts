@@ -333,6 +333,47 @@ describe("computeMySlot", () => {
   });
 });
 
+describe("getRefereeGames new filters", () => {
+  it("filters by gameType=home", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0, gameType: "home" });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(JSON.stringify(whereArg)).toMatch(/isHomeGame|is_home_game/i);
+  });
+
+  it("filters by gameType=away", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0, gameType: "away" });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(JSON.stringify(whereArg)).toMatch(/isGuestGame|is_guest_game/i);
+  });
+
+  it("filters by assignedRefereeApiId across both slots", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0, assignedRefereeApiId: 12345 });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(JSON.stringify(whereArg)).toMatch(/sr1RefereeApiId|sr2RefereeApiId/i);
+  });
+});
+
 describe("getRefereeGameById", () => {
   function buildSingleRowChain(result: unknown) {
     const chain: Record<string, unknown> = {};

@@ -69,10 +69,12 @@ interface GetRefereeGamesParams {
   league?: string;
   dateFrom?: string;
   dateTo?: string;
+  gameType?: "home" | "away" | "both";
+  assignedRefereeApiId?: number;
 }
 
 export async function getRefereeGames(params: GetRefereeGamesParams) {
-  const { limit, offset, search, status, league, dateFrom, dateTo } = params;
+  const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId } = params;
   const conditions = [];
 
   // Status
@@ -85,6 +87,11 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
 
   // League
   if (league) conditions.push(eq(refereeGames.leagueShort, league));
+
+  // Game type
+  if (gameType === "home") conditions.push(eq(refereeGames.isHomeGame, true));
+  else if (gameType === "away") conditions.push(eq(refereeGames.isGuestGame, true));
+  // "both" or undefined: no filter
 
   // Date range
   if (dateFrom) conditions.push(gte(refereeGames.kickoffDate, dateFrom));
@@ -101,6 +108,14 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
         ilike(refereeGames.leagueName, pattern),
       )!);
     }
+  }
+
+  // Assigned referee
+  if (assignedRefereeApiId != null) {
+    conditions.push(or(
+      eq(refereeGames.sr1RefereeApiId, assignedRefereeApiId),
+      eq(refereeGames.sr2RefereeApiId, assignedRefereeApiId),
+    )!);
   }
 
   const whereClause = conditions.length > 0
