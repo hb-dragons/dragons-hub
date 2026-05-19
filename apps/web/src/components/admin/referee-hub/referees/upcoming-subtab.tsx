@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
 import { apiFetcher } from "@/lib/swr";
@@ -11,27 +10,32 @@ interface Props {
   referee: RefereeListItem;
 }
 
-interface ApiResp {
+interface AssignedResp {
+  items: RefereeGameListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+interface EligibleResp {
   items: RefereeGameListItem[];
 }
 
 export function UpcomingSubtab({ referee }: Props) {
   const t = useTranslations() as (key: string) => string;
-  const { data } = useSWR<ApiResp>(SWR_KEYS.refereeGames, apiFetcher);
-  const items = data?.items ?? [];
 
-  const { assigned, eligibleOpen } = useMemo(() => {
-    const assigned = items.filter((g) =>
-      g.sr1RefereeApiId === referee.apiId || g.sr2RefereeApiId === referee.apiId,
-    );
-    const eligibleOpen = items.filter((g) =>
-      (g.sr1Status === "open" || g.sr2Status === "open") &&
-      (g.sr1OurClub || g.sr2OurClub) &&
-      !g.isCancelled &&
-      !g.isForfeited,
-    );
-    return { assigned, eligibleOpen };
-  }, [items, referee.apiId]);
+  const { data: assignedData } = useSWR<AssignedResp>(
+    SWR_KEYS.refereeGamesFiltered({ assignedRefereeApiId: referee.apiId, status: "active", limit: 100 }),
+    apiFetcher,
+  );
+  const { data: eligibleData } = useSWR<EligibleResp>(
+    SWR_KEYS.refereeEligibleGames(referee.id),
+    apiFetcher,
+  );
+
+  const assigned = assignedData?.items ?? [];
+  const eligible = eligibleData?.items ?? [];
 
   return (
     <div className="p-4 space-y-6">
@@ -48,12 +52,12 @@ export function UpcomingSubtab({ referee }: Props) {
       </Section>
       <Section
         title={t("refereeHub.referees.upcoming.eligibleOpen")}
-        count={eligibleOpen.length}
+        count={eligible.length}
       >
-        {eligibleOpen.map((g) => (
+        {eligible.map((g) => (
           <Row key={g.apiMatchId} game={g} />
         ))}
-        {eligibleOpen.length === 0 && (
+        {eligible.length === 0 && (
           <Empty text={t("refereeHub.referees.upcoming.eligibleOpenEmpty")} />
         )}
       </Section>
