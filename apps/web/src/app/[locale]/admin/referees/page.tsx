@@ -4,6 +4,7 @@ import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
 import { fetchAPIServer } from "@/lib/api.server";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { todayInBerlin, plusDaysInBerlin } from "@/lib/tz";
 import { RefereeHubPage } from "@/components/admin/referee-hub/referee-hub";
 
 export default async function RefereesPage() {
@@ -14,32 +15,8 @@ export default async function RefereesPage() {
 
   const refereesKey = SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 });
 
-  // Europe/Berlin is the canonical timezone for this German basketball admin tool.
-  function todayInTz(tz: string): string {
-    const fmt = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    return fmt.format(new Date()); // "YYYY-MM-DD"
-  }
-
-  function plusDaysInTz(tz: string, days: number): string {
-    const fmt = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    return fmt.format(d);
-  }
-
-  const TZ = "Europe/Berlin";
-  const today = todayInTz(TZ);
-  const to = plusDaysInTz(TZ, 14);
+  const today = todayInBerlin();
+  const to = plusDaysInBerlin(14);
 
   const gamesKey = SWR_KEYS.refereeGamesFiltered({
     status: "active",

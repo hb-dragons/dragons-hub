@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { Label } from "@dragons/ui/components/label";
 import { Checkbox } from "@dragons/ui/components/checkbox";
 import { Button } from "@dragons/ui/components/button";
+import { todayInBerlin, plusDaysInBerlin } from "@/lib/tz";
 import type { HubFilters } from "../use-referee-hub-url";
 
 interface LeagueOption {
@@ -138,14 +139,11 @@ export function SlotsFilterSidebar({ filters, onChange, leagueOptions }: Props) 
 }
 
 function matchesPreset(f: HubFilters, preset: "14d" | "30d" | "season" | "custom"): boolean {
-  const today = new Date().toISOString().slice(0, 10);
   if (preset === "14d") {
-    const to = new Date(); to.setDate(to.getDate() + 14);
-    return f.dateFrom === today && f.dateTo === to.toISOString().slice(0, 10);
+    return f.dateFrom === todayInBerlin() && f.dateTo === plusDaysInBerlin(14);
   }
   if (preset === "30d") {
-    const to = new Date(); to.setDate(to.getDate() + 30);
-    return f.dateFrom === today && f.dateTo === to.toISOString().slice(0, 10);
+    return f.dateFrom === todayInBerlin() && f.dateTo === plusDaysInBerlin(30);
   }
   if (preset === "season") {
     return f.dateFrom === null && f.dateTo === null;
@@ -155,20 +153,17 @@ function matchesPreset(f: HubFilters, preset: "14d" | "30d" | "season" | "custom
 }
 
 function applyPreset(preset: "14d" | "30d" | "season" | "custom"): Partial<HubFilters> {
-  const today = new Date().toISOString().slice(0, 10);
   if (preset === "14d") {
-    const to = new Date(); to.setDate(to.getDate() + 14);
-    return { dateFrom: today, dateTo: to.toISOString().slice(0, 10) };
+    return { dateFrom: todayInBerlin(), dateTo: plusDaysInBerlin(14) };
   }
   if (preset === "30d") {
-    const to = new Date(); to.setDate(to.getDate() + 30);
-    return { dateFrom: today, dateTo: to.toISOString().slice(0, 10) };
+    return { dateFrom: todayInBerlin(), dateTo: plusDaysInBerlin(30) };
   }
   if (preset === "season") {
     return { dateFrom: null, dateTo: null };
   }
   // custom — keep existing dates or initialize to today
-  return { dateFrom: today, dateTo: today };
+  return { dateFrom: todayInBerlin(), dateTo: todayInBerlin() };
 }
 
 // Re-export pure helpers for testing
