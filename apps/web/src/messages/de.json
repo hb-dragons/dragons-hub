@@ -1353,6 +1353,7 @@
       "history": {
         "total": "{n} Spiele",
         "exportCsv": "CSV-Export",
+        "loadMore": "Mehr laden",
         "empty": "Keine Spielhistorie im gewählten Zeitraum",
         "statusPlayed": "Gespielt",
         "statusCancelled": "Abgesagt",

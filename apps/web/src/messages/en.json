@@ -1353,6 +1353,7 @@
       "history": {
         "total": "{n} games",
         "exportCsv": "Export CSV",
+        "loadMore": "Load more",
         "empty": "No history in selected range",
         "statusPlayed": "Played",
         "statusCancelled": "Cancelled",
