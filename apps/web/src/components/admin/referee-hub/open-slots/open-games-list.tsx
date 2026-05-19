@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { FixedSizeList as List, type ListChildComponentProps } from "react-window";
 import { useTranslations } from "next-intl";
@@ -33,13 +33,26 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
   const t = useTranslations("refereeHub.openSlots");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [height, setHeight] = useState(400);
 
-  // Map our status to server's expected status param
-  const serverStatus =
-    filters.status === "any" ? "all" : "active";
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setHeight(el.clientHeight));
+    ro.observe(el);
+    setHeight(el.clientHeight);
+    return () => ro.disconnect();
+  }, []);
+
+  const slotStatus =
+    filters.status === "open" ? "open" :
+    filters.status === "offered" ? "offered" :
+    undefined; // "any" → no slotStatus, server returns everything active
 
   const key = SWR_KEYS.refereeGamesFiltered({
-    status: serverStatus,
+    status: "active",
+    slotStatus,
     league: filters.league,
     dateFrom: filters.dateFrom ?? undefined,
     dateTo: filters.dateTo ?? undefined,
@@ -53,12 +66,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
     dedupingInterval: 5000,
   });
 
-  // Client-side post-filter for slot-level open/offered distinction
-  const rows = (data?.items ?? []).filter((g) => {
-    if (filters.status === "open") return g.sr1Status === "open" || g.sr2Status === "open";
-    if (filters.status === "offered") return g.sr1Status === "offered" || g.sr2Status === "offered" || g.sr1Status === "open" || g.sr2Status === "open";
-    return true;
-  });
+  const rows = data?.items ?? [];
 
   const Row = ({ index, style }: ListChildComponentProps) => {
     const g = rows[index]!;
@@ -96,7 +104,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
           aria-label={t("searchPlaceholder")}
         />
       </div>
-      <div className="flex-1 min-h-0">
+      <div ref={containerRef} className="flex-1 min-h-0">
         {error && <div className="p-4 text-sm text-destructive">{t("loadError")}</div>}
         {isLoading && !data && <div className="p-4 text-sm text-muted-foreground">{t("loading")}</div>}
         {!isLoading && rows.length === 0 && (
@@ -104,7 +112,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
         )}
         {rows.length > 0 && (
           <List
-            height={600}
+            height={height}
             itemCount={rows.length}
             itemSize={ROW_HEIGHT}
             width="100%"

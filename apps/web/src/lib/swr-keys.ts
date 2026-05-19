@@ -67,6 +67,7 @@ export const SWR_KEYS = {
   channelConfigProviders: "/admin/channel-configs/providers",
   refereeGamesFiltered: (opts: {
     status?: "active" | "all";
+    slotStatus?: "open" | "offered" | "any";
     league?: string[];
     dateFrom?: string;
     dateTo?: string;
@@ -80,6 +81,7 @@ export const SWR_KEYS = {
     qs.set("status", opts.status ?? "active");
     qs.set("limit", String(opts.limit ?? 100));
     qs.set("offset", String(opts.offset ?? 0));
+    if (opts.slotStatus) qs.set("slotStatus", opts.slotStatus);
     if (opts.gameType) qs.set("gameType", opts.gameType);
     if (opts.dateFrom) qs.set("dateFrom", opts.dateFrom);
     if (opts.dateTo) qs.set("dateTo", opts.dateTo);
