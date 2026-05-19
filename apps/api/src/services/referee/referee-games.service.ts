@@ -71,10 +71,11 @@ interface GetRefereeGamesParams {
   dateTo?: string;
   gameType?: "home" | "away" | "both";
   assignedRefereeApiId?: number;
+  slotStatus?: "open" | "offered" | "any";
 }
 
 export async function getRefereeGames(params: GetRefereeGamesParams) {
-  const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId } = params;
+  const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId, slotStatus } = params;
   const conditions = [];
 
   // Status
@@ -121,6 +122,23 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
       eq(refereeGames.sr2RefereeApiId, assignedRefereeApiId),
     )!);
   }
+
+  // Slot status
+  if (slotStatus === "open") {
+    conditions.push(
+      or(eq(refereeGames.sr1Status, "open"), eq(refereeGames.sr2Status, "open"))!,
+    );
+  } else if (slotStatus === "offered") {
+    conditions.push(
+      or(
+        eq(refereeGames.sr1Status, "open"),
+        eq(refereeGames.sr2Status, "open"),
+        eq(refereeGames.sr1Status, "offered"),
+        eq(refereeGames.sr2Status, "offered"),
+      )!,
+    );
+  }
+  // slotStatus === "any" or undefined: no extra clause
 
   const whereClause = conditions.length > 0
     ? conditions.length === 1 ? conditions[0]! : and(...conditions)!
