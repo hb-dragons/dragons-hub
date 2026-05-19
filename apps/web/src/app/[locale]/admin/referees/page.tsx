@@ -13,12 +13,36 @@ export default async function RefereesPage() {
   const fallback: Record<string, unknown> = {};
 
   const refereesKey = SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 });
-  const today = new Date().toISOString().slice(0, 10);
-  const to = new Date(); to.setDate(to.getDate() + 14);
+
+  // Europe/Berlin is the canonical timezone for this German basketball admin tool.
+  function todayInTz(tz: string): string {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return fmt.format(new Date()); // "YYYY-MM-DD"
+  }
+
+  function plusDaysInTz(tz: string, days: number): string {
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    return fmt.format(new Date(Date.now() + days * 86400_000));
+  }
+
+  const TZ = "Europe/Berlin";
+  const today = todayInTz(TZ);
+  const to = plusDaysInTz(TZ, 14);
+
   const gamesKey = SWR_KEYS.refereeGamesFiltered({
     status: "active",
     dateFrom: today,
-    dateTo: to.toISOString().slice(0, 10),
+    dateTo: to,
     gameType: "both",
     limit: 200,
   });
