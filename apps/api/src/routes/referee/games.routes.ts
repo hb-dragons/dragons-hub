@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import type { AppEnv } from "../../types";
 import { requireRefereeSelfOrPermission } from "../../middleware/rbac";
 import {
@@ -7,6 +8,22 @@ import {
   getVisibleRefereeGameByMatchId,
   getVisibleRefereeGameByApiMatchId,
 } from "../../services/referee/referee-game-visibility.service";
+
+const gamesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  offset: z.coerce.number().int().min(0).default(0),
+  search: z.string().min(1).optional(),
+  status: z.enum(["active", "cancelled", "forfeited", "all"]).default("active"),
+  league: z
+    .string()
+    .optional()
+    .transform((s) => (s ? s.split(",").map((x) => x.trim()).filter(Boolean) : undefined)),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  gameType: z.enum(["home", "away", "both"]).optional(),
+  assignedRefereeApiId: z.coerce.number().int().positive().optional(),
+  slotStatus: z.enum(["open", "offered", "any"]).optional(),
+});
 
 const refereeGamesRoutes = new Hono<AppEnv>();
 
@@ -17,22 +34,26 @@ const refereeGamesRoutes = new Hono<AppEnv>();
 const gate = requireRefereeSelfOrPermission("assignment", "view");
 
 refereeGamesRoutes.get("/games", gate, async (c) => {
-  const limit = Math.min(Number(c.req.query("limit") || 100), 500);
-  const offset = Number(c.req.query("offset") || 0);
-  const search = c.req.query("search") || undefined;
-  const status = (c.req.query("status") || "active") as "active" | "cancelled" | "forfeited" | "all";
-  const leagueRaw = c.req.query("league");
-  const league = leagueRaw ? leagueRaw.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
-  const dateFrom = c.req.query("dateFrom") || undefined;
-  const dateTo = c.req.query("dateTo") || undefined;
-
-  const gameType = c.req.query("gameType") as "home" | "away" | "both" | undefined;
-  const assignedRefereeApiIdRaw = c.req.query("assignedRefereeApiId");
-  const assignedRefereeApiId = assignedRefereeApiIdRaw ? Number(assignedRefereeApiIdRaw) : undefined;
-
+  const parsed = gamesQuerySchema.safeParse({
+    limit: c.req.query("limit"),
+    offset: c.req.query("offset"),
+    search: c.req.query("search"),
+    status: c.req.query("status"),
+    league: c.req.query("league"),
+    dateFrom: c.req.query("dateFrom"),
+    dateTo: c.req.query("dateTo"),
+    gameType: c.req.query("gameType"),
+    assignedRefereeApiId: c.req.query("assignedRefereeApiId"),
+    slotStatus: c.req.query("slotStatus"),
+  });
+  if (!parsed.success) {
+    return c.json(
+      { error: "Invalid query parameters", code: "VALIDATION_ERROR", issues: parsed.error.flatten() },
+      400,
+    );
+  }
   const refereeId = c.get("refereeId") ?? null;
-  const params = { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId };
-  const result = await getVisibleRefereeGames(refereeId, params);
+  const result = await getVisibleRefereeGames(refereeId, parsed.data);
   return c.json(result);
 });
 

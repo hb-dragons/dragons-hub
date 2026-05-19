@@ -36,6 +36,7 @@ interface GetVisibleRefereeGamesParams {
   dateTo?: string;
   gameType?: "home" | "away" | "both";
   assignedRefereeApiId?: number;
+  slotStatus?: "open" | "offered" | "any";
 }
 
 export async function getVisibleRefereeGames(
@@ -48,7 +49,7 @@ export async function getVisibleRefereeGames(
   offset: number;
   hasMore: boolean;
 }> {
-  const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId } = params;
+  const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId, slotStatus } = params;
 
   if (refereeId === null) {
     const openOurClubSlot = or(
@@ -81,6 +82,22 @@ export async function getVisibleRefereeGames(
         eq(refereeGames.sr2RefereeApiId, assignedRefereeApiId),
       )!);
     }
+
+    if (slotStatus === "open") {
+      conditions.push(
+        or(eq(refereeGames.sr1Status, "open"), eq(refereeGames.sr2Status, "open"))!,
+      );
+    } else if (slotStatus === "offered") {
+      conditions.push(
+        or(
+          eq(refereeGames.sr1Status, "open"),
+          eq(refereeGames.sr2Status, "open"),
+          eq(refereeGames.sr1Status, "offered"),
+          eq(refereeGames.sr2Status, "offered"),
+        )!,
+      );
+    }
+    // slotStatus === "any" or undefined: no extra clause
 
     if (search) {
       const words = search.split(/\s+/).filter(Boolean);
@@ -239,6 +256,23 @@ export async function getVisibleRefereeGames(
       eq(refereeGames.sr2RefereeApiId, assignedRefereeApiId),
     )!);
   }
+
+  // Slot status
+  if (slotStatus === "open") {
+    conditions.push(
+      or(eq(refereeGames.sr1Status, "open"), eq(refereeGames.sr2Status, "open"))!,
+    );
+  } else if (slotStatus === "offered") {
+    conditions.push(
+      or(
+        eq(refereeGames.sr1Status, "open"),
+        eq(refereeGames.sr2Status, "open"),
+        eq(refereeGames.sr1Status, "offered"),
+        eq(refereeGames.sr2Status, "offered"),
+      )!,
+    );
+  }
+  // slotStatus === "any" or undefined: no extra clause
 
   const whereClause = and(...conditions)!;
 

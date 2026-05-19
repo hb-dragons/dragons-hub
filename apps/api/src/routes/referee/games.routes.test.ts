@@ -73,6 +73,7 @@ describe("GET /games", () => {
       dateTo: undefined,
       gameType: undefined,
       assignedRefereeApiId: undefined,
+      slotStatus: undefined,
     });
   });
 
@@ -115,18 +116,14 @@ describe("GET /games", () => {
       dateTo: "2026-05-31",
       gameType: undefined,
       assignedRefereeApiId: undefined,
+      slotStatus: undefined,
     });
   });
 
-  it("caps limit at 500", async () => {
-    mocks.getVisibleRefereeGames.mockResolvedValue({ items: [], total: 0 });
-
-    await app.request("/games?limit=9999");
-
-    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
-      42,
-      expect.objectContaining({ limit: 500 }),
-    );
+  it("rejects limit > 500 with 400", async () => {
+    const res = await app.request("/games?limit=9999");
+    expect(res.status).toBe(400);
+    expect(mocks.getVisibleRefereeGames).not.toHaveBeenCalled();
   });
 
   it("defaults status to 'active'", async () => {
@@ -343,6 +340,48 @@ describe("GET /referee/games new query params", () => {
     expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ assignedRefereeApiId: 12345 }),
+    );
+  });
+});
+
+describe("GET /games Zod query validation", () => {
+  it("rejects gameType outside enum with 400", async () => {
+    const res = await app.request("/games?gameType=invalid", { method: "GET" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("rejects slotStatus outside enum with 400", async () => {
+    const res = await app.request("/games?slotStatus=bogus", { method: "GET" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("rejects limit=9999 with 400 and VALIDATION_ERROR code", async () => {
+    const res = await app.request("/games?limit=9999", { method: "GET" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("accepts default values and returns 200", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValueOnce({
+      items: [], total: 0, limit: 100, offset: 0, hasMore: false,
+    });
+    const res = await app.request("/games", { method: "GET" });
+    expect(res.status).toBe(200);
+  });
+
+  it("propagates slotStatus to the service", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValueOnce({
+      items: [], total: 0, limit: 100, offset: 0, hasMore: false,
+    });
+    await app.request("/games?slotStatus=offered", { method: "GET" });
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ slotStatus: "offered" }),
     );
   });
 });
