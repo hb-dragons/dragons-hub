@@ -132,6 +132,7 @@ export type {
   RefereeCountsResponse,
   UpdateRefereeRulesBody,
   UpdateRefereeVisibilityBody,
+  EligibleOpenGamesResponse,
 } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";

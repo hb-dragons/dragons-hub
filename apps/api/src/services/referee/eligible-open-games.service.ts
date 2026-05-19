@@ -1,11 +1,7 @@
 import { getRefereeGames } from "./referee-games.service";
 import { searchCandidates } from "./referee-assignment.service";
 import { isRefereeEligibleForGame } from "./referee-slot-resolver";
-import type { RefereeGameListItem } from "@dragons/shared";
-
-export interface EligibleOpenGamesResponse {
-  items: RefereeGameListItem[];
-}
+import type { EligibleOpenGamesResponse, RefereeGameListItem } from "@dragons/shared";
 
 /**
  * Returns open games this referee is eligible to take (matching the candidate-picker

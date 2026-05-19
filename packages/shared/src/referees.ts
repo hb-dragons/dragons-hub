@@ -1,3 +1,5 @@
+import type { RefereeGameListItem } from "./referee-games";
+
 export interface RefereeListItem {
   id: number;
   apiId: number;
@@ -43,4 +45,8 @@ export interface UpdateRefereeRulesBody {
 export interface RefereeCountsResponse {
   own: number;
   all: number;
+}
+
+export interface EligibleOpenGamesResponse {
+  items: RefereeGameListItem[];
 }
