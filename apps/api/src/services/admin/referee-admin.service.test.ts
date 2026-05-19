@@ -60,6 +60,7 @@ vi.mock("drizzle-orm", () => ({
 
 import {
   getReferees,
+  getRefereeById,
   getRefereeCounts,
   updateRefereeVisibility,
   updateRefereeRules,
@@ -256,6 +257,41 @@ describe("getReferees scope + sort", () => {
     const result = await getReferees({ limit: 10, offset: 0, scope: "all" });
 
     expect(result.total).toBe(0);
+  });
+});
+
+describe("getRefereeById", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns a single RefereeListItem when present", async () => {
+    const row = {
+      id: 1,
+      apiId: 100,
+      firstName: "A",
+      lastName: "Z",
+      licenseNumber: 1,
+      allowAllHomeGames: false,
+      allowAwayGames: false,
+      isOwnClub: true,
+      matchCount: 5,
+      createdAt: makeDate("2025-01-01T00:00:00.000Z"),
+      updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
+    };
+
+    mockSelect.mockReturnValueOnce(buildChain([row]));
+
+    const ref = await getRefereeById(1);
+    expect(ref).toMatchObject({ id: 1 });
+    expect(ref).not.toHaveProperty("roles");
+  });
+
+  it("returns null when no row matches", async () => {
+    mockSelect.mockReturnValueOnce(buildChain([]));
+
+    const ref = await getRefereeById(999_999);
+    expect(ref).toBeNull();
   });
 });
 

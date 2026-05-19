@@ -22,8 +22,8 @@ export class RefereeSettingsError extends Error {
   }
 }
 
-export type RefereeScope = "own" | "all";
-export type RefereeSort = "name" | "workloadAsc" | "workloadDesc";
+type RefereeScope = "own" | "all";
+type RefereeSort = "name" | "workloadAsc" | "workloadDesc";
 
 export interface RefereeListParams {
   limit: number;
@@ -103,6 +103,44 @@ export async function getReferees(
   }));
 
   return { items, total, limit, offset, hasMore: offset + items.length < total };
+}
+
+export async function getRefereeById(refereeId: number): Promise<RefereeListItem | null> {
+  const matchCountExpr = sql<number>`count(distinct ${matchReferees.matchId})::int`.as("match_count");
+
+  const [row] = await db
+    .select({
+      id: referees.id,
+      apiId: referees.apiId,
+      firstName: referees.firstName,
+      lastName: referees.lastName,
+      licenseNumber: referees.licenseNumber,
+      allowAllHomeGames: referees.allowAllHomeGames,
+      allowAwayGames: referees.allowAwayGames,
+      isOwnClub: referees.isOwnClub,
+      matchCount: matchCountExpr,
+      createdAt: referees.createdAt,
+      updatedAt: referees.updatedAt,
+    })
+    .from(referees)
+    .leftJoin(matchReferees, eq(matchReferees.refereeId, referees.id))
+    .where(eq(referees.id, refereeId))
+    .groupBy(referees.id);
+
+  if (!row) return null;
+  return {
+    id: row.id,
+    apiId: row.apiId,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    licenseNumber: row.licenseNumber,
+    allowAllHomeGames: row.allowAllHomeGames,
+    allowAwayGames: row.allowAwayGames,
+    isOwnClub: row.isOwnClub,
+    matchCount: row.matchCount,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
 export async function getRefereeCounts(): Promise<RefereeCountsResponse> {
