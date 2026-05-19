@@ -19,7 +19,7 @@ export function OpenSlotsTab() {
     apiFetcher,
   );
   const leagueOptions = (leagueData?.leagues ?? []).map((l) => ({
-    value: String(l.ligaNr),
+    value: String(l.apiLigaId),
     label: l.name,
   }));
 

@@ -20,7 +20,8 @@ refereeGamesRoutes.get("/games", gate, async (c) => {
   const offset = Number(c.req.query("offset") || 0);
   const search = c.req.query("search") || undefined;
   const status = (c.req.query("status") || "active") as "active" | "cancelled" | "forfeited" | "all";
-  const league = c.req.query("league") || undefined;
+  const leagueRaw = c.req.query("league");
+  const league = leagueRaw ? leagueRaw.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
   const dateFrom = c.req.query("dateFrom") || undefined;
   const dateTo = c.req.query("dateTo") || undefined;
 

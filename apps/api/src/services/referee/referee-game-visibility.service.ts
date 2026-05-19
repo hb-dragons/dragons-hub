@@ -31,7 +31,7 @@ interface GetVisibleRefereeGamesParams {
   offset: number;
   search?: string;
   status?: "active" | "cancelled" | "forfeited" | "all";
-  league?: string;
+  league?: string[];
   dateFrom?: string;
   dateTo?: string;
   gameType?: "home" | "away" | "both";
@@ -64,7 +64,11 @@ export async function getVisibleRefereeGames(
       conditions.push(eq(refereeGames.isForfeited, false));
     }
 
-    if (league) conditions.push(eq(refereeGames.leagueShort, league));
+    if (league && league.length > 0) {
+      const leagueIds = league.map(Number).filter((n) => !Number.isNaN(n));
+      if (leagueIds.length === 1) conditions.push(eq(refereeGames.leagueApiId, leagueIds[0]!));
+      else if (leagueIds.length > 1) conditions.push(inArray(refereeGames.leagueApiId, leagueIds));
+    }
     if (dateFrom) conditions.push(gte(refereeGames.kickoffDate, dateFrom));
     if (dateTo) conditions.push(lte(refereeGames.kickoffDate, dateTo));
 
@@ -201,7 +205,11 @@ export async function getVisibleRefereeGames(
   }
 
   // League
-  if (league) conditions.push(eq(refereeGames.leagueShort, league));
+  if (league && league.length > 0) {
+    const leagueIds = league.map(Number).filter((n) => !Number.isNaN(n));
+    if (leagueIds.length === 1) conditions.push(eq(refereeGames.leagueApiId, leagueIds[0]!));
+    else if (leagueIds.length > 1) conditions.push(inArray(refereeGames.leagueApiId, leagueIds));
+  }
 
   // Date range
   if (dateFrom) conditions.push(gte(refereeGames.kickoffDate, dateFrom));

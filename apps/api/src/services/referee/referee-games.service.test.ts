@@ -22,6 +22,7 @@ vi.mock("@dragons/db/schema", () => ({
     guestTeamName: "rg.guestTeamName",
     leagueName: "rg.leagueName",
     leagueShort: "rg.leagueShort",
+    leagueApiId: "rg.leagueApiId",
     venueName: "rg.venueName",
     venueCity: "rg.venueCity",
     sr1OurClub: "rg.sr1OurClub",
@@ -48,6 +49,7 @@ vi.mock("drizzle-orm", () => ({
   lte: vi.fn((...args: unknown[]) => ({ lte: args })),
   ilike: vi.fn((...args: unknown[]) => ({ ilike: args })),
   asc: vi.fn((...args: unknown[]) => ({ asc: args })),
+  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
   sql: Object.assign(
     vi.fn((...args: unknown[]) => ({ sql: args, as: vi.fn().mockReturnValue("sql_aliased") })),
     { raw: vi.fn((s: string) => ({ raw: s })) },
@@ -170,16 +172,30 @@ describe("getRefereeGames", () => {
     expect(result.items[0]?.isCancelled).toBe(true);
   });
 
-  it("filters by league", async () => {
-    const row = makeGameRow({ leagueShort: "BL" });
+  it("filters by league (single)", async () => {
+    const row = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
     mockSelect
       .mockReturnValueOnce(buildChain([row]))
       .mockReturnValueOnce(buildChain([{ count: 1 }]));
 
-    const result = await getRefereeGames({ limit: 20, offset: 0, league: "BL" });
+    const result = await getRefereeGames({ limit: 20, offset: 0, league: ["101"] });
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.leagueShort).toBe("BL");
+  });
+
+  it("filters by league (multiple, uses inArray)", async () => {
+    const { inArray: mockInArray } = await import("drizzle-orm");
+    const row1 = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
+    const row2 = makeGameRow({ id: 2, leagueShort: "OL", leagueApiId: 202 });
+    mockSelect
+      .mockReturnValueOnce(buildChain([row1, row2]))
+      .mockReturnValueOnce(buildChain([{ count: 2 }]));
+
+    const result = await getRefereeGames({ limit: 20, offset: 0, league: ["101", "202"] });
+
+    expect(result.items).toHaveLength(2);
+    expect(mockInArray).toHaveBeenCalled();
   });
 
   it("search matches team names", async () => {

@@ -74,6 +74,28 @@ describe("GET /games", () => {
     });
   });
 
+  it("splits comma-separated league param into an array", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValue({ items: [], total: 0 });
+
+    await app.request("/games?league=101,202,303");
+
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ league: ["101", "202", "303"] }),
+    );
+  });
+
+  it("passes single league as a one-element array", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValue({ items: [], total: 0 });
+
+    await app.request("/games?league=101");
+
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ league: ["101"] }),
+    );
+  });
+
   it("passes query params to getVisibleRefereeGames", async () => {
     mocks.getVisibleRefereeGames.mockResolvedValue({ items: [], total: 0 });
 
@@ -86,7 +108,7 @@ describe("GET /games", () => {
       offset: 5,
       search: "Berlin",
       status: "all",
-      league: "BBL",
+      league: ["BBL"],
       dateFrom: "2026-03-01",
       dateTo: "2026-05-31",
       gameType: undefined,

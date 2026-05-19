@@ -28,6 +28,7 @@ vi.mock("@dragons/db/schema", () => ({
     guestTeamName: "rg.guestTeamName",
     leagueName: "rg.leagueName",
     leagueShort: "rg.leagueShort",
+    leagueApiId: "rg.leagueApiId",
     venueName: "rg.venueName",
     venueCity: "rg.venueCity",
     sr1OurClub: "rg.sr1OurClub",
@@ -410,8 +411,8 @@ describe("getVisibleRefereeGames", () => {
     expect(result.items[0]?.homeTeamName).toBe("Dragons U16");
   });
 
-  it("applies league filter on top of visibility", async () => {
-    const row = makeGameRow({ leagueShort: "BL" });
+  it("applies league filter on top of visibility (single)", async () => {
+    const row = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
     setupMocks(
       { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
@@ -421,11 +422,29 @@ describe("getVisibleRefereeGames", () => {
 
     const result = await getVisibleRefereeGames(1, {
       ...defaultParams,
-      league: "BL",
+      league: ["101"],
     });
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.leagueShort).toBe("BL");
+  });
+
+  it("applies league filter on top of visibility (multiple)", async () => {
+    const row1 = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
+    const row2 = makeGameRow({ id: 2, leagueShort: "OL", leagueApiId: 202 });
+    setupMocks(
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
+      [],
+      [row1, row2],
+      2,
+    );
+
+    const result = await getVisibleRefereeGames(1, {
+      ...defaultParams,
+      league: ["101", "202"],
+    });
+
+    expect(result.items).toHaveLength(2);
   });
 
   it("applies date range filters", async () => {
@@ -772,7 +791,7 @@ describe("getVisibleRefereeGames (admin mode)", () => {
       limit: 10,
       offset: 0,
       status: "cancelled",
-      league: "KLN",
+      league: ["KLN"],
       dateFrom: "2026-04-01",
       dateTo: "2026-04-30",
       search: "Dragons Berlin",

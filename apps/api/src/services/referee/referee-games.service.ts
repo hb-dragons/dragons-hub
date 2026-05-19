@@ -1,6 +1,6 @@
 import { db } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
-import { and, eq, gte, lte, or, ilike, sql, asc } from "drizzle-orm";
+import { and, eq, gte, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
 
 const isTrackedLeagueExpr = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
@@ -66,7 +66,7 @@ interface GetRefereeGamesParams {
   offset: number;
   search?: string;
   status?: "active" | "cancelled" | "forfeited" | "all";
-  league?: string;
+  league?: string[];
   dateFrom?: string;
   dateTo?: string;
   gameType?: "home" | "away" | "both";
@@ -86,7 +86,11 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
   }
 
   // League
-  if (league) conditions.push(eq(refereeGames.leagueShort, league));
+  if (league && league.length > 0) {
+    const leagueIds = league.map(Number).filter((n) => !Number.isNaN(n));
+    if (leagueIds.length === 1) conditions.push(eq(refereeGames.leagueApiId, leagueIds[0]!));
+    else if (leagueIds.length > 1) conditions.push(inArray(refereeGames.leagueApiId, leagueIds));
+  }
 
   // Game type
   if (gameType === "home") conditions.push(eq(refereeGames.isHomeGame, true));
