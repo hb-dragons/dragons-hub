@@ -91,6 +91,17 @@ export function RulesSubtab({ referee }: Props) {
   const saveDisabled = status === "idle" || status === "saving" || status === "saved";
   const secondsAgo = useTimeAgo(lastSavedAt, status === "saved");
 
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers ignore the message but require returnValue or preventDefault.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
