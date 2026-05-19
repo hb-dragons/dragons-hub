@@ -340,6 +340,83 @@ function buildAwayVisibility(
 }
 
 /**
+ * Fetch a single referee game by federation apiMatchId if it matches the referee's visibility.
+ * Returns null when no referee-game exists or the referee cannot see it.
+ */
+export async function getVisibleRefereeGameByApiMatchId(
+  refereeId: number | null,
+  apiMatchId: number,
+): Promise<RefereeGameListItem | null> {
+  if (refereeId === null) {
+    const [row] = await db
+      .select(refereeGameColumns)
+      .from(refereeGames)
+      .where(eq(refereeGames.apiMatchId, apiMatchId))
+      .limit(1);
+    if (!row) return null;
+    return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
+  }
+
+  const [referee] = await db
+    .select({
+      apiId: referees.apiId,
+      allowAllHomeGames: referees.allowAllHomeGames,
+      allowAwayGames: referees.allowAwayGames,
+      isOwnClub: referees.isOwnClub,
+    })
+    .from(referees)
+    .where(eq(referees.id, refereeId));
+
+  if (!referee || !referee.isOwnClub) return null;
+
+  const rules = await db
+    .select({
+      teamId: refereeAssignmentRules.teamId,
+      deny: refereeAssignmentRules.deny,
+      allowSr1: refereeAssignmentRules.allowSr1,
+      allowSr2: refereeAssignmentRules.allowSr2,
+    })
+    .from(refereeAssignmentRules)
+    .where(eq(refereeAssignmentRules.refereeId, refereeId));
+
+  const homeVisibility = buildHomeVisibility(referee, rules);
+  const awayVisibility = buildAwayVisibility(referee);
+
+  const visibilityParts = [homeVisibility, awayVisibility].filter(
+    (p): p is NonNullable<typeof p> => p != null,
+  );
+  const visibilityCondition = visibilityParts.length === 0
+    ? null
+    : visibilityParts.length === 1
+      ? visibilityParts[0]!
+      : or(...visibilityParts)!;
+
+  const assignedToMe = buildAssignedToMe(referee.apiId ?? null);
+
+  const accessParts = [visibilityCondition, assignedToMe].filter(
+    (p): p is NonNullable<typeof p> => p != null,
+  );
+  if (accessParts.length === 0) return null;
+
+  const accessCondition = accessParts.length === 1
+    ? accessParts[0]!
+    : or(...accessParts)!;
+
+  const [row] = await db
+    .select(refereeGameColumns)
+    .from(refereeGames)
+    .where(and(eq(refereeGames.apiMatchId, apiMatchId), accessCondition)!)
+    .limit(1);
+
+  if (!row) return null;
+  return {
+    ...row,
+    mySlot: computeMySlot(row, referee.apiId ?? null),
+    claimableSlots: resolveClaimableSlots(row, referee, rules),
+  } as RefereeGameListItem;
+}
+
+/**
  * Fetch a single referee game by internal match id if it matches the referee's visibility.
  * Returns null when no referee-game exists for the match or the referee cannot see it.
  */

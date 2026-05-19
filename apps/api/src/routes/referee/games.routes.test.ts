@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getVisibleRefereeGames: vi.fn(),
   getVisibleRefereeGameById: vi.fn(),
   getVisibleRefereeGameByMatchId: vi.fn(),
+  getVisibleRefereeGameByApiMatchId: vi.fn(),
   refereeId: 42 as number | undefined,
   allowedByPermission: false,
 }));
@@ -35,6 +36,7 @@ vi.mock("../../services/referee/referee-game-visibility.service", () => ({
   getVisibleRefereeGames: mocks.getVisibleRefereeGames,
   getVisibleRefereeGameById: mocks.getVisibleRefereeGameById,
   getVisibleRefereeGameByMatchId: mocks.getVisibleRefereeGameByMatchId,
+  getVisibleRefereeGameByApiMatchId: mocks.getVisibleRefereeGameByApiMatchId,
 }));
 
 import { refereeGamesRoutes } from "./games.routes";
@@ -272,6 +274,52 @@ describe("GET /matches/:matchId", () => {
 
     expect(res.status).toBe(200);
     expect(mocks.getVisibleRefereeGameByMatchId).toHaveBeenCalledWith(null, 500);
+  });
+});
+
+describe("GET /games/by-api-match/:apiMatchId", () => {
+  it("returns visible row via getVisibleRefereeGameByApiMatchId", async () => {
+    const row = { id: 5, apiMatchId: 4711, matchId: null };
+    mocks.getVisibleRefereeGameByApiMatchId.mockResolvedValue(row);
+
+    const res = await app.request("/games/by-api-match/4711");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(row);
+    expect(mocks.getVisibleRefereeGameByApiMatchId).toHaveBeenCalledWith(42, 4711);
+  });
+
+  it("returns 404 when not found", async () => {
+    mocks.getVisibleRefereeGameByApiMatchId.mockResolvedValue(null);
+
+    const res = await app.request("/games/by-api-match/4711");
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("returns 400 on invalid apiMatchId", async () => {
+    const res = await app.request("/games/by-api-match/abc");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mocks.getVisibleRefereeGameByApiMatchId).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 on non-positive apiMatchId", async () => {
+    const res = await app.request("/games/by-api-match/0");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("admin (no refereeId, has permission) invokes service with refereeId=null", async () => {
+    mocks.refereeId = undefined;
+    mocks.allowedByPermission = true;
+    mocks.getVisibleRefereeGameByApiMatchId.mockResolvedValue({ id: 5, apiMatchId: 4711 });
+
+    const res = await app.request("/games/by-api-match/4711");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getVisibleRefereeGameByApiMatchId).toHaveBeenCalledWith(null, 4711);
   });
 });
 

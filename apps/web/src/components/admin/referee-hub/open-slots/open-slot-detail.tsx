@@ -12,7 +12,7 @@ interface Props {
 
 export function OpenSlotDetail({ selectedGameId }: Props) {
   const t = useTranslations("refereeHub.openSlots");
-  const key = `/referee/matches/${selectedGameId}`;
+  const key = `/referee/games/by-api-match/${selectedGameId}`;
   const { data: game, mutate } = useSWR<RefereeGameListItem>(key, apiFetcher);
 
   if (!game) {

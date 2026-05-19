@@ -5,6 +5,7 @@ import {
   getVisibleRefereeGames,
   getVisibleRefereeGameById,
   getVisibleRefereeGameByMatchId,
+  getVisibleRefereeGameByApiMatchId,
 } from "../../services/referee/referee-game-visibility.service";
 
 const refereeGamesRoutes = new Hono<AppEnv>();
@@ -33,6 +34,18 @@ refereeGamesRoutes.get("/games", gate, async (c) => {
   const params = { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId };
   const result = await getVisibleRefereeGames(refereeId, params);
   return c.json(result);
+});
+
+refereeGamesRoutes.get("/games/by-api-match/:apiMatchId", gate, async (c) => {
+  const apiMatchId = Number(c.req.param("apiMatchId"));
+  if (!Number.isInteger(apiMatchId) || apiMatchId <= 0) {
+    return c.json({ error: "Invalid apiMatchId", code: "VALIDATION_ERROR" }, 400);
+  }
+
+  const refereeId = c.get("refereeId") ?? null;
+  const row = await getVisibleRefereeGameByApiMatchId(refereeId, apiMatchId);
+  if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+  return c.json(row);
 });
 
 refereeGamesRoutes.get("/matches/:matchId", gate, async (c) => {

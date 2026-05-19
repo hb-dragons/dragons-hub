@@ -86,6 +86,7 @@ import {
   getVisibleRefereeGames,
   getVisibleRefereeGameById,
   getVisibleRefereeGameByMatchId,
+  getVisibleRefereeGameByApiMatchId,
 } from "./referee-game-visibility.service";
 
 // --- Helpers ---
@@ -872,6 +873,75 @@ describe("getVisibleRefereeGameByMatchId (admin mode)", () => {
     selectReturnValues.push([]);
 
     const result = await getVisibleRefereeGameByMatchId(null, 999);
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("getVisibleRefereeGameByApiMatchId (admin mode)", () => {
+  it("returns the row without visibility filtering and with null mySlot", async () => {
+    const row = makeGameRow({ id: 5, apiMatchId: 4711 });
+    selectReturnValues.push([row]);
+
+    const result = await getVisibleRefereeGameByApiMatchId(null, 4711);
+
+    expect(result?.id).toBe(5);
+    expect(result?.apiMatchId).toBe(4711);
+    expect(result?.mySlot).toBeNull();
+    expect(result?.claimableSlots).toEqual([]);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null when no row is found", async () => {
+    selectReturnValues.push([]);
+
+    const result = await getVisibleRefereeGameByApiMatchId(null, 99999);
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("getVisibleRefereeGameByApiMatchId (referee mode)", () => {
+  it("returns null when referee not found", async () => {
+    selectReturnValues.push([]);
+
+    const result = await getVisibleRefereeGameByApiMatchId(999, 4711);
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null when referee is not own club", async () => {
+    selectReturnValues.push([
+      { apiId: 9001, allowAllHomeGames: true, allowAwayGames: true, isOwnClub: false },
+    ]);
+
+    const result = await getVisibleRefereeGameByApiMatchId(1, 4711);
+
+    expect(result).toBeNull();
+  });
+
+  it("returns the row when visible by apiMatchId", async () => {
+    const row = makeGameRow({ id: 5, apiMatchId: 4711 });
+    selectReturnValues.push(
+      [{ apiId: 9001, allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }],
+      [],
+      [row],
+    );
+
+    const result = await getVisibleRefereeGameByApiMatchId(1, 4711);
+
+    expect(result?.id).toBe(5);
+    expect(result?.apiMatchId).toBe(4711);
+  });
+
+  it("returns null when row not visible", async () => {
+    selectReturnValues.push(
+      [{ apiId: 9001, allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }],
+      [],
+      [],
+    );
+
+    const result = await getVisibleRefereeGameByApiMatchId(1, 4711);
 
     expect(result).toBeNull();
   });
