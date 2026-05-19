@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { toast } from "sonner";
 import { fetchAPI, APIError } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
 import { CandidatePicker } from "./candidate-picker";
@@ -25,19 +24,19 @@ interface Props {
 export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props) {
   const t = useTranslations("refereeHub.openSlots");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleAssign(refereeApiId: number) {
     setBusy(true);
+    setError(null);
     try {
       await fetchAPI(`/admin/referee/games/${gameApiId}/assign`, {
         method: "POST",
         body: JSON.stringify({ slotNumber, refereeApiId }),
       });
-      toast.success(t("toast.assigned"));
       onChange();
     } catch (err) {
-      const msg = err instanceof APIError ? err.message : t("toast.assignFailed");
-      toast.error(msg);
+      setError(err instanceof APIError ? err.message : err instanceof Error ? err.message : "Assign failed");
     } finally {
       setBusy(false);
     }
@@ -45,15 +44,12 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
 
   async function handleUnassign() {
     setBusy(true);
+    setError(null);
     try {
-      await fetchAPI(`/admin/referee/games/${gameApiId}/assignment/${slotNumber}`, {
-        method: "DELETE",
-      });
-      toast.success(t("toast.unassigned"));
+      await fetchAPI(`/admin/referee/games/${gameApiId}/assignment/${slotNumber}`, { method: "DELETE" });
       onChange();
     } catch (err) {
-      const msg = err instanceof APIError ? err.message : t("toast.unassignFailed");
-      toast.error(msg);
+      setError(err instanceof APIError ? err.message : err instanceof Error ? err.message : "Unassign failed");
     } finally {
       setBusy(false);
     }
@@ -65,23 +61,25 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
     <div className="border rounded-md p-3 space-y-3">
       <div className="flex justify-between items-start">
         <div>
-          <div className="text-xs text-muted-foreground">
-            {t("slot.label", { n: String(slotNumber) })}
-          </div>
+          <div className="text-xs text-muted-foreground">{t("slot.label", { n: String(slotNumber) })}</div>
           {isOpen ? (
-            <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-              {t("slot.open")}
-            </div>
+            <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">{t("slot.open")}</div>
           ) : (
             <div className="text-sm font-semibold">{assignment.refereeName ?? "—"}</div>
           )}
         </div>
         {!isOpen && (
-          <Button variant="outline" size="sm" disabled={busy} onClick={handleUnassign}>
-            {t("slot.unassign")}
-          </Button>
+          <Button variant="outline" size="sm" disabled={busy} onClick={handleUnassign}>{t("slot.unassign")}</Button>
         )}
       </div>
+
+      {error && (
+        <div className="flex items-center justify-between text-xs rounded-md bg-destructive/10 text-destructive px-2 py-1">
+          <span>{error}</span>
+          <Button variant="ghost" size="sm" onClick={() => setError(null)}>{t("errorChip.dismiss")}</Button>
+        </div>
+      )}
+
       {isOpen && (
         <CandidatePicker
           gameApiId={gameApiId}

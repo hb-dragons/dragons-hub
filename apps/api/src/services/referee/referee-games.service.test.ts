@@ -22,6 +22,7 @@ vi.mock("@dragons/db/schema", () => ({
     guestTeamName: "rg.guestTeamName",
     leagueName: "rg.leagueName",
     leagueShort: "rg.leagueShort",
+    leagueApiId: "rg.leagueApiId",
     venueName: "rg.venueName",
     venueCity: "rg.venueCity",
     sr1OurClub: "rg.sr1OurClub",
@@ -48,6 +49,7 @@ vi.mock("drizzle-orm", () => ({
   lte: vi.fn((...args: unknown[]) => ({ lte: args })),
   ilike: vi.fn((...args: unknown[]) => ({ ilike: args })),
   asc: vi.fn((...args: unknown[]) => ({ asc: args })),
+  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
   sql: Object.assign(
     vi.fn((...args: unknown[]) => ({ sql: args, as: vi.fn().mockReturnValue("sql_aliased") })),
     { raw: vi.fn((s: string) => ({ raw: s })) },
@@ -170,16 +172,30 @@ describe("getRefereeGames", () => {
     expect(result.items[0]?.isCancelled).toBe(true);
   });
 
-  it("filters by league", async () => {
-    const row = makeGameRow({ leagueShort: "BL" });
+  it("filters by league (single)", async () => {
+    const row = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
     mockSelect
       .mockReturnValueOnce(buildChain([row]))
       .mockReturnValueOnce(buildChain([{ count: 1 }]));
 
-    const result = await getRefereeGames({ limit: 20, offset: 0, league: "BL" });
+    const result = await getRefereeGames({ limit: 20, offset: 0, league: ["101"] });
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.leagueShort).toBe("BL");
+  });
+
+  it("filters by league (multiple, uses inArray)", async () => {
+    const { inArray: mockInArray } = await import("drizzle-orm");
+    const row1 = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
+    const row2 = makeGameRow({ id: 2, leagueShort: "OL", leagueApiId: 202 });
+    mockSelect
+      .mockReturnValueOnce(buildChain([row1, row2]))
+      .mockReturnValueOnce(buildChain([{ count: 2 }]));
+
+    const result = await getRefereeGames({ limit: 20, offset: 0, league: ["101", "202"] });
+
+    expect(result.items).toHaveLength(2);
+    expect(mockInArray).toHaveBeenCalled();
   });
 
   it("search matches team names", async () => {
@@ -305,6 +321,70 @@ describe("getRefereeGames", () => {
 
     expect(result.items).toHaveLength(1);
   });
+
+  it("slotStatus=open adds an or() clause covering sr1Status and sr2Status", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0, slotStatus: "open" });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const serialized = JSON.stringify(whereArg);
+    expect(serialized).toMatch(/sr1Status/i);
+    expect(serialized).toMatch(/sr2Status/i);
+    // The or() clause must reference "open" for both slots
+    expect(serialized).toMatch(/"open"/);
+  });
+
+  it("slotStatus=offered adds an or() clause covering open and offered for both slots", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0, slotStatus: "offered" });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const serialized = JSON.stringify(whereArg);
+    expect(serialized).toMatch(/sr1Status/i);
+    expect(serialized).toMatch(/sr2Status/i);
+    expect(serialized).toMatch(/"open"/);
+    expect(serialized).toMatch(/"offered"/);
+  });
+
+  it("slotStatus=any does not add an sr1Status/sr2Status clause", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0, slotStatus: "any" });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const serialized = JSON.stringify(whereArg);
+    expect(serialized).not.toMatch(/sr1Status/i);
+    expect(serialized).not.toMatch(/sr2Status/i);
+  });
+
+  it("no slotStatus does not add an sr1Status/sr2Status clause", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0 });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const serialized = JSON.stringify(whereArg);
+    expect(serialized).not.toMatch(/sr1Status/i);
+    expect(serialized).not.toMatch(/sr2Status/i);
+  });
 });
 
 describe("computeMySlot", () => {
@@ -330,6 +410,47 @@ describe("computeMySlot", () => {
     expect(
       computeMySlot({ sr1RefereeApiId: 100, sr2RefereeApiId: 200 }, 300),
     ).toBeNull();
+  });
+});
+
+describe("getRefereeGames new filters", () => {
+  it("filters by gameType=home", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0, gameType: "home" });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(JSON.stringify(whereArg)).toMatch(/isHomeGame|is_home_game/i);
+  });
+
+  it("filters by gameType=away", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0, gameType: "away" });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(JSON.stringify(whereArg)).toMatch(/isGuestGame|is_guest_game/i);
+  });
+
+  it("filters by assignedRefereeApiId across both slots", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0, assignedRefereeApiId: 12345 });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(JSON.stringify(whereArg)).toMatch(/sr1RefereeApiId|sr2RefereeApiId/i);
   });
 });
 

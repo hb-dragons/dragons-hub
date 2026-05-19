@@ -11,8 +11,25 @@ export const SWR_KEYS = {
   matchHistory: (id: number, limit?: number, offset?: number) =>
     `/admin/matches/${id}/history?limit=${limit ?? 50}&offset=${offset ?? 0}`,
   teams: "/admin/teams",
-  referees: (ownClub?: boolean) =>
-    `/admin/referees${ownClub === false ? "?ownClub=false" : ""}`,
+  refereesPaginated: (opts: {
+    scope?: "own" | "all";
+    search?: string;
+    sort?: "name" | "workloadAsc" | "workloadDesc";
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    qs.set("scope", opts.scope ?? "own");
+    qs.set("sort", opts.sort ?? "name");
+    qs.set("limit", String(opts.limit ?? 50));
+    qs.set("offset", String(opts.offset ?? 0));
+    if (opts.search) qs.set("search", opts.search);
+    return `/admin/referees?${qs.toString()}`;
+  },
+  refereeCounts: "/admin/referees/counts",
+  referee: (id: number) => `/admin/referees/${id}`,
+  refereeEligibleGames: (refereeId: number) =>
+    `/admin/referees/${refereeId}/eligible-open-games`,
   refereeRules: (refereeId: number) => `/admin/referees/${refereeId}/rules`,
   standings: "/admin/standings",
   venues: "/admin/venues",
@@ -48,7 +65,31 @@ export const SWR_KEYS = {
   watchRules: "/admin/watch-rules",
   channelConfigs: "/admin/channel-configs",
   channelConfigProviders: "/admin/channel-configs/providers",
-  refereeGames: "/referee/games?limit=500&offset=0",
+  refereeGamesFiltered: (opts: {
+    status?: "active" | "all";
+    slotStatus?: "open" | "offered" | "any";
+    league?: string[];
+    dateFrom?: string;
+    dateTo?: string;
+    gameType?: "home" | "away" | "both";
+    assignedRefereeApiId?: number;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    qs.set("status", opts.status ?? "active");
+    qs.set("limit", String(opts.limit ?? 100));
+    qs.set("offset", String(opts.offset ?? 0));
+    if (opts.slotStatus) qs.set("slotStatus", opts.slotStatus);
+    if (opts.gameType) qs.set("gameType", opts.gameType);
+    if (opts.dateFrom) qs.set("dateFrom", opts.dateFrom);
+    if (opts.dateTo) qs.set("dateTo", opts.dateTo);
+    if (opts.league?.length) qs.set("league", opts.league.join(","));
+    if (opts.search) qs.set("search", opts.search);
+    if (opts.assignedRefereeApiId != null) qs.set("assignedRefereeApiId", String(opts.assignedRefereeApiId));
+    return `/referee/games?${qs.toString()}`;
+  },
   refereeMatches: "/referee/matches?limit=500&offset=0",
   refereeSyncStatus: "/admin/sync/status?syncType=referee-games",
   refereeSyncLogs: (limit: number, offset: number) =>
@@ -66,6 +107,6 @@ export const SWR_KEYS = {
     `/admin/referee/history/games.csv${qs ? `?${qs}` : ""}`,
   refereeHistoryLeaderboardCsv: (qs: string) =>
     `/admin/referee/history/leaderboard.csv${qs ? `?${qs}` : ""}`,
-  refereeCandidates: (spielplanId: number, search: string, pageFrom: number) =>
-    `/admin/referee/games/${spielplanId}/candidates?search=${encodeURIComponent(search)}&pageFrom=${pageFrom}&pageSize=15`,
+  refereeCandidates: (spielplanId: number, search: string, pageFrom: number, slot?: 1 | 2) =>
+    `/admin/referee/games/${spielplanId}/candidates?search=${encodeURIComponent(search)}&pageFrom=${pageFrom}&pageSize=15${slot != null ? `&slot=${slot}` : ""}`,
 } as const;

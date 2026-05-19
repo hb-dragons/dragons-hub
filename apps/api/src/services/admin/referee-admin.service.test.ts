@@ -50,14 +50,20 @@ vi.mock("drizzle-orm", () => ({
   or: vi.fn((...args: unknown[]) => ({ or: args })),
   ilike: vi.fn((...args: unknown[]) => ({ ilike: args })),
   asc: vi.fn((...args: unknown[]) => ({ asc: args })),
-  sql: vi.fn((...args: unknown[]) => ({ sql: args })),
+  desc: vi.fn((...args: unknown[]) => ({ desc: args })),
+  sql: Object.assign(vi.fn((...args: unknown[]) => {
+    const result = { sql: args, as: (alias: string) => ({ sql: args, alias }) };
+    return result;
+  }), { raw: vi.fn((...args: unknown[]) => ({ sql: args })) }),
   inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
 }));
 
 import {
   getReferees,
+  getRefereeById,
+  getRefereeCounts,
   updateRefereeVisibility,
-  updateRefereeSettings,
+  updateRefereeRules,
   RefereeSettingsError,
 } from "./referee-admin.service";
 
@@ -88,28 +94,75 @@ function buildChain(result: unknown) {
   return chain;
 }
 
-describe("getReferees", () => {
+describe("getReferees scope + sort", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("returns referees without search", async () => {
+  it("returns all referees when scope is 'all'", async () => {
     const rows = [
       {
         id: 1,
-        apiId: "a1",
-        firstName: "Max",
-        lastName: "Mustermann",
-        licenseNumber: "L001",
+        apiId: 100,
+        firstName: "A",
+        lastName: "Z",
+        licenseNumber: 1,
         allowAllHomeGames: false,
         allowAwayGames: false,
+        isOwnClub: true,
+        matchCount: 5,
+        createdAt: makeDate("2025-01-01T00:00:00.000Z"),
+        updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
+      },
+      {
+        id: 2,
+        apiId: 200,
+        firstName: "B",
+        lastName: "Y",
+        licenseNumber: 2,
+        allowAllHomeGames: false,
+        allowAwayGames: false,
+        isOwnClub: false,
+        matchCount: 3,
+        createdAt: makeDate("2025-01-03T00:00:00.000Z"),
+        updatedAt: makeDate("2025-01-04T00:00:00.000Z"),
+      },
+    ];
+    const countResult = [{ count: 2 }];
+
+    const dataChain = buildChain(rows);
+    const countChain = buildChain(countResult);
+
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all" });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.total).toBe(2);
+    expect(result.items.some((r) => !r.isOwnClub)).toBe(true);
+    expect(result.items[0]).not.toHaveProperty("roles");
+    expect(mockSelectDistinct).not.toHaveBeenCalled();
+  });
+
+  it("filters to own-club when scope is 'own'", async () => {
+    const rows = [
+      {
+        id: 1,
+        apiId: 100,
+        firstName: "A",
+        lastName: "Z",
+        licenseNumber: 1,
+        allowAllHomeGames: false,
+        allowAwayGames: false,
+        isOwnClub: true,
         matchCount: 5,
         createdAt: makeDate("2025-01-01T00:00:00.000Z"),
         updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
       },
     ];
     const countResult = [{ count: 1 }];
-    const roleRows = [{ refereeId: 1, roleName: "Schiedsrichter" }];
 
     const dataChain = buildChain(rows);
     const countChain = buildChain(countResult);
@@ -118,74 +171,42 @@ describe("getReferees", () => {
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain);
 
-    const roleChain = buildChain(roleRows);
-    mockSelectDistinct.mockReturnValueOnce(roleChain);
-
-    const result = await getReferees({ limit: 20, offset: 0, ownClub: true });
-
-    expect(result).toEqual({
-      items: [
-        {
-          id: 1,
-          apiId: "a1",
-          firstName: "Max",
-          lastName: "Mustermann",
-          licenseNumber: "L001",
-          allowAllHomeGames: false,
-          allowAwayGames: false,
-          matchCount: 5,
-          roles: ["Schiedsrichter"],
-          createdAt: "2025-01-01T00:00:00.000Z",
-          updatedAt: "2025-01-02T00:00:00.000Z",
-        },
-      ],
-      total: 1,
-      limit: 20,
-      offset: 0,
-      hasMore: false,
-    });
-    expect(mockSelect).toHaveBeenCalledTimes(2);
-    expect(mockSelectDistinct).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns referees with search filter", async () => {
-    const rows = [
-      {
-        id: 2,
-        apiId: "a2",
-        firstName: "Anna",
-        lastName: "Schmidt",
-        licenseNumber: "L002",
-        allowAllHomeGames: false,
-        allowAwayGames: false,
-        matchCount: 3,
-        createdAt: makeDate("2025-02-01T00:00:00.000Z"),
-        updatedAt: makeDate("2025-02-02T00:00:00.000Z"),
-      },
-    ];
-    const countResult = [{ count: 1 }];
-    const roleRows = [{ refereeId: 2, roleName: "Zeitnehmer" }];
-
-    const dataChain = buildChain(rows);
-    const countChain = buildChain(countResult);
-
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    const roleChain = buildChain(roleRows);
-    mockSelectDistinct.mockReturnValueOnce(roleChain);
-
-    const result = await getReferees({
-      limit: 20,
-      offset: 0,
-      search: "Schmidt",
-      ownClub: true,
-    });
+    const result = await getReferees({ limit: 50, offset: 0, scope: "own" });
 
     expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.lastName).toBe("Schmidt");
-    expect(result.items[0]?.roles).toEqual(["Zeitnehmer"]);
+    expect(result.items[0]?.isOwnClub).toBe(true);
+  });
+
+  it("orders by ascending workload when sort is 'workloadAsc'", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getReferees({ limit: 50, offset: 0, scope: "own", sort: "workloadAsc" });
+
+    // The chain's orderBy was called — verify via the chain mock
+    expect(dataChain.orderBy).toHaveBeenCalled();
+    const orderByArgs = (dataChain.orderBy as ReturnType<typeof vi.fn>).mock.calls[0];
+    // drizzle-orm asc/desc mocks return { asc: [...] } / { desc: [...] }
+    expect(JSON.stringify(orderByArgs)).toMatch(/asc/i);
+  });
+
+  it("orders by descending workload when sort is 'workloadDesc'", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getReferees({ limit: 50, offset: 0, scope: "all", sort: "workloadDesc" });
+
+    expect(dataChain.orderBy).toHaveBeenCalled();
+    const orderByArgs = (dataChain.orderBy as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.stringify(orderByArgs)).toMatch(/desc/i);
   });
 
   it("returns empty results when total is 0", async () => {
@@ -196,252 +217,81 @@ describe("getReferees", () => {
       .mockReturnValueOnce(dataChain)
       .mockReturnValueOnce(countChain);
 
-    const result = await getReferees({ limit: 20, offset: 0, ownClub: true });
+    const result = await getReferees({ limit: 20, offset: 0, scope: "own" });
 
-    expect(result).toEqual({
-      items: [],
-      total: 0,
-      limit: 20,
-      offset: 0,
-      hasMore: false,
-    });
-    expect(mockSelectDistinct).not.toHaveBeenCalled();
-  });
-
-  it("returns roles grouped per referee", async () => {
-    const rows = [
-      {
-        id: 10,
-        apiId: "a10",
-        firstName: "Tom",
-        lastName: "Bauer",
-        licenseNumber: "L010",
-        allowAllHomeGames: true,
-        allowAwayGames: false,
-        matchCount: 7,
-        createdAt: makeDate("2025-03-01T00:00:00.000Z"),
-        updatedAt: makeDate("2025-03-02T00:00:00.000Z"),
-      },
-      {
-        id: 11,
-        apiId: "a11",
-        firstName: "Lisa",
-        lastName: "Klein",
-        licenseNumber: "L011",
-        allowAllHomeGames: false,
-        allowAwayGames: true,
-        matchCount: 2,
-        createdAt: makeDate("2025-03-03T00:00:00.000Z"),
-        updatedAt: makeDate("2025-03-04T00:00:00.000Z"),
-      },
-    ];
-    const countResult = [{ count: 2 }];
-    const roleRows = [
-      { refereeId: 10, roleName: "Schiedsrichter" },
-      { refereeId: 10, roleName: "Zeitnehmer" },
-      { refereeId: 11, roleName: "Anschreiber" },
-    ];
-
-    const dataChain = buildChain(rows);
-    const countChain = buildChain(countResult);
-
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    const roleChain = buildChain(roleRows);
-    mockSelectDistinct.mockReturnValueOnce(roleChain);
-
-    const result = await getReferees({ limit: 20, offset: 0, ownClub: true });
-
-    expect(result.items[0]?.roles).toEqual([
-      "Schiedsrichter",
-      "Zeitnehmer",
-    ]);
-    expect(result.items[1]?.roles).toEqual(["Anschreiber"]);
-  });
-
-  it("skips role query when no referees are returned", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
-
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    await getReferees({ limit: 10, offset: 0, ownClub: true });
-
-    expect(mockSelectDistinct).not.toHaveBeenCalled();
+    expect(result).toEqual({ items: [], total: 0, limit: 20, offset: 0, hasMore: false });
   });
 
   it("returns hasMore=true when more results exist", async () => {
     const rows = [
       {
         id: 1,
-        apiId: "a1",
-        firstName: "Max",
-        lastName: "Mustermann",
-        licenseNumber: "L001",
+        apiId: 100,
+        firstName: "A",
+        lastName: "Z",
+        licenseNumber: 1,
         allowAllHomeGames: false,
         allowAwayGames: false,
+        isOwnClub: true,
         matchCount: 1,
         createdAt: makeDate("2025-01-01T00:00:00.000Z"),
         updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
       },
     ];
-    const countResult = [{ count: 5 }];
-
-    const dataChain = buildChain(rows);
-    const countChain = buildChain(countResult);
 
     mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
+      .mockReturnValueOnce(buildChain(rows))
+      .mockReturnValueOnce(buildChain([{ count: 5 }]));
 
-    const roleChain = buildChain([]);
-    mockSelectDistinct.mockReturnValueOnce(roleChain);
-
-    const result = await getReferees({ limit: 1, offset: 0, ownClub: true });
+    const result = await getReferees({ limit: 1, offset: 0, scope: "all" });
 
     expect(result.hasMore).toBe(true);
     expect(result.total).toBe(5);
   });
 
-  it("returns hasMore=false when at end of results", async () => {
-    const rows = [
-      {
-        id: 1,
-        apiId: "a1",
-        firstName: "Max",
-        lastName: "Mustermann",
-        licenseNumber: "L001",
-        allowAllHomeGames: false,
-        allowAwayGames: false,
-        matchCount: 1,
-        createdAt: makeDate("2025-01-01T00:00:00.000Z"),
-        updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
-      },
-    ];
-    const countResult = [{ count: 5 }];
-
-    const dataChain = buildChain(rows);
-    const countChain = buildChain(countResult);
-
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    const roleChain = buildChain([]);
-    mockSelectDistinct.mockReturnValueOnce(roleChain);
-
-    const result = await getReferees({ limit: 2, offset: 4, ownClub: true });
-
-    expect(result.hasMore).toBe(false);
-  });
-
   it("defaults total to 0 when count result is empty", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([]);
-
     mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
+      .mockReturnValueOnce(buildChain([]))
+      .mockReturnValueOnce(buildChain([]));
 
-    const result = await getReferees({ limit: 10, offset: 0, ownClub: true });
+    const result = await getReferees({ limit: 10, offset: 0, scope: "all" });
 
     expect(result.total).toBe(0);
   });
+});
 
-  it("defaults total to 0 when count property is undefined", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: undefined }]);
-
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    const result = await getReferees({ limit: 10, offset: 0, ownClub: true });
-
-    expect(result.total).toBe(0);
+describe("getRefereeById", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("handles multiple referees where only some have roles", async () => {
-    const rows = [
-      {
-        id: 20,
-        apiId: "a20",
-        firstName: "Karl",
-        lastName: "Adams",
-        licenseNumber: "L020",
-        allowAllHomeGames: false,
-        allowAwayGames: false,
-        matchCount: 4,
-        createdAt: makeDate("2025-05-01T00:00:00.000Z"),
-        updatedAt: makeDate("2025-05-02T00:00:00.000Z"),
-      },
-      {
-        id: 21,
-        apiId: "a21",
-        firstName: "Petra",
-        lastName: "Berg",
-        licenseNumber: "L021",
-        allowAllHomeGames: false,
-        allowAwayGames: false,
-        matchCount: 1,
-        createdAt: makeDate("2025-05-03T00:00:00.000Z"),
-        updatedAt: makeDate("2025-05-04T00:00:00.000Z"),
-      },
-    ];
-    const countResult = [{ count: 2 }];
-    // Only referee 20 has roles; referee 21 has none
-    const roleRows = [{ refereeId: 20, roleName: "Schiedsrichter" }];
+  it("returns a single RefereeListItem when present", async () => {
+    const row = {
+      id: 1,
+      apiId: 100,
+      firstName: "A",
+      lastName: "Z",
+      licenseNumber: 1,
+      allowAllHomeGames: false,
+      allowAwayGames: false,
+      isOwnClub: true,
+      matchCount: 5,
+      createdAt: makeDate("2025-01-01T00:00:00.000Z"),
+      updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
+    };
 
-    const dataChain = buildChain(rows);
-    const countChain = buildChain(countResult);
+    mockSelect.mockReturnValueOnce(buildChain([row]));
 
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    const roleChain = buildChain(roleRows);
-    mockSelectDistinct.mockReturnValueOnce(roleChain);
-
-    const result = await getReferees({ limit: 20, offset: 0, ownClub: true });
-
-    expect(result.items[0]?.roles).toEqual(["Schiedsrichter"]);
-    expect(result.items[1]?.roles).toEqual([]);
+    const ref = await getRefereeById(1);
+    expect(ref).toMatchObject({ id: 1 });
+    expect(ref).not.toHaveProperty("roles");
   });
 
-  it("returns empty roles array for referee with no roles", async () => {
-    const rows = [
-      {
-        id: 5,
-        apiId: "a5",
-        firstName: "Jan",
-        lastName: "Weber",
-        licenseNumber: "L005",
-        allowAllHomeGames: false,
-        allowAwayGames: false,
-        matchCount: 0,
-        createdAt: makeDate("2025-04-01T00:00:00.000Z"),
-        updatedAt: makeDate("2025-04-02T00:00:00.000Z"),
-      },
-    ];
-    const countResult = [{ count: 1 }];
+  it("returns null when no row matches", async () => {
+    mockSelect.mockReturnValueOnce(buildChain([]));
 
-    const dataChain = buildChain(rows);
-    const countChain = buildChain(countResult);
-
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    const roleChain = buildChain([]);
-    mockSelectDistinct.mockReturnValueOnce(roleChain);
-
-    const result = await getReferees({ limit: 10, offset: 0, ownClub: true });
-
-    expect(result.items[0]?.roles).toEqual([]);
+    const ref = await getRefereeById(999_999);
+    expect(ref).toBeNull();
   });
 });
 
@@ -584,151 +434,31 @@ function runTx(cfg: TxStubConfig) {
   return { tx, calls };
 }
 
-describe("updateRefereeSettings", () => {
+describe("getRefereeCounts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("updates visibility and rules atomically inside a transaction", async () => {
-    const visibility = { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true };
-    const finalRules = [
-      { id: 1, teamId: 10, teamName: "Team A", deny: false, allowSr1: true, allowSr2: true },
-    ];
-    const { tx } = runTx({
-      updateReturning: [visibility],
-      selectValidTeams: [{ id: 10 }],
-      finalRules,
-    });
+  it("returns own and all counts", async () => {
+    const chain = buildChain([{ own: 7, all: 42 }]);
+    mockSelect.mockReturnValueOnce(chain);
 
-    const result = await updateRefereeSettings(1, {
-      visibility,
-      rules: [{ teamId: 10, deny: false, allowSr1: true, allowSr2: true }],
-    });
-
-    expect(result).toEqual({ visibility, rules: finalRules });
-    expect(tx.update).toHaveBeenCalledTimes(1);
-    expect(tx.delete).toHaveBeenCalledTimes(1);
-    expect(tx.insert).toHaveBeenCalledTimes(1);
+    const result = await getRefereeCounts();
+    expect(result).toEqual({ own: 7, all: 42 });
   });
 
-  it("accepts visibility-only payload (no rules touched)", async () => {
-    const visibility = { allowAllHomeGames: false, allowAwayGames: true, isOwnClub: true };
-    const { tx } = runTx({
-      updateReturning: [visibility],
-      finalRules: [],
-    });
+  it("defaults to zero counts when result is empty", async () => {
+    const chain = buildChain([]);
+    mockSelect.mockReturnValueOnce(chain);
 
-    const result = await updateRefereeSettings(1, { visibility });
-
-    expect(result.visibility).toEqual(visibility);
-    expect(tx.delete).not.toHaveBeenCalled();
-    expect(tx.insert).not.toHaveBeenCalled();
+    const result = await getRefereeCounts();
+    expect(result).toEqual({ own: 0, all: 0 });
   });
+});
 
-  it("accepts rules-only payload and reads current visibility", async () => {
-    const visibility = { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true };
-    const { tx } = runTx({
-      selectVisibility: [visibility],
-      selectValidTeams: [{ id: 7 }],
-      finalRules: [],
-    });
-
-    const result = await updateRefereeSettings(1, {
-      rules: [{ teamId: 7, deny: true, allowSr1: false, allowSr2: false }],
-    });
-
-    expect(result.visibility).toEqual(visibility);
-    expect(tx.update).not.toHaveBeenCalled();
-    expect(tx.delete).toHaveBeenCalledTimes(1);
-    expect(tx.insert).toHaveBeenCalledTimes(1);
-  });
-
-  it("clears rules when rules array is empty", async () => {
-    const visibility = { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true };
-    const { tx } = runTx({
-      selectVisibility: [visibility],
-      finalRules: [],
-    });
-
-    await updateRefereeSettings(1, { rules: [] });
-
-    expect(tx.delete).toHaveBeenCalledTimes(1);
-    expect(tx.insert).not.toHaveBeenCalled();
-  });
-
-  it("throws NOT_FOUND when update touches no rows", async () => {
-    runTx({ updateReturning: [] });
-
-    await expect(
-      updateRefereeSettings(999, {
-        visibility: { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true },
-      }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-  });
-
-  it("throws NOT_FOUND when rules-only path finds no referee", async () => {
-    runTx({ selectVisibility: [] });
-
-    await expect(
-      updateRefereeSettings(999, { rules: [] }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
-  });
-
-  it("throws NOT_OWN_CLUB when rules provided but isOwnClub=false (race regression)", async () => {
-    runTx({
-      updateReturning: [
-        { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: false },
-      ],
-    });
-
-    await expect(
-      updateRefereeSettings(1, {
-        visibility: { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: false },
-        rules: [{ teamId: 10, deny: false, allowSr1: true, allowSr2: true }],
-      }),
-    ).rejects.toMatchObject({ code: "NOT_OWN_CLUB" });
-  });
-
-  it("throws VALIDATION_ERROR for invalid teamIds", async () => {
-    runTx({
-      updateReturning: [
-        { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true },
-      ],
-      selectValidTeams: [{ id: 10 }],
-    });
-
-    await expect(
-      updateRefereeSettings(1, {
-        visibility: { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true },
-        rules: [
-          { teamId: 10, deny: false, allowSr1: true, allowSr2: true },
-          { teamId: 99, deny: false, allowSr1: true, allowSr2: true },
-        ],
-      }),
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-
-  it("zeros allowSr1/allowSr2 when rule.deny=true", async () => {
-    const visibility = { allowAllHomeGames: false, allowAwayGames: false, isOwnClub: true };
-    const { tx } = runTx({
-      updateReturning: [visibility],
-      selectValidTeams: [{ id: 10 }],
-      finalRules: [],
-    });
-
-    await updateRefereeSettings(1, {
-      visibility,
-      rules: [{ teamId: 10, deny: true, allowSr1: true, allowSr2: true }],
-    });
-
-    const insertCall = tx.insert.mock.calls[0];
-    expect(insertCall).toBeDefined();
-    // The `.values()` call captures the inserted rows
-    const valuesArg = (tx.insert as unknown as { mock: { results: { value: { values: ReturnType<typeof vi.fn> } }[] } })
-      .mock.results[0]?.value.values;
-    expect(valuesArg).toHaveBeenCalledWith([
-      expect.objectContaining({ teamId: 10, deny: true, allowSr1: false, allowSr2: false }),
-    ]);
+describe("updateRefereeRules", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
   it("RefereeSettingsError is properly typed", () => {
@@ -736,5 +466,81 @@ describe("updateRefereeSettings", () => {
     expect(err).toBeInstanceOf(Error);
     expect(err.code).toBe("NOT_OWN_CLUB");
     expect(err.name).toBe("RefereeSettingsError");
+  });
+
+  it("throws NOT_FOUND when referee does not exist", async () => {
+    runTx({ selectVisibility: [] });
+
+    await expect(
+      updateRefereeRules(999, { rules: [] }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("throws NOT_OWN_CLUB when referee is not own-club", async () => {
+    runTx({ selectVisibility: [{ isOwnClub: false }] });
+
+    await expect(updateRefereeRules(1, { rules: [] })).rejects.toMatchObject({
+      code: "NOT_OWN_CLUB",
+    });
+  });
+
+  it("throws VALIDATION_ERROR for non-own-club team IDs", async () => {
+    runTx({
+      selectVisibility: [{ isOwnClub: true }],
+      selectValidTeams: [],
+    });
+
+    await expect(
+      updateRefereeRules(1, { rules: [{ teamId: 99, deny: false, allowSr1: true, allowSr2: false }] }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("clears rules when rules array is empty", async () => {
+    const { tx } = runTx({
+      selectVisibility: [{ isOwnClub: true }],
+      finalRules: [],
+    });
+
+    await updateRefereeRules(1, { rules: [] });
+
+    expect(tx.delete).toHaveBeenCalledTimes(1);
+    expect(tx.insert).not.toHaveBeenCalled();
+  });
+
+  it("upserts rules and returns them", async () => {
+    const finalRules = [
+      { id: 1, teamId: 10, teamName: "Team A", deny: false, allowSr1: true, allowSr2: true },
+    ];
+    const { tx } = runTx({
+      selectVisibility: [{ isOwnClub: true }],
+      selectValidTeams: [{ id: 10 }],
+      finalRules,
+    });
+
+    const result = await updateRefereeRules(1, {
+      rules: [{ teamId: 10, deny: false, allowSr1: true, allowSr2: true }],
+    });
+
+    expect(result).toEqual({ rules: finalRules });
+    expect(tx.delete).toHaveBeenCalledTimes(1);
+    expect(tx.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it("zeros allowSr1/allowSr2 when rule.deny=true", async () => {
+    const { tx } = runTx({
+      selectVisibility: [{ isOwnClub: true }],
+      selectValidTeams: [{ id: 10 }],
+      finalRules: [],
+    });
+
+    await updateRefereeRules(1, {
+      rules: [{ teamId: 10, deny: true, allowSr1: true, allowSr2: true }],
+    });
+
+    const valuesArg = (tx.insert as unknown as { mock: { results: { value: { values: ReturnType<typeof vi.fn> } }[] } })
+      .mock.results[0]?.value.values;
+    expect(valuesArg).toHaveBeenCalledWith([
+      expect.objectContaining({ teamId: 10, deny: true, allowSr1: false, allowSr2: false }),
+    ]);
   });
 });

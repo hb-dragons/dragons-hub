@@ -14,7 +14,7 @@ export default async function AdminDashboardPage() {
 
   const [referees, standings, todayMatches] = await Promise.allSettled([
     fetchAPIServer<PaginatedResponse<RefereeListItem>>(
-      "/admin/referees?limit=1&offset=0",
+      "/admin/referees?scope=own&sort=name&limit=50&offset=0",
     ),
     fetchAPIServer<LeagueStandings[]>("/admin/standings"),
     fetchAPIServer<PaginatedResponse<MatchListItem>>(
@@ -25,7 +25,7 @@ export default async function AdminDashboardPage() {
   const fallback: Record<string, unknown> = {};
 
   if (referees.status === "fulfilled") {
-    fallback[SWR_KEYS.referees()] = referees.value;
+    fallback[SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 })] = referees.value;
   }
   if (standings.status === "fulfilled") {
     fallback[SWR_KEYS.standings] = standings.value;

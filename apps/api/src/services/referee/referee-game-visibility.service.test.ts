@@ -28,6 +28,7 @@ vi.mock("@dragons/db/schema", () => ({
     guestTeamName: "rg.guestTeamName",
     leagueName: "rg.leagueName",
     leagueShort: "rg.leagueShort",
+    leagueApiId: "rg.leagueApiId",
     venueName: "rg.venueName",
     venueCity: "rg.venueCity",
     sr1OurClub: "rg.sr1OurClub",
@@ -85,6 +86,7 @@ import {
   getVisibleRefereeGames,
   getVisibleRefereeGameById,
   getVisibleRefereeGameByMatchId,
+  getVisibleRefereeGameByApiMatchId,
 } from "./referee-game-visibility.service";
 
 // --- Helpers ---
@@ -410,8 +412,8 @@ describe("getVisibleRefereeGames", () => {
     expect(result.items[0]?.homeTeamName).toBe("Dragons U16");
   });
 
-  it("applies league filter on top of visibility", async () => {
-    const row = makeGameRow({ leagueShort: "BL" });
+  it("applies league filter on top of visibility (single)", async () => {
+    const row = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
     setupMocks(
       { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
       [],
@@ -421,11 +423,29 @@ describe("getVisibleRefereeGames", () => {
 
     const result = await getVisibleRefereeGames(1, {
       ...defaultParams,
-      league: "BL",
+      league: ["101"],
     });
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.leagueShort).toBe("BL");
+  });
+
+  it("applies league filter on top of visibility (multiple)", async () => {
+    const row1 = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
+    const row2 = makeGameRow({ id: 2, leagueShort: "OL", leagueApiId: 202 });
+    setupMocks(
+      { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true },
+      [],
+      [row1, row2],
+      2,
+    );
+
+    const result = await getVisibleRefereeGames(1, {
+      ...defaultParams,
+      league: ["101", "202"],
+    });
+
+    expect(result.items).toHaveLength(2);
   });
 
   it("applies date range filters", async () => {
@@ -772,7 +792,7 @@ describe("getVisibleRefereeGames (admin mode)", () => {
       limit: 10,
       offset: 0,
       status: "cancelled",
-      league: "KLN",
+      league: ["KLN"],
       dateFrom: "2026-04-01",
       dateTo: "2026-04-30",
       search: "Dragons Berlin",
@@ -853,6 +873,75 @@ describe("getVisibleRefereeGameByMatchId (admin mode)", () => {
     selectReturnValues.push([]);
 
     const result = await getVisibleRefereeGameByMatchId(null, 999);
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("getVisibleRefereeGameByApiMatchId (admin mode)", () => {
+  it("returns the row without visibility filtering and with null mySlot", async () => {
+    const row = makeGameRow({ id: 5, apiMatchId: 4711 });
+    selectReturnValues.push([row]);
+
+    const result = await getVisibleRefereeGameByApiMatchId(null, 4711);
+
+    expect(result?.id).toBe(5);
+    expect(result?.apiMatchId).toBe(4711);
+    expect(result?.mySlot).toBeNull();
+    expect(result?.claimableSlots).toEqual([]);
+    expect(mockSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null when no row is found", async () => {
+    selectReturnValues.push([]);
+
+    const result = await getVisibleRefereeGameByApiMatchId(null, 99999);
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("getVisibleRefereeGameByApiMatchId (referee mode)", () => {
+  it("returns null when referee not found", async () => {
+    selectReturnValues.push([]);
+
+    const result = await getVisibleRefereeGameByApiMatchId(999, 4711);
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null when referee is not own club", async () => {
+    selectReturnValues.push([
+      { apiId: 9001, allowAllHomeGames: true, allowAwayGames: true, isOwnClub: false },
+    ]);
+
+    const result = await getVisibleRefereeGameByApiMatchId(1, 4711);
+
+    expect(result).toBeNull();
+  });
+
+  it("returns the row when visible by apiMatchId", async () => {
+    const row = makeGameRow({ id: 5, apiMatchId: 4711 });
+    selectReturnValues.push(
+      [{ apiId: 9001, allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }],
+      [],
+      [row],
+    );
+
+    const result = await getVisibleRefereeGameByApiMatchId(1, 4711);
+
+    expect(result?.id).toBe(5);
+    expect(result?.apiMatchId).toBe(4711);
+  });
+
+  it("returns null when row not visible", async () => {
+    selectReturnValues.push(
+      [{ apiId: 9001, allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }],
+      [],
+      [],
+    );
+
+    const result = await getVisibleRefereeGameByApiMatchId(1, 4711);
 
     expect(result).toBeNull();
   });

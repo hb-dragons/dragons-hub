@@ -129,10 +129,10 @@ export type {
   RefereeListItem,
   RefereeRule,
   RefereeRulesResponse,
+  RefereeCountsResponse,
   UpdateRefereeRulesBody,
   UpdateRefereeVisibilityBody,
-  UpdateRefereeSettingsBody,
-  UpdateRefereeSettingsResponse,
+  EligibleOpenGamesResponse,
 } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";

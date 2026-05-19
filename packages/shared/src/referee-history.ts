@@ -63,6 +63,8 @@ export interface HistoryGameItem {
   sr2Name: string | null;
   sr1Status: string;
   sr2Status: string;
+  sr1RefereeApiId: number | null;
+  sr2RefereeApiId: number | null;
   isCancelled: boolean;
   isForfeited: boolean;
   isHomeGame: boolean;

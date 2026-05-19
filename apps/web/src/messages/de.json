@@ -17,9 +17,6 @@
     "board": "Board",
     "bookings": "Buchungen",
     "menu": "Menü",
-    "groupReferee": "Schiedsrichter",
-    "openAssignments": "Offene Ansetzungen",
-    "refereeHistory": "Schiedsrichter-Historie",
     "groupLeague": "Liga",
     "groupOperations": "Betrieb",
     "groupSocial": "Social Media",
@@ -195,7 +192,10 @@
       "openProfile": "Schiri-Profil öffnen",
       "empty": "Keine Spiele für diesen Schiri im Zeitraum.",
       "gamesCount": "Spiele · {count}",
-      "role": { "sr1": "SR1", "sr2": "SR2" },
+      "role": {
+        "sr1": "SR1",
+        "sr2": "SR2"
+      },
       "stats": {
         "total": "Gesamt",
         "sr1": "SR1",
@@ -511,7 +511,6 @@
       "firstName": "Vorname",
       "licenseNumber": "Lizenz-Nr.",
       "matchCount": "Spiele",
-      "roles": "Rollen",
       "apiId": "API-ID",
       "isOwnClub": "Eigener Verein"
     },
@@ -1244,15 +1243,11 @@
       "openSlots": "Offene Spiele",
       "referees": "Schiedsrichter"
     },
-    "range": {
-      "label": "Zeitraum",
-      "season": "Saison",
-      "30d": "Letzte 30 Tage",
-      "month": "Diesen Monat",
-      "custom": "Benutzerdefiniert"
-    },
     "openSlots": {
       "searchPlaceholder": "Spiel suchen…",
+      "loading": "Lädt…",
+      "loadError": "Spiele konnten nicht geladen werden.",
+      "empty": "Keine Spiele entsprechen Ihren Filtern.",
       "detail": {
         "notFound": "Spiel nicht gefunden oder benötigt keine Schiedsrichter mehr",
         "selectGamePrompt": "Spiel links auswählen, um offene Slots zu sehen"
@@ -1262,11 +1257,8 @@
         "open": "⚠ Offen",
         "unassign": "Aufheben"
       },
-      "toast": {
-        "assigned": "Schiedsrichter zugewiesen",
-        "assignFailed": "Zuweisung fehlgeschlagen",
-        "unassigned": "Zuweisung aufgehoben",
-        "unassignFailed": "Aufheben fehlgeschlagen"
+      "errorChip": {
+        "dismiss": "Schließen"
       },
       "picker": {
         "searchPlaceholder": "Schiedsrichter suchen…",
@@ -1281,18 +1273,64 @@
           "modeMismatchSr2": "SR2-Modus passt nicht",
           "blocked": "Blockiert"
         }
+      },
+      "filters": {
+        "status": "Status",
+        "statusValue": {
+          "open": "Nur offen",
+          "offered": "Offen + Angeboten",
+          "any": "Beliebig"
+        },
+        "league": "Liga",
+        "noLeagues": "Keine Ligen geladen",
+        "date": "Datum",
+        "datePreset": {
+          "14d": "Nächste 14 Tage",
+          "30d": "Nächste 30 Tage",
+          "season": "Ganze Saison",
+          "custom": "Benutzerdefiniert"
+        },
+        "dateFrom": "Von",
+        "dateTo": "Bis",
+        "gameType": "Spielart",
+        "gameTypeValue": {
+          "home": "Heim",
+          "away": "Auswärts"
+        },
+        "reset": "Filter zurücksetzen"
       }
     },
     "referees": {
-      "kpi": { "total": "Spiele gesamt", "refs": "Schiedsrichter", "workload": "Ø Auslastung" },
-      "columns": { "ref": "Schiedsrichter", "own": "Vereinseigen", "games": "Spiele" },
+      "kpi": {
+        "ownClubRefs": "Vereinseigene SR",
+        "avgMatches": "Ø Spiele/SR"
+      },
+      "columns": {
+        "ref": "Schiedsrichter",
+        "own": "Vereinseigen",
+        "games": "Spiele"
+      },
       "search": "Schiedsrichter suchen…",
-      "sort": { "name": "Sortieren: Name", "workloadDesc": "Spiele (hoch → niedrig)", "workloadAsc": "Spiele (niedrig → hoch)" },
+      "sort": {
+        "name": "Sortieren: Name",
+        "workloadDesc": "Spiele (hoch → niedrig)",
+        "workloadAsc": "Spiele (niedrig → hoch)"
+      },
       "empty": "Keine Schiedsrichter passen zu den Filtern",
       "profile": {
-        "visibility": { "title": "Sichtbarkeit", "ownClub": "Vereinseigener Schiedsrichter", "allHome": "Alle Heimspiele erlauben", "away": "Auswärtsspiele erlauben" },
-        "rules": { "title": "Team-Regeln", "add": "Regel hinzufügen", "deny": "Ablehnen", "allow": "Erlauben", "selectTeam": "Team", "none": "Keine Team-Regeln — Standard gilt" },
-        "save": { "saving": "Speichern…", "saved": "Vor {n}s gespeichert", "dirty": "Nicht gespeichert", "error": "Speichern fehlgeschlagen", "now": "Jetzt speichern" }
+        "visibility": {
+          "title": "Sichtbarkeit",
+          "ownClub": "Vereinseigener Schiedsrichter",
+          "allHome": "Alle Heimspiele erlauben",
+          "away": "Auswärtsspiele erlauben"
+        },
+        "save": {
+          "saving": "Speichern…",
+          "saved": "Vor {n}s gespeichert",
+          "dirty": "Nicht gespeichert",
+          "error": "Speichern fehlgeschlagen",
+          "now": "Jetzt speichern"
+        }
       },
       "upcoming": {
         "assigned": "Zugewiesen",
@@ -1303,15 +1341,44 @@
       "history": {
         "total": "{n} Spiele",
         "exportCsv": "CSV-Export",
+        "loadMore": "Mehr laden",
         "empty": "Keine Spielhistorie im gewählten Zeitraum",
         "statusPlayed": "Gespielt",
         "statusCancelled": "Abgesagt",
         "statusForfeited": "Forfeit"
       },
+      "loading": "Lädt…",
       "notFound": "Schiedsrichter nicht gefunden",
       "ownClubBadge": "Vereinseigen",
-      "subtabs": { "profile": "Profil", "upcoming": "Bevorstehend", "history": "Historie" },
-      "selectPrompt": "Schiedsrichter wählen, um Konfiguration und Historie zu sehen"
+      "rules": {
+        "title": "Team-Regeln",
+        "add": "Regel hinzufügen",
+        "deny": "Ablehnen",
+        "allow": "Erlauben",
+        "selectTeam": "Team",
+        "none": "Keine Regeln",
+        "disabledHint": "Schiedsrichter erst als vereinseigen markieren",
+        "markOwnClub": "Als eigenen Verein markieren",
+        "save": {
+          "save": "Speichern",
+          "discard": "Verwerfen",
+          "saving": "Speichern…",
+          "saved": "Vor {n}s gespeichert",
+          "dirty": "Nicht gespeichert",
+          "error": "Speichern fehlgeschlagen: {msg}"
+        }
+      },
+      "subtabs": {
+        "profile": "Profil",
+        "rules": "Regeln",
+        "upcoming": "Bevorstehend",
+        "history": "Historie"
+      },
+      "selectPrompt": "Schiedsrichter wählen, um Konfiguration und Historie zu sehen",
+      "scope": {
+        "own": "Vereinseigen ({n})",
+        "all": "Alle ({n})"
+      }
     }
   },
   "errors": {

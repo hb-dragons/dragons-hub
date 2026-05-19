@@ -50,6 +50,7 @@ describe("gamesToCsvRows", () => {
       sr1OurClub: true, sr2OurClub: false,
       sr1Name: "Mueller", sr2Name: null,
       sr1Status: "filled", sr2Status: "open",
+      sr1RefereeApiId: 100, sr2RefereeApiId: null,
       isCancelled: false, isForfeited: false, isHomeGame: true,
     };
     const [row] = gamesToCsvRows([item]);

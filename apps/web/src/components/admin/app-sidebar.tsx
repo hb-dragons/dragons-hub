@@ -37,29 +37,12 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { UserButton } from "@daveyplate/better-auth-ui";
 import { Wordmark } from "@/components/brand/wordmark";
-import { can, canViewOpenGames, type Resource, type Action } from "@dragons/shared";
+import { can, type Resource, type Action } from "@dragons/shared";
 
 type Perm = { [R in Resource]: { resource: R; action: Action<R> } }[Resource];
 type GateUser = Parameters<typeof can>[0];
-type Gate = (user: GateUser) => boolean;
 
 const navGroups = [
-  {
-    labelKey: "nav.groupReferee" as const,
-    icon: Gavel,
-    items: [
-      {
-        href: "/admin/referee/matches",
-        labelKey: "nav.openAssignments" as const,
-        gate: canViewOpenGames as Gate,
-      },
-      {
-        href: "/admin/referee/history",
-        labelKey: "nav.refereeHistory" as const,
-        gate: canViewOpenGames as Gate,
-      },
-    ],
-  },
   {
     labelKey: "nav.groupLeague" as const,
     icon: Trophy,
@@ -78,11 +61,6 @@ const navGroups = [
         href: "/admin/teams",
         labelKey: "nav.teams" as const,
         perm: { resource: "team", action: "view" } as const,
-      },
-      {
-        href: "/admin/referees",
-        labelKey: "nav.referees" as const,
-        perm: { resource: "referee", action: "view" } as const,
       },
     ],
   },
@@ -178,24 +156,18 @@ const navGroups = [
 ] satisfies ReadonlyArray<{
   labelKey: string;
   icon: React.ComponentType;
-  items: ReadonlyArray<
-    { href: string; labelKey: string } & ({ perm: Perm } | { gate: Gate })
-  >;
+  items: ReadonlyArray<{ href: string; labelKey: string; perm: Perm }>;
 }>;
 
 function isItemVisible(
   user: GateUser,
-  item: { perm?: Perm; gate?: Gate },
+  item: { perm: Perm },
 ): boolean {
-  if (item.gate) return item.gate(user);
-  if (item.perm) {
-    return can(
-      user,
-      item.perm.resource,
-      item.perm.action as Action<typeof item.perm.resource>,
-    );
-  }
-  return false;
+  return can(
+    user,
+    item.perm.resource,
+    item.perm.action as Action<typeof item.perm.resource>,
+  );
 }
 
 export type AppSidebarUser = {
@@ -245,6 +217,20 @@ export function AppSidebar({
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {can(user, "referee", "view") && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith("/admin/referees")}
+                  tooltip={t("nav.referees")}
+                >
+                  <Link href="/admin/referees" onClick={() => setOpenMobile(false)}>
+                    <Gavel />
+                    <span>{t("nav.referees")}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
           </SidebarMenu>
         </SidebarGroup>
         {visibleGroups.map((group) => {

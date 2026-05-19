@@ -1,19 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { fetchAPI, APIError } from "@/lib/api";
+import { useRefereeHubUrl } from "../use-referee-hub-url";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@dragons/ui/components/input";
 import { Checkbox } from "@dragons/ui/components/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@dragons/ui/components/select";
+import { Button } from "@dragons/ui/components/button";
 import { cn } from "@dragons/ui/lib/utils";
-import type { RefereeListItem, PaginatedResponse } from "@dragons/shared";
-
-type Sort = "name" | "workloadDesc" | "workloadAsc";
+import type { RefereeListItem, PaginatedResponse, RefereeCountsResponse } from "@dragons/shared";
 
 interface Props {
   selectedId: number | null;
@@ -22,62 +23,79 @@ interface Props {
 
 export function RefereeList({ selectedId, onSelect }: Props) {
   const t = useTranslations("refereeHub.referees");
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<Sort>("name");
+  const { state, update } = useRefereeHubUrl();
+  const [searchLocal, setSearchLocal] = useState(state.search);
+  const debouncedSearch = useDebounce(searchLocal, 300);
 
-  const { data } = useSWR<PaginatedResponse<RefereeListItem>>(SWR_KEYS.referees(true), apiFetcher);
+  useEffect(() => {
+    if (debouncedSearch !== state.search) update({ search: debouncedSearch });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  const listKey = SWR_KEYS.refereesPaginated({
+    scope: state.scope,
+    search: state.search || undefined,
+    sort: state.sort,
+    limit: 50,
+    offset: 0,
+  });
+
+  const { data } = useSWR<PaginatedResponse<RefereeListItem>>(listKey, apiFetcher);
+  const { data: counts } = useSWR<RefereeCountsResponse>(SWR_KEYS.refereeCounts, apiFetcher, { dedupingInterval: 30_000 });
   const items = data?.items ?? [];
 
-  const visible = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const filtered = items.filter((r) => !term ||
-      (r.firstName ?? "").toLowerCase().includes(term) ||
-      (r.lastName ?? "").toLowerCase().includes(term),
-    );
-    const sorted = [...filtered].sort((a, b) => {
-      if (sort === "workloadDesc") return b.matchCount - a.matchCount;
-      if (sort === "workloadAsc") return a.matchCount - b.matchCount;
-      return (a.lastName ?? "").localeCompare(b.lastName ?? "");
-    });
-    return sorted;
-  }, [items, search, sort]);
-
-  const kpi = useMemo(() => {
-    const total = items.reduce((sum, r) => sum + r.matchCount, 0);
-    const refs = items.length;
-    const avg = refs === 0 ? 0 : Math.round(total / refs);
-    return { total, refs, avg };
+  const avg = useMemo(() => {
+    if (items.length === 0) return 0;
+    return Math.round(items.reduce((s, r) => s + r.matchCount, 0) / items.length);
   }, [items]);
 
   async function toggleOwnClub(ref: RefereeListItem, checked: boolean) {
     try {
-      await fetchAPI(`/admin/referees/${ref.id}`, {
+      await fetchAPI(`/admin/referees/${ref.id}/visibility`, {
         method: "PATCH",
-        body: JSON.stringify({
-          visibility: {
-            allowAllHomeGames: ref.allowAllHomeGames,
-            allowAwayGames: ref.allowAwayGames,
-            isOwnClub: checked,
-          },
-        }),
+        body: JSON.stringify({ isOwnClub: checked, allowAllHomeGames: ref.allowAllHomeGames, allowAwayGames: ref.allowAwayGames }),
       });
-      await mutate(SWR_KEYS.referees(true));
+      await Promise.all([
+        mutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true }),
+        mutate(SWR_KEYS.refereeCounts),
+      ]);
     } catch (err) {
-      const msg = err instanceof APIError ? err.message : "Failed";
-      toast.error(msg);
+      toast.error(err instanceof APIError ? err.message : "Failed");
     }
   }
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b grid grid-cols-3 gap-2">
-        <Kpi label={t("kpi.total")} value={kpi.total} />
-        <Kpi label={t("kpi.refs")} value={kpi.refs} />
-        <Kpi label={t("kpi.workload")} value={kpi.avg} />
-      </div>
       <div className="p-3 border-b flex gap-2">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("search")} aria-label={t("search")} />
-        <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
+        <Button
+          variant={state.scope === "own" ? "default" : "outline"}
+          size="sm"
+          onClick={() => update({ scope: "own" })}
+        >
+          {t("scope.own", { n: String(counts?.own ?? "") })}
+        </Button>
+        <Button
+          variant={state.scope === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => update({ scope: "all" })}
+        >
+          {t("scope.all", { n: String(counts?.all ?? "") })}
+        </Button>
+      </div>
+
+      <div className="p-3 border-b grid grid-cols-2 gap-2">
+        <Kpi label={t("kpi.ownClubRefs")} value={counts?.own ?? 0} />
+        <Kpi label={t("kpi.avgMatches")} value={avg} />
+      </div>
+
+      <div className="p-3 border-b flex gap-2">
+        <Input
+          value={searchLocal}
+          onChange={(e) => setSearchLocal(e.target.value)}
+          placeholder={t("search")}
+          aria-label={t("search")}
+        />
+        <Select value={state.sort} onValueChange={(v) => update({ sort: v as never })}>
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="name">{t("sort.name")}</SelectItem>
@@ -86,9 +104,10 @@ export function RefereeList({ selectedId, onSelect }: Props) {
           </SelectContent>
         </Select>
       </div>
+
       <div className="flex-1 overflow-auto">
-        {visible.length === 0 && <div className="p-4 text-sm text-muted-foreground">{t("empty")}</div>}
-        {visible.map((r) => (
+        {items.length === 0 && <div className="p-4 text-sm text-muted-foreground">{t("empty")}</div>}
+        {items.map((r) => (
           <div
             key={r.id}
             className={cn(
@@ -100,7 +119,7 @@ export function RefereeList({ selectedId, onSelect }: Props) {
           >
             <div>
               <div className="text-sm font-medium">{r.lastName}, {r.firstName}</div>
-              <div className="text-xs opacity-70">Lic {r.licenseNumber ?? "—"} · {r.roles.join(", ")}</div>
+              <div className="text-xs opacity-70">Lic {r.licenseNumber ?? "—"}</div>
             </div>
             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
               <Checkbox
