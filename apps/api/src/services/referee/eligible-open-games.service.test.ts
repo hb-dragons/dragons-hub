@@ -179,4 +179,45 @@ describe("getEligibleOpenGames", () => {
       expect.objectContaining({ status: "active" }),
     );
   });
+
+  it("processes candidates with bounded concurrency, preserving game order", async () => {
+    // 12 open games, each with SR1 open and no assigned referee
+    const GAME_COUNT = 12;
+    const gameItems = Array.from({ length: GAME_COUNT }, (_, i) => ({
+      id: i + 1,
+      apiMatchId: (i + 1) * 100, // 100, 200, ..., 1200
+      sr1Status: "open",
+      sr2Status: "assigned",
+      sr1RefereeApiId: null,
+      sr2RefereeApiId: 999,
+    }));
+
+    mockedGames.mockResolvedValueOnce({
+      items: gameItems as any,
+      total: GAME_COUNT,
+      limit: 500,
+      offset: 0,
+      hasMore: false,
+    });
+
+    // Each searchCandidates call takes ~10ms; sequential would be ~120ms
+    mockedSearch.mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+      return {
+        results: [makeCandidate(42)],
+        total: 1,
+      } as any;
+    });
+
+    const start = Date.now();
+    const result = await getEligibleOpenGames(42);
+    const elapsed = Date.now() - start;
+
+    // Sequential (12 × 10ms) ≈ 120ms; concurrency-5 should finish well under 80ms
+    expect(elapsed).toBeLessThan(80);
+
+    // Promise.all preserves input order, so output apiMatchIds should match input order
+    const expectedIds = gameItems.map((g) => g.apiMatchId);
+    expect(result.items.map((g) => g.apiMatchId)).toEqual(expectedIds);
+  });
 });
