@@ -5,7 +5,7 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import { NextIntlClientProvider } from "next-intl";
 import { ProfileSubtab } from "./profile-subtab";
 
-const ref = { id: 1, apiId: 100, firstName: "Anna", lastName: "Müller", licenseNumber: 12345, matchCount: 14, roles: ["SR1"], allowAllHomeGames: true, allowAwayGames: true, isOwnClub: true, createdAt: "", updatedAt: "" };
+const ref = { id: 1, apiId: 100, firstName: "Anna", lastName: "Müller", licenseNumber: 12345, matchCount: 14, allowAllHomeGames: true, allowAwayGames: true, isOwnClub: true, createdAt: "", updatedAt: "" };
 
 vi.mock("swr", () => ({
   default: vi.fn((key: string) => {
@@ -36,29 +36,45 @@ afterEach(() => { vi.useRealTimers(); cleanup(); });
 // rendered with happy-dom + fake timers (compose-refs identity churn). The
 // component is exercised end-to-end via integration manually; once Radix ships
 // the compose-refs stable-callback fix upstream, drop the .skip.
+//
+// Assertions track the new split-endpoint shape (PATCH /visibility + PATCH /rules
+// fired in parallel) so that re-enabling these tests after the upstream fix
+// validates the right behavior. The full Profile/Rules subtab split with
+// explicit save model is deferred to Plan 2.
 describe.skip("ProfileSubtab", () => {
-  it("auto-saves visibility toggle after debounce with full combined payload", async () => {
+  it("auto-saves via /visibility and /rules endpoints after debounce", async () => {
     render(wrap(<ProfileSubtab referee={ref} />));
     fireEvent.click(screen.getByRole("switch", { name: /allow all home/i }));
     await vi.advanceTimersByTimeAsync(800);
-    await waitFor(() => expect(fetchAPI).toHaveBeenCalledWith(
-      "/admin/referees/1",
-      expect.objectContaining({
-        method: "PATCH",
-        body: expect.stringContaining("\"visibility\""),
-      }),
-    ));
-    const callBody = JSON.parse((fetchAPI.mock.calls[0]![1] as RequestInit).body as string);
-    expect(callBody).toEqual({
-      visibility: { allowAllHomeGames: false, allowAwayGames: true, isOwnClub: true },
-      rules: [],
+
+    await waitFor(() => {
+      expect(fetchAPI).toHaveBeenCalledWith(
+        "/admin/referees/1/visibility",
+        expect.objectContaining({ method: "PATCH" }),
+      );
+      expect(fetchAPI).toHaveBeenCalledWith(
+        "/admin/referees/1/rules",
+        expect.objectContaining({ method: "PATCH" }),
+      );
     });
+
+    const visibilityCall = fetchAPI.mock.calls.find((c) => (c[0] as string).endsWith("/visibility"))!;
+    const visibilityBody = JSON.parse((visibilityCall[1] as RequestInit).body as string);
+    expect(visibilityBody).toEqual({
+      allowAllHomeGames: false,
+      allowAwayGames: true,
+      isOwnClub: true,
+    });
+
+    const rulesCall = fetchAPI.mock.calls.find((c) => (c[0] as string).endsWith("/rules"))!;
+    const rulesBody = JSON.parse((rulesCall[1] as RequestInit).body as string);
+    expect(rulesBody).toEqual({ rules: [] });
   });
 
   it("Save now button bypasses debounce", async () => {
     render(wrap(<ProfileSubtab referee={ref} />));
     fireEvent.click(screen.getByRole("switch", { name: /allow all home/i }));
     fireEvent.click(screen.getByRole("button", { name: /save now/i }));
-    await waitFor(() => expect(fetchAPI).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetchAPI).toHaveBeenCalledTimes(2));
   });
 });

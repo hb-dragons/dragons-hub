@@ -49,16 +49,19 @@ export function ProfileSubtab({ referee }: Props) {
 
   const { status, lastSavedAt, markDirty, saveNow } = useAutoSave({
     save: async () => {
-      await fetchAPI(`/admin/referees/${referee.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          visibility,
-          rules: rules.filter((r) => r.deny || r.allowSr1 || r.allowSr2),
+      await Promise.all([
+        fetchAPI(`/admin/referees/${referee.id}/visibility`, {
+          method: "PATCH",
+          body: JSON.stringify(visibility),
         }),
-      });
+        fetchAPI(`/admin/referees/${referee.id}/rules`, {
+          method: "PATCH",
+          body: JSON.stringify({ rules: rules.filter((r) => r.deny || r.allowSr1 || r.allowSr2) }),
+        }),
+      ]);
       await Promise.all([
         swrMutate(SWR_KEYS.refereeRules(referee.id)),
-        swrMutate(SWR_KEYS.referees(true)),
+        swrMutate(SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 })),
       ]);
     },
   });
