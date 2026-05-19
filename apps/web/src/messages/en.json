@@ -1360,8 +1360,26 @@
       },
       "notFound": "Referee not found",
       "ownClubBadge": "Own-club",
+      "rules": {
+        "title": "Per-team rules",
+        "add": "Add rule",
+        "deny": "Deny",
+        "allow": "Allow",
+        "selectTeam": "Team",
+        "none": "No rules",
+        "disabledHint": "Mark as own-club referee first",
+        "save": {
+          "save": "Save",
+          "discard": "Discard",
+          "saving": "Saving…",
+          "saved": "Saved {n}s ago",
+          "dirty": "Unsaved",
+          "error": "Save failed: {msg}"
+        }
+      },
       "subtabs": {
         "profile": "Profile",
+        "rules": "Rules",
         "upcoming": "Upcoming",
         "history": "History"
       },

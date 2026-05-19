@@ -1360,8 +1360,26 @@
       },
       "notFound": "Schiedsrichter nicht gefunden",
       "ownClubBadge": "Vereinseigen",
+      "rules": {
+        "title": "Team-Regeln",
+        "add": "Regel hinzufügen",
+        "deny": "Ablehnen",
+        "allow": "Erlauben",
+        "selectTeam": "Team",
+        "none": "Keine Regeln",
+        "disabledHint": "Schiedsrichter erst als vereinseigen markieren",
+        "save": {
+          "save": "Speichern",
+          "discard": "Verwerfen",
+          "saving": "Speichern…",
+          "saved": "Vor {n}s gespeichert",
+          "dirty": "Nicht gespeichert",
+          "error": "Speichern fehlgeschlagen: {msg}"
+        }
+      },
       "subtabs": {
         "profile": "Profil",
+        "rules": "Regeln",
         "upcoming": "Bevorstehend",
         "history": "Historie"
       },

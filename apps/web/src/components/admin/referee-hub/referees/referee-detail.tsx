@@ -6,11 +6,12 @@ import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { useRefereeHubUrl, type HubSubtab } from "../use-referee-hub-url";
 import { ProfileSubtab } from "./profile-subtab";
+import { RulesSubtab } from "./rules-subtab";
 import { UpcomingSubtab } from "./upcoming-subtab";
 import { HistorySubtab } from "./history-subtab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@dragons/ui/components/tabs";
 import { Badge } from "@dragons/ui/components/badge";
-import type { RefereeListItem, PaginatedResponse } from "@dragons/shared";
+import type { RefereeListItem } from "@dragons/shared";
 
 interface Props { refereeId: number }
 
@@ -18,8 +19,7 @@ export function RefereeDetail({ refereeId }: Props) {
   const t = useTranslations("refereeHub.referees");
   const { state, update } = useRefereeHubUrl();
 
-  const { data } = useSWR<PaginatedResponse<RefereeListItem>>(SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 }), apiFetcher);
-  const ref = data?.items.find((r) => r.id === refereeId);
+  const { data: ref } = useSWR<RefereeListItem | null>(SWR_KEYS.referee(refereeId), apiFetcher);
 
   if (!ref) return <div className="p-6 text-sm text-muted-foreground">{t("notFound")}</div>;
 
@@ -35,10 +35,14 @@ export function RefereeDetail({ refereeId }: Props) {
       <Tabs value={state.subtab} onValueChange={(v) => update({ subtab: v as HubSubtab })}>
         <TabsList className="m-4">
           <TabsTrigger value="profile">{t("subtabs.profile")}</TabsTrigger>
+          <TabsTrigger value="rules" disabled={!ref.isOwnClub} title={!ref.isOwnClub ? t("rules.disabledHint") : undefined}>
+            {t("subtabs.rules")}
+          </TabsTrigger>
           <TabsTrigger value="upcoming">{t("subtabs.upcoming")}</TabsTrigger>
           <TabsTrigger value="history">{t("subtabs.history")}</TabsTrigger>
         </TabsList>
         <TabsContent value="profile"><ProfileSubtab referee={ref} /></TabsContent>
+        <TabsContent value="rules"><RulesSubtab referee={ref} /></TabsContent>
         <TabsContent value="upcoming"><UpcomingSubtab referee={ref} /></TabsContent>
         <TabsContent value="history"><HistorySubtab referee={ref} /></TabsContent>
       </Tabs>
