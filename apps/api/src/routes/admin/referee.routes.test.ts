@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
   return {
     getReferees: vi.fn(),
     getRefereeCounts: vi.fn(),
+    getRefereeById: vi.fn(),
     updateRefereeVisibility: vi.fn(),
     updateRefereeRules: vi.fn(),
     RefereeSettingsError,
@@ -26,6 +27,7 @@ const mocks = vi.hoisted(() => {
 vi.mock("../../services/admin/referee-admin.service", () => ({
   getReferees: mocks.getReferees,
   getRefereeCounts: mocks.getRefereeCounts,
+  getRefereeById: mocks.getRefereeById,
   updateRefereeVisibility: mocks.updateRefereeVisibility,
   updateRefereeRules: mocks.updateRefereeRules,
   RefereeSettingsError: mocks.RefereeSettingsError,
@@ -391,5 +393,30 @@ describe("PATCH /referees/:id/rules", () => {
       body: JSON.stringify({ rules: [sampleRule] }),
     });
     expect(res.status).toBe(500);
+  });
+});
+
+describe("GET /referees/:id", () => {
+  it("returns 200 with referee on hit", async () => {
+    mocks.getRefereeById.mockImplementation((id: number) =>
+      id === 1 ? Promise.resolve({ id: 1, firstName: "Max", lastName: "Mustermann" }) : Promise.resolve(null),
+    );
+
+    const res = await app.request("/referees/1", { method: "GET" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ id: 1 });
+  });
+
+  it("returns 404 when not found", async () => {
+    mocks.getRefereeById.mockResolvedValue(null);
+
+    const res = await app.request("/referees/9999999", { method: "GET" });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 on non-numeric id", async () => {
+    const res = await app.request("/referees/abc", { method: "GET" });
+    expect(res.status).toBe(400);
   });
 });

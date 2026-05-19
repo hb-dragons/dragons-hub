@@ -4,6 +4,7 @@ import { describeRoute } from "hono-openapi";
 import {
   getReferees,
   getRefereeCounts,
+  getRefereeById,
   updateRefereeVisibility,
   updateRefereeRules,
   RefereeSettingsError,
@@ -124,6 +125,29 @@ refereeRoutes.patch(
       }
       throw err;
     }
+  },
+);
+
+refereeRoutes.get(
+  "/referees/:id",
+  requirePermission("referee", "view"),
+  describeRoute({
+    description: "Get a single referee by id",
+    tags: ["Referees"],
+    responses: {
+      200: { description: "Found" },
+      400: { description: "Invalid id" },
+      404: { description: "Not found" },
+    },
+  }),
+  async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id <= 0) {
+      return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
+    }
+    const ref = await getRefereeById(id);
+    if (!ref) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    return c.json(ref);
   },
 );
 
