@@ -1258,11 +1258,8 @@
         "open": "⚠ Offen",
         "unassign": "Aufheben"
       },
-      "toast": {
-        "assigned": "Schiedsrichter zugewiesen",
-        "assignFailed": "Zuweisung fehlgeschlagen",
-        "unassigned": "Zuweisung aufgehoben",
-        "unassignFailed": "Aufheben fehlgeschlagen"
+      "errorChip": {
+        "dismiss": "Schließen"
       },
       "picker": {
         "searchPlaceholder": "Schiedsrichter suchen…",

@@ -1258,11 +1258,8 @@
         "open": "⚠ Open",
         "unassign": "Unassign"
       },
-      "toast": {
-        "assigned": "Referee assigned",
-        "assignFailed": "Could not assign referee",
-        "unassigned": "Referee unassigned",
-        "unassignFailed": "Could not unassign referee"
+      "errorChip": {
+        "dismiss": "Dismiss"
       },
       "picker": {
         "searchPlaceholder": "Search referees…",
