@@ -55,7 +55,10 @@ export function RefereeList({ selectedId, onSelect }: Props) {
         method: "PATCH",
         body: JSON.stringify({ isOwnClub: checked, allowAllHomeGames: ref.allowAllHomeGames, allowAwayGames: ref.allowAwayGames }),
       });
-      await Promise.all([mutate(listKey), mutate(SWR_KEYS.refereeCounts)]);
+      await Promise.all([
+        mutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true }),
+        mutate(SWR_KEYS.refereeCounts),
+      ]);
     } catch (err) {
       toast.error(err instanceof APIError ? err.message : "Failed");
     }

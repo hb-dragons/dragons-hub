@@ -76,7 +76,7 @@ export function RulesSubtab({ referee }: Props) {
         body: JSON.stringify({ rules: rules.filter((r) => r.deny || r.allowSr1 || r.allowSr2) }),
       });
       await swrMutate(SWR_KEYS.refereeRules(referee.id));
-      await swrMutate(SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 }));
+      await swrMutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true });
       setStatus("saved");
       setLastSavedAt(Date.now());
     } catch (err) {

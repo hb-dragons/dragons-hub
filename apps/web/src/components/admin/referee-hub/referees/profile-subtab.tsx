@@ -39,7 +39,7 @@ export function ProfileSubtab({ referee }: Props) {
       });
       await Promise.all([
         swrMutate(SWR_KEYS.referee(referee.id)),
-        swrMutate(SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 })),
+        swrMutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true }),
         swrMutate(SWR_KEYS.refereeCounts),
       ]);
     },
