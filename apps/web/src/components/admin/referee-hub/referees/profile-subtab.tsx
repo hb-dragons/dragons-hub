@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR, { mutate as swrMutate } from "swr";
 import { useTranslations } from "next-intl";
 import { apiFetcher } from "@/lib/swr";
@@ -47,18 +47,36 @@ export function ProfileSubtab({ referee }: Props) {
   }, [referee.id, referee.isOwnClub, referee.allowAllHomeGames, referee.allowAwayGames]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  const dirtyVisibilityRef = useRef(false);
+  const dirtyRulesRef = useRef(false);
+
   const { status, lastSavedAt, markDirty, saveNow } = useAutoSave({
     save: async () => {
-      await Promise.all([
-        fetchAPI(`/admin/referees/${referee.id}/visibility`, {
-          method: "PATCH",
-          body: JSON.stringify(visibility),
-        }),
-        fetchAPI(`/admin/referees/${referee.id}/rules`, {
-          method: "PATCH",
-          body: JSON.stringify({ rules: rules.filter((r) => r.deny || r.allowSr1 || r.allowSr2) }),
-        }),
-      ]);
+      const patches: Promise<unknown>[] = [];
+
+      if (dirtyVisibilityRef.current) {
+        patches.push(
+          fetchAPI(`/admin/referees/${referee.id}/visibility`, {
+            method: "PATCH",
+            body: JSON.stringify(visibility),
+          }),
+        );
+      }
+
+      if (dirtyRulesRef.current && rulesData) {
+        patches.push(
+          fetchAPI(`/admin/referees/${referee.id}/rules`, {
+            method: "PATCH",
+            body: JSON.stringify({ rules: rules.filter((r) => r.deny || r.allowSr1 || r.allowSr2) }),
+          }),
+        );
+      }
+
+      await Promise.all(patches);
+
+      dirtyVisibilityRef.current = false;
+      dirtyRulesRef.current = false;
+
       await Promise.all([
         swrMutate(SWR_KEYS.refereeRules(referee.id)),
         swrMutate(SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 })),
@@ -66,24 +84,34 @@ export function ProfileSubtab({ referee }: Props) {
     },
   });
 
+  function markVisibilityDirty() {
+    dirtyVisibilityRef.current = true;
+    markDirty();
+  }
+
+  function markRulesDirty() {
+    dirtyRulesRef.current = true;
+    markDirty();
+  }
+
   function patchVisibility(p: Partial<typeof visibility>) {
     setVisibility((v) => ({ ...v, ...p }));
-    markDirty();
+    markVisibilityDirty();
   }
 
   function addRule() {
     setRules((r) => [...r, { teamId: teamsData[0]?.id ?? 0, deny: false, allowSr1: false, allowSr2: true }]);
-    markDirty();
+    markRulesDirty();
   }
 
   function updateRule(i: number, p: Partial<Rule>) {
     setRules((r) => r.map((x, idx) => (idx === i ? { ...x, ...p } : x)));
-    markDirty();
+    markRulesDirty();
   }
 
   function removeRule(i: number) {
     setRules((r) => r.filter((_, idx) => idx !== i));
-    markDirty();
+    markRulesDirty();
   }
 
   return (
