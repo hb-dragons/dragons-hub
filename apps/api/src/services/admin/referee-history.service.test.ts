@@ -525,6 +525,21 @@ describe("getRefereeHistoryGames", () => {
   });
 });
 
+describe("getRefereeHistoryGames sr*RefereeApiId projection", () => {
+  beforeEach(async () => { await seedReferees(); });
+
+  it("returns sr1RefereeApiId and sr2RefereeApiId on each item", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1 }),
+    ]);
+    const result = await getRefereeHistoryGames({ limit: 10, offset: 0, refereeApiId: 100, status: [], dateFrom: "2025-08-01", dateTo: "2026-07-31" });
+    for (const item of result.items) {
+      expect(item).toHaveProperty("sr1RefereeApiId");
+      expect(item).toHaveProperty("sr2RefereeApiId");
+    }
+  });
+});
+
 describe("getRefereeHistoryGames refereeApiId filter", () => {
   beforeEach(async () => { await seedReferees(); });
 

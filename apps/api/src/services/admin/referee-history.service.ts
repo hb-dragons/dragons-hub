@@ -301,6 +301,8 @@ export async function getRefereeHistoryGames(
     sr2Name: refereeGames.sr2Name,
     sr1Status: refereeGames.sr1Status,
     sr2Status: refereeGames.sr2Status,
+    sr1RefereeApiId: refereeGames.sr1RefereeApiId,
+    sr2RefereeApiId: refereeGames.sr2RefereeApiId,
     isCancelled: refereeGames.isCancelled,
     isForfeited: refereeGames.isForfeited,
     isHomeGame: refereeGames.isHomeGame,
