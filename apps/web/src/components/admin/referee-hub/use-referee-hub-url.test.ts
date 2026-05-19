@@ -17,6 +17,8 @@ describe("parseHubUrl", () => {
         gameType: "both",
       },
       scope: "own",
+      search: "",
+      sort: "name",
     });
   });
 
@@ -37,6 +39,8 @@ describe("parseHubUrl", () => {
         gameType: "both",
       },
       scope: "own",
+      search: "",
+      sort: "name",
     });
   });
 
@@ -74,6 +78,8 @@ describe("buildHubUrl", () => {
         subtab: "profile",
         filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
         scope: "own",
+        search: "",
+        sort: "name",
       }),
     ).toBe("");
   });
@@ -87,6 +93,8 @@ describe("buildHubUrl", () => {
         subtab: "profile",
         filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
         scope: "own",
+        search: "",
+        sort: "name",
       }),
     ).toBe("tab=referees&id=42");
   });
@@ -100,6 +108,8 @@ describe("buildHubUrl", () => {
         subtab: "profile",
         filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
         scope: "own",
+        search: "",
+        sort: "name",
       }),
     ).toBe("game=4287");
   });
@@ -113,6 +123,8 @@ describe("buildHubUrl", () => {
         subtab: "history",
         filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
         scope: "own",
+        search: "",
+        sort: "name",
       }),
     ).toBe("tab=referees&id=42&subtab=history");
   });
@@ -149,7 +161,38 @@ describe("hub URL state — open-slots filters", () => {
       subtab: "profile",
       filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
       scope: "own",
+      search: "",
+      sort: "name",
     });
     expect(url).toBe("");
+  });
+});
+
+describe("hub URL state — search and sort", () => {
+  it("parses search and sort from query, with defaults", () => {
+    expect(parseHubUrl(new URLSearchParams("")).search).toBe("");
+    expect(parseHubUrl(new URLSearchParams("")).sort).toBe("name");
+    expect(parseHubUrl(new URLSearchParams("search=mei&sort=workloadDesc")).search).toBe("mei");
+    expect(parseHubUrl(new URLSearchParams("search=mei&sort=workloadDesc")).sort).toBe("workloadDesc");
+  });
+
+  it("ignores invalid sort and falls back to name", () => {
+    expect(parseHubUrl(new URLSearchParams("sort=bogus")).sort).toBe("name");
+  });
+
+  it("serializes only non-default search/sort under referees tab", () => {
+    const filters = { status: "open" as const, league: [], dateFrom: null, dateTo: null, gameType: "both" as const };
+    const qs = buildHubUrl({
+      tab: "referees",
+      gameId: null,
+      refereeId: null,
+      subtab: "profile",
+      filters,
+      scope: "own",
+      search: "mei",
+      sort: "workloadDesc",
+    });
+    expect(qs).toContain("search=mei");
+    expect(qs).toContain("sort=workloadDesc");
   });
 });

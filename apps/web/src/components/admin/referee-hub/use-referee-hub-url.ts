@@ -5,9 +5,10 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 export type HubTab = "open-slots" | "referees";
 export type HubSubtab = "profile" | "upcoming" | "history" | "rules";
-export type HubStatus = "open" | "offered" | "any";
-export type HubGameType = "home" | "away" | "both";
-export type HubScope = "own" | "all";
+type HubStatus = "open" | "offered" | "any";
+type HubGameType = "home" | "away" | "both";
+type HubScope = "own" | "all";
+export type HubSort = "name" | "workloadAsc" | "workloadDesc";
 
 export interface HubFilters {
   status: HubStatus;
@@ -24,6 +25,8 @@ export interface HubState {
   subtab: HubSubtab;
   filters: HubFilters;
   scope: HubScope;
+  search: string;
+  sort: HubSort;
 }
 
 const TABS: readonly HubTab[] = ["open-slots", "referees"];
@@ -31,6 +34,7 @@ const SUBTABS: readonly HubSubtab[] = ["profile", "upcoming", "history", "rules"
 const STATUSES: readonly HubStatus[] = ["open", "offered", "any"];
 const GAME_TYPES: readonly HubGameType[] = ["home", "away", "both"];
 const SCOPES: readonly HubScope[] = ["own", "all"];
+const SORTS: readonly HubSort[] = ["name", "workloadAsc", "workloadDesc"];
 
 const DEFAULT_FILTERS: HubFilters = {
   status: "open",
@@ -47,6 +51,8 @@ const DEFAULT_STATE: HubState = {
   subtab: "profile",
   filters: DEFAULT_FILTERS,
   scope: "own",
+  search: "",
+  sort: "name",
 };
 
 function parseId(value: string | null): number | null {
@@ -74,6 +80,8 @@ export function parseHubUrl(params: URLSearchParams): HubState {
       gameType: clamp(params.get("gameType"), GAME_TYPES, DEFAULT_FILTERS.gameType),
     },
     scope: clamp(params.get("scope"), SCOPES, DEFAULT_STATE.scope),
+    search: params.get("search") ?? "",
+    sort: clamp(params.get("sort"), SORTS, DEFAULT_STATE.sort),
   };
 }
 
@@ -84,6 +92,8 @@ export function buildHubUrl(state: HubState): string {
   if (state.tab === "referees" && state.refereeId !== null) params.set("id", String(state.refereeId));
   if (state.tab === "referees" && state.subtab !== DEFAULT_STATE.subtab) params.set("subtab", state.subtab);
   if (state.tab === "referees" && state.scope !== DEFAULT_STATE.scope) params.set("scope", state.scope);
+  if (state.tab === "referees" && state.search !== DEFAULT_STATE.search) params.set("search", state.search);
+  if (state.tab === "referees" && state.sort !== DEFAULT_STATE.sort) params.set("sort", state.sort);
   if (state.tab === "open-slots") {
     if (state.filters.status !== DEFAULT_FILTERS.status) params.set("status", state.filters.status);
     if (state.filters.league.length > 0) params.set("league", state.filters.league.join(","));
