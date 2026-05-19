@@ -72,7 +72,7 @@ describe("GET /referee/games/:spielplanId/candidates", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ total: 3 });
-    expect(mocks.searchCandidates).toHaveBeenCalledWith(12345, "Max", 0, 15);
+    expect(mocks.searchCandidates).toHaveBeenCalledWith(12345, "Max", 0, 15, "either");
   });
 
   it("returns 400 for invalid spielplanId (0 or negative)", async () => {
@@ -99,6 +99,30 @@ describe("GET /referee/games/:spielplanId/candidates", () => {
 
     const res2 = await app.request("/referee/games/12345/candidates?slotNumber=1&pageSize=101");
     expect(res2.status).toBe(400);
+  });
+
+  it("passes slot=1 to searchCandidates as eligibility slot 1", async () => {
+    mocks.searchCandidates.mockResolvedValue({ total: 0, results: [] });
+
+    await app.request("/referee/games/12345/candidates?slot=1");
+
+    expect(mocks.searchCandidates).toHaveBeenCalledWith(12345, "", 0, 15, 1);
+  });
+
+  it("passes slot=2 to searchCandidates as eligibility slot 2", async () => {
+    mocks.searchCandidates.mockResolvedValue({ total: 0, results: [] });
+
+    await app.request("/referee/games/12345/candidates?slot=2");
+
+    expect(mocks.searchCandidates).toHaveBeenCalledWith(12345, "", 0, 15, 2);
+  });
+
+  it("defaults to 'either' when slot is omitted", async () => {
+    mocks.searchCandidates.mockResolvedValue({ total: 0, results: [] });
+
+    await app.request("/referee/games/12345/candidates");
+
+    expect(mocks.searchCandidates).toHaveBeenCalledWith(12345, "", 0, 15, "either");
   });
 
   it("returns mapped error status for AssignmentError", async () => {

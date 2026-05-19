@@ -37,6 +37,8 @@ adminRefereeAssignmentRoutes.get(
     const search = c.req.query("search") ?? "";
     const pageFrom = Number(c.req.query("pageFrom") ?? "0");
     const pageSize = Number(c.req.query("pageSize") ?? "15");
+    const slotRaw = c.req.query("slot");
+    const slot = slotRaw === "1" ? 1 : slotRaw === "2" ? 2 : undefined;
 
     if (!Number.isInteger(pageFrom) || pageFrom < 0) {
       return c.json({ error: "Invalid pageFrom", code: "VALIDATION_ERROR" }, 400);
@@ -45,8 +47,10 @@ adminRefereeAssignmentRoutes.get(
       return c.json({ error: "Invalid pageSize", code: "VALIDATION_ERROR" }, 400);
     }
 
+    const eligibilitySlot = slot === 1 ? (1 as const) : slot === 2 ? (2 as const) : ("either" as const);
+
     try {
-      const result = await searchCandidates(spielplanId, search, pageFrom, pageSize);
+      const result = await searchCandidates(spielplanId, search, pageFrom, pageSize, eligibilitySlot);
       return c.json(result);
     } catch (error) {
       if (error instanceof AssignmentError) {

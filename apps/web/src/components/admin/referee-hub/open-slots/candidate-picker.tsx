@@ -43,7 +43,7 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
   const [page, setPage] = useState(0);
 
   const { data } = useSWR<CandidateSearchResponse>(
-    SWR_KEYS.refereeCandidates(gameApiId, debounced, page),
+    SWR_KEYS.refereeCandidates(gameApiId, debounced, page, slotNumber),
     apiFetcher,
   );
 
