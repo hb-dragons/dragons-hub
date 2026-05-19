@@ -19,8 +19,9 @@ export function RefereeDetail({ refereeId }: Props) {
   const t = useTranslations("refereeHub.referees");
   const { state, update } = useRefereeHubUrl();
 
-  const { data: ref } = useSWR<RefereeListItem | null>(SWR_KEYS.referee(refereeId), apiFetcher);
+  const { data: ref, isLoading } = useSWR<RefereeListItem | null>(SWR_KEYS.referee(refereeId), apiFetcher);
 
+  if (isLoading && !ref) return <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>;
   if (!ref) return <div className="p-6 text-sm text-muted-foreground">{t("notFound")}</div>;
 
   return (

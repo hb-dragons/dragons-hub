@@ -1347,6 +1347,7 @@
         "statusCancelled": "Abgesagt",
         "statusForfeited": "Forfeit"
       },
+      "loading": "Lädt…",
       "notFound": "Schiedsrichter nicht gefunden",
       "ownClubBadge": "Vereinseigen",
       "rules": {

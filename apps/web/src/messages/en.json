@@ -1347,6 +1347,7 @@
         "statusCancelled": "Cancelled",
         "statusForfeited": "Forfeited"
       },
+      "loading": "Loading…",
       "notFound": "Referee not found",
       "ownClubBadge": "Own-club",
       "rules": {

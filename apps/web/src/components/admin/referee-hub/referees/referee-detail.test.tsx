@@ -14,6 +14,7 @@ vi.mock("../use-referee-hub-url", () => ({
 }));
 
 const messages = { refereeHub: { referees: {
+  loading: "Loading…",
   notFound: "Referee not found",
   ownClubBadge: "Own club",
   subtabs: { profile: "Profile", rules: "Rules", upcoming: "Upcoming", history: "History" },
@@ -38,9 +39,17 @@ describe("RefereeDetail", () => {
 
   it("renders notFound message when SWR returns null", async () => {
     const useSWR = (await import("swr")).default;
-    vi.mocked(useSWR).mockReturnValue({ data: null } as never);
+    vi.mocked(useSWR).mockReturnValue({ data: null, isLoading: false } as never);
     render(wrap(<RefereeDetail refereeId={999} />));
     expect(screen.getByText(/Referee not found/)).toBeInTheDocument();
+  });
+
+  it("renders loading message when SWR is in-flight (data undefined)", async () => {
+    const useSWR = (await import("swr")).default;
+    vi.mocked(useSWR).mockReturnValue({ data: undefined, isLoading: true } as never);
+    render(wrap(<RefereeDetail refereeId={42} />));
+    expect(screen.getByText(/Loading…/)).toBeInTheDocument();
+    expect(screen.queryByText(/Referee not found/)).not.toBeInTheDocument();
   });
 
   it("disables the Rules tab when isOwnClub is false", async () => {
