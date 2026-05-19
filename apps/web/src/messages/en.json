@@ -192,7 +192,10 @@
       "openProfile": "Open ref profile",
       "empty": "No games for this ref in range.",
       "gamesCount": "Games · {count}",
-      "role": { "sr1": "SR1", "sr2": "SR2" },
+      "role": {
+        "sr1": "SR1",
+        "sr2": "SR2"
+      },
       "stats": {
         "total": "Total",
         "sr1": "SR1",
@@ -1277,28 +1280,69 @@
       },
       "filters": {
         "status": "Status",
-        "statusValue": { "open": "Open only", "offered": "Open + Offered", "any": "Any" },
+        "statusValue": {
+          "open": "Open only",
+          "offered": "Open + Offered",
+          "any": "Any"
+        },
         "league": "League",
         "noLeagues": "No leagues loaded",
         "date": "Date",
-        "datePreset": { "14d": "Next 14 days", "30d": "Next 30 days", "season": "Whole season", "custom": "Custom range" },
+        "datePreset": {
+          "14d": "Next 14 days",
+          "30d": "Next 30 days",
+          "season": "Whole season",
+          "custom": "Custom range"
+        },
         "dateFrom": "From",
         "dateTo": "To",
         "gameType": "Game type",
-        "gameTypeValue": { "home": "Home", "away": "Away" },
+        "gameTypeValue": {
+          "home": "Home",
+          "away": "Away"
+        },
         "reset": "Reset filters"
       }
     },
     "referees": {
-      "kpi": { "total": "Total games", "refs": "Referees", "workload": "Avg workload" },
-      "columns": { "ref": "Referee", "own": "Own-club", "games": "Games" },
+      "kpi": {
+        "ownClubRefs": "Own-club refs",
+        "avgMatches": "Avg matches/ref"
+      },
+      "columns": {
+        "ref": "Referee",
+        "own": "Own-club",
+        "games": "Games"
+      },
       "search": "Search referees…",
-      "sort": { "name": "Sort: Name", "workloadDesc": "Games (high → low)", "workloadAsc": "Games (low → high)" },
+      "sort": {
+        "name": "Sort: Name",
+        "workloadDesc": "Games (high → low)",
+        "workloadAsc": "Games (low → high)"
+      },
       "empty": "No referees match your filters",
       "profile": {
-        "visibility": { "title": "Visibility", "ownClub": "Own-club referee", "allHome": "Allow all home games", "away": "Allow away games" },
-        "rules": { "title": "Per-team rules", "add": "Add rule", "deny": "Deny", "allow": "Allow", "selectTeam": "Team", "none": "No team rules — federation defaults apply" },
-        "save": { "saving": "Saving…", "saved": "Saved {n}s ago", "dirty": "Unsaved changes", "error": "Save failed", "now": "Save now" }
+        "visibility": {
+          "title": "Visibility",
+          "ownClub": "Own-club referee",
+          "allHome": "Allow all home games",
+          "away": "Allow away games"
+        },
+        "rules": {
+          "title": "Per-team rules",
+          "add": "Add rule",
+          "deny": "Deny",
+          "allow": "Allow",
+          "selectTeam": "Team",
+          "none": "No team rules — federation defaults apply"
+        },
+        "save": {
+          "saving": "Saving…",
+          "saved": "Saved {n}s ago",
+          "dirty": "Unsaved changes",
+          "error": "Save failed",
+          "now": "Save now"
+        }
       },
       "upcoming": {
         "assigned": "Assigned",
@@ -1316,8 +1360,16 @@
       },
       "notFound": "Referee not found",
       "ownClubBadge": "Own-club",
-      "subtabs": { "profile": "Profile", "upcoming": "Upcoming", "history": "History" },
-      "selectPrompt": "Pick a referee to see their config + history"
+      "subtabs": {
+        "profile": "Profile",
+        "upcoming": "Upcoming",
+        "history": "History"
+      },
+      "selectPrompt": "Pick a referee to see their config + history",
+      "scope": {
+        "own": "Own ({n})",
+        "all": "All ({n})"
+      }
     }
   },
   "errors": {
