@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import useSWR, { mutate as swrMutate } from "swr";
+import { useTimeAgo } from "./use-time-ago";
 import { useTranslations } from "next-intl";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -88,8 +89,7 @@ export function RulesSubtab({ referee }: Props) {
 
   const isDirty = status === "dirty" || status === "error";
   const saveDisabled = status === "idle" || status === "saving" || status === "saved";
-  // eslint-disable-next-line react-hooks/purity
-  const secondsAgo = lastSavedAt ? Math.max(1, Math.floor((Date.now() - lastSavedAt) / 1000)) : 0;
+  const secondsAgo = useTimeAgo(lastSavedAt, status === "saved");
 
   return (
     <div className="space-y-4 p-4">

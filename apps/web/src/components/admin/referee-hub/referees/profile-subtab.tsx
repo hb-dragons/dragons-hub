@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { fetchAPI } from "@/lib/api";
 import { useAutoSave } from "./use-auto-save";
+import { useTimeAgo } from "./use-time-ago";
 import { Switch } from "@dragons/ui/components/switch";
 import { Label } from "@dragons/ui/components/label";
 import { Button } from "@dragons/ui/components/button";
@@ -81,8 +82,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function SaveStatusBar({ status, lastSavedAt, onSaveNow }: { status: string; lastSavedAt: number | null; onSaveNow: () => void }) {
   const t = useTranslations("refereeHub.referees.profile.save");
-  // eslint-disable-next-line react-hooks/purity
-  const secondsAgo = lastSavedAt ? Math.max(1, Math.floor((Date.now() - lastSavedAt) / 1000)) : 0;
+  const secondsAgo = useTimeAgo(lastSavedAt, status === "saved");
   const text =
     status === "saving" ? t("saving") :
     status === "dirty" ? t("dirty") :
