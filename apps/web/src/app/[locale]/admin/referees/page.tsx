@@ -12,14 +12,23 @@ export default async function RefereesPage() {
 
   const fallback: Record<string, unknown> = {};
 
+  const refereesKey = SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 });
+  const today = new Date().toISOString().slice(0, 10);
+  const to = new Date(); to.setDate(to.getDate() + 14);
+  const gamesKey = SWR_KEYS.refereeGamesFiltered({
+    status: "active",
+    dateFrom: today,
+    dateTo: to.toISOString().slice(0, 10),
+    gameType: "both",
+    limit: 200,
+  });
+
   try {
-    const referees = await fetchAPIServer<unknown>("/admin/referees");
-    fallback[SWR_KEYS.referees(true)] = referees;
+    fallback[refereesKey] = await fetchAPIServer<unknown>(refereesKey);
   } catch {}
 
   try {
-    const refereeGames = await fetchAPIServer<unknown>(SWR_KEYS.refereeGames);
-    fallback[SWR_KEYS.refereeGames] = refereeGames;
+    fallback[gamesKey] = await fetchAPIServer<unknown>(gamesKey);
   } catch {}
 
   return (
