@@ -19,7 +19,7 @@ function makeCandidate(over: Record<string, unknown> = {}) {
   };
 }
 
-let swrReturnValue: any = null;
+let swrReturnValue: { data?: unknown; error?: unknown } | null = null;
 
 vi.mock("swr", () => ({
   default: vi.fn(() => {
