@@ -1241,13 +1241,6 @@
       "openSlots": "Open Slots",
       "referees": "Referees"
     },
-    "range": {
-      "label": "Range",
-      "season": "Season",
-      "30d": "Last 30 days",
-      "month": "This month",
-      "custom": "Custom"
-    },
     "openSlots": {
       "searchPlaceholder": "Search game…",
       "loading": "Loading…",

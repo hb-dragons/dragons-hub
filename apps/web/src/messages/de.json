@@ -1241,13 +1241,6 @@
       "openSlots": "Offene Spiele",
       "referees": "Schiedsrichter"
     },
-    "range": {
-      "label": "Zeitraum",
-      "season": "Saison",
-      "30d": "Letzte 30 Tage",
-      "month": "Diesen Monat",
-      "custom": "Benutzerdefiniert"
-    },
     "openSlots": {
       "searchPlaceholder": "Spiel suchen…",
       "loading": "Lädt…",
