@@ -322,55 +322,68 @@ describe("getRefereeGames", () => {
     expect(result.items).toHaveLength(1);
   });
 
-  it("slotStatus=open returns rows where sr1 OR sr2 is open", async () => {
-    // Fixtures: one with sr1=open+sr2=assigned, one with sr1=assigned+sr2=open
-    const rowOpenSr1 = makeGameRow({ id: 1, sr1Status: "open", sr2Status: "assigned" });
-    const rowOpenSr2 = makeGameRow({ id: 2, sr1Status: "assigned", sr2Status: "open" });
+  it("slotStatus=open adds an or() clause covering sr1Status and sr2Status", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
     mockSelect
-      .mockReturnValueOnce(buildChain([rowOpenSr1, rowOpenSr2]))
-      .mockReturnValueOnce(buildChain([{ count: 2 }]));
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
 
-    const result = await getRefereeGames({ limit: 100, offset: 0, slotStatus: "open" });
+    await getRefereeGames({ limit: 50, offset: 0, slotStatus: "open" });
 
-    for (const g of result.items) {
-      expect(g.sr1Status === "open" || g.sr2Status === "open").toBe(true);
-    }
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const serialized = JSON.stringify(whereArg);
+    expect(serialized).toMatch(/sr1Status/i);
+    expect(serialized).toMatch(/sr2Status/i);
+    // The or() clause must reference "open" for both slots
+    expect(serialized).toMatch(/"open"/);
   });
 
-  it("slotStatus=offered returns rows where sr1 OR sr2 is open or offered", async () => {
-    // Fixtures: open+assigned, offered+assigned, assigned+offered, assigned+open
-    const rowOpenSr1 = makeGameRow({ id: 1, sr1Status: "open", sr2Status: "assigned" });
-    const rowOfferedSr1 = makeGameRow({ id: 2, sr1Status: "offered", sr2Status: "assigned" });
-    const rowOfferedSr2 = makeGameRow({ id: 3, sr1Status: "assigned", sr2Status: "offered" });
-    const rowOpenSr2 = makeGameRow({ id: 4, sr1Status: "assigned", sr2Status: "open" });
+  it("slotStatus=offered adds an or() clause covering open and offered for both slots", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
     mockSelect
-      .mockReturnValueOnce(buildChain([rowOpenSr1, rowOfferedSr1, rowOfferedSr2, rowOpenSr2]))
-      .mockReturnValueOnce(buildChain([{ count: 4 }]));
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
 
-    const result = await getRefereeGames({ limit: 100, offset: 0, slotStatus: "offered" });
+    await getRefereeGames({ limit: 50, offset: 0, slotStatus: "offered" });
 
-    for (const g of result.items) {
-      const ok =
-        g.sr1Status === "open" || g.sr2Status === "open" ||
-        g.sr1Status === "offered" || g.sr2Status === "offered";
-      expect(ok).toBe(true);
-    }
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const serialized = JSON.stringify(whereArg);
+    expect(serialized).toMatch(/sr1Status/i);
+    expect(serialized).toMatch(/sr2Status/i);
+    expect(serialized).toMatch(/"open"/);
+    expect(serialized).toMatch(/"offered"/);
   });
 
-  it("slotStatus=any composes with status=active and excludes cancelled/forfeited", async () => {
-    // Fixtures: two active rows (slotStatus=any means no slot filter, status=active excludes cancelled/forfeited)
-    const row1 = makeGameRow({ id: 1, isCancelled: false, isForfeited: false, sr1Status: "assigned", sr2Status: "assigned" });
-    const row2 = makeGameRow({ id: 2, isCancelled: false, isForfeited: false, sr1Status: "open", sr2Status: "assigned" });
+  it("slotStatus=any does not add an sr1Status/sr2Status clause", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
     mockSelect
-      .mockReturnValueOnce(buildChain([row1, row2]))
-      .mockReturnValueOnce(buildChain([{ count: 2 }]));
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
 
-    const result = await getRefereeGames({ limit: 100, offset: 0, status: "active", slotStatus: "any" });
+    await getRefereeGames({ limit: 50, offset: 0, slotStatus: "any" });
 
-    for (const g of result.items) {
-      expect(g.isCancelled).toBe(false);
-      expect(g.isForfeited).toBe(false);
-    }
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const serialized = JSON.stringify(whereArg);
+    expect(serialized).not.toMatch(/sr1Status/i);
+    expect(serialized).not.toMatch(/sr2Status/i);
+  });
+
+  it("no slotStatus does not add an sr1Status/sr2Status clause", async () => {
+    const dataChain = buildChain([]);
+    const countChain = buildChain([{ count: 0 }]);
+    mockSelect
+      .mockReturnValueOnce(dataChain)
+      .mockReturnValueOnce(countChain);
+
+    await getRefereeGames({ limit: 50, offset: 0 });
+
+    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const serialized = JSON.stringify(whereArg);
+    expect(serialized).not.toMatch(/sr1Status/i);
+    expect(serialized).not.toMatch(/sr2Status/i);
   });
 });
 
