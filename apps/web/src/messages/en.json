@@ -511,7 +511,6 @@
       "firstName": "First Name",
       "licenseNumber": "License #",
       "matchCount": "Matches",
-      "roles": "Roles",
       "apiId": "API ID",
       "isOwnClub": "Own Club"
     },
@@ -1324,14 +1323,6 @@
           "ownClub": "Own-club referee",
           "allHome": "Allow all home games",
           "away": "Allow away games"
-        },
-        "rules": {
-          "title": "Per-team rules",
-          "add": "Add rule",
-          "deny": "Deny",
-          "allow": "Allow",
-          "selectTeam": "Team",
-          "none": "No team rules — federation defaults apply"
         },
         "save": {
           "saving": "Saving…",

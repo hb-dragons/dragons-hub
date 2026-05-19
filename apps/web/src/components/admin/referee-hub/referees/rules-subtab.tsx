@@ -88,6 +88,8 @@ export function RulesSubtab({ referee }: Props) {
 
   const isDirty = status === "dirty" || status === "error";
   const saveDisabled = status === "idle" || status === "saving" || status === "saved";
+  // eslint-disable-next-line react-hooks/purity
+  const secondsAgo = lastSavedAt ? Math.max(1, Math.floor((Date.now() - lastSavedAt) / 1000)) : 0;
 
   return (
     <div className="space-y-4 p-4">
@@ -143,7 +145,7 @@ export function RulesSubtab({ referee }: Props) {
         <span className={status === "error" ? "text-destructive" : "text-muted-foreground"}>
           {status === "saving" ? tSave("saving") :
            status === "dirty"  ? tSave("dirty") :
-           status === "saved"  ? tSave("saved", { n: String(Math.max(1, Math.floor(((Date.now() - (lastSavedAt ?? Date.now())) / 1000)))) }) :
+           status === "saved"  ? tSave("saved", { n: String(secondsAgo) }) :
            status === "error"  ? tSave("error", { msg: errorMsg ?? "" }) :
            ""}
         </span>

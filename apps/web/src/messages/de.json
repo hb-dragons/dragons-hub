@@ -511,7 +511,6 @@
       "firstName": "Vorname",
       "licenseNumber": "Lizenz-Nr.",
       "matchCount": "Spiele",
-      "roles": "Rollen",
       "apiId": "API-ID",
       "isOwnClub": "Eigener Verein"
     },
@@ -1324,14 +1323,6 @@
           "ownClub": "Vereinseigener Schiedsrichter",
           "allHome": "Alle Heimspiele erlauben",
           "away": "Auswärtsspiele erlauben"
-        },
-        "rules": {
-          "title": "Team-Regeln",
-          "add": "Regel hinzufügen",
-          "deny": "Ablehnen",
-          "allow": "Erlauben",
-          "selectTeam": "Team",
-          "none": "Keine Team-Regeln — Standard gilt"
         },
         "save": {
           "saving": "Speichern…",

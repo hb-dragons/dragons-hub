@@ -32,7 +32,9 @@ export default async function RefereesPage() {
       month: "2-digit",
       day: "2-digit",
     });
-    return fmt.format(new Date(Date.now() + days * 86400_000));
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return fmt.format(d);
   }
 
   const TZ = "Europe/Berlin";
