@@ -1358,6 +1358,7 @@
         "selectTeam": "Team",
         "none": "Keine Regeln",
         "disabledHint": "Schiedsrichter erst als vereinseigen markieren",
+        "markOwnClub": "Als eigenen Verein markieren",
         "save": {
           "save": "Speichern",
           "discard": "Verwerfen",

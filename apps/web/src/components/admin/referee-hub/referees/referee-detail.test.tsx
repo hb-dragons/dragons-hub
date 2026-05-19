@@ -52,10 +52,10 @@ describe("RefereeDetail", () => {
     expect(screen.queryByText(/Referee not found/)).not.toBeInTheDocument();
   });
 
-  it("disables the Rules tab when isOwnClub is false", async () => {
+  it("renders the Rules tab as enabled for non-own-club refs (subtab shows CTA instead)", async () => {
     const useSWR = (await import("swr")).default;
-    vi.mocked(useSWR).mockReturnValue({ data: { id: 1, firstName: "A", lastName: "B", apiId: 1, licenseNumber: 0, isOwnClub: false, matchCount: 0 } } as never);
+    vi.mocked(useSWR).mockReturnValue({ data: { id: 1, firstName: "A", lastName: "B", apiId: 1, licenseNumber: 0, isOwnClub: false, matchCount: 0 }, isLoading: false } as never);
     render(wrap(<RefereeDetail refereeId={1} />));
-    expect(screen.getByRole("tab", { name: /rules/i })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: /rules/i })).not.toBeDisabled();
   });
 });

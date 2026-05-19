@@ -36,7 +36,7 @@ export function RefereeDetail({ refereeId }: Props) {
       <Tabs value={state.subtab} onValueChange={(v) => update({ subtab: v as HubSubtab })}>
         <TabsList className="m-4">
           <TabsTrigger value="profile">{t("subtabs.profile")}</TabsTrigger>
-          <TabsTrigger value="rules" disabled={!ref.isOwnClub} title={!ref.isOwnClub ? t("rules.disabledHint") : undefined}>
+          <TabsTrigger value="rules">
             {t("subtabs.rules")}
           </TabsTrigger>
           <TabsTrigger value="upcoming">{t("subtabs.upcoming")}</TabsTrigger>
