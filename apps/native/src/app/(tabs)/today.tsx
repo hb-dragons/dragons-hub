@@ -4,19 +4,14 @@ import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
-import { authClient } from "@/lib/auth-client";
+import { useGateUser } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 import { useTodayItems } from "@/lib/today/registry";
 
 export default function TodayScreen() {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
-  const { data: session } = authClient.useSession();
-  const user = (session?.user ?? null) as
-    | { role?: string | null; refereeId?: number | null }
-    | null;
-
-  const items = useTodayItems(user);
+  const items = useTodayItems(useGateUser());
 
   return (
     <Screen>

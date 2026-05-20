@@ -1,18 +1,16 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { selectTabs } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
-import { authClient } from "@/lib/auth-client";
+import { useGateUser } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 import { TAB_CONFIG } from "@/lib/nav/tabs";
 
 export default function TabLayout() {
   const { colors } = useTheme();
-  const { data: session } = authClient.useSession();
-  const tabs = selectTabs(
-    (session?.user ?? null) as
-      | { role?: string | null; refereeId?: number | null }
-      | null,
-  );
+  // Changing the visible trigger set on sign-in/out remounts the navigator and
+  // resets tab state. That's fine here: auth transitions route to a fresh screen
+  // (/today on sign-in, / on sign-out), so there's no in-tab state to preserve.
+  const tabs = selectTabs(useGateUser());
 
   return (
     <NativeTabs tintColor={colors.primary}>

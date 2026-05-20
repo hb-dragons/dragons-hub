@@ -9,7 +9,7 @@ import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
-import { authClient } from "@/lib/auth-client";
+import { useGateUser } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 import { NATIVE_SURFACES } from "@/lib/tools/surfaces";
 
@@ -24,14 +24,9 @@ const GROUP_LABEL: Record<SurfaceGroup, string> = {
 export default function ToolsScreen() {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
-  const { data: session } = authClient.useSession();
-
-  const user = (session?.user ?? null) as
-    | { role?: string | null; refereeId?: number | null }
-    | null;
 
   // Surfaces the user can see AND that have a native screen.
-  const rows = visibleSurfaces(user)
+  const rows = visibleSurfaces(useGateUser())
     .map((s) => NATIVE_SURFACES[s.id])
     .filter((s): s is NonNullable<typeof s> => Boolean(s));
 
