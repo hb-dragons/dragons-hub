@@ -30,4 +30,22 @@ describe("selectTabs", () => {
       "tools",
     ]);
   });
+  it.each([
+    ["venueManager", "venueManager"],
+    ["teamManager", "teamManager"],
+    ["coach", "coach"],
+    ["multi-role", "venueManager,teamManager"],
+  ])("a %s staff user gets Tools", (_label, role) => {
+    expect(selectTabs({ role })).toEqual([
+      "home",
+      "schedule",
+      "today",
+      "teams",
+      "tools",
+    ]);
+  });
+  it("a signed-in member with no staff role gets Today but no Tools", () => {
+    // member/parent: no staff role and no refereeId => no surfaces
+    expect(selectTabs({ role: null })).toEqual(["home", "schedule", "today", "teams"]);
+  });
 });

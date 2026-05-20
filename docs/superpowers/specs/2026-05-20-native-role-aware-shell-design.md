@@ -125,10 +125,10 @@ Today renders the union of visible providers' items, ordered by urgency then pri
 
 ### New audiences as seams
 
-- **`coach` role** is added to `rbac.ts`: `ROLE_NAMES`, the `roles` map, and a minimal role grant (`team: ["view"]`). Team-scoping (which teams a coach manages) is row-level and deferred.
+- **`coach` role** is added to `rbac.ts`: `ROLE_NAMES`, the `roles` map, and a read-only grant of `team`, `match`, `standing`, and `board` (all `["view"]`). This is wider than the original `team: ["view"]` sketch: a coach should land with the read-only league context and the team Boards already useful on a phone, so the seam is immediately usable rather than inert. The grant surfaces those rows in both clients via the shared catalog. Team-scoping (which teams a coach manages) is row-level and deferred.
 - **`isMember(user)`** predicate is added to `rbac.ts`. Backend linkage (`user.memberId` or a membership join) is deferred.
 
-Both can return `false` / empty until backend work lands. The shell is ready for them without that work.
+`isMember` returns `false` until backend linkage lands. The shell is ready for both audiences without that work.
 
 ## Build-now vs. defer
 
