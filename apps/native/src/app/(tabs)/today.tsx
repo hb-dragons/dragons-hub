@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { Screen } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Card } from "@/components/Card";
@@ -35,7 +35,7 @@ export default function TodayScreen() {
           {items.map((item) => (
             <Pressable
               key={`${item.providerId}:${item.id}`}
-              onPress={() => router.push(item.route)}
+              onPress={() => router.push(item.route as Href)}
             >
               <Card>
                 <Text style={[textStyles.cardTitle, { color: colors.foreground }]}>

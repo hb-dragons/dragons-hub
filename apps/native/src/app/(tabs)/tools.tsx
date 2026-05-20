@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import {
   visibleSurfaces,
   SURFACE_GROUP_ORDER,
@@ -66,7 +66,7 @@ export default function ToolsScreen() {
               {i18n.t(GROUP_LABEL[group]).toUpperCase()}
             </Text>
             {items.map((item) => (
-              <Pressable key={item.id} onPress={() => router.push(item.route)}>
+              <Pressable key={item.id} onPress={() => router.push(item.route as Href)}>
                 <Card>
                   <Text style={[textStyles.cardTitle, { color: colors.foreground }]}>
                     {i18n.t(item.labelKey)}
