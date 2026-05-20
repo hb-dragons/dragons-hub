@@ -15,7 +15,6 @@ import { can, type RefereeGameListItem } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
 import { Screen } from "@/components/Screen";
-import { SectionHeader } from "@/components/SectionHeader";
 import { RefereeGameCard } from "@/components/RefereeGameCard";
 import { AssignRefereeModal } from "@/components/AssignRefereeModal";
 import { authClient } from "@/lib/auth-client";
@@ -308,7 +307,6 @@ export default function RefereeScreen() {
   if (isLoading) {
     return (
       <Screen scroll={false}>
-        <SectionHeader title={i18n.t("refereeTab.title")} />
         <View
           style={{
             flex: 1,
@@ -326,7 +324,6 @@ export default function RefereeScreen() {
   if (error) {
     return (
       <Screen scroll={false}>
-        <SectionHeader title={i18n.t("refereeTab.title")} />
         <View
           style={{
             flex: 1,
@@ -366,7 +363,6 @@ export default function RefereeScreen() {
 
   return (
     <Screen scroll={false}>
-      <SectionHeader title={i18n.t("refereeTab.title")} />
       <SegmentedControl segments={segments} selected={segment} onSelect={setSegment} />
       {sections.length === 0 ? (
         <View
