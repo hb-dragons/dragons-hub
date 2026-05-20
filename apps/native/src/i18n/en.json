@@ -218,6 +218,7 @@
     "invalidCredentials": "Invalid email or password",
     "staffSignInPrompt": "Sign in as referee or admin",
     "staffSignInHint": "Fans don't need an account to use the app.",
+    "noAccountHint": "No account? Ask your club admin to create one.",
     "tapToUnlock": "Tap to unlock",
     "close": "Close"
   },

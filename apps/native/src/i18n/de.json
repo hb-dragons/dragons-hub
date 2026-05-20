@@ -218,6 +218,7 @@
     "invalidCredentials": "Ungültige E-Mail oder Passwort",
     "staffSignInPrompt": "Als Schiedsrichter oder Admin anmelden",
     "staffSignInHint": "Als Fan brauchst du kein Konto.",
+    "noAccountHint": "Kein Konto? Bitte deinen Vereins-Admin, eines zu erstellen.",
     "tapToUnlock": "Tippen zum Entsperren",
     "close": "Schließen"
   },
