@@ -4,7 +4,28 @@
     "schedule": "Spielplan",
     "standings": "Tabelle",
     "teams": "Teams",
-    "referee": "Schiri"
+    "referee": "Schiri",
+    "today": "Heute",
+    "tools": "Verwaltung"
+  },
+  "today": {
+    "title": "Heute",
+    "empty": "Alles erledigt.",
+    "emptyHint": "Neue Aufgaben für deine Rollen erscheinen hier.",
+    "openSlots": "{count} offene Schiedsrichter-Slots brauchen Besetzung",
+    "nextAssignment": "Du pfeifst {teams}",
+    "nextGame": "Nächstes Spiel: {teams}"
+  },
+  "tools": {
+    "title": "Verwaltung",
+    "empty": "Keine Werkzeuge für dein Konto verfügbar.",
+    "groupLeague": "Liga",
+    "groupOperations": "Betrieb",
+    "groupSocial": "Social",
+    "groupNotifications": "Benachrichtigungen",
+    "groupSystem": "System",
+    "officiating": "Schiedsrichter",
+    "boards": "Boards"
   },
   "home": {
     "nextGame": "Nächstes Spiel",
