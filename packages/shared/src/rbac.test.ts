@@ -188,10 +188,12 @@ describe("coach role", () => {
     expect(ROLE_NAMES).toContain("coach");
     expect(parseRoles("coach")).toEqual(["coach"]);
   });
-  it("can view teams and matches but not manage venues", () => {
+  it("can view teams, matches, standings and boards but not manage venues", () => {
     expect(can(coach, "team", "view")).toBe(true);
     expect(can(coach, "match", "view")).toBe(true);
     expect(can(coach, "venue", "create")).toBe(false);
+    expect(can(coach, "standing", "view")).toBe(true);
+    expect(can(coach, "board", "view")).toBe(true);
   });
   it("hasRole detects it", () => {
     expect(hasRole(coach, "coach")).toBe(true);

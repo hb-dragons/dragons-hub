@@ -13,7 +13,7 @@ export interface Surface {
   visible: (user: GateUser) => boolean;
 }
 
-export const SURFACE_GROUP_ORDER: SurfaceGroup[] = [
+export const SURFACE_GROUP_ORDER: readonly SurfaceGroup[] = [
   "league",
   "operations",
   "social",
@@ -21,7 +21,7 @@ export const SURFACE_GROUP_ORDER: SurfaceGroup[] = [
   "system",
 ];
 
-export const SURFACES: Surface[] = [
+export const SURFACES: readonly Surface[] = [
   { id: "officiating", group: "league", visible: (u) => canViewOpenGames(u) },
   { id: "matches", group: "league", visible: (u) => can(u, "match", "view") },
   { id: "standings", group: "league", visible: (u) => can(u, "standing", "view") },

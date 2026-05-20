@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import { selectTabs } from "./nav-tabs";
 
 describe("selectTabs", () => {
+  it("treats undefined like anonymous", () => {
+    expect(selectTabs(undefined)).toEqual(["home", "schedule", "standings", "teams"]);
+  });
   it("anonymous users get the four fan tabs", () => {
     expect(selectTabs(null)).toEqual(["home", "schedule", "standings", "teams"]);
   });
