@@ -4,7 +4,6 @@
     "schedule": "Schedule",
     "standings": "Standings",
     "teams": "Teams",
-    "referee": "Referee",
     "today": "Today",
     "tools": "Tools"
   },
@@ -12,9 +11,9 @@
     "title": "Today",
     "empty": "You're all caught up.",
     "emptyHint": "New tasks for your roles will show up here.",
-    "openSlots": "{count} open referee slot(s) need cover",
-    "nextAssignment": "You officiate {teams}",
-    "nextGame": "Next game: {teams}"
+    "openSlots": "%{count} open referee slot(s) need cover",
+    "nextAssignment": "You officiate %{teams}",
+    "nextGame": "Next game: %{teams}"
   },
   "tools": {
     "title": "Tools",

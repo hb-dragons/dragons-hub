@@ -160,7 +160,7 @@ function SegmentedControl({
   );
 }
 
-export default function RefereeScreen() {
+export default function OfficiatingScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
   const router = useRouter();
 
