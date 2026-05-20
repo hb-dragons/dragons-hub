@@ -177,6 +177,7 @@ export default function ProfileScreen() {
                 refereeAdmin: "profile.roleRefereeAdmin",
                 venueManager: "profile.roleVenueManager",
                 teamManager: "profile.roleTeamManager",
+                coach: "profile.roleCoach",
               };
               return (
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>

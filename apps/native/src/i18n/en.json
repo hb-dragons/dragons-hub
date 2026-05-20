@@ -93,6 +93,7 @@
     "roleRefereeAdmin": "Referee Admin",
     "roleVenueManager": "Venue Manager",
     "roleTeamManager": "Team Manager",
+    "roleCoach": "Coach",
     "roleReferee": "Referee"
   },
   "teamDetail": {

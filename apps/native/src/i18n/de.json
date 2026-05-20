@@ -93,6 +93,7 @@
     "roleRefereeAdmin": "Schiri-Admin",
     "roleVenueManager": "Hallenverwaltung",
     "roleTeamManager": "Team-Manager",
+    "roleCoach": "Trainer",
     "roleReferee": "Schiri"
   },
   "teamDetail": {
