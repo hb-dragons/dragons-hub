@@ -5,6 +5,7 @@ import {
   canAll,
   canViewOpenGames,
   hasRole,
+  isMember,
   isReferee,
   parseRoles,
   type RoleName,
@@ -181,13 +182,42 @@ describe("canViewOpenGames", () => {
   });
 });
 
+describe("coach role", () => {
+  const coach = { role: "coach" };
+  it("is a known role", () => {
+    expect(ROLE_NAMES).toContain("coach");
+    expect(parseRoles("coach")).toEqual(["coach"]);
+  });
+  it("can view teams and matches but not manage venues", () => {
+    expect(can(coach, "team", "view")).toBe(true);
+    expect(can(coach, "match", "view")).toBe(true);
+    expect(can(coach, "venue", "create")).toBe(false);
+  });
+  it("hasRole detects it", () => {
+    expect(hasRole(coach, "coach")).toBe(true);
+  });
+});
+
+describe("isMember", () => {
+  it("is true when memberId is a number", () => {
+    expect(isMember({ memberId: 7 })).toBe(true);
+  });
+  it("is false when memberId is missing or null", () => {
+    expect(isMember({ memberId: null })).toBe(false);
+    expect(isMember({})).toBe(false);
+    expect(isMember(null)).toBe(false);
+    expect(isMember(undefined)).toBe(false);
+  });
+});
+
 describe("ROLE_NAMES catalog", () => {
-  it("has exactly the four v1 roles in canonical order", () => {
+  it("has exactly the five roles in canonical order", () => {
     expect(ROLE_NAMES).toEqual([
       "admin",
       "refereeAdmin",
       "venueManager",
       "teamManager",
+      "coach",
     ]);
   });
 });
