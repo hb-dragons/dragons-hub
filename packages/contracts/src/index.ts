@@ -99,3 +99,28 @@ export {
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
 } from "./sync";
+
+export {
+  taskBoardIdParamSchema,
+  taskIdParamSchema,
+  taskChecklistItemParamSchema,
+  taskCommentParamSchema,
+  taskListQuerySchema,
+  taskCreateBodySchema,
+  taskUpdateBodySchema,
+  taskAssigneeParamSchema,
+  taskMoveBodySchema,
+  checklistItemCreateBodySchema,
+  checklistItemUpdateBodySchema,
+  commentCreateBodySchema,
+  commentUpdateBodySchema,
+  type TaskAssigneeParam,
+  type TaskListQuery,
+  type TaskCreateBody,
+  type TaskUpdateBody,
+  type TaskMoveBody,
+  type ChecklistItemCreateBody,
+  type ChecklistItemUpdateBody,
+  type CommentCreateBody,
+  type CommentUpdateBody,
+} from "./task";

@@ -72,6 +72,7 @@ export const commentUpdateBodySchema = z.object({
   body: z.string().min(1).max(5000),
 });
 
+export type TaskListQuery = z.infer<typeof taskListQuerySchema>;
 export type TaskCreateBody = z.infer<typeof taskCreateBodySchema>;
 export type TaskUpdateBody = z.infer<typeof taskUpdateBodySchema>;
 export type TaskMoveBody = z.infer<typeof taskMoveBodySchema>;

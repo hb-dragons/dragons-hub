@@ -12,7 +12,7 @@ import {
   checklistItemUpdateBodySchema,
   commentCreateBodySchema,
   commentUpdateBodySchema,
-} from "./task.schemas";
+} from "./task";
 
 describe("taskBoardIdParamSchema", () => {
   it("coerces string to positive integer", () => {
