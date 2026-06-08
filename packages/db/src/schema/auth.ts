@@ -11,7 +11,11 @@ export const user = pgTable("user", {
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires", { withTimezone: true }),
-  refereeId: integer("referee_id").references(() => referees.id),
+  // Unique so two auth users cannot claim the same referee identity. In
+  // Postgres NULLs are distinct, so any number of users may stay unlinked.
+  refereeId: integer("referee_id")
+    .references(() => referees.id)
+    .unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

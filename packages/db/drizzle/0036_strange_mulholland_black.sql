@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD CONSTRAINT "user_referee_id_unique" UNIQUE("referee_id");
