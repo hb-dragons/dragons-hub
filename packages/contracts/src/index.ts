@@ -73,3 +73,10 @@ export {
   type RefereeRulesParam,
   type UpdateRefereeRulesBodyParsed,
 } from "./referee-rules";
+
+export {
+  refereeListQuerySchema,
+  refereeVisibilityBodySchema,
+  type RefereeListQuery,
+  type RefereeVisibilityBody,
+} from "./referee";

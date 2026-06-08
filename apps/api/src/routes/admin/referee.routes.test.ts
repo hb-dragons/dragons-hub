@@ -231,22 +231,26 @@ describe("PATCH /referees/:id/visibility", () => {
     const res = await app.request("/referees/abc/visibility", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }),
     });
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    const body = await json(res);
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(body.error).toBe("Invalid referee ID");
   });
 
   it("returns 400 for negative referee ID", async () => {
     const res = await app.request("/referees/-1/visibility", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false }),
+      body: JSON.stringify({ allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }),
     });
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    const body = await json(res);
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(body.error).toBe("Invalid referee ID");
   });
 
   it("returns 400 for invalid body", async () => {
@@ -343,7 +347,9 @@ describe("PATCH /referees/:id/rules", () => {
       body: JSON.stringify({ rules: [sampleRule] }),
     });
     expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    const body = await json(res);
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(body.error).toBe("Invalid referee ID");
   });
 
   it("returns 404 when service throws NOT_FOUND", async () => {

@@ -1,6 +1,5 @@
 import { Hono } from "hono";
-import { z } from "zod";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import {
   getReferees,
   getRefereeCounts,
@@ -10,27 +9,27 @@ import {
   RefereeSettingsError,
 } from "../../services/admin/referee-admin.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
-import { refereeListQuerySchema } from "./referee.schemas";
+import {
+  refereeListQuerySchema,
+  refereeVisibilityBodySchema,
+  updateRefereeRulesBodySchema,
+} from "@dragons/contracts";
 
 const refereeRoutes = new Hono<AppEnv>();
 
 refereeRoutes.get(
   "/referees",
   requirePermission("referee", "view"),
+  validator("query", refereeListQuerySchema, validationHook),
   describeRoute({
     description: "List referees with pagination, search, and sort",
     tags: ["Referees"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = refereeListQuerySchema.parse({
-      limit: c.req.query("limit"),
-      offset: c.req.query("offset"),
-      search: c.req.query("search"),
-      scope: c.req.query("scope"),
-      sort: c.req.query("sort"),
-    });
+    const query = c.req.valid("query");
     const result = await getReferees(query);
     return c.json(result);
   },
@@ -50,15 +49,10 @@ refereeRoutes.get(
   },
 );
 
-const visibilityBodySchema = z.object({
-  allowAllHomeGames: z.boolean(),
-  allowAwayGames: z.boolean(),
-  isOwnClub: z.boolean(),
-});
-
 refereeRoutes.patch(
   "/referees/:id/visibility",
   requirePermission("referee", "update"),
+  validator("json", refereeVisibilityBodySchema, validationHook),
   describeRoute({
     description: "Update referee visibility flags (own-club, all home, away)",
     tags: ["Referees"],
@@ -73,7 +67,7 @@ refereeRoutes.patch(
     if (!Number.isInteger(id) || id <= 0) {
       return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
     }
-    const body = visibilityBodySchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     try {
       const result = await updateRefereeVisibility(id, body);
       return c.json(result);
@@ -86,20 +80,10 @@ refereeRoutes.patch(
   },
 );
 
-const rulesBodySchema = z.object({
-  rules: z.array(
-    z.object({
-      teamId: z.number().int().positive(),
-      deny: z.boolean(),
-      allowSr1: z.boolean(),
-      allowSr2: z.boolean(),
-    }),
-  ),
-});
-
 refereeRoutes.patch(
   "/referees/:id/rules",
   requirePermission("referee", "update"),
+  validator("json", updateRefereeRulesBodySchema, validationHook),
   describeRoute({
     description: "Replace all assignment rules for a referee",
     tags: ["Referees"],
@@ -114,7 +98,7 @@ refereeRoutes.patch(
     if (!Number.isInteger(id) || id <= 0) {
       return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
     }
-    const body = rulesBodySchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     try {
       const result = await updateRefereeRules(id, body);
       return c.json(result);
