@@ -109,6 +109,11 @@ export {
 } from "./team";
 
 export {
+  venueSearchQuerySchema,
+  type VenueSearchQuery,
+} from "./venue";
+
+export {
   taskBoardIdParamSchema,
   taskIdParamSchema,
   taskChecklistItemParamSchema,

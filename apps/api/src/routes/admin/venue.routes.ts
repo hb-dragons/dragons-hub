@@ -1,12 +1,13 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import {
   searchVenues,
   getVenues,
 } from "../../services/admin/venue-admin.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
-import { venueSearchQuerySchema } from "./venue.schemas";
+import { venueSearchQuerySchema } from "@dragons/contracts";
 
 const venueRoutes = new Hono<AppEnv>();
 
@@ -29,13 +30,14 @@ venueRoutes.get(
 venueRoutes.get(
   "/venues/search",
   requirePermission("venue", "view"),
+  validator("query", venueSearchQuerySchema, validationHook),
   describeRoute({
     description: "Search venues by name",
     tags: ["Venues"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const { q, limit } = venueSearchQuerySchema.parse(c.req.query());
+    const { q, limit } = c.req.valid("query");
     const venues = await searchVenues(q, limit);
     return c.json({ venues });
   },
