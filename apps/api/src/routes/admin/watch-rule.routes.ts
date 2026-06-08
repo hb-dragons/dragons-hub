@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import {
   listWatchRules,
@@ -9,12 +9,13 @@ import {
   deleteWatchRule,
 } from "../../services/admin/watch-rule-admin.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import {
   watchRuleIdParamSchema,
   watchRuleListQuerySchema,
   createWatchRuleSchema,
   updateWatchRuleSchema,
-} from "./watch-rule.schemas";
+} from "@dragons/contracts";
 
 const watchRuleRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
@@ -23,13 +24,14 @@ const settingsUpdate = requirePermission("settings", "update");
 watchRuleRoutes.get(
   "/watch-rules",
   settingsUpdate,
+  validator("query", watchRuleListQuerySchema, validationHook),
   describeRoute({
     description: "List watch rules with pagination",
     tags: ["Watch Rules"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = watchRuleListQuerySchema.parse(c.req.query());
+    const query = c.req.valid("query");
     const result = await listWatchRules(query);
     return c.json(result);
   },
@@ -39,6 +41,7 @@ watchRuleRoutes.get(
 watchRuleRoutes.get(
   "/watch-rules/:id",
   settingsUpdate,
+  validator("param", watchRuleIdParamSchema, validationHook),
   describeRoute({
     description: "Get a single watch rule by ID",
     tags: ["Watch Rules"],
@@ -48,7 +51,7 @@ watchRuleRoutes.get(
     },
   }),
   async (c) => {
-    const { id } = watchRuleIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const rule = await getWatchRule(id);
 
     if (!rule) {
@@ -66,13 +69,14 @@ watchRuleRoutes.get(
 watchRuleRoutes.post(
   "/watch-rules",
   settingsUpdate,
+  validator("json", createWatchRuleSchema, validationHook),
   describeRoute({
     description: "Create a new watch rule",
     tags: ["Watch Rules"],
     responses: { 201: { description: "Created" } },
   }),
   async (c) => {
-    const body = createWatchRuleSchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     const userId = c.get("user")?.id ?? "system";
     const rule = await createWatchRule(body, userId);
     return c.json(rule, 201);
@@ -83,6 +87,8 @@ watchRuleRoutes.post(
 watchRuleRoutes.patch(
   "/watch-rules/:id",
   settingsUpdate,
+  validator("param", watchRuleIdParamSchema, validationHook),
+  validator("json", updateWatchRuleSchema, validationHook),
   describeRoute({
     description: "Update a watch rule",
     tags: ["Watch Rules"],
@@ -92,8 +98,8 @@ watchRuleRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = watchRuleIdParamSchema.parse({ id: c.req.param("id") });
-    const body = updateWatchRuleSchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
     const rule = await updateWatchRule(id, body);
 
     if (!rule) {
@@ -111,6 +117,7 @@ watchRuleRoutes.patch(
 watchRuleRoutes.delete(
   "/watch-rules/:id",
   settingsUpdate,
+  validator("param", watchRuleIdParamSchema, validationHook),
   describeRoute({
     description: "Delete a watch rule",
     tags: ["Watch Rules"],
@@ -120,7 +127,7 @@ watchRuleRoutes.delete(
     },
   }),
   async (c) => {
-    const { id } = watchRuleIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const success = await deleteWatchRule(id);
 
     if (!success) {

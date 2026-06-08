@@ -137,3 +137,10 @@ export {
   type CommentCreateBody,
   type CommentUpdateBody,
 } from "./task";
+
+export {
+  watchRuleIdParamSchema,
+  watchRuleListQuerySchema,
+  createWatchRuleSchema,
+  updateWatchRuleSchema,
+} from "./watch-rule";
