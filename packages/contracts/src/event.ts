@@ -21,3 +21,6 @@ export const triggerEventSchema = z.object({
   payload: z.record(z.string(), z.unknown()).default({}),
   urgencyOverride: z.enum(["immediate", "routine"]).optional(),
 });
+
+export type EventListQuery = z.infer<typeof eventListQuerySchema>;
+export type TriggerEventBody = z.infer<typeof triggerEventSchema>;

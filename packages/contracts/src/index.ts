@@ -44,3 +44,10 @@ export {
   updateChannelConfigSchema,
   validateConfigForType,
 } from "./channel-config";
+
+export {
+  eventListQuerySchema,
+  triggerEventSchema,
+  type EventListQuery,
+  type TriggerEventBody,
+} from "./event";
