@@ -158,3 +158,8 @@ export {
   type RefereeAssignBody,
   type RefereeClaimBody,
 } from "./referee-self";
+
+export {
+  deviceRegisterBodySchema,
+  type DeviceRegisterBody,
+} from "./devices";
