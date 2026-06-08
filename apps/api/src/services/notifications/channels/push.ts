@@ -180,13 +180,15 @@ export class PushChannelAdapter {
       if (result.failed > 0) result.success = false;
       return result;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "unknown";
       log.error({ err, eventId: params.eventId }, "Expo sendBatch failed");
-      // The claim rows are real delivery attempts — mark them failed (don't
-      // delete); the existing receipt/retry path owns recovery.
+      // The whole batch was undelivered (transient network failure). Release the
+      // claim rows so the outbox reprocess can retry delivery, mirroring the
+      // WhatsApp-group adapter. There is no automatic sweeper for stranded push
+      // rows, so leaving them as "failed" would block all future delivery for
+      // this event. Per-ticket terminal errors (e.g. DeviceNotRegistered) are
+      // handled in the success path and keep their "failed" rows.
       await db
-        .update(notificationLog)
-        .set({ status: "failed", errorMessage: message })
+        .delete(notificationLog)
         .where(inArray(notificationLog.id, [...claimIdByUser.values()]));
       return { success: false, sent: 0, failed: toSend.length };
     }

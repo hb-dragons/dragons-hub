@@ -255,18 +255,26 @@ describe("PushChannelAdapter", () => {
     expect(await getLogs()).toHaveLength(0);
   });
 
-  it("keeps the claim row (status failed) on an Expo network error so retry can recover", async () => {
+  it("releases the claim on an Expo network error so the event can retry", async () => {
     await seedDevice("user_a", "ExponentPushToken[a]");
     sendBatch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
 
     const adapter = new PushChannelAdapter(mockClient);
-    const result = await adapter.send(baseParams(["user_a"]));
+    const failed = await adapter.send(baseParams(["user_a"]));
 
-    expect(result).toEqual({ success: false, sent: 0, failed: 1 });
+    expect(failed).toEqual({ success: false, sent: 0, failed: 1 });
+    // The whole batch was undelivered, so the claim must be released — not left
+    // stranded — otherwise the unique index blocks all future delivery.
+    expect(await getLogs()).toHaveLength(0);
+
+    // Outbox reprocesses the same event: it must redeliver, not dedupe to nothing.
+    sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_a" }]);
+    const retried = await adapter.send(baseParams(["user_a"]));
+
+    expect(retried).toEqual({ success: true, sent: 1, failed: 0 });
     const rows = await getLogs();
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.status).toBe("failed");
-    expect(rows[0]!.error_message).toContain("ECONNREFUSED");
+    expect(rows[0]!.status).toBe("sent_ticket");
   });
 
   it("prefers the user preference locale over the device locale", async () => {
