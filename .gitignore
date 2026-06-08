@@ -25,6 +25,10 @@ apps/*/tsconfig.tsbuildinfo
 # next-intl generated type declarations
 apps/web/src/messages/*.d.json.ts
 
+# Extracted test seed contains real federation PII — regenerate via
+# `pnpm seed:extract`, never commit it (GDPR; no consumer needs it in git)
+apps/api/src/test/fixtures/seed.json
+
 # Mobile app secrets
 apps/mobile/android/app/google-services.json
 
