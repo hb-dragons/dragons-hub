@@ -80,3 +80,11 @@ export {
   type RefereeListQuery,
   type RefereeVisibilityBody,
 } from "./referee";
+
+export {
+  socialMatchesQuerySchema,
+  socialGenerateBodySchema,
+  socialIdParamSchema,
+  type SocialMatchesQuery,
+  type SocialGenerateBody,
+} from "./social";

@@ -1,14 +1,14 @@
 import { z } from "zod";
 
-export const matchesQuerySchema = z.object({
+export const socialMatchesQuerySchema = z.object({
   type: z.enum(["preview", "results"]),
   week: z.coerce.number().int().min(1).max(53),
   year: z.coerce.number().int().min(2020).max(2100),
 });
 
-export type MatchesQuery = z.infer<typeof matchesQuerySchema>;
+export type SocialMatchesQuery = z.infer<typeof socialMatchesQuerySchema>;
 
-export const generateBodySchema = z.object({
+export const socialGenerateBodySchema = z.object({
   type: z.enum(["preview", "results"]),
   calendarWeek: z.number().int().min(1).max(53),
   year: z.number().int().min(2020).max(2100),
@@ -30,8 +30,8 @@ export const generateBodySchema = z.object({
   }),
 });
 
-export type GenerateBody = z.infer<typeof generateBodySchema>;
+export type SocialGenerateBody = z.infer<typeof socialGenerateBodySchema>;
 
-export const idParamSchema = z.object({
+export const socialIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
