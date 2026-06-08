@@ -103,12 +103,11 @@ describe("admin-board request bodies satisfy @dragons/contracts schemas", () => 
 
   it("listTasks filters parse against taskListQuerySchema", async () => {
     const { api, calls } = recordingClient();
-    await api.listTasks(1, { columnId: 2, assigneeId: "user-1", priority: "urgent" });
-    // GET passes filters as query params, not body — validate the filters object directly
-    const filtersArg = calls[0]!.body;
-    // listTasks is a GET so body is undefined; validate the filter shape directly
-    const parsed = taskListQuerySchema.safeParse({ columnId: 2, assigneeId: "user-1", priority: "urgent" });
-    expect(parsed.error?.issues, "taskListQuerySchema rejected the filters").toBeUndefined();
+    await api.listTasks(1, { columnId: 2, assigneeId: "user-1", priority: "high" });
+    // GET passes filters as query params — extract what the client actually serialized
+    const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
+    const parsed = taskListQuerySchema.safeParse(query);
+    expect(parsed.error?.issues, "taskListQuerySchema rejected the listTasks query").toBeUndefined();
   });
 
   it("addChecklistItem body parses against checklistItemCreateBodySchema", async () => {
