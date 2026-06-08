@@ -163,3 +163,10 @@ export {
   deviceRegisterBodySchema,
   type DeviceRegisterBody,
 } from "./devices";
+
+export {
+  leagueNumbersSchema,
+  leagueOwnClubRefsSchema,
+  type LeagueNumbersBody,
+  type LeagueOwnClubRefsBody,
+} from "./league";
