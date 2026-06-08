@@ -29,6 +29,9 @@ importers:
       '@bull-board/hono':
         specifier: ^6.21.2
         version: 6.21.2(hono@4.12.18)
+      '@dragons/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@dragons/db':
         specifier: workspace:*
         version: link:../../packages/db
