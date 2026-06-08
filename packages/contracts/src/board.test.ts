@@ -7,7 +7,7 @@ import {
   columnCreateBodySchema,
   columnUpdateBodySchema,
   columnReorderBodySchema,
-} from "@dragons/contracts";
+} from "./board";
 
 describe("boardIdParamSchema", () => {
   it("coerces string id to positive integer", () => {
