@@ -33,21 +33,16 @@ const statusField = z
     return result;
   });
 
-export const historyFilterSchema = z.object({
+export const refereeHistoryFilterSchema = z.object({
   dateFrom: isoDate.optional(),
   dateTo: isoDate.optional(),
   league: z.string().trim().min(1).optional(),
   status: statusField,
 });
 
-export const historyGamesQuerySchema = historyFilterSchema.extend({
+export const refereeHistoryGamesQuerySchema = refereeHistoryFilterSchema.extend({
   search: z.string().trim().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).default(50),
   offset: z.coerce.number().int().min(0).default(0),
   refereeApiId: z.coerce.number().int().positive().optional(),
 });
-
-export type {
-  HistoryFilterParams,
-  HistoryGamesQueryParams,
-} from "../../services/admin/referee-history.service";

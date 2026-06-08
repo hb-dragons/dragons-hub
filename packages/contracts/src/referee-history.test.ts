@@ -1,55 +1,55 @@
 import { describe, expect, it } from "vitest";
 import {
-  historyFilterSchema,
-  historyGamesQuerySchema,
-} from "./referee-history.schemas";
+  refereeHistoryFilterSchema,
+  refereeHistoryGamesQuerySchema,
+} from "./referee-history";
 
-describe("historyFilterSchema status parsing", () => {
+describe("refereeHistoryFilterSchema status parsing", () => {
   it("defaults to empty array when omitted", () => {
-    const parsed = historyFilterSchema.parse({});
+    const parsed = refereeHistoryFilterSchema.parse({});
     expect(parsed.status).toEqual([]);
   });
 
   it("parses 'all' as empty array", () => {
-    const parsed = historyFilterSchema.parse({ status: "all" });
+    const parsed = refereeHistoryFilterSchema.parse({ status: "all" });
     expect(parsed.status).toEqual([]);
   });
 
   it("parses comma list into array", () => {
-    const parsed = historyFilterSchema.parse({ status: "cancelled,forfeited" });
+    const parsed = refereeHistoryFilterSchema.parse({ status: "cancelled,forfeited" });
     expect(parsed.status).toEqual(["cancelled", "forfeited"]);
   });
 
   it("accepts legacy 'active' as ['played']", () => {
-    const parsed = historyFilterSchema.parse({ status: "active" });
+    const parsed = refereeHistoryFilterSchema.parse({ status: "active" });
     expect(parsed.status).toEqual(["played"]);
   });
 
   it("rejects unknown value", () => {
-    expect(() => historyFilterSchema.parse({ status: "nope" })).toThrow();
+    expect(() => refereeHistoryFilterSchema.parse({ status: "nope" })).toThrow();
   });
 
   it("rejects unknown value inside list", () => {
     expect(() =>
-      historyFilterSchema.parse({ status: "played,bogus" }),
+      refereeHistoryFilterSchema.parse({ status: "played,bogus" }),
     ).toThrow();
   });
 });
 
-describe("historyGamesQuerySchema refereeApiId", () => {
+describe("refereeHistoryGamesQuerySchema refereeApiId", () => {
   it("coerces numeric string to number", () => {
-    const parsed = historyGamesQuerySchema.parse({ refereeApiId: "42" });
+    const parsed = refereeHistoryGamesQuerySchema.parse({ refereeApiId: "42" });
     expect(parsed.refereeApiId).toBe(42);
   });
 
   it("omits refereeApiId when absent", () => {
-    const parsed = historyGamesQuerySchema.parse({});
+    const parsed = refereeHistoryGamesQuerySchema.parse({});
     expect(parsed.refereeApiId).toBeUndefined();
   });
 
   it("rejects non-integer refereeApiId", () => {
     expect(() =>
-      historyGamesQuerySchema.parse({ refereeApiId: "abc" }),
+      refereeHistoryGamesQuerySchema.parse({ refereeApiId: "abc" }),
     ).toThrow();
   });
 });

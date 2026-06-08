@@ -59,3 +59,8 @@ export {
   notificationPreferencesBodySchema,
   type NotificationPreferencesBody,
 } from "./notification";
+
+export {
+  refereeHistoryFilterSchema,
+  refereeHistoryGamesQuerySchema,
+} from "./referee-history";
