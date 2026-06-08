@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../../../config/database";
 import {
   pushDevices,
@@ -101,51 +101,94 @@ export class PushChannelAdapter {
 
     if (outgoing.length === 0) return result;
 
+    // Claim a notification_log row per UNIQUE userId BEFORE sending. The dedup
+    // unique index (event_id, channel_config_id, COALESCE(recipient_id,'__group__'))
+    // already collapsed a user's many devices to one row; push rows use
+    // recipient_id = userId, so the claim is per-user. Inserting first makes a
+    // re-processed outbox event a no-op (returning() comes back empty) instead of
+    // physically re-delivering, which is what the old send-then-log order allowed.
+    const firstByUser = new Map<string, Outgoing>();
+    for (const o of outgoing) {
+      if (!firstByUser.has(o.device.userId)) firstByUser.set(o.device.userId, o);
+    }
+    const claimValues = [...firstByUser.values()].map((o) => ({
+      eventId: params.eventId,
+      watchRuleId: params.watchRuleId,
+      channelConfigId: params.channelConfigId,
+      recipientId: o.device.userId,
+      title: o.message.title,
+      body: o.message.body,
+      locale: o.locale,
+      status: "pending",
+    }));
+
+    const claimedRows = await db
+      .insert(notificationLog)
+      .values(claimValues)
+      .onConflictDoNothing()
+      .returning({ id: notificationLog.id, recipientId: notificationLog.recipientId });
+
+    const claimIdByUser = new Map<string, number>();
+    for (const row of claimedRows) {
+      if (row.recipientId) claimIdByUser.set(row.recipientId, row.id);
+    }
+
+    // Only send to devices whose user we actually claimed; the rest are duplicates.
+    const toSend = outgoing.filter((o) => claimIdByUser.has(o.device.userId));
+    if (toSend.length === 0) return result;
+
     try {
-      const tickets = await this.client.sendBatch(outgoing.map((o) => o.message));
-      const rows = outgoing.map((o, i) => {
+      const tickets = await this.client.sendBatch(toSend.map((o) => o.message));
+
+      // Per-user collapse means per-device receipt tracking is coarsened (it
+      // already was — only one row survived per user). Aggregate every device's
+      // ticket onto that user's single claim row: sent_ticket if any device
+      // succeeded, else failed, keeping the first ok ticket's id/token.
+      type DeviceResult = { ok: boolean; ticketId: string | null; token: string; error: string | null };
+      const byUser = new Map<string, DeviceResult[]>();
+      toSend.forEach((o, i) => {
         const ticket = tickets[i];
         const ok = ticket?.status === "ok";
-        return {
-          eventId: params.eventId,
-          watchRuleId: params.watchRuleId,
-          channelConfigId: params.channelConfigId,
-          recipientId: o.device.userId,
-          recipientToken: o.device.token,
-          title: o.message.title,
-          body: o.message.body,
-          locale: o.locale,
-          status: ok ? "sent_ticket" : "failed",
-          sentAt: ok ? new Date() : null,
-          providerTicketId: ok ? ticket.id ?? null : null,
-          errorMessage: ok ? null : (ticket?.message ?? ticket?.details?.error ?? "unknown"),
-        };
+        const list = byUser.get(o.device.userId) ?? [];
+        list.push({
+          ok,
+          ticketId: ok ? ticket.id ?? null : null,
+          token: o.device.token,
+          error: ok ? null : (ticket?.message ?? ticket?.details?.error ?? "unknown"),
+        });
+        byUser.set(o.device.userId, list);
+        if (ok) result.sent++;
+        else result.failed++;
       });
-      await db.insert(notificationLog).values(rows).onConflictDoNothing();
 
-      result.sent = rows.filter((r) => r.status === "sent_ticket").length;
-      result.failed = rows.length - result.sent;
+      for (const [userId, devices] of byUser) {
+        const claimId = claimIdByUser.get(userId)!;
+        const okDevice = devices.find((d) => d.ok);
+        const firstFail = devices.find((d) => !d.ok);
+        await db
+          .update(notificationLog)
+          .set({
+            status: okDevice ? "sent_ticket" : "failed",
+            sentAt: okDevice ? new Date() : null,
+            providerTicketId: okDevice?.ticketId ?? null,
+            recipientToken: okDevice ? okDevice.token : (firstFail?.token ?? null),
+            errorMessage: okDevice ? null : (firstFail?.error ?? "unknown"),
+          })
+          .where(eq(notificationLog.id, claimId));
+      }
+
       if (result.failed > 0) result.success = false;
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : "unknown";
       log.error({ err, eventId: params.eventId }, "Expo sendBatch failed");
-      const rows = outgoing.map((o) => ({
-        eventId: params.eventId,
-        watchRuleId: params.watchRuleId,
-        channelConfigId: params.channelConfigId,
-        recipientId: o.device.userId,
-        recipientToken: o.device.token,
-        title: o.message.title,
-        body: o.message.body,
-        locale: o.locale,
-        status: "failed",
-        sentAt: null,
-        providerTicketId: null,
-        errorMessage: message,
-      }));
-      await db.insert(notificationLog).values(rows).onConflictDoNothing();
-      return { success: false, sent: 0, failed: outgoing.length };
+      // The claim rows are real delivery attempts — mark them failed (don't
+      // delete); the existing receipt/retry path owns recovery.
+      await db
+        .update(notificationLog)
+        .set({ status: "failed", errorMessage: message })
+        .where(inArray(notificationLog.id, [...claimIdByUser.values()]));
+      return { success: false, sent: 0, failed: toSend.length };
     }
   }
 }
