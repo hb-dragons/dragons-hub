@@ -144,3 +144,8 @@ export {
   createWatchRuleSchema,
   updateWatchRuleSchema,
 } from "./watch-rule";
+
+export {
+  publicScheduleIcsQuerySchema,
+  type PublicScheduleIcsQuery,
+} from "./public";
