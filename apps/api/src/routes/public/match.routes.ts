@@ -6,7 +6,7 @@ import { getOwnClubMatches } from "../../services/admin/match-admin.service";
 import { getPublicMatchDetail } from "../../services/admin/match-query.service";
 import { getMatchContext } from "../../services/public/match-context.service";
 import { buildCalendarFeed } from "../../services/public/calendar.service";
-import { matchListQuerySchema } from "../admin/match.schemas";
+import { matchListQuerySchema } from "@dragons/contracts";
 import { env } from "../../config/env";
 
 function resolveIcsHostname(): string {

@@ -52,3 +52,6 @@ export const releaseOverrideParamsSchema = z.object({
 
 export type MatchListQuery = z.infer<typeof matchListQuerySchema>;
 export type MatchUpdateBody = z.infer<typeof matchUpdateBodySchema>;
+export type MatchIdParam = z.infer<typeof matchIdParamSchema>;
+export type MatchHistoryQuery = z.infer<typeof matchHistoryQuerySchema>;
+export type ReleaseOverrideParams = z.infer<typeof releaseOverrideParamsSchema>;

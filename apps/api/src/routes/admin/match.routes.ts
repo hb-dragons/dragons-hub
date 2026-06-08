@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import {
   getOwnClubMatches,
@@ -9,6 +9,7 @@ import {
   releaseOverride,
 } from "../../services/admin/match-admin.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import { reconcileMatch } from "../../services/venue-booking/venue-booking.service";
 import {
   matchListQuerySchema,
@@ -16,7 +17,7 @@ import {
   matchHistoryQuerySchema,
   matchUpdateBodySchema,
   releaseOverrideParamsSchema,
-} from "./match.schemas";
+} from "@dragons/contracts";
 
 const matchRoutes = new Hono<AppEnv>();
 
@@ -24,22 +25,14 @@ const matchRoutes = new Hono<AppEnv>();
 matchRoutes.get(
   "/matches",
   requirePermission("match", "view"),
+  validator("query", matchListQuerySchema, validationHook),
   describeRoute({
     description: "List own club matches",
     tags: ["Matches"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = matchListQuerySchema.parse({
-      limit: c.req.query("limit"),
-      offset: c.req.query("offset"),
-      leagueId: c.req.query("leagueId"),
-      dateFrom: c.req.query("dateFrom"),
-      dateTo: c.req.query("dateTo"),
-      sort: c.req.query("sort"),
-      hasScore: c.req.query("hasScore"),
-      teamApiId: c.req.query("teamApiId"),
-    });
+    const query = c.req.valid("query");
     const result = await getOwnClubMatches(query);
     return c.json(result);
   },
@@ -49,6 +42,7 @@ matchRoutes.get(
 matchRoutes.get(
   "/matches/:id",
   requirePermission("match", "view"),
+  validator("param", matchIdParamSchema, validationHook),
   describeRoute({
     description: "Get match detail with diffs",
     tags: ["Matches"],
@@ -58,7 +52,7 @@ matchRoutes.get(
     },
   }),
   async (c) => {
-    const { id } = matchIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const result = await getMatchDetail(id);
 
     if (!result) {
@@ -73,6 +67,8 @@ matchRoutes.get(
 matchRoutes.get(
   "/matches/:id/history",
   requirePermission("match", "view"),
+  validator("param", matchIdParamSchema, validationHook),
+  validator("query", matchHistoryQuerySchema, validationHook),
   describeRoute({
     description: "Get match change history",
     tags: ["Matches"],
@@ -81,11 +77,8 @@ matchRoutes.get(
     },
   }),
   async (c) => {
-    const { id } = matchIdParamSchema.parse({ id: c.req.param("id") });
-    const query = matchHistoryQuerySchema.parse({
-      limit: c.req.query("limit"),
-      offset: c.req.query("offset"),
-    });
+    const { id } = c.req.valid("param");
+    const query = c.req.valid("query");
     const result = await getMatchChangeHistory(id, query);
     return c.json(result);
   },
@@ -95,6 +88,8 @@ matchRoutes.get(
 matchRoutes.patch(
   "/matches/:id",
   requirePermission("match", "update"),
+  validator("param", matchIdParamSchema, validationHook),
+  validator("json", matchUpdateBodySchema, validationHook),
   describeRoute({
     description: "Update local match overrides",
     tags: ["Matches"],
@@ -104,8 +99,8 @@ matchRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = matchIdParamSchema.parse({ id: c.req.param("id") });
-    const body = matchUpdateBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
 
     const changedBy = c.get("user")?.id ?? "unknown";
     const result = await updateMatchLocal(id, body, changedBy);
@@ -129,6 +124,7 @@ matchRoutes.patch(
 matchRoutes.delete(
   "/matches/:id/overrides/:fieldName",
   requirePermission("match", "update"),
+  validator("param", releaseOverrideParamsSchema, validationHook),
   describeRoute({
     description: "Release a specific field override",
     tags: ["Matches"],
@@ -138,10 +134,7 @@ matchRoutes.delete(
     },
   }),
   async (c) => {
-    const { id, fieldName } = releaseOverrideParamsSchema.parse({
-      id: c.req.param("id"),
-      fieldName: c.req.param("fieldName"),
-    });
+    const { id, fieldName } = c.req.valid("param");
 
     const changedBy = c.get("user")?.id ?? "unknown";
     const result = await releaseOverride(id, fieldName, changedBy);
