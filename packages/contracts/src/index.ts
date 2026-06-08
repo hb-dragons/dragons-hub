@@ -175,3 +175,12 @@ export {
   scoreboardListQuerySchema,
   type ScoreboardListQuery,
 } from "./scoreboard";
+
+export {
+  settingsClubConfigSchema,
+  settingsBookingConfigSchema,
+  settingsRefereeReminderSchema,
+  type SettingsClubConfig,
+  type SettingsBookingConfig,
+  type SettingsRefereeReminder,
+} from "./settings";
