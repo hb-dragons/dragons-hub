@@ -94,10 +94,10 @@ export function adminBoardEndpoints(client: ApiClient) {
     },
     reorderColumns(
       boardId: number,
-      order: { id: number; position: number }[],
+      columns: { id: number; position: number }[],
     ): Promise<void> {
       return client.patch(`/admin/boards/${boardId}/columns/reorder`, {
-        order,
+        columns,
       });
     },
 
