@@ -7,41 +7,18 @@ import type {
   TaskAssignee,
   ChecklistItem,
   TaskComment,
-  TaskPriority,
 } from "@dragons/shared";
 import type {
   BoardCreateBody,
   BoardUpdateBody,
   ColumnCreateBody,
   ColumnUpdateBody,
+  TaskCreateBody,
+  TaskUpdateBody,
+  TaskMoveBody,
+  TaskListQuery,
 } from "@dragons/contracts";
 import type { ApiClient } from "../client";
-
-export interface TaskListFilters {
-  columnId?: number;
-  assigneeId?: string;
-  priority?: TaskPriority;
-}
-
-export interface CreateTaskBody {
-  columnId: number;
-  title: string;
-  description?: string | null;
-  priority?: TaskPriority;
-  dueDate?: string | null;
-}
-
-export interface UpdateTaskBody {
-  title?: string;
-  description?: string | null;
-  priority?: TaskPriority;
-  dueDate?: string | null;
-}
-
-export interface MoveTaskBody {
-  columnId: number;
-  position: number;
-}
 
 export function adminBoardEndpoints(client: ApiClient) {
   return {
@@ -88,23 +65,23 @@ export function adminBoardEndpoints(client: ApiClient) {
     // Tasks
     listTasks(
       boardId: number,
-      filters?: TaskListFilters,
+      filters?: TaskListQuery,
     ): Promise<TaskCardData[]> {
       return client.get(
         `/admin/boards/${boardId}/tasks`,
         filters as Record<string, string | number | boolean | undefined>,
       );
     },
-    createTask(boardId: number, body: CreateTaskBody): Promise<TaskCardData> {
+    createTask(boardId: number, body: TaskCreateBody): Promise<TaskCardData> {
       return client.post(`/admin/boards/${boardId}/tasks`, body);
     },
     getTask(id: number): Promise<TaskDetail> {
       return client.get(`/admin/tasks/${id}`);
     },
-    updateTask(id: number, body: UpdateTaskBody): Promise<TaskDetail> {
+    updateTask(id: number, body: TaskUpdateBody): Promise<TaskDetail> {
       return client.patch(`/admin/tasks/${id}`, body);
     },
-    moveTask(id: number, body: MoveTaskBody): Promise<TaskDetail> {
+    moveTask(id: number, body: TaskMoveBody): Promise<TaskDetail> {
       return client.patch(`/admin/tasks/${id}/move`, body);
     },
     deleteTask(id: number): Promise<void> {

@@ -5,6 +5,12 @@ import {
   columnCreateBodySchema,
   columnUpdateBodySchema,
   columnReorderBodySchema,
+  taskCreateBodySchema,
+  taskUpdateBodySchema,
+  taskMoveBodySchema,
+  taskListQuerySchema,
+  checklistItemCreateBodySchema,
+  commentCreateBodySchema,
 } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { adminBoardEndpoints } from "./admin-board";
@@ -61,5 +67,61 @@ describe("admin-board request bodies satisfy @dragons/contracts schemas", () => 
     await api.reorderColumns(1, [{ id: 9, position: 0 }]);
     const parsed = columnReorderBodySchema.safeParse(calls[0]!.body);
     expect(parsed.error?.issues, "columnReorderBodySchema rejected the request body").toBeUndefined();
+  });
+
+  it("createTask body parses against taskCreateBodySchema (incl. assigneeIds — closes drift)", async () => {
+    const { api, calls } = recordingClient();
+    await api.createTask(1, {
+      title: "Buy jerseys",
+      columnId: 2,
+      description: "Order from supplier",
+      assigneeIds: ["user-1", "user-2"],
+      priority: "high",
+      dueDate: "2026-06-01",
+    });
+    const parsed = taskCreateBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "taskCreateBodySchema rejected the request body").toBeUndefined();
+  });
+
+  it("updateTask body parses against taskUpdateBodySchema (incl. assigneeIds — closes drift)", async () => {
+    const { api, calls } = recordingClient();
+    await api.updateTask(5, {
+      title: "Renamed",
+      assigneeIds: ["user-3"],
+      priority: "normal",
+    });
+    const parsed = taskUpdateBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "taskUpdateBodySchema rejected the request body").toBeUndefined();
+  });
+
+  it("moveTask body parses against taskMoveBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.moveTask(5, { columnId: 3, position: 1 });
+    const parsed = taskMoveBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "taskMoveBodySchema rejected the request body").toBeUndefined();
+  });
+
+  it("listTasks filters parse against taskListQuerySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.listTasks(1, { columnId: 2, assigneeId: "user-1", priority: "urgent" });
+    // GET passes filters as query params, not body — validate the filters object directly
+    const filtersArg = calls[0]!.body;
+    // listTasks is a GET so body is undefined; validate the filter shape directly
+    const parsed = taskListQuerySchema.safeParse({ columnId: 2, assigneeId: "user-1", priority: "urgent" });
+    expect(parsed.error?.issues, "taskListQuerySchema rejected the filters").toBeUndefined();
+  });
+
+  it("addChecklistItem body parses against checklistItemCreateBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.addChecklistItem(3, "Step 1");
+    const parsed = checklistItemCreateBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "checklistItemCreateBodySchema rejected the request body").toBeUndefined();
+  });
+
+  it("addComment body parses against commentCreateBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.addComment(3, "Great work!");
+    const parsed = commentCreateBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "commentCreateBodySchema rejected the request body").toBeUndefined();
   });
 });

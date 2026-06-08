@@ -9,14 +9,12 @@ export type { RefereeGamesQueryParams } from "./referee";
 
 export { adminBoardEndpoints } from "./admin-board";
 export type {
-  TaskListFilters,
-  CreateTaskBody,
-  UpdateTaskBody,
-  MoveTaskBody,
-} from "./admin-board";
-export type {
   BoardCreateBody,
   BoardUpdateBody,
   ColumnCreateBody,
   ColumnUpdateBody,
+  TaskCreateBody,
+  TaskUpdateBody,
+  TaskMoveBody,
+  TaskListQuery,
 } from "@dragons/contracts";
