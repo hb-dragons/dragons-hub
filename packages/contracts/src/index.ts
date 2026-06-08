@@ -149,3 +149,12 @@ export {
   publicScheduleIcsQuerySchema,
   type PublicScheduleIcsQuery,
 } from "./public";
+
+export {
+  refereeGamesQuerySchema,
+  refereeAssignBodySchema,
+  refereeClaimBodySchema,
+  type RefereeGamesQuery,
+  type RefereeAssignBody,
+  type RefereeClaimBody,
+} from "./referee-self";
