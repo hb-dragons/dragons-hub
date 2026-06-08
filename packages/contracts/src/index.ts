@@ -197,3 +197,8 @@ export {
   type BroadcastUpsertBody,
   type BroadcastStartStopBody,
 } from "./broadcast";
+
+export {
+  notificationTestSendBodySchema,
+  type NotificationTestSendBody,
+} from "./notification-test";

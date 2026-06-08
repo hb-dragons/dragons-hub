@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
-import { z } from "zod";
 import { eq, like, desc } from "drizzle-orm";
 import { ulid } from "ulid";
 import { db } from "../../config/database";
@@ -17,15 +16,12 @@ import { redis } from "../../config/redis";
 import { requirePermission } from "../../middleware/rbac";
 import { escapeLikePattern } from "../../services/utils/sql";
 import type { AppEnv } from "../../types";
+import { notificationTestSendBodySchema } from "@dragons/contracts";
 
 const log = logger.child({ service: "admin-notification-test" });
 
 const notificationTestRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
-
-const sendBodySchema = z.object({
-  message: z.string().min(1).max(180).optional(),
-});
 
 const expoPushClient = new ExpoPushClient({
   accessToken: env.EXPO_ACCESS_TOKEN,
@@ -53,7 +49,7 @@ notificationTestRoutes.post(
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
     const raw = await c.req.json().catch(() => ({}));
-    const body = sendBodySchema.parse(raw);
+    const body = notificationTestSendBodySchema.parse(raw);
     const callerId = user.id;
 
     const cooldownKey = `${TEST_PUSH_COOLDOWN_KEY_PREFIX}${callerId}`;
