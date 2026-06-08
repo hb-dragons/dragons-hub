@@ -4,8 +4,8 @@ import { haptics } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import type {
-  CreateBoardBody,
-  UpdateBoardBody,
+  BoardCreateBody,
+  BoardUpdateBody,
 } from "@dragons/api-client";
 import type { BoardData } from "@dragons/shared";
 import { BOARD_LIST_KEY } from "./useBoardList";
@@ -15,7 +15,7 @@ export function useBoardMutations() {
   const { mutate } = useSWRConfig();
   const toast = useToast();
 
-  async function create(body: CreateBoardBody): Promise<BoardData> {
+  async function create(body: BoardCreateBody): Promise<BoardData> {
     try {
       const created = await adminBoardApi.createBoard(body);
       await Promise.all([
@@ -32,7 +32,7 @@ export function useBoardMutations() {
     }
   }
 
-  async function update(id: number, body: UpdateBoardBody): Promise<BoardData> {
+  async function update(id: number, body: BoardUpdateBody): Promise<BoardData> {
     try {
       const next = await adminBoardApi.updateBoard(id, body);
       await Promise.all([

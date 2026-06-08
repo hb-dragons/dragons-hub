@@ -432,6 +432,9 @@ importers:
 
   packages/api-client:
     dependencies:
+      '@dragons/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@dragons/shared':
         specifier: workspace:*
         version: link:../shared

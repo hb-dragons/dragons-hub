@@ -9,34 +9,18 @@ import type {
   TaskComment,
   TaskPriority,
 } from "@dragons/shared";
+import type {
+  BoardCreateBody,
+  BoardUpdateBody,
+  ColumnCreateBody,
+  ColumnUpdateBody,
+} from "@dragons/contracts";
 import type { ApiClient } from "../client";
 
 export interface TaskListFilters {
   columnId?: number;
   assigneeId?: string;
   priority?: TaskPriority;
-}
-
-export interface CreateBoardBody {
-  name: string;
-  description?: string | null;
-}
-
-export interface UpdateBoardBody {
-  name?: string;
-  description?: string | null;
-}
-
-export interface AddColumnBody {
-  name: string;
-  color?: string | null;
-  isDoneColumn?: boolean;
-}
-
-export interface UpdateColumnBody {
-  name?: string;
-  color?: string | null;
-  isDoneColumn?: boolean;
 }
 
 export interface CreateTaskBody {
@@ -68,10 +52,10 @@ export function adminBoardEndpoints(client: ApiClient) {
     getBoard(id: number): Promise<BoardData> {
       return client.get(`/admin/boards/${id}`);
     },
-    createBoard(body: CreateBoardBody): Promise<BoardData> {
+    createBoard(body: BoardCreateBody): Promise<BoardData> {
       return client.post("/admin/boards", body);
     },
-    updateBoard(id: number, body: UpdateBoardBody): Promise<BoardData> {
+    updateBoard(id: number, body: BoardUpdateBody): Promise<BoardData> {
       return client.patch(`/admin/boards/${id}`, body);
     },
     deleteBoard(id: number): Promise<void> {
@@ -79,13 +63,13 @@ export function adminBoardEndpoints(client: ApiClient) {
     },
 
     // Columns
-    addColumn(boardId: number, body: AddColumnBody): Promise<BoardColumnData> {
+    addColumn(boardId: number, body: ColumnCreateBody): Promise<BoardColumnData> {
       return client.post(`/admin/boards/${boardId}/columns`, body);
     },
     updateColumn(
       boardId: number,
       colId: number,
-      body: UpdateColumnBody,
+      body: ColumnUpdateBody,
     ): Promise<BoardColumnData> {
       return client.patch(`/admin/boards/${boardId}/columns/${colId}`, body);
     },

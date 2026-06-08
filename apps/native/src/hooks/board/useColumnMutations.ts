@@ -4,8 +4,8 @@ import { haptics } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import type {
-  AddColumnBody,
-  UpdateColumnBody,
+  ColumnCreateBody,
+  ColumnUpdateBody,
 } from "@dragons/api-client";
 import type { BoardColumnData } from "@dragons/shared";
 import { boardKey } from "./useBoard";
@@ -29,7 +29,7 @@ export function useColumnMutations(boardId: number) {
     }
   }
 
-  async function add(body: AddColumnBody): Promise<BoardColumnData> {
+  async function add(body: ColumnCreateBody): Promise<BoardColumnData> {
     return withErrorToast(async () => {
       const created = await adminBoardApi.addColumn(boardId, body);
       await mutate(boardKey(boardId));
@@ -39,7 +39,7 @@ export function useColumnMutations(boardId: number) {
     }, "toast.createFailed");
   }
 
-  async function update(colId: number, body: UpdateColumnBody): Promise<BoardColumnData> {
+  async function update(colId: number, body: ColumnUpdateBody): Promise<BoardColumnData> {
     return withErrorToast(async () => {
       const next = await adminBoardApi.updateColumn(boardId, colId, body);
       await mutate(boardKey(boardId));
