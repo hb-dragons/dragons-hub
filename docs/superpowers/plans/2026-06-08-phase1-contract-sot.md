@@ -618,34 +618,41 @@ describe("admin-board request bodies satisfy @dragons/contracts schemas", () => 
   it("createBoard body parses against boardCreateBodySchema", async () => {
     const { api, calls } = recordingClient();
     await api.createBoard({ name: "Sprint", description: "desc" });
-    expect(boardCreateBodySchema.safeParse(calls[0]!.body).success).toBe(true);
+    const parsed = boardCreateBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "boardCreateBodySchema rejected the request body").toBeUndefined();
   });
 
   it("updateBoard body parses against boardUpdateBodySchema", async () => {
     const { api, calls } = recordingClient();
     await api.updateBoard(1, { name: "Renamed" });
-    expect(boardUpdateBodySchema.safeParse(calls[0]!.body).success).toBe(true);
+    const parsed = boardUpdateBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "boardUpdateBodySchema rejected the request body").toBeUndefined();
   });
 
   it("addColumn body parses against columnCreateBodySchema", async () => {
     const { api, calls } = recordingClient();
     await api.addColumn(1, { name: "To Do", color: "#ff0000" });
-    expect(columnCreateBodySchema.safeParse(calls[0]!.body).success).toBe(true);
+    const parsed = columnCreateBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "columnCreateBodySchema rejected the request body").toBeUndefined();
   });
 
   it("updateColumn body parses against columnUpdateBodySchema (incl. position)", async () => {
     const { api, calls } = recordingClient();
     await api.updateColumn(1, 2, { name: "Doing", position: 3 });
-    expect(columnUpdateBodySchema.safeParse(calls[0]!.body).success).toBe(true);
+    const parsed = columnUpdateBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "columnUpdateBodySchema rejected the request body").toBeUndefined();
   });
 
   it("reorderColumns body parses against columnReorderBodySchema", async () => {
     const { api, calls } = recordingClient();
     await api.reorderColumns(1, [{ id: 9, position: 0 }]);
-    expect(columnReorderBodySchema.safeParse(calls[0]!.body).success).toBe(true);
+    const parsed = columnReorderBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "columnReorderBodySchema rejected the request body").toBeUndefined();
   });
 });
 ```
+
+> **Assertion style (use this in every group's contract test):** assert on `safeParse(...).error?.issues` being `toBeUndefined()`, not `.success` being `true`. On failure Vitest then prints the actual Zod issue list (field path + message) instead of a bare "expected false to be true" — essential because this test fires exactly when someone has just broken a contract.
 
 - [ ] **Step 2: Run the test to verify it passes**
 
