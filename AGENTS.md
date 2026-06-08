@@ -311,6 +311,12 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 
 Match list and detail responses include associated venue booking data when available.
 
+### Admin - Assistant
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/admin/assistant/reschedule/chat` | Rescheduling copilot chat (AI SDK UI message stream). 503 when ASSISTANT_ENABLED=false. Permission: match:update |
+
 ### Admin - Bookings
 
 | Method | Path | Description |
