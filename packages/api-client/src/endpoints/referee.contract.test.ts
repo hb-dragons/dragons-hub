@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { refereeGamesQuerySchema, refereeClaimBodySchema } from "@dragons/contracts";
+import { refereeGamesQuerySchema, refereeClaimBodySchema, refereeAssignBodySchema } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { refereeEndpoints } from "./referee";
 
@@ -57,5 +57,12 @@ describe("referee request queries/bodies satisfy @dragons/contracts schemas", ()
     // client.post sends params ?? {} — so body is {}
     const parsed = refereeClaimBodySchema.safeParse(calls[0]!.body ?? {});
     expect(parsed.error?.issues, "refereeClaimBodySchema rejected the empty claimGame body").toBeUndefined();
+  });
+
+  it("assignReferee body parses against refereeAssignBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.assignReferee(99, { slotNumber: 1, refereeApiId: 4242 });
+    const parsed = refereeAssignBodySchema.safeParse(calls[0]!.body);
+    expect(parsed.error?.issues, "refereeAssignBodySchema rejected the assignReferee body").toBeUndefined();
   });
 });

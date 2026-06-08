@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { z } from "zod";
+import { refereeAssignBodySchema } from "@dragons/contracts";
 import type { AppEnv } from "../../types";
 import { requirePermission } from "../../middleware/rbac";
 import {
@@ -8,11 +8,6 @@ import {
   searchCandidates,
   AssignmentError,
 } from "../../services/referee/referee-assignment.service";
-
-const assignBodySchema = z.object({
-  slotNumber: z.union([z.literal(1), z.literal(2)]),
-  refereeApiId: z.number().int().positive(),
-});
 
 const ERROR_STATUS_MAP: Record<string, number> = {
   GAME_NOT_FOUND: 404,
@@ -77,7 +72,7 @@ adminRefereeAssignmentRoutes.post(
     } catch {
       return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
     }
-    const { slotNumber, refereeApiId } = assignBodySchema.parse(body);
+    const { slotNumber, refereeApiId } = refereeAssignBodySchema.parse(body);
 
     try {
       const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
