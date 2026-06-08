@@ -34,6 +34,14 @@ export const envSchema = z
     REFEREE_SDK_USERNAME: z.string().min(1).optional(),
     REFEREE_SDK_PASSWORD: z.string().min(1).optional(),
 
+    GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
+    ASSISTANT_ENABLED: z
+      .union([z.literal("true"), z.literal("false")])
+      .default("false")
+      .transform((v) => v === "true"),
+    ASSISTANT_MODEL: z.string().min(1).default("gemini-2.5-flash"),
+    MCP_TOKEN: z.string().min(32).optional(),
+
     SMTP_HOST: z.string().min(1).optional(),
     SMTP_PORT: z.coerce.number().int().positive().optional(),
     SMTP_USER: z.string().min(1).optional(),
@@ -51,6 +59,13 @@ export const envSchema = z
       .transform((v) => v === "true"),
   })
   .superRefine((env, ctx) => {
+    if (env.ASSISTANT_ENABLED && !env.GOOGLE_GENERATIVE_AI_API_KEY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["GOOGLE_GENERATIVE_AI_API_KEY"],
+        message: "GOOGLE_GENERATIVE_AI_API_KEY is required when ASSISTANT_ENABLED=true",
+      });
+    }
     if (env.NODE_ENV === "production") {
       try {
         const host = new URL(env.BETTER_AUTH_URL).hostname;
