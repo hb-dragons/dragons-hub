@@ -88,3 +88,14 @@ export {
   type SocialMatchesQuery,
   type SocialGenerateBody,
 } from "./social";
+
+export {
+  syncPaginationSchema,
+  syncLogsQuerySchema,
+  syncEntryIdParamSchema,
+  syncEntriesQuerySchema,
+  syncStreamParamSchema,
+  syncJobStatusesQuerySchema,
+  syncUpdateScheduleBodySchema,
+  syncMatchChangesParamSchema,
+} from "./sync";

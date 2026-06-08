@@ -1,33 +1,34 @@
 import { describe, expect, it } from "vitest";
 import {
-  paginationSchema,
+  syncPaginationSchema,
   syncLogsQuerySchema,
   syncEntryIdParamSchema,
   syncEntriesQuerySchema,
   syncStreamParamSchema,
-  jobStatusesQuerySchema,
-  updateScheduleBodySchema,
-} from "./sync.schemas";
+  syncJobStatusesQuerySchema,
+  syncUpdateScheduleBodySchema,
+  syncMatchChangesParamSchema,
+} from "./sync";
 
-describe("paginationSchema", () => {
+describe("syncPaginationSchema", () => {
   it("applies defaults when empty", () => {
-    expect(paginationSchema.parse({})).toEqual({ limit: 20, offset: 0 });
+    expect(syncPaginationSchema.parse({})).toEqual({ limit: 20, offset: 0 });
   });
 
   it("coerces string values to numbers", () => {
-    expect(paginationSchema.parse({ limit: "10", offset: "5" })).toEqual({ limit: 10, offset: 5 });
+    expect(syncPaginationSchema.parse({ limit: "10", offset: "5" })).toEqual({ limit: 10, offset: 5 });
   });
 
   it("rejects limit below 1", () => {
-    expect(() => paginationSchema.parse({ limit: 0 })).toThrow();
+    expect(() => syncPaginationSchema.parse({ limit: 0 })).toThrow();
   });
 
   it("rejects limit above 100", () => {
-    expect(() => paginationSchema.parse({ limit: 101 })).toThrow();
+    expect(() => syncPaginationSchema.parse({ limit: 101 })).toThrow();
   });
 
   it("rejects negative offset", () => {
-    expect(() => paginationSchema.parse({ offset: -1 })).toThrow();
+    expect(() => syncPaginationSchema.parse({ offset: -1 })).toThrow();
   });
 });
 
@@ -133,46 +134,46 @@ describe("syncStreamParamSchema", () => {
   });
 });
 
-describe("jobStatusesQuerySchema", () => {
+describe("syncJobStatusesQuerySchema", () => {
   it("parses comma-separated valid statuses", () => {
-    const result = jobStatusesQuerySchema.parse({ statuses: "active,failed" });
+    const result = syncJobStatusesQuerySchema.parse({ statuses: "active,failed" });
     expect(result.statuses).toEqual(["active", "failed"]);
   });
 
   it("filters out invalid statuses", () => {
-    const result = jobStatusesQuerySchema.parse({ statuses: "active,bogus,failed" });
+    const result = syncJobStatusesQuerySchema.parse({ statuses: "active,bogus,failed" });
     expect(result.statuses).toEqual(["active", "failed"]);
   });
 
   it("returns undefined when statuses not provided", () => {
-    expect(jobStatusesQuerySchema.parse({}).statuses).toBeUndefined();
+    expect(syncJobStatusesQuerySchema.parse({}).statuses).toBeUndefined();
   });
 
   it("returns undefined for empty string", () => {
-    expect(jobStatusesQuerySchema.parse({ statuses: "" }).statuses).toBeUndefined();
+    expect(syncJobStatusesQuerySchema.parse({ statuses: "" }).statuses).toBeUndefined();
   });
 
   it("accepts all valid statuses", () => {
-    const result = jobStatusesQuerySchema.parse({
+    const result = syncJobStatusesQuerySchema.parse({
       statuses: "active,waiting,delayed,completed,failed",
     });
     expect(result.statuses).toEqual(["active", "waiting", "delayed", "completed", "failed"]);
   });
 });
 
-describe("updateScheduleBodySchema", () => {
+describe("syncUpdateScheduleBodySchema", () => {
   it("accepts valid cron expression", () => {
-    const result = updateScheduleBodySchema.parse({ cronExpression: "0 4 * * *" });
+    const result = syncUpdateScheduleBodySchema.parse({ cronExpression: "0 4 * * *" });
     expect(result.cronExpression).toBe("0 4 * * *");
   });
 
   it("rejects invalid cron expression", () => {
-    expect(() => updateScheduleBodySchema.parse({ cronExpression: "invalid" })).toThrow();
+    expect(() => syncUpdateScheduleBodySchema.parse({ cronExpression: "invalid" })).toThrow();
   });
 
   it("rejects cron with wrong number of fields", () => {
-    expect(() => updateScheduleBodySchema.parse({ cronExpression: "* * *" })).toThrow();
-    expect(() => updateScheduleBodySchema.parse({ cronExpression: "* * * * * *" })).toThrow();
+    expect(() => syncUpdateScheduleBodySchema.parse({ cronExpression: "* * *" })).toThrow();
+    expect(() => syncUpdateScheduleBodySchema.parse({ cronExpression: "* * * * * *" })).toThrow();
   });
 
   it("accepts all fields together", () => {
@@ -182,11 +183,11 @@ describe("updateScheduleBodySchema", () => {
       timezone: "UTC",
       updatedBy: "admin",
     };
-    expect(updateScheduleBodySchema.parse(input)).toEqual(input);
+    expect(syncUpdateScheduleBodySchema.parse(input)).toEqual(input);
   });
 
   it("allows empty object", () => {
-    const result = updateScheduleBodySchema.parse({});
+    const result = syncUpdateScheduleBodySchema.parse({});
     expect(result.enabled).toBeUndefined();
     expect(result.cronExpression).toBeUndefined();
     expect(result.timezone).toBeUndefined();
@@ -194,13 +195,31 @@ describe("updateScheduleBodySchema", () => {
   });
 
   it("rejects empty timezone string", () => {
-    expect(() => updateScheduleBodySchema.parse({ timezone: "" })).toThrow();
+    expect(() => syncUpdateScheduleBodySchema.parse({ timezone: "" })).toThrow();
   });
 
   it("accepts complex cron expressions", () => {
     const expressions = ["0 0,12 * * 1-5", "*/15 * * * *", "0 4 1,15 * *"];
     for (const cronExpression of expressions) {
-      expect(updateScheduleBodySchema.parse({ cronExpression }).cronExpression).toBe(cronExpression);
+      expect(syncUpdateScheduleBodySchema.parse({ cronExpression }).cronExpression).toBe(cronExpression);
     }
+  });
+});
+
+describe("syncMatchChangesParamSchema", () => {
+  it("coerces string to positive integer", () => {
+    expect(syncMatchChangesParamSchema.parse({ apiMatchId: "5001" })).toEqual({ apiMatchId: 5001 });
+  });
+
+  it("rejects zero", () => {
+    expect(() => syncMatchChangesParamSchema.parse({ apiMatchId: 0 })).toThrow();
+  });
+
+  it("rejects negative numbers", () => {
+    expect(() => syncMatchChangesParamSchema.parse({ apiMatchId: -1 })).toThrow();
+  });
+
+  it("rejects non-numeric strings", () => {
+    expect(() => syncMatchChangesParamSchema.parse({ apiMatchId: "abc" })).toThrow();
   });
 });
