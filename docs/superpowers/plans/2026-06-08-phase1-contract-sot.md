@@ -27,7 +27,7 @@
 **Modified — API:**
 - `apps/api/src/middleware/validation.ts` — **new**: shared `validationHook` producing the central `{error, code, details}` envelope.
 - `apps/api/src/middleware/validation.test.ts` — **new**: hook unit test.
-- `apps/api/src/routes/admin/board.routes.ts` — replace manual `schema.parse()` with `validator()`; add `resolver()` to `describeRoute`.
+- `apps/api/src/routes/admin/board.routes.ts` — replace manual `schema.parse()` with `validator()` (which auto-registers the request schema in the spec; no manual `requestBody`/`resolver()`).
 - `apps/api/src/routes/admin/board.schemas.ts` — **deleted** (re-exported from `@dragons/contracts` during migration, then removed).
 - `apps/api/package.json` — add `@dragons/contracts` workspace dep.
 
@@ -322,9 +322,11 @@ git commit -m "feat(api): add shared validation hook for consistent 400 envelope
 
 ---
 
-## Task 3: Wire board routes to `validator()` + `resolver()`
+## Task 3: Wire board routes to `validator()`
 
-Replace every manual `schema.parse(...)` in `board.routes.ts` with `validator()` reading from `@dragons/contracts`, and document request/response in the spec. Existing board route tests in `apps/api` must stay green (the envelope is unchanged; behavior is unchanged).
+Replace every manual `schema.parse(...)` in `board.routes.ts` with `validator()` reading from `@dragons/contracts`. Existing board route tests in `apps/api` must stay green (the envelope is unchanged; behavior is unchanged).
+
+> **VERIFIED PATTERN (do not deviate — confirmed against `hono-openapi@1.3.0` source):** `hono-openapi`'s `validator("json"|"param"|"query", schema, validationHook)` middleware **already registers the request body and path/query parameters into the generated OpenAPI spec** (with `required: true` and a properly resolved schema). **Do NOT add a manual `requestBody:`/`parameters:` block to `describeRoute` for request schemas** — doing so overwrites the validator's correctly-resolved entry with an *unresolved* `resolver()` object reference (a latent spec bug) and forces an `as unknown as` cast. `describeRoute` carries only `description`, `tags`, and `responses`. `resolver()` is used **only for response schemas** inside `responses[...].content` (see the response-schema section in Task 7), because the library's response types are resolver-aware. For request-only routes you do not import `resolver` at all.
 
 **Files:**
 - Modify: `apps/api/src/routes/admin/board.routes.ts`
@@ -378,14 +380,14 @@ it("rejects an invalid reorder body with the VALIDATION_ERROR envelope", async (
 Run: `pnpm --filter @dragons/api test board`
 Expected: PASS now (manual-parse path) and PASS again after Step 5 (validator path). If it ever 400s with a different `code` or a non-400 status after Step 5, the `validationHook` wiring is wrong — fix before continuing.
 
-- [ ] **Step 5: Convert the route handlers to `validator()` + `resolver()`**
+- [ ] **Step 5: Convert the route handlers to `validator()`**
 
 In `apps/api/src/routes/admin/board.routes.ts`:
 
-1. Update imports:
+1. Update imports (note: **no `resolver`** — request schemas need only `validator`):
 
 ```ts
-import { describeRoute, resolver, validator } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import { validationHook } from "../../middleware/validation";
 import {
   boardIdParamSchema,
@@ -398,7 +400,7 @@ import {
 } from "@dragons/contracts";
 ```
 
-2. For each handler, (a) insert the `validator()` middleware, (b) read validated data via `c.req.valid(...)` instead of `schema.parse(...)`, and (c) add request/response schema to `describeRoute`.
+2. For each handler, (a) insert the `validator()` middleware, (b) read validated data via `c.req.valid(...)` instead of `schema.parse(...)`. The `validator()` call registers the request schema in the spec automatically; `describeRoute` keeps only `description`/`tags`/`responses` (NO manual `requestBody`).
 
 Exemplar — the create-board POST:
 
@@ -410,9 +412,6 @@ boardRoutes.post(
   describeRoute({
     description: "Create board with default columns",
     tags: ["Boards"],
-    requestBody: {
-      content: { "application/json": { schema: resolver(boardCreateBodySchema) } },
-    },
     responses: { 201: { description: "Created" } },
   }),
   async (c) => {
@@ -449,7 +448,7 @@ boardRoutes.get(
 );
 ```
 
-Exemplar — the reorder route (the bug-prone one):
+Exemplar — the reorder route (the bug-prone one), `param` + `json`:
 
 ```ts
 boardRoutes.patch(
@@ -460,9 +459,6 @@ boardRoutes.patch(
   describeRoute({
     description: "Reorder columns within a board",
     tags: ["Boards"],
-    requestBody: {
-      content: { "application/json": { schema: resolver(columnReorderBodySchema) } },
-    },
     responses: { 204: { description: "Reordered" } },
   }),
   async (c) => {
@@ -474,7 +470,7 @@ boardRoutes.patch(
 );
 ```
 
-**Preserve each handler's existing response** (status code and body). The exemplars above show only the contract wiring (`validator()` middleware, `c.req.valid(...)` in place of `schema.parse(...)`, and the `requestBody`/`resolver()` additions to `describeRoute`). Read the current handler before editing and keep whatever status/body it returns today — e.g. if the current reorder handler returns `200` with a body rather than `204`, keep that; do not change response behavior in this task (route tests assert it). The `responses:` block in `describeRoute` should document the status the handler actually returns.
+**Preserve each handler's existing response** (status code and body). The exemplars above show only the contract wiring (`validator()` middleware + `c.req.valid(...)` in place of `schema.parse(...)`). Read the current handler before editing and keep whatever status/body it returns today — e.g. if the current reorder handler returns `200` with a body rather than `204`, keep that; do not change response behavior in this task (route tests assert it). The `responses:` block in `describeRoute` should document the status the handler actually returns. **No `requestBody`/`resolver()` for request schemas** — `validator()` already puts them in the spec.
 
 Apply the same transform to every remaining board/column handler in the file: `GET /boards` (no input), `PATCH /boards/:id` (`param` + `json` body `boardUpdateBodySchema`), `DELETE /boards/:id` (`param`), `POST /boards/:id/columns` (`param` boardId + `json` `columnCreateBodySchema`), `PATCH /boards/:id/columns/:colId` (`param` `columnIdParamSchema` + `json` `columnUpdateBodySchema`), `DELETE /boards/:id/columns/:colId` (`param`). Remove every now-unused manual `…Schema.parse(...)` call. Note the param routes currently parse `{ id: c.req.param("id") }`; `validator("param", …)` validates `c.req.param()` directly, and `z.coerce.number()` still coerces the string — so reading `c.req.valid("param")` yields the coerced number.
 
@@ -743,7 +739,7 @@ Each remaining route group is its own task, instantiating the template below. **
 
 - [ ] **Step 1:** Create `packages/contracts/src/<G>.ts` containing the group's request schemas. If the API already has `apps/api/src/routes/<area>/<G>.schemas.ts`, move its contents verbatim (keep export names) and add `z.infer` type exports for every body schema. If the schemas are **inline `z.object(...)`** in the route file, extract them into `packages/contracts/src/<G>.ts` first.
 - [ ] **Step 2:** Add `export * from "./<G>";` to `packages/contracts/src/index.ts`.
-- [ ] **Step 3:** In the route file, replace `import … from "./<G>.schemas"` (or the inline definitions) with imports from `@dragons/contracts`; swap every `schema.parse(...)` for `validator("json" | "param" | "query", schema, validationHook)` + `c.req.valid(...)`; add `requestBody`/`resolver()` to each `describeRoute`. Delete the old `.schemas.ts` (or inline definitions).
+- [ ] **Step 3:** In the route file, replace `import … from "./<G>.schemas"` (or the inline definitions) with imports from `@dragons/contracts`; swap every `schema.parse(...)` for `validator("json" | "param" | "query", schema, validationHook)` + `c.req.valid(...)`. **Do NOT add a manual `requestBody`/`parameters` block to `describeRoute`** — `validator()` already registers request schemas in the spec (see the VERIFIED PATTERN note under Task 3). `describeRoute` keeps `description`/`tags`/`responses` only. Delete the old `.schemas.ts` (or inline definitions).
 - [ ] **Step 4:** If an api-client endpoint module exists for this group, delete its hand-declared request-body interfaces and import the `z.infer` types from `@dragons/contracts`; fix the `src/index.ts` re-exports.
 - [ ] **Step 5:** If an api-client endpoint module exists, add a `<G>.contract.test.ts` mirroring Task 5 (recording client → `schema.safeParse(body)`).
 - [ ] **Step 6:** Run `pnpm --filter @dragons/api test <G>`, `pnpm --filter @dragons/api typecheck`, and (if touched) `pnpm --filter @dragons/api-client test`. All green.
