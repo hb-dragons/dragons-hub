@@ -4,7 +4,7 @@ export const refereeRulesParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
-export const ruleItemSchema = z
+export const refereeRuleItemSchema = z
   .object({
     teamId: z.number().int().positive(),
     deny: z.boolean(),
@@ -15,7 +15,7 @@ export const ruleItemSchema = z
     message: "Deny must be true, or at least one of allowSr1/allowSr2 must be true",
   });
 
-export const rulesArraySchema = z.array(ruleItemSchema).refine(
+export const refereeRulesArraySchema = z.array(refereeRuleItemSchema).refine(
   (rules) => {
     const teamIds = rules.map((r) => r.teamId);
     return new Set(teamIds).size === teamIds.length;
@@ -24,7 +24,7 @@ export const rulesArraySchema = z.array(ruleItemSchema).refine(
 );
 
 export const updateRefereeRulesBodySchema = z.object({
-  rules: rulesArraySchema,
+  rules: refereeRulesArraySchema,
 });
 
 export type RefereeRulesParam = z.infer<typeof refereeRulesParamSchema>;

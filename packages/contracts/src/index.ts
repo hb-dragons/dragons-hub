@@ -64,3 +64,12 @@ export {
   refereeHistoryFilterSchema,
   refereeHistoryGamesQuerySchema,
 } from "./referee-history";
+
+export {
+  refereeRulesParamSchema,
+  refereeRuleItemSchema,
+  refereeRulesArraySchema,
+  updateRefereeRulesBodySchema,
+  type RefereeRulesParam,
+  type UpdateRefereeRulesBodyParsed,
+} from "./referee-rules";
