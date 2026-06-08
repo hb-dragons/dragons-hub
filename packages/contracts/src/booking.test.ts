@@ -5,7 +5,7 @@ import {
   bookingUpdateBodySchema,
   bookingStatusBodySchema,
   bookingCreateBodySchema,
-} from "./booking.schemas";
+} from "./booking";
 
 describe("bookingIdParamSchema", () => {
   it("coerces string id to positive integer", () => {
