@@ -530,74 +530,82 @@ export async function syncMatchesFromData(
               })
               .where(eq(matches.id, locked.id));
 
+            // Publish match.* events INSIDE the transaction. The old order
+            // published after the tx committed, so a crash between commit and the
+            // event insert permanently lost these high-urgency events (there was
+            // no outbox row to recover). Passing tx inserts them atomically with
+            // the match write; the 30s outbox poller enqueues them after commit.
+            if (effective.length > 0) {
+              const homeTeamName = basicMatch.homeTeam?.teamname ?? "Unknown";
+              const guestTeamName = basicMatch.guestTeam?.teamname ?? "Unknown";
+              const leagueName = data.leagueName ?? "";
+              const teamIds = [remoteSnapshot.homeTeamApiId, remoteSnapshot.guestTeamApiId];
+              const matchEventTypes = classifyMatchChanges(effective);
+
+              for (const eventType of matchEventTypes) {
+                try {
+                  const eventPayload: Record<string, unknown> = {
+                    matchNo: basicMatch.matchNo,
+                    homeTeam: homeTeamName,
+                    guestTeam: guestTeamName,
+                    leagueName,
+                    leagueId: data.leagueDbId,
+                    teamIds,
+                  };
+
+                  if (eventType === EVENT_TYPES.MATCH_SCHEDULE_CHANGED) {
+                    eventPayload.changes = effective
+                      .filter((c) => c.fieldName === "kickoffDate" || c.fieldName === "kickoffTime")
+                      .map((c) => ({ field: c.fieldName, oldValue: c.oldValue, newValue: c.newValue }));
+                  } else if (eventType === EVENT_TYPES.MATCH_VENUE_CHANGED) {
+                    const venueChange = effective.find((c) => c.fieldName === "venueId");
+                    eventPayload.oldVenueId = venueChange?.oldValue ? Number(venueChange.oldValue) : null;
+                    eventPayload.oldVenueName = null;
+                    eventPayload.newVenueId = venueChange?.newValue ? Number(venueChange.newValue) : null;
+                    eventPayload.newVenueName = null;
+                  } else if (eventType === EVENT_TYPES.MATCH_RESULT_ENTERED) {
+                    const homeScoreChange = effective.find((c) => c.fieldName === "homeScore");
+                    const guestScoreChange = effective.find((c) => c.fieldName === "guestScore");
+                    eventPayload.homeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : 0;
+                    eventPayload.guestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : 0;
+                  } else if (eventType === EVENT_TYPES.MATCH_RESULT_CHANGED) {
+                    const homeScoreChange = effective.find((c) => c.fieldName === "homeScore");
+                    const guestScoreChange = effective.find((c) => c.fieldName === "guestScore");
+                    eventPayload.oldHomeScore = homeScoreChange?.oldValue ? Number(homeScoreChange.oldValue) : 0;
+                    eventPayload.oldGuestScore = guestScoreChange?.oldValue ? Number(guestScoreChange.oldValue) : 0;
+                    eventPayload.newHomeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : 0;
+                    eventPayload.newGuestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : 0;
+                  } else if (eventType === EVENT_TYPES.MATCH_CONFIRMED) {
+                    const homeScoreChange = effective.find((c) => c.fieldName === "homeScore");
+                    const guestScoreChange = effective.find((c) => c.fieldName === "guestScore");
+                    eventPayload.homeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : (remoteSnapshot.homeScore ?? null);
+                    eventPayload.guestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : (remoteSnapshot.guestScore ?? null);
+                  }
+
+                  await publishDomainEvent(
+                    {
+                      type: eventType as import("@dragons/shared").EventType,
+                      source: "sync",
+                      entityType: "match",
+                      entityId: existing.id,
+                      entityName,
+                      deepLinkPath: `/admin/matches/${existing.id}`,
+                      payload: eventPayload,
+                      syncRunId,
+                    },
+                    tx,
+                  );
+                } catch (error) {
+                  log.warn({ err: error, eventType, matchId: existing.id }, "Failed to emit match event");
+                }
+              }
+            }
+
             return effective;
           });
 
           if (effectiveChanges.length > 0) {
             result.updated++;
-
-            // Emit domain events based on what changed
-            const homeTeamName = basicMatch.homeTeam?.teamname ?? "Unknown";
-            const guestTeamName = basicMatch.guestTeam?.teamname ?? "Unknown";
-            const leagueName = data.leagueName ?? "";
-            const teamIds = [remoteSnapshot.homeTeamApiId, remoteSnapshot.guestTeamApiId];
-            const matchEventTypes = classifyMatchChanges(effectiveChanges);
-
-            for (const eventType of matchEventTypes) {
-              try {
-                const eventPayload: Record<string, unknown> = {
-                  matchNo: basicMatch.matchNo,
-                  homeTeam: homeTeamName,
-                  guestTeam: guestTeamName,
-                  leagueName,
-                  leagueId: data.leagueDbId,
-                  teamIds,
-                };
-
-                if (eventType === EVENT_TYPES.MATCH_SCHEDULE_CHANGED) {
-                  eventPayload.changes = effectiveChanges
-                    .filter((c) => c.fieldName === "kickoffDate" || c.fieldName === "kickoffTime")
-                    .map((c) => ({ field: c.fieldName, oldValue: c.oldValue, newValue: c.newValue }));
-                } else if (eventType === EVENT_TYPES.MATCH_VENUE_CHANGED) {
-                  const venueChange = effectiveChanges.find((c) => c.fieldName === "venueId");
-                  eventPayload.oldVenueId = venueChange?.oldValue ? Number(venueChange.oldValue) : null;
-                  eventPayload.oldVenueName = null;
-                  eventPayload.newVenueId = venueChange?.newValue ? Number(venueChange.newValue) : null;
-                  eventPayload.newVenueName = null;
-                } else if (eventType === EVENT_TYPES.MATCH_RESULT_ENTERED) {
-                  const homeScoreChange = effectiveChanges.find((c) => c.fieldName === "homeScore");
-                  const guestScoreChange = effectiveChanges.find((c) => c.fieldName === "guestScore");
-                  eventPayload.homeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : 0;
-                  eventPayload.guestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : 0;
-                } else if (eventType === EVENT_TYPES.MATCH_RESULT_CHANGED) {
-                  const homeScoreChange = effectiveChanges.find((c) => c.fieldName === "homeScore");
-                  const guestScoreChange = effectiveChanges.find((c) => c.fieldName === "guestScore");
-                  eventPayload.oldHomeScore = homeScoreChange?.oldValue ? Number(homeScoreChange.oldValue) : 0;
-                  eventPayload.oldGuestScore = guestScoreChange?.oldValue ? Number(guestScoreChange.oldValue) : 0;
-                  eventPayload.newHomeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : 0;
-                  eventPayload.newGuestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : 0;
-                } else if (eventType === EVENT_TYPES.MATCH_CONFIRMED) {
-                  const homeScoreChange = effectiveChanges.find((c) => c.fieldName === "homeScore");
-                  const guestScoreChange = effectiveChanges.find((c) => c.fieldName === "guestScore");
-                  eventPayload.homeScore = homeScoreChange?.newValue ? Number(homeScoreChange.newValue) : (remoteSnapshot.homeScore ?? null);
-                  eventPayload.guestScore = guestScoreChange?.newValue ? Number(guestScoreChange.newValue) : (remoteSnapshot.guestScore ?? null);
-                }
-
-                await publishDomainEvent({
-                  type: eventType as import("@dragons/shared").EventType,
-                  source: "sync",
-                  entityType: "match",
-                  entityId: existing.id,
-                  entityName,
-                  deepLinkPath: `/admin/matches/${existing.id}`,
-                  payload: eventPayload,
-                  syncRunId,
-                });
-              } catch (error) {
-                log.warn({ err: error, eventType, matchId: existing.id }, "Failed to emit match event");
-              }
-            }
-
             await logger?.log({
               entityType: "match",
               entityId: String(apiMatchId),
@@ -616,90 +624,96 @@ export async function syncMatchesFromData(
             });
           }
         } else {
-          // Create new match
-          const [newMatch] = await db
-            .insert(matches)
-            .values({
-              apiMatchId,
-              matchNo: remoteSnapshot.matchNo,
-              matchDay: remoteSnapshot.matchDay,
-              kickoffDate: remoteSnapshot.kickoffDate,
-              kickoffTime: remoteSnapshot.kickoffTime,
-              leagueId: remoteSnapshot.leagueId,
-              homeTeamApiId: remoteSnapshot.homeTeamApiId,
-              guestTeamApiId: remoteSnapshot.guestTeamApiId,
-              venueId: internalVenueId,
-              isConfirmed: remoteSnapshot.isConfirmed,
-              isForfeited: remoteSnapshot.isForfeited,
-              isCancelled: remoteSnapshot.isCancelled,
-              homeScore: remoteSnapshot.homeScore,
-              guestScore: remoteSnapshot.guestScore,
-              homeHalftimeScore: remoteSnapshot.homeHalftimeScore,
-              guestHalftimeScore: remoteSnapshot.guestHalftimeScore,
-              periodFormat: remoteSnapshot.periodFormat,
-              homeQ1: remoteSnapshot.homeQ1,
-              guestQ1: remoteSnapshot.guestQ1,
-              homeQ2: remoteSnapshot.homeQ2,
-              guestQ2: remoteSnapshot.guestQ2,
-              homeQ3: remoteSnapshot.homeQ3,
-              guestQ3: remoteSnapshot.guestQ3,
-              homeQ4: remoteSnapshot.homeQ4,
-              guestQ4: remoteSnapshot.guestQ4,
-              homeOt1: remoteSnapshot.homeOt1,
-              guestOt1: remoteSnapshot.guestOt1,
-              homeOt2: remoteSnapshot.homeOt2,
-              guestOt2: remoteSnapshot.guestOt2,
-              sr1Open: remoteSnapshot.sr1Open,
-              sr2Open: remoteSnapshot.sr2Open,
-              sr3Open: remoteSnapshot.sr3Open,
-              currentRemoteVersion: 1,
-              currentLocalVersion: 0,
-              remoteDataHash: newHash,
-              lastRemoteSync: new Date(),
-            })
-            .returning();
+          // Create new match — insert, version snapshot, and the match.created
+          // event in ONE transaction so a crash between the row write and the
+          // event insert can't lose the event (the old order ran all three
+          // outside any transaction). Passing tx inserts the event atomically
+          // with the match; the 30s outbox poller enqueues it after commit.
+          await db.transaction(async (tx) => {
+            const [newMatch] = await tx
+              .insert(matches)
+              .values({
+                apiMatchId,
+                matchNo: remoteSnapshot.matchNo,
+                matchDay: remoteSnapshot.matchDay,
+                kickoffDate: remoteSnapshot.kickoffDate,
+                kickoffTime: remoteSnapshot.kickoffTime,
+                leagueId: remoteSnapshot.leagueId,
+                homeTeamApiId: remoteSnapshot.homeTeamApiId,
+                guestTeamApiId: remoteSnapshot.guestTeamApiId,
+                venueId: internalVenueId,
+                isConfirmed: remoteSnapshot.isConfirmed,
+                isForfeited: remoteSnapshot.isForfeited,
+                isCancelled: remoteSnapshot.isCancelled,
+                homeScore: remoteSnapshot.homeScore,
+                guestScore: remoteSnapshot.guestScore,
+                homeHalftimeScore: remoteSnapshot.homeHalftimeScore,
+                guestHalftimeScore: remoteSnapshot.guestHalftimeScore,
+                periodFormat: remoteSnapshot.periodFormat,
+                homeQ1: remoteSnapshot.homeQ1,
+                guestQ1: remoteSnapshot.guestQ1,
+                homeQ2: remoteSnapshot.homeQ2,
+                guestQ2: remoteSnapshot.guestQ2,
+                homeQ3: remoteSnapshot.homeQ3,
+                guestQ3: remoteSnapshot.guestQ3,
+                homeQ4: remoteSnapshot.homeQ4,
+                guestQ4: remoteSnapshot.guestQ4,
+                homeOt1: remoteSnapshot.homeOt1,
+                guestOt1: remoteSnapshot.guestOt1,
+                homeOt2: remoteSnapshot.homeOt2,
+                guestOt2: remoteSnapshot.guestOt2,
+                sr1Open: remoteSnapshot.sr1Open,
+                sr2Open: remoteSnapshot.sr2Open,
+                sr3Open: remoteSnapshot.sr3Open,
+                currentRemoteVersion: 1,
+                currentLocalVersion: 0,
+                remoteDataHash: newHash,
+                lastRemoteSync: new Date(),
+              })
+              .returning();
 
-          if (newMatch) {
-            await db.insert(matchRemoteVersions).values({
-              matchId: newMatch.id,
-              versionNumber: 1,
-              syncRunId,
-              snapshot: remoteSnapshot as unknown as CurrentRemoteSnapshot,
-              dataHash: newHash,
-            });
-          }
+            if (newMatch) {
+              await tx.insert(matchRemoteVersions).values({
+                matchId: newMatch.id,
+                versionNumber: 1,
+                syncRunId,
+                snapshot: remoteSnapshot as unknown as CurrentRemoteSnapshot,
+                dataHash: newHash,
+              });
+
+              // Emit match.created event for new match
+              try {
+                await publishDomainEvent(
+                  {
+                    type: EVENT_TYPES.MATCH_CREATED,
+                    source: "sync",
+                    entityType: "match",
+                    entityId: newMatch.id,
+                    entityName,
+                    deepLinkPath: `/admin/matches/${newMatch.id}`,
+                    payload: {
+                      matchNo: basicMatch.matchNo,
+                      homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
+                      guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
+                      leagueId: data.leagueDbId,
+                      leagueName: data.leagueName ?? "",
+                      kickoffDate: remoteSnapshot.kickoffDate,
+                      kickoffTime: remoteSnapshot.kickoffTime,
+                      venueId: internalVenueId,
+                      venueName: null,
+                      teamIds: [remoteSnapshot.homeTeamApiId, remoteSnapshot.guestTeamApiId],
+                    },
+                    syncRunId,
+                  },
+                  tx,
+                );
+              } catch (error) {
+                log.warn({ err: error, matchId: newMatch.id }, "Failed to emit match.created event");
+              }
+            }
+          });
 
           result.created++;
-
-          // Emit match.created event for new match
-          if (newMatch) {
-            try {
-              await publishDomainEvent({
-                type: EVENT_TYPES.MATCH_CREATED,
-                source: "sync",
-                entityType: "match",
-                entityId: newMatch.id,
-                entityName,
-                deepLinkPath: `/admin/matches/${newMatch.id}`,
-                payload: {
-                  matchNo: basicMatch.matchNo,
-                  homeTeam: basicMatch.homeTeam?.teamname ?? "Unknown",
-                  guestTeam: basicMatch.guestTeam?.teamname ?? "Unknown",
-                  leagueId: data.leagueDbId,
-                  leagueName: data.leagueName ?? "",
-                  kickoffDate: remoteSnapshot.kickoffDate,
-                  kickoffTime: remoteSnapshot.kickoffTime,
-                  venueId: internalVenueId,
-                  venueName: null,
-                  teamIds: [remoteSnapshot.homeTeamApiId, remoteSnapshot.guestTeamApiId],
-                },
-                syncRunId,
-              });
-            } catch (error) {
-              log.warn({ err: error, matchId: newMatch.id }, "Failed to emit match.created event");
-            }
-
-          }
 
           await logger?.log({
             entityType: "match",
