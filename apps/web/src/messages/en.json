@@ -607,7 +607,8 @@
       "admin": "Admin",
       "refereeAdmin": "Referee Admin",
       "venueManager": "Venue Manager",
-      "teamManager": "Team Manager"
+      "teamManager": "Team Manager",
+      "coach": "Coach"
     },
     "noRole": "No role",
     "refereeBadge": "Referee",

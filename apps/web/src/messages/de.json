@@ -607,7 +607,8 @@
       "admin": "Admin",
       "refereeAdmin": "Schiedsrichter-Admin",
       "venueManager": "Hallenverwalter",
-      "teamManager": "Team-Manager"
+      "teamManager": "Team-Manager",
+      "coach": "Trainer"
     },
     "noRole": "Keine Rolle",
     "refereeBadge": "Schiedsrichter",
