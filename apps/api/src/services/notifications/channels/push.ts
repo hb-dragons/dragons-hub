@@ -81,6 +81,7 @@ export class PushChannelAdapter {
         eventType: params.eventType,
         payload: params.payload,
         locale,
+        eventId: params.eventId,
       });
       if (!rendered) continue;
 

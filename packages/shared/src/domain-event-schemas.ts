@@ -114,6 +114,14 @@ const refereeAssignmentSchema = z.object({
   refereeName: z.string(),
   role: z.string(),
   teamIds: z.array(z.number()),
+  // Optional enrichment for self-notification + push deep link. The manual
+  // path (refereeGames) supplies all of these; the sync path (matchReferees)
+  // supplies refereeId but not kickoff/deepLink, so these stay optional.
+  refereeId: z.number().nullish(),
+  matchId: z.number().nullish(),
+  kickoffDate: z.string().nullish(),
+  kickoffTime: z.string().nullish(),
+  deepLink: z.string().nullish(),
 });
 
 const refereeReassignedSchema = z.object({
@@ -124,6 +132,10 @@ const refereeReassignedSchema = z.object({
   newRefereeName: z.string(),
   role: z.string(),
   teamIds: z.array(z.number()),
+  oldRefereeId: z.number().nullish(),
+  newRefereeId: z.number().nullish(),
+  matchId: z.number().nullish(),
+  deepLink: z.string().nullish(),
 });
 
 const refereeSlotsSchema = z.object({

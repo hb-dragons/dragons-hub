@@ -4,13 +4,14 @@ import { BODY_MAX, TITLE_MAX } from "./types";
 
 const payload = {
   matchId: 123,
-  matchNo: "0042",
+  matchNo: 42,
   homeTeam: "Dragons U16",
   guestTeam: "TSV Neustadt",
-  slot: "SR1" as const,
+  refereeName: "Max Muster",
+  role: "SR1",
   kickoffDate: "2026-04-30",
   kickoffTime: "14:00",
-  eventId: "evt_assigned_1",
+  deepLink: "/referee-game/123",
 };
 
 describe("renderRefereeAssignedPush", () => {
@@ -20,9 +21,9 @@ describe("renderRefereeAssignedPush", () => {
     expect(out.body).toContain("Dragons U16");
     expect(out.body).toContain("TSV Neustadt");
     expect(out.body).toContain("SR1");
+    expect(out.body).not.toContain("undefined");
     expect(out.data.deepLink).toBe("/referee-game/123");
     expect(out.data.eventType).toBe("referee.assigned");
-    expect(out.data.eventId).toBe("evt_assigned_1");
   });
 
   it("renders English output", () => {

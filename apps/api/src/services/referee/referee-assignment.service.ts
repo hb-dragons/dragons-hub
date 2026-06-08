@@ -184,6 +184,11 @@ export async function assignReferee(
       refereeName,
       role: slotKey.toUpperCase(),
       teamIds: [],
+      refereeId: referee.id,
+      matchId: game.matchId,
+      kickoffDate: game.kickoffDate,
+      kickoffTime: game.kickoffTime,
+      deepLink: `/referee-game/${game.id}`,
     },
   });
 
@@ -290,6 +295,11 @@ export async function unassignReferee(
       refereeName,
       role: slotKey.toUpperCase(),
       teamIds: [],
+      refereeId: refereeEntityId > 0 ? refereeEntityId : undefined,
+      matchId: game.matchId,
+      kickoffDate: game.kickoffDate,
+      kickoffTime: game.kickoffTime,
+      deepLink: `/referee-game/${game.id}`,
     },
   });
 

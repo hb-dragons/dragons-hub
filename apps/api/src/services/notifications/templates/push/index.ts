@@ -22,13 +22,31 @@ export interface RenderArgs {
   eventType: string;
   payload: Record<string, unknown>;
   locale: Locale;
+  /** Domain event id, known at dispatch time (not part of the payload). */
+  eventId?: string;
 }
 
 /**
  * Returns null when the event type has no push template.
+ *
+ * `eventId` is injected into the rendered `data` centrally so individual
+ * templates don't have to know about it (and can't forget it). It is the
+ * domain event row id, which lives on the dispatch envelope, not the payload.
  */
 export function renderPushTemplate(args: RenderArgs): PushTemplateOutput | null {
-  const { eventType, payload, locale } = args;
+  const { eventType, payload, locale, eventId } = args;
+  const out = renderForType(eventType, payload, locale);
+  if (out && eventId != null) {
+    out.data = { ...out.data, eventId };
+  }
+  return out;
+}
+
+function renderForType(
+  eventType: string,
+  payload: Record<string, unknown>,
+  locale: Locale,
+): PushTemplateOutput | null {
   switch (eventType) {
     case "referee.assigned":
       return renderRefereeAssignedPush(payload as unknown as RefereeAssignedPayload, locale);
