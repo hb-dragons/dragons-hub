@@ -9,7 +9,7 @@
     },
     "apps/api": {
       "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["pino-pretty"]
+      "ignoreDependencies": ["pino-pretty", "@modelcontextprotocol/sdk"]
     },
     "apps/web": {
       "project": ["src/**/*.{ts,tsx}"],
