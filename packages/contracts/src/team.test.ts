@@ -3,7 +3,7 @@ import {
   teamIdParamSchema,
   teamReorderBodySchema,
   teamUpdateBodySchema,
-} from "./team.schemas";
+} from "./team";
 
 describe("teamIdParamSchema", () => {
   it("coerces string id to positive integer", () => {
@@ -90,6 +90,24 @@ describe("teamUpdateBodySchema", () => {
         estimatedGameDuration: 120,
       }),
     ).toEqual({ customName: "H1", estimatedGameDuration: 120 });
+  });
+
+  it("accepts badgeColor as a hex string", () => {
+    expect(teamUpdateBodySchema.parse({ badgeColor: "#ff0000" })).toEqual({
+      badgeColor: "#ff0000",
+    });
+  });
+
+  it("accepts null badgeColor", () => {
+    expect(teamUpdateBodySchema.parse({ badgeColor: null })).toEqual({
+      badgeColor: null,
+    });
+  });
+
+  it("rejects badgeColor exceeding 20 characters", () => {
+    expect(() =>
+      teamUpdateBodySchema.parse({ badgeColor: "x".repeat(21) }),
+    ).toThrow();
   });
 });
 

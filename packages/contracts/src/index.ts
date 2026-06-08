@@ -101,6 +101,14 @@ export {
 } from "./sync";
 
 export {
+  teamIdParamSchema,
+  teamUpdateBodySchema,
+  teamReorderBodySchema,
+  type TeamUpdateBody,
+  type TeamReorderBody,
+} from "./team";
+
+export {
   taskBoardIdParamSchema,
   taskIdParamSchema,
   taskChecklistItemParamSchema,

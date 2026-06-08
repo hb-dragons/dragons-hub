@@ -1,17 +1,18 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import {
   getOwnClubTeams,
   updateTeam,
   reorderOwnClubTeams,
 } from "../../services/admin/team-admin.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
 import {
   teamIdParamSchema,
   teamUpdateBodySchema,
   teamReorderBodySchema,
-} from "./team.schemas";
+} from "@dragons/contracts";
 
 const teamRoutes = new Hono<AppEnv>();
 
@@ -34,6 +35,7 @@ teamRoutes.get(
 teamRoutes.put(
   "/teams/order",
   requirePermission("team", "manage"),
+  validator("json", teamReorderBodySchema, validationHook),
   describeRoute({
     description: "Reorder own club teams",
     tags: ["Teams"],
@@ -43,7 +45,7 @@ teamRoutes.put(
     },
   }),
   async (c) => {
-    const { teamIds } = teamReorderBodySchema.parse(await c.req.json());
+    const { teamIds } = c.req.valid("json");
     try {
       const result = await reorderOwnClubTeams(teamIds);
       return c.json(result);
@@ -61,6 +63,8 @@ teamRoutes.put(
 teamRoutes.patch(
   "/teams/:id",
   requirePermission("team", "manage"),
+  validator("param", teamIdParamSchema, validationHook),
+  validator("json", teamUpdateBodySchema, validationHook),
   describeRoute({
     description: "Update team properties",
     tags: ["Teams"],
@@ -70,8 +74,8 @@ teamRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = teamIdParamSchema.parse({ id: c.req.param("id") });
-    const body = teamUpdateBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
 
     const result = await updateTeam(id, body);
 
