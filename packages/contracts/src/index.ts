@@ -184,3 +184,8 @@ export {
   type SettingsBookingConfig,
   type SettingsRefereeReminder,
 } from "./settings";
+
+export {
+  userRefereeLinkBodySchema,
+  type UserRefereeLinkBody,
+} from "./user";
