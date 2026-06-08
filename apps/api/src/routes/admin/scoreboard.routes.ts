@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { and, desc, eq, gt } from "drizzle-orm";
-import { describeRoute } from "hono-openapi";
-import { z } from "zod";
+import { describeRoute, validator } from "hono-openapi";
 import { requireAnyRole } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import { db } from "../../config/database";
 import {
   liveScoreboards,
@@ -12,19 +12,15 @@ import {
   computeSecondsSince,
   SCOREBOARD_ONLINE_THRESHOLD_MS,
 } from "../../services/scoreboard/constants";
+import { scoreboardListQuerySchema } from "@dragons/contracts";
 import type { AppEnv } from "../../types";
 
 const adminScoreboardRoutes = new Hono<AppEnv>();
 
-const listQuerySchema = z.object({
-  deviceId: z.string().min(1),
-  limit: z.coerce.number().int().min(1).max(500).default(100),
-  afterId: z.coerce.number().int().min(0).optional(),
-});
-
 adminScoreboardRoutes.get(
   "/snapshots",
   requireAnyRole("admin"),
+  validator("query", scoreboardListQuerySchema, validationHook),
   describeRoute({
     description: "Recent decoded snapshots for a device",
     tags: ["Scoreboard"],
@@ -34,7 +30,7 @@ adminScoreboardRoutes.get(
     },
   }),
   async (c) => {
-    const query = listQuerySchema.parse(c.req.query());
+    const query = c.req.valid("query");
     const where =
       query.afterId !== undefined
         ? and(

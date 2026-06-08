@@ -170,3 +170,8 @@ export {
   type LeagueNumbersBody,
   type LeagueOwnClubRefsBody,
 } from "./league";
+
+export {
+  scoreboardListQuerySchema,
+  type ScoreboardListQuery,
+} from "./scoreboard";
