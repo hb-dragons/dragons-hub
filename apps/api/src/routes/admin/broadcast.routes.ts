@@ -1,6 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
-import { z } from "zod";
+import { describeRoute, validator } from "hono-openapi";
 import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "../../config/database";
@@ -18,20 +17,15 @@ import {
   invalidateMatchCache,
   publishBroadcastForDevice,
 } from "../../services/broadcast/publisher";
+import { validationHook } from "../../middleware/validation";
+import {
+  broadcastUpsertSchema,
+  broadcastStartStopSchema,
+  broadcastMatchesQuerySchema,
+} from "@dragons/contracts";
 import type { AppEnv } from "../../types";
 
 const adminBroadcastRoutes = new Hono<AppEnv>();
-
-const upsertSchema = z.object({
-  deviceId: z.string().min(1),
-  matchId: z.number().int().positive().nullable().optional(),
-  homeAbbr: z.string().max(8).nullable().optional(),
-  guestAbbr: z.string().max(8).nullable().optional(),
-  homeColorOverride: z.string().max(20).nullable().optional(),
-  guestColorOverride: z.string().max(20).nullable().optional(),
-});
-
-const startStopSchema = z.object({ deviceId: z.string().min(1) });
 
 adminBroadcastRoutes.get(
   "/config",
@@ -63,6 +57,7 @@ adminBroadcastRoutes.get(
 adminBroadcastRoutes.put(
   "/config",
   requireAnyRole("admin"),
+  validator("json", broadcastUpsertSchema, validationHook),
   describeRoute({
     description: "Upsert the broadcast config for a device",
     tags: ["Broadcast"],
@@ -72,13 +67,10 @@ adminBroadcastRoutes.put(
     },
   }),
   async (c) => {
-    const parsed = upsertSchema.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({ error: "invalid body", code: "BAD_REQUEST" }, 400);
-    }
-    const config = await upsertBroadcastConfig(parsed.data);
-    invalidateMatchCache(parsed.data.deviceId);
-    await publishBroadcastForDevice(parsed.data.deviceId);
+    const body = c.req.valid("json");
+    const config = await upsertBroadcastConfig(body);
+    invalidateMatchCache(body.deviceId);
+    await publishBroadcastForDevice(body.deviceId);
     return c.json({ config });
   },
 );
@@ -86,6 +78,7 @@ adminBroadcastRoutes.put(
 adminBroadcastRoutes.post(
   "/start",
   requireAnyRole("admin"),
+  validator("json", broadcastStartStopSchema, validationHook),
   describeRoute({
     description: "Set isLive=true",
     tags: ["Broadcast"],
@@ -95,13 +88,10 @@ adminBroadcastRoutes.post(
     },
   }),
   async (c) => {
-    const parsed = startStopSchema.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({ error: "invalid body", code: "BAD_REQUEST" }, 400);
-    }
+    const body = c.req.valid("json");
     try {
-      const config = await setBroadcastLive(parsed.data.deviceId, true);
-      await publishBroadcastForDevice(parsed.data.deviceId);
+      const config = await setBroadcastLive(body.deviceId, true);
+      await publishBroadcastForDevice(body.deviceId);
       return c.json({ config });
     } catch (err) {
       if (err instanceof BroadcastError && err.code === "MISSING_MATCH") {
@@ -118,26 +108,19 @@ adminBroadcastRoutes.post(
 adminBroadcastRoutes.post(
   "/stop",
   requireAnyRole("admin"),
+  validator("json", broadcastStartStopSchema, validationHook),
   describeRoute({
     description: "Set isLive=false",
     tags: ["Broadcast"],
     responses: { 200: { description: "Stopped" } },
   }),
   async (c) => {
-    const parsed = startStopSchema.safeParse(await c.req.json());
-    if (!parsed.success) {
-      return c.json({ error: "invalid body", code: "BAD_REQUEST" }, 400);
-    }
-    const config = await setBroadcastLive(parsed.data.deviceId, false);
-    await publishBroadcastForDevice(parsed.data.deviceId);
+    const body = c.req.valid("json");
+    const config = await setBroadcastLive(body.deviceId, false);
+    await publishBroadcastForDevice(body.deviceId);
     return c.json({ config });
   },
 );
-
-const matchesQuerySchema = z.object({
-  q: z.string().optional(),
-  scope: z.enum(["today", "all"]).default("today"),
-});
 
 const homeTeam = alias(teams, "home_team");
 const guestTeam = alias(teams, "guest_team");
@@ -145,17 +128,14 @@ const guestTeam = alias(teams, "guest_team");
 adminBroadcastRoutes.get(
   "/matches",
   requireAnyRole("admin"),
+  validator("query", broadcastMatchesQuerySchema, validationHook),
   describeRoute({
     description: "Own-club matches available for broadcast binding",
     tags: ["Broadcast"],
     responses: { 200: { description: "List of matches" } },
   }),
   async (c) => {
-    const parsed = matchesQuerySchema.safeParse(c.req.query());
-    if (!parsed.success) {
-      return c.json({ error: "invalid query", code: "BAD_REQUEST" }, 400);
-    }
-    const { q, scope } = parsed.data;
+    const { q, scope } = c.req.valid("query");
 
     const today = new Date().toISOString().slice(0, 10);
 
