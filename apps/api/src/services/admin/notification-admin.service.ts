@@ -1,8 +1,26 @@
 import { db } from "../../config/database";
-import { notificationLog, domainEvents } from "@dragons/db/schema";
-import { eq, and, desc, sql, count, ne } from "drizzle-orm";
+import { notificationLog, domainEvents, user } from "@dragons/db/schema";
+import { eq, and, desc, sql, count, ne, inArray } from "drizzle-orm";
+import { parseRoles } from "@dragons/shared";
 import { renderEventMessage } from "../notifications/templates/index";
 import { logger } from "../../config/logger";
+
+/**
+ * The recipient keys that address a given user, mirroring how the pipeline
+ * writes notification_log.recipient_id (user:<id>, referee:<id>, audience:<role>).
+ * Inbox reads/writes must match against this SET, not the bare user id.
+ */
+export async function recipientKeysForUserId(userId: string): Promise<string[]> {
+  const keys = [`user:${userId}`];
+  const [u] = await db
+    .select({ refereeId: user.refereeId, role: user.role })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  if (u?.refereeId != null) keys.push(`referee:${u.refereeId}`);
+  for (const role of parseRoles(u?.role)) keys.push(`audience:${role}`);
+  return keys;
+}
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,7 +63,11 @@ export async function listNotifications(params: {
 }): Promise<NotificationCenterListResult> {
   const { userId, limit = 20, offset = 0 } = params;
 
-  const where = userId ? eq(notificationLog.recipientId, userId) : undefined;
+  // userId scopes to that user's recipient keys; omitting it returns the whole
+  // log (admin monitoring view).
+  const where = userId
+    ? inArray(notificationLog.recipientId, await recipientKeysForUserId(userId))
+    : undefined;
 
   const [totalRow] = await db
     .select({ count: count() })
@@ -97,11 +119,17 @@ export async function listNotifications(params: {
 
 // ── markRead ────────────────────────────────────────────────────────────────
 
-export async function markRead(id: number): Promise<boolean> {
+export async function markRead(id: number, userId: string): Promise<boolean> {
+  const keys = await recipientKeysForUserId(userId);
   const [updated] = await db
     .update(notificationLog)
     .set({ status: "read", readAt: new Date() })
-    .where(eq(notificationLog.id, id))
+    .where(
+      and(
+        eq(notificationLog.id, id),
+        inArray(notificationLog.recipientId, keys),
+      ),
+    )
     .returning({ id: notificationLog.id });
 
   return !!updated;
@@ -109,16 +137,17 @@ export async function markRead(id: number): Promise<boolean> {
 
 // ── markAllRead ─────────────────────────────────────────────────────────────
 
-export async function markAllRead(userId?: string): Promise<number> {
-  const conditions = [ne(notificationLog.status, "read")];
-  if (userId) {
-    conditions.push(eq(notificationLog.recipientId, userId));
-  }
-
+export async function markAllRead(userId: string): Promise<number> {
+  const keys = await recipientKeysForUserId(userId);
   const result = await db
     .update(notificationLog)
     .set({ status: "read", readAt: new Date() })
-    .where(and(...conditions))
+    .where(
+      and(
+        ne(notificationLog.status, "read"),
+        inArray(notificationLog.recipientId, keys),
+      ),
+    )
     .returning({ id: notificationLog.id });
 
   return result.length;
@@ -127,12 +156,13 @@ export async function markAllRead(userId?: string): Promise<number> {
 // ── getUnreadCount ──────────────────────────────────────────────────────────
 
 export async function getUnreadCount(userId: string): Promise<number> {
+  const keys = await recipientKeysForUserId(userId);
   const [row] = await db
     .select({ count: count() })
     .from(notificationLog)
     .where(
       and(
-        eq(notificationLog.recipientId, userId),
+        inArray(notificationLog.recipientId, keys),
         ne(notificationLog.status, "read"),
       ),
     );

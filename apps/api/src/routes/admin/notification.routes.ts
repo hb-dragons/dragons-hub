@@ -53,7 +53,8 @@ notificationRoutes.patch(
   }),
   async (c) => {
     const { id } = notificationIdParamSchema.parse({ id: c.req.param("id") });
-    const success = await markRead(id);
+    // Scope to the caller so one admin can't mark another recipient's row read.
+    const success = await markRead(id, c.get("user").id);
 
     if (!success) {
       return c.json(
@@ -76,9 +77,9 @@ notificationRoutes.patch(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = c.req.query();
-    const userId = query.userId || undefined;
-    const count = await markAllRead(userId);
+    // Always scope to the caller; a bare update would mark the entire log read
+    // across every recipient.
+    const count = await markAllRead(c.get("user").id);
     return c.json({ updated: count });
   },
 );

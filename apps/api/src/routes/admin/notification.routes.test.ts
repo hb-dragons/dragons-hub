@@ -138,7 +138,7 @@ describe("PATCH /notifications/:id/read", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ success: true });
-    expect(mocks.markRead).toHaveBeenCalledWith(1);
+    expect(mocks.markRead).toHaveBeenCalledWith(1, "test-user-1");
   });
 
   it("returns 404 when notification not found", async () => {
@@ -172,30 +172,7 @@ describe("PATCH /notifications/:id/read", () => {
 });
 
 describe("PATCH /notifications/read-all", () => {
-  it("marks all notifications as read", async () => {
-    mocks.markAllRead.mockResolvedValue(3);
-
-    const res = await app.request("/notifications/read-all?userId=user-1", {
-      method: "PATCH",
-    });
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ updated: 3 });
-    expect(mocks.markAllRead).toHaveBeenCalledWith("user-1");
-  });
-
-  it("returns 0 when nothing to update", async () => {
-    mocks.markAllRead.mockResolvedValue(0);
-
-    const res = await app.request("/notifications/read-all?userId=user-1", {
-      method: "PATCH",
-    });
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ updated: 0 });
-  });
-
-  it("returns 200 when userId is missing (marks all)", async () => {
+  it("marks all of the caller's notifications as read", async () => {
     mocks.markAllRead.mockResolvedValue(3);
 
     const res = await app.request("/notifications/read-all", {
@@ -204,7 +181,29 @@ describe("PATCH /notifications/read-all", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ updated: 3 });
-    expect(mocks.markAllRead).toHaveBeenCalledWith(undefined);
+    expect(mocks.markAllRead).toHaveBeenCalledWith("test-user-1");
+  });
+
+  it("returns 0 when nothing to update", async () => {
+    mocks.markAllRead.mockResolvedValue(0);
+
+    const res = await app.request("/notifications/read-all", {
+      method: "PATCH",
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({ updated: 0 });
+  });
+
+  it("ignores a query userId and always scopes to the caller", async () => {
+    mocks.markAllRead.mockResolvedValue(3);
+
+    const res = await app.request("/notifications/read-all?userId=someone-else", {
+      method: "PATCH",
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.markAllRead).toHaveBeenCalledWith("test-user-1");
   });
 });
 
