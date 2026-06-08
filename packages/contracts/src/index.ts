@@ -51,3 +51,11 @@ export {
   type EventListQuery,
   type TriggerEventBody,
 } from "./event";
+
+export {
+  notificationIdParamSchema,
+  notificationListQuerySchema,
+  notificationUserIdQuerySchema,
+  notificationPreferencesBodySchema,
+  type NotificationPreferencesBody,
+} from "./notification";

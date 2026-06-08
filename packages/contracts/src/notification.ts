@@ -18,3 +18,7 @@ export const notificationPreferencesBodySchema = z.object({
   mutedEventTypes: z.array(z.string()).optional(),
   locale: z.enum(["de", "en"]).optional(),
 });
+
+export type NotificationPreferencesBody = z.infer<
+  typeof notificationPreferencesBodySchema
+>;

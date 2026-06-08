@@ -3,7 +3,8 @@ import {
   notificationIdParamSchema,
   notificationListQuerySchema,
   notificationUserIdQuerySchema,
-} from "./notification.schemas";
+  notificationPreferencesBodySchema,
+} from "./notification";
 
 describe("notificationIdParamSchema", () => {
   it("coerces string id to positive integer", () => {
@@ -100,5 +101,48 @@ describe("notificationUserIdQuerySchema", () => {
     expect(
       notificationUserIdQuerySchema.parse({ userId: "user-1" }),
     ).toEqual({ userId: "user-1" });
+  });
+});
+
+describe("notificationPreferencesBodySchema", () => {
+  it("accepts empty object (all fields optional)", () => {
+    expect(notificationPreferencesBodySchema.parse({})).toEqual({});
+  });
+
+  it("accepts mutedEventTypes array", () => {
+    expect(
+      notificationPreferencesBodySchema.parse({
+        mutedEventTypes: ["task.assigned", "match.updated"],
+      }),
+    ).toEqual({ mutedEventTypes: ["task.assigned", "match.updated"] });
+  });
+
+  it("accepts empty mutedEventTypes array", () => {
+    expect(
+      notificationPreferencesBodySchema.parse({ mutedEventTypes: [] }),
+    ).toEqual({ mutedEventTypes: [] });
+  });
+
+  it("accepts locale de", () => {
+    expect(notificationPreferencesBodySchema.parse({ locale: "de" })).toEqual({
+      locale: "de",
+    });
+  });
+
+  it("accepts locale en", () => {
+    expect(notificationPreferencesBodySchema.parse({ locale: "en" })).toEqual({
+      locale: "en",
+    });
+  });
+
+  it("rejects invalid locale", () => {
+    expect(() =>
+      notificationPreferencesBodySchema.parse({ locale: "fr" }),
+    ).toThrow();
+  });
+
+  it("accepts both mutedEventTypes and locale together", () => {
+    const input = { mutedEventTypes: ["task.assigned"], locale: "en" as const };
+    expect(notificationPreferencesBodySchema.parse(input)).toEqual(input);
   });
 });

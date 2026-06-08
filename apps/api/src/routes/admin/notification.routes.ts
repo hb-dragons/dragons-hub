@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import {
   listNotifications,
   markRead,
@@ -12,13 +12,14 @@ import {
   updateUserNotificationPreferences,
 } from "../../services/notifications/user-preferences.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
   notificationUserIdQuerySchema,
   notificationPreferencesBodySchema,
-} from "./notification.schemas";
+} from "@dragons/contracts";
 
 const notificationRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
@@ -27,13 +28,14 @@ const settingsUpdate = requirePermission("settings", "update");
 notificationRoutes.get(
   "/notifications",
   settingsUpdate,
+  validator("query", notificationListQuerySchema, validationHook),
   describeRoute({
     description: "List notifications for a user from the notification log",
     tags: ["Notifications"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = notificationListQuerySchema.parse(c.req.query());
+    const query = c.req.valid("query");
     const result = await listNotifications(query);
     return c.json(result);
   },
@@ -43,6 +45,7 @@ notificationRoutes.get(
 notificationRoutes.patch(
   "/notifications/:id/read",
   settingsUpdate,
+  validator("param", notificationIdParamSchema, validationHook),
   describeRoute({
     description: "Mark one notification as read",
     tags: ["Notifications"],
@@ -52,7 +55,7 @@ notificationRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = notificationIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     // Scope to the caller so one admin can't mark another recipient's row read.
     const success = await markRead(id, c.get("user").id);
 
@@ -88,13 +91,14 @@ notificationRoutes.patch(
 notificationRoutes.get(
   "/notifications/unread-count",
   settingsUpdate,
+  validator("query", notificationUserIdQuerySchema, validationHook),
   describeRoute({
     description: "Get unread count for a user",
     tags: ["Notifications"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const { userId } = notificationUserIdQuerySchema.parse(c.req.query());
+    const { userId } = c.req.valid("query");
     const count = await getUnreadCount(userId);
     return c.json({ count });
   },
@@ -104,6 +108,7 @@ notificationRoutes.get(
 notificationRoutes.post(
   "/notifications/:id/retry",
   settingsUpdate,
+  validator("param", notificationIdParamSchema, validationHook),
   describeRoute({
     description: "Retry a failed notification delivery",
     tags: ["Notifications"],
@@ -114,7 +119,7 @@ notificationRoutes.post(
     },
   }),
   async (c) => {
-    const { id } = notificationIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const result = await retryFailedNotification(id);
 
     if (!result.success && result.error === "Notification not found") {
@@ -147,6 +152,7 @@ notificationRoutes.get(
 // PATCH /admin/notifications/preferences - update caller's notification preferences
 notificationRoutes.patch(
   "/notifications/preferences",
+  validator("json", notificationPreferencesBodySchema, validationHook),
   describeRoute({
     description: "Update the caller's notification preferences",
     tags: ["Notifications"],
@@ -157,7 +163,7 @@ notificationRoutes.patch(
   }),
   async (c) => {
     const userId = c.get("user").id;
-    const body = notificationPreferencesBodySchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     try {
       const prefs = await updateUserNotificationPreferences(userId, body);
       return c.json(prefs);
