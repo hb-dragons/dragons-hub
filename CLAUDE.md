@@ -13,7 +13,11 @@ packages/ui       @dragons/ui       Shared shadcn/Radix UI components
 packages/sdk      @dragons/sdk      Basketball-Bund SDK type definitions
 packages/db       @dragons/db       Drizzle ORM schema & database client
 packages/shared   @dragons/shared   Shared types, constants, and validation schemas
+packages/contracts @dragons/contracts Zod request schemas — single source of truth for each API endpoint's request contract
+packages/api-client @dragons/api-client Typed API client; infers request types from @dragons/contracts
 ```
+
+**API request contracts:** Each API route group's request schema lives in `packages/contracts/src/<group>.ts` (zod-only, domain-noun-prefixed exports, re-exported by name from `index.ts`). Routes validate with `hono-openapi`'s `validator(target, schema, validationHook)` + `c.req.valid(...)` (the shared `validationHook` in `apps/api/src/middleware/validation.ts` emits the central `{error, code, details}` 400). `@dragons/api-client` infers its request types from the same schemas, and `*.contract.test.ts` files assert each client request body/query parses against its contract so client/server drift fails the build. When adding/changing a request contract, edit the schema in `@dragons/contracts` (never redeclare it in the route or the client).
 
 Managed with pnpm workspaces + Turborepo. See `AGENTS.md` for detailed architecture.
 

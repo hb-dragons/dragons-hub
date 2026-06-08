@@ -5,13 +5,17 @@ Detailed technical reference for AI agents working in this codebase. For guideli
 ## Package Dependency Graph
 
 ```
-@dragons/web  ──> @dragons/ui, @dragons/shared
-@dragons/api  ──> @dragons/sdk, @dragons/db, @dragons/shared
+@dragons/web        ──> @dragons/ui, @dragons/shared, @dragons/api-client
+@dragons/api        ──> @dragons/sdk, @dragons/db, @dragons/shared, @dragons/contracts
+@dragons/api-client ──> @dragons/contracts (infers request types from the shared schemas)
+@dragons/contracts  ──> @dragons/shared (zod-only request schemas; single source of truth for API request contracts)
 @dragons/db   ──> (standalone - drizzle-orm + pg)
 @dragons/sdk  ──> (standalone - basketball-bund-sdk)
 @dragons/shared ──> (standalone - zod for validation schemas)
 @dragons/ui   ──> (standalone - radix-ui + tailwind)
 ```
+
+**Request contracts:** `@dragons/contracts` (`packages/contracts/src/<group>.ts`) is the sole declaration of each API endpoint's request schema. The API validates via `hono-openapi`'s `validator(..., validationHook)` (which also registers the schema into `/openapi.json`); `@dragons/api-client` infers `z.infer` request types from the same schemas; `*.contract.test.ts` files guard against client/server drift. A handful of endpoints with optional/empty bodies or custom JSON-parse handling (referee self/admin assign + claim, notification test-push) deliberately keep a manual `schema.parse()` but still source the schema from `@dragons/contracts`.
 
 ## Data Model
 
