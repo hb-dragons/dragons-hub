@@ -21,13 +21,13 @@ const publicMatchRoutes = new Hono();
 // GET /public/matches - List own club matches (no auth required)
 publicMatchRoutes.get(
   "/matches",
+  validator("query", matchListQuerySchema, validationHook),
   describeRoute({
     description: "List own club matches (public)",
     tags: ["Public"],
     security: [],
     responses: { 200: { description: "Success" } },
   }),
-  validator("query", matchListQuerySchema, validationHook),
   async (c) => {
     const query = c.req.valid("query");
     const opponentApiId = c.req.query("opponentApiId");
@@ -43,6 +43,7 @@ publicMatchRoutes.get(
 // GET /public/schedule.ics - ICS calendar subscription feed
 publicMatchRoutes.get(
   "/schedule.ics",
+  validator("query", publicScheduleIcsQuerySchema, validationHook),
   describeRoute({
     description: "ICS calendar feed for own club matches",
     tags: ["Public"],
@@ -54,7 +55,6 @@ publicMatchRoutes.get(
       },
     },
   }),
-  validator("query", publicScheduleIcsQuerySchema, validationHook),
   async (c) => {
     const query = c.req.valid("query");
 
