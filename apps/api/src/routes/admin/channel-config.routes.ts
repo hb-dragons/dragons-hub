@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import {
   listChannelConfigs,
@@ -8,15 +8,16 @@ import {
   updateChannelConfig,
   deleteChannelConfig,
 } from "../../services/admin/channel-config-admin.service";
-import type { CreateChannelConfigBody, UpdateChannelConfigBody } from "@dragons/shared";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import {
   channelConfigIdParamSchema,
   channelConfigListQuerySchema,
   createChannelConfigSchema,
   updateChannelConfigSchema,
   validateConfigForType,
-} from "./channel-config.schemas";
+} from "@dragons/contracts";
+import type { CreateChannelConfigBody, UpdateChannelConfigBody } from "@dragons/shared";
 import { env } from "../../config/env";
 
 const channelConfigRoutes = new Hono<AppEnv>();
@@ -63,13 +64,14 @@ channelConfigRoutes.get(
 channelConfigRoutes.get(
   "/channel-configs",
   settingsUpdate,
+  validator("query", channelConfigListQuerySchema, validationHook),
   describeRoute({
     description: "List channel configurations with pagination",
     tags: ["Channel Configs"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = channelConfigListQuerySchema.parse(c.req.query());
+    const query = c.req.valid("query");
     const result = await listChannelConfigs(query);
     return c.json(result);
   },
@@ -79,6 +81,7 @@ channelConfigRoutes.get(
 channelConfigRoutes.get(
   "/channel-configs/:id",
   settingsUpdate,
+  validator("param", channelConfigIdParamSchema, validationHook),
   describeRoute({
     description: "Get a single channel configuration by ID",
     tags: ["Channel Configs"],
@@ -88,7 +91,7 @@ channelConfigRoutes.get(
     },
   }),
   async (c) => {
-    const { id } = channelConfigIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const config = await getChannelConfig(id);
 
     if (!config) {
@@ -106,13 +109,14 @@ channelConfigRoutes.get(
 channelConfigRoutes.post(
   "/channel-configs",
   settingsUpdate,
+  validator("json", createChannelConfigSchema, validationHook),
   describeRoute({
     description: "Create a new channel configuration",
     tags: ["Channel Configs"],
     responses: { 201: { description: "Created" } },
   }),
   async (c) => {
-    const body = createChannelConfigSchema.parse(await c.req.json());
+    const body = c.req.valid("json");
 
     if (!isProviderConfigured(body.type)) {
       return c.json(
@@ -133,6 +137,8 @@ channelConfigRoutes.post(
 channelConfigRoutes.patch(
   "/channel-configs/:id",
   settingsUpdate,
+  validator("param", channelConfigIdParamSchema, validationHook),
+  validator("json", updateChannelConfigSchema, validationHook),
   describeRoute({
     description: "Update a channel configuration",
     tags: ["Channel Configs"],
@@ -142,8 +148,8 @@ channelConfigRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = channelConfigIdParamSchema.parse({ id: c.req.param("id") });
-    const body = updateChannelConfigSchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
 
     if (body.config) {
       const existing = await getChannelConfig(id);
@@ -183,6 +189,7 @@ channelConfigRoutes.patch(
 channelConfigRoutes.delete(
   "/channel-configs/:id",
   settingsUpdate,
+  validator("param", channelConfigIdParamSchema, validationHook),
   describeRoute({
     description: "Delete a channel configuration",
     tags: ["Channel Configs"],
@@ -192,7 +199,7 @@ channelConfigRoutes.delete(
     },
   }),
   async (c) => {
-    const { id } = channelConfigIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const success = await deleteChannelConfig(id);
 
     if (!success) {

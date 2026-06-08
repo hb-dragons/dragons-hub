@@ -36,3 +36,11 @@ export {
   type BookingUpdateBody,
   type BookingStatusBody,
 } from "./booking";
+
+export {
+  channelConfigIdParamSchema,
+  channelConfigListQuerySchema,
+  createChannelConfigSchema,
+  updateChannelConfigSchema,
+  validateConfigForType,
+} from "./channel-config";

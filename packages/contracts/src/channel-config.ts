@@ -84,3 +84,4 @@ export function validateConfigForType(
   const result = schema.safeParse(config);
   return result.success ? (result.data as Record<string, unknown>) : null;
 }
+
