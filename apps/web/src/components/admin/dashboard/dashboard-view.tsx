@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/lib/navigation";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { apiFetcher } from "@/lib/swr";
+import { todayInBerlin } from "@/lib/tz";
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
 import { StatCard } from "@/components/admin/shared/stat-card";
@@ -36,7 +37,7 @@ function formatTime(kickoffTime: string | null): string {
 
 export function DashboardView() {
   const t = useTranslations("dashboard");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInBerlin();
   const { data: session } = authClient.useSession();
   const user = session?.user ?? null;
   const canViewReferees = can(user, "referee", "view");

@@ -1,6 +1,7 @@
 import { fetchAPIServer } from "@/lib/api.server";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { todayInBerlin } from "@/lib/tz";
 import { DashboardView } from "@/components/admin/dashboard/dashboard-view";
 import type {
   PaginatedResponse,
@@ -10,7 +11,10 @@ import type {
 } from "@dragons/shared";
 
 export default async function AdminDashboardPage() {
-  const today = new Date().toISOString().slice(0, 10);
+  // Club operates in Europe/Berlin; UTC date would show the wrong day's
+  // fixtures between Berlin midnight and 01:00/02:00. Must match the client's
+  // todayInBerlin() so the SWR fallback key lines up.
+  const today = todayInBerlin();
 
   const [referees, standings, todayMatches] = await Promise.allSettled([
     fetchAPIServer<PaginatedResponse<RefereeListItem>>(
