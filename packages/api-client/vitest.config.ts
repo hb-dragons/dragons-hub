@@ -10,11 +10,11 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
       thresholds: {
-        // Phase 1 baseline — measured floor; ratchet up as api-client tests grow (see Phase 2).
-        branches: 86,
-        functions: 78,
-        lines: 85,
-        statements: 85,
+        // Phase 2 floor (2026-06-10).
+        branches: 94,
+        functions: 84,
+        lines: 89,
+        statements: 89,
       },
     },
   },
