@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseHubUrl, buildHubUrl } from "./use-referee-hub-url";
 
 describe("parseHubUrl", () => {
@@ -9,7 +9,16 @@ describe("parseHubUrl", () => {
       gameId: null,
       refereeId: null,
       subtab: "profile",
-      range: "30d",
+      filters: {
+        status: "open",
+        league: [],
+        dateFrom: null,
+        dateTo: null,
+        gameType: "both",
+      },
+      scope: "own",
+      search: "",
+      sort: "name",
     });
   });
 
@@ -22,7 +31,16 @@ describe("parseHubUrl", () => {
       gameId: null,
       refereeId: 42,
       subtab: "history",
-      range: "30d",
+      filters: {
+        status: "open",
+        league: [],
+        dateFrom: null,
+        dateTo: null,
+        gameType: "both",
+      },
+      scope: "own",
+      search: "",
+      sort: "name",
     });
   });
 
@@ -48,36 +66,133 @@ describe("parseHubUrl", () => {
     const state = parseHubUrl(new URLSearchParams("tab=referees&subtab=x"));
     expect(state.subtab).toBe("profile");
   });
-
-  it("clamps unknown range to 30d", () => {
-    const state = parseHubUrl(new URLSearchParams("range=forever"));
-    expect(state.range).toBe("30d");
-  });
 });
 
 describe("buildHubUrl", () => {
   it("omits default tab in the URL", () => {
-    expect(buildHubUrl({ tab: "open-slots", gameId: null, refereeId: null, subtab: "profile", range: "30d" }))
-      .toBe("");
+    expect(
+      buildHubUrl({
+        tab: "open-slots",
+        gameId: null,
+        refereeId: null,
+        subtab: "profile",
+        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+        scope: "own",
+        search: "",
+        sort: "name",
+      }),
+    ).toBe("");
   });
 
   it("includes tab and ref id", () => {
-    expect(buildHubUrl({ tab: "referees", gameId: null, refereeId: 42, subtab: "profile", range: "30d" }))
-      .toBe("tab=referees&id=42");
+    expect(
+      buildHubUrl({
+        tab: "referees",
+        gameId: null,
+        refereeId: 42,
+        subtab: "profile",
+        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+        scope: "own",
+        search: "",
+        sort: "name",
+      }),
+    ).toBe("tab=referees&id=42");
   });
 
   it("includes game id when on open-slots", () => {
-    expect(buildHubUrl({ tab: "open-slots", gameId: 4287, refereeId: null, subtab: "profile", range: "30d" }))
-      .toBe("game=4287");
+    expect(
+      buildHubUrl({
+        tab: "open-slots",
+        gameId: 4287,
+        refereeId: null,
+        subtab: "profile",
+        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+        scope: "own",
+        search: "",
+        sort: "name",
+      }),
+    ).toBe("game=4287");
   });
 
   it("includes subtab when not profile", () => {
-    expect(buildHubUrl({ tab: "referees", gameId: null, refereeId: 42, subtab: "history", range: "30d" }))
-      .toBe("tab=referees&id=42&subtab=history");
+    expect(
+      buildHubUrl({
+        tab: "referees",
+        gameId: null,
+        refereeId: 42,
+        subtab: "history",
+        filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+        scope: "own",
+        search: "",
+        sort: "name",
+      }),
+    ).toBe("tab=referees&id=42&subtab=history");
+  });
+});
+
+describe("hub URL state — open-slots filters", () => {
+  it("parses status, league, dateFrom, dateTo, gameType from URL", () => {
+    const params = new URLSearchParams(
+      "tab=open-slots&status=open&league=OL,BL&dateFrom=2026-05-18&dateTo=2026-06-01&gameType=home",
+    );
+    const state = parseHubUrl(params);
+    expect(state.filters).toEqual({
+      status: "open",
+      league: ["OL", "BL"],
+      dateFrom: "2026-05-18",
+      dateTo: "2026-06-01",
+      gameType: "home",
+    });
   });
 
-  it("includes range when not 30d", () => {
-    expect(buildHubUrl({ tab: "open-slots", gameId: null, refereeId: null, subtab: "profile", range: "season" }))
-      .toBe("range=season");
+  it("defaults to status=open, gameType=both, no league filter", () => {
+    const params = new URLSearchParams("tab=open-slots");
+    const state = parseHubUrl(params);
+    expect(state.filters.status).toBe("open");
+    expect(state.filters.gameType).toBe("both");
+    expect(state.filters.league).toEqual([]);
+  });
+
+  it("omits default filter values from rebuilt URL", () => {
+    const url = buildHubUrl({
+      tab: "open-slots",
+      gameId: null,
+      refereeId: null,
+      subtab: "profile",
+      filters: { status: "open", league: [], dateFrom: null, dateTo: null, gameType: "both" },
+      scope: "own",
+      search: "",
+      sort: "name",
+    });
+    expect(url).toBe("");
+  });
+});
+
+describe("hub URL state — search and sort", () => {
+  it("parses search and sort from query, with defaults", () => {
+    expect(parseHubUrl(new URLSearchParams("")).search).toBe("");
+    expect(parseHubUrl(new URLSearchParams("")).sort).toBe("name");
+    expect(parseHubUrl(new URLSearchParams("search=mei&sort=workloadDesc")).search).toBe("mei");
+    expect(parseHubUrl(new URLSearchParams("search=mei&sort=workloadDesc")).sort).toBe("workloadDesc");
+  });
+
+  it("ignores invalid sort and falls back to name", () => {
+    expect(parseHubUrl(new URLSearchParams("sort=bogus")).sort).toBe("name");
+  });
+
+  it("serializes only non-default search/sort under referees tab", () => {
+    const filters = { status: "open" as const, league: [], dateFrom: null, dateTo: null, gameType: "both" as const };
+    const qs = buildHubUrl({
+      tab: "referees",
+      gameId: null,
+      refereeId: null,
+      subtab: "profile",
+      filters,
+      scope: "own",
+      search: "mei",
+      sort: "workloadDesc",
+    });
+    expect(qs).toContain("search=mei");
+    expect(qs).toContain("sort=workloadDesc");
   });
 });

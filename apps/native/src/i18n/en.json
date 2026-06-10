@@ -4,7 +4,27 @@
     "schedule": "Schedule",
     "standings": "Standings",
     "teams": "Teams",
-    "referee": "Referee"
+    "today": "Today",
+    "tools": "Tools"
+  },
+  "today": {
+    "title": "Today",
+    "empty": "You're all caught up.",
+    "emptyHint": "New tasks for your roles will show up here.",
+    "openSlots": "%{count} open referee slot(s) need cover",
+    "nextAssignment": "You officiate %{teams}",
+    "nextGame": "Next game: %{teams}"
+  },
+  "tools": {
+    "title": "Tools",
+    "empty": "No tools available for your account.",
+    "groupLeague": "League",
+    "groupOperations": "Operations",
+    "groupSocial": "Social",
+    "groupNotifications": "Notifications",
+    "groupSystem": "System",
+    "officiating": "Officiating",
+    "boards": "Boards"
   },
   "home": {
     "nextGame": "Next Game",
@@ -72,6 +92,7 @@
     "roleRefereeAdmin": "Referee Admin",
     "roleVenueManager": "Venue Manager",
     "roleTeamManager": "Team Manager",
+    "roleCoach": "Coach",
     "roleReferee": "Referee"
   },
   "teamDetail": {
@@ -197,6 +218,7 @@
     "invalidCredentials": "Invalid email or password",
     "staffSignInPrompt": "Sign in as referee or admin",
     "staffSignInHint": "Fans don't need an account to use the app.",
+    "noAccountHint": "No account? Ask your club admin to create one.",
     "tapToUnlock": "Tap to unlock",
     "close": "Close"
   },

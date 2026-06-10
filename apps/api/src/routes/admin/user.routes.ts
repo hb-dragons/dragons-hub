@@ -1,26 +1,30 @@
 import { Hono } from "hono";
-import { z } from "zod";
+import { describeRoute, validator } from "hono-openapi";
 import { db } from "../../config/database";
 import { user as userTable, referees } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAnyRole } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
+import { userRefereeLinkBodySchema } from "@dragons/contracts";
 
 const userRoutes = new Hono();
-
-const refereeLinkBodySchema = z.object({
-  refereeId: z.number().int().positive().nullable(),
-});
 
 userRoutes.patch(
   "/users/:id/referee-link",
   requireAnyRole("admin"),
+  validator("json", userRefereeLinkBodySchema, validationHook),
+  describeRoute({
+    description: "Link or unlink a referee record from a user account",
+    tags: ["Users"],
+    responses: {
+      200: { description: "Success" },
+      400: { description: "Invalid body" },
+      404: { description: "Referee or user not found" },
+    },
+  }),
   async (c) => {
     const userId = c.req.param("id");
-    const parsed = refereeLinkBodySchema.safeParse(await c.req.json().catch(() => ({})));
-    if (!parsed.success) {
-      return c.json({ error: "Invalid body", code: "BAD_REQUEST" }, 400);
-    }
-    const body = parsed.data;
+    const body = c.req.valid("json");
 
     // Validate referee exists if linking
     if (body.refereeId !== null) {

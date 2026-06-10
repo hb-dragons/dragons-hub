@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import {
   listDomainEvents,
@@ -7,7 +7,8 @@ import {
   listFailedNotifications,
 } from "../../services/admin/event-admin.service";
 import { requirePermission } from "../../middleware/rbac";
-import { eventListQuerySchema, triggerEventSchema } from "./event.schemas";
+import { validationHook } from "../../middleware/validation";
+import { eventListQuerySchema, triggerEventSchema } from "@dragons/contracts";
 
 const eventRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
@@ -16,13 +17,14 @@ const settingsUpdate = requirePermission("settings", "update");
 eventRoutes.get(
   "/events",
   settingsUpdate,
+  validator("query", eventListQuerySchema, validationHook),
   describeRoute({
     description: "List domain events with filtering and pagination",
     tags: ["Events"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = eventListQuerySchema.parse(c.req.query());
+    const query = c.req.valid("query");
     const result = await listDomainEvents(query);
     return c.json(result);
   },
@@ -32,6 +34,7 @@ eventRoutes.get(
 eventRoutes.post(
   "/events/trigger",
   settingsUpdate,
+  validator("json", triggerEventSchema, validationHook),
   describeRoute({
     description: "Manually trigger a domain event for notification processing",
     tags: ["Events"],
@@ -41,7 +44,7 @@ eventRoutes.post(
     },
   }),
   async (c) => {
-    const body = triggerEventSchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     const user = c.get("user");
     const result = await triggerManualEvent({
       ...body,
@@ -55,13 +58,14 @@ eventRoutes.post(
 eventRoutes.get(
   "/events/failed",
   settingsUpdate,
+  validator("query", eventListQuerySchema, validationHook),
   describeRoute({
     description: "List failed notification deliveries with event context",
     tags: ["Events"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = eventListQuerySchema.parse(c.req.query());
+    const query = c.req.valid("query");
     const result = await listFailedNotifications({
       page: query.page,
       limit: query.limit,

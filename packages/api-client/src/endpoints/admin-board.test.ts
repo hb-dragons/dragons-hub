@@ -88,18 +88,18 @@ describe("adminBoardEndpoints", () => {
 
   // ── Columns ─────────────────────────────────────────────────────────────
 
-  it("PATCHes /admin/boards/:id/columns/reorder with { order } body", async () => {
+  it("PATCHes /admin/boards/:id/columns/reorder with { columns } body", async () => {
     const { client, mockFetch } = makeClient({});
     const api = adminBoardEndpoints(client);
-    const order = [{ id: 1, position: 0 }, { id: 2, position: 1 }];
+    const columns = [{ id: 1, position: 0 }, { id: 2, position: 1 }];
 
-    await api.reorderColumns(10, order);
+    await api.reorderColumns(10, columns);
 
     const [url, init] = mockFetch.mock.calls[0]!;
     expect(url).toBe("https://example.test/admin/boards/10/columns/reorder");
     expect((init as RequestInit).method).toBe("PATCH");
-    // Must wrap in { order: [...] }, not send raw array
-    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ order });
+    // Server's columnReorderBodySchema requires { columns: [...] }, not { order }
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ columns });
   });
 
   it("POSTs /admin/boards/:id/columns for addColumn", async () => {

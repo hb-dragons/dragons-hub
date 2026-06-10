@@ -29,8 +29,8 @@ vi.mock("../../config/env", () => ({
   env: mocks.env,
 }));
 
-vi.mock("./channel-config.schemas", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./channel-config.schemas")>();
+vi.mock("@dragons/contracts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@dragons/contracts")>();
   return {
     ...actual,
     validateConfigForType: mocks.validateConfigForType,
@@ -194,7 +194,7 @@ describe("POST /channel-configs", () => {
     expect(mocks.createChannelConfig).toHaveBeenCalledWith(body);
   });
 
-  it("returns 400 when name is missing", async () => {
+  it("returns 400 when required fields are missing", async () => {
     const res = await app.request("/channel-configs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

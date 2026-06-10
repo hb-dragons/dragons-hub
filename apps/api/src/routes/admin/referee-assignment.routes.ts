@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { z } from "zod";
+import { refereeAssignBodySchema } from "@dragons/contracts";
 import type { AppEnv } from "../../types";
 import { requirePermission } from "../../middleware/rbac";
 import {
@@ -8,11 +8,6 @@ import {
   searchCandidates,
   AssignmentError,
 } from "../../services/referee/referee-assignment.service";
-
-const assignBodySchema = z.object({
-  slotNumber: z.union([z.literal(1), z.literal(2)]),
-  refereeApiId: z.number().int().positive(),
-});
 
 const ERROR_STATUS_MAP: Record<string, number> = {
   GAME_NOT_FOUND: 404,
@@ -37,6 +32,8 @@ adminRefereeAssignmentRoutes.get(
     const search = c.req.query("search") ?? "";
     const pageFrom = Number(c.req.query("pageFrom") ?? "0");
     const pageSize = Number(c.req.query("pageSize") ?? "15");
+    const slotRaw = c.req.query("slot");
+    const slot = slotRaw === "1" ? 1 : slotRaw === "2" ? 2 : undefined;
 
     if (!Number.isInteger(pageFrom) || pageFrom < 0) {
       return c.json({ error: "Invalid pageFrom", code: "VALIDATION_ERROR" }, 400);
@@ -45,8 +42,10 @@ adminRefereeAssignmentRoutes.get(
       return c.json({ error: "Invalid pageSize", code: "VALIDATION_ERROR" }, 400);
     }
 
+    const eligibilitySlot = slot === 1 ? (1 as const) : slot === 2 ? (2 as const) : ("either" as const);
+
     try {
-      const result = await searchCandidates(spielplanId, search, pageFrom, pageSize);
+      const result = await searchCandidates(spielplanId, search, pageFrom, pageSize, eligibilitySlot);
       return c.json(result);
     } catch (error) {
       if (error instanceof AssignmentError) {
@@ -73,7 +72,7 @@ adminRefereeAssignmentRoutes.post(
     } catch {
       return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
     }
-    const { slotNumber, refereeApiId } = assignBodySchema.parse(body);
+    const { slotNumber, refereeApiId } = refereeAssignBodySchema.parse(body);
 
     try {
       const result = await assignReferee(spielplanId, slotNumber, refereeApiId);

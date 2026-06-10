@@ -4,7 +4,7 @@ import { haptics } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import type { TaskDetail, TaskPriority } from "@dragons/shared";
-import type { UpdateTaskBody } from "@dragons/api-client";
+import type { TaskUpdateBody } from "@dragons/api-client";
 import { taskKey } from "./useTaskDetail";
 
 const tasksPrefix = (boardId: number) => `admin/boards/${boardId}/tasks`;
@@ -13,7 +13,7 @@ export function useTaskMutations(boardId: number) {
   const { mutate } = useSWRConfig();
   const toast = useToast();
 
-  async function patch(taskId: number, body: UpdateTaskBody): Promise<TaskDetail> {
+  async function patch(taskId: number, body: TaskUpdateBody): Promise<TaskDetail> {
     try {
       const next = await adminBoardApi.updateTask(taskId, body);
       await Promise.all([

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import { logger } from "../../config/logger";
 import type { AppEnv } from "../../types";
 import {
@@ -9,9 +10,9 @@ import {
   getRefereeHistoryLeaderboard,
 } from "../../services/admin/referee-history.service";
 import {
-  historyFilterSchema,
-  historyGamesQuerySchema,
-} from "./referee-history.schemas";
+  refereeHistoryFilterSchema,
+  refereeHistoryGamesQuerySchema,
+} from "@dragons/contracts";
 import {
   GAMES_CSV_HEADERS,
   gamesToCsvRows,
@@ -26,18 +27,14 @@ const adminRefereeHistoryRoutes = new Hono<AppEnv>();
 adminRefereeHistoryRoutes.get(
   "/referee/history/summary",
   requirePermission("assignment", "view"),
+  validator("query", refereeHistoryFilterSchema, validationHook),
   describeRoute({
     description: "Referee history KPIs + leaderboard for a date range",
     tags: ["Referees"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const parsed = historyFilterSchema.parse({
-      dateFrom: c.req.query("dateFrom"),
-      dateTo: c.req.query("dateTo"),
-      league: c.req.query("league"),
-      status: c.req.query("status"),
-    });
+    const parsed = c.req.valid("query");
     const result = await getRefereeHistorySummary(parsed);
     return c.json(result);
   },
@@ -47,22 +44,14 @@ adminRefereeHistoryRoutes.get(
 adminRefereeHistoryRoutes.get(
   "/referee/history/games",
   requirePermission("assignment", "view"),
+  validator("query", refereeHistoryGamesQuerySchema, validationHook),
   describeRoute({
     description: "Paginated past referee games",
     tags: ["Referees"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const parsed = historyGamesQuerySchema.parse({
-      dateFrom: c.req.query("dateFrom"),
-      dateTo: c.req.query("dateTo"),
-      league: c.req.query("league"),
-      status: c.req.query("status"),
-      search: c.req.query("search"),
-      limit: c.req.query("limit"),
-      offset: c.req.query("offset"),
-      refereeApiId: c.req.query("refereeApiId"),
-    });
+    const parsed = c.req.valid("query");
     const result = await getRefereeHistoryGames(parsed);
     return c.json(result);
   },
@@ -72,22 +61,14 @@ adminRefereeHistoryRoutes.get(
 adminRefereeHistoryRoutes.get(
   "/referee/history/games.csv",
   requirePermission("assignment", "view"),
+  validator("query", refereeHistoryGamesQuerySchema, validationHook),
   describeRoute({
     description: "CSV export of referee history games",
     tags: ["Referees"],
     responses: { 200: { description: "text/csv" } },
   }),
   async (c) => {
-    const parsed = historyGamesQuerySchema.parse({
-      dateFrom: c.req.query("dateFrom"),
-      dateTo: c.req.query("dateTo"),
-      league: c.req.query("league"),
-      status: c.req.query("status"),
-      search: c.req.query("search"),
-      refereeApiId: c.req.query("refereeApiId"),
-      // CSV always exports a full page; override after validation.
-      // If the dataset exceeds this cap, `page.hasMore` drives the truncation header.
-    });
+    const parsed = c.req.valid("query");
     const CSV_MAX_ROWS = 1000;
     const page = await getRefereeHistoryGames({
       ...parsed,
@@ -126,18 +107,14 @@ adminRefereeHistoryRoutes.get(
 adminRefereeHistoryRoutes.get(
   "/referee/history/leaderboard.csv",
   requirePermission("assignment", "view"),
+  validator("query", refereeHistoryFilterSchema, validationHook),
   describeRoute({
     description: "CSV export of referee history leaderboard",
     tags: ["Referees"],
     responses: { 200: { description: "text/csv" } },
   }),
   async (c) => {
-    const parsed = historyFilterSchema.parse({
-      dateFrom: c.req.query("dateFrom"),
-      dateTo: c.req.query("dateTo"),
-      league: c.req.query("league"),
-      status: c.req.query("status"),
-    });
+    const parsed = c.req.valid("query");
     const entries = await getRefereeHistoryLeaderboard(parsed, { limit: 10000 });
     const BOM = "﻿";
     const csv = BOM + toCsv(LEADERBOARD_CSV_HEADERS, leaderboardToCsvRows(entries));

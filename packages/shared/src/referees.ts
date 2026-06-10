@@ -1,3 +1,5 @@
+import type { RefereeGameListItem } from "./referee-games";
+
 export interface RefereeListItem {
   id: number;
   apiId: number;
@@ -5,7 +7,6 @@ export interface RefereeListItem {
   lastName: string | null;
   licenseNumber: number | null;
   matchCount: number;
-  roles: string[];
   allowAllHomeGames: boolean;
   allowAwayGames: boolean;
   isOwnClub: boolean;
@@ -41,16 +42,11 @@ export interface UpdateRefereeRulesBody {
   }>;
 }
 
-export interface UpdateRefereeSettingsBody {
-  visibility?: UpdateRefereeVisibilityBody;
-  rules?: UpdateRefereeRulesBody["rules"];
+export interface RefereeCountsResponse {
+  own: number;
+  all: number;
 }
 
-export interface UpdateRefereeSettingsResponse {
-  visibility: {
-    allowAllHomeGames: boolean;
-    allowAwayGames: boolean;
-    isOwnClub: boolean;
-  };
-  rules: RefereeRule[];
+export interface EligibleOpenGamesResponse {
+  items: RefereeGameListItem[];
 }

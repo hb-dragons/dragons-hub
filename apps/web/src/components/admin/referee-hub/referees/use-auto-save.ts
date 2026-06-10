@@ -41,7 +41,7 @@ export function useAutoSave({ save, debounceMs = 800 }: Options) {
     if (!aliveRef.current) return;
     setStatus("dirty");
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => { void runSave(); }, debounceMs);
+    timerRef.current = setTimeout(runSave, debounceMs);
   }, [debounceMs, runSave]);
 
   const saveNow = useCallback(async () => {

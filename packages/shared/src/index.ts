@@ -129,10 +129,10 @@ export type {
   RefereeListItem,
   RefereeRule,
   RefereeRulesResponse,
+  RefereeCountsResponse,
   UpdateRefereeRulesBody,
   UpdateRefereeVisibilityBody,
-  UpdateRefereeSettingsBody,
-  UpdateRefereeSettingsResponse,
+  EligibleOpenGamesResponse,
 } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";
@@ -203,15 +203,22 @@ export {
   refereeAdmin,
   venueManager,
   teamManager,
+  coach,
   ROLE_NAMES,
   parseRoles,
   can,
   canAll,
   hasRole,
   isReferee,
+  isMember,
   canViewOpenGames,
 } from "./rbac";
-export type { RoleName, Resource, Action } from "./rbac";
+export type { RoleName, Resource, Action, GateUser } from "./rbac";
+
+// Navigation surfaces, tabs, and Today ordering (role-aware shell foundation)
+export * from "./nav-surfaces";
+export * from "./nav-tabs";
+export * from "./today";
 
 export * from "./referee-history";
 

@@ -17,9 +17,6 @@
     "board": "Board",
     "bookings": "Bookings",
     "menu": "Menu",
-    "groupReferee": "Referee",
-    "openAssignments": "Open Assignments",
-    "refereeHistory": "Referee History",
     "groupLeague": "League",
     "groupOperations": "Operations",
     "groupSocial": "Social Media",
@@ -195,7 +192,10 @@
       "openProfile": "Open ref profile",
       "empty": "No games for this ref in range.",
       "gamesCount": "Games · {count}",
-      "role": { "sr1": "SR1", "sr2": "SR2" },
+      "role": {
+        "sr1": "SR1",
+        "sr2": "SR2"
+      },
       "stats": {
         "total": "Total",
         "sr1": "SR1",
@@ -521,7 +521,6 @@
       "firstName": "First Name",
       "licenseNumber": "License #",
       "matchCount": "Matches",
-      "roles": "Roles",
       "apiId": "API ID",
       "isOwnClub": "Own Club"
     },
@@ -618,7 +617,8 @@
       "admin": "Admin",
       "refereeAdmin": "Referee Admin",
       "venueManager": "Venue Manager",
-      "teamManager": "Team Manager"
+      "teamManager": "Team Manager",
+      "coach": "Coach"
     },
     "noRole": "No role",
     "refereeBadge": "Referee",
@@ -1254,15 +1254,11 @@
       "openSlots": "Open Slots",
       "referees": "Referees"
     },
-    "range": {
-      "label": "Range",
-      "season": "Season",
-      "30d": "Last 30 days",
-      "month": "This month",
-      "custom": "Custom"
-    },
     "openSlots": {
       "searchPlaceholder": "Search game…",
+      "loading": "Loading…",
+      "loadError": "Failed to load games.",
+      "empty": "No games match your filters.",
       "detail": {
         "notFound": "Game not found or no longer needs referees",
         "selectGamePrompt": "Select a game on the left to see its open slots"
@@ -1272,11 +1268,8 @@
         "open": "⚠ Open",
         "unassign": "Unassign"
       },
-      "toast": {
-        "assigned": "Referee assigned",
-        "assignFailed": "Could not assign referee",
-        "unassigned": "Referee unassigned",
-        "unassignFailed": "Could not unassign referee"
+      "errorChip": {
+        "dismiss": "Dismiss"
       },
       "picker": {
         "searchPlaceholder": "Search referees…",
@@ -1291,18 +1284,64 @@
           "modeMismatchSr2": "SR2 mode mismatch",
           "blocked": "Blocked"
         }
+      },
+      "filters": {
+        "status": "Status",
+        "statusValue": {
+          "open": "Open only",
+          "offered": "Open + Offered",
+          "any": "Any"
+        },
+        "league": "League",
+        "noLeagues": "No leagues loaded",
+        "date": "Date",
+        "datePreset": {
+          "14d": "Next 14 days",
+          "30d": "Next 30 days",
+          "season": "Whole season",
+          "custom": "Custom range"
+        },
+        "dateFrom": "From",
+        "dateTo": "To",
+        "gameType": "Game type",
+        "gameTypeValue": {
+          "home": "Home",
+          "away": "Away"
+        },
+        "reset": "Reset filters"
       }
     },
     "referees": {
-      "kpi": { "total": "Total games", "refs": "Referees", "workload": "Avg workload" },
-      "columns": { "ref": "Referee", "own": "Own-club", "games": "Games" },
+      "kpi": {
+        "ownClubRefs": "Own-club refs",
+        "avgMatches": "Avg matches/ref"
+      },
+      "columns": {
+        "ref": "Referee",
+        "own": "Own-club",
+        "games": "Games"
+      },
       "search": "Search referees…",
-      "sort": { "name": "Sort: Name", "workloadDesc": "Games (high → low)", "workloadAsc": "Games (low → high)" },
+      "sort": {
+        "name": "Sort: Name",
+        "workloadDesc": "Games (high → low)",
+        "workloadAsc": "Games (low → high)"
+      },
       "empty": "No referees match your filters",
       "profile": {
-        "visibility": { "title": "Visibility", "ownClub": "Own-club referee", "allHome": "Allow all home games", "away": "Allow away games" },
-        "rules": { "title": "Per-team rules", "add": "Add rule", "deny": "Deny", "allow": "Allow", "selectTeam": "Team", "none": "No team rules — federation defaults apply" },
-        "save": { "saving": "Saving…", "saved": "Saved {n}s ago", "dirty": "Unsaved changes", "error": "Save failed", "now": "Save now" }
+        "visibility": {
+          "title": "Visibility",
+          "ownClub": "Own-club referee",
+          "allHome": "Allow all home games",
+          "away": "Allow away games"
+        },
+        "save": {
+          "saving": "Saving…",
+          "saved": "Saved {n}s ago",
+          "dirty": "Unsaved changes",
+          "error": "Save failed",
+          "now": "Save now"
+        }
       },
       "upcoming": {
         "assigned": "Assigned",
@@ -1313,15 +1352,44 @@
       "history": {
         "total": "{n} games",
         "exportCsv": "Export CSV",
+        "loadMore": "Load more",
         "empty": "No history in selected range",
         "statusPlayed": "Played",
         "statusCancelled": "Cancelled",
         "statusForfeited": "Forfeited"
       },
+      "loading": "Loading…",
       "notFound": "Referee not found",
       "ownClubBadge": "Own-club",
-      "subtabs": { "profile": "Profile", "upcoming": "Upcoming", "history": "History" },
-      "selectPrompt": "Pick a referee to see their config + history"
+      "rules": {
+        "title": "Per-team rules",
+        "add": "Add rule",
+        "deny": "Deny",
+        "allow": "Allow",
+        "selectTeam": "Team",
+        "none": "No rules",
+        "disabledHint": "Mark as own-club referee first",
+        "markOwnClub": "Mark as own club",
+        "save": {
+          "save": "Save",
+          "discard": "Discard",
+          "saving": "Saving…",
+          "saved": "Saved {n}s ago",
+          "dirty": "Unsaved",
+          "error": "Save failed: {msg}"
+        }
+      },
+      "subtabs": {
+        "profile": "Profile",
+        "rules": "Rules",
+        "upcoming": "Upcoming",
+        "history": "History"
+      },
+      "selectPrompt": "Pick a referee to see their config + history",
+      "scope": {
+        "own": "Own ({n})",
+        "all": "All ({n})"
+      }
     }
   },
   "errors": {

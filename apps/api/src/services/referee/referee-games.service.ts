@@ -1,6 +1,6 @@
 import { db } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
-import { and, eq, gte, lte, or, ilike, sql, asc } from "drizzle-orm";
+import { and, eq, gte, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
 
 const isTrackedLeagueExpr = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
@@ -66,13 +66,16 @@ interface GetRefereeGamesParams {
   offset: number;
   search?: string;
   status?: "active" | "cancelled" | "forfeited" | "all";
-  league?: string;
+  league?: string[];
   dateFrom?: string;
   dateTo?: string;
+  gameType?: "home" | "away" | "both";
+  assignedRefereeApiId?: number;
+  slotStatus?: "open" | "offered" | "any";
 }
 
 export async function getRefereeGames(params: GetRefereeGamesParams) {
-  const { limit, offset, search, status, league, dateFrom, dateTo } = params;
+  const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId, slotStatus } = params;
   const conditions = [];
 
   // Status
@@ -84,7 +87,16 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
   }
 
   // League
-  if (league) conditions.push(eq(refereeGames.leagueShort, league));
+  if (league && league.length > 0) {
+    const leagueIds = league.map(Number).filter((n) => !Number.isNaN(n));
+    if (leagueIds.length === 1) conditions.push(eq(refereeGames.leagueApiId, leagueIds[0]!));
+    else if (leagueIds.length > 1) conditions.push(inArray(refereeGames.leagueApiId, leagueIds));
+  }
+
+  // Game type
+  if (gameType === "home") conditions.push(eq(refereeGames.isHomeGame, true));
+  else if (gameType === "away") conditions.push(eq(refereeGames.isGuestGame, true));
+  // "both" or undefined: no filter
 
   // Date range
   if (dateFrom) conditions.push(gte(refereeGames.kickoffDate, dateFrom));
@@ -102,6 +114,31 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
       )!);
     }
   }
+
+  // Assigned referee
+  if (assignedRefereeApiId != null) {
+    conditions.push(or(
+      eq(refereeGames.sr1RefereeApiId, assignedRefereeApiId),
+      eq(refereeGames.sr2RefereeApiId, assignedRefereeApiId),
+    )!);
+  }
+
+  // Slot status
+  if (slotStatus === "open") {
+    conditions.push(
+      or(eq(refereeGames.sr1Status, "open"), eq(refereeGames.sr2Status, "open"))!,
+    );
+  } else if (slotStatus === "offered") {
+    conditions.push(
+      or(
+        eq(refereeGames.sr1Status, "open"),
+        eq(refereeGames.sr2Status, "open"),
+        eq(refereeGames.sr1Status, "offered"),
+        eq(refereeGames.sr2Status, "offered"),
+      )!,
+    );
+  }
+  // slotStatus === "any" or undefined: no extra clause
 
   const whereClause = conditions.length > 0
     ? conditions.length === 1 ? conditions[0]! : and(...conditions)!

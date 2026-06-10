@@ -374,6 +374,17 @@ describe("PATCH /boards/:id/columns/reorder", () => {
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
+
+  it("rejects an invalid reorder body with the VALIDATION_ERROR envelope", async () => {
+    const res = await app.request("/boards/1/columns/reorder", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: [] }), // wrong shape: API requires { columns }
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
 });
 
 describe("PATCH /boards/:id/columns/:colId", () => {

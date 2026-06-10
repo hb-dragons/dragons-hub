@@ -1,12 +1,11 @@
 import { Hono } from "hono";
-import { z } from "zod";
-import { describeRoute } from "hono-openapi";
-import { dateSchema } from "@dragons/shared";
+import { describeRoute, validator } from "hono-openapi";
 import { getOwnClubMatches } from "../../services/admin/match-admin.service";
 import { getPublicMatchDetail } from "../../services/admin/match-query.service";
 import { getMatchContext } from "../../services/public/match-context.service";
 import { buildCalendarFeed } from "../../services/public/calendar.service";
-import { matchListQuerySchema } from "../admin/match.schemas";
+import { matchListQuerySchema, publicScheduleIcsQuerySchema } from "@dragons/contracts";
+import { validationHook } from "../../middleware/validation";
 import { env } from "../../config/env";
 
 function resolveIcsHostname(): string {
@@ -22,6 +21,7 @@ const publicMatchRoutes = new Hono();
 // GET /public/matches - List own club matches (no auth required)
 publicMatchRoutes.get(
   "/matches",
+  validator("query", matchListQuerySchema, validationHook),
   describeRoute({
     description: "List own club matches (public)",
     tags: ["Public"],
@@ -29,16 +29,7 @@ publicMatchRoutes.get(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = matchListQuerySchema.parse({
-      limit: c.req.query("limit"),
-      offset: c.req.query("offset"),
-      leagueId: c.req.query("leagueId"),
-      dateFrom: c.req.query("dateFrom"),
-      dateTo: c.req.query("dateTo"),
-      sort: c.req.query("sort"),
-      hasScore: c.req.query("hasScore"),
-      teamApiId: c.req.query("teamApiId"),
-    });
+    const query = c.req.valid("query");
     const opponentApiId = c.req.query("opponentApiId");
     const result = await getOwnClubMatches({
       ...query,
@@ -49,17 +40,10 @@ publicMatchRoutes.get(
   },
 );
 
-// Query schema for ICS feed — subset of match list params
-const icsQuerySchema = z.object({
-  teamApiId: z.coerce.number().int().positive().optional(),
-  leagueId: z.coerce.number().int().positive().optional(),
-  dateFrom: dateSchema.optional(),
-  dateTo: dateSchema.optional(),
-});
-
 // GET /public/schedule.ics - ICS calendar subscription feed
 publicMatchRoutes.get(
   "/schedule.ics",
+  validator("query", publicScheduleIcsQuerySchema, validationHook),
   describeRoute({
     description: "ICS calendar feed for own club matches",
     tags: ["Public"],
@@ -72,12 +56,7 @@ publicMatchRoutes.get(
     },
   }),
   async (c) => {
-    const query = icsQuerySchema.parse({
-      teamApiId: c.req.query("teamApiId"),
-      leagueId: c.req.query("leagueId"),
-      dateFrom: c.req.query("dateFrom"),
-      dateTo: c.req.query("dateTo"),
-    });
+    const query = c.req.valid("query");
 
     // Default window: 30 days back → 180 days forward
     const now = new Date();

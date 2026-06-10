@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import {
   listBoards,
   createBoard,
@@ -12,6 +12,7 @@ import {
   reorderColumns,
 } from "../../services/admin/board.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
 import {
   boardIdParamSchema,
@@ -21,7 +22,7 @@ import {
   columnCreateBodySchema,
   columnUpdateBodySchema,
   columnReorderBodySchema,
-} from "./board.schemas";
+} from "@dragons/contracts";
 
 const boardRoutes = new Hono<AppEnv>();
 const boardView = requirePermission("board", "view");
@@ -47,13 +48,14 @@ boardRoutes.get(
 boardRoutes.post(
   "/boards",
   boardUpdate,
+  validator("json", boardCreateBodySchema, validationHook),
   describeRoute({
     description: "Create board with default columns",
     tags: ["Boards"],
     responses: { 201: { description: "Created" } },
   }),
   async (c) => {
-    const body = boardCreateBodySchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     const result = await createBoard(body.name, body.description, body.createdBy);
     return c.json(result, 201);
   },
@@ -63,6 +65,7 @@ boardRoutes.post(
 boardRoutes.get(
   "/boards/:id",
   boardView,
+  validator("param", boardIdParamSchema, validationHook),
   describeRoute({
     description: "Get board with columns",
     tags: ["Boards"],
@@ -72,7 +75,7 @@ boardRoutes.get(
     },
   }),
   async (c) => {
-    const { id } = boardIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const result = await getBoard(id);
 
     if (!result) {
@@ -87,6 +90,8 @@ boardRoutes.get(
 boardRoutes.patch(
   "/boards/:id",
   boardUpdate,
+  validator("param", boardIdParamSchema, validationHook),
+  validator("json", boardUpdateBodySchema, validationHook),
   describeRoute({
     description: "Update board",
     tags: ["Boards"],
@@ -96,8 +101,8 @@ boardRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = boardIdParamSchema.parse({ id: c.req.param("id") });
-    const body = boardUpdateBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
     const result = await updateBoard(id, body);
 
     if (!result) {
@@ -112,6 +117,7 @@ boardRoutes.patch(
 boardRoutes.delete(
   "/boards/:id",
   boardDelete,
+  validator("param", boardIdParamSchema, validationHook),
   describeRoute({
     description: "Delete board",
     tags: ["Boards"],
@@ -121,7 +127,7 @@ boardRoutes.delete(
     },
   }),
   async (c) => {
-    const { id } = boardIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const deleted = await deleteBoard(id);
 
     if (!deleted) {
@@ -136,6 +142,8 @@ boardRoutes.delete(
 boardRoutes.post(
   "/boards/:id/columns",
   boardUpdate,
+  validator("param", boardIdParamSchema, validationHook),
+  validator("json", columnCreateBodySchema, validationHook),
   describeRoute({
     description: "Add column to board",
     tags: ["Boards"],
@@ -145,8 +153,8 @@ boardRoutes.post(
     },
   }),
   async (c) => {
-    const { id } = boardIdParamSchema.parse({ id: c.req.param("id") });
-    const body = columnCreateBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
     const result = await addColumn(id, body);
 
     if (!result) {
@@ -162,15 +170,17 @@ boardRoutes.post(
 boardRoutes.patch(
   "/boards/:id/columns/reorder",
   boardUpdate,
+  validator("param", boardIdParamSchema, validationHook),
+  validator("json", columnReorderBodySchema, validationHook),
   describeRoute({
     description: "Reorder board columns",
     tags: ["Boards"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const { id } = boardIdParamSchema.parse({ id: c.req.param("id") });
-    const body = columnReorderBodySchema.parse(await c.req.json());
-    await reorderColumns(id, body.columns);
+    const { id } = c.req.valid("param");
+    const { columns } = c.req.valid("json");
+    await reorderColumns(id, columns);
     return c.json({ success: true });
   },
 );
@@ -179,6 +189,8 @@ boardRoutes.patch(
 boardRoutes.patch(
   "/boards/:id/columns/:colId",
   boardUpdate,
+  validator("param", columnIdParamSchema, validationHook),
+  validator("json", columnUpdateBodySchema, validationHook),
   describeRoute({
     description: "Update column",
     tags: ["Boards"],
@@ -188,11 +200,8 @@ boardRoutes.patch(
     },
   }),
   async (c) => {
-    const { id, colId } = columnIdParamSchema.parse({
-      id: c.req.param("id"),
-      colId: c.req.param("colId"),
-    });
-    const body = columnUpdateBodySchema.parse(await c.req.json());
+    const { id, colId } = c.req.valid("param");
+    const body = c.req.valid("json");
     const result = await updateColumn(id, colId, body);
 
     if (!result) {
@@ -207,6 +216,7 @@ boardRoutes.patch(
 boardRoutes.delete(
   "/boards/:id/columns/:colId",
   boardUpdate,
+  validator("param", columnIdParamSchema, validationHook),
   describeRoute({
     description: "Delete column",
     tags: ["Boards"],
@@ -216,10 +226,7 @@ boardRoutes.delete(
     },
   }),
   async (c) => {
-    const { id, colId } = columnIdParamSchema.parse({
-      id: c.req.param("id"),
-      colId: c.req.param("colId"),
-    });
+    const { id, colId } = c.req.valid("param");
     const deleted = await deleteColumn(id, colId);
 
     if (!deleted) {

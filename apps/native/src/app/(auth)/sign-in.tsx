@@ -60,7 +60,10 @@ export default function SignInScreen() {
         return;
       }
 
-      dismiss();
+      if (router.canDismiss()) {
+        router.dismiss();
+      }
+      router.replace("/today");
     } catch (err) {
       setErrorText(
         err instanceof Error ? err.message : i18n.t("auth.unexpectedError"),
@@ -190,6 +193,19 @@ export default function SignInScreen() {
             </Text>
           )}
         </Pressable>
+
+        <Text
+          style={[
+            textStyles.caption,
+            {
+              color: colors.mutedForeground,
+              textAlign: "center",
+              marginTop: spacing.sm,
+            },
+          ]}
+        >
+          {i18n.t("auth.noAccountHint")}
+        </Text>
       </View>
     </KeyboardAvoidingView>
   );

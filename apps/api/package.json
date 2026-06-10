@@ -17,6 +17,7 @@
     "@better-auth/expo": "^1.6.11",
     "@bull-board/api": "^6.21.2",
     "@bull-board/hono": "^6.21.2",
+    "@dragons/contracts": "workspace:*",
     "@dragons/db": "workspace:*",
     "@dragons/sdk": "workspace:*",
     "@dragons/shared": "workspace:*",

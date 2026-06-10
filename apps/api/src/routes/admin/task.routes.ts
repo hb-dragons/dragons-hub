@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import {
   listTasks,
   createTask,
@@ -17,6 +17,7 @@ import {
   removeAssignee,
 } from "../../services/admin/task.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
 import {
   taskBoardIdParamSchema,
@@ -32,7 +33,7 @@ import {
   commentCreateBodySchema,
   commentUpdateBodySchema,
   taskAssigneeParamSchema,
-} from "./task.schemas";
+} from "@dragons/contracts";
 
 const taskRoutes = new Hono<AppEnv>();
 const boardView = requirePermission("board", "view");
@@ -42,20 +43,16 @@ const boardUpdate = requirePermission("board", "update");
 taskRoutes.get(
   "/boards/:boardId/tasks",
   boardView,
+  validator("param", taskBoardIdParamSchema, validationHook),
+  validator("query", taskListQuerySchema, validationHook),
   describeRoute({
     description: "List tasks for a board",
     tags: ["Tasks"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const { boardId } = taskBoardIdParamSchema.parse({
-      boardId: c.req.param("boardId"),
-    });
-    const filters = taskListQuerySchema.parse({
-      columnId: c.req.query("columnId"),
-      assigneeId: c.req.query("assigneeId"),
-      priority: c.req.query("priority"),
-    });
+    const { boardId } = c.req.valid("param");
+    const filters = c.req.valid("query");
     const result = await listTasks(boardId, filters);
     return c.json(result);
   },
@@ -65,6 +62,8 @@ taskRoutes.get(
 taskRoutes.post(
   "/boards/:boardId/tasks",
   boardUpdate,
+  validator("param", taskBoardIdParamSchema, validationHook),
+  validator("json", taskCreateBodySchema, validationHook),
   describeRoute({
     description: "Create task",
     tags: ["Tasks"],
@@ -74,10 +73,8 @@ taskRoutes.post(
     },
   }),
   async (c) => {
-    const { boardId } = taskBoardIdParamSchema.parse({
-      boardId: c.req.param("boardId"),
-    });
-    const body = taskCreateBodySchema.parse(await c.req.json());
+    const { boardId } = c.req.valid("param");
+    const body = c.req.valid("json");
     const callerId = c.get("user")?.id;
     /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
@@ -100,6 +97,7 @@ taskRoutes.post(
 taskRoutes.get(
   "/tasks/:id",
   boardView,
+  validator("param", taskIdParamSchema, validationHook),
   describeRoute({
     description: "Get task detail",
     tags: ["Tasks"],
@@ -109,7 +107,7 @@ taskRoutes.get(
     },
   }),
   async (c) => {
-    const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const result = await getTaskDetail(id);
 
     if (!result) {
@@ -124,6 +122,8 @@ taskRoutes.get(
 taskRoutes.patch(
   "/tasks/:id",
   boardUpdate,
+  validator("param", taskIdParamSchema, validationHook),
+  validator("json", taskUpdateBodySchema, validationHook),
   describeRoute({
     description: "Update task",
     tags: ["Tasks"],
@@ -133,8 +133,8 @@ taskRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
-    const body = taskUpdateBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
     const callerId = c.get("user")?.id;
     /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
@@ -154,6 +154,8 @@ taskRoutes.patch(
 taskRoutes.patch(
   "/tasks/:id/move",
   boardUpdate,
+  validator("param", taskIdParamSchema, validationHook),
+  validator("json", taskMoveBodySchema, validationHook),
   describeRoute({
     description: "Move task to column and position",
     tags: ["Tasks"],
@@ -163,8 +165,8 @@ taskRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
-    const body = taskMoveBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
     const result = await moveTask(id, body.columnId, body.position);
 
     if (!result) {
@@ -182,6 +184,7 @@ taskRoutes.patch(
 taskRoutes.delete(
   "/tasks/:id",
   boardUpdate,
+  validator("param", taskIdParamSchema, validationHook),
   describeRoute({
     description: "Delete task",
     tags: ["Tasks"],
@@ -191,7 +194,7 @@ taskRoutes.delete(
     },
   }),
   async (c) => {
-    const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const deleted = await deleteTask(id);
 
     if (!deleted) {
@@ -206,6 +209,8 @@ taskRoutes.delete(
 taskRoutes.post(
   "/tasks/:id/checklist",
   boardUpdate,
+  validator("param", taskIdParamSchema, validationHook),
+  validator("json", checklistItemCreateBodySchema, validationHook),
   describeRoute({
     description: "Add checklist item",
     tags: ["Tasks"],
@@ -215,8 +220,8 @@ taskRoutes.post(
     },
   }),
   async (c) => {
-    const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
-    const body = checklistItemCreateBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
     const result = await addChecklistItem(id, body);
 
     if (!result) {
@@ -231,6 +236,8 @@ taskRoutes.post(
 taskRoutes.patch(
   "/tasks/:id/checklist/:itemId",
   boardUpdate,
+  validator("param", taskChecklistItemParamSchema, validationHook),
+  validator("json", checklistItemUpdateBodySchema, validationHook),
   describeRoute({
     description: "Update checklist item",
     tags: ["Tasks"],
@@ -240,11 +247,8 @@ taskRoutes.patch(
     },
   }),
   async (c) => {
-    const { id, itemId } = taskChecklistItemParamSchema.parse({
-      id: c.req.param("id"),
-      itemId: c.req.param("itemId"),
-    });
-    const body = checklistItemUpdateBodySchema.parse(await c.req.json());
+    const { id, itemId } = c.req.valid("param");
+    const body = c.req.valid("json");
     const callerId = c.get("user")?.id;
     /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
@@ -267,6 +271,7 @@ taskRoutes.patch(
 taskRoutes.delete(
   "/tasks/:id/checklist/:itemId",
   boardUpdate,
+  validator("param", taskChecklistItemParamSchema, validationHook),
   describeRoute({
     description: "Delete checklist item",
     tags: ["Tasks"],
@@ -276,10 +281,7 @@ taskRoutes.delete(
     },
   }),
   async (c) => {
-    const { id, itemId } = taskChecklistItemParamSchema.parse({
-      id: c.req.param("id"),
-      itemId: c.req.param("itemId"),
-    });
+    const { id, itemId } = c.req.valid("param");
     const deleted = await deleteChecklistItem(id, itemId);
 
     if (!deleted) {
@@ -297,6 +299,8 @@ taskRoutes.delete(
 taskRoutes.post(
   "/tasks/:id/comments",
   boardUpdate,
+  validator("param", taskIdParamSchema, validationHook),
+  validator("json", commentCreateBodySchema, validationHook),
   describeRoute({
     description: "Add comment",
     tags: ["Tasks"],
@@ -306,8 +310,8 @@ taskRoutes.post(
     },
   }),
   async (c) => {
-    const { id } = taskIdParamSchema.parse({ id: c.req.param("id") });
-    const body = commentCreateBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
     const callerId = c.get("user")?.id;
     /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
@@ -327,6 +331,8 @@ taskRoutes.post(
 taskRoutes.patch(
   "/tasks/:id/comments/:commentId",
   boardUpdate,
+  validator("param", taskCommentParamSchema, validationHook),
+  validator("json", commentUpdateBodySchema, validationHook),
   describeRoute({
     description: "Edit comment",
     tags: ["Tasks"],
@@ -336,11 +342,8 @@ taskRoutes.patch(
     },
   }),
   async (c) => {
-    const { id, commentId } = taskCommentParamSchema.parse({
-      id: c.req.param("id"),
-      commentId: c.req.param("commentId"),
-    });
-    const body = commentUpdateBodySchema.parse(await c.req.json());
+    const { id, commentId } = c.req.valid("param");
+    const body = c.req.valid("json");
     const result = await updateComment(id, commentId, body);
 
     if (!result) {
@@ -355,6 +358,7 @@ taskRoutes.patch(
 taskRoutes.delete(
   "/tasks/:id/comments/:commentId",
   boardUpdate,
+  validator("param", taskCommentParamSchema, validationHook),
   describeRoute({
     description: "Delete comment",
     tags: ["Tasks"],
@@ -364,10 +368,7 @@ taskRoutes.delete(
     },
   }),
   async (c) => {
-    const { id, commentId } = taskCommentParamSchema.parse({
-      id: c.req.param("id"),
-      commentId: c.req.param("commentId"),
-    });
+    const { id, commentId } = c.req.valid("param");
     const deleted = await deleteComment(id, commentId);
 
     if (!deleted) {
@@ -382,6 +383,7 @@ taskRoutes.delete(
 taskRoutes.put(
   "/tasks/:id/assignees/:userId",
   boardUpdate,
+  validator("param", taskAssigneeParamSchema, validationHook),
   describeRoute({
     description: "Assign a user to a task (idempotent)",
     tags: ["Tasks"],
@@ -391,10 +393,7 @@ taskRoutes.put(
     },
   }),
   async (c) => {
-    const { id, userId } = taskAssigneeParamSchema.parse({
-      id: c.req.param("id"),
-      userId: c.req.param("userId"),
-    });
+    const { id, userId } = c.req.valid("param");
     const callerId = c.get("user")?.id;
     /* istanbul ignore next: requirePermission middleware guarantees user is set */
     if (!callerId) {
@@ -412,6 +411,7 @@ taskRoutes.put(
 taskRoutes.delete(
   "/tasks/:id/assignees/:userId",
   boardUpdate,
+  validator("param", taskAssigneeParamSchema, validationHook),
   describeRoute({
     description: "Remove a user from a task",
     tags: ["Tasks"],
@@ -421,10 +421,7 @@ taskRoutes.delete(
     },
   }),
   async (c) => {
-    const { id, userId } = taskAssigneeParamSchema.parse({
-      id: c.req.param("id"),
-      userId: c.req.param("userId"),
-    });
+    const { id, userId } = c.req.valid("param");
     const callerId = c.get("user")?.id;
     if (!callerId) return c.json({ error: "Unauthorized" }, 401);
     const removed = await removeAssignee(id, userId, callerId);

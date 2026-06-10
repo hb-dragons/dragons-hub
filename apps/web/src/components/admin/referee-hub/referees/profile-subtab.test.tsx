@@ -5,14 +5,10 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import { NextIntlClientProvider } from "next-intl";
 import { ProfileSubtab } from "./profile-subtab";
 
-const ref = { id: 1, apiId: 100, firstName: "Anna", lastName: "Müller", licenseNumber: 12345, matchCount: 14, roles: ["SR1"], allowAllHomeGames: true, allowAwayGames: true, isOwnClub: true, createdAt: "", updatedAt: "" };
+const ref = { id: 1, apiId: 100, firstName: "Anna", lastName: "Müller", licenseNumber: 12345, matchCount: 14, allowAllHomeGames: true, allowAwayGames: true, isOwnClub: true, createdAt: "", updatedAt: "" };
 
 vi.mock("swr", () => ({
-  default: vi.fn((key: string) => {
-    if (key?.includes("/rules")) return { data: { rules: [] } };
-    if (key === "/admin/teams") return { data: [{ id: 10, name: "Dragons H1", customName: null, leagueName: "OL" }] };
-    return { data: undefined };
-  }),
+  default: vi.fn(() => ({ data: undefined })),
   mutate: vi.fn(),
 }));
 
@@ -21,8 +17,7 @@ vi.mock("@/lib/api", () => ({ fetchAPI: (...a: unknown[]) => fetchAPI(...a), API
 
 const messages = { refereeHub: { referees: { profile: {
   visibility: { title: "Visibility", ownClub: "Own-club referee", allHome: "Allow all home", away: "Allow away" },
-  rules: { title: "Per-team rules", add: "Add rule", deny: "Deny", allow: "Allow", selectTeam: "Team", none: "None" },
-  save: { saving: "Saving…", saved: "Saved {n}s ago", dirty: "Unsaved", error: "Save failed", now: "Save now" },
+  save: { saving: "Saving…", saved: "Saved {n}s ago", dirty: "Unsaved changes", error: "Save failed", now: "Save now" },
 } } } };
 
 function wrap(ui: React.ReactNode) {
@@ -36,22 +31,28 @@ afterEach(() => { vi.useRealTimers(); cleanup(); });
 // rendered with happy-dom + fake timers (compose-refs identity churn). The
 // component is exercised end-to-end via integration manually; once Radix ships
 // the compose-refs stable-callback fix upstream, drop the .skip.
+//
+// Assertions track the visibility-only PATCH shape following the Profile/Rules
+// subtab split (Plan 2). Rules are now in RulesSubtab with explicit save.
 describe.skip("ProfileSubtab", () => {
-  it("auto-saves visibility toggle after debounce with full combined payload", async () => {
+  it("auto-saves via /visibility endpoint after debounce", async () => {
     render(wrap(<ProfileSubtab referee={ref} />));
     fireEvent.click(screen.getByRole("switch", { name: /allow all home/i }));
     await vi.advanceTimersByTimeAsync(800);
-    await waitFor(() => expect(fetchAPI).toHaveBeenCalledWith(
-      "/admin/referees/1",
-      expect.objectContaining({
-        method: "PATCH",
-        body: expect.stringContaining("\"visibility\""),
-      }),
-    ));
-    const callBody = JSON.parse((fetchAPI.mock.calls[0]![1] as RequestInit).body as string);
-    expect(callBody).toEqual({
-      visibility: { allowAllHomeGames: false, allowAwayGames: true, isOwnClub: true },
-      rules: [],
+
+    await waitFor(() => {
+      expect(fetchAPI).toHaveBeenCalledWith(
+        "/admin/referees/1/visibility",
+        expect.objectContaining({ method: "PATCH" }),
+      );
+    });
+
+    const visibilityCall = fetchAPI.mock.calls.find((c) => (c[0] as string).endsWith("/visibility"))!;
+    const visibilityBody = JSON.parse((visibilityCall[1] as RequestInit).body as string);
+    expect(visibilityBody).toEqual({
+      allowAllHomeGames: false,
+      allowAwayGames: true,
+      isOwnClub: true,
     });
   });
 

@@ -1,6 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
-import { z } from "zod";
+import { describeRoute, validator } from "hono-openapi";
 import {
   getClubConfig,
   setClubConfig,
@@ -10,7 +9,13 @@ import {
   upsertSetting,
 } from "../../services/admin/settings.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
+import {
+  settingsClubConfigSchema,
+  settingsBookingConfigSchema,
+  settingsRefereeReminderSchema,
+} from "@dragons/contracts";
 
 const settingsRoutes = new Hono<AppEnv>();
 
@@ -29,22 +34,18 @@ settingsRoutes.get(
   },
 );
 
-const clubConfigSchema = z.object({
-  clubId: z.number().int().positive(),
-  clubName: z.string().min(1),
-});
-
 // PUT /admin/settings/club - Set club config
 settingsRoutes.put(
   "/settings/club",
   requirePermission("settings", "update"),
+  validator("json", settingsClubConfigSchema, validationHook),
   describeRoute({
     description: "Set club configuration",
     tags: ["Settings"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const body = clubConfigSchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     await setClubConfig(body.clubId, body.clubName);
     return c.json({ clubId: body.clubId, clubName: body.clubName });
   },
@@ -65,24 +66,18 @@ settingsRoutes.get(
   },
 );
 
-const bookingConfigSchema = z.object({
-  bufferBefore: z.number().int().min(0),
-  bufferAfter: z.number().int().min(0),
-  gameDuration: z.number().int().positive(),
-  dueDaysBefore: z.number().int().min(0),
-});
-
 // PUT /admin/settings/booking - Set booking config
 settingsRoutes.put(
   "/settings/booking",
   requirePermission("settings", "update"),
+  validator("json", settingsBookingConfigSchema, validationHook),
   describeRoute({
     description: "Set booking configuration",
     tags: ["Settings"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const body = bookingConfigSchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     await setBookingSettings(body);
     return c.json(body);
   },
@@ -111,26 +106,19 @@ settingsRoutes.get(
   },
 );
 
-const refereeReminderSchema = z.object({
-  days: z.array(z.number().int().positive()).min(1).max(10),
-});
-
 // PUT /admin/settings/referee-reminders - Set referee reminder days
 settingsRoutes.put(
   "/settings/referee-reminders",
   requirePermission("settings", "update"),
+  validator("json", settingsRefereeReminderSchema, validationHook),
   describeRoute({
     description: "Set referee reminder days configuration",
     tags: ["Settings"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const body = await c.req.json();
-    const parsed = refereeReminderSchema.safeParse(body);
-    if (!parsed.success) {
-      return c.json({ error: parsed.error.flatten() }, 400);
-    }
-    const sorted = parsed.data.days.sort((a, b) => b - a);
+    const { days } = c.req.valid("json");
+    const sorted = [...days].sort((a, b) => b - a);
     await upsertSetting("referee_reminder_days", JSON.stringify(sorted));
     return c.json({ days: sorted });
   },

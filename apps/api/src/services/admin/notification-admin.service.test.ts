@@ -66,6 +66,17 @@ async function ensureChannelConfig(id: number = 1): Promise<void> {
   }
 }
 
+async function seedUser(
+  id: string,
+  opts: { role?: string | null } = {},
+): Promise<void> {
+  await ctx.client.query(
+    `INSERT INTO "user" (id, name, email, email_verified, role, created_at, updated_at)
+     VALUES ($1, $2, $3, false, $4, now(), now())`,
+    [id, id, `${id}@test.de`, opts.role ?? null],
+  );
+}
+
 async function insertEvent(overrides: Record<string, unknown> = {}): Promise<string> {
   eventCounter++;
   const id = overrides.id ?? `evt-${eventCounter}`;
@@ -92,6 +103,9 @@ async function insertEvent(overrides: Record<string, unknown> = {}): Promise<str
   return id as string;
 }
 
+// Recipients are stored prefixed by the pipeline: user:<id>, referee:<id>,
+// audience:<role>. The inbox must match against the recipient-key SET for a
+// user, not the bare user id.
 async function insertNotification(overrides: Record<string, unknown> = {}) {
   const channelConfigId = (overrides.channel_config_id as number) ?? 1;
   await ensureChannelConfig(channelConfigId);
@@ -99,7 +113,7 @@ async function insertNotification(overrides: Record<string, unknown> = {}) {
   const defaults = {
     event_id: eventId,
     channel_config_id: 1,
-    recipient_id: "user-1",
+    recipient_id: "user:user-1",
     title: "Test",
     body: "Test body",
     locale: "de",
@@ -126,16 +140,39 @@ describe("listNotifications", () => {
     expect(result).toEqual({ notifications: [], total: 0 });
   });
 
-  it("returns notifications for a specific user", async () => {
-    await insertNotification({ recipient_id: "user-1", title: "N1" });
-    await insertNotification({ recipient_id: "user-1", title: "N2" });
-    await insertNotification({ recipient_id: "user-2", title: "N3" });
+  it("returns notifications addressed to the user's recipient keys", async () => {
+    await insertNotification({ recipient_id: "user:user-1", title: "N1" });
+    await insertNotification({ recipient_id: "user:user-1", title: "N2" });
+    await insertNotification({ recipient_id: "user:user-2", title: "N3" });
 
     const result = await listNotifications({ userId: "user-1" });
 
     expect(result.total).toBe(2);
     expect(result.notifications).toHaveLength(2);
-    expect(result.notifications.every((n) => n.recipientId === "user-1")).toBe(true);
+    expect(result.notifications.every((n) => n.recipientId === "user:user-1")).toBe(true);
+  });
+
+  it("also matches audience: keys for the user's roles", async () => {
+    await seedUser("user-1", { role: "admin" });
+    await insertNotification({ recipient_id: "user:user-1", title: "Direct" });
+    await insertNotification({ recipient_id: "audience:admin", title: "Audience" });
+    await insertNotification({ recipient_id: "audience:teamManager", title: "Other role" });
+    await insertNotification({ recipient_id: "user:user-2", title: "Other user" });
+
+    const result = await listNotifications({ userId: "user-1" });
+
+    const titles = result.notifications.map((n) => n.title).sort();
+    expect(titles).toEqual(["Audience", "Direct"]);
+  });
+
+  it("returns all notifications when no userId is given (admin view)", async () => {
+    await insertNotification({ recipient_id: "user:user-1", title: "N1" });
+    await insertNotification({ recipient_id: "audience:admin", title: "N2" });
+    await insertNotification({ recipient_id: "user:user-2", title: "N3" });
+
+    const result = await listNotifications({});
+
+    expect(result.total).toBe(3);
   });
 
   it("orders by createdAt descending", async () => {
@@ -144,8 +181,8 @@ describe("listNotifications", () => {
     const e2 = await insertEvent();
     await ctx.client.exec(`
       INSERT INTO notification_log (event_id, channel_config_id, recipient_id, title, body, status, created_at)
-      VALUES ('${e1}', 1, 'user-1', 'Older', 'body', 'sent', '2025-01-01T00:00:00Z'),
-             ('${e2}', 1, 'user-1', 'Newer', 'body', 'sent', '2025-06-01T00:00:00Z')
+      VALUES ('${e1}', 1, 'user:user-1', 'Older', 'body', 'sent', '2025-01-01T00:00:00Z'),
+             ('${e2}', 1, 'user:user-1', 'Newer', 'body', 'sent', '2025-06-01T00:00:00Z')
     `);
 
     const result = await listNotifications({ userId: "user-1" });
@@ -155,9 +192,9 @@ describe("listNotifications", () => {
   });
 
   it("respects limit parameter", async () => {
-    await insertNotification({ recipient_id: "user-1", title: "N1" });
-    await insertNotification({ recipient_id: "user-1", title: "N2" });
-    await insertNotification({ recipient_id: "user-1", title: "N3" });
+    await insertNotification({ recipient_id: "user:user-1", title: "N1" });
+    await insertNotification({ recipient_id: "user:user-1", title: "N2" });
+    await insertNotification({ recipient_id: "user:user-1", title: "N3" });
 
     const result = await listNotifications({ userId: "user-1", limit: 2 });
 
@@ -166,9 +203,9 @@ describe("listNotifications", () => {
   });
 
   it("respects offset parameter", async () => {
-    await insertNotification({ recipient_id: "user-1", title: "N1" });
-    await insertNotification({ recipient_id: "user-1", title: "N2" });
-    await insertNotification({ recipient_id: "user-1", title: "N3" });
+    await insertNotification({ recipient_id: "user:user-1", title: "N1" });
+    await insertNotification({ recipient_id: "user:user-1", title: "N2" });
+    await insertNotification({ recipient_id: "user:user-1", title: "N3" });
 
     const result = await listNotifications({ userId: "user-1", limit: 10, offset: 2 });
 
@@ -185,7 +222,7 @@ describe("listNotifications", () => {
       entity_type: "match",
       entity_id: 99,
     });
-    await insertNotification({ event_id: eventId, recipient_id: "user-1" });
+    await insertNotification({ event_id: eventId, recipient_id: "user:user-1" });
 
     const result = await listNotifications({ userId: "user-1" });
 
@@ -201,10 +238,10 @@ describe("listNotifications", () => {
 });
 
 describe("markRead", () => {
-  it("marks a notification as read with readAt timestamp", async () => {
-    const id = await insertNotification({ status: "sent" });
+  it("marks a notification owned by the caller as read with readAt timestamp", async () => {
+    const id = await insertNotification({ recipient_id: "user:user-1", status: "sent" });
 
-    const success = await markRead(id);
+    const success = await markRead(id, "user-1");
 
     expect(success).toBe(true);
 
@@ -217,38 +254,51 @@ describe("markRead", () => {
     expect(row.read_at).not.toBeNull();
   });
 
+  it("does not mark a notification the caller does not own (closes IDOR)", async () => {
+    const id = await insertNotification({ recipient_id: "user:user-1", status: "sent" });
+
+    const success = await markRead(id, "user-2");
+
+    expect(success).toBe(false);
+    const row = await ctx.client.query(
+      "SELECT status FROM notification_log WHERE id = $1",
+      [id],
+    );
+    expect((row.rows[0] as { status: string }).status).toBe("sent");
+  });
+
   it("returns false for non-existent notification", async () => {
-    const success = await markRead(999);
+    const success = await markRead(999, "user-1");
     expect(success).toBe(false);
   });
 
   it("can mark an already-read notification (idempotent)", async () => {
-    const id = await insertNotification({ status: "read" });
+    const id = await insertNotification({ recipient_id: "user:user-1", status: "read" });
 
-    const success = await markRead(id);
+    const success = await markRead(id, "user-1");
     expect(success).toBe(true);
   });
 });
 
 describe("markAllRead", () => {
-  it("marks all unread notifications for a user as read", async () => {
-    await insertNotification({ recipient_id: "user-1", title: "N1", status: "sent" });
-    await insertNotification({ recipient_id: "user-1", title: "N2", status: "sent" });
-    await insertNotification({ recipient_id: "user-1", title: "N3", status: "read" });
+  it("marks all of the caller's unread notifications as read", async () => {
+    await insertNotification({ recipient_id: "user:user-1", title: "N1", status: "sent" });
+    await insertNotification({ recipient_id: "user:user-1", title: "N2", status: "sent" });
+    await insertNotification({ recipient_id: "user:user-1", title: "N3", status: "read" });
 
     const count = await markAllRead("user-1");
 
     expect(count).toBe(2);
 
     const result = await ctx.client.query(
-      "SELECT status FROM notification_log WHERE recipient_id = 'user-1' ORDER BY id",
+      "SELECT status FROM notification_log WHERE recipient_id = 'user:user-1' ORDER BY id",
     );
     const rows = result.rows as { status: string }[];
     expect(rows.every((r) => r.status === "read")).toBe(true);
   });
 
   it("returns 0 when all notifications are already read", async () => {
-    await insertNotification({ recipient_id: "user-1", status: "read" });
+    await insertNotification({ recipient_id: "user:user-1", status: "read" });
     const count = await markAllRead("user-1");
     expect(count).toBe(0);
   });
@@ -259,30 +309,30 @@ describe("markAllRead", () => {
   });
 
   it("does not affect other users' notifications", async () => {
-    await insertNotification({ recipient_id: "user-1", status: "sent" });
-    await insertNotification({ recipient_id: "user-2", status: "sent" });
+    await insertNotification({ recipient_id: "user:user-1", status: "sent" });
+    await insertNotification({ recipient_id: "user:user-2", status: "sent" });
 
     await markAllRead("user-1");
 
     const result = await ctx.client.query(
-      "SELECT status FROM notification_log WHERE recipient_id = 'user-2'",
+      "SELECT status FROM notification_log WHERE recipient_id = 'user:user-2'",
     );
     expect((result.rows[0] as { status: string }).status).toBe("sent");
   });
 });
 
 describe("getUnreadCount", () => {
-  it("returns count of unread notifications for a user", async () => {
-    await insertNotification({ recipient_id: "user-1", status: "sent" });
-    await insertNotification({ recipient_id: "user-1", status: "sent" });
-    await insertNotification({ recipient_id: "user-1", status: "read" });
+  it("returns count of unread notifications for the user's recipient keys", async () => {
+    await insertNotification({ recipient_id: "user:user-1", status: "sent" });
+    await insertNotification({ recipient_id: "user:user-1", status: "sent" });
+    await insertNotification({ recipient_id: "user:user-1", status: "read" });
 
     const count = await getUnreadCount("user-1");
     expect(count).toBe(2);
   });
 
   it("returns 0 when all notifications are read", async () => {
-    await insertNotification({ recipient_id: "user-1", status: "read" });
+    await insertNotification({ recipient_id: "user:user-1", status: "read" });
     const count = await getUnreadCount("user-1");
     expect(count).toBe(0);
   });
@@ -293,15 +343,15 @@ describe("getUnreadCount", () => {
   });
 
   it("does not count other users' notifications", async () => {
-    await insertNotification({ recipient_id: "user-1", status: "sent" });
-    await insertNotification({ recipient_id: "user-2", status: "sent" });
+    await insertNotification({ recipient_id: "user:user-1", status: "sent" });
+    await insertNotification({ recipient_id: "user:user-2", status: "sent" });
 
     const count = await getUnreadCount("user-1");
     expect(count).toBe(1);
   });
 
   it("counts pending status as unread", async () => {
-    await insertNotification({ recipient_id: "user-1", status: "pending" });
+    await insertNotification({ recipient_id: "user:user-1", status: "pending" });
 
     const count = await getUnreadCount("user-1");
     expect(count).toBe(1);

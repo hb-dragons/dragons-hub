@@ -1,121 +1,137 @@
 import { Hono } from "hono";
-import { z } from "zod";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import {
   getReferees,
+  getRefereeCounts,
+  getRefereeById,
   updateRefereeVisibility,
-  updateRefereeSettings,
+  updateRefereeRules,
   RefereeSettingsError,
 } from "../../services/admin/referee-admin.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
-import { refereeListQuerySchema } from "./referee.schemas";
-import { rulesArraySchema } from "./referee-rules.schemas";
+import {
+  refereeListQuerySchema,
+  refereeVisibilityBodySchema,
+  updateRefereeRulesBodySchema,
+} from "@dragons/contracts";
 
 const refereeRoutes = new Hono<AppEnv>();
 
-// GET /admin/referees - List all referees
 refereeRoutes.get(
   "/referees",
   requirePermission("referee", "view"),
+  validator("query", refereeListQuerySchema, validationHook),
   describeRoute({
-    description: "List all referees with pagination and search",
+    description: "List referees with pagination, search, and sort",
     tags: ["Referees"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = refereeListQuerySchema.parse({
-      limit: c.req.query("limit"),
-      offset: c.req.query("offset"),
-      search: c.req.query("search"),
-      ownClub: c.req.query("ownClub"),
-    });
+    const query = c.req.valid("query");
     const result = await getReferees(query);
     return c.json(result);
   },
 );
 
-const visibilityBodySchema = z.object({
-  allowAllHomeGames: z.boolean(),
-  allowAwayGames: z.boolean(),
-  isOwnClub: z.boolean(),
-});
-
-const settingsBodySchema = z.object({
-  visibility: visibilityBodySchema.optional(),
-  rules: rulesArraySchema.optional(),
-});
+refereeRoutes.get(
+  "/referees/counts",
+  requirePermission("referee", "view"),
+  describeRoute({
+    description: "Returns own-club and total referee counts",
+    tags: ["Referees"],
+    responses: { 200: { description: "Counts" } },
+  }),
+  async (c) => {
+    const result = await getRefereeCounts();
+    return c.json(result);
+  },
+);
 
 refereeRoutes.patch(
-  "/referees/:id",
+  "/referees/:id/visibility",
   requirePermission("referee", "update"),
+  validator("json", refereeVisibilityBodySchema, validationHook),
   describeRoute({
-    description:
-      "Update referee settings (visibility + assignment rules) atomically in a single transaction",
+    description: "Update referee visibility flags (own-club, all home, away)",
     tags: ["Referees"],
     responses: {
-      200: { description: "Updated settings" },
+      200: { description: "Updated" },
       400: { description: "Invalid request" },
-      404: { description: "Referee not found" },
+      404: { description: "Not found" },
     },
   }),
   async (c) => {
     const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      return c.json(
-        { error: "Invalid referee ID", code: "VALIDATION_ERROR" },
-        400,
-      );
+      return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
     }
-
-    const body = settingsBodySchema.parse(await c.req.json());
-
+    const body = c.req.valid("json");
     try {
-      const result = await updateRefereeSettings(id, body);
+      const result = await updateRefereeVisibility(id, body);
       return c.json(result);
-    } catch (error) {
-      if (error instanceof RefereeSettingsError) {
-        const status = error.code === "NOT_FOUND" ? 404 : 400;
-        return c.json({ error: error.message, code: error.code }, status);
+    } catch (err) {
+      if (err instanceof RefereeSettingsError) {
+        return c.json({ error: err.message, code: err.code }, err.code === "NOT_FOUND" ? 404 : 400);
       }
-      throw error;
+      throw err;
     }
   },
 );
 
-// PATCH /admin/referees/:id/visibility - Update referee game visibility flags
 refereeRoutes.patch(
-  "/referees/:id/visibility",
+  "/referees/:id/rules",
   requirePermission("referee", "update"),
+  validator("json", updateRefereeRulesBodySchema, validationHook),
   describeRoute({
-    description: "Update referee game visibility flags",
+    description: "Replace all assignment rules for a referee",
     tags: ["Referees"],
     responses: {
-      200: { description: "Updated visibility flags" },
+      200: { description: "Updated" },
       400: { description: "Invalid request" },
-      404: { description: "Referee not found" },
+      404: { description: "Not found" },
     },
   }),
   async (c) => {
     const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      return c.json(
-        { error: "Invalid referee ID", code: "VALIDATION_ERROR" },
-        400,
-      );
+      return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
     }
-
-    const body = visibilityBodySchema.parse(await c.req.json());
-
+    const body = c.req.valid("json");
     try {
-      const result = await updateRefereeVisibility(id, body);
+      const result = await updateRefereeRules(id, body);
       return c.json(result);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("not found")) {
-        return c.json({ error: error.message, code: "NOT_FOUND" }, 404);
+    } catch (err) {
+      if (err instanceof RefereeSettingsError) {
+        const status = err.code === "NOT_FOUND" ? 404 : 400;
+        return c.json({ error: err.message, code: err.code }, status);
       }
-      throw error;
+      throw err;
     }
+  },
+);
+
+refereeRoutes.get(
+  "/referees/:id",
+  requirePermission("referee", "view"),
+  describeRoute({
+    description: "Get a single referee by id",
+    tags: ["Referees"],
+    responses: {
+      200: { description: "Found" },
+      400: { description: "Invalid id" },
+      404: { description: "Not found" },
+    },
+  }),
+  async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id <= 0) {
+      return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
+    }
+    const ref = await getRefereeById(id);
+    if (!ref) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    return c.json(ref);
   },
 );
 

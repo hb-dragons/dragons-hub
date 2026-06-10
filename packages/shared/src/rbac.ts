@@ -50,12 +50,24 @@ export const teamManager = ac.newRole({
   board:    ["view", "create", "update"],
 });
 
-export const roles = { admin, refereeAdmin, venueManager, teamManager };
+export const coach = ac.newRole({
+  team:     ["view"],
+  match:    ["view"],
+  standing: ["view"],
+  board:    ["view"],
+});
 
-export const ROLE_NAMES = ["admin", "refereeAdmin", "venueManager", "teamManager"] as const;
+export const roles = { admin, refereeAdmin, venueManager, teamManager, coach };
+
+export const ROLE_NAMES = ["admin", "refereeAdmin", "venueManager", "teamManager", "coach"] as const;
 export type RoleName = (typeof ROLE_NAMES)[number];
 export type Resource = keyof typeof statement;
 export type Action<R extends Resource> = (typeof statement)[R][number];
+
+export type GateUser =
+  | { role?: string | null; refereeId?: number | null }
+  | null
+  | undefined;
 
 export function parseRoles(role: string | null | undefined): RoleName[] {
   if (!role) return [];
@@ -109,6 +121,12 @@ export function isReferee<U extends { refereeId?: number | null }>(
   user: U | null | undefined,
 ): user is U & { refereeId: number } {
   return typeof user?.refereeId === "number";
+}
+
+export function isMember<U extends { memberId?: number | null }>(
+  user: U | null | undefined,
+): user is U & { memberId: number } {
+  return typeof user?.memberId === "number";
 }
 
 export function canViewOpenGames(

@@ -67,7 +67,7 @@ vi.mock("@dragons/db/schema", () => ({
   refereeAssignmentIntents: { matchId: "rai.matchId", refereeId: "rai.refereeId", slotNumber: "rai.slotNumber" },
 }));
 
-import { assignReferee, unassignReferee, searchCandidates, AssignmentError } from "./referee-assignment.service";
+import { assignReferee, unassignReferee, searchCandidates, rankCandidates, AssignmentError } from "./referee-assignment.service";
 
 const GAME_ROW = {
   id: 1, apiMatchId: 12345, matchId: 100, matchNo: 42,
@@ -368,7 +368,7 @@ describe("searchCandidates", () => {
       pageFrom: 0,
       pageSize: 15,
     });
-    expect(result).toBe(mockResponse);
+    expect(result).toEqual(mockResponse);
   });
 
   it("passes null textSearch when search is empty string", async () => {
@@ -382,5 +382,57 @@ describe("searchCandidates", () => {
       pageFrom: 0,
       pageSize: 20,
     });
+  });
+});
+
+describe("rankCandidates", () => {
+  const makeCandidate = (overrides: Partial<{
+    srId: number;
+    vorname: string;
+    nachName: string;
+    lizenznr: number;
+    qualiSr1: boolean;
+    qualiSr2: boolean;
+    srModusMismatchSr1: boolean;
+    srModusMismatchSr2: boolean;
+    blocktermin: boolean;
+    zeitraumBlockiert: string | null;
+    meta: { total: number };
+  }> = {}) => ({
+    srId: 1,
+    vorname: "A",
+    nachName: "Last",
+    lizenznr: 100,
+    qualiSr1: true,
+    qualiSr2: true,
+    srModusMismatchSr1: false,
+    srModusMismatchSr2: false,
+    blocktermin: false,
+    zeitraumBlockiert: null,
+    meta: { total: 5 },
+    ...overrides,
+  });
+
+  it("places eligible candidates before blocked ones", () => {
+    const eligible = makeCandidate({ srId: 1 });
+    const blocked = makeCandidate({ srId: 2, blocktermin: true });
+    const result = rankCandidates([blocked, eligible], 1);
+    expect(result.map((c) => c.srId)).toEqual([1, 2]);
+  });
+
+  it("orders eligible candidates by ascending workload", () => {
+    const a = makeCandidate({ srId: 1, meta: { total: 10 } });
+    const b = makeCandidate({ srId: 2, meta: { total: 3 } });
+    const c = makeCandidate({ srId: 3, meta: { total: 7 } });
+    const result = rankCandidates([a, b, c], 1);
+    expect(result.map((x) => x.srId)).toEqual([2, 3, 1]);
+  });
+
+  it("tie-breaks equal workload by license number, then last name", () => {
+    const a = makeCandidate({ srId: 1, lizenznr: 200, nachName: "Beta", meta: { total: 5 } });
+    const b = makeCandidate({ srId: 2, lizenznr: 100, nachName: "Alpha", meta: { total: 5 } });
+    const c = makeCandidate({ srId: 3, lizenznr: 200, nachName: "Alpha", meta: { total: 5 } });
+    const result = rankCandidates([a, b, c], 1);
+    expect(result.map((x) => x.srId)).toEqual([2, 3, 1]);
   });
 });

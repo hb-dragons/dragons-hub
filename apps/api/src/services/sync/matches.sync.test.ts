@@ -89,6 +89,17 @@ import { computeEntityHash } from "./hash";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default transaction: delegate tx.* to the db-level mocks so the create path
+  // (now wrapped in db.transaction) behaves like the old direct db.insert calls.
+  // The update-path tests override this via makeTxMock with a dedicated tx.
+  mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+    fn({
+      insert: (...args: unknown[]) => mockInsert(...args),
+      select: (...args: unknown[]) => mockSelect(...args),
+      update: (...args: unknown[]) => mockUpdate(...args),
+      delete: (...args: unknown[]) => mockDelete(...args),
+    }),
+  );
 });
 
 // --- Helpers ---
@@ -357,6 +368,23 @@ describe("syncMatchesFromData", () => {
     const result = await syncMatchesFromData([data], new Map(), null);
 
     expect(result.skipped).toBe(1);
+  });
+
+  it("publishes match.created with the transaction client (atomic with the insert)", async () => {
+    const data = makeLeagueData();
+    setupBatchSelect([]);
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+      }),
+    });
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "match.created" }),
+      expect.objectContaining({ insert: expect.any(Function) }),
+    );
   });
 
   it("updates existing match when hash differs and effective changes exist", async () => {
@@ -1265,6 +1293,7 @@ describe("classifyMatchChanges via syncMatchesFromData", () => {
 
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "match.schedule.changed" }),
+      expect.objectContaining({ insert: expect.any(Function) }),
     );
   });
 
@@ -1280,6 +1309,7 @@ describe("classifyMatchChanges via syncMatchesFromData", () => {
 
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "match.schedule.changed" }),
+      expect.objectContaining({ insert: expect.any(Function) }),
     );
   });
 
@@ -1295,6 +1325,7 @@ describe("classifyMatchChanges via syncMatchesFromData", () => {
 
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "match.result_entered" }),
+      expect.objectContaining({ insert: expect.any(Function) }),
     );
   });
 
@@ -1315,6 +1346,7 @@ describe("classifyMatchChanges via syncMatchesFromData", () => {
 
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "match.result_changed" }),
+      expect.objectContaining({ insert: expect.any(Function) }),
     );
   });
 
@@ -1330,6 +1362,7 @@ describe("classifyMatchChanges via syncMatchesFromData", () => {
 
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "match.cancelled" }),
+      expect.objectContaining({ insert: expect.any(Function) }),
     );
   });
 
@@ -1345,6 +1378,7 @@ describe("classifyMatchChanges via syncMatchesFromData", () => {
 
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "match.forfeited" }),
+      expect.objectContaining({ insert: expect.any(Function) }),
     );
   });
 
@@ -1389,6 +1423,22 @@ describe("classifyMatchChanges via syncMatchesFromData", () => {
     );
     expect(eventTypes).toContain("match.schedule.changed");
     expect(eventTypes).toContain("match.result_entered");
+  });
+
+  it("publishes match.* events with the transaction client (atomic with the row write)", async () => {
+    vi.mocked(computeEntityHash).mockReturnValueOnce("new-hash");
+    const data = makeLeagueData({
+      spielplan: [makeBasicMatch({ kickoffDate: "2025-02-20" })],
+    });
+    setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
+    makeTxMock(makeLockedRow({ kickoffDate: "2025-01-15" }));
+
+    await syncMatchesFromData([data], new Map(), 1);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "match.schedule.changed" }),
+      expect.objectContaining({ insert: expect.any(Function), update: expect.any(Function) }),
+    );
   });
 });
 

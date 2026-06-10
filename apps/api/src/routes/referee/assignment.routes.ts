@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { z } from "zod";
 import type { AppEnv } from "../../types";
 import { requireRefereeSelf } from "../../middleware/rbac";
 import { db } from "../../config/database";
@@ -13,17 +12,7 @@ import {
   claimRefereeGame,
   unclaimRefereeGame,
 } from "../../services/referee/referee-claim.service";
-
-const assignBodySchema = z.object({
-  slotNumber: z.union([z.literal(1), z.literal(2)]),
-  refereeApiId: z.number().int().positive(),
-});
-
-const claimBodySchema = z
-  .object({
-    slotNumber: z.union([z.literal(1), z.literal(2)]).optional(),
-  })
-  .optional();
+import { refereeAssignBodySchema, refereeClaimBodySchema } from "@dragons/contracts";
 
 const ERROR_STATUS_MAP: Record<string, number> = {
   GAME_NOT_FOUND: 404,
@@ -51,7 +40,7 @@ refereeAssignmentRoutes.post("/games/:spielplanId/assign", requireRefereeSelf, a
   } catch {
     return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
   }
-  const { slotNumber, refereeApiId } = assignBodySchema.parse(body);
+  const { slotNumber, refereeApiId } = refereeAssignBodySchema.parse(body);
 
   // Ownership check: referee can only assign themselves.
   const refereeId = c.get("refereeId");
@@ -99,7 +88,7 @@ refereeAssignmentRoutes.post("/games/:id/claim", requireRefereeSelf, async (c) =
   let parsed: { slotNumber?: 1 | 2 } | undefined;
   try {
     const raw = await c.req.text();
-    parsed = raw ? claimBodySchema.parse(JSON.parse(raw)) : undefined;
+    parsed = raw ? refereeClaimBodySchema.parse(JSON.parse(raw)) : undefined;
   } catch {
     return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
   }

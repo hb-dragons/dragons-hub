@@ -1,10 +1,14 @@
 import { Hono } from "hono";
+import { validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import { requireRefereeSelfOrPermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
+import { refereeGamesQuerySchema } from "@dragons/contracts";
 import {
   getVisibleRefereeGames,
   getVisibleRefereeGameById,
   getVisibleRefereeGameByMatchId,
+  getVisibleRefereeGameByApiMatchId,
 } from "../../services/referee/referee-game-visibility.service";
 
 const refereeGamesRoutes = new Hono<AppEnv>();
@@ -15,19 +19,28 @@ const refereeGamesRoutes = new Hono<AppEnv>();
 // allowlist, swap to a role-based guard rather than a permission-based one.
 const gate = requireRefereeSelfOrPermission("assignment", "view");
 
-refereeGamesRoutes.get("/games", gate, async (c) => {
-  const limit = Math.min(Number(c.req.query("limit") || 100), 500);
-  const offset = Number(c.req.query("offset") || 0);
-  const search = c.req.query("search") || undefined;
-  const status = (c.req.query("status") || "active") as "active" | "cancelled" | "forfeited" | "all";
-  const league = c.req.query("league") || undefined;
-  const dateFrom = c.req.query("dateFrom") || undefined;
-  const dateTo = c.req.query("dateTo") || undefined;
+refereeGamesRoutes.get(
+  "/games",
+  gate,
+  validator("query", refereeGamesQuerySchema, validationHook),
+  async (c) => {
+    const query = c.req.valid("query");
+    const refereeId = c.get("refereeId") ?? null;
+    const result = await getVisibleRefereeGames(refereeId, query);
+    return c.json(result);
+  },
+);
+
+refereeGamesRoutes.get("/games/by-api-match/:apiMatchId", gate, async (c) => {
+  const apiMatchId = Number(c.req.param("apiMatchId"));
+  if (!Number.isInteger(apiMatchId) || apiMatchId <= 0) {
+    return c.json({ error: "Invalid apiMatchId", code: "VALIDATION_ERROR" }, 400);
+  }
 
   const refereeId = c.get("refereeId") ?? null;
-  const params = { limit, offset, search, status, league, dateFrom, dateTo };
-  const result = await getVisibleRefereeGames(refereeId, params);
-  return c.json(result);
+  const row = await getVisibleRefereeGameByApiMatchId(refereeId, apiMatchId);
+  if (!row) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+  return c.json(row);
 });
 
 refereeGamesRoutes.get("/matches/:matchId", gate, async (c) => {

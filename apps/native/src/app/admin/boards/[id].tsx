@@ -39,7 +39,7 @@ import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/hooks/useToast";
 import { adminBoardApi } from "@/lib/api";
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
-import type { TaskListFilters } from "@dragons/api-client";
+import type { TaskListQuery } from "@dragons/api-client";
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -65,8 +65,8 @@ function BoardDetailBody() {
 
   const currentUserId = authClient.useSession().data?.user?.id ?? null;
 
-  const apiFilters = useMemo<TaskListFilters | undefined>(() => {
-    const f: TaskListFilters = {};
+  const apiFilters = useMemo<TaskListQuery | undefined>(() => {
+    const f: TaskListQuery = {};
     if (filters.priority) f.priority = filters.priority;
     return Object.keys(f).length ? f : undefined;
   }, [filters.priority]);

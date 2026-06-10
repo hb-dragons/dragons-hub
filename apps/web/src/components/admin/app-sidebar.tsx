@@ -37,166 +37,73 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { UserButton } from "@daveyplate/better-auth-ui";
 import { Wordmark } from "@/components/brand/wordmark";
-import { can, canViewOpenGames, type Resource, type Action } from "@dragons/shared";
+import {
+  can,
+  SURFACES,
+  SURFACE_GROUP_ORDER,
+  visibleSurfaces,
+  type SurfaceGroup,
+} from "@dragons/shared";
 
-type Perm = { [R in Resource]: { resource: R; action: Action<R> } }[Resource];
-type GateUser = Parameters<typeof can>[0];
-type Gate = (user: GateUser) => boolean;
+// next-intl's typed `t()` needs literal message keys (not `string`) to resolve
+// the parameterless overload, so the label keys are typed as literal unions.
+type GroupLabelKey =
+  | "nav.groupLeague"
+  | "nav.groupOperations"
+  | "nav.groupSocial"
+  | "nav.groupNotifications"
+  | "nav.groupSystem";
 
-const navGroups = [
-  {
-    labelKey: "nav.groupReferee" as const,
-    icon: Gavel,
-    items: [
-      {
-        href: "/admin/referee/matches",
-        labelKey: "nav.openAssignments" as const,
-        gate: canViewOpenGames as Gate,
-      },
-      {
-        href: "/admin/referee/history",
-        labelKey: "nav.refereeHistory" as const,
-        gate: canViewOpenGames as Gate,
-      },
-    ],
-  },
-  {
-    labelKey: "nav.groupLeague" as const,
-    icon: Trophy,
-    items: [
-      {
-        href: "/admin/matches",
-        labelKey: "nav.matches" as const,
-        perm: { resource: "match", action: "view" } as const,
-      },
-      {
-        href: "/admin/standings",
-        labelKey: "nav.standings" as const,
-        perm: { resource: "standing", action: "view" } as const,
-      },
-      {
-        href: "/admin/teams",
-        labelKey: "nav.teams" as const,
-        perm: { resource: "team", action: "view" } as const,
-      },
-      {
-        href: "/admin/referees",
-        labelKey: "nav.referees" as const,
-        perm: { resource: "referee", action: "view" } as const,
-      },
-    ],
-  },
-  {
-    labelKey: "nav.groupOperations" as const,
-    icon: KanbanSquare,
-    items: [
-      {
-        href: "/admin/boards",
-        labelKey: "nav.board" as const,
-        perm: { resource: "board", action: "view" } as const,
-      },
-      {
-        href: "/admin/bookings",
-        labelKey: "nav.bookings" as const,
-        perm: { resource: "booking", action: "view" } as const,
-      },
-      {
-        href: "/admin/venues",
-        labelKey: "nav.venues" as const,
-        perm: { resource: "venue", action: "view" } as const,
-      },
-      {
-        href: "/admin/broadcast",
-        labelKey: "nav.broadcast" as const,
-        perm: { resource: "settings", action: "view" } as const,
-      },
-    ],
-  },
-  {
-    labelKey: "nav.groupSocial" as const,
-    icon: Image,
-    items: [
-      {
-        href: "/admin/social/create",
-        labelKey: "nav.createPost" as const,
-        perm: { resource: "settings", action: "view" } as const,
-      },
-    ],
-  },
-  {
-    labelKey: "nav.groupNotifications" as const,
-    icon: Bell,
-    items: [
-      {
-        href: "/admin/notifications",
-        labelKey: "nav.notificationCenter" as const,
-        perm: { resource: "settings", action: "view" } as const,
-      },
-      {
-        href: "/admin/notifications/rules",
-        labelKey: "nav.watchRules" as const,
-        perm: { resource: "settings", action: "view" } as const,
-      },
-      {
-        href: "/admin/notifications/channels",
-        labelKey: "nav.channels" as const,
-        perm: { resource: "settings", action: "view" } as const,
-      },
-      {
-        href: "/admin/notifications/events",
-        labelKey: "nav.domainEvents" as const,
-        perm: { resource: "settings", action: "view" } as const,
-      },
-      {
-        href: "/admin/settings/notifications",
-        labelKey: "nav.pushTest" as const,
-        perm: { resource: "settings", action: "update" } as const,
-      },
-    ],
-  },
-  {
-    labelKey: "nav.groupSystem" as const,
-    icon: Settings,
-    items: [
-      {
-        href: "/admin/sync",
-        labelKey: "nav.sync" as const,
-        perm: { resource: "sync", action: "view" } as const,
-      },
-      {
-        href: "/admin/settings",
-        labelKey: "nav.settings" as const,
-        perm: { resource: "settings", action: "view" } as const,
-      },
-      {
-        href: "/admin/users",
-        labelKey: "nav.users" as const,
-        perm: { resource: "settings", action: "update" } as const,
-      },
-    ],
-  },
-] satisfies ReadonlyArray<{
-  labelKey: string;
-  icon: React.ComponentType;
-  items: ReadonlyArray<
-    { href: string; labelKey: string } & ({ perm: Perm } | { gate: Gate })
-  >;
-}>;
+type SurfaceLabelKey =
+  | "nav.matches"
+  | "nav.standings"
+  | "nav.teams"
+  | "nav.board"
+  | "nav.bookings"
+  | "nav.venues"
+  | "nav.broadcast"
+  | "nav.createPost"
+  | "nav.notificationCenter"
+  | "nav.watchRules"
+  | "nav.channels"
+  | "nav.domainEvents"
+  | "nav.pushTest"
+  | "nav.sync"
+  | "nav.settings"
+  | "nav.users";
 
-function isItemVisible(
-  user: GateUser,
-  item: { perm?: Perm; gate?: Gate },
-): boolean {
-  if (item.gate) return item.gate(user);
-  if (item.perm) {
-    return can(
-      user,
-      item.perm.resource,
-      item.perm.action as Action<typeof item.perm.resource>,
-    );
-  }
-  return false;
-}
+// id -> web presentation for the grouped surfaces. The `officiating` surface is
+// native-only and intentionally has no entry here; the Referees link below
+// stays a top-level item with its own gate (unchanged behavior).
+const SURFACE_META: Record<string, { href: string; labelKey: SurfaceLabelKey }> = {
+  matches: { href: "/admin/matches", labelKey: "nav.matches" },
+  standings: { href: "/admin/standings", labelKey: "nav.standings" },
+  teams: { href: "/admin/teams", labelKey: "nav.teams" },
+  boards: { href: "/admin/boards", labelKey: "nav.board" },
+  bookings: { href: "/admin/bookings", labelKey: "nav.bookings" },
+  venues: { href: "/admin/venues", labelKey: "nav.venues" },
+  broadcast: { href: "/admin/broadcast", labelKey: "nav.broadcast" },
+  createPost: { href: "/admin/social/create", labelKey: "nav.createPost" },
+  notifications: { href: "/admin/notifications", labelKey: "nav.notificationCenter" },
+  watchRules: { href: "/admin/notifications/rules", labelKey: "nav.watchRules" },
+  channels: { href: "/admin/notifications/channels", labelKey: "nav.channels" },
+  domainEvents: { href: "/admin/notifications/events", labelKey: "nav.domainEvents" },
+  pushTest: { href: "/admin/settings/notifications", labelKey: "nav.pushTest" },
+  sync: { href: "/admin/sync", labelKey: "nav.sync" },
+  settings: { href: "/admin/settings", labelKey: "nav.settings" },
+  users: { href: "/admin/users", labelKey: "nav.users" },
+};
+
+const GROUP_META: Record<
+  SurfaceGroup,
+  { labelKey: GroupLabelKey; icon: React.ComponentType }
+> = {
+  league: { labelKey: "nav.groupLeague", icon: Trophy },
+  operations: { labelKey: "nav.groupOperations", icon: KanbanSquare },
+  social: { labelKey: "nav.groupSocial", icon: Image },
+  notifications: { labelKey: "nav.groupNotifications", icon: Bell },
+  system: { labelKey: "nav.groupSystem", icon: Settings },
+};
 
 export type AppSidebarUser = {
   role: string | null;
@@ -210,12 +117,18 @@ export function AppSidebar({
   const pathname = usePathname();
   const t = useTranslations();
   const { setOpenMobile } = useSidebar();
-  const visibleGroups = navGroups
-    .map((g) => ({
-      ...g,
-      items: g.items.filter((i) => isItemVisible(user, i)),
-    }))
-    .filter((g) => g.items.length > 0);
+
+  const visibleIds = new Set(visibleSurfaces(user).map((s) => s.id));
+  const visibleGroups = SURFACE_GROUP_ORDER.map((groupId) => ({
+    labelKey: GROUP_META[groupId].labelKey,
+    icon: GROUP_META[groupId].icon,
+    items: SURFACES.flatMap((s) => {
+      if (s.group !== groupId) return [];
+      const meta = SURFACE_META[s.id];
+      if (!meta || !visibleIds.has(s.id)) return [];
+      return [{ href: meta.href, labelKey: meta.labelKey }];
+    }),
+  })).filter((g) => g.items.length > 0);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -245,6 +158,20 @@ export function AppSidebar({
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {can(user, "referee", "view") && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith("/admin/referees")}
+                  tooltip={t("nav.referees")}
+                >
+                  <Link href="/admin/referees" onClick={() => setOpenMobile(false)}>
+                    <Gavel />
+                    <span>{t("nav.referees")}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
           </SidebarMenu>
         </SidebarGroup>
         {visibleGroups.map((group) => {

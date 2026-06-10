@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getVisibleRefereeGames: vi.fn(),
   getVisibleRefereeGameById: vi.fn(),
   getVisibleRefereeGameByMatchId: vi.fn(),
+  getVisibleRefereeGameByApiMatchId: vi.fn(),
   refereeId: 42 as number | undefined,
   allowedByPermission: false,
 }));
@@ -35,6 +36,7 @@ vi.mock("../../services/referee/referee-game-visibility.service", () => ({
   getVisibleRefereeGames: mocks.getVisibleRefereeGames,
   getVisibleRefereeGameById: mocks.getVisibleRefereeGameById,
   getVisibleRefereeGameByMatchId: mocks.getVisibleRefereeGameByMatchId,
+  getVisibleRefereeGameByApiMatchId: mocks.getVisibleRefereeGameByApiMatchId,
 }));
 
 import { refereeGamesRoutes } from "./games.routes";
@@ -69,7 +71,32 @@ describe("GET /games", () => {
       league: undefined,
       dateFrom: undefined,
       dateTo: undefined,
+      gameType: undefined,
+      assignedRefereeApiId: undefined,
+      slotStatus: undefined,
     });
+  });
+
+  it("splits comma-separated league param into an array", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValue({ items: [], total: 0 });
+
+    await app.request("/games?league=101,202,303");
+
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ league: ["101", "202", "303"] }),
+    );
+  });
+
+  it("passes single league as a one-element array", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValue({ items: [], total: 0 });
+
+    await app.request("/games?league=101");
+
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ league: ["101"] }),
+    );
   });
 
   it("passes query params to getVisibleRefereeGames", async () => {
@@ -84,21 +111,19 @@ describe("GET /games", () => {
       offset: 5,
       search: "Berlin",
       status: "all",
-      league: "BBL",
+      league: ["BBL"],
       dateFrom: "2026-03-01",
       dateTo: "2026-05-31",
+      gameType: undefined,
+      assignedRefereeApiId: undefined,
+      slotStatus: undefined,
     });
   });
 
-  it("caps limit at 500", async () => {
-    mocks.getVisibleRefereeGames.mockResolvedValue({ items: [], total: 0 });
-
-    await app.request("/games?limit=9999");
-
-    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
-      42,
-      expect.objectContaining({ limit: 500 }),
-    );
+  it("rejects limit > 500 with 400", async () => {
+    const res = await app.request("/games?limit=9999");
+    expect(res.status).toBe(400);
+    expect(mocks.getVisibleRefereeGames).not.toHaveBeenCalled();
   });
 
   it("defaults status to 'active'", async () => {
@@ -246,5 +271,117 @@ describe("GET /matches/:matchId", () => {
 
     expect(res.status).toBe(200);
     expect(mocks.getVisibleRefereeGameByMatchId).toHaveBeenCalledWith(null, 500);
+  });
+});
+
+describe("GET /games/by-api-match/:apiMatchId", () => {
+  it("returns visible row via getVisibleRefereeGameByApiMatchId", async () => {
+    const row = { id: 5, apiMatchId: 4711, matchId: null };
+    mocks.getVisibleRefereeGameByApiMatchId.mockResolvedValue(row);
+
+    const res = await app.request("/games/by-api-match/4711");
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(row);
+    expect(mocks.getVisibleRefereeGameByApiMatchId).toHaveBeenCalledWith(42, 4711);
+  });
+
+  it("returns 404 when not found", async () => {
+    mocks.getVisibleRefereeGameByApiMatchId.mockResolvedValue(null);
+
+    const res = await app.request("/games/by-api-match/4711");
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("returns 400 on invalid apiMatchId", async () => {
+    const res = await app.request("/games/by-api-match/abc");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mocks.getVisibleRefereeGameByApiMatchId).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 on non-positive apiMatchId", async () => {
+    const res = await app.request("/games/by-api-match/0");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("admin (no refereeId, has permission) invokes service with refereeId=null", async () => {
+    mocks.refereeId = undefined;
+    mocks.allowedByPermission = true;
+    mocks.getVisibleRefereeGameByApiMatchId.mockResolvedValue({ id: 5, apiMatchId: 4711 });
+
+    const res = await app.request("/games/by-api-match/4711");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getVisibleRefereeGameByApiMatchId).toHaveBeenCalledWith(null, 4711);
+  });
+});
+
+describe("GET /referee/games new query params", () => {
+  it("passes gameType to the service", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValueOnce({
+      items: [], total: 0, limit: 100, offset: 0, hasMore: false,
+    });
+    await app.request("/games?gameType=home");
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ gameType: "home" }),
+    );
+  });
+
+  it("passes assignedRefereeApiId to the service", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValueOnce({
+      items: [], total: 0, limit: 100, offset: 0, hasMore: false,
+    });
+    await app.request("/games?assignedRefereeApiId=12345");
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ assignedRefereeApiId: 12345 }),
+    );
+  });
+});
+
+describe("GET /games Zod query validation", () => {
+  it("rejects gameType outside enum with 400", async () => {
+    const res = await app.request("/games?gameType=invalid", { method: "GET" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("rejects slotStatus outside enum with 400", async () => {
+    const res = await app.request("/games?slotStatus=bogus", { method: "GET" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("rejects limit=9999 with 400 and VALIDATION_ERROR code", async () => {
+    const res = await app.request("/games?limit=9999", { method: "GET" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("accepts default values and returns 200", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValueOnce({
+      items: [], total: 0, limit: 100, offset: 0, hasMore: false,
+    });
+    const res = await app.request("/games", { method: "GET" });
+    expect(res.status).toBe(200);
+  });
+
+  it("propagates slotStatus to the service", async () => {
+    mocks.getVisibleRefereeGames.mockResolvedValueOnce({
+      items: [], total: 0, limit: 100, offset: 0, hasMore: false,
+    });
+    await app.request("/games?slotStatus=offered", { method: "GET" });
+    expect(mocks.getVisibleRefereeGames).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ slotStatus: "offered" }),
+    );
   });
 });

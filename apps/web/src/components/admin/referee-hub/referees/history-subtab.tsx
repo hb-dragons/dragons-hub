@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
 import { apiFetcher } from "@/lib/swr";
@@ -17,13 +18,18 @@ interface HistoryResp {
   hasMore: boolean;
 }
 
+const PAGE = 50;
+
 export function HistorySubtab({ referee }: Props) {
   const t = useTranslations("refereeHub.referees.history");
+  const [pages, setPages] = useState(1);
+
   const qs = new URLSearchParams({
     refereeApiId: String(referee.apiId),
-    limit: "50",
+    limit: String(pages * PAGE),
     offset: "0",
   }).toString();
+
   const { data } = useSWR<HistoryResp>(SWR_KEYS.refereeHistoryGames(qs), apiFetcher);
   const items = data?.items ?? [];
 
@@ -35,11 +41,12 @@ export function HistorySubtab({ referee }: Props) {
           <a href={`/api/admin/referee/history/games.csv?${qs}`} download>{t("exportCsv")}</a>
         </Button>
       </div>
+
       <div className="space-y-1">
         {items.map((g) => {
           const role =
-            g.sr1Name && g.sr1Name.includes(referee.lastName ?? "") ? "SR1" :
-            g.sr2Name && g.sr2Name.includes(referee.lastName ?? "") ? "SR2" : "—";
+            g.sr1RefereeApiId === referee.apiId ? "SR1" :
+            g.sr2RefereeApiId === referee.apiId ? "SR2" : "—";
           const status = g.isCancelled ? t("statusCancelled") : g.isForfeited ? t("statusForfeited") : t("statusPlayed");
           return (
             <div key={g.id} className="flex justify-between border rounded-md p-2 text-sm">
@@ -53,6 +60,12 @@ export function HistorySubtab({ referee }: Props) {
         })}
         {items.length === 0 && <div className="text-sm text-muted-foreground">{t("empty")}</div>}
       </div>
+
+      {data?.hasMore && (
+        <Button variant="outline" size="sm" onClick={() => setPages((n) => n + 1)}>
+          {t("loadMore")}
+        </Button>
+      )}
     </div>
   );
 }

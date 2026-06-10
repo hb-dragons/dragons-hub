@@ -7,57 +7,18 @@ import type {
   TaskAssignee,
   ChecklistItem,
   TaskComment,
-  TaskPriority,
 } from "@dragons/shared";
+import type {
+  BoardCreateBody,
+  BoardUpdateBody,
+  ColumnCreateBody,
+  ColumnUpdateBody,
+  TaskCreateBody,
+  TaskUpdateBody,
+  TaskMoveBody,
+  TaskListQuery,
+} from "@dragons/contracts";
 import type { ApiClient } from "../client";
-
-export interface TaskListFilters {
-  columnId?: number;
-  assigneeId?: string;
-  priority?: TaskPriority;
-}
-
-export interface CreateBoardBody {
-  name: string;
-  description?: string | null;
-}
-
-export interface UpdateBoardBody {
-  name?: string;
-  description?: string | null;
-}
-
-export interface AddColumnBody {
-  name: string;
-  color?: string | null;
-  isDoneColumn?: boolean;
-}
-
-export interface UpdateColumnBody {
-  name?: string;
-  color?: string | null;
-  isDoneColumn?: boolean;
-}
-
-export interface CreateTaskBody {
-  columnId: number;
-  title: string;
-  description?: string | null;
-  priority?: TaskPriority;
-  dueDate?: string | null;
-}
-
-export interface UpdateTaskBody {
-  title?: string;
-  description?: string | null;
-  priority?: TaskPriority;
-  dueDate?: string | null;
-}
-
-export interface MoveTaskBody {
-  columnId: number;
-  position: number;
-}
 
 export function adminBoardEndpoints(client: ApiClient) {
   return {
@@ -68,10 +29,10 @@ export function adminBoardEndpoints(client: ApiClient) {
     getBoard(id: number): Promise<BoardData> {
       return client.get(`/admin/boards/${id}`);
     },
-    createBoard(body: CreateBoardBody): Promise<BoardData> {
+    createBoard(body: BoardCreateBody): Promise<BoardData> {
       return client.post("/admin/boards", body);
     },
-    updateBoard(id: number, body: UpdateBoardBody): Promise<BoardData> {
+    updateBoard(id: number, body: BoardUpdateBody): Promise<BoardData> {
       return client.patch(`/admin/boards/${id}`, body);
     },
     deleteBoard(id: number): Promise<void> {
@@ -79,13 +40,13 @@ export function adminBoardEndpoints(client: ApiClient) {
     },
 
     // Columns
-    addColumn(boardId: number, body: AddColumnBody): Promise<BoardColumnData> {
+    addColumn(boardId: number, body: ColumnCreateBody): Promise<BoardColumnData> {
       return client.post(`/admin/boards/${boardId}/columns`, body);
     },
     updateColumn(
       boardId: number,
       colId: number,
-      body: UpdateColumnBody,
+      body: ColumnUpdateBody,
     ): Promise<BoardColumnData> {
       return client.patch(`/admin/boards/${boardId}/columns/${colId}`, body);
     },
@@ -94,33 +55,33 @@ export function adminBoardEndpoints(client: ApiClient) {
     },
     reorderColumns(
       boardId: number,
-      order: { id: number; position: number }[],
+      columns: { id: number; position: number }[],
     ): Promise<void> {
       return client.patch(`/admin/boards/${boardId}/columns/reorder`, {
-        order,
+        columns,
       });
     },
 
     // Tasks
     listTasks(
       boardId: number,
-      filters?: TaskListFilters,
+      filters?: TaskListQuery,
     ): Promise<TaskCardData[]> {
       return client.get(
         `/admin/boards/${boardId}/tasks`,
         filters as Record<string, string | number | boolean | undefined>,
       );
     },
-    createTask(boardId: number, body: CreateTaskBody): Promise<TaskCardData> {
+    createTask(boardId: number, body: TaskCreateBody): Promise<TaskCardData> {
       return client.post(`/admin/boards/${boardId}/tasks`, body);
     },
     getTask(id: number): Promise<TaskDetail> {
       return client.get(`/admin/tasks/${id}`);
     },
-    updateTask(id: number, body: UpdateTaskBody): Promise<TaskDetail> {
+    updateTask(id: number, body: TaskUpdateBody): Promise<TaskDetail> {
       return client.patch(`/admin/tasks/${id}`, body);
     },
-    moveTask(id: number, body: MoveTaskBody): Promise<TaskDetail> {
+    moveTask(id: number, body: TaskMoveBody): Promise<TaskDetail> {
       return client.patch(`/admin/tasks/${id}/move`, body);
     },
     deleteTask(id: number): Promise<void> {

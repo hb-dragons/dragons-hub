@@ -16,6 +16,7 @@ import type {
   UnassignRefereeResponse,
   CandidateSearchResponse,
 } from "@dragons/shared";
+import { isRefereeEligibleForGame, type EligibilitySlot } from "./referee-slot-resolver";
 
 export class AssignmentError extends Error {
   constructor(
@@ -175,7 +176,7 @@ export async function assignReferee(
     entityType: "referee",
     entityId: referee.id,
     entityName: refereeName,
-    deepLinkPath: "/admin/referee/matches",
+    deepLinkPath: "/admin/referees",
     payload: {
       matchNo: game.matchNo,
       homeTeam: game.homeTeamName,
@@ -183,6 +184,11 @@ export async function assignReferee(
       refereeName,
       role: slotKey.toUpperCase(),
       teamIds: [],
+      refereeId: referee.id,
+      matchId: game.matchId,
+      kickoffDate: game.kickoffDate,
+      kickoffTime: game.kickoffTime,
+      deepLink: `/referee-game/${game.id}`,
     },
   });
 
@@ -281,7 +287,7 @@ export async function unassignReferee(
     entityType: "referee",
     entityId: refereeEntityId,
     entityName: refereeName,
-    deepLinkPath: "/admin/referee/matches",
+    deepLinkPath: "/admin/referees",
     payload: {
       matchNo: game.matchNo,
       homeTeam: game.homeTeamName,
@@ -289,6 +295,11 @@ export async function unassignReferee(
       refereeName,
       role: slotKey.toUpperCase(),
       teamIds: [],
+      refereeId: refereeEntityId > 0 ? refereeEntityId : undefined,
+      matchId: game.matchId,
+      kickoffDate: game.kickoffDate,
+      kickoffTime: game.kickoffTime,
+      deepLink: `/referee-game/${game.id}`,
     },
   });
 
@@ -300,15 +311,52 @@ export async function unassignReferee(
   };
 }
 
+export function rankCandidates<
+  T extends {
+    srId: number;
+    nachName: string;
+    lizenznr: number;
+    qualiSr1: boolean;
+    qualiSr2: boolean;
+    srModusMismatchSr1: boolean;
+    srModusMismatchSr2: boolean;
+    blocktermin: boolean;
+    zeitraumBlockiert: string | null;
+    meta: { total: number };
+  },
+>(candidates: T[], slot: EligibilitySlot): T[] {
+  const eligible: T[] = [];
+  const blocked: T[] = [];
+
+  for (const c of candidates) {
+    if (isRefereeEligibleForGame(c, slot)) eligible.push(c);
+    else blocked.push(c);
+  }
+
+  const compare = (a: T, b: T) => {
+    if (a.meta.total !== b.meta.total) return a.meta.total - b.meta.total;
+    if (a.lizenznr !== b.lizenznr) return a.lizenznr - b.lizenznr;
+    return a.nachName.localeCompare(b.nachName);
+  };
+
+  eligible.sort(compare);
+  blocked.sort(compare);
+
+  return [...eligible, ...blocked];
+}
+
 export async function searchCandidates(
   spielplanId: number,
   search: string,
   pageFrom: number,
   pageSize: number,
+  slot: EligibilitySlot = "either",
 ): Promise<CandidateSearchResponse> {
-  return sdkClient.searchRefereesForGame(spielplanId, {
+  const { results, ...rest } = await sdkClient.searchRefereesForGame(spielplanId, {
     textSearch: search || null,
     pageFrom,
     pageSize,
   });
+  const ranked = rankCandidates(results, slot);
+  return { ...rest, results: ranked };
 }

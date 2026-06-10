@@ -53,3 +53,34 @@ export function resolveClaimableSlots(
   if (sr2Open) slots.push(2);
   return slots;
 }
+
+export interface RefereeCandidateMeta {
+  qualiSr1: boolean;
+  qualiSr2: boolean;
+  srModusMismatchSr1: boolean;
+  srModusMismatchSr2: boolean;
+  blocktermin: boolean;
+  zeitraumBlockiert: string | null;
+}
+
+export type EligibilitySlot = 1 | 2 | "either";
+
+export function isRefereeEligibleForGame(
+  meta: RefereeCandidateMeta,
+  slot: EligibilitySlot,
+): boolean {
+  if (meta.blocktermin) return false;
+  if (meta.zeitraumBlockiert) return false;
+
+  if (slot === 1) {
+    return meta.qualiSr1 && !meta.srModusMismatchSr1;
+  }
+  if (slot === 2) {
+    return meta.qualiSr2 && !meta.srModusMismatchSr2;
+  }
+  // "either"
+  return (
+    (meta.qualiSr1 && !meta.srModusMismatchSr1) ||
+    (meta.qualiSr2 && !meta.srModusMismatchSr2)
+  );
+}

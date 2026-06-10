@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import {
   listBookings,
   getBookingDetail,
@@ -13,6 +13,7 @@ import {
   reconcileAfterSync,
 } from "../../services/venue-booking/venue-booking.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
 import {
   bookingIdParamSchema,
@@ -20,7 +21,7 @@ import {
   bookingUpdateBodySchema,
   bookingStatusBodySchema,
   bookingCreateBodySchema,
-} from "./booking.schemas";
+} from "@dragons/contracts";
 
 const bookingRoutes = new Hono<AppEnv>();
 
@@ -28,13 +29,14 @@ const bookingRoutes = new Hono<AppEnv>();
 bookingRoutes.get(
   "/bookings",
   requirePermission("booking", "view"),
+  validator("query", bookingListQuerySchema, validationHook),
   describeRoute({
     description: "List all bookings",
     tags: ["Bookings"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = bookingListQuerySchema.parse(c.req.query());
+    const query = c.req.valid("query");
     const result = await listBookings(query);
     return c.json(result);
   },
@@ -75,6 +77,7 @@ bookingRoutes.post(
 bookingRoutes.get(
   "/bookings/:id",
   requirePermission("booking", "view"),
+  validator("param", bookingIdParamSchema, validationHook),
   describeRoute({
     description: "Get booking detail",
     tags: ["Bookings"],
@@ -84,7 +87,7 @@ bookingRoutes.get(
     },
   }),
   async (c) => {
-    const { id } = bookingIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const result = await getBookingDetail(id);
 
     if (!result) {
@@ -99,6 +102,8 @@ bookingRoutes.get(
 bookingRoutes.patch(
   "/bookings/:id",
   requirePermission("booking", "update"),
+  validator("param", bookingIdParamSchema, validationHook),
+  validator("json", bookingUpdateBodySchema, validationHook),
   describeRoute({
     description: "Update booking",
     tags: ["Bookings"],
@@ -108,8 +113,8 @@ bookingRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = bookingIdParamSchema.parse({ id: c.req.param("id") });
-    const body = bookingUpdateBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
     const result = await updateBooking(id, body);
 
     if (!result) {
@@ -124,6 +129,8 @@ bookingRoutes.patch(
 bookingRoutes.patch(
   "/bookings/:id/status",
   requirePermission("booking", "update"),
+  validator("param", bookingIdParamSchema, validationHook),
+  validator("json", bookingStatusBodySchema, validationHook),
   describeRoute({
     description: "Quick status change for booking",
     tags: ["Bookings"],
@@ -133,8 +140,8 @@ bookingRoutes.patch(
     },
   }),
   async (c) => {
-    const { id } = bookingIdParamSchema.parse({ id: c.req.param("id") });
-    const body = bookingStatusBodySchema.parse(await c.req.json());
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
     const result = await updateBookingStatus(id, body.status);
 
     if (!result) {
@@ -149,6 +156,7 @@ bookingRoutes.patch(
 bookingRoutes.post(
   "/bookings",
   requirePermission("booking", "create"),
+  validator("json", bookingCreateBodySchema, validationHook),
   describeRoute({
     description: "Create a booking manually",
     tags: ["Bookings"],
@@ -158,7 +166,7 @@ bookingRoutes.post(
     },
   }),
   async (c) => {
-    const body = bookingCreateBodySchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     const result = await createBooking(body);
 
     if (!result) {
@@ -176,6 +184,7 @@ bookingRoutes.post(
 bookingRoutes.delete(
   "/bookings/:id",
   requirePermission("booking", "delete"),
+  validator("param", bookingIdParamSchema, validationHook),
   describeRoute({
     description: "Delete a booking",
     tags: ["Bookings"],
@@ -185,7 +194,7 @@ bookingRoutes.delete(
     },
   }),
   async (c) => {
-    const { id } = bookingIdParamSchema.parse({ id: c.req.param("id") });
+    const { id } = c.req.valid("param");
     const deleted = await deleteBooking(id);
 
     if (!deleted) {

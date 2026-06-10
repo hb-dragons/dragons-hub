@@ -250,6 +250,21 @@ describe("GET /referee/history/games.csv", () => {
     expect(res.headers.get("X-Total-Count")).toBe("5");
     expect(res.headers.get("X-Result-Truncated")).toBeNull();
   });
+
+  it("overrides caller-supplied limit/offset to CSV_MAX_ROWS=1000 and 0", async () => {
+    mocks.getRefereeHistoryGames.mockResolvedValue({
+      items: [], total: 0, limit: 1000, offset: 0, hasMore: false,
+    });
+
+    const res = await app.request(
+      "/referee/history/games.csv?limit=5&offset=10",
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.getRefereeHistoryGames).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 1000, offset: 0 }),
+    );
+  });
 });
 
 describe("GET /referee/history/leaderboard.csv", () => {

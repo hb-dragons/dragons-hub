@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import { triggerManualSync, getJobStatus, syncQueue } from "../../workers/queues";
 import {
@@ -13,15 +13,16 @@ import {
   getMatchChangesForEntry,
 } from "../../services/admin/sync-admin.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import {
   syncLogsQuerySchema,
   syncEntryIdParamSchema,
   syncEntriesQuerySchema,
   syncStreamParamSchema,
-  jobStatusesQuerySchema,
-  updateScheduleBodySchema,
-  matchChangesParamSchema,
-} from "./sync.schemas";
+  syncJobStatusesQuerySchema,
+  syncUpdateScheduleBodySchema,
+  syncMatchChangesParamSchema,
+} from "@dragons/contracts";
 import type { JobType } from "bullmq";
 import Redis from "ioredis";
 import { env } from "../../config/env";
@@ -90,15 +91,14 @@ syncRoutes.get(
 syncRoutes.get(
   "/sync/jobs",
   requirePermission("sync", "view"),
+  validator("query", syncJobStatusesQuerySchema, validationHook),
   describeRoute({
     description: "List queue jobs with status filtering",
     tags: ["Sync"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const { statuses } = jobStatusesQuerySchema.parse({
-      statuses: c.req.query("statuses"),
-    });
+    const { statuses } = c.req.valid("query");
     const limitRaw = Number(c.req.query("limit"));
     const limit = Number.isInteger(limitRaw) && limitRaw > 0 && limitRaw <= 500 ? limitRaw : 100;
 
@@ -211,18 +211,14 @@ syncRoutes.get(
 syncRoutes.get(
   "/sync/logs",
   requirePermission("sync", "view"),
+  validator("query", syncLogsQuerySchema, validationHook),
   describeRoute({
     description: "List sync run history with pagination and status filtering",
     tags: ["Sync"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = syncLogsQuerySchema.parse({
-      limit: c.req.query("limit"),
-      offset: c.req.query("offset"),
-      status: c.req.query("status"),
-      syncType: c.req.query("syncType"),
-    });
+    const query = c.req.valid("query");
     const result = await getSyncLogs(query);
     return c.json(result);
   },
@@ -232,6 +228,8 @@ syncRoutes.get(
 syncRoutes.get(
   "/sync/logs/:id/entries",
   requirePermission("sync", "view"),
+  validator("param", syncEntryIdParamSchema, validationHook),
+  validator("query", syncEntriesQuerySchema, validationHook),
   describeRoute({
     description: "Get per-item entries for a sync run",
     tags: ["Sync"],
@@ -241,14 +239,8 @@ syncRoutes.get(
     },
   }),
   async (c) => {
-    const { id } = syncEntryIdParamSchema.parse({ id: c.req.param("id") });
-    const query = syncEntriesQuerySchema.parse({
-      limit: c.req.query("limit"),
-      offset: c.req.query("offset"),
-      entityType: c.req.query("entityType"),
-      action: c.req.query("action"),
-      search: c.req.query("search"),
-    });
+    const { id } = c.req.valid("param");
+    const query = c.req.valid("query");
 
     const syncRun = await getSyncRun(id);
     if (!syncRun) {
@@ -264,6 +256,7 @@ syncRoutes.get(
 syncRoutes.get(
   "/sync/logs/:id/match-changes/:apiMatchId",
   requirePermission("sync", "view"),
+  validator("param", syncEntryIdParamSchema.merge(syncMatchChangesParamSchema), validationHook),
   describeRoute({
     description: "Get field-level changes for a match entry",
     tags: ["Sync"],
@@ -273,8 +266,7 @@ syncRoutes.get(
     },
   }),
   async (c) => {
-    const { id } = syncEntryIdParamSchema.parse({ id: c.req.param("id") });
-    const { apiMatchId } = matchChangesParamSchema.parse({ apiMatchId: c.req.param("apiMatchId") });
+    const { id, apiMatchId } = c.req.valid("param");
 
     const syncRun = await getSyncRun(id);
     if (!syncRun) {
@@ -294,6 +286,7 @@ syncRoutes.get(
 syncRoutes.get(
   "/sync/logs/:id/stream",
   requirePermission("sync", "view"),
+  validator("param", syncStreamParamSchema, validationHook),
   describeRoute({
     description: "Stream real-time sync entries via SSE",
     tags: ["Sync"],
@@ -304,7 +297,7 @@ syncRoutes.get(
     },
   }),
   async (c) => {
-    const { id: syncRunId } = syncStreamParamSchema.parse({ id: c.req.param("id") });
+    const { id: syncRunId } = c.req.valid("param");
 
     const syncRun = await getSyncRun(syncRunId);
     if (!syncRun) {
@@ -404,13 +397,14 @@ syncRoutes.get(
 syncRoutes.put(
   "/sync/schedule",
   requirePermission("sync", "trigger"),
+  validator("json", syncUpdateScheduleBodySchema, validationHook),
   describeRoute({
     description: "Update sync schedule",
     tags: ["Sync"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const body = updateScheduleBodySchema.parse(await c.req.json());
+    const body = c.req.valid("json");
     const schedule = await upsertSchedule(body);
     return c.json(schedule);
   },

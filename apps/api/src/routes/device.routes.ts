@@ -1,22 +1,18 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
-import { z } from "zod";
+import { describeRoute, validator } from "hono-openapi";
 import { db } from "../config/database";
 import { pushDevices } from "@dragons/db/schema";
 import { eq, and } from "drizzle-orm";
 import { auth } from "../config/auth";
+import { deviceRegisterBodySchema } from "@dragons/contracts";
+import { validationHook } from "../middleware/validation";
 
 const deviceRoutes = new Hono();
-
-const registerBodySchema = z.object({
-  token: z.string().min(1),
-  platform: z.enum(["ios", "android"]),
-  locale: z.string().min(2).max(15).optional(),
-});
 
 // POST /register — Register push notification device token
 deviceRoutes.post(
   "/register",
+  validator("json", deviceRegisterBodySchema, validationHook),
   describeRoute({
     description: "Register push notification device token",
     tags: ["Devices"],
@@ -31,7 +27,7 @@ deviceRoutes.post(
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
 
-    const { token, platform, locale } = registerBodySchema.parse(await c.req.json());
+    const { token, platform, locale } = c.req.valid("json");
 
     await db
       .insert(pushDevices)

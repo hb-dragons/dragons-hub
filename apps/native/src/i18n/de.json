@@ -4,7 +4,27 @@
     "schedule": "Spielplan",
     "standings": "Tabelle",
     "teams": "Teams",
-    "referee": "Schiri"
+    "today": "Heute",
+    "tools": "Verwaltung"
+  },
+  "today": {
+    "title": "Heute",
+    "empty": "Alles erledigt.",
+    "emptyHint": "Neue Aufgaben für deine Rollen erscheinen hier.",
+    "openSlots": "%{count} offene Schiedsrichter-Slots brauchen Besetzung",
+    "nextAssignment": "Du pfeifst %{teams}",
+    "nextGame": "Nächstes Spiel: %{teams}"
+  },
+  "tools": {
+    "title": "Verwaltung",
+    "empty": "Keine Werkzeuge für dein Konto verfügbar.",
+    "groupLeague": "Liga",
+    "groupOperations": "Betrieb",
+    "groupSocial": "Social",
+    "groupNotifications": "Benachrichtigungen",
+    "groupSystem": "System",
+    "officiating": "Schiedsrichter",
+    "boards": "Boards"
   },
   "home": {
     "nextGame": "Nächstes Spiel",
@@ -72,6 +92,7 @@
     "roleRefereeAdmin": "Schiri-Admin",
     "roleVenueManager": "Hallenverwaltung",
     "roleTeamManager": "Team-Manager",
+    "roleCoach": "Trainer",
     "roleReferee": "Schiri"
   },
   "teamDetail": {
@@ -197,6 +218,7 @@
     "invalidCredentials": "Ungültige E-Mail oder Passwort",
     "staffSignInPrompt": "Als Schiedsrichter oder Admin anmelden",
     "staffSignInHint": "Als Fan brauchst du kein Konto.",
+    "noAccountHint": "Kein Konto? Bitte deinen Vereins-Admin, eines zu erstellen.",
     "tapToUnlock": "Tippen zum Entsperren",
     "close": "Schließen"
   },
