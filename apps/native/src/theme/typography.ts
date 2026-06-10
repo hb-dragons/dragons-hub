@@ -25,7 +25,6 @@ export const fontFamilies = {
  * NOTE: The require() calls will fail typecheck until the actual .ttf files
  * are present in assets/fonts/. This is expected during initial scaffolding.
  */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 export const fontAssets = {
   [fontFamilies.display]: require("../../assets/fonts/SpaceGrotesk-Bold.ttf"),
   [fontFamilies.displayMedium]: require("../../assets/fonts/SpaceGrotesk-Medium.ttf"),

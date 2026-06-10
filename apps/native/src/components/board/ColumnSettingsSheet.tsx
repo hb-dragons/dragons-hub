@@ -90,13 +90,15 @@ export const ColumnSettingsSheet = forwardRef<ColumnSettingsSheetHandle>(
           {
             text: i18n.t("common.delete"),
             style: "destructive",
-            onPress: async () => {
-              try {
-                await mutations.remove(args.column.id);
-                sheetRef.current?.dismiss();
-              } catch {
-                // toast handled
-              }
+            onPress: () => {
+              void (async () => {
+                try {
+                  await mutations.remove(args.column.id);
+                  sheetRef.current?.dismiss();
+                } catch {
+                  // toast handled
+                }
+              })();
             },
           },
         ],
@@ -202,7 +204,7 @@ export const ColumnSettingsSheet = forwardRef<ColumnSettingsSheetHandle>(
           </Pressable>
 
           <Pressable
-            onPress={save}
+            onPress={() => { void save(); }}
             disabled={!canSave}
             accessibilityRole="button"
             style={{

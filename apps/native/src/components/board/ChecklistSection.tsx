@@ -288,14 +288,14 @@ export function ChecklistSection({ task, boardId }: Props) {
         <BottomSheetTextInput
           value={draft}
           onChangeText={setDraft}
-          onSubmitEditing={submit}
+          onSubmitEditing={() => { void submit(); }}
           returnKeyType="done"
           placeholder={i18n.t("board.checklist.addPlaceholder")}
           placeholderTextColor={colors.mutedForeground}
           style={[singleLineInput(theme, { fontSize: 14 }), { flex: 1 }]}
         />
         <Pressable
-          onPress={submit}
+          onPress={() => { void submit(); }}
           disabled={!draft.trim() || adding}
           accessibilityRole="button"
           accessibilityLabel={i18n.t("board.checklist.add")}

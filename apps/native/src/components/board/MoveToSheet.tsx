@@ -139,7 +139,7 @@ export const MoveToSheet = forwardRef<MoveToSheetHandle>(function MoveToSheet(_p
         </View>
 
         <Pressable
-          onPress={confirm}
+          onPress={() => { void confirm(); }}
           disabled={selectedColumnId == null}
           accessibilityRole="button"
           style={{

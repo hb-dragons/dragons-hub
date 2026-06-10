@@ -159,7 +159,7 @@ export function CommentsSection({ task }: Props) {
                     <Text style={{ color: colors.foreground }}>{i18n.t("common.cancel")}</Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => saveEdit(c.id)}
+                    onPress={() => { void saveEdit(c.id); }}
                     style={{
                       paddingHorizontal: spacing.md,
                       paddingVertical: spacing.xs,
@@ -191,7 +191,7 @@ export function CommentsSection({ task }: Props) {
           ]}
         />
         <Pressable
-          onPress={submit}
+          onPress={() => { void submit(); }}
           disabled={!draft.trim() || sending}
           accessibilityRole="button"
           accessibilityLabel={i18n.t("board.comments.send")}

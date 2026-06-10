@@ -154,7 +154,7 @@ export default function SignInScreen() {
           textContentType="password"
           autoComplete="current-password"
           returnKeyType="go"
-          onSubmitEditing={handleSignIn}
+          onSubmitEditing={() => { void handleSignIn(); }}
         />
 
         {errorText ? (
@@ -168,7 +168,7 @@ export default function SignInScreen() {
         ) : null}
 
         <Pressable
-          onPress={handleSignIn}
+          onPress={() => { void handleSignIn(); }}
           disabled={!canSubmit}
           style={({ pressed }) => [
             {

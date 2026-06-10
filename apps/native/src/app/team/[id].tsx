@@ -63,7 +63,7 @@ export default function TeamDetailScreen() {
 
   const allMatches = matchesData?.items ?? [];
 
-  const { pastMatches, lastGame, nextGame } = useMemo(() => {
+  const { lastGame, nextGame } = useMemo(() => {
     const past: MatchListItem[] = [];
     const future: MatchListItem[] = [];
 

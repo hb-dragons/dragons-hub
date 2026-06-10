@@ -94,7 +94,7 @@ export const CreateBoardSheet = forwardRef<CreateBoardSheetHandle>(
           />
 
           <Pressable
-            onPress={submit}
+            onPress={() => { void submit(); }}
             disabled={!canSubmit}
             accessibilityRole="button"
             style={{

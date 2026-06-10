@@ -413,8 +413,9 @@ export default function OfficiatingScreen() {
                 }
                 onAdminUnassign={
                   isAdmin
-                    ? (slotNumber, name) =>
-                        handleUnassign(item, slotNumber, name)
+                    ? (slotNumber, name) => {
+                        void handleUnassign(item, slotNumber, name);
+                      }
                     : undefined
                 }
                 onPress={() => {

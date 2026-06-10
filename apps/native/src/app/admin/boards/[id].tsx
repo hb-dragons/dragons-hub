@@ -413,7 +413,7 @@ function BoardDetailBody() {
         targetIndex={columnDrag.targetIndex}
         onReorderStart={columnDrag.start}
         onReorderTargetIndex={columnDrag.setTargetIndex}
-        onReorderCommit={columnDrag.commit}
+        onReorderCommit={() => { void columnDrag.commit(); }}
         onReorderCancel={columnDrag.cancel}
       />
       <FilterChips
@@ -533,7 +533,7 @@ function BoardDetailBody() {
             onPagerLayout={onPagerLayout}
             columnRefs={columnRefsMap}
             refreshing={refreshing}
-            onRefresh={onPullRefresh}
+            onRefresh={() => { void onPullRefresh(); }}
             scrollEnabled={!columnDrag.reordering}
           />
         )}

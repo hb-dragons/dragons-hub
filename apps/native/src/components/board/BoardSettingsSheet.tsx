@@ -80,14 +80,16 @@ export const BoardSettingsSheet = forwardRef<BoardSettingsSheetHandle>(
           {
             text: i18n.t("common.delete"),
             style: "destructive",
-            onPress: async () => {
-              try {
-                await mutations.remove(board.id);
-                sheetRef.current?.dismiss();
-                router.back();
-              } catch {
-                // toast already shown
-              }
+            onPress: () => {
+              void (async () => {
+                try {
+                  await mutations.remove(board.id);
+                  sheetRef.current?.dismiss();
+                  router.back();
+                } catch {
+                  // toast already shown
+                }
+              })();
             },
           },
         ],
@@ -134,7 +136,7 @@ export const BoardSettingsSheet = forwardRef<BoardSettingsSheetHandle>(
           />
 
           <Pressable
-            onPress={saveRename}
+            onPress={() => { void saveRename(); }}
             disabled={!canSave}
             accessibilityRole="button"
             style={{
