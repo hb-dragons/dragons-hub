@@ -93,7 +93,7 @@ export function AssigneePicker({
                 <button
                   key={u.id}
                   type="button"
-                  onClick={() => toggle(u.id)}
+                  onClick={() => { void toggle(u.id); }}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
                 >
                   <span className="h-5 w-5 rounded-full bg-muted inline-flex items-center justify-center text-[9px] font-semibold">

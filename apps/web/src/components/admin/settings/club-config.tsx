@@ -106,7 +106,7 @@ export function ClubConfig() {
             />
           </div>
           <Button
-            onClick={handleSave}
+            onClick={() => { void handleSave(); }}
             disabled={!hasChanges || saving || !canUpdate}
             className="w-fit"
           >

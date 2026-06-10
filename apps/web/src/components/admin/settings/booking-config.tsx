@@ -140,7 +140,7 @@ export function BookingConfig() {
             />
           </div>
           <Button
-            onClick={handleSave}
+            onClick={() => { void handleSave(); }}
             disabled={!hasChanges || saving}
             className="w-fit"
           >

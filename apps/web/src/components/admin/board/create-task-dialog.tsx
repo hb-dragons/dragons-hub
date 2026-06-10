@@ -106,7 +106,7 @@ export function CreateTaskDialog({
           <DialogTitle>{t("board.addTask")}</DialogTitle>
           <DialogDescription>{t("board.task.title")}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={(e) => { void submit(e); }} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="ct-title">{t("board.task.title")}</Label>
             <Input

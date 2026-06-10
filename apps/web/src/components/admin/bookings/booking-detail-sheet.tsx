@@ -438,7 +438,7 @@ export function BookingDetailSheet({
                 {canUpdate && (
                   <Button
                     className="flex-1"
-                    onClick={handleSave}
+                    onClick={() => { void handleSave(); }}
                     disabled={saving || !isDirty}
                   >
                     {saving ? (
@@ -499,7 +499,7 @@ export function BookingDetailSheet({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+            <AlertDialogAction onClick={() => { void handleDelete(); }} disabled={deleting}>
               {deleting && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}

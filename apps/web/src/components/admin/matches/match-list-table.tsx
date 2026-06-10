@@ -404,7 +404,7 @@ export function MatchListTable() {
           onOpenChange={(open) => {
             if (!open) setSelectedMatchId(null)
           }}
-          onSaved={() => mutate(SWR_KEYS.matches)}
+          onSaved={() => { void mutate(SWR_KEYS.matches); }}
         />
       </Sheet>
     </TooltipProvider>

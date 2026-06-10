@@ -37,7 +37,7 @@ export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
   useEffect(() => {
     if (!deviceId) return;
     let cancelled = false;
-    fetchAPI<ScoreboardSnapshotRow[]>(
+    void fetchAPI<ScoreboardSnapshotRow[]>(
       `/admin/scoreboard/snapshots?deviceId=${encodeURIComponent(deviceId)}&limit=200`,
     ).then((rows) => {
       if (!cancelled) setSnapshots(rows);

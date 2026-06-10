@@ -53,7 +53,7 @@ export function SubscribeButton({
           <code className="flex-1 truncate text-xs">{icsUrl}</code>
           <button
             type="button"
-            onClick={handleCopy}
+            onClick={() => { void handleCopy(); }}
             className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium hover:bg-accent"
           >
             {copied ? t.copied : t.copy}

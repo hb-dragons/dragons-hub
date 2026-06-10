@@ -106,14 +106,16 @@ export function RulesSubtab({ referee }: Props) {
     return (
       <div className="p-4 space-y-3 text-sm text-muted-foreground">
         <p>{t("disabledHint")}</p>
-        <Button size="sm" variant="outline" onClick={async () => {
-          await fetchAPI(`/admin/referees/${referee.id}/visibility`, {
-            method: "PATCH",
-            body: JSON.stringify({ isOwnClub: true, allowAllHomeGames: referee.allowAllHomeGames, allowAwayGames: referee.allowAwayGames }),
-          });
-          await swrMutate(SWR_KEYS.referee(referee.id));
-          await swrMutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true });
-          await swrMutate(SWR_KEYS.refereeCounts);
+        <Button size="sm" variant="outline" onClick={() => {
+          void (async () => {
+            await fetchAPI(`/admin/referees/${referee.id}/visibility`, {
+              method: "PATCH",
+              body: JSON.stringify({ isOwnClub: true, allowAllHomeGames: referee.allowAllHomeGames, allowAwayGames: referee.allowAwayGames }),
+            });
+            await swrMutate(SWR_KEYS.referee(referee.id));
+            await swrMutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true });
+            await swrMutate(SWR_KEYS.refereeCounts);
+          })();
         }}>
           {t("markOwnClub")}
         </Button>

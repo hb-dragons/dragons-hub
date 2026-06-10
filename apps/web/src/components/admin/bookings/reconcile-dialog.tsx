@@ -255,7 +255,7 @@ export function ReconcileDialog({ onReconciled }: ReconcileDialogProps) {
   function handleOpenChange(newOpen: boolean) {
     setOpen(newOpen);
     if (newOpen) {
-      loadPreview();
+      void loadPreview();
     }
   }
 
@@ -307,7 +307,7 @@ export function ReconcileDialog({ onReconciled }: ReconcileDialogProps) {
 
         {preview && hasChanges && (
           <DialogFooter>
-            <Button onClick={handleApply} disabled={applying}>
+            <Button onClick={() => { void handleApply(); }} disabled={applying}>
               {applying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t("reconcile.apply")}
             </Button>

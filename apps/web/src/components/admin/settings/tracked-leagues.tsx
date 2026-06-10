@@ -133,7 +133,7 @@ export function TrackedLeagues() {
             />
           </div>
           <Button
-            onClick={handleSave}
+            onClick={() => { void handleSave(); }}
             disabled={!clubConfig || saving}
             className="w-fit"
           >
@@ -178,7 +178,7 @@ export function TrackedLeagues() {
                     <td className="px-4 py-2">
                       <Switch
                         checked={league.ownClubRefs}
-                        onCheckedChange={(checked) => handleToggleOwnClubRefs(league.id, checked)}
+                        onCheckedChange={(checked) => { void handleToggleOwnClubRefs(league.id, checked); }}
                       />
                     </td>
                   </tr>

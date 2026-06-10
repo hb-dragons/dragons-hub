@@ -312,7 +312,7 @@ export function WatchRulesList() {
                 <TableCell className="text-center">
                   <Switch
                     checked={rule.enabled}
-                    onCheckedChange={() => handleToggleEnabled(rule)}
+                    onCheckedChange={() => { void handleToggleEnabled(rule); }}
                   />
                 </TableCell>
                 <TableCell>
@@ -370,7 +370,7 @@ export function WatchRulesList() {
                             {tCommon("cancel")}
                           </AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={() => handleDelete(rule.id)}
+                            onClick={() => { void handleDelete(rule.id); }}
                           >
                             {t("delete")}
                           </AlertDialogAction>
@@ -394,7 +394,7 @@ export function WatchRulesList() {
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-6">
             {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="rule-name">{t("name")}</Label>

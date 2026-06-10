@@ -127,7 +127,7 @@ export function CreateBookingDialog({
           <DialogTitle>{t("bookings.create.title")}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
           <div className="space-y-2">
             <Label>{t("bookings.create.venue")}</Label>
             <Combobox

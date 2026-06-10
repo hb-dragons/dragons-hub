@@ -84,7 +84,7 @@ export function SetPasswordDialog({
             {t("users.setPasswordDialog.description", { name: user?.name ?? "" })}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={(e) => { void form.handleSubmit(onSubmit)(e); }} className="space-y-4">
           <Controller
             control={form.control}
             name="password"

@@ -83,7 +83,7 @@ function urgencyBadgeVariant(
   return urgency === "immediate" ? "destructive" : "secondary";
 }
 
-type TranslateFunc = ReturnType<typeof import("next-intl").useTranslations>;
+type TranslateFunc = ReturnType<typeof useTranslations>;
 
 function sourceLabel(source: string, t: TranslateFunc): string {
   switch (source) {
@@ -205,7 +205,7 @@ export function EventBrowser() {
       });
       setTriggerPayload("");
       setTriggerUrgency("");
-      mutate();
+      void mutate();
     } catch {
       toast.error(t("triggerFailed"));
     } finally {
@@ -336,7 +336,7 @@ export function EventBrowser() {
             </div>
             <DialogFooter>
               <Button
-                onClick={handleTrigger}
+                onClick={() => { void handleTrigger(); }}
                 disabled={
                   triggerSubmitting ||
                   !triggerForm.type ||

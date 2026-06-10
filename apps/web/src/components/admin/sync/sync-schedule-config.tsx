@@ -160,7 +160,7 @@ export function SyncScheduleConfig() {
 
         {/* Save */}
         <div className="flex items-center gap-3">
-          <Button onClick={handleSave} disabled={!hasChanges || saving}>
+          <Button onClick={() => { void handleSave(); }} disabled={!hasChanges || saving}>
             {saving ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : saveState === "success" ? (

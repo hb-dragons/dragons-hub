@@ -368,7 +368,7 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
           id="teams-reorder"
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
+          onDragEnd={(event) => { void handleDragEnd(event); }}
         >
           <Table>
             {tableHeader}

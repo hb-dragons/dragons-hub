@@ -12,7 +12,7 @@ export function SyncTriggerButton() {
   const { trigger } = useTriggerSync();
 
   return (
-    <Button onClick={trigger} disabled={isRunning || triggering}>
+    <Button onClick={() => { void trigger(); }} disabled={isRunning || triggering}>
       {triggering ? (
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
       ) : (

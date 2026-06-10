@@ -190,7 +190,7 @@ export function UserListTable() {
 
   const currentUserId = session?.user?.id ?? ""
   const columns = useMemo(
-    () => getColumns(t, format, currentUserId, () => mutate()),
+    () => getColumns(t, format, currentUserId, () => { void mutate(); }),
     [t, format, currentUserId, mutate],
   )
 
@@ -249,7 +249,7 @@ export function UserListTable() {
       <CreateUserDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onCreated={() => mutate()}
+        onCreated={() => { void mutate(); }}
       />
     </>
   )

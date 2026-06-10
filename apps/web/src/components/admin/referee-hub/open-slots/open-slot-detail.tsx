@@ -35,13 +35,13 @@ export function OpenSlotDetail({ selectedGameId }: Props) {
         gameApiId={game.apiMatchId}
         slotNumber={1}
         assignment={{ refereeApiId: game.sr1RefereeApiId, refereeName: game.sr1Name, status: game.sr1Status }}
-        onChange={() => mutate()}
+        onChange={() => { void mutate(); }}
       />
       <SlotCard
         gameApiId={game.apiMatchId}
         slotNumber={2}
         assignment={{ refereeApiId: game.sr2RefereeApiId, refereeName: game.sr2Name, status: game.sr2Status }}
-        onChange={() => mutate()}
+        onChange={() => { void mutate(); }}
       />
     </div>
   );

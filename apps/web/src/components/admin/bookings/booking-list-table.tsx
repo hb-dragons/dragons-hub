@@ -84,7 +84,7 @@ export function BookingListTable() {
           </SelectContent>
         </Select>
         {canCreate && (
-          <ReconcileDialog onReconciled={() => mutate(SWR_KEYS.bookings)} />
+          <ReconcileDialog onReconciled={() => { void mutate(SWR_KEYS.bookings); }} />
         )}
         {canCreate && (
           <Button size="sm" onClick={() => setShowCreateDialog(true)}>
@@ -157,14 +157,14 @@ export function BookingListTable() {
           onOpenChange={(open) => {
             if (!open) setSelectedBookingId(null);
           }}
-          onUpdated={() => mutate(SWR_KEYS.bookings)}
+          onUpdated={() => { void mutate(SWR_KEYS.bookings); }}
         />
       </Sheet>
 
       <CreateBookingDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
-        onCreated={() => mutate(SWR_KEYS.bookings)}
+        onCreated={() => { void mutate(SWR_KEYS.bookings); }}
       />
     </div>
   );

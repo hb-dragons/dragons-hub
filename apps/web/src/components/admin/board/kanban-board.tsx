@@ -312,7 +312,7 @@ export function KanbanBoard({
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
+      onDragEnd={(e) => { void handleDragEnd(e); }}
       onDragCancel={() => {
         setActiveId(null);
         setActiveSize(null);

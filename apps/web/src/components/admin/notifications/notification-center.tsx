@@ -159,7 +159,7 @@ export function NotificationCenter() {
           </TabsTrigger>
         </TabsList>
 
-        <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
+        <Button variant="outline" size="sm" onClick={() => { void handleMarkAllRead(); }}>
           <CheckCheck className="mr-2 h-4 w-4" />
           {t("markAllRead")}
         </Button>
@@ -180,7 +180,7 @@ export function NotificationCenter() {
                 t={t}
                 formatTimestamp={formatTimestamp}
                 truncateBody={truncateBody}
-                onMarkRead={handleMarkRead}
+                onMarkRead={(id) => { void handleMarkRead(id); }}
               />
             ))}
             <Pagination
@@ -209,7 +209,7 @@ export function NotificationCenter() {
                 item={item}
                 t={t}
                 formatTimestamp={formatTimestamp}
-                onRetry={handleRetry}
+                onRetry={(id) => { void handleRetry(id); }}
               />
             ))}
             <Pagination
