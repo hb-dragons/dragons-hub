@@ -14,6 +14,7 @@ export {
   refereeEndpoints,
   adminBoardEndpoints,
   matchEndpoints,
+  syncEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -32,4 +33,7 @@ export type {
   MatchListQuery,
   MatchUpdateBody,
   MatchHistoryQuery,
+  SyncLogsQuery,
+  SyncEntriesQuery,
+  SyncUpdateScheduleBody,
 } from "./endpoints";

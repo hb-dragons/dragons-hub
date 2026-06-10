@@ -9,7 +9,7 @@ import {
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api, fetchAPI } from "@/lib/api";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type {
@@ -17,7 +17,6 @@ import type {
   PaginatedResponse,
   SyncScheduleData,
   SyncRun,
-  TriggerResponse,
 } from "./types";
 
 // --- Minimal context for sync run tracking ---
@@ -99,9 +98,7 @@ export function useTriggerSync() {
   const trigger = useCallback(async () => {
     try {
       setTriggering(true);
-      const result = await fetchAPI<TriggerResponse>("/admin/sync/trigger", {
-        method: "POST",
-      });
+      const result = await api.sync.trigger();
 
       setRunningSyncRunId(result.syncRunId);
 

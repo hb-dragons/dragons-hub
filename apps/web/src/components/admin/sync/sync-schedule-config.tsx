@@ -21,8 +21,7 @@ import {
 } from "@dragons/ui/components/select";
 import { Loader2, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
-import type { SyncScheduleData } from "./types";
+import { api } from "@/lib/api";
 import { useSyncSchedule } from "./use-sync";
 
 const HOURS = Array.from({ length: 24 }, (_, i) =>
@@ -72,17 +71,11 @@ export function SyncScheduleConfig() {
       setSaving(true);
       setSaveState("idle");
 
-      const updated = await fetchAPI<SyncScheduleData>(
-        "/admin/sync/schedule",
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            enabled,
-            cronExpression: hourToCron(hour),
-            timezone,
-          }),
-        },
-      );
+      const updated = await api.sync.updateSchedule({
+        enabled,
+        cronExpression: hourToCron(hour),
+        timezone,
+      });
 
       await scheduleMutate(updated, { revalidate: false });
       setSaveState("success");

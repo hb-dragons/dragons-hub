@@ -98,6 +98,9 @@ export {
   syncJobStatusesQuerySchema,
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
+  type SyncLogsQuery,
+  type SyncEntriesQuery,
+  type SyncUpdateScheduleBody,
 } from "./sync";
 
 export {

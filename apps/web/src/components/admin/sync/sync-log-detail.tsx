@@ -32,13 +32,12 @@ import {
   Search,
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api, fetchAPI } from "@/lib/api";
 import type {
   SyncRun,
   SyncRunEntry,
   SyncRunEntriesResponse,
   MatchFieldChange,
-  MatchChangesResponse,
   EntityType,
   EntryAction,
 } from "./types";
@@ -137,9 +136,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
 
     setMatchChangesCache((prev) => ({ ...prev, [entryId]: "loading" }));
     try {
-      const data = await fetchAPI<MatchChangesResponse>(
-        `/admin/sync/logs/${syncRun.id}/match-changes/${entry.entityId}`,
-      );
+      const data = await api.sync.matchChanges(syncRun.id, Number(entry.entityId));
       setMatchChangesCache((prev) => ({ ...prev, [entryId]: data.changes }));
     } catch {
       setMatchChangesCache((prev) => ({ ...prev, [entryId]: "error" }));

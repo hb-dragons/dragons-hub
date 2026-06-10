@@ -25,3 +25,10 @@ export type {
   MatchUpdateBody,
   MatchHistoryQuery,
 } from "@dragons/contracts";
+
+export { syncEndpoints } from "./sync";
+export type {
+  SyncLogsQuery,
+  SyncEntriesQuery,
+  SyncUpdateScheduleBody,
+} from "@dragons/contracts";
