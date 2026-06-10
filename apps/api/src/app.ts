@@ -11,6 +11,7 @@ import { auth } from "./config/auth";
 import { env } from "./config/env";
 import { openApiSpec } from "./config/openapi";
 import { routes } from "./routes/index";
+import { mcpRoutes } from "./routes/mcp.routes";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { HonoAdapter } from "@bull-board/hono";
@@ -53,4 +54,6 @@ app.use("/admin/*", requireAuth);
 app.use("/admin/queues/*", requireAnyRole("admin"));
 app.route("/admin/queues", serverAdapter.registerPlugin());
 app.route("/", routes);
+// MCP endpoint uses bearer-token auth (MCP_TOKEN), not the session gate.
+app.route("/", mcpRoutes);
 app.get("/", (c) => c.json({ service: "api", message: "Hello from Hono" }));

@@ -147,6 +147,10 @@ REFEREE_SDK_USERNAME=<separate federation account for referee assignment>
 REFEREE_SDK_PASSWORD=<separate federation account for referee assignment>
 EXPO_ACCESS_TOKEN=<optional — enables authenticated Expo Push send tier, higher rate limits + better receipt SLA>
 EXPO_PROJECT_ID=<optional — validates EAS project ID match between server and native; surfaces mismatch early>
+ASSISTANT_ENABLED=false           # set true to enable the game rescheduling AI copilot
+ASSISTANT_MODEL=gemini-2.5-flash  # Gemini model ID used by the assistant
+GOOGLE_GENERATIVE_AI_API_KEY=<google ai studio key; required when ASSISTANT_ENABLED=true>
+MCP_TOKEN=<random string min 32 chars; bearer token for the /mcp endpoint>
 ```
 
 ### Production deployment plumbing

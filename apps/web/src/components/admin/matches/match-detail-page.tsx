@@ -19,6 +19,7 @@ import { Sheet } from "@dragons/ui/components/sheet";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { Can } from "@/components/rbac/can";
 import { MatchEditSheet } from "./match-edit-sheet";
+import { RescheduleChatSheet } from "./reschedule-chat-sheet";
 import { MatchDivergenceTable } from "./match-divergence-table";
 import { MatchChangeHistory } from "./match-change-history";
 import { formatMatchTime, formatScore, formatPeriodScores } from "./utils";
@@ -43,6 +44,7 @@ export function MatchDetailPage({
   const router = useRouter();
   const { mutate: globalMutate } = useSWRConfig();
   const [editOpen, setEditOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
 
   const { data: detailData, mutate: mutateDetail } = useSWR<MatchDetailResponse>(
     SWR_KEYS.matchDetail(matchId),
@@ -90,6 +92,9 @@ export function MatchDetailPage({
             </Badge>
           )}
           <Can resource="match" action="update">
+            <Button variant="outline" size="sm" onClick={() => setRescheduleOpen(true)}>
+              {t("matchDetail.reschedule.trigger")}
+            </Button>
             <Button size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="mr-2 h-4 w-4" />
               {t("matchDetail.edit")}
@@ -285,6 +290,13 @@ export function MatchDetailPage({
           onSaved={handleSaved}
         />
       </Sheet>
+
+      {/* Reschedule Chat Sheet */}
+      <RescheduleChatSheet
+        matchId={matchId}
+        open={rescheduleOpen}
+        onOpenChange={setRescheduleOpen}
+      />
     </div>
   );
 }
