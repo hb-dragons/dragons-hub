@@ -252,6 +252,7 @@ export type {
   StramatelSnapshot,
   PublicLiveSnapshot,
   ScoreboardSnapshotRow,
+  ScoreboardHealth,
 } from "./scoreboard";
 
 // Broadcast types

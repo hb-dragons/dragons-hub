@@ -11,10 +11,20 @@ vi.mock("swr", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({
-  fetchAPI: vi.fn(async () => [
-    { id: 2, scoreHome: 5, scoreGuest: 4, capturedAt: new Date().toISOString(), rawHex: "f8" },
-    { id: 1, scoreHome: 4, scoreGuest: 4, capturedAt: new Date().toISOString(), rawHex: "f8" },
-  ]),
+  api: {
+    scoreboard: {
+      snapshots: vi.fn(async () => [
+        { id: 2, scoreHome: 5, scoreGuest: 4, capturedAt: new Date().toISOString(), rawHex: "f8" },
+        { id: 1, scoreHome: 4, scoreGuest: 4, capturedAt: new Date().toISOString(), rawHex: "f8" },
+      ]),
+      health: vi.fn(async () => ({
+        deviceId: "d1",
+        lastFrameAt: null,
+        secondsSinceLastFrame: null,
+        online: false,
+      })),
+    },
+  },
 }));
 
 class MockEventSource {

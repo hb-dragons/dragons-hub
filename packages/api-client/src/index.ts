@@ -26,6 +26,7 @@ export {
   watchRuleEndpoints,
   eventEndpoints,
   venueEndpoints,
+  scoreboardEndpoints,
   standingsEndpoints,
   userEndpoints,
 } from "./endpoints";
@@ -81,6 +82,7 @@ export type {
   EventListQuery,
   TriggerEventBody,
   VenueSearchQuery,
+  ScoreboardListQuery,
   UserRefereeLinkBody,
   UserRefereeLinkResult,
 } from "./endpoints";

@@ -39,3 +39,14 @@ export interface ScoreboardSnapshotRow extends StramatelSnapshot {
   rawHex: string | null;
   capturedAt: string;
 }
+
+/**
+ * Ingest connection health returned by GET /admin/scoreboard/health.
+ * Reports whether the device has sent a frame recently enough to be online.
+ */
+export interface ScoreboardHealth {
+  deviceId: string;
+  lastFrameAt: string | null;
+  secondsSinceLastFrame: number | null;
+  online: boolean;
+}
