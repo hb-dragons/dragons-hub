@@ -7,6 +7,15 @@ export type { RegisterDeviceResponse, UnregisterDeviceResponse } from "./devices
 export { refereeEndpoints } from "./referee";
 export type { RefereeGamesQueryParams } from "./referee";
 
+export { refereeAdminEndpoints } from "./referee-admin";
+export type {
+  RefereeListQuery,
+  RefereeVisibilityBody,
+  UpdateRefereeRulesBodyParsed,
+  RefereeHistoryFilterQuery,
+  RefereeHistoryGamesQuery,
+} from "@dragons/contracts";
+
 export { adminBoardEndpoints } from "./admin-board";
 export type {
   BoardCreateBody,

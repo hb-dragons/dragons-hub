@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
-import { fetchAPI, APIError } from "@/lib/api";
+import { api, APIError } from "@/lib/api";
 import { useRefereeHubUrl } from "../use-referee-hub-url";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@dragons/ui/components/input";
@@ -51,9 +51,10 @@ export function RefereeList({ selectedId, onSelect }: Props) {
 
   async function toggleOwnClub(ref: RefereeListItem, checked: boolean) {
     try {
-      await fetchAPI(`/admin/referees/${ref.id}/visibility`, {
-        method: "PATCH",
-        body: JSON.stringify({ isOwnClub: checked, allowAllHomeGames: ref.allowAllHomeGames, allowAwayGames: ref.allowAwayGames }),
+      await api.refereeAdmin.setVisibility(ref.id, {
+        isOwnClub: checked,
+        allowAllHomeGames: ref.allowAllHomeGames,
+        allowAwayGames: ref.allowAwayGames,
       });
       await Promise.all([
         mutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true }),

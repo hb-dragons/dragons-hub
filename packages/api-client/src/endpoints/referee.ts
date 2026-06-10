@@ -15,6 +15,9 @@ export interface RefereeGamesQueryParams {
   league?: string;
   dateFrom?: string;
   dateTo?: string;
+  gameType?: "home" | "away" | "both";
+  slotStatus?: "open" | "offered" | "any";
+  assignedRefereeApiId?: number;
 }
 
 export interface ClaimGameParams {

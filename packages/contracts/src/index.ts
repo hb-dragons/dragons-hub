@@ -69,6 +69,8 @@ export {
 export {
   refereeHistoryFilterSchema,
   refereeHistoryGamesQuerySchema,
+  type RefereeHistoryFilterQuery,
+  type RefereeHistoryGamesQuery,
 } from "./referee-history";
 
 export {

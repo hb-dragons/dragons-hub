@@ -18,8 +18,11 @@ vi.mock("swr", () => ({
   mutate: vi.fn(),
 }));
 
-const fetchAPI = vi.fn().mockResolvedValue({});
-vi.mock("@/lib/api", () => ({ fetchAPI: (...args: unknown[]) => fetchAPI(...args), APIError: class extends Error {} }));
+const setVisibility = vi.fn().mockResolvedValue({});
+vi.mock("@/lib/api", () => ({
+  api: { refereeAdmin: { setVisibility: (...args: unknown[]) => setVisibility(...args) } },
+  APIError: class extends Error {},
+}));
 
 vi.mock("../use-referee-hub-url", () => ({
   useRefereeHubUrl: vi.fn(() => ({
@@ -45,7 +48,7 @@ function wrap(ui: React.ReactNode) {
   return <NextIntlClientProvider locale="en" messages={messages as never}>{ui}</NextIntlClientProvider>;
 }
 
-afterEach(() => { cleanup(); fetchAPI.mockClear(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); setVisibility.mockClear(); vi.clearAllMocks(); });
 
 describe("RefereeList", () => {
   it("renders referees", () => {
@@ -65,9 +68,9 @@ describe("RefereeList", () => {
     render(wrap(<RefereeList selectedId={null} onSelect={vi.fn()} />));
     const toggles = screen.getAllByRole("checkbox", { name: /own/i });
     fireEvent.click(toggles[0]!);
-    await waitFor(() => expect(fetchAPI).toHaveBeenCalledWith(
-      "/admin/referees/1/visibility",
-      expect.objectContaining({ method: "PATCH" }),
+    await waitFor(() => expect(setVisibility).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ isOwnClub: false }),
     ));
   });
 

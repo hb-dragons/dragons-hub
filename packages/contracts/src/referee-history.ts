@@ -46,3 +46,8 @@ export const refereeHistoryGamesQuerySchema = refereeHistoryFilterSchema.extend(
   offset: z.coerce.number().int().min(0).default(0),
   refereeApiId: z.coerce.number().int().positive().optional(),
 });
+
+// Request (input) types — the `status` field is a transform whose input is a
+// string, so callers build queries with `z.input`, not the parsed output.
+export type RefereeHistoryFilterQuery = z.input<typeof refereeHistoryFilterSchema>;
+export type RefereeHistoryGamesQuery = z.input<typeof refereeHistoryGamesQuerySchema>;

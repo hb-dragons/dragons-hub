@@ -8,8 +8,17 @@ import { SlotCard } from "./slot-card";
 const toast = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast }));
 
-const fetchAPI = vi.fn();
-vi.mock("@/lib/api", () => ({ fetchAPI: (...a: unknown[]) => fetchAPI(...a), APIError: class extends Error {} }));
+const assignReferee = vi.fn();
+const unassignReferee = vi.fn();
+vi.mock("@/lib/api", () => ({
+  api: {
+    referees: {
+      assignReferee: (...a: unknown[]) => assignReferee(...a),
+      unassignReferee: (...a: unknown[]) => unassignReferee(...a),
+    },
+  },
+  APIError: class extends Error {},
+}));
 
 vi.mock("./candidate-picker", () => ({
   CandidatePicker: ({ onPick }: { onPick: (n: number) => void }) =>
@@ -25,12 +34,12 @@ function wrap(ui: React.ReactNode) {
   return <NextIntlClientProvider locale="en" messages={messages as never}>{ui}</NextIntlClientProvider>;
 }
 
-beforeEach(() => { fetchAPI.mockReset(); toast.success.mockReset(); toast.error.mockReset(); });
+beforeEach(() => { assignReferee.mockReset(); unassignReferee.mockReset(); toast.success.mockReset(); toast.error.mockReset(); });
 afterEach(() => cleanup());
 
 describe("SlotCard", () => {
   it("renders inline error chip on assign failure (no toast)", async () => {
-    fetchAPI.mockRejectedValueOnce(new Error("federation down"));
+    assignReferee.mockRejectedValueOnce(new Error("federation down"));
     render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={{ refereeApiId: null, refereeName: null, status: "open" }} onChange={() => {}} />));
     fireEvent.click(screen.getByTestId("pick"));
     await waitFor(() => expect(screen.getByText(/federation down/)).toBeInTheDocument());
@@ -38,7 +47,7 @@ describe("SlotCard", () => {
   });
 
   it("dismiss clears the chip", async () => {
-    fetchAPI.mockRejectedValueOnce(new Error("nope"));
+    assignReferee.mockRejectedValueOnce(new Error("nope"));
     render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={{ refereeApiId: null, refereeName: null, status: "open" }} onChange={() => {}} />));
     fireEvent.click(screen.getByTestId("pick"));
     await waitFor(() => expect(screen.getByText("nope")).toBeInTheDocument());
@@ -47,7 +56,7 @@ describe("SlotCard", () => {
   });
 
   it("does not toast on success either", async () => {
-    fetchAPI.mockResolvedValueOnce({});
+    assignReferee.mockResolvedValueOnce({});
     const onChange = vi.fn();
     render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={{ refereeApiId: null, refereeName: null, status: "open" }} onChange={onChange} />));
     fireEvent.click(screen.getByTestId("pick"));

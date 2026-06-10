@@ -16,8 +16,17 @@ vi.mock("swr", () => ({
   mutate: vi.fn(),
 }));
 
-const fetchAPI = vi.fn().mockResolvedValue({ rules: [] });
-vi.mock("@/lib/api", () => ({ fetchAPI: (...a: unknown[]) => fetchAPI(...a), APIError: class extends Error {} }));
+const updateRules = vi.fn().mockResolvedValue({ rules: [] });
+const setVisibility = vi.fn().mockResolvedValue({});
+vi.mock("@/lib/api", () => ({
+  api: {
+    refereeAdmin: {
+      updateRules: (...a: unknown[]) => updateRules(...a),
+      setVisibility: (...a: unknown[]) => setVisibility(...a),
+    },
+  },
+  APIError: class extends Error {},
+}));
 
 const messages = { refereeHub: { referees: { rules: {
   title: "Rules", add: "Add", deny: "Deny", allow: "Allow", selectTeam: "Team", none: "No rules",
@@ -28,7 +37,7 @@ function wrap(ui: React.ReactNode) {
   return <NextIntlClientProvider locale="en" messages={messages as never}>{ui}</NextIntlClientProvider>;
 }
 
-beforeEach(() => { fetchAPI.mockClear(); });
+beforeEach(() => { updateRules.mockClear(); setVisibility.mockClear(); });
 afterEach(() => { cleanup(); });
 
 // Tests hit a React 19 + Radix UI (Select, Checkbox) max-update-depth / compose-refs
@@ -51,10 +60,7 @@ describe.skip("RulesSubtab", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
     await waitFor(() => {
-      expect(fetchAPI).toHaveBeenCalledWith(
-        "/admin/referees/1/rules",
-        expect.objectContaining({ method: "PATCH" }),
-      );
+      expect(updateRules).toHaveBeenCalledWith(1, expect.objectContaining({ rules: expect.any(Array) }));
     });
   });
 
@@ -66,7 +72,7 @@ describe.skip("RulesSubtab", () => {
   });
 
   it("surfaces save error inline without toast", async () => {
-    fetchAPI.mockRejectedValueOnce(new Error("boom"));
+    updateRules.mockRejectedValueOnce(new Error("boom"));
     render(wrap(<RulesSubtab referee={ref} />));
     fireEvent.click(screen.getByRole("button", { name: /add/i }));
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));

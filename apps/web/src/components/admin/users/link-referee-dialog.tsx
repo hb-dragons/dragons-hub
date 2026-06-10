@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { fetchAPI } from "@/lib/api"
+import { api, fetchAPI } from "@/lib/api"
 
 import { Button } from "@dragons/ui/components/button"
 import {
@@ -18,7 +18,7 @@ import {
 import { Input } from "@dragons/ui/components/input"
 
 import type { UserListItem } from "./types"
-import type { RefereeListItem, PaginatedResponse } from "@dragons/shared"
+import type { RefereeListItem } from "@dragons/shared"
 
 interface LinkRefereeDialogProps {
   user: UserListItem | null
@@ -28,11 +28,11 @@ interface LinkRefereeDialogProps {
 }
 
 async function fetchReferees(search: string): Promise<RefereeListItem[]> {
-  const params = new URLSearchParams({ limit: "20", offset: "0" })
-  if (search) params.set("search", search)
-  const result = await fetchAPI<PaginatedResponse<RefereeListItem>>(
-    `/admin/referees?${params}`,
-  )
+  const result = await api.refereeAdmin.listReferees({
+    limit: 20,
+    offset: 0,
+    ...(search ? { search } : {}),
+  })
   return result.items
 }
 

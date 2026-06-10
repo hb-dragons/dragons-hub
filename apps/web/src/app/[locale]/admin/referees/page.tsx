@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { SWRConfig } from "swr";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { fetchAPIServer } from "@/lib/api.server";
+import { getServerApi } from "@/lib/api.server";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { todayInBerlin, plusDaysInBerlin } from "@/lib/tz";
 import { RefereeHubPage } from "@/components/admin/referee-hub/referee-hub";
@@ -26,12 +26,23 @@ export default async function RefereesPage() {
     limit: 200,
   });
 
+  const serverApi = await getServerApi();
+
   try {
-    fallback[refereesKey] = await fetchAPIServer<unknown>(refereesKey);
+    fallback[refereesKey] = await serverApi.refereeAdmin.listReferees({
+      scope: "own",
+      limit: 50,
+    });
   } catch {}
 
   try {
-    fallback[gamesKey] = await fetchAPIServer<unknown>(gamesKey);
+    fallback[gamesKey] = await serverApi.referees.getGames({
+      status: "active",
+      dateFrom: today,
+      dateTo: to,
+      gameType: "both",
+      limit: 200,
+    });
   } catch {}
 
   return (
