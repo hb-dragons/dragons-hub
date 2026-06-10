@@ -142,7 +142,6 @@ export async function cleanupOldDomainEvents(
   let totalEvents = 0;
 
   // Process in batches to avoid loading thousands of IDs into memory
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const batch = await db
       .select({ id: domainEvents.id })
