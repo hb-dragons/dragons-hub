@@ -19,11 +19,11 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
       thresholds: {
-        // Phase 2 starting floor — ratchet up as native tests grow.
-        branches: 0,
-        functions: 0,
-        lines: 0,
-        statements: 0,
+        // Phase 2 measured floor (2026-06-10) — ratchet up as native tests grow.
+        branches: 43,
+        functions: 21,
+        lines: 43,
+        statements: 42,
       },
     },
   },
