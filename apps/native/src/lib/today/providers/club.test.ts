@@ -15,6 +15,11 @@ const user = { id: "u1" } as unknown as GateUser;
 describe("clubProvider.useItems", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("returns [] when SWR data is still loading (undefined)", () => {
+    (useSWR as unknown as Mock).mockReturnValue({ data: undefined });
+    expect(clubProvider.useItems(user)).toEqual([]);
+  });
+
   it("returns [] when there is no next game", () => {
     (useSWR as unknown as Mock).mockReturnValue({ data: { nextGame: null } });
     expect(clubProvider.useItems(user)).toEqual([]);

@@ -63,10 +63,21 @@ describe("refereeProvider.useItems", () => {
     setData([
       game({ sr1OurClub: true, sr1Status: "open", isCancelled: true }),
       game({ sr1OurClub: true, sr1Status: "open", kickoffDate: "2000-01-01" }),
+      game({ sr1OurClub: true, sr1Status: "open", isForfeited: true }),
     ]);
     expect(
       refereeProvider.useItems(user).find((i) => i.id === "open-slots"),
     ).toBeUndefined();
+  });
+
+  it("counts offered slots even when neither slot is our-club", () => {
+    setData([
+      game({ sr1OurClub: false, sr2OurClub: false, sr1Status: "offered" }),
+    ]);
+    const items = refereeProvider.useItems(user);
+    const openSlots = items.find((i) => i.id === "open-slots");
+    expect(openSlots).toBeDefined();
+    expect(openSlots?.title).toContain('"count":1');
   });
 
   it("emits the earliest assigned game as the next assignment", () => {

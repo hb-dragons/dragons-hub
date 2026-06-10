@@ -20,7 +20,7 @@ export default defineConfig({
       reportsDirectory: "./coverage",
       thresholds: {
         // Phase 2 measured floor (2026-06-10) — ratchet up as native tests grow.
-        branches: 46,
+        branches: 48,
         functions: 27,
         lines: 49,
         statements: 48,

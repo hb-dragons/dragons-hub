@@ -4,7 +4,7 @@ vi.mock("expo-device", () => ({ isDevice: true }));
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { eas: { projectId: "proj-1" } } } },
 }));
-vi.mock("expo-localization", () => ({ getLocales: () => [{ languageTag: "de-DE" }] }));
+vi.mock("expo-localization", () => ({ getLocales: vi.fn(() => [{ languageTag: "de-DE" }]) }));
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 vi.mock("expo-notifications", () => ({
   getPermissionsAsync: vi.fn(),
@@ -14,6 +14,7 @@ vi.mock("expo-notifications", () => ({
 vi.mock("../api", () => ({ deviceApi: { register: vi.fn(), unregister: vi.fn() } }));
 
 import * as Notifications from "expo-notifications";
+import { getLocales } from "expo-localization";
 import { deviceApi } from "../api";
 import { registerForPush, unregisterForPush } from "@/lib/push/registration";
 
@@ -33,6 +34,14 @@ describe("registerForPush", () => {
     await registerForPush();
     expect(Notifications.requestPermissionsAsync).toHaveBeenCalled();
     expect(deviceApi.register).not.toHaveBeenCalled();
+  });
+
+  it("passes undefined as locale when getLocales returns empty array", async () => {
+    vi.mocked(getLocales).mockReturnValueOnce([] as never);
+    vi.mocked(Notifications.getPermissionsAsync).mockResolvedValue({ status: "granted" } as never);
+    vi.mocked(Notifications.getExpoPushTokenAsync).mockResolvedValue({ data: "tok-2" } as never);
+    await registerForPush();
+    expect(deviceApi.register).toHaveBeenCalledWith("tok-2", "ios", undefined);
   });
 });
 

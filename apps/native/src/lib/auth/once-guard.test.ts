@@ -21,4 +21,15 @@ describe("createOnceGuard", () => {
     await guard();
     expect(action).toHaveBeenCalledTimes(2);
   });
+
+  it("propagates rejection to all concurrent callers and calls action once", async () => {
+    const action = vi.fn().mockRejectedValueOnce(new Error("shared-boom"));
+    const guard = createOnceGuard(action);
+
+    const results = await Promise.allSettled([guard(), guard(), guard()]);
+    expect(action).toHaveBeenCalledTimes(1);
+    for (const result of results) {
+      expect(result.status).toBe("rejected");
+    }
+  });
 });
