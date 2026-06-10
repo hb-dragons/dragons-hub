@@ -61,3 +61,10 @@ export type {
 
 export { teamEndpoints } from "./team";
 export type { TeamUpdateBody, TeamReorderBody } from "@dragons/contracts";
+
+export { channelConfigEndpoints } from "./channel-config";
+export type {
+  ChannelConfigListQuery,
+  ChannelConfigCreateBody,
+  ChannelConfigUpdateBody,
+} from "@dragons/contracts";

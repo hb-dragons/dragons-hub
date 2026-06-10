@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { fetchAPIServer } from "@/lib/api.server";
+import { fetchAPIServer, getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -24,7 +24,7 @@ export default async function WatchRulesPage() {
   try {
     [rulesData, channelsData] = await Promise.all([
       fetchAPIServer<WatchRuleListResult>("/admin/watch-rules"),
-      fetchAPIServer<ChannelConfigListResult>("/admin/channel-configs"),
+      (await getServerApi()).channelConfigs.list(),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";

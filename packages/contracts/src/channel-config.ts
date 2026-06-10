@@ -9,6 +9,11 @@ export const channelConfigListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
+export type ChannelConfigIdParam = z.infer<typeof channelConfigIdParamSchema>;
+export type ChannelConfigListQuery = z.infer<
+  typeof channelConfigListQuerySchema
+>;
+
 // ── Per-channel config schemas ──────────────────────────────────────────────
 
 const localeSchema = z.enum(["de", "en"]);
@@ -60,6 +65,10 @@ export const createChannelConfigSchema = z
     }
   });
 
+export type ChannelConfigCreateBody = z.infer<
+  typeof createChannelConfigSchema
+>;
+
 // ── Update schema ───────────────────────────────────────────────────────────
 
 export const updateChannelConfigSchema = z.object({
@@ -72,6 +81,10 @@ export const updateChannelConfigSchema = z.object({
   digestCron: z.string().nullable().optional(),
   digestTimezone: z.string().optional(),
 });
+
+export type ChannelConfigUpdateBody = z.infer<
+  typeof updateChannelConfigSchema
+>;
 
 // ── Config validation helper (for update route) ─────────────────────────────
 

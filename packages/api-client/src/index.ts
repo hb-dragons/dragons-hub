@@ -20,6 +20,7 @@ export {
   settingsEndpoints,
   bookingEndpoints,
   teamEndpoints,
+  channelConfigEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -56,4 +57,7 @@ export type {
   BookingStatusBody,
   TeamUpdateBody,
   TeamReorderBody,
+  ChannelConfigListQuery,
+  ChannelConfigCreateBody,
+  ChannelConfigUpdateBody,
 } from "./endpoints";

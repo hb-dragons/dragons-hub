@@ -44,6 +44,10 @@ export {
   createChannelConfigSchema,
   updateChannelConfigSchema,
   validateConfigForType,
+  type ChannelConfigIdParam,
+  type ChannelConfigListQuery,
+  type ChannelConfigCreateBody,
+  type ChannelConfigUpdateBody,
 } from "./channel-config";
 
 export {
