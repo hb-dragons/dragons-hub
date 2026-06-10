@@ -18,25 +18,11 @@ import { Label } from "@dragons/ui/components/label";
 import { Loader2, Save } from "lucide-react";
 import { Switch } from "@dragons/ui/components/switch";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import type {
   ClubConfig as ClubConfigType,
   TrackedLeaguesResponse,
 } from "./settings-provider";
-
-interface ResolvedLeague {
-  ligaNr: number;
-  ligaId: number;
-  name: string;
-  seasonName: string;
-}
-
-interface ResolveResponse {
-  resolved: ResolvedLeague[];
-  notFound: number[];
-  tracked: number;
-  untracked: number;
-}
 
 export function TrackedLeagues() {
   const t = useTranslations();
@@ -68,10 +54,7 @@ export function TrackedLeagues() {
 
   async function handleToggleOwnClubRefs(leagueId: number, ownClubRefs: boolean) {
     try {
-      await fetchAPI(`/admin/settings/leagues/${leagueId}/own-club-refs`, {
-        method: "PATCH",
-        body: JSON.stringify({ ownClubRefs }),
-      });
+      await api.settings.setLeagueOwnClubRefs(leagueId, { ownClubRefs });
       await mutate(SWR_KEYS.settingsLeagues);
     } catch {
       toast.error(t("settings.leagues.toast.saveFailed"));
@@ -85,10 +68,7 @@ export function TrackedLeagues() {
       setSaving(true);
       setLastNotFound([]);
 
-      const result = await fetchAPI<ResolveResponse>("/admin/settings/leagues", {
-        method: "PUT",
-        body: JSON.stringify({ leagueNumbers }),
-      });
+      const result = await api.settings.setLeagues({ leagueNumbers });
 
       // Revalidate from server to get full league data
       await mutate(SWR_KEYS.settingsLeagues);

@@ -152,7 +152,13 @@ export type {
 } from "./social";
 export type { UserToggleableEventType } from "./notification-events";
 export { USER_TOGGLEABLE_EVENTS, isUserToggleableEventType } from "./notification-events";
-export type { ClubConfig, BookingSettings } from "./settings";
+export type {
+  ClubConfig,
+  BookingSettings,
+  RefereeReminderConfig,
+  RefereeGamesSyncResponse,
+  LeagueOwnClubRefsResponse,
+} from "./settings";
 export { BOOKING_DEFAULTS } from "./settings";
 export type {
   ResolvedLeague,

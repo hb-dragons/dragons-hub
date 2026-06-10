@@ -17,6 +17,7 @@ export {
   syncEndpoints,
   notificationEndpoints,
   socialEndpoints,
+  settingsEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -42,4 +43,9 @@ export type {
   NotificationPreferencesBody,
   SocialMatchesQuery,
   SocialGenerateBody,
+  SettingsClubConfig,
+  SettingsBookingConfig,
+  SettingsRefereeReminder,
+  LeagueNumbersBody,
+  LeagueOwnClubRefsBody,
 } from "./endpoints";

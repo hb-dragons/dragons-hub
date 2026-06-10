@@ -16,3 +16,17 @@ export const BOOKING_DEFAULTS: BookingSettings = {
   gameDuration: 90,
   dueDaysBefore: 7,
 };
+
+export interface RefereeReminderConfig {
+  days: number[];
+}
+
+export interface RefereeGamesSyncResponse {
+  success: boolean;
+  syncRunId: number;
+  message: string;
+}
+
+export interface LeagueOwnClubRefsResponse {
+  ok: boolean;
+}

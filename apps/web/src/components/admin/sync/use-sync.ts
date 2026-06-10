@@ -9,7 +9,7 @@ import {
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { api, fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type {
@@ -223,10 +223,7 @@ export function useTriggerRefereeSync() {
   const trigger = useCallback(async () => {
     try {
       setTriggering(true);
-      const result = await fetchAPI<{ syncRunId: number; success: boolean }>(
-        "/admin/settings/referee-games-sync",
-        { method: "POST" },
-      );
+      const result = await api.settings.triggerRefereeGamesSync();
 
       setRunningSyncRunId(result.syncRunId);
 

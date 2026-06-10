@@ -41,3 +41,12 @@ export type {
 
 export { socialEndpoints } from "./social";
 export type { SocialMatchesQuery, SocialGenerateBody } from "@dragons/contracts";
+
+export { settingsEndpoints } from "./settings";
+export type {
+  SettingsClubConfig,
+  SettingsBookingConfig,
+  SettingsRefereeReminder,
+  LeagueNumbersBody,
+  LeagueOwnClubRefsBody,
+} from "@dragons/contracts";

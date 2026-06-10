@@ -8,6 +8,7 @@ import {
   syncEndpoints,
   notificationEndpoints,
   socialEndpoints,
+  settingsEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -20,6 +21,7 @@ export function createApi(client: ApiClient) {
     sync: syncEndpoints(client),
     notifications: notificationEndpoints(client),
     social: socialEndpoints(client),
+    settings: settingsEndpoints(client),
   };
 }
 

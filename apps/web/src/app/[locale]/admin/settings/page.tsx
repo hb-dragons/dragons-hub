@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
-import { fetchAPIServer } from "@/lib/api.server";
+import { getServerApi } from "@/lib/api.server";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { ClubConfig } from "@/components/admin/settings/club-config";
@@ -24,17 +24,19 @@ export default async function SettingsPage() {
   let leaguesResponse: TrackedLeaguesResponse | null = null;
   let bookingConfig: { bufferBefore: number; bufferAfter: number; gameDuration: number; dueDaysBefore: number } | null = null;
 
+  const serverApi = await getServerApi();
+
   try {
     [clubConfig, leaguesResponse] = await Promise.all([
-      fetchAPIServer<ClubConfigType | null>("/admin/settings/club"),
-      fetchAPIServer<TrackedLeaguesResponse>("/admin/settings/leagues"),
+      serverApi.settings.getClub(),
+      serverApi.settings.getLeagues(),
     ]);
   } catch {
     // Will show empty state for club and leagues
   }
 
   try {
-    bookingConfig = await fetchAPIServer<{ bufferBefore: number; bufferAfter: number; gameDuration: number; dueDaysBefore: number }>("/admin/settings/booking");
+    bookingConfig = await serverApi.settings.getBooking();
   } catch {
     // Will show defaults for booking config
   }
