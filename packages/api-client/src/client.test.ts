@@ -277,3 +277,24 @@ describe("ApiClient cache option", () => {
     );
   });
 });
+
+describe("ApiClient AbortSignal support", () => {
+  it("passes an AbortSignal to fetch when provided to get", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    const client = new ApiClient({ baseUrl: "https://x.test", fetchFn });
+    const controller = new AbortController();
+    await client.get("/x", undefined, { signal: controller.signal });
+    expect(fetchFn.mock.calls[0]![1]).toMatchObject({ signal: controller.signal });
+  });
+
+  it("does not set signal when none provided", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    const client = new ApiClient({ baseUrl: "https://x.test", fetchFn });
+    await client.get("/x");
+    expect(fetchFn.mock.calls[0]![1]?.signal).toBeUndefined();
+  });
+});

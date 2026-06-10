@@ -38,8 +38,9 @@ export class ApiClient {
   async get<T>(
     path: string,
     params?: Record<string, string | number | boolean | undefined>,
+    opts?: { signal?: AbortSignal },
   ): Promise<T> {
-    return this.request<T>("GET", path, params);
+    return this.request<T>("GET", path, params, undefined, opts);
   }
 
   async post<T>(path: string, body?: unknown): Promise<T> {
@@ -63,6 +64,7 @@ export class ApiClient {
     path: string,
     params?: Record<string, string | number | boolean | undefined>,
     body?: unknown,
+    opts?: { signal?: AbortSignal },
   ): Promise<T> {
     const qs = params ? buildQueryString(params) : "";
     const url = `${this.baseUrl}${path}${qs}`;
@@ -87,6 +89,9 @@ export class ApiClient {
     }
     if (this.cache) {
       init.cache = this.cache;
+    }
+    if (opts?.signal) {
+      init.signal = opts.signal;
     }
     const response = await this.fetchFn(url, init);
 
