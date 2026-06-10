@@ -38,3 +38,6 @@ export type {
   NotificationListQuery,
   NotificationPreferencesBody,
 } from "@dragons/contracts";
+
+export { socialEndpoints } from "./social";
+export type { SocialMatchesQuery, SocialGenerateBody } from "@dragons/contracts";

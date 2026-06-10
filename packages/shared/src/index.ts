@@ -144,6 +144,12 @@ export type {
   NotificationMarkAllReadResponse,
   NotificationPreferences,
 } from "./notifications";
+export type {
+  SocialMatchItem,
+  SocialPlayerPhoto,
+  SocialBackground,
+  SocialActionResponse,
+} from "./social";
 export type { UserToggleableEventType } from "./notification-events";
 export { USER_TOGGLEABLE_EVENTS, isUserToggleableEventType } from "./notification-events";
 export type { ClubConfig, BookingSettings } from "./settings";

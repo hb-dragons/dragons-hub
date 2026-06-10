@@ -16,6 +16,7 @@ export {
   matchEndpoints,
   syncEndpoints,
   notificationEndpoints,
+  socialEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -39,4 +40,6 @@ export type {
   SyncUpdateScheduleBody,
   NotificationListQuery,
   NotificationPreferencesBody,
+  SocialMatchesQuery,
+  SocialGenerateBody,
 } from "./endpoints";
