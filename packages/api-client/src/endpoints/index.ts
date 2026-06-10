@@ -68,3 +68,10 @@ export type {
   ChannelConfigCreateBody,
   ChannelConfigUpdateBody,
 } from "@dragons/contracts";
+
+export { broadcastEndpoints } from "./broadcast";
+export type {
+  BroadcastUpsertBody,
+  BroadcastStartStopBody,
+  BroadcastMatchesQuery,
+} from "@dragons/contracts";

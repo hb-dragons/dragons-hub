@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Copy, Pencil, Play, Radio, Square } from "lucide-react";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -41,32 +41,21 @@ export function BroadcastControl({ deviceId, initial }: Props) {
   );
 
   async function reload() {
-    const next = await fetchAPI<{
-      config: BroadcastConfig | null;
-      match: BroadcastMatch | null;
-    }>(`/admin/broadcast/config?deviceId=${encodeURIComponent(deviceId)}`);
+    const next = await api.broadcast.config(deviceId);
     setConfig(next.config);
     setMatch(next.match);
   }
 
   async function save(partial: Partial<BroadcastConfig>) {
     setError(null);
-    await fetchAPI(`/admin/broadcast/config`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deviceId, ...partial }),
-    });
+    await api.broadcast.upsertConfig({ deviceId, ...partial });
     await reload();
   }
 
   async function goLive() {
     setError(null);
     try {
-      await fetchAPI(`/admin/broadcast/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceId }),
-      });
+      await api.broadcast.start({ deviceId });
       await reload();
     } catch {
       setError(t("errors.matchRequired"));
@@ -74,11 +63,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
   }
 
   async function endBroadcast() {
-    await fetchAPI(`/admin/broadcast/stop`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deviceId }),
-    });
+    await api.broadcast.stop({ deviceId });
     await reload();
   }
 

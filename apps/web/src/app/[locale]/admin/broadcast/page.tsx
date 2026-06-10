@@ -1,4 +1,4 @@
-import { fetchAPI } from "@/lib/api";
+import { getServerApi } from "@/lib/api.server";
 import type { BroadcastConfig, BroadcastMatch } from "@dragons/shared";
 import { BroadcastControl } from "./broadcast-control";
 
@@ -13,9 +13,7 @@ export default async function AdminBroadcastPage() {
   let initial: ConfigResponse = { config: null, match: null };
   if (deviceId) {
     try {
-      initial = await fetchAPI<ConfigResponse>(
-        `/admin/broadcast/config?deviceId=${encodeURIComponent(deviceId)}`,
-      );
+      initial = await (await getServerApi()).broadcast.config(deviceId);
     } catch {
       initial = { config: null, match: null };
     }

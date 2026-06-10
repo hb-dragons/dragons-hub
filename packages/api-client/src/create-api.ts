@@ -12,6 +12,7 @@ import {
   bookingEndpoints,
   teamEndpoints,
   channelConfigEndpoints,
+  broadcastEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -28,6 +29,7 @@ export function createApi(client: ApiClient) {
     bookings: bookingEndpoints(client),
     teams: teamEndpoints(client),
     channelConfigs: channelConfigEndpoints(client),
+    broadcast: broadcastEndpoints(client),
   };
 }
 

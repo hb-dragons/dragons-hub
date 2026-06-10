@@ -205,6 +205,7 @@ export {
   broadcastMatchesQuerySchema,
   type BroadcastUpsertBody,
   type BroadcastStartStopBody,
+  type BroadcastMatchesQuery,
 } from "./broadcast";
 
 export {
