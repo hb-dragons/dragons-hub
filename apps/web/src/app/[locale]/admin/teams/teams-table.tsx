@@ -25,8 +25,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { COLOR_PRESET_KEYS, getColorPreset } from "@dragons/shared";
+import type { OwnClubTeam } from "@dragons/shared";
 import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
 import { cn } from "@dragons/ui/lib/utils";
@@ -38,16 +39,6 @@ import {
   TableHeader,
   TableRow,
 } from "@dragons/ui/components/table";
-
-interface OwnClubTeam {
-  id: number;
-  name: string;
-  customName: string | null;
-  leagueName: string | null;
-  estimatedGameDuration: number | null;
-  badgeColor: string | null;
-  displayOrder: number;
-}
 
 interface TeamRowProps {
   team: OwnClubTeam;
@@ -254,9 +245,10 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
 
     setSaving((prev) => ({ ...prev, [team.id]: true }));
     try {
-      const updated = await fetchAPI<OwnClubTeam>(`/admin/teams/${team.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ customName, estimatedGameDuration, badgeColor }),
+      const updated = await api.teams.update(team.id, {
+        customName,
+        estimatedGameDuration,
+        badgeColor,
       });
       await mutate(
         SWR_KEYS.teams,
@@ -300,13 +292,7 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
     await mutate(SWR_KEYS.teams, reordered, { revalidate: false });
 
     try {
-      await fetchAPI<Array<{ id: number; name: string; displayOrder: number }>>(
-        `/admin/teams/order`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ teamIds: reordered.map((t) => t.id) }),
-        },
-      );
+      await api.teams.reorder({ teamIds: reordered.map((t) => t.id) });
       await mutate(SWR_KEYS.teams);
     } catch {
       await mutate(SWR_KEYS.teams);

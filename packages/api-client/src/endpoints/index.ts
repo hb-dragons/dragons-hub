@@ -58,3 +58,6 @@ export type {
   BookingUpdateBody,
   BookingStatusBody,
 } from "@dragons/contracts";
+
+export { teamEndpoints } from "./team";
+export type { TeamUpdateBody, TeamReorderBody } from "@dragons/contracts";

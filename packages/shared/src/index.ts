@@ -45,6 +45,8 @@ export type {
   RefereeSlotInfo,
 } from "./matches";
 
+export type { OwnClubTeam, TeamReorderItem } from "./teams";
+
 export type {
   BookingMatch,
   BookingListItem,

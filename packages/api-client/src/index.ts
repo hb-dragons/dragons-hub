@@ -19,6 +19,7 @@ export {
   socialEndpoints,
   settingsEndpoints,
   bookingEndpoints,
+  teamEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -53,4 +54,6 @@ export type {
   BookingCreateBody,
   BookingUpdateBody,
   BookingStatusBody,
+  TeamUpdateBody,
+  TeamReorderBody,
 } from "./endpoints";

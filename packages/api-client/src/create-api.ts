@@ -10,6 +10,7 @@ import {
   socialEndpoints,
   settingsEndpoints,
   bookingEndpoints,
+  teamEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -24,6 +25,7 @@ export function createApi(client: ApiClient) {
     social: socialEndpoints(client),
     settings: settingsEndpoints(client),
     bookings: bookingEndpoints(client),
+    teams: teamEndpoints(client),
   };
 }
 

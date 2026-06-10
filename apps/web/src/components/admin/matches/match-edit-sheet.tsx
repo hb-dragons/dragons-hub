@@ -54,6 +54,7 @@ import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react"
 
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
+import type { OwnClubTeam } from "@dragons/shared";
 import { api, fetchAPI } from "@/lib/api";
 import {
   formatMatchTime,
@@ -156,14 +157,6 @@ function getDefaultValues(match: MatchDetail): MatchFormValues {
 // ---------------------------------------------------------------------------
 // Team types & helpers
 // ---------------------------------------------------------------------------
-
-interface OwnClubTeam {
-  id: number;
-  name: string;
-  nameShort: string | null;
-  customName: string | null;
-  leagueName: string | null;
-}
 
 function getTeamDisplayName(team: OwnClubTeam): string {
   return team.customName ?? team.nameShort ?? team.name;
@@ -289,7 +282,8 @@ export function MatchEditSheet({
         if (!cancelled) setLoading(false);
       });
 
-    fetchAPI<OwnClubTeam[]>("/admin/teams")
+    api.teams
+      .list()
       .then((result) => {
         if (!cancelled) setOwnClubTeams(result);
       })

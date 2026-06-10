@@ -1,17 +1,9 @@
 import { db } from "../../config/database";
 import { teams, standings, leagues } from "@dragons/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
 
-export interface OwnClubTeam {
-  id: number;
-  name: string;
-  nameShort: string | null;
-  customName: string | null;
-  leagueName: string | null;
-  estimatedGameDuration: number | null;
-  badgeColor: string | null;
-  displayOrder: number;
-}
+export type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
 
 export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
   const rows = await db
@@ -73,15 +65,9 @@ export async function updateTeam(
   return { ...updated, leagueName: standing?.leagueName ?? null };
 }
 
-export interface ReorderedTeam {
-  id: number;
-  name: string;
-  displayOrder: number;
-}
-
 export async function reorderOwnClubTeams(
   teamIds: number[],
-): Promise<ReorderedTeam[]> {
+): Promise<TeamReorderItem[]> {
   // Reject duplicates
   const unique = new Set(teamIds);
   if (unique.size !== teamIds.length) {
