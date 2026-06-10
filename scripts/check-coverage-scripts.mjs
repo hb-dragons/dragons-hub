@@ -5,7 +5,13 @@ const ROOTS = ["apps", "packages"];
 
 function hasTestFile(dir) {
   for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry === "dist" || entry === ".next") continue;
+    if (
+      entry === "node_modules" ||
+      entry === "dist" ||
+      entry === ".next" ||
+      entry === "coverage"
+    )
+      continue;
     const full = join(dir, entry);
     const s = statSync(full);
     if (s.isDirectory()) {

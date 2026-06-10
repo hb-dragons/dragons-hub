@@ -10,7 +10,7 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
       thresholds: {
-        // Phase 2 floor (2026-06-10).
+        // Phase 2 floor (2026-06-10) — ratchet up as tests grow.
         branches: 94,
         functions: 84,
         lines: 89,
