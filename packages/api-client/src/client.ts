@@ -10,6 +10,7 @@ export interface ApiClientOptions {
   auth?: AuthStrategy;
   fetchFn?: typeof fetch;
   credentials?: RequestCredentials;
+  cache?: RequestCache;
   /**
    * Called for every response before the client parses the body.
    * Errors thrown from the hook are not caught — keep it defensive.
@@ -22,6 +23,7 @@ export class ApiClient {
   private readonly auth?: AuthStrategy;
   private readonly fetchFn: typeof fetch;
   private readonly credentials?: RequestCredentials;
+  private readonly cache?: RequestCache;
   private readonly onResponse?: (response: Response) => void | Promise<void>;
 
   constructor(options: ApiClientOptions) {
@@ -29,6 +31,7 @@ export class ApiClient {
     this.auth = options.auth;
     this.fetchFn = options.fetchFn ?? globalThis.fetch;
     this.credentials = options.credentials;
+    this.cache = options.cache;
     this.onResponse = options.onResponse;
   }
 
@@ -82,6 +85,9 @@ export class ApiClient {
     if (this.credentials) {
       init.credentials = this.credentials;
     }
+    if (this.cache) {
+      init.cache = this.cache;
+    }
     const response = await this.fetchFn(url, init);
 
     if (this.onResponse) {
@@ -94,7 +100,9 @@ export class ApiClient {
       throw new APIError(
         response.status,
         (errorRecord["code"] as string) ?? "UNKNOWN_ERROR",
-        (errorRecord["message"] as string) ?? response.statusText,
+        (errorRecord["error"] as string) ??
+          (errorRecord["message"] as string) ??
+          response.statusText,
       );
     }
 
