@@ -23,6 +23,7 @@ export {
   channelConfigEndpoints,
   broadcastEndpoints,
   watchRuleEndpoints,
+  eventEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -68,4 +69,6 @@ export type {
   WatchRuleListQuery,
   WatchRuleCreateBody,
   WatchRuleUpdateBody,
+  EventListQuery,
+  TriggerEventBody,
 } from "./endpoints";

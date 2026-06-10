@@ -49,3 +49,31 @@ export interface NotificationPreferences {
   mutedEventTypes: string[];
   locale: "de" | "en";
 }
+
+/**
+ * Failed notification delivery from GET /admin/events/failed
+ * (notification_log rows with status "failed", joined onto domain_events).
+ */
+export interface FailedNotificationItem {
+  id: number;
+  eventId: string;
+  watchRuleId: number | null;
+  channelConfigId: number;
+  recipientId: string | null;
+  title: string;
+  body: string;
+  locale: string;
+  status: string;
+  errorMessage: string | null;
+  retryCount: number;
+  createdAt: string;
+  // Joined from domain_events
+  eventType: string;
+  entityName: string;
+  deepLinkPath: string;
+}
+
+export interface FailedNotificationListResult {
+  notifications: FailedNotificationItem[];
+  total: number;
+}

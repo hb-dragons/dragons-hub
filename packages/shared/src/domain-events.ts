@@ -378,3 +378,12 @@ export interface DomainEventListResult {
   events: DomainEventItem[];
   total: number;
 }
+
+/** Response of POST /admin/events/trigger — the event that was created and queued. */
+export interface TriggerEventResult {
+  eventId: string;
+  type: EventType;
+  urgency: EventUrgency;
+  entityType: EventEntityType;
+  entityId: number;
+}

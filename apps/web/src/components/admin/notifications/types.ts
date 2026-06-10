@@ -1,25 +1,6 @@
-// Domain event from GET /admin/events
-export interface DomainEventItem {
-  id: string;
-  type: string;
-  source: "sync" | "manual" | "reconciliation";
-  urgency: "immediate" | "routine";
-  occurredAt: string;
-  actor: string | null;
-  syncRunId: number | null;
-  entityType: "match" | "booking" | "referee";
-  entityId: number;
-  entityName: string;
-  deepLinkPath: string;
-  enqueuedAt: string | null;
-  payload: Record<string, unknown>;
-  createdAt: string;
-}
-
-export interface DomainEventListResult {
-  events: DomainEventItem[];
-  total: number;
-}
+// Domain event shapes live in @dragons/shared (the API's
+// DomainEventItem/ListResult); re-export so call sites keep one name.
+export type { DomainEventItem, DomainEventListResult } from "@dragons/shared";
 
 // Notification Center response shapes live in @dragons/shared (the API's
 // NotificationCenterItem/ListResult); re-export so call sites keep one name.
@@ -28,29 +9,12 @@ export type {
   NotificationListResult,
 } from "@dragons/shared";
 
-// Failed notification from GET /admin/events/failed
-export interface FailedNotificationItem {
-  id: number;
-  eventId: string;
-  watchRuleId: number | null;
-  channelConfigId: number;
-  recipientId: string | null;
-  title: string;
-  body: string;
-  locale: string;
-  status: string;
-  errorMessage: string | null;
-  retryCount: number;
-  createdAt: string;
-  eventType: string;
-  entityName: string;
-  deepLinkPath: string;
-}
-
-export interface FailedNotificationListResult {
-  notifications: FailedNotificationItem[];
-  total: number;
-}
+// Failed notification shapes live in @dragons/shared (the API's
+// FailedNotificationItem/ListResult); re-export so call sites keep one name.
+export type {
+  FailedNotificationItem,
+  FailedNotificationListResult,
+} from "@dragons/shared";
 
 // Watch rule shapes live in @dragons/shared (the API's
 // WatchRuleItem/ListResult + FilterCondition/ChannelTarget); re-export so
@@ -104,13 +68,6 @@ export interface ProviderStatus {
 
 export type ProviderAvailability = Record<string, ProviderStatus>;
 
-// Trigger event body
-export interface TriggerEventBody {
-  type: string;
-  entityType: "match" | "booking" | "referee";
-  entityId: number;
-  entityName: string;
-  deepLinkPath: string;
-  payload?: Record<string, unknown>;
-  urgencyOverride?: "immediate" | "routine";
-}
+// Trigger event body is the request contract; re-export from the API client
+// (inferred from @dragons/contracts) so call sites keep one name.
+export type { TriggerEventBody } from "@dragons/api-client";

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { fetchAPIServer, getServerApi } from "@/lib/api.server";
+import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -25,9 +25,7 @@ export default async function NotificationsPage() {
     const sApi = await getServerApi();
     [notifications, failed] = await Promise.all([
       sApi.notifications.list({ limit: 20, offset: 0 }),
-      fetchAPIServer<FailedNotificationListResult>(
-        "/admin/events/failed?page=1&limit=20",
-      ),
+      sApi.events.failed({ page: 1, limit: 20 }),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";

@@ -82,3 +82,6 @@ export type {
   WatchRuleCreateBody,
   WatchRuleUpdateBody,
 } from "@dragons/contracts";
+
+export { eventEndpoints } from "./event";
+export type { EventListQuery, TriggerEventBody } from "@dragons/contracts";
