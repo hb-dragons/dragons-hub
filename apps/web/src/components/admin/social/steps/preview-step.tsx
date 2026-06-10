@@ -34,6 +34,7 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
     };
 
     try {
+      // eslint-disable-next-line no-restricted-globals -- non-JSON blob response (generated PNG); the typed JSON client can't carry an image body
       const res = await fetch(`${API_BASE}/admin/social/generate`, {
         method: "POST",
         credentials: "include",

@@ -82,6 +82,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
       const formData = new FormData();
       formData.append("file", file);
 
+      // eslint-disable-next-line no-restricted-globals -- non-JSON multipart FormData upload; the typed JSON client can't carry a multipart body
       const res = await fetch(`${API_BASE}${uploadEndpoint}`, {
         method: "POST",
         credentials: "include",
@@ -108,6 +109,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
     if (!deleteTarget) return;
     setDeleting(true);
     try {
+      // eslint-disable-next-line no-restricted-globals -- co-located with the multipart upload + image-src flow against the same ${API_BASE}/photos endpoint, which has no typed-client namespace
       const res = await fetch(`${API_BASE}${deleteEndpoint}/${deleteTarget.id}`, {
         method: "DELETE",
         credentials: "include",
