@@ -39,3 +39,8 @@ export const updateWatchRuleSchema = z.object({
   urgencyOverride: z.string().nullable().optional(),
   templateOverride: z.string().nullable().optional(),
 });
+
+export type WatchRuleIdParam = z.infer<typeof watchRuleIdParamSchema>;
+export type WatchRuleListQuery = z.infer<typeof watchRuleListQuerySchema>;
+export type WatchRuleCreateBody = z.infer<typeof createWatchRuleSchema>;
+export type WatchRuleUpdateBody = z.infer<typeof updateWatchRuleSchema>;

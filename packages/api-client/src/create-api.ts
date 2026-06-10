@@ -13,6 +13,7 @@ import {
   teamEndpoints,
   channelConfigEndpoints,
   broadcastEndpoints,
+  watchRuleEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -30,6 +31,7 @@ export function createApi(client: ApiClient) {
     teams: teamEndpoints(client),
     channelConfigs: channelConfigEndpoints(client),
     broadcast: broadcastEndpoints(client),
+    watchRules: watchRuleEndpoints(client),
   };
 }
 

@@ -152,6 +152,10 @@ export {
   watchRuleListQuerySchema,
   createWatchRuleSchema,
   updateWatchRuleSchema,
+  type WatchRuleIdParam,
+  type WatchRuleListQuery,
+  type WatchRuleCreateBody,
+  type WatchRuleUpdateBody,
 } from "./watch-rule";
 
 export {

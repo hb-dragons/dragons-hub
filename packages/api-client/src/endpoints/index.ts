@@ -75,3 +75,10 @@ export type {
   BroadcastStartStopBody,
   BroadcastMatchesQuery,
 } from "@dragons/contracts";
+
+export { watchRuleEndpoints } from "./watch-rule";
+export type {
+  WatchRuleListQuery,
+  WatchRuleCreateBody,
+  WatchRuleUpdateBody,
+} from "@dragons/contracts";

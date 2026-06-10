@@ -52,36 +52,15 @@ export interface FailedNotificationListResult {
   total: number;
 }
 
-// Watch rule from GET /admin/watch-rules
-export interface WatchRuleItem {
-  id: number;
-  name: string;
-  enabled: boolean;
-  createdBy: string;
-  eventTypes: string[];
-  filters: FilterCondition[];
-  channels: ChannelTarget[];
-  urgencyOverride: string | null;
-  templateOverride: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface FilterCondition {
-  field: "teamId" | "leagueId" | "venueId" | "source";
-  operator: "eq" | "neq" | "in" | "any";
-  value: string | string[] | null;
-}
-
-export interface ChannelTarget {
-  channel: "in_app" | "whatsapp_group" | "push" | "email";
-  targetId: string;
-}
-
-export interface WatchRuleListResult {
-  rules: WatchRuleItem[];
-  total: number;
-}
+// Watch rule shapes live in @dragons/shared (the API's
+// WatchRuleItem/ListResult + FilterCondition/ChannelTarget); re-export so
+// call sites keep one name.
+export type {
+  WatchRuleItem,
+  WatchRuleListResult,
+  FilterCondition,
+  ChannelTarget,
+} from "@dragons/shared";
 
 // Channel config shapes
 export interface InAppConfig {

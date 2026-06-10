@@ -22,6 +22,7 @@ export {
   teamEndpoints,
   channelConfigEndpoints,
   broadcastEndpoints,
+  watchRuleEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -64,4 +65,7 @@ export type {
   BroadcastUpsertBody,
   BroadcastStartStopBody,
   BroadcastMatchesQuery,
+  WatchRuleListQuery,
+  WatchRuleCreateBody,
+  WatchRuleUpdateBody,
 } from "./endpoints";

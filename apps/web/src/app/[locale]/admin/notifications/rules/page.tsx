@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { fetchAPIServer, getServerApi } from "@/lib/api.server";
+import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -22,9 +22,10 @@ export default async function WatchRulesPage() {
   let error: string | null = null;
 
   try {
+    const serverApi = await getServerApi();
     [rulesData, channelsData] = await Promise.all([
-      fetchAPIServer<WatchRuleListResult>("/admin/watch-rules"),
-      (await getServerApi()).channelConfigs.list(),
+      serverApi.watchRules.list(),
+      serverApi.channelConfigs.list(),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";
