@@ -30,7 +30,7 @@ function matchBoardTasks(boardId: number) {
 export function useTaskMutations(boardId: number) {
   const { mutate } = useSWRConfig();
 
-  async function createTask(input: TaskCreateInput): Promise<TaskCardData> {
+  async function createTask(input: TaskCreateInput): Promise<TaskDetail> {
     try {
       const created = await api.boards.createTask(boardId, input);
       await mutate(matchBoardTasks(boardId));

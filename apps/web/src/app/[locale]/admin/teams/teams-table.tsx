@@ -272,7 +272,7 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
         return next;
       });
     } catch {
-      // surfaced by fetchAPI; keep draft for retry
+      // error surfaced upstream; keep draft for retry
     } finally {
       setSaving((prev) => ({ ...prev, [team.id]: false }));
     }
