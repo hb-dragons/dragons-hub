@@ -73,6 +73,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Coverage-script check
+        run: pnpm check:coverage-scripts
+
       - name: Coverage
         run: pnpm coverage
 
@@ -80,8 +83,10 @@ jobs:
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: coverage-reports
-          path: apps/api/coverage
-          if-no-files-found: error
+          path: |
+            apps/*/coverage
+            packages/*/coverage
+          if-no-files-found: warn
 
   build:
     name: Build
