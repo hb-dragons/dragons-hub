@@ -5,7 +5,6 @@ import { todayInBerlin } from "@/lib/tz";
 import { DashboardView } from "@/components/admin/dashboard/dashboard-view";
 import type {
   PaginatedResponse,
-  LeagueStandings,
   RefereeListItem,
 } from "@dragons/shared";
 
@@ -21,7 +20,7 @@ export default async function AdminDashboardPage() {
     fetchAPIServer<PaginatedResponse<RefereeListItem>>(
       "/admin/referees?scope=own&sort=name&limit=50&offset=0",
     ),
-    fetchAPIServer<LeagueStandings[]>("/admin/standings"),
+    sApi.standings.list(),
     sApi.matches.list({ dateFrom: today, dateTo: today, limit: 20, offset: 0 }),
   ]);
 

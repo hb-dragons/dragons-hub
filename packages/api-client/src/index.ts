@@ -26,6 +26,7 @@ export {
   watchRuleEndpoints,
   eventEndpoints,
   venueEndpoints,
+  standingsEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
