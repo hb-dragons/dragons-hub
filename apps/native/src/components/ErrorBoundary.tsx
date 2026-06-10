@@ -31,7 +31,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   componentDidCatch(error: Error, info: ErrorInfo): void {
     const stack = error.stack?.split("\n").slice(0, 8).join(" | ");
     const componentStack = info.componentStack?.split("\n").slice(0, 8).join(" | ");
-    // eslint-disable-next-line no-console
     console.warn(
       `DRAGONS_JS_ERROR boundary=root name=${error.name} msg=${error.message} stack=${stack} component=${componentStack}`,
     );

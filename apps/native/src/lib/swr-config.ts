@@ -8,7 +8,6 @@ function isClientError(err: unknown): boolean {
 export const swrConfig: SWRConfiguration = {
   onError: (err, key) => {
     if (isClientError(err)) return;
-    // eslint-disable-next-line no-console
     console.warn(`DRAGONS_SWR_ERROR key=${key}`, err);
   },
   shouldRetryOnError: (err) => !isClientError(err),

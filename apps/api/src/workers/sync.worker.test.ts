@@ -325,6 +325,19 @@ describe("sync worker event handlers", () => {
 
       expect(mockDbUpdate).not.toHaveBeenCalled();
     });
+
+    it("logs an error when reconciliation DB work throws", async () => {
+      mockDbSelect.mockImplementation(() => {
+        throw new Error("db down");
+      });
+
+      await mockOnCompleted({ id: "job-1", data: { syncRunId: 42 } });
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: "job-1", syncRunId: 42 }),
+        "Failed to reconcile sync run on completion",
+      );
+    });
   });
 
   describe("failed handler", () => {
@@ -355,6 +368,20 @@ describe("sync worker event handlers", () => {
 
       expect(logger.error).toHaveBeenCalled();
       expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it("logs an error when the DB update throws", async () => {
+      mockDbUpdate.mockImplementation(() => {
+        throw new Error("db down");
+      });
+
+      const err = new Error("sync crashed");
+      await mockOnFailed({ id: "job-1", data: { syncRunId: 42 } }, err);
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: "job-1", syncRunId: 42 }),
+        "Failed to mark sync run as failed",
+      );
     });
   });
 

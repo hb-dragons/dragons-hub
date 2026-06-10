@@ -35,7 +35,6 @@ configureNotificationHandler();
 const existingHandler = ErrorUtils.getGlobalHandler();
 ErrorUtils.setGlobalHandler((error, isFatal) => {
   const err = error as Error | undefined;
-  // eslint-disable-next-line no-console
   console.warn(
     `DRAGONS_JS_ERROR fatal=${String(isFatal)} name=${err?.name} msg=${err?.message} stack=${err?.stack?.split("\n").slice(0, 8).join(" | ")}`,
   );

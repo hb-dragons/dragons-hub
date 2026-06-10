@@ -51,9 +51,10 @@ function composeRefs<T>(...refs: PossibleRef<T>[]) {
 function useComposedRefs<T>(...refs: PossibleRef<T>[]) {
   // Keep latest refs in a ref so the stable callback always sees current values.
   const refsRef = React.useRef(refs);
+  // Intentional latest-ref write at render so the empty-dep callback below always
+  // sees current refs while keeping a stable identity (React 19 detects no change).
+  // eslint-disable-next-line react-hooks/refs
   refsRef.current = refs;
-  // Empty deps → stable identity → React 19 never detects a ref-callback change.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   return React.useCallback(
     (node: T | null) => composeRefs<T>(...refsRef.current)(node),
     [],

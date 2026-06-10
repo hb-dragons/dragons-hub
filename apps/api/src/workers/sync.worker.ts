@@ -111,19 +111,26 @@ syncWorker.on("completed", (job) => {
     logger.info({ jobId: job.id }, "Sync job completed");
 
     if (job.data.syncRunId) {
-      const [run] = await db
-        .select({ status: syncRuns.status })
-        .from(syncRuns)
-        .where(eq(syncRuns.id, job.data.syncRunId));
-      if (run && run.status === "running") {
-        logger.warn(
-          { syncRunId: job.data.syncRunId },
-          "Sync run still running after job completed, marking as completed",
-        );
-        await db
-          .update(syncRuns)
-          .set({ status: "completed", completedAt: new Date() })
+      try {
+        const [run] = await db
+          .select({ status: syncRuns.status })
+          .from(syncRuns)
           .where(eq(syncRuns.id, job.data.syncRunId));
+        if (run && run.status === "running") {
+          logger.warn(
+            { syncRunId: job.data.syncRunId },
+            "Sync run still running after job completed, marking as completed",
+          );
+          await db
+            .update(syncRuns)
+            .set({ status: "completed", completedAt: new Date() })
+            .where(eq(syncRuns.id, job.data.syncRunId));
+        }
+      } catch (err) {
+        logger.error(
+          { jobId: job.id, syncRunId: job.data.syncRunId, err },
+          "Failed to reconcile sync run on completion",
+        );
       }
     }
   })();
@@ -134,14 +141,21 @@ syncWorker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, err }, "Sync job failed");
 
     if (job?.data.syncRunId) {
-      await db
-        .update(syncRuns)
-        .set({
-          status: "failed",
-          completedAt: new Date(),
-          errorMessage: err.message,
-        })
-        .where(eq(syncRuns.id, job.data.syncRunId));
+      try {
+        await db
+          .update(syncRuns)
+          .set({
+            status: "failed",
+            completedAt: new Date(),
+            errorMessage: err.message,
+          })
+          .where(eq(syncRuns.id, job.data.syncRunId));
+      } catch (updateErr) {
+        logger.error(
+          { jobId: job.id, syncRunId: job.data.syncRunId, err: updateErr },
+          "Failed to mark sync run as failed",
+        );
+      }
     }
   })();
 });
