@@ -57,6 +57,7 @@ export {
   notificationListQuerySchema,
   notificationUserIdQuerySchema,
   notificationPreferencesBodySchema,
+  type NotificationListQuery,
   type NotificationPreferencesBody,
 } from "./notification";
 

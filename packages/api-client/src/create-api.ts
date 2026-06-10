@@ -6,6 +6,7 @@ import {
   adminBoardEndpoints,
   matchEndpoints,
   syncEndpoints,
+  notificationEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -16,6 +17,7 @@ export function createApi(client: ApiClient) {
     boards: adminBoardEndpoints(client),
     matches: matchEndpoints(client),
     sync: syncEndpoints(client),
+    notifications: notificationEndpoints(client),
   };
 }
 

@@ -32,3 +32,9 @@ export type {
   SyncEntriesQuery,
   SyncUpdateScheduleBody,
 } from "@dragons/contracts";
+
+export { notificationEndpoints } from "./notification";
+export type {
+  NotificationListQuery,
+  NotificationPreferencesBody,
+} from "@dragons/contracts";

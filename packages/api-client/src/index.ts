@@ -15,6 +15,7 @@ export {
   adminBoardEndpoints,
   matchEndpoints,
   syncEndpoints,
+  notificationEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -36,4 +37,6 @@ export type {
   SyncLogsQuery,
   SyncEntriesQuery,
   SyncUpdateScheduleBody,
+  NotificationListQuery,
+  NotificationPreferencesBody,
 } from "./endpoints";

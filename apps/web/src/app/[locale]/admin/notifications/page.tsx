@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { fetchAPIServer } from "@/lib/api.server";
+import { fetchAPIServer, getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -22,10 +22,9 @@ export default async function NotificationsPage() {
   let error: string | null = null;
 
   try {
+    const sApi = await getServerApi();
     [notifications, failed] = await Promise.all([
-      fetchAPIServer<NotificationListResult>(
-        "/admin/notifications?limit=20&offset=0",
-      ),
+      sApi.notifications.list({ limit: 20, offset: 0 }),
       fetchAPIServer<FailedNotificationListResult>(
         "/admin/events/failed?page=1&limit=20",
       ),

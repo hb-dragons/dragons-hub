@@ -21,35 +21,12 @@ export interface DomainEventListResult {
   total: number;
 }
 
-// Notification from GET /admin/notifications
-export interface NotificationItem {
-  id: number;
-  eventId: string;
-  watchRuleId: number | null;
-  channelConfigId: number;
-  recipientId: string | null;
-  title: string;
-  body: string;
-  locale: string;
-  status: string;
-  sentAt: string | null;
-  readAt: string | null;
-  digestRunId: number | null;
-  errorMessage: string | null;
-  retryCount: number;
-  createdAt: string;
-  eventType: string;
-  entityName: string;
-  entityType: string;
-  entityId: number;
-  deepLinkPath: string;
-  urgency: string;
-}
-
-export interface NotificationListResult {
-  notifications: NotificationItem[];
-  total: number;
-}
+// Notification Center response shapes live in @dragons/shared (the API's
+// NotificationCenterItem/ListResult); re-export so call sites keep one name.
+export type {
+  NotificationItem,
+  NotificationListResult,
+} from "@dragons/shared";
 
 // Failed notification from GET /admin/events/failed
 export interface FailedNotificationItem {

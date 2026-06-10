@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { USER_TOGGLEABLE_EVENTS } from "@dragons/shared";
+import type { NotificationPreferences } from "@dragons/shared";
 import {
   Card,
   CardContent,
@@ -22,17 +23,14 @@ import {
   SelectValue,
 } from "@dragons/ui/components/select";
 
-interface Prefs {
-  mutedEventTypes: string[];
-  locale: "de" | "en";
-}
+type Prefs = NotificationPreferences;
 
 export function MyNotificationsCard() {
   const t = useTranslations("settings.myNotifications");
   const [prefs, setPrefs] = useState<Prefs | null>(null);
 
   useEffect(() => {
-    fetchAPI<Prefs>("/admin/notifications/preferences").then(setPrefs).catch(() => {
+    api.notifications.getPreferences().then(setPrefs).catch(() => {
       toast.error(t("saveError"));
     });
   }, [t]);
@@ -41,10 +39,7 @@ export function MyNotificationsCard() {
     const previous = prefs;
     setPrefs(next);
     try {
-      const saved = await fetchAPI<Prefs>("/admin/notifications/preferences", {
-        method: "PATCH",
-        body: JSON.stringify(next),
-      });
+      const saved = await api.notifications.updatePreferences(next);
       setPrefs(saved);
       toast.success(t("saveSuccess"));
     } catch {

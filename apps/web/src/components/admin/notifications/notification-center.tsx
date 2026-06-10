@@ -5,7 +5,7 @@ import { useTranslations, useFormatter } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { Link } from "@/lib/navigation";
 import { toast } from "sonner";
 import { Badge } from "@dragons/ui/components/badge";
@@ -94,7 +94,7 @@ export function NotificationCenter() {
 
   async function handleMarkRead(id: number) {
     try {
-      await fetchAPI(`/admin/notifications/${id}/read`, { method: "PATCH" });
+      await api.notifications.markRead(id);
       await mutate(inboxKey);
     } catch {
       toast.error(t("retryFailed"));
@@ -103,10 +103,7 @@ export function NotificationCenter() {
 
   async function handleMarkAllRead() {
     try {
-      await fetchAPI(
-        "/admin/notifications/read-all",
-        { method: "PATCH" },
-      );
+      await api.notifications.markAllRead();
       await mutate(inboxKey);
     } catch {
       toast.error(t("retryFailed"));
@@ -115,7 +112,7 @@ export function NotificationCenter() {
 
   async function handleRetry(id: number) {
     try {
-      await fetchAPI(`/admin/notifications/${id}/retry`, { method: "POST" });
+      await api.notifications.retry(id);
       toast.success(t("retrySuccess"));
       await mutate(failedKey);
     } catch {
