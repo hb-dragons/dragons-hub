@@ -3,6 +3,9 @@ export type { AuthStrategy, ApiClientOptions } from "./client";
 
 export { APIError } from "./errors";
 
+export { createApi } from "./create-api";
+export type { Api } from "./create-api";
+
 export { buildQueryString } from "./query-string";
 
 export {
