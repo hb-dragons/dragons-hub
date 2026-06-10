@@ -31,10 +31,12 @@ export function syncEndpoints(client: ApiClient) {
     logEntries(
       id: number,
       query?: Partial<SyncEntriesQuery>,
+      opts?: { signal?: AbortSignal },
     ): Promise<SyncRunEntriesResponse> {
       return client.get(
         `/admin/sync/logs/${id}/entries`,
         query as Record<string, string | number | boolean | undefined>,
+        opts,
       );
     },
     matchChanges(id: number, apiMatchId: number): Promise<MatchChangesResponse> {

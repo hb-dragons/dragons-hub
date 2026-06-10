@@ -21,7 +21,12 @@ export interface ApiClientOptions {
 export class ApiClient {
   private readonly baseUrl: string;
   private readonly auth?: AuthStrategy;
-  private readonly fetchFn: typeof fetch;
+  /**
+   * Explicitly-injected fetch, if any. When absent we resolve `globalThis.fetch`
+   * at call time (not construction time) so test doubles that stub the global
+   * after the client is constructed still take effect.
+   */
+  private readonly fetchFn?: typeof fetch;
   private readonly credentials?: RequestCredentials;
   private readonly cache?: RequestCache;
   private readonly onResponse?: (response: Response) => void | Promise<void>;
@@ -29,7 +34,7 @@ export class ApiClient {
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.auth = options.auth;
-    this.fetchFn = options.fetchFn ?? globalThis.fetch;
+    this.fetchFn = options.fetchFn;
     this.credentials = options.credentials;
     this.cache = options.cache;
     this.onResponse = options.onResponse;
@@ -93,7 +98,8 @@ export class ApiClient {
     if (opts?.signal) {
       init.signal = opts.signal;
     }
-    const response = await this.fetchFn(url, init);
+    const fetchFn = this.fetchFn ?? globalThis.fetch;
+    const response = await fetchFn(url, init);
 
     if (this.onResponse) {
       await this.onResponse(response);

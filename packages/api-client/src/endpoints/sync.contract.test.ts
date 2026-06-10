@@ -7,12 +7,12 @@ import {
 import { ApiClient } from "../client";
 import { syncEndpoints } from "./sync";
 
-/** Build a client whose fetch records the outgoing request body. */
+/** Build a client whose fetch records the outgoing request body + signal. */
 function recordingClient() {
-  const calls: { url: string; body: unknown }[] = [];
+  const calls: { url: string; body: unknown; signal: AbortSignal | null }[] = [];
   const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(init.body as string) : undefined;
-    calls.push({ url: String(url), body });
+    calls.push({ url: String(url), body, signal: init?.signal ?? null });
     return new Response("{}", {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -46,6 +46,13 @@ describe("sync request bodies satisfy @dragons/contracts schemas", () => {
     const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
     const parsed = syncEntriesQuerySchema.safeParse(query);
     expect(parsed.error?.issues, "syncEntriesQuerySchema rejected the entries query").toBeUndefined();
+  });
+
+  it("logEntries threads an AbortSignal into the request", async () => {
+    const { api, calls } = recordingClient();
+    const controller = new AbortController();
+    await api.logEntries(7, { limit: 50, offset: 0 }, { signal: controller.signal });
+    expect(calls[0]!.signal).toBe(controller.signal);
   });
 
   it("updateSchedule (cron variant) body parses against syncUpdateScheduleBodySchema", async () => {

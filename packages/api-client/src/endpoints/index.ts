@@ -48,6 +48,9 @@ export type {
   NotificationPreferencesBody,
 } from "@dragons/contracts";
 
+export { notificationTestEndpoints } from "./notification-test";
+export type { NotificationTestSendBody } from "@dragons/contracts";
+
 export { socialEndpoints } from "./social";
 export type { SocialMatchesQuery, SocialGenerateBody } from "@dragons/contracts";
 

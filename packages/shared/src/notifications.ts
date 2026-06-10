@@ -77,3 +77,17 @@ export interface FailedNotificationListResult {
   notifications: FailedNotificationItem[];
   total: number;
 }
+
+/** One device's Expo ticket result from POST /admin/notifications/test-push. */
+export interface TestPushTicket {
+  platform: string;
+  status: "sent_ticket" | "failed" | string;
+  ticketId: string | null;
+  error: string | null;
+}
+
+/** Response of POST /admin/notifications/test-push. */
+export interface TestPushResponse {
+  deviceCount: number;
+  tickets: TestPushTicket[];
+}
