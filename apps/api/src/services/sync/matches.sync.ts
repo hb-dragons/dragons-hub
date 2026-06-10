@@ -14,6 +14,7 @@ import type { SyncLogger } from "./sync-logger";
 import type { CurrentRemoteSnapshot } from "@dragons/db/schema";
 import { logger } from "../../config/logger";
 import { publishDomainEvent } from "../events/event-publisher";
+import type { EventType } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import {
   extractPeriodScores,
@@ -584,7 +585,7 @@ export async function syncMatchesFromData(
 
                   await publishDomainEvent(
                     {
-                      type: eventType as import("@dragons/shared").EventType,
+                      type: eventType as EventType,
                       source: "sync",
                       entityType: "match",
                       entityId: existing.id,

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type * as RefereeAssignmentService from "./referee-assignment.service";
 
 const mocks = vi.hoisted(() => ({
   selectCalls: [] as unknown[][],
@@ -30,7 +31,7 @@ vi.mock("../../config/database", () => ({
 }));
 
 vi.mock("./referee-assignment.service", async () => {
-  const actual = await vi.importActual<typeof import("./referee-assignment.service")>(
+  const actual = await vi.importActual<typeof RefereeAssignmentService>(
     "./referee-assignment.service",
   );
   return {

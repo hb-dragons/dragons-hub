@@ -15,7 +15,7 @@ export interface TimeWindow {
 }
 
 const MAX_MINUTES_IN_DAY = 23 * 60 + 59;
-const MAX_SECONDS_IN_DAY = MAX_MINUTES_IN_DAY * 60 + 59;
+const _MAX_SECONDS_IN_DAY = MAX_MINUTES_IN_DAY * 60 + 59;
 
 function parseTimeToMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number) as [number, number];

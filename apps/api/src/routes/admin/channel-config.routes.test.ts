@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import type { AppEnv } from "../../types";
+import type * as DragonsContracts from "@dragons/contracts";
 
 // --- Mocks (hoisted before imports) ---
 
@@ -30,7 +31,7 @@ vi.mock("../../config/env", () => ({
 }));
 
 vi.mock("@dragons/contracts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@dragons/contracts")>();
+  const actual = await importOriginal<typeof DragonsContracts>();
   return {
     ...actual,
     validateConfigForType: mocks.validateConfigForType,

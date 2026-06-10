@@ -1,4 +1,5 @@
-import { Worker, Job } from "bullmq";
+import { Worker } from "bullmq";
+import type { Job } from "bullmq";
 import { eq } from "drizzle-orm";
 import { domainEvents } from "@dragons/db/schema";
 import { EVENT_TYPES } from "@dragons/shared";

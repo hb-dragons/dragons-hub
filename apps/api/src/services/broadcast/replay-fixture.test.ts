@@ -9,6 +9,7 @@ import {
 } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import type * as ScoreboardPubsub from "../scoreboard/pubsub";
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
@@ -27,9 +28,9 @@ vi.mock("../../config/database", () => ({
 }));
 
 vi.mock("../scoreboard/pubsub", async () => {
-  const actual = await vi.importActual<
-    typeof import("../scoreboard/pubsub")
-  >("../scoreboard/pubsub");
+  const actual = await vi.importActual<typeof ScoreboardPubsub>(
+    "../scoreboard/pubsub",
+  );
   return {
     ...actual,
     publishSnapshot: (...a: unknown[]) => mocks.publishSnapshot(...a),

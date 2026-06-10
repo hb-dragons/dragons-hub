@@ -6,7 +6,6 @@ import {
   matches,
   teams,
   venues,
-  leagues,
   appSettings,
 } from "@dragons/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
@@ -14,9 +13,6 @@ import { calculateTimeWindow, type BookingConfig } from "./booking-calculator";
 import type {
   ReconcilePreview,
   ReconcilePreviewMatch,
-  ReconcilePreviewCreate,
-  ReconcilePreviewUpdate,
-  ReconcilePreviewRemove,
   ReconcileResult,
   BookingStatus,
 } from "@dragons/shared";

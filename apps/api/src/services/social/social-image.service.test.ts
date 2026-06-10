@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => {
 
   const satoriMock = vi.fn().mockResolvedValue("<svg>mock</svg>");
 
-  const downloadFromGcs = vi.fn().mockImplementation((path: string) => {
+  const downloadFromGcs = vi.fn().mockImplementation((_path: string) => {
     const buf = Buffer.from("data");
     return Promise.resolve(buf);
   });

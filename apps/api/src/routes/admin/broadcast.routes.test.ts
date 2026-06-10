@@ -8,6 +8,7 @@ import {
   vi,
 } from "vitest";
 import { Hono } from "hono";
+import type * as BroadcastPublisher from "../../services/broadcast/publisher";
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
@@ -31,9 +32,9 @@ vi.mock("../../middleware/rbac", () => ({
 }));
 
 vi.mock("../../services/broadcast/publisher", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../services/broadcast/publisher")
-  >("../../services/broadcast/publisher");
+  const actual = await vi.importActual<typeof BroadcastPublisher>(
+    "../../services/broadcast/publisher",
+  );
   return {
     ...actual,
     publishBroadcastForDevice: (...a: unknown[]) =>

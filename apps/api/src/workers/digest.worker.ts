@@ -1,5 +1,5 @@
 import { Worker, type Job } from "bullmq";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { digestBuffer, domainEvents, channelConfigs, notificationLog } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";

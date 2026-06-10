@@ -67,7 +67,7 @@ vi.mock("@dragons/db/schema", () => ({
   refereeAssignmentIntents: { matchId: "rai.matchId", refereeId: "rai.refereeId", slotNumber: "rai.slotNumber" },
 }));
 
-import { assignReferee, unassignReferee, searchCandidates, rankCandidates, AssignmentError } from "./referee-assignment.service";
+import { assignReferee, unassignReferee, searchCandidates, rankCandidates } from "./referee-assignment.service";
 
 const GAME_ROW = {
   id: 1, apiMatchId: 12345, matchId: 100, matchNo: 42,

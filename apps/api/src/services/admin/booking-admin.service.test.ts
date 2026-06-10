@@ -80,7 +80,7 @@ beforeEach(() => {
 function makeChain(rows: unknown[]) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = {};
-  const terminal = vi.fn().mockResolvedValue(rows);
+  const _terminal = vi.fn().mockResolvedValue(rows);
   const methods = ["from", "innerJoin", "leftJoin", "where", "orderBy", "limit", "groupBy"];
   for (const m of methods) {
     chain[m] = vi.fn().mockReturnValue(chain);

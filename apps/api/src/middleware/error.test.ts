@@ -156,7 +156,7 @@ describe("errorHandler", () => {
     };
 
     envMock.verbose = true;
-    errorHandler("string error" as never, mockContext as never);
+    void errorHandler("string error" as never, mockContext as never);
     envMock.verbose = false;
 
     expect(mockContext.json).toHaveBeenCalledWith(

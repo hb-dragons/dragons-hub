@@ -6,7 +6,6 @@ import type { SdkLiga } from "@dragons/sdk";
 import type {
   ResolvedLeague,
   ResolveResult,
-  TrackedLeague,
   TrackedLeaguesResponse,
 } from "@dragons/shared";
 

@@ -38,7 +38,7 @@ describe("POST /admin/assistant/reschedule/chat", () => {
     });
     expect(res.headers.get("x-test")).toBe("1");
     expect(mocks.streamRescheduleChat).toHaveBeenCalledWith([{ role: "user", parts: [] }], 7);
-    res.body?.cancel();
+    await res.body?.cancel();
   });
 
   it("rejects an invalid body with a validation error", async () => {

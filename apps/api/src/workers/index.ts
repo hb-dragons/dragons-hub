@@ -87,13 +87,15 @@ export async function initializeWorkers() {
   }
 
   // Trigger referee games sync after main sync completes
-  syncWorker.on("completed", async (job) => {
+  syncWorker.on("completed", (job) => {
     if (job?.data?.type !== "referee-games") {
-      try {
-        await syncRefereeGames();
-      } catch (error) {
-        logger.warn({ err: error }, "Failed to run referee games sync after main sync");
-      }
+      void (async () => {
+        try {
+          await syncRefereeGames();
+        } catch (error) {
+          logger.warn({ err: error }, "Failed to run referee games sync after main sync");
+        }
+      })();
     }
   });
 
