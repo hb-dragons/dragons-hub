@@ -1,4 +1,5 @@
-import { Worker, Job } from "bullmq";
+import { Worker } from "bullmq";
+import type { Job } from "bullmq";
 import { eq } from "drizzle-orm";
 import { syncRuns } from "@dragons/db/schema";
 import { env } from "../config/env";
@@ -105,40 +106,44 @@ export const syncWorker = new Worker<SyncJobData>(
   },
 );
 
-syncWorker.on("completed", async (job) => {
-  logger.info({ jobId: job.id }, "Sync job completed");
+syncWorker.on("completed", (job) => {
+  void (async () => {
+    logger.info({ jobId: job.id }, "Sync job completed");
 
-  if (job.data.syncRunId) {
-    const [run] = await db
-      .select({ status: syncRuns.status })
-      .from(syncRuns)
-      .where(eq(syncRuns.id, job.data.syncRunId));
-    if (run && run.status === "running") {
-      logger.warn(
-        { syncRunId: job.data.syncRunId },
-        "Sync run still running after job completed, marking as completed",
-      );
-      await db
-        .update(syncRuns)
-        .set({ status: "completed", completedAt: new Date() })
+    if (job.data.syncRunId) {
+      const [run] = await db
+        .select({ status: syncRuns.status })
+        .from(syncRuns)
         .where(eq(syncRuns.id, job.data.syncRunId));
+      if (run && run.status === "running") {
+        logger.warn(
+          { syncRunId: job.data.syncRunId },
+          "Sync run still running after job completed, marking as completed",
+        );
+        await db
+          .update(syncRuns)
+          .set({ status: "completed", completedAt: new Date() })
+          .where(eq(syncRuns.id, job.data.syncRunId));
+      }
     }
-  }
+  })();
 });
 
-syncWorker.on("failed", async (job, err) => {
-  logger.error({ jobId: job?.id, err }, "Sync job failed");
+syncWorker.on("failed", (job, err) => {
+  void (async () => {
+    logger.error({ jobId: job?.id, err }, "Sync job failed");
 
-  if (job?.data.syncRunId) {
-    await db
-      .update(syncRuns)
-      .set({
-        status: "failed",
-        completedAt: new Date(),
-        errorMessage: err.message,
-      })
-      .where(eq(syncRuns.id, job.data.syncRunId));
-  }
+    if (job?.data.syncRunId) {
+      await db
+        .update(syncRuns)
+        .set({
+          status: "failed",
+          completedAt: new Date(),
+          errorMessage: err.message,
+        })
+        .where(eq(syncRuns.id, job.data.syncRunId));
+    }
+  })();
 });
 
 syncWorker.on("error", (err) => {

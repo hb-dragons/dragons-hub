@@ -69,7 +69,7 @@ describe("validationHook", () => {
         return body;
       },
     } as unknown as Context;
-    validationHook(
+    void validationHook(
       {
         success: false,
         data: undefined,

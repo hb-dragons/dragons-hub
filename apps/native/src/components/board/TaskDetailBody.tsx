@@ -210,7 +210,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
           <BottomSheetTextInput
             value={title}
             onChangeText={setTitle}
-            onBlur={saveTitle}
+            onBlur={() => { void saveTitle(); }}
             maxLength={300}
             // Inline title — no surface, no lineHeight (lineHeight on a
             // TextInput shifts placeholder/text down on iOS).
@@ -263,7 +263,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
           <BottomSheetTextInput
             value={description}
             onChangeText={setDescription}
-            onBlur={saveDescription}
+            onBlur={() => { void saveDescription(); }}
             multiline
             // Reserve room on the right for the absolute SaveIndicator
             // overlay (22pt icon + 8pt gap).

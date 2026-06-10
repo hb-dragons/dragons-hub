@@ -42,9 +42,7 @@ export function ChecklistEditor({
           >
             <Checkbox
               checked={item.isChecked}
-              onCheckedChange={(checked) =>
-                onToggle(item.id, checked === true)
-              }
+              onCheckedChange={(checked) => { void onToggle(item.id, checked === true); }}
             />
             <span
               className={
@@ -59,7 +57,7 @@ export function ChecklistEditor({
               type="button"
               size="icon-sm"
               variant="ghost"
-              onClick={() => onDelete(item.id)}
+              onClick={() => { void onDelete(item.id); }}
               className="opacity-0 group-hover:opacity-100"
               aria-label={t("delete.confirm")}
             >
@@ -68,7 +66,7 @@ export function ChecklistEditor({
           </div>
         ))}
       </div>
-      <form onSubmit={submit} className="flex gap-2">
+      <form onSubmit={(e) => { void submit(e); }} className="flex gap-2">
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

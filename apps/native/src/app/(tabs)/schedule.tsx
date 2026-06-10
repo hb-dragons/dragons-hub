@@ -27,7 +27,8 @@ type Segment = "upcoming" | "results";
 type LocationFilter = "all" | "home" | "away";
 
 function getToday(): string {
-  return new Date().toISOString().split("T")[0];
+  // ISO string always has a T separator, so index 0 is always defined
+  return new Date().toISOString().split("T")[0]!;
 }
 
 function formatSectionDate(dateStr: string): string {

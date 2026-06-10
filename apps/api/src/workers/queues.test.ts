@@ -87,7 +87,6 @@ import {
   updateSyncSchedule,
   updateRefereeSyncSchedule,
   initTaskReminders,
-  taskRemindersQueue,
 } from "./queues";
 
 beforeEach(() => {

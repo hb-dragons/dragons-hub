@@ -125,7 +125,7 @@ export function RefereeList({ selectedId, onSelect }: Props) {
               <Checkbox
                 aria-label={t("columns.own")}
                 checked={r.isOwnClub}
-                onCheckedChange={(checked) => toggleOwnClub(r, checked === true)}
+                onCheckedChange={(checked) => { void toggleOwnClub(r, checked === true); }}
               />
             </div>
             <div className="text-sm text-center tabular-nums">{r.matchCount}</div>

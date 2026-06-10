@@ -27,7 +27,7 @@ import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { ToastProvider } from "@/hooks/useToast";
 import { ToastHost } from "@/components/ui/ToastHost";
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
 configureNotificationHandler();
 
 // Install a global JS error handler that logs to NSLog BEFORE RCTFatal aborts

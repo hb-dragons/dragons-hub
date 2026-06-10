@@ -3,6 +3,10 @@
   "remoteCache": {
     "signature": true
   },
+  "globalDependencies": [
+    "tsconfig.base.json",
+    "eslint.config.base.mjs"
+  ],
   "tasks": {
     "dev": {
       "cache": false,

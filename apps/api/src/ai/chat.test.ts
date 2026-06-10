@@ -11,8 +11,8 @@ vi.mock("../config/ai", () => ({ assistantModel: m.assistantModel }));
 vi.mock("../services/reschedule/reschedule-context.service", async (orig) => ({
   ...(await orig<Record<string, unknown>>()), getMatchForReschedule: m.getMatchForReschedule,
 }));
-vi.mock("./tool-registry", () => {
-  const { z } = require("zod");
+vi.mock("./tool-registry", async () => {
+  const { z } = await import("zod");
   return {
     reschedTools: [
       { name: "verify_slot", description: "verify a slot", inputSchema: z.object({ date: z.string() }), execute: m.stubExecute },

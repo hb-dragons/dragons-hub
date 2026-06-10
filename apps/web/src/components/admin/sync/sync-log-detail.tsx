@@ -182,7 +182,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadEntries(0, false, controller.signal);
+    void loadEntries(0, false, controller.signal);
     return () => controller.abort();
   }, [loadEntries]);
 
@@ -309,7 +309,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
                 <div key={entry.id}>
                   <div
                     className={`flex items-center gap-3 px-3 py-2 text-sm bg-background ${isExpandable ? "cursor-pointer hover:bg-muted/50" : ""}`}
-                    onClick={isExpandable ? () => toggleMatchChanges(entry) : undefined}
+                    onClick={isExpandable ? () => { void toggleMatchChanges(entry); } : undefined}
                   >
                     {isExpandable ? (
                       isExpanded ? (
@@ -392,7 +392,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => loadEntries(entries.length, true)}
+            onClick={() => { void loadEntries(entries.length, true); }}
             disabled={loading}
           >
             {t("loadMore", { remaining: String(total - entries.length) })}

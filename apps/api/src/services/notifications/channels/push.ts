@@ -6,7 +6,7 @@ import {
   userNotificationPreferences,
 } from "@dragons/db/schema";
 import { logger } from "../../../config/logger";
-import { ExpoPushClient, type ExpoPushMessage } from "../expo-push.client";
+import type { ExpoPushClient, ExpoPushMessage } from "../expo-push.client";
 import { renderPushTemplate, type Locale } from "../templates/push";
 
 const log = logger.child({ service: "push-adapter" });

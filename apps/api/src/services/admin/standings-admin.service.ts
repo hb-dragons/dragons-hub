@@ -1,7 +1,7 @@
 import { db } from "../../config/database";
 import { standings, leagues, teams } from "@dragons/db/schema";
 import { eq, asc } from "drizzle-orm";
-import type { StandingItem, LeagueStandings } from "@dragons/shared";
+import type { LeagueStandings } from "@dragons/shared";
 
 export async function getStandings(): Promise<LeagueStandings[]> {
   const rows = await db

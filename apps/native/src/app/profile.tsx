@@ -305,7 +305,7 @@ export default function ProfileScreen() {
 
           {/* Sign Out */}
           <Pressable
-            onPress={handleSignOut}
+            onPress={() => { void handleSignOut(); }}
             style={{
               backgroundColor: colors.destructive + "1A",
               borderRadius: radius.md,

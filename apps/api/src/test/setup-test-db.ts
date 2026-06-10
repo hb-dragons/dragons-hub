@@ -1,12 +1,11 @@
 import type { PGlite } from "@electric-sql/pglite";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
 import * as path from "node:path";
 import * as schema from "@dragons/db/schema";
 
-type PgliteDatabase = import("drizzle-orm/pglite").PgliteDatabase<typeof schema>;
-
 export interface TestDbContext {
   client: PGlite;
-  db: PgliteDatabase;
+  db: PgliteDatabase<typeof schema>;
 }
 
 export async function setupTestDb(): Promise<TestDbContext> {

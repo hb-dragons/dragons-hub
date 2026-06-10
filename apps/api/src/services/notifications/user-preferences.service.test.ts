@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
+import type { Database } from "@dragons/db";
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 vi.mock("../../config/database", () => ({
@@ -44,7 +45,7 @@ describe("user-preferences.service", () => {
 
   it("returns stored preferences when row exists", async () => {
     await makeUser("u1");
-    await (ctx.db as typeof import("../../config/database").db)
+    await (ctx.db as Database)
       .insert(userNotificationPreferences)
       .values({ userId: "u1", locale: "en", mutedEventTypes: ["task.assigned"] });
 
@@ -58,7 +59,7 @@ describe("user-preferences.service", () => {
       mutedEventTypes: ["task.comment.added"],
       locale: "en",
     });
-    const [row] = await (ctx.db as typeof import("../../config/database").db)
+    const [row] = await (ctx.db as Database)
       .select()
       .from(userNotificationPreferences)
       .where(eq(userNotificationPreferences.userId, "u1"));

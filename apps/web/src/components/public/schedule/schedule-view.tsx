@@ -91,20 +91,20 @@ export function ScheduleView({
   useEffect(() => {
     if (prevTeamRef.current !== selectedTeamApiId) {
       prevTeamRef.current = selectedTeamApiId;
-      fetchMatches(saturday, selectedTeamApiId);
+      void fetchMatches(saturday, selectedTeamApiId);
     }
   }, [selectedTeamApiId, saturday, fetchMatches]);
 
   const handlePrevious = useCallback(() => {
     const prev = previousSaturday(saturday);
     setSaturday(prev);
-    fetchMatches(prev, selectedTeamApiId);
+    void fetchMatches(prev, selectedTeamApiId);
   }, [saturday, selectedTeamApiId, fetchMatches]);
 
   const handleNext = useCallback(() => {
     const next = nextSaturday(saturday);
     setSaturday(next);
-    fetchMatches(next, selectedTeamApiId);
+    void fetchMatches(next, selectedTeamApiId);
   }, [saturday, selectedTeamApiId, fetchMatches]);
 
   const weekendLabel = formatWeekendLabel(saturday, sunday);

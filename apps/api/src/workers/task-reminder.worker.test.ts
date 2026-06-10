@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import * as eventPublisher from "../services/events/event-publisher";
 import { eq } from "drizzle-orm";
+import type { Database } from "@dragons/db";
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
@@ -42,12 +43,8 @@ vi.mock("bullmq", () => ({
 }));
 
 import {
-  boards,
-  boardColumns,
   tasks,
-  taskAssignees,
   domainEvents,
-  user,
 } from "@dragons/db/schema";
 import { runTaskReminderSweep } from "./task-reminder.worker";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../test/setup-test-db";
@@ -105,7 +102,7 @@ describe("runTaskReminderSweep", () => {
 
     await runTaskReminderSweep();
 
-    const events = await (ctx.db as typeof import("../config/database").db)
+    const events = await (ctx.db as Database)
       .select()
       .from(domainEvents)
       .where(eq(domainEvents.entityId, taskId));
@@ -123,13 +120,13 @@ describe("runTaskReminderSweep", () => {
     await runTaskReminderSweep();
     await runTaskReminderSweep();
 
-    const events = await (ctx.db as typeof import("../config/database").db)
+    const events = await (ctx.db as Database)
       .select()
       .from(domainEvents)
       .where(eq(domainEvents.entityId, taskId));
     expect(events).toHaveLength(1);
 
-    const [row] = await (ctx.db as typeof import("../config/database").db)
+    const [row] = await (ctx.db as Database)
       .select({ at: tasks.leadReminderSentAt })
       .from(tasks)
       .where(eq(tasks.id, taskId));
@@ -142,7 +139,7 @@ describe("runTaskReminderSweep", () => {
 
     await runTaskReminderSweep();
 
-    const events = await (ctx.db as typeof import("../config/database").db)
+    const events = await (ctx.db as Database)
       .select()
       .from(domainEvents)
       .where(eq(domainEvents.entityId, taskId));
@@ -155,7 +152,7 @@ describe("runTaskReminderSweep", () => {
 
     await runTaskReminderSweep();
 
-    const events = await (ctx.db as typeof import("../config/database").db)
+    const events = await (ctx.db as Database)
       .select()
       .from(domainEvents)
       .where(eq(domainEvents.entityId, taskId));
@@ -178,7 +175,7 @@ describe("runTaskReminderSweep", () => {
       await runTaskReminderSweep();
 
       const newTomorrow = new Date(today.getTime() + 20 * 60 * 60 * 1000);
-      await (ctx.db as typeof import("../config/database").db)
+      await (ctx.db as Database)
         .update(tasks)
         .set({
           dueDate: newTomorrow.toISOString().slice(0, 10),
@@ -189,7 +186,7 @@ describe("runTaskReminderSweep", () => {
 
       await runTaskReminderSweep();
 
-      const events = await (ctx.db as typeof import("../config/database").db)
+      const events = await (ctx.db as Database)
         .select()
         .from(domainEvents)
         .where(eq(domainEvents.entityId, taskId));
@@ -216,13 +213,13 @@ describe("runTaskReminderSweep", () => {
 
       await runTaskReminderSweep();
 
-      const events = await (ctx.db as typeof import("../config/database").db)
+      const events = await (ctx.db as Database)
         .select()
         .from(domainEvents)
         .where(eq(domainEvents.entityId, taskId));
       expect(events).toHaveLength(0);
 
-      const [row] = await (ctx.db as typeof import("../config/database").db)
+      const [row] = await (ctx.db as Database)
         .select({ at: tasks.leadReminderSentAt })
         .from(tasks)
         .where(eq(tasks.id, taskId));
@@ -245,7 +242,7 @@ describe("runTaskReminderSweep", () => {
 
       await runTaskReminderSweep();
 
-      const events = await (ctx.db as typeof import("../config/database").db)
+      const events = await (ctx.db as Database)
         .select()
         .from(domainEvents)
         .where(eq(domainEvents.entityId, taskId));
@@ -271,7 +268,7 @@ describe("runTaskReminderSweep", () => {
 
       await runTaskReminderSweep();
 
-      const events = await (ctx.db as typeof import("../config/database").db)
+      const events = await (ctx.db as Database)
         .select()
         .from(domainEvents)
         .where(eq(domainEvents.entityId, taskId));
@@ -301,7 +298,7 @@ describe("runTaskReminderSweep", () => {
     // The sweep continues — lead count stays at 0 because the emit failed
     expect(result.lead).toBe(0);
     // No domain event was persisted
-    const events = await (ctx.db as typeof import("../config/database").db)
+    const events = await (ctx.db as Database)
       .select()
       .from(domainEvents)
       .where(eq(domainEvents.entityId, taskId));
@@ -328,7 +325,7 @@ describe("runTaskReminderSweep", () => {
       // dayOf count stays at 0 — emit failed
       expect(result.dayOf).toBe(0);
 
-      const events = await (ctx.db as typeof import("../config/database").db)
+      const events = await (ctx.db as Database)
         .select()
         .from(domainEvents)
         .where(eq(domainEvents.entityId, taskId));

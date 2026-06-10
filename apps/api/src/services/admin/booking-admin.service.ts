@@ -11,7 +11,6 @@ import { eq, and, gte, lte, sql, count, asc } from "drizzle-orm";
 import type {
   BookingListItem,
   BookingDetail,
-  BookingMatch,
   BookingStatus,
 } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";

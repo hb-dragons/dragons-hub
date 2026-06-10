@@ -11,6 +11,7 @@
     "test": "turbo test",
     "coverage": "turbo coverage",
     "check:ai-slop": "node scripts/check-ai-slop.mjs",
+    "check:coverage-scripts": "node scripts/check-coverage-scripts.mjs",
     "check:i18n": "pnpm --filter @dragons/web i18n:check",
     "security:audit": "pnpm audit --audit-level=high",
     "knip": "knip",
@@ -18,8 +19,11 @@
     "seed:extract": "pnpm --filter @dragons/api exec tsx ../../scripts/extract-test-seed.ts"
   },
   "devDependencies": {
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "knip": "^6.13.1",
     "turbo": "^2.9.14",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.58.2"
   }
 }

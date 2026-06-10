@@ -8,7 +8,9 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit"
+    "lint": "eslint .",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@better-auth/expo": "^1.6.11",
@@ -50,6 +52,8 @@
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
-    "typescript": "^6.0.3"
+    "@vitest/coverage-v8": "^4.1.6",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
   }
 }

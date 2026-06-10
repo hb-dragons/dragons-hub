@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { EVENT_TYPES } from "@dragons/shared";
+import type { Database } from "@dragons/db";
 
 // --- Mock setup ---
 
@@ -199,7 +200,7 @@ describe("insertDomainEvent", () => {
       }),
     });
     const tx = { insert: mockTxInsert } as unknown as Parameters<
-      Parameters<typeof import("../../config/database").db.transaction>[0]
+      Parameters<Database["transaction"]>[0]
     >[0];
 
     const event = buildDomainEvent({
@@ -291,7 +292,7 @@ describe("publishDomainEvent", () => {
       }),
     });
     const tx = { insert: mockTxInsert } as unknown as Parameters<
-      Parameters<typeof import("../../config/database").db.transaction>[0]
+      Parameters<Database["transaction"]>[0]
     >[0];
 
     const event = await publishDomainEvent(

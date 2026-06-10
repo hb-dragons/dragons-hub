@@ -141,7 +141,7 @@ export function LinkRefereeDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={handleLink} disabled={!selected || submitting}>
+          <Button onClick={() => { void handleLink(); }} disabled={!selected || submitting}>
             {submitting
               ? t("users.linkRefereeDialog.linking")
               : t("users.linkRefereeDialog.link")}

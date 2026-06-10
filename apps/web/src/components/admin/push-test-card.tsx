@@ -147,7 +147,7 @@ export function PushTestCard() {
                 {message.length}/180
               </span>
               <Button
-                onClick={handleSend}
+                onClick={() => { void handleSend(); }}
                 disabled={sending}
                 className="w-fit"
               >

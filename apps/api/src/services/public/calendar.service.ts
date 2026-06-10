@@ -24,8 +24,8 @@ function resolveTeamName(team: {
 
 function buildDescription(
   match: MatchListItem,
-  homeName: string,
-  guestName: string,
+  _homeName: string,
+  _guestName: string,
 ): string {
   const parts: string[] = [];
 

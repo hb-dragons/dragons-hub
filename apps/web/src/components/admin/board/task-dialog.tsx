@@ -297,7 +297,7 @@ export function TaskDialog({
               </Button>
               <Button
                 size="sm"
-                onClick={save}
+                onClick={() => { void save(); }}
                 disabled={!dirty || saving || !title.trim()}
               >
                 {saving && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}

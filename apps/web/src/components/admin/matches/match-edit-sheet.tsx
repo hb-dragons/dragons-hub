@@ -449,7 +449,7 @@ export function MatchEditSheet({
           <SheetSkeleton />
         ) : (
           <form
-            onSubmit={form.handleSubmit(onSubmit)}
+            onSubmit={(e) => { void form.handleSubmit(onSubmit)(e); }}
             className="flex min-h-0 flex-1 flex-col"
           >
             <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4">
@@ -598,7 +598,7 @@ export function MatchEditSheet({
                         }
                         isOverridden={match.overriddenFields.includes("kickoffDate")}
                         isDirty={!!dirtyFields.kickoffDate}
-                        onRelease={() => handleReleaseOverride("kickoffDate")}
+                        onRelease={() => { void handleReleaseOverride("kickoffDate"); }}
                         onReset={() => form.resetField("kickoffDate")}
                         canEdit={canEdit}
                       >
@@ -629,7 +629,7 @@ export function MatchEditSheet({
                         }
                         isOverridden={match.overriddenFields.includes("kickoffTime")}
                         isDirty={!!dirtyFields.kickoffTime}
-                        onRelease={() => handleReleaseOverride("kickoffTime")}
+                        onRelease={() => { void handleReleaseOverride("kickoffTime"); }}
                         onReset={() => form.resetField("kickoffTime")}
                         canEdit={canEdit}
                       >
@@ -679,7 +679,7 @@ export function MatchEditSheet({
                               variant="ghost"
                               size="sm"
                               className="h-6 px-2 text-xs text-muted-foreground"
-                              onClick={() => handleReleaseOverride("isForfeited")}
+                              onClick={() => { void handleReleaseOverride("isForfeited"); }}
                             >
                               <RotateCcw className="mr-1 h-3 w-3" />
                               {t("common.release")}
@@ -719,7 +719,7 @@ export function MatchEditSheet({
                               variant="ghost"
                               size="sm"
                               className="h-6 px-2 text-xs text-muted-foreground"
-                              onClick={() => handleReleaseOverride("isCancelled")}
+                              onClick={() => { void handleReleaseOverride("isCancelled"); }}
                             >
                               <RotateCcw className="mr-1 h-3 w-3" />
                               {t("common.release")}
@@ -754,9 +754,7 @@ export function MatchEditSheet({
                         "venueNameOverride",
                       )}
                       isDirty={!!dirtyFields.venueNameOverride}
-                      onRelease={() =>
-                        handleReleaseOverride("venueNameOverride")
-                      }
+                      onRelease={() => { void handleReleaseOverride("venueNameOverride"); }}
                       onReset={() => form.resetField("venueNameOverride")}
                       canEdit={canEdit}
                     >

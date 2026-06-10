@@ -8,6 +8,8 @@ import {
   vi,
 } from "vitest";
 import { Hono } from "hono";
+import type * as ConfigEnv from "../../config/env";
+import type * as ScoreboardPubsub from "../../services/scoreboard/pubsub";
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
@@ -16,9 +18,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/env", async () => {
-  const actual = await vi.importActual<typeof import("../../config/env")>(
-    "../../config/env",
-  );
+  const actual = await vi.importActual<typeof ConfigEnv>("../../config/env");
   return {
     env: new Proxy(actual.env, {
       get(target, prop) {
@@ -40,9 +40,9 @@ vi.mock("../../config/database", () => ({
 }));
 
 vi.mock("../../services/scoreboard/pubsub", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../services/scoreboard/pubsub")
-  >("../../services/scoreboard/pubsub");
+  const actual = await vi.importActual<typeof ScoreboardPubsub>(
+    "../../services/scoreboard/pubsub",
+  );
   return {
     ...actual,
     subscribeBroadcast: (...a: unknown[]) => mocks.subscribe(...a),
@@ -111,7 +111,7 @@ describe("GET /public/broadcast/stream", () => {
       "/public/broadcast/stream?deviceId=d1",
     );
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
-    res.body?.cancel();
+    await res.body?.cancel();
   });
 
   it("returns 400 without deviceId", async () => {

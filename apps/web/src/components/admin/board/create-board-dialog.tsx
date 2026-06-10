@@ -64,7 +64,7 @@ export function CreateBoardDialog({ trigger }: CreateBoardDialogProps) {
         )}
       </DialogTrigger>
       <DialogContent>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={(e) => { void submit(e); }} className="space-y-4">
           <DialogHeader>
             <DialogTitle>{t("board.addBoard")}</DialogTitle>
             <DialogDescription>{t("board.boardName")}</DialogDescription>

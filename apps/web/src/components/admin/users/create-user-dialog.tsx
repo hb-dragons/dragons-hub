@@ -91,7 +91,7 @@ export function CreateUserDialog({
             {t("users.createDialog.description")}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={(e) => { void form.handleSubmit(onSubmit)(e); }} className="space-y-4">
           <Controller
             control={form.control}
             name="name"

@@ -12,7 +12,6 @@ import type {
   SdkGetGameResponse,
   SdkTeamRef,
   SdkSpielfeld,
-  SdkSpielleitung,
 } from "@dragons/sdk";
 
 export interface LeagueFetchedData {

@@ -1,6 +1,6 @@
 import { db } from "../../config/database";
 import { notificationLog, domainEvents, user } from "@dragons/db/schema";
-import { eq, and, desc, sql, count, ne, inArray } from "drizzle-orm";
+import { eq, and, desc, count, ne, inArray } from "drizzle-orm";
 import { parseRoles } from "@dragons/shared";
 import { renderEventMessage } from "../notifications/templates/index";
 import { logger } from "../../config/logger";

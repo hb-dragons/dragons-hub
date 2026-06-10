@@ -60,7 +60,7 @@ export function CommentThread({ comments, onAdd }: CommentThreadProps) {
           ))}
         </ul>
       )}
-      <form onSubmit={submit} className="flex gap-2">
+      <form onSubmit={(e) => { void submit(e); }} className="flex gap-2">
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -68,7 +68,7 @@ export function CommentThread({ comments, onAdd }: CommentThreadProps) {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              submit(e);
+              void submit(e);
             }
           }}
         />

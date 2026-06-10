@@ -180,7 +180,7 @@ export function UserActions({
             </DropdownMenuItem>
           )}
           {!isSelf && user.refereeId !== null && (
-            <DropdownMenuItem onSelect={handleRemoveReferee}>
+            <DropdownMenuItem onSelect={() => { void handleRemoveReferee(); }}>
               {t("users.actions.removeReferee")}
             </DropdownMenuItem>
           )}
@@ -237,7 +237,7 @@ export function UserActions({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>
+            <AlertDialogAction onClick={() => { void handleDelete(); }}>
               {t("users.deleteConfirm.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -254,7 +254,7 @@ export function UserActions({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleUnban}>
+            <AlertDialogAction onClick={() => { void handleUnban(); }}>
               {t("users.unbanConfirm.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -291,7 +291,7 @@ export function UserActions({
             >
               {t("common.cancel")}
             </Button>
-            <Button onClick={handleSaveRoles} disabled={savingRoles}>
+            <Button onClick={() => { void handleSaveRoles(); }} disabled={savingRoles}>
               {savingRoles
                 ? t("users.editRolesDialog.saving")
                 : t("users.editRolesDialog.save")}

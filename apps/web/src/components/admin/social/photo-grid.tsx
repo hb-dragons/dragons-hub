@@ -202,7 +202,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
         type="file"
         accept="image/png,image/jpeg,image/webp"
         className="hidden"
-        onChange={handleFileChange}
+        onChange={(e) => { void handleFileChange(e); }}
       />
 
       {/* Delete confirmation dialog */}
@@ -217,7 +217,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Abbrechen</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleConfirmDelete}
+              onClick={() => { void handleConfirmDelete(); }}
               disabled={deleting}
               className="bg-destructive text-white hover:bg-destructive/90"
             >

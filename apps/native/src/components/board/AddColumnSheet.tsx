@@ -96,7 +96,7 @@ export const AddColumnSheet = forwardRef<AddColumnSheetHandle>(function AddColum
           autoFocus
           maxLength={64}
           returnKeyType="done"
-          onSubmitEditing={submit}
+          onSubmitEditing={() => { void submit(); }}
           style={singleLineInput(theme, { fontSize: 16, fontWeight: "600" })}
         />
 
@@ -130,7 +130,7 @@ export const AddColumnSheet = forwardRef<AddColumnSheetHandle>(function AddColum
         </View>
 
         <Pressable
-          onPress={submit}
+          onPress={() => { void submit(); }}
           disabled={!canSubmit}
           accessibilityRole="button"
           style={{

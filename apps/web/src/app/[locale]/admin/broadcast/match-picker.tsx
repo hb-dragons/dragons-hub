@@ -44,7 +44,7 @@ export function MatchPicker({ open, onOpenChange, onPick }: Props) {
     let cancelled = false;
     const params = new URLSearchParams({ scope });
     if (scope === "all" && q) params.set("q", q);
-    fetchAPI<{ matches: AdminBroadcastMatchListItem[] }>(
+    void fetchAPI<{ matches: AdminBroadcastMatchListItem[] }>(
       `/admin/broadcast/matches?${params.toString()}`,
     ).then((res) => {
       if (!cancelled) setList(res.matches);
@@ -115,7 +115,7 @@ export function MatchPicker({ open, onOpenChange, onPick }: Props) {
                 type="button"
                 role="option"
                 aria-selected={false}
-                onClick={() => onPick(m.id)}
+                onClick={() => { void onPick(m.id); }}
                 className="flex w-full items-center gap-4 rounded-md px-3 py-2 text-left outline-none transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <span className="min-w-0 flex-1 truncate font-display text-sm font-bold">

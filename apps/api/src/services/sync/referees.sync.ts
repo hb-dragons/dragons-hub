@@ -1,6 +1,6 @@
 import { db } from "../../config/database";
 import { referees, refereeRoles, matchReferees, matches, matchChanges, refereeAssignmentIntents } from "@dragons/db/schema";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import type {
   ExtractedReferee,

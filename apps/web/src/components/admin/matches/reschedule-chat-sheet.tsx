@@ -59,7 +59,7 @@ export function RescheduleChatSheet({
           onSubmit={(e) => {
             e.preventDefault();
             if (input.trim()) {
-              sendMessage({ text: input });
+              void sendMessage({ text: input });
               setInput("");
             }
           }}

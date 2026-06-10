@@ -161,7 +161,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
                 <Input
                   defaultValue={config?.homeAbbr ?? ""}
                   maxLength={8}
-                  onBlur={(e) => save({ homeAbbr: e.target.value || null })}
+                  onBlur={(e) => { void save({ homeAbbr: e.target.value || null }); }}
                 />
               </Field>
               <Field>
@@ -169,7 +169,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
                 <Input
                   defaultValue={config?.guestAbbr ?? ""}
                   maxLength={8}
-                  onBlur={(e) => save({ guestAbbr: e.target.value || null })}
+                  onBlur={(e) => { void save({ guestAbbr: e.target.value || null }); }}
                 />
               </Field>
               <Field>
@@ -177,9 +177,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
                 <Input
                   placeholder={t("useDefault")}
                   defaultValue={config?.homeColorOverride ?? ""}
-                  onBlur={(e) =>
-                    save({ homeColorOverride: e.target.value || null })
-                  }
+                  onBlur={(e) => { void save({ homeColorOverride: e.target.value || null }); }}
                 />
               </Field>
               <Field>
@@ -187,9 +185,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
                 <Input
                   placeholder={t("useDefault")}
                   defaultValue={config?.guestColorOverride ?? ""}
-                  onBlur={(e) =>
-                    save({ guestColorOverride: e.target.value || null })
-                  }
+                  onBlur={(e) => { void save({ guestColorOverride: e.target.value || null }); }}
                 />
               </Field>
             </div>
@@ -225,12 +221,12 @@ export function BroadcastControl({ deviceId, initial }: Props) {
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 py-4">
           {!isLive ? (
-            <Button disabled={!match} onClick={goLive} size="lg">
+            <Button disabled={!match} onClick={() => { void goLive(); }} size="lg">
               <Play />
               {t("goLive")}
             </Button>
           ) : (
-            <Button variant="destructive" onClick={endBroadcast} size="lg">
+            <Button variant="destructive" onClick={() => { void endBroadcast(); }} size="lg">
               <Square />
               {t("endBroadcast")}
             </Button>
@@ -246,7 +242,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={copyOverlayUrl}
+              onClick={() => { void copyOverlayUrl(); }}
               aria-label={t("copy")}
             >
               {copied ? <Check /> : <Copy />}

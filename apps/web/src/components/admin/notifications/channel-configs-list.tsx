@@ -95,7 +95,7 @@ function buildConfig(form: ChannelFormState): Record<string, unknown> {
 }
 
 // next-intl's t() has strict key typing, so we use ReturnType to accept it
-type TranslateFunc = ReturnType<typeof import("next-intl").useTranslations>;
+type TranslateFunc = ReturnType<typeof useTranslations>;
 
 function digestModeLabel(mode: DigestMode, t: TranslateFunc): string {
   switch (mode) {
@@ -230,7 +230,7 @@ export function ChannelConfigsList() {
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={channel.enabled}
-                    onCheckedChange={() => handleToggleEnabled(channel)}
+                    onCheckedChange={() => { void handleToggleEnabled(channel); }}
                   />
                   <Button
                     variant="ghost"
@@ -281,7 +281,7 @@ export function ChannelConfigsList() {
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
             {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="channel-name">{t("name")}</Label>

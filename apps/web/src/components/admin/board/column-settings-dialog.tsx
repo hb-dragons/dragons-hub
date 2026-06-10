@@ -159,7 +159,7 @@ export function ColumnSettingsDialog({
             <Button
               type="button"
               variant="destructive"
-              onClick={handleDelete}
+              onClick={() => { void handleDelete(); }}
               disabled={deleting}
               className="mr-auto"
             >
@@ -178,7 +178,7 @@ export function ColumnSettingsDialog({
           >
             {t("common.cancel")}
           </Button>
-          <Button onClick={handleSave} disabled={!name.trim() || saving}>
+          <Button onClick={() => { void handleSave(); }} disabled={!name.trim() || saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {saving ? t("common.saving") : t("common.save")}
           </Button>

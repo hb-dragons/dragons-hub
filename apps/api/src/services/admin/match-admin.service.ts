@@ -9,7 +9,7 @@ import {
 } from "@dragons/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
-import type { MatchDetailResponse } from "@dragons/shared";
+import type { MatchDetailResponse, EventType } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import type { MatchUpdateData, TransactionClient } from "./match-query.service";
 import { buildDetailResponse, loadRemoteSnapshot } from "./match-query.service";
@@ -208,7 +208,7 @@ export async function updateMatchLocal(
     const emitEvent = async (eventType: string, extraPayload: Record<string, unknown>) => {
       try {
         await publishDomainEvent({
-          type: eventType as import("@dragons/shared").EventType,
+          type: eventType as EventType,
           source: "manual",
           actor: changedBy,
           entityType: "match",
@@ -417,7 +417,7 @@ export async function releaseOverride(
     if (isScheduleField && currentStr !== remoteStr) {
       try {
         await publishDomainEvent({
-          type: EVENT_TYPES.MATCH_SCHEDULE_CHANGED as import("@dragons/shared").EventType,
+          type: EVENT_TYPES.MATCH_SCHEDULE_CHANGED as EventType,
           source: "manual",
           actor: changedBy,
           entityType: "match",
@@ -439,7 +439,7 @@ export async function releaseOverride(
     if (isVenueField && currentStr !== remoteStr) {
       try {
         await publishDomainEvent({
-          type: EVENT_TYPES.MATCH_VENUE_CHANGED as import("@dragons/shared").EventType,
+          type: EVENT_TYPES.MATCH_VENUE_CHANGED as EventType,
           source: "manual",
           actor: changedBy,
           entityType: "match",

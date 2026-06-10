@@ -329,37 +329,41 @@ syncRoutes.get(
           streamDone = resolve;
         });
 
-        redisSubscriber.on("message", async (channel, message) => {
-          if (channel === channelName) {
-            try {
-              const data = JSON.parse(message);
-              if (data.type === "complete") {
-                await stream.writeSSE({
-                  event: "complete",
-                  data: JSON.stringify({ syncRunId }),
-                });
-                streamDone();
-              } else {
-                await stream.writeSSE({
-                  event: "entry",
-                  data: message,
-                });
+        redisSubscriber.on("message", (channel, message) => {
+          void (async () => {
+            if (channel === channelName) {
+              try {
+                const data = JSON.parse(message);
+                if (data.type === "complete") {
+                  await stream.writeSSE({
+                    event: "complete",
+                    data: JSON.stringify({ syncRunId }),
+                  });
+                  streamDone();
+                } else {
+                  await stream.writeSSE({
+                    event: "entry",
+                    data: message,
+                  });
+                }
+              } catch {
+                // Ignore parse errors
               }
-            } catch {
-              // Ignore parse errors
             }
-          }
+          })();
         });
 
-        const pingInterval = setInterval(async () => {
-          try {
-            await stream.writeSSE({
-              event: "ping",
-              data: JSON.stringify({ timestamp: Date.now() }),
-            });
-          } catch {
-            clearInterval(pingInterval);
-          }
+        const pingInterval = setInterval(() => {
+          void (async () => {
+            try {
+              await stream.writeSSE({
+                event: "ping",
+                data: JSON.stringify({ timestamp: Date.now() }),
+              });
+            } catch {
+              clearInterval(pingInterval);
+            }
+          })();
         }, 30000);
 
         stream.onAbort(() => {

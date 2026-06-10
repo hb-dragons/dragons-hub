@@ -252,7 +252,7 @@ function SyncHistoryTableInner({
               <div className="mt-4 text-center">
                 <Button
                   variant="outline"
-                  onClick={onLoadMore}
+                  onClick={() => { void onLoadMore(); }}
                   disabled={loadingMore}
                 >
                   {loadingMore && (

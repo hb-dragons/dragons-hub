@@ -304,7 +304,7 @@ export const QuickCreateSheet = forwardRef<QuickCreateSheetHandle>(
           </View>
 
           <Pressable
-            onPress={submit}
+            onPress={() => { void submit(); }}
             disabled={!title.trim() || submitting || selectedColumnId == null}
             accessibilityRole="button"
             style={{

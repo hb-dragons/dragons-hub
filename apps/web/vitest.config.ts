@@ -36,5 +36,24 @@ export default defineConfig({
         inline: [/@radix-ui/, /radix-ui/],
       },
     },
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/**/*.d.ts",
+        "src/messages/**",
+        "src/i18n/**",
+      ],
+      reporter: ["text", "html", "lcov"],
+      reportsDirectory: "./coverage",
+      thresholds: {
+        // Phase 2 measured floor (2026-06-10) — ratchet up over time.
+        branches: 9,
+        functions: 10,
+        lines: 12,
+        statements: 12,
+      },
+    },
   },
 });

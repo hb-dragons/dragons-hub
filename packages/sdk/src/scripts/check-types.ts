@@ -9,7 +9,7 @@ import { printReport } from "./report";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SAMPLES_DIR = resolve(__dirname, "../samples");
-const SDK_ROOT = resolve(__dirname, "../..");
+const _SDK_ROOT = resolve(__dirname, "../..");
 
 // Load .env from monorepo root
 config({ path: resolve(__dirname, "../../../../.env") });

@@ -110,7 +110,7 @@ vi.mock("../../config/logger", () => ({
 
 // --- Import after mocks ---
 
-import { processEvent, clearCoalesceCache, loadMutedEventTypes } from "./notification-pipeline";
+import { processEvent, clearCoalesceCache } from "./notification-pipeline";
 
 // --- Helpers ---
 
@@ -192,11 +192,9 @@ function setupDbMocks(opts: {
     // others use no chaining (prefs). Return a mock that resolves via any path.
     const mockResult = Promise.resolve(data);
     const withClause = {
-      ...mockResult,
       where: vi.fn().mockReturnValue({
-        ...Promise.resolve(data),
         limit: vi.fn().mockResolvedValue(data),
-        then: Promise.resolve(data).then.bind(Promise.resolve(data)),
+        then: mockResult.then.bind(mockResult),
       }),
       limit: vi.fn().mockResolvedValue(data),
       then: mockResult.then.bind(mockResult),
@@ -728,7 +726,6 @@ describe("processEvent", () => {
           const mockResult = Promise.resolve(data);
           return {
             from: vi.fn().mockReturnValue({
-              ...mockResult,
               where: vi.fn().mockResolvedValue(data),
               then: mockResult.then.bind(mockResult),
             }),
@@ -738,7 +735,6 @@ describe("processEvent", () => {
         const rejected = Promise.reject(new Error("DB error"));
         return {
           from: vi.fn().mockReturnValue({
-            ...rejected,
             then: rejected.then.bind(rejected),
             catch: rejected.catch.bind(rejected),
           }),

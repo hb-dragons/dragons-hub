@@ -58,9 +58,9 @@ export function MatchDetailPage({
   const periodScores = formatPeriodScores(match);
 
   function handleSaved() {
-    mutateDetail();
+    void mutateDetail();
     // Revalidate history — use a matcher to catch any limit/offset variant
-    globalMutate(
+    void globalMutate(
       (key) => typeof key === "string" && key.startsWith(`/admin/matches/${matchId}/history`),
     );
     router.refresh();

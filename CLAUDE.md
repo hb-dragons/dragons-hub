@@ -26,15 +26,17 @@ Managed with pnpm workspaces + Turborepo. See `AGENTS.md` for detailed architect
 ```bash
 pnpm dev                          # Start all services (Turbopack + tsx watch)
 pnpm build                        # Production build all packages
-pnpm lint                         # ESLint + tsc --noEmit across all packages
-pnpm typecheck                    # TypeScript checks across all packages
+pnpm lint                         # Real ESLint across all packages (distinct from typecheck)
+pnpm typecheck                    # tsc --noEmit across all packages
 pnpm test                         # Run all tests
-pnpm coverage                     # Run tests with coverage enforcement
+pnpm coverage                     # Run tests with per-package coverage enforcement
+pnpm check:coverage-scripts       # Fail if a package with tests lacks a coverage script
 
 # Package-specific
 pnpm --filter @dragons/api dev    # API only
 pnpm --filter @dragons/web dev    # Web only
 pnpm --filter @dragons/api test   # API tests only
+pnpm --filter @dragons/native test  # Native (Expo) tests only
 
 # Database
 pnpm --filter @dragons/db db:generate   # Generate Drizzle migrations
@@ -65,12 +67,17 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 
 ## Testing Requirements
 
-- **Coverage thresholds**: 90% branches, 95% functions/lines/statements (enforced in `apps/api/vitest.config.ts`)
+- **Coverage is gated per testable package** (`api`, `web`, `shared`, `api-client`, `contracts`, `native`), each with its own thresholds in that package's `vitest.config.ts`. `apps/api` holds the high bar (90% branches, 95% functions/lines/statements); the other packages start at their measured floor and **ratchet up** over time — never lower a threshold. CI runs `pnpm check:coverage-scripts`, which fails if a package with `*.test.*` files has no `coverage` script.
 - **Every new feature or changed behavior MUST have corresponding tests**
 - Tests live next to source files: `foo.ts` -> `foo.test.ts`
-- Test framework: Vitest (v4) with `@hono/node-server` for API tests
-- Run tests before committing: `pnpm --filter @dragons/api test`
+- Test framework: Vitest (v4) with `@hono/node-server` for API tests. `apps/native` uses a node-environment, logic-first vitest setup (react-native/expo are mocked per test; no RN component rendering).
+- Run tests before committing: `pnpm --filter @dragons/api test` (or the relevant package)
 - Coverage report: `pnpm --filter @dragons/api coverage`
+
+## Linting
+
+- `lint` and `typecheck` are **distinct** tasks. `pnpm lint` runs real ESLint (shared flat config in `eslint.config.base.mjs`); `pnpm typecheck` runs `tsc --noEmit`. Both run in CI.
+- Bug-class rules are **errors** (CI fails): `no-floating-promises`, `no-misused-promises`, `no-unused-vars` (`^_`-prefixed args/vars are ignored), `consistent-type-imports`. `no-explicit-any` is a warning (and `any` is still disallowed by convention).
 
 ## Code Conventions
 

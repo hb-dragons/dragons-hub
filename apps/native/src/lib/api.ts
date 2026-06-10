@@ -8,30 +8,21 @@ import {
   adminBoardEndpoints,
 } from "@dragons/api-client";
 import { authClient, resolveApiUrl } from "./auth-client";
+import { createOnceGuard } from "./auth/once-guard";
 
 const baseUrl = resolveApiUrl();
 
 // De-duplicate the 401 recovery flow so a burst of concurrent authed requests
 // can't trigger N sign-outs / navigations.
-let unauthorizedInFlight: Promise<void> | null = null;
-
-async function handleUnauthorized(): Promise<void> {
-  if (unauthorizedInFlight) return unauthorizedInFlight;
-  unauthorizedInFlight = (async () => {
-    try {
-      await authClient.signOut().catch(() => {});
-      // Clear every SWR cache entry without revalidating so post-signOut
-      // screens don't briefly show the previous user's data.
-      await globalMutate(() => true, undefined, { revalidate: false });
-      // `router` is a stable singleton from expo-router; safe to call outside
-      // the React tree. `replace("/")` is a no-op if already on home.
-      router.replace("/");
-    } finally {
-      unauthorizedInFlight = null;
-    }
-  })();
-  return unauthorizedInFlight;
-}
+const handleUnauthorized = createOnceGuard(async () => {
+  await authClient.signOut().catch(() => {});
+  // Clear every SWR cache entry without revalidating so post-signOut
+  // screens don't briefly show the previous user's data.
+  await globalMutate(() => true, undefined, { revalidate: false });
+  // `router` is a stable singleton from expo-router; safe to call outside
+  // the React tree. `replace("/")` is a no-op if already on home.
+  router.replace("/");
+});
 
 export const apiClient = new ApiClient({
   baseUrl,

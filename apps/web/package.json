@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "i18n:check": "i18n-check -l src/messages -s en -f next-intl",
-    "test": "vitest run"
+    "test": "vitest run",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.199",
@@ -49,6 +50,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/react-window": "^1.8.8",
+    "@vitest/coverage-v8": "^4.1.6",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9.28.0",
     "eslint-config-next": "16.2.6",

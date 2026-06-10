@@ -69,7 +69,7 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
           )}
         </div>
         {!isOpen && (
-          <Button variant="outline" size="sm" disabled={busy} onClick={handleUnassign}>{t("slot.unassign")}</Button>
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => { void handleUnassign(); }}>{t("slot.unassign")}</Button>
         )}
       </div>
 
@@ -84,7 +84,7 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
         <CandidatePicker
           gameApiId={gameApiId}
           slotNumber={slotNumber}
-          onPick={handleAssign}
+          onPick={(id) => { void handleAssign(id); }}
           disabled={busy}
         />
       )}

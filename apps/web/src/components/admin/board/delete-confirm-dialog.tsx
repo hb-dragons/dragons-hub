@@ -66,7 +66,7 @@ export function DeleteConfirmDialog({
           <div className="flex gap-2">
             <AlertDialogCancel>{t("delete.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleConfirm}
+              onClick={() => { void handleConfirm(); }}
               disabled={running}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
