@@ -27,8 +27,13 @@ export const base = tseslint.config(
       ],
       "@typescript-eslint/consistent-type-imports": "error",
       // --- stylistic / lower-value: warnings on first rollout ---
+      // `no-explicit-any` stays a warning: CLAUDE.md forbids `any`, and there
+      // are few enough that the warnings are actionable.
       "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-non-null-assertion": "warn",
+      // `no-non-null-assertion` intentionally OFF: `!` is used deliberately
+      // across the codebase under strict mode + noUncheckedIndexedAccess, so
+      // warning on ~1.2k call sites is noise that buries actionable warnings.
+      // Reducing `!` usage, if desired, is a separate dedicated effort.
     },
   },
 );
