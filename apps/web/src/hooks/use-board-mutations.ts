@@ -1,6 +1,6 @@
 import { useSWRConfig } from "swr";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type { BoardData } from "@dragons/shared";
 
@@ -19,10 +19,7 @@ export function useBoardMutations() {
 
   async function createBoard(input: BoardCreateInput): Promise<BoardData> {
     try {
-      const board = await fetchAPI<BoardData>("/admin/boards", {
-        method: "POST",
-        body: JSON.stringify(input),
-      });
+      const board = await api.boards.createBoard(input);
       await mutate(SWR_KEYS.boards);
       return board;
     } catch (err) {
@@ -36,10 +33,7 @@ export function useBoardMutations() {
     input: BoardUpdateInput,
   ): Promise<void> {
     try {
-      await fetchAPI(`/admin/boards/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(input),
-      });
+      await api.boards.updateBoard(id, input);
       await Promise.all([
         mutate(SWR_KEYS.boardDetail(id)),
         mutate(SWR_KEYS.boards),
@@ -52,7 +46,7 @@ export function useBoardMutations() {
 
   async function deleteBoard(id: number): Promise<void> {
     try {
-      await fetchAPI(`/admin/boards/${id}`, { method: "DELETE" });
+      await api.boards.deleteBoard(id);
       await mutate(SWR_KEYS.boards);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete board");

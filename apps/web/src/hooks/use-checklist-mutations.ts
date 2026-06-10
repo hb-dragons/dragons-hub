@@ -1,6 +1,6 @@
 import { useSWRConfig } from "swr";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type { ChecklistItem } from "@dragons/shared";
 
@@ -18,10 +18,7 @@ export function useChecklistMutations(boardId: number) {
     label: string,
   ): Promise<ChecklistItem> {
     try {
-      const item = await fetchAPI<ChecklistItem>(
-        `/admin/tasks/${taskId}/checklist`,
-        { method: "POST", body: JSON.stringify({ label }) },
-      );
+      const item = await api.boards.addChecklistItem(taskId, label);
       await Promise.all([
         mutate(SWR_KEYS.taskDetail(taskId)),
         mutate(matchBoardTasks(boardId)),
@@ -39,10 +36,7 @@ export function useChecklistMutations(boardId: number) {
     isChecked: boolean,
   ): Promise<void> {
     try {
-      await fetchAPI(`/admin/tasks/${taskId}/checklist/${itemId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ isChecked }),
-      });
+      await api.boards.updateChecklistItem(taskId, itemId, { isChecked });
       await Promise.all([
         mutate(SWR_KEYS.taskDetail(taskId)),
         mutate(matchBoardTasks(boardId)),
@@ -61,10 +55,7 @@ export function useChecklistMutations(boardId: number) {
     label: string,
   ): Promise<void> {
     try {
-      await fetchAPI(`/admin/tasks/${taskId}/checklist/${itemId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ label }),
-      });
+      await api.boards.updateChecklistItem(taskId, itemId, { label });
       await mutate(SWR_KEYS.taskDetail(taskId));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update item");
@@ -77,9 +68,7 @@ export function useChecklistMutations(boardId: number) {
     itemId: number,
   ): Promise<void> {
     try {
-      await fetchAPI(`/admin/tasks/${taskId}/checklist/${itemId}`, {
-        method: "DELETE",
-      });
+      await api.boards.deleteChecklistItem(taskId, itemId);
       await Promise.all([
         mutate(SWR_KEYS.taskDetail(taskId)),
         mutate(matchBoardTasks(boardId)),

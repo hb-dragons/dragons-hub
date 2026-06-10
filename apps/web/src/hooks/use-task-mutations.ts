@@ -1,6 +1,6 @@
 import { useSWRConfig } from "swr";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type { TaskCardData, TaskDetail, TaskPriority } from "@dragons/shared";
 
@@ -30,12 +30,9 @@ function matchBoardTasks(boardId: number) {
 export function useTaskMutations(boardId: number) {
   const { mutate } = useSWRConfig();
 
-  async function createTask(input: TaskCreateInput): Promise<TaskDetail> {
+  async function createTask(input: TaskCreateInput): Promise<TaskCardData> {
     try {
-      const created = await fetchAPI<TaskDetail>(
-        `/admin/boards/${boardId}/tasks`,
-        { method: "POST", body: JSON.stringify(input) },
-      );
+      const created = await api.boards.createTask(boardId, input);
       await mutate(matchBoardTasks(boardId));
       return created;
     } catch (err) {
@@ -49,10 +46,7 @@ export function useTaskMutations(boardId: number) {
     input: TaskUpdateInput,
   ): Promise<TaskDetail> {
     try {
-      const updated = await fetchAPI<TaskDetail>(`/admin/tasks/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(input),
-      });
+      const updated = await api.boards.updateTask(id, input);
       await Promise.all([
         mutate(SWR_KEYS.taskDetail(id), updated, { revalidate: false }),
         mutate(matchBoardTasks(boardId)),
@@ -70,10 +64,7 @@ export function useTaskMutations(boardId: number) {
     position: number,
   ): Promise<void> {
     try {
-      await fetchAPI(`/admin/tasks/${id}/move`, {
-        method: "PATCH",
-        body: JSON.stringify({ columnId, position }),
-      });
+      await api.boards.moveTask(id, { columnId, position });
       await mutate(matchBoardTasks(boardId));
     } catch (err) {
       await mutate(matchBoardTasks(boardId));
@@ -84,7 +75,7 @@ export function useTaskMutations(boardId: number) {
 
   async function deleteTask(id: number): Promise<void> {
     try {
-      await fetchAPI(`/admin/tasks/${id}`, { method: "DELETE" });
+      await api.boards.deleteTask(id);
       await mutate(
         matchBoardTasks(boardId),
         (current: TaskCardData[] | undefined) =>

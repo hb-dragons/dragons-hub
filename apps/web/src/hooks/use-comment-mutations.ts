@@ -1,6 +1,6 @@
 import { useSWRConfig } from "swr";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type { TaskComment } from "@dragons/shared";
 
@@ -12,10 +12,7 @@ export function useCommentMutations() {
     body: string,
   ): Promise<TaskComment> {
     try {
-      const comment = await fetchAPI<TaskComment>(
-        `/admin/tasks/${taskId}/comments`,
-        { method: "POST", body: JSON.stringify({ body }) },
-      );
+      const comment = await api.boards.addComment(taskId, body);
       await mutate(SWR_KEYS.taskDetail(taskId));
       return comment;
     } catch (err) {
@@ -30,10 +27,7 @@ export function useCommentMutations() {
     body: string,
   ): Promise<void> {
     try {
-      await fetchAPI(`/admin/tasks/${taskId}/comments/${commentId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ body }),
-      });
+      await api.boards.updateComment(taskId, commentId, body);
       await mutate(SWR_KEYS.taskDetail(taskId));
     } catch (err) {
       toast.error(
@@ -48,9 +42,7 @@ export function useCommentMutations() {
     commentId: number,
   ): Promise<void> {
     try {
-      await fetchAPI(`/admin/tasks/${taskId}/comments/${commentId}`, {
-        method: "DELETE",
-      });
+      await api.boards.deleteComment(taskId, commentId);
       await mutate(SWR_KEYS.taskDetail(taskId));
     } catch (err) {
       toast.error(

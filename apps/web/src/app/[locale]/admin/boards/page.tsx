@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { can } from "@dragons/shared";
 import type { BoardSummary } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { fetchAPIServer } from "@/lib/api.server";
+import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { CreateBoardDialog } from "@/components/admin/board/create-board-dialog";
 
@@ -16,7 +16,8 @@ export default async function BoardsPage() {
   let error: string | null = null;
 
   try {
-    boards = await fetchAPIServer<BoardSummary[]>("/admin/boards");
+    const sApi = await getServerApi();
+    boards = await sApi.boards.listBoards();
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load boards";
   }
