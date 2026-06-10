@@ -262,6 +262,13 @@
       "active": "Aktiv",
       "cancelled": "Abgesagt",
       "forfeited": "Kampflos"
+    },
+    "reschedule": {
+      "trigger": "Terminverschiebung vorschlagen",
+      "title": "Terminverschiebungs-Assistent",
+      "description": "Beschreibe deine Einschränkungen; ich schlage gültige Termine und Hallen vor.",
+      "placeholder": "z. B. nächste 3 Wochen, lieber Samstagabend, gleiche Halle",
+      "send": "Senden"
     }
   },
   "matchDetail": {
@@ -374,7 +381,10 @@
       "fieldCleared": "{field}: gelöscht (war {oldValue})",
       "showMore": "Mehr laden"
     },
-    "edit": "Bearbeiten"
+    "edit": "Bearbeiten",
+    "reschedule": {
+      "trigger": "Terminverschiebung vorschlagen"
+    }
   },
   "sync": {
     "title": "Synchronisation",
