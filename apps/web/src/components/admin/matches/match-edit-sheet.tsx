@@ -55,7 +55,7 @@ import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react"
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
 import type { OwnClubTeam } from "@dragons/shared";
-import { api, fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   formatMatchTime,
   formatPeriodScores,
@@ -751,14 +751,7 @@ export function MatchEditSheet({
                           value={field.value ?? ""}
                           onChange={(v) => field.onChange(v || null)}
                           onSearch={async (q) => {
-                            const result = await fetchAPI<{
-                              venues: {
-                                id: number;
-                                name: string;
-                                street: string | null;
-                                city: string | null;
-                              }[];
-                            }>(`/admin/venues/search?q=${encodeURIComponent(q)}`);
+                            const result = await api.venues.search({ q });
                             return result.venues.map(
                               (v): ComboboxOption => ({
                                 value: String(v.id),

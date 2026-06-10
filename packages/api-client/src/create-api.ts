@@ -16,6 +16,7 @@ import {
   broadcastEndpoints,
   watchRuleEndpoints,
   eventEndpoints,
+  venueEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -36,6 +37,7 @@ export function createApi(client: ApiClient) {
     broadcast: broadcastEndpoints(client),
     watchRules: watchRuleEndpoints(client),
     events: eventEndpoints(client),
+    venues: venueEndpoints(client),
   };
 }
 

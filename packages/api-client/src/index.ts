@@ -25,6 +25,7 @@ export {
   broadcastEndpoints,
   watchRuleEndpoints,
   eventEndpoints,
+  venueEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -77,4 +78,5 @@ export type {
   WatchRuleUpdateBody,
   EventListQuery,
   TriggerEventBody,
+  VenueSearchQuery,
 } from "./endpoints";

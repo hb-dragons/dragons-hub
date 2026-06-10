@@ -94,3 +94,6 @@ export type {
 
 export { eventEndpoints } from "./event";
 export type { EventListQuery, TriggerEventBody } from "@dragons/contracts";
+
+export { venueEndpoints } from "./venue";
+export type { VenueSearchQuery } from "@dragons/contracts";
