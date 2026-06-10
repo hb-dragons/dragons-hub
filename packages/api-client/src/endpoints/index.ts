@@ -99,3 +99,7 @@ export { venueEndpoints } from "./venue";
 export type { VenueSearchQuery } from "@dragons/contracts";
 
 export { standingsEndpoints } from "./standings";
+
+export { userEndpoints } from "./user";
+export type { UserRefereeLinkResult } from "./user";
+export type { UserRefereeLinkBody } from "@dragons/contracts";

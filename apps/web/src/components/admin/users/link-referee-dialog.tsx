@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import useSWR from "swr"
 import { toast } from "sonner"
-import { api, fetchAPI } from "@/lib/api"
+import { api } from "@/lib/api"
 
 import { Button } from "@dragons/ui/components/button"
 import {
@@ -64,11 +64,7 @@ export function LinkRefereeDialog({
     try {
       // Referee status is identity-based: the refereeId FK on the user is the
       // authoritative "is a referee" signal. No role assignment is needed.
-      await fetchAPI(`/admin/users/${user.id}/referee-link`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refereeId: selected.id }),
-      })
+      await api.users.linkReferee(user.id, { refereeId: selected.id })
 
       toast.success(t("users.toast.refereeLinked"))
       onOpenChange(false)

@@ -18,6 +18,7 @@ import {
   eventEndpoints,
   venueEndpoints,
   standingsEndpoints,
+  userEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -40,6 +41,7 @@ export function createApi(client: ApiClient) {
     events: eventEndpoints(client),
     venues: venueEndpoints(client),
     standings: standingsEndpoints(client),
+    users: userEndpoints(client),
   };
 }
 

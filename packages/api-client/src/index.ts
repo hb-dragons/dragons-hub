@@ -27,6 +27,7 @@ export {
   eventEndpoints,
   venueEndpoints,
   standingsEndpoints,
+  userEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -80,4 +81,6 @@ export type {
   EventListQuery,
   TriggerEventBody,
   VenueSearchQuery,
+  UserRefereeLinkBody,
+  UserRefereeLinkResult,
 } from "./endpoints";
