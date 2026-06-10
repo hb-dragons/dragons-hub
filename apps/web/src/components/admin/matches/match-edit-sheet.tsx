@@ -54,7 +54,7 @@ import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react"
 
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
-import { fetchAPI } from "@/lib/api";
+import { api, fetchAPI } from "@/lib/api";
 import {
   formatMatchTime,
   formatPeriodScores,
@@ -62,10 +62,10 @@ import {
 import {
   matchFormSchema,
   type MatchDetail,
-  type MatchDetailResponse,
   type FieldDiff,
   type MatchFormValues,
 } from "./types";
+import type { MatchUpdateBody } from "@dragons/api-client";
 
 // ---------------------------------------------------------------------------
 // OverrideField — conditional layout (#2, #8)
@@ -271,7 +271,8 @@ export function MatchEditSheet({
     let cancelled = false;
     setLoading(true);
 
-    fetchAPI<MatchDetailResponse>(`/admin/matches/${matchId}`)
+    api.matches
+      .get(matchId)
       .then((result) => {
         if (cancelled) return;
         setMatch(result.match);
@@ -323,12 +324,14 @@ export function MatchEditSheet({
       if (!match) return;
       const { dirtyFields: currentDirtyFields } = form.formState;
 
-      const updateData: Record<string, unknown> = {};
+      const dirtyValues: Partial<MatchFormValues> = {};
       for (const key of Object.keys(data) as (keyof typeof data)[]) {
         if (currentDirtyFields[key]) {
-          updateData[key] = data[key];
+          (dirtyValues[key] as MatchFormValues[typeof key]) = data[key];
         }
       }
+
+      const updateData: MatchUpdateBody = { ...dirtyValues };
 
       // Include venueId when a venue was selected from the combobox
       if (currentDirtyFields.venueNameOverride && selectedVenueIdRef.current != null) {
@@ -339,13 +342,7 @@ export function MatchEditSheet({
 
       try {
         setSaving(true);
-        const result = await fetchAPI<MatchDetailResponse>(
-          `/admin/matches/${match.id}`,
-          {
-            method: "PATCH",
-            body: JSON.stringify(updateData),
-          },
-        );
+        const result = await api.matches.update(match.id, updateData);
         setMatch(result.match);
         setDiffs(result.diffs);
         selectedVenueIdRef.current = null;
@@ -367,10 +364,7 @@ export function MatchEditSheet({
       if (!match) return;
       try {
         setSaving(true);
-        const result = await fetchAPI<MatchDetailResponse>(
-          `/admin/matches/${match.id}/overrides/${fieldName}`,
-          { method: "DELETE" },
-        );
+        const result = await api.matches.releaseOverride(match.id, fieldName);
         setMatch(result.match);
         setDiffs(result.diffs);
         selectedVenueIdRef.current = null;

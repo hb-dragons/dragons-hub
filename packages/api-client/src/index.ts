@@ -13,6 +13,7 @@ export {
   deviceEndpoints,
   refereeEndpoints,
   adminBoardEndpoints,
+  matchEndpoints,
 } from "./endpoints";
 export type {
   MatchQueryParams,
@@ -28,4 +29,7 @@ export type {
   BoardUpdateBody,
   ColumnCreateBody,
   ColumnUpdateBody,
+  MatchListQuery,
+  MatchUpdateBody,
+  MatchHistoryQuery,
 } from "./endpoints";

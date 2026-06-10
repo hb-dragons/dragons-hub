@@ -18,3 +18,10 @@ export type {
   TaskMoveBody,
   TaskListQuery,
 } from "@dragons/contracts";
+
+export { matchEndpoints } from "./match";
+export type {
+  MatchListQuery,
+  MatchUpdateBody,
+  MatchHistoryQuery,
+} from "@dragons/contracts";

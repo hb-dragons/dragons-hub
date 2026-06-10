@@ -4,6 +4,7 @@ import {
   deviceEndpoints,
   refereeEndpoints,
   adminBoardEndpoints,
+  matchEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -12,6 +13,7 @@ export function createApi(client: ApiClient) {
     devices: deviceEndpoints(client),
     referees: refereeEndpoints(client),
     boards: adminBoardEndpoints(client),
+    matches: matchEndpoints(client),
   };
 }
 
