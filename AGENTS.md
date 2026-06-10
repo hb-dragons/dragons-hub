@@ -317,6 +317,25 @@ Match list and detail responses include associated venue booking data when avail
 |--------|------|-------------|
 | POST | `/admin/assistant/reschedule/chat` | Rescheduling copilot chat (AI SDK UI message stream). 503 when ASSISTANT_ENABLED=false. Permission: match:update |
 
+### MCP server
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/mcp` | Streamable-HTTP MCP endpoint. Bearer-token auth (`Authorization: Bearer $MCP_TOKEN`), not the admin session gate. Exposes the read-only reschedule tools (`get_match`, `list_club_matches`, `list_venue_bookings`, `list_club_venues`, `get_round_window`, `get_referee_context`, `verify_slot`). Stateless. 401 on missing/invalid token. |
+
+The same provider-neutral tool registry that backs the in-app chat is served here for external hosts (Claude Desktop, Cursor). The tools are read-only: they never write to the federation. Attach a host with:
+
+```json
+{
+  "mcpServers": {
+    "dragons-reschedule": {
+      "url": "https://<api-host>/mcp",
+      "headers": { "Authorization": "Bearer <MCP_TOKEN>" }
+    }
+  }
+}
+```
+
 ### Admin - Bookings
 
 | Method | Path | Description |
