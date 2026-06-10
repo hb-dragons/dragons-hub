@@ -32,6 +32,7 @@ export {
   bookingUpdateBodySchema,
   bookingStatusBodySchema,
   bookingCreateBodySchema,
+  type BookingListQuery,
   type BookingCreateBody,
   type BookingUpdateBody,
   type BookingStatusBody,

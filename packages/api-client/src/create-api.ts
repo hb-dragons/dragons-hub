@@ -9,6 +9,7 @@ import {
   notificationEndpoints,
   socialEndpoints,
   settingsEndpoints,
+  bookingEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -22,6 +23,7 @@ export function createApi(client: ApiClient) {
     notifications: notificationEndpoints(client),
     social: socialEndpoints(client),
     settings: settingsEndpoints(client),
+    bookings: bookingEndpoints(client),
   };
 }
 

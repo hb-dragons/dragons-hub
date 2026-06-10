@@ -33,6 +33,7 @@ export const bookingCreateBodySchema = z.object({
   matchIds: z.array(z.number().int().positive()).optional(),
 });
 
+export type BookingListQuery = z.infer<typeof bookingListQuerySchema>;
 export type BookingCreateBody = z.infer<typeof bookingCreateBodySchema>;
 export type BookingUpdateBody = z.infer<typeof bookingUpdateBodySchema>;
 export type BookingStatusBody = z.infer<typeof bookingStatusBodySchema>;

@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import {
   Dialog,
@@ -95,16 +95,13 @@ export function CreateBookingDialog({
 
     setSubmitting(true);
     try {
-      await fetchAPI("/admin/bookings", {
-        method: "POST",
-        body: JSON.stringify({
-          venueId,
-          date,
-          overrideStartTime: startTime,
-          overrideEndTime: endTime,
-          overrideReason: overrideReason || undefined,
-          notes: notes || undefined,
-        }),
+      await api.bookings.create({
+        venueId,
+        date,
+        overrideStartTime: startTime,
+        overrideEndTime: endTime,
+        overrideReason: overrideReason || undefined,
+        notes: notes || undefined,
       });
       await mutate(SWR_KEYS.bookings);
       toast.success(t("bookings.toast.created"));
