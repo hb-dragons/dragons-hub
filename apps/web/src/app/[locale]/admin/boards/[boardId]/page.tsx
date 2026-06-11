@@ -12,7 +12,7 @@ import { getServerSession } from "@/lib/auth-server";
 import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { BoardView } from "@/components/admin/board/board-view";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 
 export default async function BoardDetailPage({
   params,
@@ -47,7 +47,6 @@ export default async function BoardDetailPage({
     ...(assigneeIds.length === 1 ? { assigneeId: assigneeIds[0] } : {}),
     ...(priority ? { priority } : {}),
   };
-  const tasksKey = SWR_KEYS.boardTasks(boardId, taskFilters);
 
   const t = await getTranslations();
   let board: BoardData | null = null;
@@ -55,12 +54,17 @@ export default async function BoardDetailPage({
   let boards: BoardSummary[] = [];
   let error: string | null = null;
 
+  const sApi = await getServerApi();
+  const sq = makeQueries(sApi);
+  const boardDetailQ = sq.boardDetail(boardId);
+  const boardTasksQ = sq.boardTasks(boardId, taskFilters);
+  const boardsQ = sq.boards();
+
   try {
-    const sApi = await getServerApi();
     [board, tasks, boards] = await Promise.all([
-      sApi.boards.getBoard(boardId),
-      sApi.boards.listTasks(boardId, taskFilters),
-      sApi.boards.listBoards(),
+      boardDetailQ.fetcher(),
+      boardTasksQ.fetcher(),
+      boardsQ.fetcher(),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load board";
@@ -83,9 +87,9 @@ export default async function BoardDetailPage({
       <SWRConfig
         value={{
           fallback: {
-            [SWR_KEYS.boardDetail(boardId)]: board,
-            [tasksKey]: tasks,
-            [SWR_KEYS.boards]: boards,
+            [boardDetailQ.key]: board,
+            [boardTasksQ.key]: tasks,
+            [boardsQ.key]: boards,
           },
         }}
       >

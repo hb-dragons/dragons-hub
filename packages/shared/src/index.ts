@@ -149,6 +149,8 @@ export type {
   FailedNotificationListResult,
   TestPushTicket,
   TestPushResponse,
+  TestPushRecentItem,
+  TestPushRecentResponse,
 } from "./notifications";
 export type {
   SocialMatchItem,

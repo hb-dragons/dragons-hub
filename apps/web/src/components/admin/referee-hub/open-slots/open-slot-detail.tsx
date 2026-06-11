@@ -2,9 +2,8 @@
 
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
-import { apiFetcher } from "@/lib/swr";
+import { queries } from "@/lib/swr-queries";
 import { SlotCard } from "./slot-card";
-import type { RefereeGameListItem } from "@dragons/shared";
 
 interface Props {
   selectedGameId: number;
@@ -12,8 +11,8 @@ interface Props {
 
 export function OpenSlotDetail({ selectedGameId }: Props) {
   const t = useTranslations("refereeHub.openSlots");
-  const key = `/referee/games/by-api-match/${selectedGameId}`;
-  const { data: game, mutate } = useSWR<RefereeGameListItem>(key, apiFetcher);
+  const gameQ = queries.refereeGameByApiMatch(selectedGameId);
+  const { data: game, mutate } = useSWR(gameQ.key, gameQ.fetcher);
 
   if (!game) {
     return (

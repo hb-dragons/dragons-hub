@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import useSWR from "swr";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import {
   Card,
   CardContent,
@@ -33,10 +32,10 @@ export function MatchChangeHistory({
   const format = useFormatter();
   const [limit, setLimit] = useState(PAGE_SIZE);
 
-  const swrKey = SWR_KEYS.matchHistory(matchId, limit, 0);
-  const { data, isLoading } = useSWR<MatchChangeHistoryResponse>(
-    swrKey,
-    apiFetcher,
+  const matchHistoryQ = queries.matchHistory(matchId, limit, 0);
+  const { data, isLoading } = useSWR(
+    matchHistoryQ.key,
+    matchHistoryQ.fetcher,
     { fallbackData: initialData },
   );
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
-import { apiFetcher } from "@/lib/swr";
+import { queries } from "@/lib/swr-queries";
 import { api, APIError } from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -26,21 +26,6 @@ import {
   TableRow,
 } from "@dragons/ui/components/table";
 import { Loader2, Send } from "lucide-react";
-
-const TEST_PUSH_RECENT_ENDPOINT = "/admin/notifications/test-push/recent";
-
-interface TestPushRecentItem {
-  id: number;
-  sentAt: string | null;
-  recipientToken: string | null;
-  status: string;
-  providerTicketId: string | null;
-  errorMessage: string | null;
-}
-
-interface TestPushRecentResponse {
-  results: TestPushRecentItem[];
-}
 
 const statusVariant: Record<
   string,
@@ -65,11 +50,8 @@ export function PushTestCard() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
-  const { data, mutate } = useSWR<TestPushRecentResponse>(
-    TEST_PUSH_RECENT_ENDPOINT,
-    apiFetcher,
-    { refreshInterval: 5000 },
-  );
+  const recentQ = queries.testPushRecent();
+  const { data, mutate } = useSWR(recentQ.key, recentQ.fetcher, { refreshInterval: 5000 });
 
   async function handleSend() {
     setSending(true);

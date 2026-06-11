@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
-import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
 import {
@@ -20,13 +20,13 @@ import { Label } from "@dragons/ui/components/label";
 import { Loader2, Check, Save } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import type { ClubConfig as ClubConfigType } from "./settings-provider";
 
 export function ClubConfig() {
   const t = useTranslations();
   const { data: session } = authClient.useSession();
   const canUpdate = can(session?.user ?? null, "settings", "update");
-  const { data: clubConfig } = useSWR<ClubConfigType | null>(SWR_KEYS.settingsClub, apiFetcher);
+  const settingsClubQ = queries.settingsClub();
+  const { data: clubConfig } = useSWR(settingsClubQ.key, settingsClubQ.fetcher);
   const { mutate } = useSWRConfig();
   const [clubId, setClubId] = useState(clubConfig?.clubId?.toString() ?? "");
   const [clubName, setClubName] = useState(clubConfig?.clubName ?? "");

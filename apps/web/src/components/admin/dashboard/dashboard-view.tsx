@@ -3,8 +3,7 @@
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
 import { Link } from "@/lib/navigation";
-import { SWR_KEYS } from "@/lib/swr-keys";
-import { apiFetcher } from "@/lib/swr";
+import { queries } from "@/lib/swr-queries";
 import { todayInBerlin } from "@/lib/tz";
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
@@ -22,13 +21,6 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { cn } from "@dragons/ui/lib/utils";
-import type {
-  PaginatedResponse,
-  MatchListItem,
-  LeagueStandings,
-  RefereeListItem,
-} from "@dragons/shared";
-import type { SyncStatusData } from "./types";
 
 function formatTime(kickoffTime: string | null): string {
   if (!kickoffTime) return "--:--";
@@ -46,30 +38,18 @@ export function DashboardView() {
   const canViewTeams = can(user, "team", "view");
   const canViewSync = can(user, "sync", "view");
 
-  const { data: referees } = useSWR<PaginatedResponse<RefereeListItem>>(
-    canViewReferees ? SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 }) : null,
-    apiFetcher,
-  );
-  const { data: upcoming } = useSWR<PaginatedResponse<MatchListItem>>(
-    canViewMatches ? SWR_KEYS.dashboardUpcomingMatches : null,
-    apiFetcher,
-  );
-  const { data: todayMatches } = useSWR<PaginatedResponse<MatchListItem>>(
-    canViewMatches ? SWR_KEYS.dashboardTodayMatches(today) : null,
-    apiFetcher,
-  );
-  const { data: standings } = useSWR<LeagueStandings[]>(
-    canViewStandings ? SWR_KEYS.standings : null,
-    apiFetcher,
-  );
-  const { data: teams } = useSWR<{ id: number; name: string }[]>(
-    canViewTeams ? SWR_KEYS.teams : null,
-    apiFetcher,
-  );
-  const { data: syncStatus } = useSWR<SyncStatusData>(
-    canViewSync ? SWR_KEYS.syncStatus : null,
-    apiFetcher,
-  );
+  const refsQ = queries.refereesPaginated({ scope: "own", limit: 50 });
+  const { data: referees } = useSWR(canViewReferees ? refsQ.key : null, refsQ.fetcher);
+  const upcomingQ = queries.dashboardUpcomingMatches();
+  const { data: upcoming } = useSWR(canViewMatches ? upcomingQ.key : null, upcomingQ.fetcher);
+  const todayQ = queries.dashboardTodayMatches(today);
+  const { data: todayMatches } = useSWR(canViewMatches ? todayQ.key : null, todayQ.fetcher);
+  const standingsQ = queries.standings();
+  const { data: standings } = useSWR(canViewStandings ? standingsQ.key : null, standingsQ.fetcher);
+  const teamsQ = queries.teams();
+  const { data: teams } = useSWR(canViewTeams ? teamsQ.key : null, teamsQ.fetcher);
+  const statusQ = queries.syncStatus();
+  const { data: syncStatus } = useSWR(canViewSync ? statusQ.key : null, statusQ.fetcher);
 
   // Compute KPIs
   const refereeCount = referees?.total ?? 0;
@@ -90,7 +70,7 @@ export function DashboardView() {
       (m) => !m.anschreiber && !m.zeitnehmer && !m.isCancelled,
     ).length ?? 0;
 
-  const syncFailed = syncStatus?.lastRun?.status === "failed";
+  const syncFailed = syncStatus?.lastSync?.status === "failed";
 
   return (
     <div className="space-y-8">

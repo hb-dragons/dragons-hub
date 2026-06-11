@@ -12,6 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@dragons/ui/components/alert-dialog";
+// eslint-disable-next-line no-restricted-imports -- postForm is a multipart upload not in the typed `api` registry; delete uses a prop-supplied endpoint so this generic grid can't resolve a typed api.social.delete* method
 import { browserClient } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";

@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { getServerApi } from "@/lib/api.server";
 import { SWRConfig } from "swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 import { TeamsTable } from "./teams-table";
 import type { OwnClubTeam } from "@dragons/shared";
 
@@ -18,8 +18,12 @@ export default async function TeamsPage() {
   let teams: OwnClubTeam[] | null = null;
   let error: string | null = null;
 
+  const sApi = await getServerApi();
+  const sq = makeQueries(sApi);
+  const teamsQ = sq.teams();
+
   try {
-    teams = await (await getServerApi()).teams.list();
+    teams = await teamsQ.fetcher();
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";
   }
@@ -31,7 +35,7 @@ export default async function TeamsPage() {
       {error ? (
         <p className="text-destructive">{error}</p>
       ) : (
-        <SWRConfig value={{ fallback: { [SWR_KEYS.teams]: teams } }}>
+        <SWRConfig value={{ fallback: { [teamsQ.key]: teams } }}>
           <TeamsTable canManage={canManage} />
         </SWRConfig>
       )}

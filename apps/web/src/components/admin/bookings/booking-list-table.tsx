@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
-import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
@@ -46,10 +46,8 @@ export function BookingListTable() {
   const format = useFormatter();
   const { data: session } = authClient.useSession();
   const canCreate = can(session?.user ?? null, "booking", "create");
-  const { data: bookings } = useSWR<BookingListItem[]>(
-    SWR_KEYS.bookings,
-    apiFetcher,
-  );
+  const bookingsQ = queries.bookings();
+  const { data: bookings } = useSWR(bookingsQ.key, bookingsQ.fetcher);
   const { mutate } = useSWRConfig();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);

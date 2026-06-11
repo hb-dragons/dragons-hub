@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/auth-server";
 import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 import { NotificationCenter } from "@/components/admin/notifications/notification-center";
 import type {
   NotificationListResult,
@@ -21,11 +21,15 @@ export default async function NotificationsPage() {
   let failed: FailedNotificationListResult | null = null;
   let error: string | null = null;
 
+  const sApi = await getServerApi();
+  const sq = makeQueries(sApi);
+  const notificationsQ = sq.notifications(20, 0);
+  const failedEventsQ = sq.domainEventsFailed(1, 20);
+
   try {
-    const sApi = await getServerApi();
     [notifications, failed] = await Promise.all([
-      sApi.notifications.list({ limit: 20, offset: 0 }),
-      sApi.events.failed({ page: 1, limit: 20 }),
+      notificationsQ.fetcher(),
+      failedEventsQ.fetcher(),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";
@@ -49,8 +53,8 @@ export default async function NotificationsPage() {
       <SWRConfig
         value={{
           fallback: {
-            [SWR_KEYS.notifications(20, 0)]: notifications,
-            [SWR_KEYS.domainEventsFailed(1, 20)]: failed,
+            [notificationsQ.key]: notifications,
+            [failedEventsQ.key]: failed,
           },
         }}
       >

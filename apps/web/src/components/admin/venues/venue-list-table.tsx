@@ -3,8 +3,7 @@
 import { useMemo } from "react"
 import { useTranslations } from "next-intl"
 import useSWR from "swr"
-import { apiFetcher } from "@/lib/swr"
-import { SWR_KEYS } from "@/lib/swr-keys"
+import { queries } from "@/lib/swr-queries"
 import type { ColumnDef, FilterFn } from "@tanstack/react-table"
 import { MapPin, SearchIcon } from "lucide-react"
 import { Input } from "@dragons/ui/components/input"
@@ -112,7 +111,8 @@ const venueGlobalFilterFn: FilterFn<VenueListItem> = (
 
 export function VenueListTable() {
   const t = useTranslations("venues")
-  const { data: venueList } = useSWR<VenueListItem[]>(SWR_KEYS.venues, apiFetcher)
+  const venuesQ = queries.venues()
+  const { data: venueList } = useSWR(venuesQ.key, venuesQ.fetcher)
   const columns = useMemo(() => getColumns(t), [t])
 
   const allItems = venueList ?? []

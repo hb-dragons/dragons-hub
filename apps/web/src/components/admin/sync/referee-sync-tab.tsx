@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { SWRConfig } from "swr";
 import { RefereeSyncRunContext } from "./use-sync";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { RefereeSyncStatusCards } from "./referee-sync-status-cards";
 import { RefereeSyncHistoryTable } from "./sync-history-table";
 import { RefereeSyncScheduleConfig } from "./referee-sync-schedule-config";
@@ -42,13 +42,17 @@ export function RefereeSyncRunProvider({
   );
   const [triggering, setTriggering] = useState(false);
 
+  const statusQ = queries.refereeSyncStatus();
+  const logsQ = queries.refereeSyncLogs(20, 0);
+  const scheduleQ = queries.refereeSyncSchedule();
+
   return (
     <SWRConfig
       value={{
         fallback: {
-          [SWR_KEYS.refereeSyncStatus]: initialStatus,
-          [SWR_KEYS.refereeSyncLogs(20, 0)]: initialLogs,
-          [SWR_KEYS.refereeSyncSchedule]: initialSchedule,
+          [statusQ.key]: initialStatus,
+          [logsQ.key]: initialLogs,
+          [scheduleQ.key]: initialSchedule,
         },
       }}
     >

@@ -2,8 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import useSWR from "swr"
-import { apiFetcher } from "@/lib/swr"
-import { SWR_KEYS } from "@/lib/swr-keys"
+import { queries } from "@/lib/swr-queries"
 import { Trophy } from "lucide-react"
 import {
   Table,
@@ -15,11 +14,11 @@ import {
 } from "@dragons/ui/components/table"
 import { cn } from "@dragons/ui/lib/utils"
 
-import type { LeagueStandings } from "./types"
 
 export function StandingsView() {
   const t = useTranslations("standings")
-  const { data: leagues } = useSWR<LeagueStandings[]>(SWR_KEYS.standings, apiFetcher)
+  const standingsQ = queries.standings()
+  const { data: leagues } = useSWR(standingsQ.key, standingsQ.fetcher)
 
   const leagueList = leagues ?? []
 

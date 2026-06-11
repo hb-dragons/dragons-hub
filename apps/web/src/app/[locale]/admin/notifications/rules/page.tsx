@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/auth-server";
 import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 import { WatchRulesList } from "@/components/admin/notifications/watch-rules-list";
 import type {
   WatchRuleListResult,
@@ -21,11 +21,15 @@ export default async function WatchRulesPage() {
   let channelsData: ChannelConfigListResult | null = null;
   let error: string | null = null;
 
+  const serverApi = await getServerApi();
+  const sq = makeQueries(serverApi);
+  const watchRulesQ = sq.watchRules();
+  const channelConfigsQ = sq.channelConfigs();
+
   try {
-    const serverApi = await getServerApi();
     [rulesData, channelsData] = await Promise.all([
-      serverApi.watchRules.list(),
-      serverApi.channelConfigs.list(),
+      watchRulesQ.fetcher(),
+      channelConfigsQ.fetcher(),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";
@@ -43,8 +47,8 @@ export default async function WatchRulesPage() {
         <SWRConfig
           value={{
             fallback: {
-              [SWR_KEYS.watchRules]: rulesData,
-              [SWR_KEYS.channelConfigs]: channelsData,
+              [watchRulesQ.key]: rulesData,
+              [channelConfigsQ.key]: channelsData,
             },
           }}
         >

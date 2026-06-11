@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
-import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import {
   Card,
   CardContent,
@@ -19,15 +19,13 @@ import { Loader2, Save } from "lucide-react";
 import { Switch } from "@dragons/ui/components/switch";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import type {
-  ClubConfig as ClubConfigType,
-  TrackedLeaguesResponse,
-} from "./settings-provider";
 
 export function TrackedLeagues() {
   const t = useTranslations();
-  const { data: clubConfig } = useSWR<ClubConfigType | null>(SWR_KEYS.settingsClub, apiFetcher);
-  const { data: leaguesData } = useSWR<TrackedLeaguesResponse>(SWR_KEYS.settingsLeagues, apiFetcher);
+  const settingsClubQ = queries.settingsClub();
+  const { data: clubConfig } = useSWR(settingsClubQ.key, settingsClubQ.fetcher);
+  const settingsLeaguesQ = queries.settingsLeagues();
+  const { data: leaguesData } = useSWR(settingsLeaguesQ.key, settingsLeaguesQ.fetcher);
   const { mutate } = useSWRConfig();
 
   const trackedLeagues = leaguesData?.leagues.map((l) => ({

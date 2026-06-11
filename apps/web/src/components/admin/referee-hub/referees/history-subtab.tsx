@@ -3,20 +3,11 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { Button } from "@dragons/ui/components/button";
-import type { RefereeListItem, HistoryGameItem } from "@dragons/shared";
+import type { RefereeListItem } from "@dragons/shared";
 
 interface Props { referee: RefereeListItem }
-
-interface HistoryResp {
-  items: HistoryGameItem[];
-  total: number;
-  limit: number;
-  offset: number;
-  hasMore: boolean;
-}
 
 const PAGE = 50;
 
@@ -30,7 +21,9 @@ export function HistorySubtab({ referee }: Props) {
     offset: "0",
   }).toString();
 
-  const { data } = useSWR<HistoryResp>(SWR_KEYS.refereeHistoryGames(qs), apiFetcher);
+  const historyQuery = { refereeApiId: referee.apiId, limit: pages * PAGE, offset: 0 };
+  const historyQ = queries.refereeHistoryGames(historyQuery, qs);
+  const { data } = useSWR(historyQ.key, historyQ.fetcher);
   const items = data?.items ?? [];
 
   return (

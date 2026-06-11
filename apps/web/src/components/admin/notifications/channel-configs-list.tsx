@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
-import { apiFetcher } from "@/lib/swr";
 import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
 import {
@@ -35,8 +35,6 @@ import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type {
   ChannelConfigItem,
-  ChannelConfigListResult,
-  ProviderAvailability,
 } from "./types";
 
 type ChannelType = ChannelConfigItem["type"];
@@ -117,14 +115,11 @@ function channelTypeLabel(type: string, t: TranslateFunc): string {
 export function ChannelConfigsList() {
   const t = useTranslations("channelConfigs");
   const tCommon = useTranslations("common");
-  const { data: result } = useSWR<ChannelConfigListResult>(
-    SWR_KEYS.channelConfigs,
-    apiFetcher,
-  );
-  const { data: providers } = useSWR<ProviderAvailability>(
-    SWR_KEYS.channelConfigProviders,
-    apiFetcher,
-  );
+  const channelConfigsQ = queries.channelConfigs();
+  const channelConfigProvidersQ = queries.channelConfigProviders();
+
+  const { data: result } = useSWR(channelConfigsQ.key, channelConfigsQ.fetcher);
+  const { data: providers } = useSWR(channelConfigProvidersQ.key, channelConfigProvidersQ.fetcher);
   const { mutate } = useSWRConfig();
 
   const availableTypes = CHANNEL_TYPES.filter(

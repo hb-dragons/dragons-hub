@@ -2,8 +2,7 @@
 
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { useRefereeHubUrl, type HubSubtab } from "../use-referee-hub-url";
 import { ProfileSubtab } from "./profile-subtab";
 import { RulesSubtab } from "./rules-subtab";
@@ -11,7 +10,6 @@ import { UpcomingSubtab } from "./upcoming-subtab";
 import { HistorySubtab } from "./history-subtab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@dragons/ui/components/tabs";
 import { Badge } from "@dragons/ui/components/badge";
-import type { RefereeListItem } from "@dragons/shared";
 
 interface Props { refereeId: number }
 
@@ -19,7 +17,8 @@ export function RefereeDetail({ refereeId }: Props) {
   const t = useTranslations("refereeHub.referees");
   const { state, update } = useRefereeHubUrl();
 
-  const { data: ref, isLoading } = useSWR<RefereeListItem | null>(SWR_KEYS.referee(refereeId), apiFetcher);
+  const refereeQ = queries.referee(refereeId);
+  const { data: ref, isLoading } = useSWR(refereeQ.key, refereeQ.fetcher);
 
   if (isLoading && !ref) return <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>;
   if (!ref) return <div className="p-6 text-sm text-muted-foreground">{t("notFound")}</div>;

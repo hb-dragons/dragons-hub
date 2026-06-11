@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/auth-server";
 import { getServerApi } from "@/lib/api.server"
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 import { VenueListTable } from "@/components/admin/venues/venue-list-table"
 import type { VenueListItem } from "@/components/admin/venues/types"
 
@@ -17,8 +17,12 @@ export default async function VenuesPage() {
   let data: VenueListItem[] | null = null;
   let error: string | null = null;
 
+  const sApi = await getServerApi();
+  const sq = makeQueries(sApi);
+  const venuesQ = sq.venues();
+
   try {
-    data = await (await getServerApi()).venues.list();
+    data = await venuesQ.fetcher();
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";
   }
@@ -32,7 +36,7 @@ export default async function VenuesPage() {
           {error}
         </div>
       ) : (
-        <SWRConfig value={{ fallback: { [SWR_KEYS.venues]: data } }}>
+        <SWRConfig value={{ fallback: { [venuesQ.key]: data } }}>
           <VenueListTable />
         </SWRConfig>
       )}

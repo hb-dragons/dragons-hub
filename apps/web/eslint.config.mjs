@@ -38,7 +38,20 @@ export default defineConfig([
         {
           name: "fetch",
           message:
-            "Use the typed client: `api`/`getServerApi()` from @/lib/api(.server), or `apiFetcher` for SWR. Raw fetch is only for non-JSON (blob/multipart) and must carry an eslint-disable with a reason.",
+            "Use the typed client: `api`/`getServerApi()` from @/lib/api(.server), or the `queries` registry from @/lib/swr-queries for SWR reads. Raw fetch is only for non-JSON (blob/multipart) and must carry an eslint-disable with a reason.",
+        },
+      ],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/lib/api",
+              importNames: ["browserClient"],
+              message:
+                "Components use `api` or the `queries` registry, not the raw browserClient.",
+            },
+          ],
         },
       ],
     },

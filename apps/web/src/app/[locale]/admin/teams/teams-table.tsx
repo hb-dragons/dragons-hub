@@ -23,8 +23,8 @@ import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
-import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { api } from "@/lib/api";
 import { COLOR_PRESET_KEYS, getColorPreset } from "@dragons/shared";
 import type { OwnClubTeam } from "@dragons/shared";
@@ -198,7 +198,8 @@ interface TeamsTableProps {
 
 export function TeamsTable({ canManage }: TeamsTableProps) {
   const t = useTranslations();
-  const { data: teams } = useSWR<OwnClubTeam[]>(SWR_KEYS.teams, apiFetcher);
+  const teamsQ = queries.teams();
+  const { data: teams } = useSWR(teamsQ.key, teamsQ.fetcher);
   const { mutate } = useSWRConfig();
   const teamsList = teams ?? [];
   const [drafts, setDrafts] = useState<Record<number, string>>({});

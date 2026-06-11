@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
-import { apiFetcher } from "@/lib/swr";
 import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
 import {
@@ -48,10 +48,8 @@ import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import type {
   WatchRuleItem,
-  WatchRuleListResult,
   FilterCondition,
   ChannelTarget,
-  ChannelConfigListResult,
   ChannelConfigItem,
 } from "./types";
 
@@ -121,14 +119,11 @@ function ruleToForm(rule: WatchRuleItem): RuleFormState {
 export function WatchRulesList() {
   const t = useTranslations("watchRules");
   const tCommon = useTranslations("common");
-  const { data: rulesResult } = useSWR<WatchRuleListResult>(
-    SWR_KEYS.watchRules,
-    apiFetcher,
-  );
-  const { data: channelsResult } = useSWR<ChannelConfigListResult>(
-    SWR_KEYS.channelConfigs,
-    apiFetcher,
-  );
+  const watchRulesQ = queries.watchRules();
+  const channelConfigsQ = queries.channelConfigs();
+
+  const { data: rulesResult } = useSWR(watchRulesQ.key, watchRulesQ.fetcher);
+  const { data: channelsResult } = useSWR(channelConfigsQ.key, channelConfigsQ.fetcher);
   const { mutate } = useSWRConfig();
 
   const [dialogOpen, setDialogOpen] = useState(false);

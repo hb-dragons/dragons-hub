@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { getServerApi } from "@/lib/api.server"
 import { SWRConfig } from "swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 import { StandingsView } from "@/components/admin/standings/standings-view"
 import type { LeagueStandings } from "@/components/admin/standings/types"
 
@@ -17,8 +17,12 @@ export default async function StandingsPage() {
   let data: LeagueStandings[] | null = null
   let error: string | null = null
 
+  const sApi = await getServerApi();
+  const sq = makeQueries(sApi);
+  const standingsQ = sq.standings();
+
   try {
-    data = await (await getServerApi()).standings.list()
+    data = await standingsQ.fetcher()
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API"
   }
@@ -32,7 +36,7 @@ export default async function StandingsPage() {
           {error}
         </div>
       ) : (
-        <SWRConfig value={{ fallback: { [SWR_KEYS.standings]: data } }}>
+        <SWRConfig value={{ fallback: { [standingsQ.key]: data } }}>
           <StandingsView />
         </SWRConfig>
       )}

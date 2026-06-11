@@ -10,14 +10,8 @@ import useSWR from "swr";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
-import type {
-  SyncStatusResponse,
-  PaginatedResponse,
-  SyncScheduleData,
-  SyncRun,
-} from "./types";
+import { queries } from "@/lib/swr-queries";
+import type { SyncRun } from "./types";
 
 // --- Minimal context for sync run tracking ---
 
@@ -42,9 +36,10 @@ export function useSyncStatus() {
   const { runningSyncRunId } = useSyncRunContext();
   const isLocalRunning = runningSyncRunId !== null;
 
-  const { data, error, mutate } = useSWR<SyncStatusResponse>(
-    SWR_KEYS.syncStatus,
-    apiFetcher,
+  const syncStatusQ = queries.syncStatus();
+  const { data, error, mutate } = useSWR(
+    syncStatusQ.key,
+    syncStatusQ.fetcher,
     {
       refreshInterval: isLocalRunning ? 3000 : 15000,
       revalidateOnFocus: true,
@@ -62,9 +57,10 @@ export function useSyncLogs() {
   const { runningSyncRunId } = useSyncRunContext();
   const isRunning = runningSyncRunId !== null;
 
-  const { data, error, mutate, isLoading } = useSWR<PaginatedResponse<SyncRun>>(
-    SWR_KEYS.syncLogs(20, 0),
-    apiFetcher,
+  const syncLogsQ = queries.syncLogs(20, 0);
+  const { data, error, mutate, isLoading } = useSWR(
+    syncLogsQ.key,
+    syncLogsQ.fetcher,
     {
       refreshInterval: isRunning ? 3000 : 15000,
       revalidateOnFocus: true,
@@ -81,9 +77,10 @@ export function useSyncLogs() {
 }
 
 export function useSyncSchedule() {
-  const { data, error, mutate } = useSWR<SyncScheduleData>(
-    SWR_KEYS.syncSchedule,
-    apiFetcher,
+  const syncScheduleQ = queries.syncSchedule();
+  const { data, error, mutate } = useSWR(
+    syncScheduleQ.key,
+    syncScheduleQ.fetcher,
   );
 
   return { schedule: data ?? null, error, mutate };
@@ -168,9 +165,10 @@ export function useRefereeSyncStatus() {
   const { runningSyncRunId } = useRefereeSyncRunContext();
   const isLocalRunning = runningSyncRunId !== null;
 
-  const { data, error, mutate } = useSWR<SyncStatusResponse>(
-    SWR_KEYS.refereeSyncStatus,
-    apiFetcher,
+  const refereeSyncStatusQ = queries.refereeSyncStatus();
+  const { data, error, mutate } = useSWR(
+    refereeSyncStatusQ.key,
+    refereeSyncStatusQ.fetcher,
     {
       refreshInterval: isLocalRunning ? 3000 : 15000,
       revalidateOnFocus: true,
@@ -187,9 +185,10 @@ export function useRefereeSyncLogs() {
   const { runningSyncRunId } = useRefereeSyncRunContext();
   const isRunning = runningSyncRunId !== null;
 
-  const { data, error, mutate, isLoading } = useSWR<PaginatedResponse<SyncRun>>(
-    SWR_KEYS.refereeSyncLogs(20, 0),
-    apiFetcher,
+  const refereeSyncLogsQ = queries.refereeSyncLogs(20, 0);
+  const { data, error, mutate, isLoading } = useSWR(
+    refereeSyncLogsQ.key,
+    refereeSyncLogsQ.fetcher,
     {
       refreshInterval: isRunning ? 3000 : 15000,
       revalidateOnFocus: true,
@@ -206,9 +205,10 @@ export function useRefereeSyncLogs() {
 }
 
 export function useRefereeSyncSchedule() {
-  const { data, error, mutate } = useSWR<SyncScheduleData>(
-    SWR_KEYS.refereeSyncSchedule,
-    apiFetcher,
+  const refereeSyncScheduleQ = queries.refereeSyncSchedule();
+  const { data, error, mutate } = useSWR(
+    refereeSyncScheduleQ.key,
+    refereeSyncScheduleQ.fetcher,
   );
 
   return { schedule: data ?? null, error, mutate };

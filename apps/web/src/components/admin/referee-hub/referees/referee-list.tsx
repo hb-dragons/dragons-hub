@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { api, APIError } from "@/lib/api";
 import { useRefereeHubUrl } from "../use-referee-hub-url";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -14,7 +14,7 @@ import { Checkbox } from "@dragons/ui/components/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@dragons/ui/components/select";
 import { Button } from "@dragons/ui/components/button";
 import { cn } from "@dragons/ui/lib/utils";
-import type { RefereeListItem, PaginatedResponse, RefereeCountsResponse } from "@dragons/shared";
+import type { RefereeListItem } from "@dragons/shared";
 
 interface Props {
   selectedId: number | null;
@@ -32,16 +32,18 @@ export function RefereeList({ selectedId, onSelect }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  const listKey = SWR_KEYS.refereesPaginated({
+  const refereesPaginatedQ = queries.refereesPaginated({
     scope: state.scope,
     search: state.search || undefined,
     sort: state.sort,
     limit: 50,
     offset: 0,
   });
+  const listKey = refereesPaginatedQ.key;
+  const refereeCountsQ = queries.refereeCounts();
 
-  const { data } = useSWR<PaginatedResponse<RefereeListItem>>(listKey, apiFetcher);
-  const { data: counts } = useSWR<RefereeCountsResponse>(SWR_KEYS.refereeCounts, apiFetcher, { dedupingInterval: 30_000 });
+  const { data } = useSWR(listKey, refereesPaginatedQ.fetcher);
+  const { data: counts } = useSWR(SWR_KEYS.refereeCounts, refereeCountsQ.fetcher, { dedupingInterval: 30_000 });
   const items = data?.items ?? [];
 
   const avg = useMemo(() => {
