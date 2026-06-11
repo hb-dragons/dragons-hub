@@ -9,13 +9,13 @@ This document tracks every finding from the review, ordered for sequential fixin
 
 ## Progress
 
-**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **87 done, 9 deferred, 4 open**.
+**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **88 done, 9 deferred, 3 open**.
 
-**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md).
+**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md), CC4 (shared Redis subscriber fanout for the admin sync-log SSE).
 
 Remaining open items:
 - **Findings:** M3a (partial — some routes still parse ids with `Number()` instead of the shared Zod `idSchema`), L19 (notification-test doesn't reuse the production `PushChannelAdapter`)
-- **Cross-cutting:** CC4 (admin sync SSE at `sync.routes.ts:323` still opens a per-connection Redis subscriber), CC6 (trace context — `traceId` not threaded into BullMQ jobs, no `traceparent` on outbound SDK fetch)
+- **Cross-cutting:** CC6 (trace context — `traceId` not threaded into BullMQ jobs, no `traceparent` on outbound SDK fetch)
 
 After-fix baseline (2026-05-04, fourth pass):
 - 158 test files, 2731 tests passing (was 153 / 2673 pre-review)
@@ -736,7 +736,7 @@ Three patterns coexist: full-tx-with-event (gold standard, `match-admin.service.
 
 ### CC4. Per-connection Redis client in 3 SSE places (C2 expanded)
 
-- [ ] **Status:** OPEN (partial) — public SSE (scoreboard/broadcast) fixed via C2; `routes/admin/sync.routes.ts:323` still opens `new Redis()` per connection.
+- [x] **Status:** done — shared-subscriber machinery extracted to `services/events/redis-channel-fanout.ts`; scoreboard pubsub delegates to it and the admin sync-log SSE now fans out via `services/sync/sync-log-stream.ts` instead of `new Redis()` per connection.
 
 `scoreboard/pubsub.ts`, `routes/public/broadcast.routes.ts`, `routes/admin/sync.routes.ts:322`. Replace with one shared subscriber per process fanning out via in-memory EventEmitter.
 
