@@ -287,6 +287,31 @@ describe("makeQueries", () => {
     });
   });
 
+  it("refereeGamesFiltered: wire key is stable (defaults-only)", () => {
+    const { api } = mockApi();
+    const q = makeQueries(api).refereeGamesFiltered({});
+    expect(q.key).toBe("/referee/games?status=active&limit=100&offset=0");
+  });
+
+  it("refereeGamesFiltered: wire key is stable (full opts incl. league join)", () => {
+    const { api } = mockApi();
+    const q = makeQueries(api).refereeGamesFiltered({
+      status: "all",
+      limit: 200,
+      offset: 50,
+      slotStatus: "offered",
+      gameType: "both",
+      dateFrom: "2026-01-01",
+      dateTo: "2026-02-28",
+      league: ["U18", "U20"],
+      search: "abc",
+      assignedRefereeApiId: 7,
+    });
+    expect(q.key).toBe(
+      "/referee/games?status=all&limit=200&offset=50&slotStatus=offered&gameType=both&dateFrom=2026-01-01&dateTo=2026-02-28&league=U18%2CU20&search=abc&assignedRefereeApiId=7",
+    );
+  });
+
   it("refereeGameByApiMatch(id): key + dispatch", async () => {
     const { api, calls } = mockApi();
     const q = makeQueries(api).refereeGameByApiMatch(4711);
