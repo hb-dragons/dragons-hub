@@ -91,3 +91,16 @@ export interface TestPushResponse {
   deviceCount: number;
   tickets: TestPushTicket[];
 }
+
+export interface TestPushRecentItem {
+  id: number;
+  sentAt: string | null;
+  recipientToken: string | null;
+  status: string;
+  providerTicketId: string | null;
+  errorMessage: string | null;
+}
+
+export interface TestPushRecentResponse {
+  results: TestPushRecentItem[];
+}

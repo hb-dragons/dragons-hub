@@ -87,6 +87,4 @@ export type {
   ScoreboardListQuery,
   UserRefereeLinkBody,
   UserRefereeLinkResult,
-  TestPushRecentResponse,
-  TestPushRecentItem,
 } from "./endpoints";
