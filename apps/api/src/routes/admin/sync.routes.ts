@@ -24,8 +24,7 @@ import {
   syncMatchChangesParamSchema,
 } from "@dragons/contracts";
 import type { JobType } from "bullmq";
-import Redis from "ioredis";
-import { env } from "../../config/env";
+import { subscribeSyncLog, syncLogChannel } from "../../services/sync/sync-log-stream";
 
 const syncRoutes = new Hono<AppEnv>();
 
@@ -317,71 +316,62 @@ syncRoutes.get(
       );
     }
 
-    const channelName = `sync:${syncRunId}:logs`;
+    const channelName = syncLogChannel(syncRunId);
 
     return streamSSE(c, async (stream) => {
-      const redisSubscriber = new Redis(env.REDIS_URL);
+      let streamDone: () => void;
+      const donePromise = new Promise<void>((resolve) => {
+        streamDone = resolve;
+      });
+
+      // One shared process subscriber fans this connection out (was a fresh
+      // `new Redis()` per connection — a Redis client-exhaustion vector).
+      const unsubscribe = await subscribeSyncLog(syncRunId, (payload) => {
+        void (async () => {
+          const data = payload as { type?: string };
+          if (data?.type === "complete") {
+            await stream.writeSSE({
+              event: "complete",
+              data: JSON.stringify({ syncRunId }),
+            });
+            streamDone();
+          } else {
+            await stream.writeSSE({
+              event: "entry",
+              data: JSON.stringify(payload),
+            });
+          }
+        })();
+      });
+
+      await stream.writeSSE({
+        event: "connected",
+        data: JSON.stringify({ syncRunId, channelName }),
+      });
+
+      const pingInterval = setInterval(() => {
+        void (async () => {
+          try {
+            await stream.writeSSE({
+              event: "ping",
+              data: JSON.stringify({ timestamp: Date.now() }),
+            });
+          } catch {
+            clearInterval(pingInterval);
+          }
+        })();
+      }, 30000);
+
+      stream.onAbort(() => {
+        clearInterval(pingInterval);
+        streamDone();
+      });
 
       try {
-        await redisSubscriber.subscribe(channelName);
-
-        await stream.writeSSE({
-          event: "connected",
-          data: JSON.stringify({ syncRunId, channelName }),
-        });
-
-        let streamDone: () => void;
-        const donePromise = new Promise<void>((resolve) => {
-          streamDone = resolve;
-        });
-
-        redisSubscriber.on("message", (channel, message) => {
-          void (async () => {
-            if (channel === channelName) {
-              try {
-                const data = JSON.parse(message);
-                if (data.type === "complete") {
-                  await stream.writeSSE({
-                    event: "complete",
-                    data: JSON.stringify({ syncRunId }),
-                  });
-                  streamDone();
-                } else {
-                  await stream.writeSSE({
-                    event: "entry",
-                    data: message,
-                  });
-                }
-              } catch {
-                // Ignore parse errors
-              }
-            }
-          })();
-        });
-
-        const pingInterval = setInterval(() => {
-          void (async () => {
-            try {
-              await stream.writeSSE({
-                event: "ping",
-                data: JSON.stringify({ timestamp: Date.now() }),
-              });
-            } catch {
-              clearInterval(pingInterval);
-            }
-          })();
-        }, 30000);
-
-        stream.onAbort(() => {
-          clearInterval(pingInterval);
-          streamDone();
-        });
-
         await donePromise;
-        clearInterval(pingInterval);
       } finally {
-        await redisSubscriber.unsubscribe(channelName);
-        await redisSubscriber.quit();
+        clearInterval(pingInterval);
+        await unsubscribe();
       }
     });
   },

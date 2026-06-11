@@ -716,6 +716,44 @@ Located in `apps/api/src/workers/`. Queues configured in `workers/queues.ts`.
 - `*-query.service.ts` files only hold reads + row mappers. Mutations stay in
   the domain service file (e.g. `match-admin.service.ts`).
 
+### Transaction boundaries
+
+Default rule for a write that both changes state **and** emits a domain event:
+wrap them in one `db.transaction(...)` and pass the `tx` to
+`publishDomainEvent(params, tx)` so the event row commits atomically with the
+state change. The gold-standard example is `services/admin/match-admin.service.ts`.
+
+- A multi-row write (bulk insert/update, or several updates that must all land or
+  none) goes inside a transaction. For many independent updates, issue them as
+  `Promise.all` of per-row updates inside the transaction (see
+  `board.service.ts#reorderColumns`, `teams.sync.ts` own-club corrective pass) —
+  not sequential `await`s.
+- Never call `publishDomainEvent` **without** `tx` from inside a transaction body:
+  the event would commit independently, so a later rollback leaves a phantom
+  notification (the outbox is built to avoid exactly this — pass the `tx`).
+- High-volume sync upserts that don't emit events may stay outside a transaction
+  (hash-skip makes re-runs cheap); document the choice at the call site.
+
+### Deployment topology & tenancy
+
+Two operational constraints the code relies on but doesn't state inline:
+
+- **Hybrid Cloud Run topology.** The API service (`RUN_MODE=api`) scales
+  horizontally (`min_instances=1, max_instances=10`); the worker service
+  (`RUN_MODE=worker`) is pinned single-instance (`max_instances=1`) in
+  `infra/environments/production/main.tf`. Worker-only state — outbox poller
+  singleton, scheduler init, stale-sync reclaim, notification coalesce, SDK
+  session cookie cache — is correct *because* the worker is pinned to 1. Any
+  per-instance rate-limit / dedupe state on the **API** path must live in Redis,
+  since up to 10 instances run. Do not raise the worker's `max_instances`
+  without first moving that state to Redis.
+- **Single-tenant ("own club").** The app is deployed once per club. The owning
+  club is identified by `teams.isOwnClub` / `referees.isOwnClub` and
+  `getClubConfig()`, threaded through routes, services, and sync. There is no
+  multi-tenant isolation; supporting a second club means a second deployment
+  (fork-per-tenant), not a tenant column. Treat "own club" as a deploy-wide
+  singleton, not a request-scoped value.
+
 ### Docker (dev)
 
 `docker/docker-compose.dev.yml`: postgres:17 (port 5432), redis:7-alpine (port 6379)

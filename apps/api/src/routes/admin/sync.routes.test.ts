@@ -19,15 +19,10 @@ const mocks = vi.hoisted(() => ({
   getSchedule: vi.fn(),
   upsertSchedule: vi.fn(),
   getMatchChangesForEntry: vi.fn(),
-  redisInstances: [] as MockRedis[],
+  subscribeSyncLog: vi.fn(),
+  unsubscribe: vi.fn(async () => {}),
+  syncLogListeners: [] as ((payload: unknown) => void)[],
 }));
-
-interface MockRedis {
-  subscribe: ReturnType<typeof vi.fn>;
-  unsubscribe: ReturnType<typeof vi.fn>;
-  quit: ReturnType<typeof vi.fn>;
-  _emit: (event: string, ...args: unknown[]) => void;
-}
 
 vi.mock("../../workers/queues", () => ({
   triggerManualSync: mocks.triggerManualSync,
@@ -55,30 +50,11 @@ vi.mock("../../config/logger", () => ({
   logger: { error: vi.fn() },
 }));
 
-vi.mock("ioredis", () => {
-  return {
-    default: class MockRedisImpl {
-      _handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-      subscribe = vi.fn(async () => {});
-      unsubscribe = vi.fn(async () => {});
-      quit = vi.fn(async () => {});
-
-      on(event: string, handler: (...args: unknown[]) => void) {
-        if (!this._handlers[event]) this._handlers[event] = [];
-        this._handlers[event].push(handler);
-        return this;
-      }
-
-      _emit(event: string, ...args: unknown[]) {
-        this._handlers[event]?.forEach((h) => h(...args));
-      }
-
-      constructor() {
-        mocks.redisInstances.push(this as unknown as MockRedis);
-      }
-    },
-  };
-});
+vi.mock("../../services/sync/sync-log-stream", () => ({
+  syncLogChannel: (id: number) => `sync:${id}:logs`,
+  subscribeSyncLog: (id: number, onMessage: (payload: unknown) => void) =>
+    mocks.subscribeSyncLog(id, onMessage),
+}));
 
 // --- Imports (after mocks) ---
 
@@ -102,7 +78,13 @@ function json(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.redisInstances.length = 0;
+  mocks.syncLogListeners.length = 0;
+  mocks.subscribeSyncLog.mockImplementation(
+    (_id: number, onMessage: (payload: unknown) => void) => {
+      mocks.syncLogListeners.push(onMessage);
+      return Promise.resolve(mocks.unsubscribe);
+    },
+  );
 });
 
 describe("POST /sync/trigger", () => {
@@ -489,7 +471,7 @@ describe("GET /sync/logs/:id/stream", () => {
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
-  it("streams SSE events from Redis pub/sub", async () => {
+  it("streams SSE events from the shared sync-log subscriber", async () => {
     mocks.getSyncRun.mockResolvedValue({ id: 1, status: "running" });
 
     const res = await app.request("/sync/logs/1/stream");
@@ -499,18 +481,15 @@ describe("GET /sync/logs/:id/stream", () => {
     // Start consuming response body (waits for stream to close)
     const textPromise = res.text();
 
-    // Give the async callback time to create Redis and subscribe
+    // Give the async callback time to attach the shared subscriber
     await new Promise((r) => setTimeout(r, 50));
 
-    expect(mocks.redisInstances.length).toBe(1);
-    const redis = mocks.redisInstances[0]!;
-    expect(redis.subscribe).toHaveBeenCalledWith("sync:1:logs");
+    expect(mocks.subscribeSyncLog).toHaveBeenCalledWith(1, expect.any(Function));
+    const listener = mocks.syncLogListeners[0]!;
 
-    // Emit events through mock Redis
-    redis._emit("message", "sync:1:logs", JSON.stringify({ entityType: "league", action: "created" }));
-    redis._emit("message", "other-channel", "ignored");
-    redis._emit("message", "sync:1:logs", "not-valid-json");
-    redis._emit("message", "sync:1:logs", JSON.stringify({ type: "complete" }));
+    // The shared fanout delivers already-parsed payloads (not raw strings).
+    listener({ entityType: "league", action: "created" });
+    listener({ type: "complete" });
 
     const text = await textPromise;
 
@@ -518,11 +497,9 @@ describe("GET /sync/logs/:id/stream", () => {
     expect(text).toContain("event: entry");
     expect(text).toContain("event: complete");
     expect(text).toContain('"syncRunId"');
-    expect(text).not.toContain("ignored");
 
-    // Verify cleanup
-    expect(redis.unsubscribe).toHaveBeenCalledWith("sync:1:logs");
-    expect(redis.quit).toHaveBeenCalled();
+    // Verify cleanup goes through the shared subscriber, not a per-conn client
+    expect(mocks.unsubscribe).toHaveBeenCalled();
   }, 10000);
 });
 

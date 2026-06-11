@@ -23,11 +23,17 @@ vi.mock("../admin/settings.service", () => ({
 const mockInsert = vi.fn();
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
+const mockTransaction = vi.fn((fn: (tx: unknown) => unknown) =>
+  // The corrective pass batches its updates inside a transaction; route
+  // tx.update back to the same mockUpdate so per-call setups still apply.
+  fn({ update: (...args: unknown[]) => mockUpdate(...args) }),
+);
 vi.mock("../../config/database", () => ({
   db: {
     insert: (...args: unknown[]) => mockInsert(...args),
     select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
+    transaction: (...args: [(tx: unknown) => unknown]) => mockTransaction(...args),
   },
 }));
 
@@ -345,6 +351,34 @@ describe("syncTeamsFromData", () => {
       expect.objectContaining({ marked: 1, unmarked: 0 }),
       "Corrected isOwnClub",
     );
+  });
+
+  it("batches mark-own corrections in one transaction with sequential displayOrder", async () => {
+    // toMarkOwn returns 2 rows → both flipped inside a single transaction,
+    // each assigned the next displayOrder (maxOrder null → starts at 0).
+    mockSelect
+      .mockReturnValueOnce(mockSelectChain([]))                    // existingIds
+      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }]))  // getMaxOwnDisplayOrder (pre-upsert)
+      .mockReturnValueOnce(mockSelectChain([{ id: 5 }, { id: 6 }])) // toMarkOwn → 2 rows
+      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder (corrective)
+    const teamsMap = new Map([[1, makeTeamRef()]]);
+    mockInsert.mockReturnValue(mockInsertChain([]));
+
+    const setCalls: Record<string, unknown>[] = [];
+    mockUpdate.mockImplementation(() => ({
+      set: (payload: Record<string, unknown>) => {
+        setCalls.push(payload);
+        // markOwn awaits .where() directly; unmarkOwn calls .where().returning().
+        return { where: () => ({ returning: () => Promise.resolve([]) }) };
+      },
+    }));
+
+    await syncTeamsFromData(teamsMap);
+
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    const markOwnSets = setCalls.filter((s) => s.isOwnClub === true);
+    expect(markOwnSets).toHaveLength(2);
+    expect(markOwnSets.map((s) => s.displayOrder)).toEqual([0, 1]);
   });
 
   it("corrective pass unmarks non-own-club teams", async () => {

@@ -44,6 +44,7 @@ vi.mock("p-limit", () => ({
 }));
 
 import { SdkClient } from "./sdk-client";
+import { runWithLogContext } from "../../config/log-context";
 
 let client: SdkClient;
 
@@ -90,6 +91,41 @@ describe("SdkClient", () => {
       await client.ensureAuthenticated();
 
       expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("sends a W3C traceparent on outbound calls when traced (CC6)", async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          text: vi.fn().mockResolvedValue("OK"),
+          headers: { getSetCookie: () => ["SESSION=abc123; Path=/"] },
+        })
+        .mockResolvedValueOnce({
+          json: vi.fn().mockResolvedValue({ data: { loginName: "testuser" } }),
+        });
+
+      await runWithLogContext(
+        {
+          traceId: "0123456789abcdef0123456789abcdef",
+          spanId: "abcdef0123456789",
+          traceSampled: true,
+        },
+        () => client.ensureAuthenticated(),
+      );
+
+      const loginHeaders = mockFetch.mock.calls[0]![1].headers as Record<
+        string,
+        string
+      >;
+      expect(loginHeaders.traceparent).toBe(
+        "00-0123456789abcdef0123456789abcdef-abcdef0123456789-01",
+      );
+      const verifyHeaders = mockFetch.mock.calls[1]![1].headers as Record<
+        string,
+        string
+      >;
+      expect(verifyHeaders.traceparent).toBe(
+        "00-0123456789abcdef0123456789abcdef-abcdef0123456789-01",
+      );
     });
 
     it("does not re-login when already authenticated", async () => {

@@ -14,22 +14,27 @@ const payload = {
 };
 
 describe("renderRefereeReassignedPush", () => {
-  it("renders German output", () => {
+  it("renders German output with both old and new referee", () => {
     const out = renderRefereeReassignedPush(payload, "de");
     expect(out.title).toContain("übertragen");
     expect(out.body).toContain("Dragons U16");
     expect(out.body).toContain("TSV Neustadt");
     expect(out.body).toContain("SR1");
+    // The "from X to Y" information the reassign event carries must surface.
+    expect(out.body).toContain("Max Muster");
+    expect(out.body).toContain("Erika Beispiel");
     expect(out.body).not.toContain("undefined");
     expect(out.data.deepLink).toBe("/referee-game/123");
     expect(out.data.eventType).toBe("referee.reassigned");
   });
 
-  it("renders English output", () => {
+  it("renders English output with both old and new referee", () => {
     const out = renderRefereeReassignedPush(payload, "en");
     expect(out.title.toLowerCase()).toContain("reassigned");
     expect(out.body).toContain("Dragons U16");
     expect(out.body).toContain("TSV Neustadt");
+    expect(out.body).toContain("Max Muster");
+    expect(out.body).toContain("Erika Beispiel");
   });
 
   it("respects title and body length limits", () => {

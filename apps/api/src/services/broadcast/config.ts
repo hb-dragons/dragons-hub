@@ -11,6 +11,7 @@ import type {
   BroadcastMatch,
   BroadcastMatchTeam,
 } from "@dragons/shared";
+import { pickDefined } from "../utils/object";
 
 const DEFAULT_HOME_COLOR = "#1e90ff";
 const DEFAULT_GUEST_COLOR = "#dc2626";
@@ -62,14 +63,16 @@ export async function upsertBroadcastConfig(
   input: UpsertInput,
 ): Promise<BroadcastConfig> {
   const now = new Date();
-  const set: Record<string, unknown> = { updatedAt: now };
-  if (input.matchId !== undefined) set.matchId = input.matchId;
-  if (input.homeAbbr !== undefined) set.homeAbbr = input.homeAbbr;
-  if (input.guestAbbr !== undefined) set.guestAbbr = input.guestAbbr;
-  if (input.homeColorOverride !== undefined)
-    set.homeColorOverride = input.homeColorOverride;
-  if (input.guestColorOverride !== undefined)
-    set.guestColorOverride = input.guestColorOverride;
+  const set = {
+    ...pickDefined(input, [
+      "matchId",
+      "homeAbbr",
+      "guestAbbr",
+      "homeColorOverride",
+      "guestColorOverride",
+    ]),
+    updatedAt: now,
+  };
   await db
     .insert(broadcastConfigs)
     .values({

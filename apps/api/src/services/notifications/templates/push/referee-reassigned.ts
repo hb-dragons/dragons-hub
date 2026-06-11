@@ -1,7 +1,22 @@
 import type { Locale, PushTemplateOutput } from "./types";
 import { BODY_MAX, TITLE_MAX } from "./types";
 import { truncate } from "./_utils";
-import { refereeDeepLink, type RefereeAssignedPayload } from "./referee-assigned";
+import { refereeDeepLink } from "./referee-assigned";
+
+/**
+ * Reassignment carries both the outgoing and incoming referee — distinct from
+ * RefereeAssignedPayload, which only knows a single referee. Matches the shared
+ * refereeReassignedSchema / RefereeReassignedPayload emitted by referees.sync.ts.
+ */
+export interface RefereeReassignedPushPayload {
+  matchNo: number | string;
+  homeTeam: string;
+  guestTeam: string;
+  oldRefereeName: string;
+  newRefereeName: string;
+  role: string;
+  deepLink?: string | null;
+}
 
 const TITLE = {
   de: "Einsatz übertragen",
@@ -9,14 +24,14 @@ const TITLE = {
 };
 
 const BODY = {
-  de: (p: RefereeAssignedPayload) =>
-    `Dein Einsatz als ${p.role} bei ${p.homeTeam} vs. ${p.guestTeam} wurde übertragen.`,
-  en: (p: RefereeAssignedPayload) =>
-    `Your assignment as ${p.role} for ${p.homeTeam} vs. ${p.guestTeam} has been reassigned.`,
+  de: (p: RefereeReassignedPushPayload) =>
+    `${p.homeTeam} vs. ${p.guestTeam}: ${p.newRefereeName} ersetzt ${p.oldRefereeName} (${p.role}).`,
+  en: (p: RefereeReassignedPushPayload) =>
+    `${p.homeTeam} vs. ${p.guestTeam}: ${p.newRefereeName} replaces ${p.oldRefereeName} (${p.role}).`,
 };
 
 export function renderRefereeReassignedPush(
-  payload: RefereeAssignedPayload,
+  payload: RefereeReassignedPushPayload,
   locale: Locale,
 ): PushTemplateOutput {
   return {
@@ -28,4 +43,3 @@ export function renderRefereeReassignedPush(
     },
   };
 }
-

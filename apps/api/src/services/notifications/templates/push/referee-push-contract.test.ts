@@ -99,6 +99,8 @@ describe("referee push contract (real emitted payloads)", () => {
     expect(out).not.toBeNull();
     expect(out!.body).not.toContain("undefined");
     expect(out!.body).toContain("SR1");
+    expect(out!.body).toContain("Max Muster");
+    expect(out!.body).toContain("Erika Beispiel");
     expect(out!.data.deepLink).toBe("/referee-game/55");
     expect(out!.data.eventType).toBe("referee.reassigned");
     expect(out!.data.eventId).toBe("evt_reassigned_1");

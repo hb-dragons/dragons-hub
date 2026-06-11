@@ -2,8 +2,15 @@ import BasketballBundSDK from "basketball-bund-sdk";
 import pLimit from "p-limit";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
+import { currentTraceparent } from "../../config/log-context";
 
 const log = logger.child({ service: "sdk-client" });
+
+/** W3C `traceparent` header for the active trace, or empty when untraced. */
+function traceHeaders(): Record<string, string> {
+  const traceparent = currentTraceparent();
+  return traceparent ? { traceparent } : {};
+}
 import type {
   SdkLiga,
   SdkLigaListResponse,
@@ -130,7 +137,10 @@ class AuthenticatedClient {
 
     const res = await fetch(loginUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        ...traceHeaders(),
+      },
       body,
       redirect: "manual",
     });
@@ -189,6 +199,7 @@ class AuthenticatedClient {
         ...options.headers,
         Cookie: this.sessionCookie,
         Accept: "application/json, text/plain, */*",
+        ...traceHeaders(),
       },
     });
   }

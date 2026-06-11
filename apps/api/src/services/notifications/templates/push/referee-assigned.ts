@@ -24,7 +24,7 @@ export interface RefereeAssignedPayload {
 /** Fallback native route when the event carries no explicit deep link. */
 const FALLBACK_DEEP_LINK = "/officiating";
 
-export function refereeDeepLink(payload: RefereeAssignedPayload): string {
+export function refereeDeepLink(payload: { deepLink?: string | null }): string {
   return payload.deepLink ?? FALLBACK_DEEP_LINK;
 }
 

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { db } from "../config/database";
+import { captureTrace } from "../config/log-context";
 import { syncSchedule, syncRuns } from "@dragons/db/schema";
 
 export const domainEventsQueue = new Queue("domain-events", {
@@ -65,6 +66,26 @@ export const taskRemindersQueue = new Queue("task-reminders", {
   connection: { url: env.REDIS_URL },
 });
 
+interface SyncJobPayload {
+  type: "full" | "referee-games";
+  triggeredBy?: string;
+  syncRunId?: number;
+}
+
+/**
+ * Enqueue a sync job, stamping the enqueuing request's trace onto the job data
+ * so the worker can re-establish it (CC6). Cron-scheduled enqueues have no trace
+ * and just pass the payload through unchanged.
+ */
+function addSyncJob(
+  name: string,
+  data: SyncJobPayload,
+  opts?: Parameters<typeof syncQueue.add>[2],
+): ReturnType<typeof syncQueue.add> {
+  const trace = captureTrace();
+  return syncQueue.add(name, trace ? { ...data, trace } : data, opts);
+}
+
 export async function triggerRefereeGamesSync(
   triggeredBy?: string,
 ): Promise<{ syncRunId: number; status: string } | null> {
@@ -85,7 +106,7 @@ export async function triggerRefereeGamesSync(
     })
     .returning();
 
-  await syncQueue.add(
+  await addSyncJob(
     "referee-games-sync",
     { type: "referee-games", syncRunId: syncRun!.id },
     {
@@ -129,7 +150,7 @@ export async function initializeScheduledJobs() {
   }
 
   if (enabled) {
-    await syncQueue.add(
+    await addSyncJob(
       "daily-sync",
       { type: "full" },
       {
@@ -156,7 +177,7 @@ export async function initializeScheduledJobs() {
     const refEnabled = refereeSchedule?.enabled ?? true;
 
     if (refEnabled) {
-      await syncQueue.add(
+      await addSyncJob(
         "referee-games-sync-scheduled",
         { type: "referee-games" },
         {
@@ -171,7 +192,7 @@ export async function initializeScheduledJobs() {
     }
   } catch {
     logger.warn("Could not read referee schedule from DB, using 30-min default");
-    await syncQueue.add(
+    await addSyncJob(
       "referee-games-sync-scheduled",
       { type: "referee-games" },
       {
@@ -226,7 +247,7 @@ export async function triggerManualSync(userId?: string) {
     .values({ syncType: "full", triggeredBy: userId ?? "manual", status: "pending", startedAt: new Date() })
     .returning();
 
-  const job = await syncQueue.add(
+  const job = await addSyncJob(
     "manual-sync",
     { type: "full", triggeredBy: userId, syncRunId: syncRun!.id },
     { jobId: MANUAL_SYNC_JOB_ID },
@@ -270,7 +291,7 @@ export async function updateSyncSchedule(
   }
 
   if (enabled) {
-    await syncQueue.add(
+    await addSyncJob(
       "daily-sync",
       { type: "full" },
       {
@@ -298,7 +319,7 @@ export async function updateRefereeSyncSchedule(
   }
 
   if (enabled) {
-    await syncQueue.add(
+    await addSyncJob(
       "referee-games-sync-scheduled",
       { type: "referee-games" },
       {

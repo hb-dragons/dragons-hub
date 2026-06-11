@@ -15,6 +15,7 @@ import type {
 } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import { publishDomainEvent } from "../events/event-publisher";
+import { pickDefined } from "../utils/object";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "booking-admin" });
@@ -192,7 +193,7 @@ export interface BookingUpdateData {
   overrideStartTime?: string | null;
   overrideEndTime?: string | null;
   overrideReason?: string | null;
-  status?: string;
+  status?: BookingStatus;
   notes?: string | null;
 }
 
@@ -200,16 +201,16 @@ export async function updateBooking(
   id: number,
   data: BookingUpdateData,
 ): Promise<BookingListItem | null> {
-  const set: Record<string, unknown> = { updatedAt: new Date() };
-
-  if (data.overrideStartTime !== undefined)
-    set.overrideStartTime = data.overrideStartTime;
-  if (data.overrideEndTime !== undefined)
-    set.overrideEndTime = data.overrideEndTime;
-  if (data.overrideReason !== undefined)
-    set.overrideReason = data.overrideReason;
-  if (data.status !== undefined) set.status = data.status;
-  if (data.notes !== undefined) set.notes = data.notes;
+  const set = {
+    ...pickDefined(data, [
+      "overrideStartTime",
+      "overrideEndTime",
+      "overrideReason",
+      "status",
+      "notes",
+    ]),
+    updatedAt: new Date(),
+  };
 
   const [updated] = await db
     .update(venueBookings)
@@ -299,15 +300,11 @@ export async function updateBookingStatus(
   id: number,
   status: string,
 ): Promise<BookingListItem | null> {
-  const set: Record<string, unknown> = { status, updatedAt: new Date() };
-
-  if (status === "confirmed") {
-    set.confirmedAt = new Date();
-    set.needsReconfirmation = false;
-  } else {
-    set.confirmedAt = null;
-    set.confirmedBy = null;
-  }
+  const base = { status: status as BookingStatus, updatedAt: new Date() };
+  const set =
+    status === "confirmed"
+      ? { ...base, confirmedAt: new Date(), needsReconfirmation: false }
+      : { ...base, confirmedAt: null, confirmedBy: null };
 
   const [updated] = await db
     .update(venueBookings)

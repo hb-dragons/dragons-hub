@@ -9,6 +9,10 @@ This document tracks every finding from the review, ordered for sequential fixin
 
 ## Progress
 
+**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **89 done, 11 deferred, 0 open**. Every finding and cross-cutting theme is now resolved or has a documented deferral reason.
+
+**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md), CC4 (shared Redis subscriber fanout for the admin sync-log SSE), CC6 (trace context threaded through sync jobs + `traceparent` on the SDK fetch). Deferred after investigation: M3a (every manual `Number()` site already guards → 400; migration would only change the error-body shape) and L19 (production push adapter is template/dedup-driven and doesn't fit the diagnostic test send).
+
 After-fix baseline (2026-05-04, fourth pass):
 - 158 test files, 2731 tests passing (was 153 / 2673 pre-review)
 - Coverage: 96.92% stmts / 90.08% branches / 96.18% funcs / 97.45% lines
@@ -152,7 +156,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 ### C1. Login rate-limit bypass via `X-Forwarded-For` spoofing
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/config/auth.ts:27-37`
 - **Problem:** better-auth rate-limits sign-in at 5/min keyed by client IP, sourced from `x-forwarded-for[0].split(",")[0].trim()`. Google's HTTPS LB *appends* to a client-supplied XFF, so the attacker controls the first segment. Each request gets a fresh rate-limit key → effectively unlimited login attempts per second. Combined with `disableSignUp: true` the path is online password-guessing against any known operator email.
 - **Fix:**
@@ -162,7 +166,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 ### C2. Public SSE streams open one Redis subscriber per connection (DoS)
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/scoreboard/pubsub.ts:25-41, 60-76`; `routes/public/scoreboard.routes.ts:51-60`; `routes/public/broadcast.routes.ts:31-90`
 - **Problem:** Both endpoints are unauthenticated and on every connection allocate a new ioredis client + `SUBSCRIBE`. No connection cap, no per-IP cap, no global cap. Attacker opens N concurrent streams → N Redis subscribers → exhausts Redis `maxclients` (default 10000) → kills ingest publishing AND BullMQ workers (shared Redis). Same pattern in `routes/admin/sync.routes.ts:322` (admin-gated, but identical resource leak).
 - **Fix:**
@@ -173,7 +177,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 ### C3. Outbox poller holds `FOR UPDATE` locks during BullMQ enqueue
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/events/outbox-poller.ts:20-86`
 - **Problem:** `SELECT ... FOR UPDATE SKIP LOCKED` followed by `await domainEventsQueue.add(...)` for each row before the transaction commits. Locks held for the full BullMQ + Redis round-trip × batch size. Concurrent pollers blocked. If BullMQ add succeeds but the wrapping tx is rolled back (e.g. connection reset), the row is enqueued in Redis but `enqueued_at` is null → next poll enqueues it again.
 - **Fix:** Split into two phases. Phase 1: open tx, `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 100`, immediately `UPDATE enqueued_at = now() RETURNING id`, commit. Phase 2: enqueue to BullMQ outside any transaction. Phase 1 holds locks for milliseconds. Or use optimistic claim: `UPDATE ... WHERE enqueued_at IS NULL RETURNING ...` to claim a batch atomically.
@@ -181,7 +185,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 ### C4. `publishDomainEvent` called inside `db.transaction(...)` without `tx` (35 call sites)
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/sync/matches.sync.ts:744` plus 30+ more. Only `apps/api/src/services/admin/match-admin.service.ts:201, 382, 408, 432` correctly pass `tx`.
 - **Problem:** `publishDomainEvent(params, tx?)` is correct: when `tx` is passed, the event row commits atomically with the state change. When omitted inside a `db.transaction(...)` body, the event commits independently. If the wrapping tx rolls back after the publish, the event has already been persisted and will be enqueued — phantom notification for a state change that never happened.
 - **Fix:** Audit all 35 call sites. For each, decide:
@@ -192,7 +196,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 ### C5. `initializeWorkers` marks all running syncs as failed on startup (multi-instance race)
 
-- [ ] **Status:** todo
+- [~] **Status:** accepted — worker pinned max_instances=1 (CC1)
 - **Location:** `apps/api/src/workers/index.ts:23-42, 246-278`
 - **Problem:** Every worker startup unconditionally marks all `syncRuns.status = 'running'` rows as `failed` ("Stale: worker restarted"). Cloud Run autoscale or rolling deploys mean a new instance comes up while an old instance's sync is still running. The new instance flags the running sync as failed; the old instance's `syncWorker.on("completed")` then refuses to overwrite the now-`failed` row (status check at `sync.worker.ts:115`). Same pattern on shutdown.
 - **Fix:** Either
@@ -209,7 +213,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H1. Better-auth rate-limit storage in-memory; horizontal scale defeats it
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/config/auth.ts:25-37` (file already comments this gap)
 - **Problem:** Each Cloud Run instance has its own rate-limit map. Effective limit = configured × instance count. Combined with C1, login is nearly unrate-limited under load.
 - **Fix:** Configure `secondaryStorage` (better-auth supports the option natively) backed by Redis. Same Redis instance the queue uses; namespace keys.
@@ -217,7 +221,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H2. SDK credentials in clear-text body; Pino redaction shallow
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/sync/sdk-client.ts:109-145`, `referee-sdk-client.ts:47-68`, `apps/api/src/config/logger.ts:43-56`
 - **Problem:** SDK clients log in via `application/x-www-form-urlencoded` body containing `username=...&password=...`. Pino redaction config (`*.password`) only matches one-level keys; not `req.body.password`, `payload.user.password`, etc. Today no log line includes the body, but one careless `log.error({ body }, ...)` leaks the federation password to Cloud Logging.
 - **Fix:**
@@ -228,7 +232,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H3. Scoreboard ingest rate-limit is process-local
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/middleware/ingest-key.ts:6-49`
 - **Problem:** 30 req/sec per device cap is a `Map` in module scope. Per-process. Multiplies with instance count. Cleanup heuristic (size > 1024) rarely triggers under steady traffic from one device.
 - **Fix:** Move counter to Redis with `INCR` + `EXPIRE` per second-window key (`ingest:rl:<deviceId>:<floor(t/1)>`). Drop the in-memory map entirely.
@@ -236,7 +240,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H4. `/openapi.json` and `/docs` world-readable in production
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/app.ts:33-34` (mounted before any auth middleware)
 - **Problem:** Anonymous attacker hits `https://api.app.hbdragons.de/openapi.json` and gets a complete enumeration of every admin endpoint, schema, request shape — free recon. Combined with C1, materially shortens the attack chain.
 - **Fix:** In production: gate `/docs` and `/openapi.json` behind `requireAnyRole("admin")`. Or generate two specs (a public-routes-only one mounted unauthed, a full one under `/admin/docs`). Cloud-Run-only IP allowlist also acceptable.
@@ -244,7 +248,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H5. Bull Board UI exposed at `/admin/queues/*`
 
-- [ ] **Status:** todo
+- [~] **Status:** decided — keep Bull Board admin-gated (see Decisions)
 - **Location:** `apps/api/src/app.ts:21-46`
 - **Problem:** Admin-gated correctly via `requireAnyRole("admin")` — not unauthenticated leak. Concern: gives admin role total power to inspect/retry/fail/remove arbitrary BullMQ jobs (including manual sync triggers with user IDs in payloads). Bull Board has historical XSS / auth-bypass bugs. One compromised admin = total queue compromise.
 - **Fix:** Either
@@ -255,7 +259,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H6. `requireRefereeSelfOrPermission` widens scope to any matching permission holder
 
-- [ ] **Status:** todo
+- [~] **Status:** decided — keep current behavior, documented at route
 - **Location:** `apps/api/src/middleware/rbac.ts:96-118`; consumer `apps/api/src/routes/referee/games.routes.ts:12-51`
 - **Problem:** Skips refereeId-scoped filter when caller has any matching permission. Today `refereeAdmin` role holds `assignment.view` (`packages/shared/src/rbac.ts:32`) so a `refereeAdmin` user with no `refereeId` link sees every referee's data on `/referee/games`. May be intended, but the design contract is hidden in the middleware.
 - **Fix:**
@@ -265,7 +269,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H7. `x-forwarded-host` reflected into ICS UID (cache poisoning)
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/public/match.routes.ts:93-99`; `apps/api/src/services/public/calendar.service.ts:115`
 - **Problem:** Hostname from request header embedded into iCal UID `match-${id}@${hostname}`. CDN cache or shared cache between users can be poisoned by an attacker reaching origin via a different vhost.
 - **Fix:** Use `env.BETTER_AUTH_URL` (or a new `PUBLIC_BASE_URL` env var) for the ICS UID hostname. Stop reflecting request headers into cached output.
@@ -273,7 +277,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H8. In-memory state never cleaned up (slow leaks)
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/admin/notification-test.routes.ts:36-42` (`lastSendByUser` only adds), `apps/api/src/middleware/ingest-key.ts:6-49` (counter map prunes only above 1024 entries)
 - **Problem:** Both maps grow over time. Slow leaks; eventual memory pressure.
 - **Fix:** Move both to Redis with TTL. Bundles with H3.
@@ -283,7 +287,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H9. Notification-test deterministic eventId collides on multi-instance double-click
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/admin/notification-test.routes.ts:101-168`
 - **Problem:** `eventId = admin_test:${callerId}:${sentAt.getTime()}`. Two clicks within the same millisecond on the same admin produce identical IDs → unique-constraint violation → 500. Cooldown (10s) is process-local so multi-instance defeats it.
 - **Fix:** Use `ulid()` (already imported via `event-publisher.ts`) for the eventId; embed click timestamp in payload. Or `onConflictDoNothing()` and short-circuit if no row returned.
@@ -291,7 +295,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H10. `setBroadcastLive` race + leaks internal error text
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/broadcast/config.ts:97-118`; `apps/api/src/routes/admin/broadcast.routes.ts:101-110`
 - **Problem:** Transaction reads existing config without `FOR UPDATE`. Concurrent admin clicks both observe `existing.matchId !== null`, both update, both publish. Route's catch block exposes `(err as Error).message` directly to the client.
 - **Fix:**
@@ -301,7 +305,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H11. Notification coalesce map unbounded; per-process
 
-- [ ] **Status:** todo
+- [~] **Status:** accepted — coalesce runs only in single-instance worker (CC1)
 - **Location:** `apps/api/src/services/notifications/notification-pipeline.ts:35-60`
 - **Problem:** `recentDispatches` cleanup only runs when `size > 1000`, and only deletes stale entries. 5000 unique entities firing in 60s drives map to 5000. Per-process, so two replicas don't share — coalescing globally defeated by horizontal scale (the whole point of the 60s window).
 - **Fix:** Move to Redis: `SET coalesce:<key> 1 NX EX 60`. Set returns null = already-dispatched, skip. Single primitive replaces both the cap and the multi-instance gap.
@@ -309,7 +313,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H12. `triggerManualSync` racy check-then-act
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/workers/queues.ts:201-232`
 - **Problem:** `getJobs(["active","waiting"], ...)` followed by `db.insert(syncRuns)` is check-then-act. Two concurrent triggers both observe an empty queue and both insert syncRuns + add jobs.
 - **Fix:** Pass deterministic `jobId: "manual-sync"` to `syncQueue.add(...)` so BullMQ rejects duplicates atomically. Or unique partial index on `syncRuns(syncType) WHERE status IN ('pending','running')`.
@@ -317,7 +321,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H13. Expo client doesn't retry transient 5xx
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/notifications/expo-push.client.ts:76-91, 110-118`
 - **Problem:** Any non-2xx throws; `PushChannelAdapter.send` writes every row in the batch as `failed`. Single Expo blip = entire cycle's notifications fail (then trigger DeviceNotRegistered checks unnecessarily).
 - **Fix:** Wrap fetch in a small retry helper (mirror `withRetry` in `sdk-client.ts`): retry on 5xx + network errors with exponential backoff (3 attempts).
@@ -325,7 +329,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H14. Sync orchestrator partial-failure semantics opaque
 
-- [ ] **Status:** todo
+- [~] **Status:** accepted — current partial-failure semantics kept
 - **Location:** `apps/api/src/services/sync/index.ts:50-345`; `matches.sync.ts:599-981`
 - **Problem:** Six steps with mixed transactional postures (some bulk-upsert, some per-row tx, some no tx at all). On fatal error mid-step, status set to `failed` but partial state already committed. Reading `errorMessage = "Fatal sync error: ..."` gives no signal whether 0% or 95% of work landed.
 - **Fix:** Add `partial` status. Capture per-step records on `syncRuns` (which step failed, what was committed). Optionally: add a `step` column.
@@ -339,14 +343,14 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M1a. Replace process-local rate-limiters / dedupe maps with Redis
 
-- [ ] **Status:** todo (bundled with H1, H3, H8, H11)
+- [x] **Status:** done
 - **Locations:** notification-test cooldown `routes/admin/notification-test.routes.ts:36-37`; SDK session cookie cache `services/sync/sdk-client.ts:93`; broadcast `matchCache` `services/broadcast/publisher.ts:25`
 - **Fix:** Single Redis migration sweep covering all these caches. Plus broadcast cache: add 30-60s TTL OR invalidate on match update via `invalidateMatchCache(deviceId)` from match service hooks.
 - **Verify:** restart any one instance → coalesce + rate-limit + cache state preserved.
 
 #### M1b. Outbox poller as BullMQ repeatable job, not setInterval
 
-- [ ] **Status:** todo
+- [~] **Status:** deferred — setInterval fine on single-instance worker; lag-metric/DLQ not done
 - **Location:** `apps/api/src/services/events/outbox-poller.ts:88-116`
 - **Problem:** `setInterval` + module-level singleton check is intra-process only. Two instances → both poll. No retry, no DLQ, no metrics on lag, no admin trigger.
 - **Fix:** Convert to BullMQ repeatable job with `concurrency: 1`, `jobId: "outbox-poll-cron"`. BullMQ deduplicates repeatable jobs by job ID. Add metric `outbox_lag_seconds = max(now - created_at) WHERE enqueued_at IS NULL`. Add alarm `events_undeliverable` for rows pending > 5 min.
@@ -356,7 +360,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M2a. `referee-games.sync.ts` sequential per-row processing
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/sync/referee-games.sync.ts:232-393`
 - **Problem:** Each iteration runs ≥ 3 queries (SELECT existing, findMatchId, INSERT/UPDATE) and possibly 5+ (event publish, reminder scheduling). 200-game backlog ≈ 1000 round-trips. `matches.sync.ts:522-530` already shows the right pattern.
 - **Fix:** Batch-load existing rows by `inArray(refereeGames.apiMatchId, allIds)`; precompute `matchIdLookup` once; group inserts/updates and run as bulk `INSERT ... ON CONFLICT DO UPDATE`. Domain event emits stay per-row.
@@ -364,7 +368,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M2b. `match-admin.service.ts` per-row inserts in transaction
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/admin/match-admin.service.ts:134-167`
 - **Problem:** `for (const change of fieldChanges) { await tx.insert(matchChanges).values(...) }` — N round-trips inside a transaction → long-held row locks.
 - **Fix:** Bulk insert: `tx.insert(matchChanges).values(fieldChanges.map(...))`. Same for overrides via `onConflictDoUpdate`.
@@ -372,25 +376,25 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M2c. `teams.sync.ts` per-team UPDATE for own-club flag
 
-- [ ] **Status:** todo
+- [x] **Status:** done — mark-own + flipped-via-upsert corrections precompute their displayOrder then apply as parallel UPDATEs inside one transaction (atomic; round-trips overlap)
 - **Location:** `apps/api/src/services/sync/teams.sync.ts:185-208`
 - **Fix:** CASE expression: `UPDATE teams SET is_own_club = CASE id WHEN x THEN true ... END WHERE id IN (...)`.
 
 #### M2d. `board.service.ts` column reorder per-row
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/admin/board.service.ts:259-266`
 - **Fix:** `UPDATE board_columns FROM (VALUES (id1, pos1), (id2, pos2), ...) AS t(id, position) WHERE board_columns.id = t.id`.
 
 #### M2e. `leagues.sync.ts` sequential SDK calls
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/sync/leagues.sync.ts:57-127`
 - **Fix:** `Promise.all(trackedLeagues.map(async (league) => { ... }))`. Token bucket already bounds.
 
 #### M2f. `push-receipt.worker.ts` per-failure UPDATE loop
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/workers/push-receipt.worker.ts:130-143`
 - **Fix:** Group failures by errorCode (small cardinality). One UPDATE per distinct errorCode using `inArray(notificationLog.id, idsForCode)`. Drops 1000s of updates to ~5.
 
@@ -398,26 +402,26 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M3a. Manual `Number(c.req.query(...))` instead of Zod
 
-- [ ] **Status:** todo
+- [~] **Status:** deferred — the correctness concern is gone: every remaining manual `Number(...)`/`parseInt(...)` site (referee/games, referee-assignment, public match/team, league, scoreboard) already guards `Number.isInteger`/`isNaN` and returns a 400, so no input reaches a handler as NaN. Migrating the ~21 sites to `@dragons/contracts` validators would change the 400 body shape (central `validationHook` vs. their current `VALIDATION_ERROR`) — a client-facing change for no correctness gain. Left as-is; revisit only if these routes gain contract schemas for other reasons.
 - **Locations:** `routes/referee/games.routes.ts:14-24`, `routes/admin/referee-assignment.routes.ts:32-46, 65-101`, `routes/admin/scoreboard.routes.ts:60-68`, `routes/public/scoreboard.routes.ts:22-58`, `routes/public/broadcast.routes.ts:21-23, 39-41`, `routes/admin/notification.routes.ts:79-81`, `routes/admin/league.routes.ts:65`
 - **Fix:** Pull `idSchema = z.coerce.number().int().positive()` into a shared `schemas/common.ts`. Adopt the Zod pattern from `match.routes.ts` everywhere.
 - **Verify:** invalid numeric inputs return 400 with structured error, not 500.
 
 #### M3b. `routes/admin/user.routes.ts` body parsed via TS-cast not Zod
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/admin/user.routes.ts:13-27`
 - **Fix:** Add a Zod schema mirroring others in `routes/admin/*.schemas.ts`.
 
 #### M3c. `routes/admin/settings.routes.ts:102` JSON.parse without try/catch
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/admin/settings.routes.ts:102`
 - **Fix:** Mirror try/catch pattern used in `services/referee/referee-reminders.service.ts:84`.
 
 #### M3d. `app.use("/admin/*", requireAuth)` does not enforce permission
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/app.ts:40` and per-route handlers
 - **Problem:** Every new admin route must remember to add `requirePermission`. No automated check.
 - **Fix:** Integration test that walks every registered route under `/admin/*` and asserts at least two middleware layers (auth + permission). Or extract the route-mounting into a helper that requires a permission tuple.
@@ -427,7 +431,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M4a. CSV formula injection in referee-history export
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/admin/referee-history.csv.ts:6-23`
 - **Problem:** Team names / referee names from federation API can include `=`, `+`, `-`, `@`. Excel auto-runs formulas → potential local-data exfiltration on admin's machine.
 - **Fix:** In `escape()`, prefix any field whose first char is `=`, `+`, `-`, `@`, `\t`, `\r` with `'` (apostrophe).
@@ -435,42 +439,42 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M4b. `/public/matches/:id` returns any match including override comments
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/public/match.routes.ts:113-126`; `services/admin/match-query.service.ts`
 - **Problem:** Public list filters to own-club; detail does not. Admin override comments authored via PATCH are exposed.
 - **Fix:** Either restrict `getPublicMatchDetail` to own-club matches, OR strip override-only fields (`publicComment`, `internalComment`) before returning to public route.
 
 #### M4c. Player photo upload preserves attacker filename extension
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/social/player-photo.service.ts:22-35`; `routes/admin/social.routes.ts:43-57`
 - **Problem:** Today not exploitable (content-type derived from filename, defaults to `image/png` for unknown extensions). Brittle: any refactor that "uses actual extension" introduces stored-XSS via SVG.
 - **Fix:** Derive extension from validated content-type (`png`/`jpeg`/`webp`), not user-supplied filename. Same fix already exists for backgrounds.
 
 #### M4d. Push token in URL path of `DELETE /api/devices/:token` is logged
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/device.routes.ts:55-80`; `middleware/request-logger.ts:57`
 - **Problem:** Path is logged in every request line. Cloud Logging retains. Exfiltrated push tokens usable for arbitrary push-spam to that device.
 - **Fix:** Either move token from path to body (`DELETE /api/devices` with `{token}`), OR redact paths matching `/api/devices/.+` to `/api/devices/<redacted>` in request logger.
 
 #### M4e. `PUT /admin/users/:id/referee-link` lets `user.update` holder link any referee
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/admin/user.routes.ts:10-42`
 - **Problem:** Today admin-only by configured permission. Latent privilege escalation if a future role gets `user.update`.
 - **Fix:** Restrict explicitly to `admin` role (`requireAnyRole("admin")`) instead of `requirePermission("user", "update")`. Or split into a new permission `user.linkReferee`.
 
 #### M4f. Public scoreboard/broadcast accept any string `deviceId`
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `routes/public/scoreboard.routes.ts:21-42, 51-60`; `routes/public/broadcast.routes.ts:20-29, 38-90`
 - **Problem:** No validation against known devices. Bundled with C2.
 - **Fix:** Validate `deviceId` against `liveScoreboards` table or known-devices allowlist. Reject unknown with 404.
 
 #### M4g. `INTERNAL_ERROR` echoes `Error.message` in non-prod
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/middleware/error.ts:38-56`
 - **Problem:** Tied to `NODE_ENV !== "production"`. Staging environments often left as `development` for verbose errors → leak DB constraint names, library internals.
 - **Fix:** Tie verbose-message branch to a separate explicit env flag (`VERBOSE_ERRORS=true`) so production-mode staging behaves like prod.
@@ -479,13 +483,13 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M5a. Services importing route schemas (layering leak)
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/admin/sync-admin.service.ts:5`; `referee-history.service.ts:11-14`
 - **Fix:** Move schema-derived types to `@dragons/shared`. Routes import their schemas separately and call services with plain types.
 
 #### M5b. Service file gigantism
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Locations:** `services/sync/matches.sync.ts` (981 lines), `services/admin/task.service.ts` (898), `services/venue-booking/venue-booking.service.ts` (652), `services/sync/sdk-client.ts` (612), `services/admin/match-query.service.ts` (581)
 - **Fix:**
   - `matches.sync.ts` → extract pure functions (`period-scores.ts`, `match-snapshot.ts`, `match-change-classifier.ts`); keep orchestrator thin.
@@ -493,19 +497,19 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M5c. Domain event payload schema implicit and untyped
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** 35+ `publishDomainEvent({ payload: {...} })` call sites; classifier `services/events/event-types.ts:39-65` scrapes payloads with regex
 - **Fix:** Define per-event-type `EventPayload` discriminated union in `@dragons/shared`. Replace `payload: Record<string, unknown>` with `EventPayload<T>`. Urgency classifier accesses `payload.kickoffDate` directly.
 
 #### M5d. Health endpoint thin
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/health.routes.ts:9-45`
 - **Fix:** Add `/health/deep` covering: outbox lag (`max(now - created_at) WHERE enqueued_at IS NULL`), queue depth, last-sync age, WAHA reachability, push-receipt backlog. Keep `/health` as fast liveness probe. Wire `/health/deep` into Cloud Monitoring uptime check (don't restart on degraded; alert).
 
 #### M5e. Implicit data-access layer
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `services/admin/match-query.service.ts` has helpers; rest of code does inline Drizzle. Inconsistent.
 - **Decision:** Either commit to repos (`repositories/` dir, all SELECTs centralized), or commit to inline (delete `match-query` helpers). Document.
 
@@ -513,38 +517,38 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M6a. `escapeLikePattern` private; ILIKE input unescaped elsewhere
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Locations:** definition `services/admin/event-admin.service.ts:16-18`; unescaped uses in `sync-admin.service.ts:127-138`, `referee-history.service.ts:255-260`, `routes/admin/broadcast.routes.ts:178-182`. Also `routes/admin/notification-test.routes.ts:198` uses LIKE with caller-controlled session id (low risk for UUIDs but fragile).
 - **Fix:** Move `escapeLikePattern` to `services/utils/sql.ts`. Use everywhere ILIKE/LIKE meets a user-provided pattern.
 
 #### M6b. Push template helpers duplicated 6 times with subtle divergence
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Locations:** `services/notifications/templates/push/{referee-assigned, referee-unassigned, referee-reassigned, match-cancelled, match-rescheduled, referee-slots}.ts`
 - **Problem:** `truncate` duplicated 6×. `formatDe` 3×. `formatDate` 2× with different output for `en` (`DD.MM.` vs `DD.MM.YYYY`) — UI inconsistency.
 - **Fix:** Move helpers to `templates/push/_utils.ts`. Pick one canonical format per locale.
 
 #### M6c. SSE plumbing duplicated
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Locations:** `services/scoreboard/sse.ts:26-105`; `routes/public/broadcast.routes.ts:32-91`
 - **Fix:** Extract `createSseStream({ initialState, subscribe, heartbeatMs })`. Both routes shrink to ~10 lines.
 
 #### M6d. `pickDefined` pattern duplicated
 
-- [ ] **Status:** todo
+- [x] **Status:** done — `services/utils/object.ts#pickDefined` added; applied to booking-admin `updateBooking` + broadcast `upsertBroadcastConfig`; `Record<string, unknown>` set objects removed (also closes L18)
 - **Locations:** `services/admin/booking-admin.service.ts:204-213, 303-311`; `services/broadcast/config.ts:65-72`; others
 - **Fix:** `pickDefined<T>(input: Partial<T>, allowedKeys: (keyof T)[]): Partial<T>` helper.
 
 #### M6e. `secondsSinceLastFrame` math repeated; admin route omits clamp
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Locations:** `routes/public/scoreboard.routes.ts:35-38`; `services/broadcast/publisher.ts:74-77`; `routes/admin/scoreboard.routes.ts:78-80`
 - **Fix:** `computeSecondsSince(date: Date): number` in scoreboard utils. Always clamp `Math.max(0, ...)`.
 
 #### M6f. `templates/index.ts` and `templates/digest.ts` renderer chain duplicated; digest excludes task
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `templates/index.ts:26-30`; `templates/digest.ts:20-37`
 - **Problem:** Asymmetric inclusion — task events in real-time, missing from digest. Silent feature drift.
 - **Fix:** Extract `tryRenderEvent(eventType, payload, entityName, locale): RenderedMessage | null`.
@@ -553,115 +557,115 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M7a. Pino redaction one-level only
 
-- [ ] **Status:** bundled with H2
+- [x] **Status:** done
 
 #### M7b. `whatsapp.provider.ts` is dead stub
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/notifications/whatsapp.provider.ts:1-13`
 - **Problem:** Returns `{ success: false }`. Only its test references it. Real WhatsApp via `whatsapp-group.ts` (WAHA).
 - **Fix:** Delete file + test.
 
 #### M7c. Unused imports
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `services/admin/event-admin.service.ts:2,10,11,12`; `services/admin/notification-admin.service.ts:146` constructs unused `inAppAdapter`
 - **Fix:** Delete unused imports + dead constructor calls.
 
 #### M7d. Retention windows hard-coded
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/workers/index.ts:54-62, 111-130, 133-182`
 - **Fix:** `SYNC_RUN_RETENTION_DAYS` and `DOMAIN_EVENT_RETENTION_DAYS` env vars in `config/env.ts`.
 
 #### M7e. Outbox poller no max-lag metric
 
-- [ ] **Status:** bundled with M1b
+- [~] **Status:** deferred — bundled with M1b
 
 #### M7f. `sync-logger.ts` Redis publish failure permanently disables stream
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/sync/sync-logger.ts:60-71`
 - **Problem:** First failure sets `redisPublishFailed = true` and never resets. Transient Redis blip kills SSE for the rest of the run.
 - **Fix:** Reset `redisPublishFailed` after a cooldown (e.g. 30s) so streaming recovers.
 
 #### M7g. `notification-pipeline.ts` unsafe `as` casts on config
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Locations:** `services/notifications/notification-pipeline.ts:287, 306, 320`; `workers/digest.worker.ts:72`
 - **Problem:** `(channelCfg.config as unknown as WhatsAppGroupConfig).groupId`, `.locale as string`. Corrupt config row crashes pipeline.
 - **Fix:** Validate config bytes against `whatsappGroupConfigSchema` etc. before use. Drop unsafe casts.
 
 #### M7h. `pubsub.ts` swallows JSON.parse silently
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `services/scoreboard/pubsub.ts:31-35, 66-70`
 - **Fix:** Log at debug/warn level instead of silent drop.
 
 #### M7i. Magic thresholds split across files
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Locations:** `STALE_MS = 30_000` in `services/broadcast/publisher.ts:14`; `< 10s` for "online" in `routes/admin/scoreboard.routes.ts:85`
 - **Fix:** Single `services/scoreboard/constants.ts` or env vars.
 
 #### M7j. `match-admin.service.ts` runs entire match update + event publish in one transaction
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/admin/match-admin.service.ts:50-256`
 - **Problem:** Could deadlock against outbox poller's `FOR UPDATE SKIP LOCKED` on `domain_events`.
 - **Fix:** After resolving C3 (poller lock window), revisit. May not need change if poller no longer holds long locks.
 
 #### M7k. Push template type reuse loses semantic info
 
-- [ ] **Status:** todo
+- [x] **Status:** done — `RefereeReassignedPushPayload` defined; push body now shows "newRef replaces oldRef" (de/en); dispatcher casts to the distinct type
 - **Locations:** `templates/push/referee-unassigned.ts:3` and `referee-reassigned.ts:3` borrow `RefereeAssignedPayload`
 - **Problem:** Reassigned should display "from X to Y" — publishing site already includes those fields, template doesn't.
 - **Fix:** Define `RefereeUnassignedPayload` + `RefereeReassignedPayload` separately. Update templates to display old/new.
 
 #### M7l. `releaseOverride` event uses team API IDs as strings, not names
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/admin/match-admin.service.ts:392-412`
 - **Problem:** `homeTeam: String(locked.homeTeamApiId)` shows `"408 vs 511"` in notifications instead of team names.
 - **Fix:** Resolve team names via existing lookup join.
 
 #### M7m. `releaseOverride` does not invalidate broadcast cache
 
-- [ ] **Status:** bundled with M1a
+- [x] **Status:** done
 
 #### M7n. `match.routes.ts` dynamic import + fire-and-forget reconcile
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/routes/admin/match.routes.ts:117-124`
 - **Fix:** Static import at top. If latency matters, enqueue a BullMQ job (already plumbed for venue-booking) instead of `.then().catch()` race.
 
 #### M7o. `setBroadcastLive` returns synthetic empty config when stopping never-started broadcast
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/broadcast/config.ts:119-137`
 - **Fix:** Return `null` for "no config existed"; route translates to 404 or `{ config: null }`.
 
 #### M7p. `event-publisher.ts` `void enqueueDomainEvent(event)` — fire-and-forget
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/events/event-publisher.ts:131-138`
 - **Fix:** `.catch(() => {})` or `await`. Future strict-mode unhandled-rejection terminates process.
 
 #### M7q. `matches.sync.ts:519` filter excludes valid 0
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/sync/matches.sync.ts:519`; `services/sync/data-fetcher.ts:63`
 - **Fix:** `filter((id): id is number => typeof id === "number" && id > 0)`.
 
 #### M7r. SDK login no concurrency guard
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/sync/sdk-client.ts:109-145, 237-255`
 - **Fix:** Per-instance promise: `if (this.loginInFlight) return this.loginInFlight; this.loginInFlight = withRetry(...);`.
 
 #### M7s. SDK `withRetry` swallows attempt context
 
-- [ ] **Status:** todo
+- [x] **Status:** done
 - **Location:** `apps/api/src/services/sync/sdk-client.ts:69-90`
 - **Fix:** Wrap final error with `new Error(\`${label} failed after ${maxAttempts} attempts: ${err.message}\`, { cause: err })`.
 
@@ -669,36 +673,38 @@ After-fix baseline (2026-05-04, fourth pass):
 
 ## Phase 4 — Low / Nit
 
-- [ ] L1. Cookie name lacks `__Secure-` prefix — `config/auth.ts:47-56`
-- [ ] L2. `BETTER_AUTH_URL` defaults to localhost — add Zod refinement to reject in prod — `config/env.ts:11`
-- [ ] L3. `BETTER_AUTH_SECRET` min 32 — bump example to 48 — `config/env.ts:10`
-- [ ] L4. `dragons://*` and `dragons://` both in trustedOrigins — redundant — `config/auth.ts:14-18`
-- [ ] L5. `app.ts:33` openAPI spec may rebuild per request — verify caching
-- [ ] L6. `index.ts:42` double-cast `httpServer = healthServer as unknown as typeof httpServer`
-- [ ] L7. Proxy-based lazy singletons for db/redis break Symbol.iterator — `config/database.ts:8-17`, `config/redis.ts:11-28`
-- [ ] L8. `health.routes.ts:14` dead `security: []` override
-- [ ] L9. `sync-admin.service.ts:55` `filter(Boolean) as ...` — use predicate
-- [ ] L10. `sync.routes.ts:104` job page size hardcoded 100 — add limit query param
-- [ ] L11. `expo-push.client.ts:89,106` Expo response shape unvalidated — add Zod schema
-- [ ] L12. `notification-test.routes.ts:215-218` `maskToken` reveals short tokens fully
-- [ ] L13. `stramatel-decoder.ts:57-59` `payload[i] as number` cast — use for-of
-- [ ] L14. `sync.worker.ts:21-23` inconsistent `as const` on ternary branches
-- [ ] L15. Admin-test emoji `🏀` violates project anti-emoji rule — `notification-test.routes.ts:106, 138`
-- [ ] L16. `notification.routes.ts:132-170` "preferences" mounted under `/admin/*` but caller-self — semantic mismatch (consider `/api/me/...`)
-- [ ] L17. `event-publisher.ts` exports `buildDomainEvent`/`insertDomainEvent`/`enqueueDomainEvent` separately — document why
-- [ ] L18. `services/admin/booking-admin.service.ts:204, 303` `set: Record<string, unknown>` — bundled with M6d
-- [ ] L19. `routes/admin/notification-test.routes.ts:124` batch error reused per device — reuse `PushChannelAdapter` from production path
-- [ ] L20. `services/scoreboard/ingest.ts:88-91` double-cast in `snapshotsDiffer` — type via `Pick<typeof liveScoreboards.$inferSelect, ...>`
-- [ ] L21. `requireRefereeSelfOrPermission` `as number` cast — make `isReferee` narrow `user is User & { refereeId: number }` in `@dragons/shared`
-- [ ] L22. `notification-pipeline.ts:155, 156, 203, 204, 286` `event.payload as Record<string, unknown>` — `getEventPayload(event)` helper
-- [ ] L23. Cookie `domain: ".app.hbdragons.de"` — verify all subdomains are owned (subdomain-takeover risk)
-- [ ] L24. `templates/push/types.ts` TITLE_MAX/BODY_MAX — verify against APNs/Android limits, document source
+- [x] L1. Cookie name lacks `__Secure-` prefix — `config/auth.ts:47-56`
+- [x] L2. `BETTER_AUTH_URL` defaults to localhost — add Zod refinement to reject in prod — `config/env.ts:11`
+- [x] L3. `BETTER_AUTH_SECRET` min 32 — bump example to 48 — `config/env.ts:10`
+- [x] L4. `dragons://*` and `dragons://` both in trustedOrigins — redundant — `config/auth.ts:14-18`
+- [x] L5. `app.ts:33` openAPI spec may rebuild per request — verify caching
+- [x] L6. `index.ts:42` double-cast `httpServer = healthServer as unknown as typeof httpServer`
+- [~] L7. Proxy-based lazy singletons for db/redis break Symbol.iterator — `config/database.ts:8-17`, `config/redis.ts:11-28`  _(left: left in place — refactor risk)_
+- [x] L8. `health.routes.ts:14` dead `security: []` override
+- [x] L9. `sync-admin.service.ts:55` `filter(Boolean) as ...` — use predicate
+- [x] L10. `sync.routes.ts:104` job page size hardcoded 100 — add limit query param
+- [x] L11. `expo-push.client.ts:89,106` Expo response shape unvalidated — add Zod schema
+- [x] L12. `notification-test.routes.ts:215-218` `maskToken` reveals short tokens fully
+- [x] L13. `stramatel-decoder.ts:57-59` `payload[i] as number` cast — use for-of
+- [x] L14. `sync.worker.ts:21-23` inconsistent `as const` on ternary branches
+- [~] L15. Admin-test emoji `🏀` violates project anti-emoji rule — `notification-test.routes.ts:106, 138`  _(left: left — human-authored product copy)_
+- [x] L16. `notification.routes.ts:132-170` "preferences" mounted under `/admin/*` but caller-self — semantic mismatch (consider `/api/me/...`)
+- [x] L17. `event-publisher.ts` exports `buildDomainEvent`/`insertDomainEvent`/`enqueueDomainEvent` separately — document why
+- [x] L18. `services/admin/booking-admin.service.ts:204, 303` `set: Record<string, unknown>` — bundled with M6d
+- [~] L19. `routes/admin/notification-test.routes.ts` batch error reused per device — reuse `PushChannelAdapter` from production path  _(deferred after investigation: the adapter is template-driven (`renderPushTemplate(eventType)` → returns early when no template) and dedup-claim-driven against the unique index. The admin test push sends arbitrary free-text with a fixed title and no `admin.test` template, so routing it through the adapter would render+send nothing and bind a diagnostic path to production dedup machinery. The ~15-line direct send stays.)_
+- [x] L20. `services/scoreboard/ingest.ts:88-91` double-cast in `snapshotsDiffer` — type via `Pick<typeof liveScoreboards.$inferSelect, ...>`
+- [x] L21. `requireRefereeSelfOrPermission` `as number` cast — make `isReferee` narrow `user is User & { refereeId: number }` in `@dragons/shared`
+- [x] L22. `notification-pipeline.ts:155, 156, 203, 204, 286` `event.payload as Record<string, unknown>` — `getEventPayload(event)` helper
+- [x] L23. Cookie `domain: ".app.hbdragons.de"` — verify all subdomains are owned (subdomain-takeover risk)
+- [x] L24. `templates/push/types.ts` TITLE_MAX/BODY_MAX — verify against APNs/Android limits, document source
 
 ---
 
 ## Cross-cutting themes (read before starting)
 
 ### CC1. Multi-instance readiness — RESOLVED via infra audit
+
+- [x] **Status:** resolved — hybrid topology confirmed; API-side state moved to Redis (C1/H1/H3/H8), worker pinned single-instance.
 
 Reading `infra/environments/production/main.tf`:
 
@@ -714,29 +720,43 @@ This is a **hybrid** deployment: the API path scales horizontally, the worker pa
 
 ### CC2. Outbox primitive correct; call sites broken (C4)
 
+- [x] **Status:** resolved — all 36 call sites audited (C4); only the inside-tx one now passes `tx`.
+
 `publishDomainEvent(params, tx?)` is correct. 35 call sites; only 4 pass `tx`. Action: audit all 35; either make `tx` required (renaming the no-tx path to `publishDomainEventOutsideTx`) or write an ESLint rule.
 
 ### CC3. Transaction boundaries inconsistent
+
+- [x] **Status:** done — default rule (state + event in one tx, pass `tx` to publishDomainEvent; bulk writes in a tx via Promise.all) documented in AGENTS.md "Transaction boundaries".
 
 Three patterns coexist: full-tx-with-event (gold standard, `match-admin.service.ts`), tx-without-event-tx (broken outbox, `matches.sync.ts`), no-tx-at-all (sync workers). Pick one default per operation type. Document.
 
 ### CC4. Per-connection Redis client in 3 SSE places (C2 expanded)
 
+- [x] **Status:** done — shared-subscriber machinery extracted to `services/events/redis-channel-fanout.ts`; scoreboard pubsub delegates to it and the admin sync-log SSE now fans out via `services/sync/sync-log-stream.ts` instead of `new Redis()` per connection.
+
 `scoreboard/pubsub.ts`, `routes/public/broadcast.routes.ts`, `routes/admin/sync.routes.ts:322`. Replace with one shared subscriber per process fanning out via in-memory EventEmitter.
 
 ### CC5. N+1 query loops (M2)
+
+- [x] **Status:** resolved — M2c done; all six M2 hot paths now bulk-load / bulk-write or batch inside a transaction.
 
 At least 6 hot paths. Bulk-load via `inArray`, bulk-insert with `values([...])`, or `UPDATE ... FROM (VALUES ...)` for batch updates.
 
 ### CC6. Trace context lost at boundaries
 
+- [x] **Status:** done — `captureTrace()` stamps the enqueuing request's trace onto sync jobs (`queues.ts#addSyncJob`); `syncWorker` re-establishes it via `runWithTrace(job.data.trace, …)` so job logs correlate; `currentTraceparent()` adds a W3C `traceparent` to the outbound federation SDK fetches (login + authenticated). Helpers + tests in `config/log-context.ts`.
+
 Excellent in-process: AsyncLocalStorage threads requestId/traceId through `logger.child()`. But: outbound SDK calls don't send `traceparent`; BullMQ jobs don't carry trace context. Sync triggered by `POST /admin/sync/trigger` becomes anonymous to the trace tree. **Action:** thread `traceId` into BullMQ job data; restore context in worker handler before processing. Add `traceparent` to outbound SDK fetch.
 
 ### CC7. Unsafe `as unknown as` / `as Record<string, unknown>` casts hide schema drift
 
+- [x] **Status:** resolved — config readers (M7g), Expo response (L11), decoder (L13), snapshot diff (L20), event payload (M5c/L22) now parse/narrow at the boundary.
+
 Concentrated in: `notification-pipeline.ts` config readers, Expo response handler, broadcast cache, decoder bounds, event payload access. Replace with Zod parse at the boundary.
 
 ### CC8. Implicit single-tenant assumption
+
+- [x] **Status:** done — single-tenant "own club" constraint documented in AGENTS.md "Deployment topology & tenancy" (alongside the worker single-instance note).
 
 "Own club" identity (`teams.isOwnClub`, `getClubConfig()`) plumbed through routes/services/sync. Adding a second club requires either full multi-tenant refactor or fork-per-tenant. Codebase reads as fork-per-tenant but doesn't say so explicitly. **Decision:** document the constraint in `AGENTS.md`.
 

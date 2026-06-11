@@ -181,31 +181,39 @@ export async function syncTeamsFromData(
     let nextCorrectionOrder = (await getMaxOwnDisplayOrder()) + 1;
     const markedByToMarkOwn = new Set<number>();
 
-    // Process hash-skipped flip-to-true rows (set isOwnClub + displayOrder)
-    for (const row of toMarkOwn) {
-      await db
-        .update(teams)
-        .set({
-          isOwnClub: true,
-          displayOrder: nextCorrectionOrder++,
-          updatedAt: now,
-        })
-        .where(eq(teams.id, row.id));
+    // Precompute the displayOrder each corrected row gets, preserving the
+    // sequential assignment, then apply them as parallel UPDATEs inside one
+    // transaction. Was N sequential round-trips, each its own auto-commit; now
+    // the corrective pass is atomic and the round-trips overlap.
+    const markOwnUpdates = toMarkOwn.map((row) => {
       markedByToMarkOwn.add(row.id);
-    }
+      return { id: row.id, displayOrder: nextCorrectionOrder++ };
+    });
 
-    // Process upsert-flipped-to-true rows (isOwnClub already true, just set displayOrder).
+    // Upsert-flipped-to-true rows (isOwnClub already true, just set displayOrder).
     // Skip any row already handled by toMarkOwn — flippingToOwnIds is built from the
     // pre-upsert state and can overlap with toMarkOwn when the row's hash didn't change.
-    for (const row of flippedViaUpsert) {
-      if (markedByToMarkOwn.has(row.id)) continue;
-      await db
-        .update(teams)
-        .set({
-          displayOrder: nextCorrectionOrder++,
-          updatedAt: now,
-        })
-        .where(eq(teams.id, row.id));
+    const orderOnlyUpdates = flippedViaUpsert
+      .filter((row) => !markedByToMarkOwn.has(row.id))
+      .map((row) => ({ id: row.id, displayOrder: nextCorrectionOrder++ }));
+
+    if (markOwnUpdates.length > 0 || orderOnlyUpdates.length > 0) {
+      await db.transaction(async (tx) => {
+        await Promise.all([
+          ...markOwnUpdates.map((u) =>
+            tx
+              .update(teams)
+              .set({ isOwnClub: true, displayOrder: u.displayOrder, updatedAt: now })
+              .where(eq(teams.id, u.id)),
+          ),
+          ...orderOnlyUpdates.map((u) =>
+            tx
+              .update(teams)
+              .set({ displayOrder: u.displayOrder, updatedAt: now })
+              .where(eq(teams.id, u.id)),
+          ),
+        ]);
+      });
     }
 
     // Flip-to-false: reset displayOrder to 0 in a single bulk UPDATE (hash-skipped rows only;
