@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../middleware/rbac", () => ({
-  requireRefereeSelfOrPermission: vi.fn(
+  requireRefereeSelfOrAdminRole: vi.fn(
     () =>
       async (
         c: { set: (k: string, v: unknown) => void; json: (body: unknown, status: number) => unknown },

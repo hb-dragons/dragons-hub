@@ -8,7 +8,7 @@ const PERMISSION_GUARDS = [
   "requirePermission",
   "requireAnyRole",
   "requireRefereeSelf",
-  "requireRefereeSelfOrPermission",
+  "requireRefereeSelfOrAdminRole",
 ];
 
 // Self-service endpoints under /admin/* that intentionally allow any
@@ -33,7 +33,7 @@ interface HandlerCall {
 
 function findGuardAliases(source: string): string[] {
   const aliases: string[] = [];
-  const re = /const\s+(\w+)\s*=\s*(requirePermission|requireAnyRole|requireRefereeSelfOrPermission)\s*\(/g;
+  const re = /const\s+(\w+)\s*=\s*(requirePermission|requireAnyRole|requireRefereeSelfOrAdminRole)\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(source)) !== null) aliases.push(m[1]!);
   return aliases;

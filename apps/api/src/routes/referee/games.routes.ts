@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
-import { requireRefereeSelfOrPermission } from "../../middleware/rbac";
+import { requireRefereeSelfOrAdminRole } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import { refereeGamesQuerySchema } from "@dragons/contracts";
 import {
@@ -13,11 +13,9 @@ import {
 
 const refereeGamesRoutes = new Hono<AppEnv>();
 
-// Any role with `assignment.view` (admin, refereeAdmin) gets cross-referee
-// visibility; a referee without that permission is scoped to their own games
-// via c.get("refereeId"). To restrict cross-referee visibility to a smaller
-// allowlist, swap to a role-based guard rather than a permission-based one.
-const gate = requireRefereeSelfOrPermission("assignment", "view");
+// admin and refereeAdmin get cross-referee (wide) visibility; a referee without
+// either role is scoped to their own games via c.get("refereeId").
+const gate = requireRefereeSelfOrAdminRole(["admin", "refereeAdmin"]);
 
 refereeGamesRoutes.get(
   "/games",

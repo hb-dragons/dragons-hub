@@ -20,7 +20,7 @@ import {
   requirePermission,
   assertPermission,
   requireRefereeSelf,
-  requireRefereeSelfOrPermission,
+  requireRefereeSelfOrAdminRole,
 } from "./rbac";
 import { errorHandler } from "./error";
 
@@ -262,9 +262,9 @@ describe("requireRefereeSelf", () => {
   });
 });
 
-describe("requireRefereeSelfOrPermission", () => {
+describe("requireRefereeSelfOrAdminRole", () => {
   const app = new Hono<AppEnv>();
-  app.use("/either/*", requireRefereeSelfOrPermission("assignment", "view"));
+  app.use("/either/*", requireRefereeSelfOrAdminRole(["admin", "refereeAdmin"]));
   app.get("/either/games", (c) =>
     c.json({ refereeId: c.get("refereeId") ?? null }),
   );
@@ -275,7 +275,7 @@ describe("requireRefereeSelfOrPermission", () => {
     expect(res.status).toBe(401);
   });
 
-  it("passes a linked referee and populates refereeId", async () => {
+  it("passes a linked referee (no admin role) and scopes to self", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: null, refereeId: 77 },
       session: { id: "s1" },
@@ -285,7 +285,7 @@ describe("requireRefereeSelfOrPermission", () => {
     expect(await res.json()).toEqual({ refereeId: 77 });
   });
 
-  it("passes an admin (no refereeId) and leaves refereeId unset", async () => {
+  it("passes an admin and leaves refereeId unset (wide view)", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: "admin", refereeId: null },
       session: { id: "s1" },
@@ -295,7 +295,7 @@ describe("requireRefereeSelfOrPermission", () => {
     expect(await res.json()).toEqual({ refereeId: null });
   });
 
-  it("passes a refereeAdmin with no referee link (permission-only path)", async () => {
+  it("passes a refereeAdmin and leaves refereeId unset (wide view)", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: "refereeAdmin", refereeId: null },
       session: { id: "s1" },
@@ -305,7 +305,7 @@ describe("requireRefereeSelfOrPermission", () => {
     expect(await res.json()).toEqual({ refereeId: null });
   });
 
-  it("returns 403 when user has neither referee link nor the permission", async () => {
+  it("returns 403 when user has neither an admin-listed role nor a referee link", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: "teamManager", refereeId: null },
       session: { id: "s1" },
@@ -314,10 +314,10 @@ describe("requireRefereeSelfOrPermission", () => {
     expect(res.status).toBe(403);
   });
 
-  // Permission wins over identity. An admin who also happens to be linked as
-  // a referee gets the full admin scope (refereeId unset) so downstream
-  // services don't silently narrow their query to that referee.
-  it("does not set refereeId when user has both permission and refereeId", async () => {
+  // Role wins over identity: an admin who is also linked as a referee gets the
+  // full wide-view scope (refereeId unset) so downstream services don't silently
+  // narrow their query to only that referee.
+  it("does not set refereeId when user has both an admin role and a refereeId", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: "admin", refereeId: 42 },
       session: { id: "s1" },

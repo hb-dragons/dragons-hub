@@ -2,7 +2,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { auth } from "../config/auth";
 import type { Resource, Action, RoleName } from "@dragons/shared";
-import { isReferee, can, hasRole } from "@dragons/shared";
+import { isReferee, hasRole } from "@dragons/shared";
 
 export const requireAuth: MiddlewareHandler = async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -90,26 +90,23 @@ export const requireRefereeSelf: MiddlewareHandler = async (c, next) => {
   await next();
 };
 
-// Permission wins over identity: a user who has the permission sees the full admin
-// scope even if they also have a refereeId. refereeId is only set when the user
+// Role wins over identity: a user who holds any of the listed roles sees the full
+// wide scope (refereeId not set on context). refereeId is only set when the user
 // qualifies solely as a referee, so downstream services scope queries to self.
-export function requireRefereeSelfOrPermission<R extends Resource>(
-  resource: R,
-  action: Action<R>,
-): MiddlewareHandler {
+export function requireRefereeSelfOrAdminRole(roleNames: RoleName[]): MiddlewareHandler {
   return async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) {
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
     const user = session.user as { refereeId?: number | null; role?: string | null };
-    const hasPerm = can(user, resource, action);
-    if (!hasPerm && !isReferee(user)) {
+    const isAdmin = roleNames.some((n) => hasRole(user, n));
+    if (!isAdmin && !isReferee(user)) {
       return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
     }
     c.set("user", session.user);
     c.set("session", session.session);
-    if (!hasPerm && isReferee(user)) {
+    if (!isAdmin && isReferee(user)) {
       c.set("refereeId", user.refereeId);
     }
     await next();
