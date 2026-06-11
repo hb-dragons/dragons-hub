@@ -728,7 +728,7 @@ This is a **hybrid** deployment: the API path scales horizontally, the worker pa
 
 ### CC3. Transaction boundaries inconsistent
 
-- [ ] **Status:** OPEN — the worst case (tx-without-event-tx) is fixed via C4, but no single default is yet written down.
+- [x] **Status:** done — default rule (state + event in one tx, pass `tx` to publishDomainEvent; bulk writes in a tx via Promise.all) documented in AGENTS.md "Transaction boundaries".
 
 Three patterns coexist: full-tx-with-event (gold standard, `match-admin.service.ts`), tx-without-event-tx (broken outbox, `matches.sync.ts`), no-tx-at-all (sync workers). Pick one default per operation type. Document.
 
@@ -758,7 +758,7 @@ Concentrated in: `notification-pipeline.ts` config readers, Expo response handle
 
 ### CC8. Implicit single-tenant assumption
 
-- [ ] **Status:** OPEN — constraint still not documented in `AGENTS.md`.
+- [x] **Status:** done — single-tenant "own club" constraint documented in AGENTS.md "Deployment topology & tenancy" (alongside the worker single-instance note).
 
 "Own club" identity (`teams.isOwnClub`, `getClubConfig()`) plumbed through routes/services/sync. Adding a second club requires either full multi-tenant refactor or fork-per-tenant. Codebase reads as fork-per-tenant but doesn't say so explicitly. **Decision:** document the constraint in `AGENTS.md`.
 
