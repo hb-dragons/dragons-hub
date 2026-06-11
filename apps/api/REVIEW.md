@@ -9,11 +9,13 @@ This document tracks every finding from the review, ordered for sequential fixin
 
 ## Progress
 
-**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **81 done, 9 deferred, 10 open**.
+**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **87 done, 9 deferred, 4 open**.
 
-Open items:
-- **Findings:** M2c, M3a (both partial), M6d, M7k, L19
-- **Cross-cutting:** CC3 (no documented tx default), CC4 (admin sync SSE still per-connection), CC5 (only M2c left), CC6 (trace context — untouched), CC8 (single-tenant constraint undocumented)
+**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md).
+
+Remaining open items:
+- **Findings:** M3a (partial — some routes still parse ids with `Number()` instead of the shared Zod `idSchema`), L19 (notification-test doesn't reuse the production `PushChannelAdapter`)
+- **Cross-cutting:** CC4 (admin sync SSE at `sync.routes.ts:323` still opens a per-connection Redis subscriber), CC6 (trace context — `traceId` not threaded into BullMQ jobs, no `traceparent` on outbound SDK fetch)
 
 After-fix baseline (2026-05-04, fourth pass):
 - 158 test files, 2731 tests passing (was 153 / 2673 pre-review)
