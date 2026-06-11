@@ -6,6 +6,7 @@ import { Button } from "@dragons/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dragons/ui/components/card";
 import { ImagePreview } from "../image-preview";
 import type { WizardState } from "../types";
+// eslint-disable-next-line no-restricted-imports -- postBlob is a binary download not in the typed `api` registry
 import { browserClient } from "@/lib/api";
 
 interface PreviewStepProps {

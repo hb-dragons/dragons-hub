@@ -12,6 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@dragons/ui/components/alert-dialog";
+// eslint-disable-next-line no-restricted-imports -- postForm and delete are multipart/DELETE operations not in the typed `api` registry
 import { browserClient } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
