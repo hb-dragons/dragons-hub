@@ -9,9 +9,11 @@ This document tracks every finding from the review, ordered for sequential fixin
 
 ## Progress
 
-**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **89 done, 11 deferred, 0 open**. Every finding and cross-cutting theme is now resolved or has a documented deferral reason.
+**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **100 done, 0 deferred, 0 open**. Every finding and cross-cutting theme is now resolved.
 
-**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md), CC4 (shared Redis subscriber fanout for the admin sync-log SSE), CC6 (trace context threaded through sync jobs + `traceparent` on the SDK fetch). Deferred after investigation: M3a (every manual `Number()` site already guards → 400; migration would only change the error-body shape) and L19 (production push adapter is template/dedup-driven and doesn't fit the diagnostic test send).
+**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md), CC4 (shared Redis subscriber fanout for the admin sync-log SSE), CC6 (trace context threaded through sync jobs + `traceparent` on the SDK fetch).
+
+**Deferred-item closeout (branch `review/deferred-11`):** the 11 items previously left as `[~]` are now all implemented and ticked `[x]` — C5, H5, H6, H11, H14, M1b, M3a, M7e, L7, L15, L19. The two items that had been deferred after investigation (M3a, L19) were implemented after all, and the infra-mitigated/decided items (C5, H5, H6, H11, H14) were given real code fixes rather than relying on the single-instance pin or accepted behavior.
 
 After-fix baseline (2026-05-04, fourth pass):
 - 158 test files, 2731 tests passing (was 153 / 2673 pre-review)
@@ -25,9 +27,9 @@ After-fix baseline (2026-05-04, fourth pass):
 - C2 SSE Redis subscribers — single shared subscriber + per-process connection cap (50/device, 1000 total)
 - C3 Outbox poller lock window — split into atomic claim (`UPDATE...RETURNING` inside short tx) then enqueue outside tx
 - C4 publishDomainEvent without tx — audited 36 sites; only `matches.sync.ts:744` was inside-tx, now passes `tx`
-- C5 initializeWorkers race — not code-fixed; mitigated by `worker max_instances=1`. Documented in CC1.
+- C5 initializeWorkers race — now code-fixed on branch review/deferred-11: heartbeat-gated stale-run reclaim via `workers/instance-heartbeat.ts` + `syncRuns.ownerInstanceId` (was previously only mitigated by `worker max_instances=1`).
 
-**High (9 of 14 fixed)**
+**High (14 of 14 fixed — H5/H6/H11/H14 closed on branch review/deferred-11)**
 - H1 better-auth Redis secondaryStorage wired (`ba:` prefix)
 - H2 + M7a Pino redaction deepened (deep paths, env-var redaction)
 - H3 + H8 ingest rate-limit + notification-test cooldown moved to Redis (INCR/EXPIRE, SET NX EX)
@@ -37,7 +39,7 @@ After-fix baseline (2026-05-04, fourth pass):
 - H10 broadcast `setBroadcastLive` uses `FOR UPDATE` row lock; `BroadcastError` typed; route stops leaking error text
 - H13 Expo client retries 5xx with exponential backoff (3 attempts)
 - Per-identifier email lockout added (10 fails / 15 min → 30 min lockout, Redis-backed)
-- H5/H6/H11/H12/H14 deferred — see CC1 / RBAC notes; not strictly required given infra constraints
+- H5/H6/H11/H14 now implemented on branch review/deferred-11 (superadmin gate, explicit referee wide-view allowlist, Redis coalesce, partial-status + failedStep); H12 fixed earlier (Round 6)
 
 **Medium (~16 of 32 fixed)**
 - M3a partial / M3b user.routes.ts Zod body / M3 league id NaN handled
@@ -111,9 +113,9 @@ After-fix baseline (2026-05-04, fourth pass):
 
 ### Decisions made (2026-05-04)
 
-- **H5** Bull Board exposure → keep as-is (admin-gated). Acceptable risk for a small admin team. If admin pool grows, revisit and either gate behind a `superadmin` role or move behind IAP.
-- **H6** `requireRefereeSelfOrPermission` widening → keep current behavior. `refereeAdmin` is an oversight role; cross-referee visibility is intended. `rbac.test.ts` covers all cases (linked-referee / admin / refereeAdmin / neither / both); route-level comment in `routes/referee/games.routes.ts` documents the contract.
-- **H14** Sync orchestrator partial-failure → accept current behavior. Hash-skip makes re-running cheap. `failed` status means at least one step failed; check `syncRunEntries` for granular per-item log.
+- **H5** Bull Board exposure → originally kept admin-gated; **superseded on branch review/deferred-11**: now gated behind the new `superadmin` role (the "revisit if the admin pool grows" path was taken).
+- **H6** `requireRefereeSelfOrPermission` widening → originally kept; **superseded on branch review/deferred-11**: the wide-view allowlist is now explicit at the route via `requireRefereeSelfOrAdminRole(["admin","refereeAdmin"])`. `rbac.test.ts` still covers all cases.
+- **H14** Sync orchestrator partial-failure → originally accepted; **superseded on branch review/deferred-11**: added `partial` status + `failedStep` so a half-landed run is distinguishable from one that did nothing.
 - **M5b** Service file gigantism → split `task.service.ts` into table-affinity files + extract pure functions out of `matches.sync.ts`. _(implementation pending)_
 - **M5c** Domain event payload typing → per-event-type Zod schemas in `@dragons/shared`. Producers and consumers parse at the boundary. _(implementation pending)_
 - **M5e** Data access layer → codify the pragmatic rule: queries repeated in 3+ places get a `*-query.service.ts` helper; otherwise inline Drizzle in the consuming service. Documented in `AGENTS.md`.
@@ -132,8 +134,10 @@ After-fix baseline (2026-05-04, fourth pass):
 
 ### Remaining low-priority items
 
-- L7 Proxy-based lazy singletons for `db`/`redis` — refactor risk too high; left in place
-- L15 admin-test emoji `🏀` — left as human-authored product copy
+None — both items here were closed on branch review/deferred-11:
+
+- L7 Proxy-based lazy singletons for `db`/`redis` → replaced with explicit `getDb()` / `getRedis()` getters (~84 call sites updated)
+- L15 admin-test push title emoji `🏀` → removed
 
 ## Baseline at review time
 
@@ -196,7 +200,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 ### C5. `initializeWorkers` marks all running syncs as failed on startup (multi-instance race)
 
-- [~] **Status:** accepted — worker pinned max_instances=1 (CC1)
+- [x] **Status:** done (branch review/deferred-11) — startup stale-run reclaim is now heartbeat-gated: each worker has an `INSTANCE_ID` + Redis heartbeat (`worker:hb:<id>`, EX 60s) via `workers/instance-heartbeat.ts`; `syncRuns.ownerInstanceId` stamps the owner and a `running` row is reclaimed only when its owner's heartbeat is absent. Shutdown reclaim is scoped to this instance. Safe even if the worker scales past one instance.
 - **Location:** `apps/api/src/workers/index.ts:23-42, 246-278`
 - **Problem:** Every worker startup unconditionally marks all `syncRuns.status = 'running'` rows as `failed` ("Stale: worker restarted"). Cloud Run autoscale or rolling deploys mean a new instance comes up while an old instance's sync is still running. The new instance flags the running sync as failed; the old instance's `syncWorker.on("completed")` then refuses to overwrite the now-`failed` row (status check at `sync.worker.ts:115`). Same pattern on shutdown.
 - **Fix:** Either
@@ -248,7 +252,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H5. Bull Board UI exposed at `/admin/queues/*`
 
-- [~] **Status:** decided — keep Bull Board admin-gated (see Decisions)
+- [x] **Status:** done (branch review/deferred-11) — new `superadmin` role added in `@dragons/shared` (superset of `admin`); `/admin/queues/*` now gated by `requireAnyRole("superadmin")` and `superadmin` added to better-auth `adminRoles`. Operational note: existing `admin` users must be explicitly granted `superadmin` to keep Bull Board access.
 - **Location:** `apps/api/src/app.ts:21-46`
 - **Problem:** Admin-gated correctly via `requireAnyRole("admin")` — not unauthenticated leak. Concern: gives admin role total power to inspect/retry/fail/remove arbitrary BullMQ jobs (including manual sync triggers with user IDs in payloads). Bull Board has historical XSS / auth-bypass bugs. One compromised admin = total queue compromise.
 - **Fix:** Either
@@ -259,7 +263,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H6. `requireRefereeSelfOrPermission` widens scope to any matching permission holder
 
-- [~] **Status:** decided — keep current behavior, documented at route
+- [x] **Status:** done (branch review/deferred-11) — `requireRefereeSelfOrPermission` replaced by `requireRefereeSelfOrAdminRole(["admin","refereeAdmin"])`; the wide-view role allowlist is now explicit at the referee/games routes instead of implicit in the middleware, and `rbac.test.ts` exercises each role's scope.
 - **Location:** `apps/api/src/middleware/rbac.ts:96-118`; consumer `apps/api/src/routes/referee/games.routes.ts:12-51`
 - **Problem:** Skips refereeId-scoped filter when caller has any matching permission. Today `refereeAdmin` role holds `assignment.view` (`packages/shared/src/rbac.ts:32`) so a `refereeAdmin` user with no `refereeId` link sees every referee's data on `/referee/games`. May be intended, but the design contract is hidden in the middleware.
 - **Fix:**
@@ -305,7 +309,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H11. Notification coalesce map unbounded; per-process
 
-- [~] **Status:** accepted — coalesce runs only in single-instance worker (CC1)
+- [x] **Status:** done (branch review/deferred-11) — coalesce moved from the in-process Map to `redis.set("coalesce:<entityType>:<entityId>","1","EX",60,"NX")`; the claim is released if nothing was dispatched. Multi-instance safe.
 - **Location:** `apps/api/src/services/notifications/notification-pipeline.ts:35-60`
 - **Problem:** `recentDispatches` cleanup only runs when `size > 1000`, and only deletes stale entries. 5000 unique entities firing in 60s drives map to 5000. Per-process, so two replicas don't share — coalescing globally defeated by horizontal scale (the whole point of the 60s window).
 - **Fix:** Move to Redis: `SET coalesce:<key> 1 NX EX 60`. Set returns null = already-dispatched, skip. Single primitive replaces both the cap and the multi-instance gap.
@@ -329,7 +333,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### H14. Sync orchestrator partial-failure semantics opaque
 
-- [~] **Status:** accepted — current partial-failure semantics kept
+- [x] **Status:** done (branch review/deferred-11) — orchestrator now sets `status:"partial"` + `failedStep` when a fatal error hits after at least one step committed (vs. `failed` when nothing landed). New `syncRuns.failedStep` column; `"partial"` added to SYNC_STATUSES.
 - **Location:** `apps/api/src/services/sync/index.ts:50-345`; `matches.sync.ts:599-981`
 - **Problem:** Six steps with mixed transactional postures (some bulk-upsert, some per-row tx, some no tx at all). On fatal error mid-step, status set to `failed` but partial state already committed. Reading `errorMessage = "Fatal sync error: ..."` gives no signal whether 0% or 95% of work landed.
 - **Fix:** Add `partial` status. Capture per-step records on `syncRuns` (which step failed, what was committed). Optionally: add a `step` column.
@@ -350,7 +354,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M1b. Outbox poller as BullMQ repeatable job, not setInterval
 
-- [~] **Status:** deferred — setInterval fine on single-instance worker; lag-metric/DLQ not done
+- [x] **Status:** done (branch review/deferred-11) — outbox poller converted from `setInterval` to a BullMQ repeatable job (`outbox-poll` queue, `jobId: "outbox-poll-cron"`, every 30s, concurrency 1, new `outbox-poll.worker.ts`); `/health/deep` now reports the outbox-poll queue counts alongside the existing lag metric. Deduped repeatable job → one poll even if the worker scales past one instance.
 - **Location:** `apps/api/src/services/events/outbox-poller.ts:88-116`
 - **Problem:** `setInterval` + module-level singleton check is intra-process only. Two instances → both poll. No retry, no DLQ, no metrics on lag, no admin trigger.
 - **Fix:** Convert to BullMQ repeatable job with `concurrency: 1`, `jobId: "outbox-poll-cron"`. BullMQ deduplicates repeatable jobs by job ID. Add metric `outbox_lag_seconds = max(now - created_at) WHERE enqueued_at IS NULL`. Add alarm `events_undeliverable` for rows pending > 5 min.
@@ -402,7 +406,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M3a. Manual `Number(c.req.query(...))` instead of Zod
 
-- [~] **Status:** deferred — the correctness concern is gone: every remaining manual `Number(...)`/`parseInt(...)` site (referee/games, referee-assignment, public match/team, league, scoreboard) already guards `Number.isInteger`/`isNaN` and returns a 400, so no input reaches a handler as NaN. Migrating the ~21 sites to `@dragons/contracts` validators would change the 400 body shape (central `validationHook` vs. their current `VALIDATION_ERROR`) — a client-facing change for no correctness gain. Left as-is; revisit only if these routes gain contract schemas for other reasons.
+- [x] **Status:** done (branch review/deferred-11) — numeric route params for referee/games, referee-assignment, league, and public/scoreboard last-event-id moved to `@dragons/contracts` schemas + the shared `validator()` pattern; the 400 body for those routes is now the central `{error:"Invalid request data",code:"VALIDATION_ERROR",details:[...]}`.
 - **Locations:** `routes/referee/games.routes.ts:14-24`, `routes/admin/referee-assignment.routes.ts:32-46, 65-101`, `routes/admin/scoreboard.routes.ts:60-68`, `routes/public/scoreboard.routes.ts:22-58`, `routes/public/broadcast.routes.ts:21-23, 39-41`, `routes/admin/notification.routes.ts:79-81`, `routes/admin/league.routes.ts:65`
 - **Fix:** Pull `idSchema = z.coerce.number().int().positive()` into a shared `schemas/common.ts`. Adopt the Zod pattern from `match.routes.ts` everywhere.
 - **Verify:** invalid numeric inputs return 400 with structured error, not 500.
@@ -580,7 +584,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M7e. Outbox poller no max-lag metric
 
-- [~] **Status:** deferred — bundled with M1b
+- [x] **Status:** done (branch review/deferred-11) — bundled with M1b: `/health/deep` reports the `outbox-poll` queue counts; lag metric already existed.
 
 #### M7f. `sync-logger.ts` Redis publish failure permanently disables stream
 
@@ -679,7 +683,7 @@ After-fix baseline (2026-05-04, fourth pass):
 - [x] L4. `dragons://*` and `dragons://` both in trustedOrigins — redundant — `config/auth.ts:14-18`
 - [x] L5. `app.ts:33` openAPI spec may rebuild per request — verify caching
 - [x] L6. `index.ts:42` double-cast `httpServer = healthServer as unknown as typeof httpServer`
-- [~] L7. Proxy-based lazy singletons for db/redis break Symbol.iterator — `config/database.ts:8-17`, `config/redis.ts:11-28`  _(left: left in place — refactor risk)_
+- [x] L7. Proxy-based lazy singletons for db/redis replaced with explicit `getDb()` / `getRedis()` lazy getters; ~84 call sites updated — `config/database.ts`, `config/redis.ts` _(branch review/deferred-11)_
 - [x] L8. `health.routes.ts:14` dead `security: []` override
 - [x] L9. `sync-admin.service.ts:55` `filter(Boolean) as ...` — use predicate
 - [x] L10. `sync.routes.ts:104` job page size hardcoded 100 — add limit query param
@@ -687,11 +691,11 @@ After-fix baseline (2026-05-04, fourth pass):
 - [x] L12. `notification-test.routes.ts:215-218` `maskToken` reveals short tokens fully
 - [x] L13. `stramatel-decoder.ts:57-59` `payload[i] as number` cast — use for-of
 - [x] L14. `sync.worker.ts:21-23` inconsistent `as const` on ternary branches
-- [~] L15. Admin-test emoji `🏀` violates project anti-emoji rule — `notification-test.routes.ts:106, 138`  _(left: left — human-authored product copy)_
+- [x] L15. Admin-test push title emoji `🏀` removed — `notification-test.routes.ts:106, 138` _(branch review/deferred-11)_
 - [x] L16. `notification.routes.ts:132-170` "preferences" mounted under `/admin/*` but caller-self — semantic mismatch (consider `/api/me/...`)
 - [x] L17. `event-publisher.ts` exports `buildDomainEvent`/`insertDomainEvent`/`enqueueDomainEvent` separately — document why
 - [x] L18. `services/admin/booking-admin.service.ts:204, 303` `set: Record<string, unknown>` — bundled with M6d
-- [~] L19. `routes/admin/notification-test.routes.ts` batch error reused per device — reuse `PushChannelAdapter` from production path  _(deferred after investigation: the adapter is template-driven (`renderPushTemplate(eventType)` → returns early when no template) and dedup-claim-driven against the unique index. The admin test push sends arbitrary free-text with a fixed title and no `admin.test` template, so routing it through the adapter would render+send nothing and bind a diagnostic path to production dedup machinery. The ~15-line direct send stays.)_
+- [x] L19. Per-device push error mapping unified — `mapTicketError` extracted in `expo-push.client.ts` and used by both `channels/push` and the notification-test route (message-first precedence) _(branch review/deferred-11)_
 - [x] L20. `services/scoreboard/ingest.ts:88-91` double-cast in `snapshotsDiffer` — type via `Pick<typeof liveScoreboards.$inferSelect, ...>`
 - [x] L21. `requireRefereeSelfOrPermission` `as number` cast — make `isReferee` narrow `user is User & { refereeId: number }` in `@dragons/shared`
 - [x] L22. `notification-pipeline.ts:155, 156, 203, 204, 286` `event.payload as Record<string, unknown>` — `getEventPayload(event)` helper

@@ -91,7 +91,7 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `taskComments` | `packages/db/src/schema/tasks.ts` | taskId FK (cascade), authorId, body |
 | `notifications` | `packages/db/src/schema/notifications.ts` | recipientId, channel, title, body, status, sentAt, errorMessage |
 | `userNotificationPreferences` | `packages/db/src/schema/notifications.ts` | userId (unique), whatsappEnabled, whatsappNumber, locale, mutedEventTypes (text[]). Per-event opt-outs live in mutedEventTypes; the user-toggleable catalog is in packages/shared/src/notification-events.ts. |
-| `syncRuns` | `packages/db/src/schema/sync-runs.ts` | syncType, status, triggeredBy, records*, durationMs, summary JSONB |
+| `syncRuns` | `packages/db/src/schema/sync-runs.ts` | syncType, status (`pending`/`running`/`completed`/`failed`/`partial`), triggeredBy, failedStep, ownerInstanceId, records*, durationMs, summary JSONB |
 | `syncRunEntries` | `packages/db/src/schema/sync-runs.ts` | syncRunId FK (cascade), entityType, action, metadata JSONB |
 | `syncSchedule` | `packages/db/src/schema/sync-runs.ts` | enabled, cronExpression, timezone |
 | `live_scoreboards` | `packages/db/src/schema/scoreboard.ts` | One row per Pi; latest decoded scoreboard state. |
@@ -169,6 +169,12 @@ Step 6: Finalize
   - Update syncRuns record with results
 ```
 
+If a fatal error hits after at least one step has already committed, the run is
+marked `status: "partial"` (not `"failed"`) and `syncRuns.failedStep` records
+which step threw, so a half-landed run is distinguishable from a run that did
+nothing. `syncRuns.ownerInstanceId` stamps the worker instance that owns the run
+(see stale-run reclaim under Deployment topology & tenancy).
+
 ### Hash-Based Change Detection
 
 Each entity computes a SHA-256 hash from its data fields (see `services/sync/hash.ts`). The hash is stored in a `dataHash` column. During sync, the new hash is compared to the stored one - if identical, the entity is skipped.
@@ -193,7 +199,7 @@ Wrapper around basketball-bund-sdk at `services/sync/sdk-client.ts`:
 
 ## Domain Events
 
-Event types are defined in `packages/shared/src/domain-events.ts`. Events are published to the outbox, picked up by the event.worker, and dispatched to notification channels.
+Event types are defined in `packages/shared/src/domain-events.ts`. Events are published to the outbox, drained by the `outbox-poll` repeatable job into the `domain-events` queue, picked up by the event.worker, and dispatched to notification channels.
 
 ### Match Events
 
@@ -438,7 +444,7 @@ The same provider-neutral tool registry that backs the in-app chat is served her
 
 ### Admin - Bull Board
 
-| GET | `/admin/queues/*` | Bull Board web UI for queue monitoring |
+| GET | `/admin/queues/*` | Bull Board web UI for queue monitoring. Requires the `superadmin` role (`requireAnyRole("superadmin")`), not plain `admin`. |
 
 ### Scoreboard ingest
 
@@ -540,9 +546,9 @@ All resources, actions, and role → permission mappings live in `packages/share
 - `requirePermission(resource, action)` — per-route gate; 403 on insufficient permission. Attach as the second argument to `get/post/...` (not via `.use("*")` — see below).
 - `assertPermission(c, resource, action)` — inline check inside a handler for row-level logic.
 - `requireRefereeSelf` — gates self-service routes; populates `c.get("refereeId")`.
-- `requireRefereeSelfOrPermission(resource, action)` — dual gate for routes serving both referees and admins; populates `refereeId` when linked (undefined for non-referee admins, signaling admin mode).
+- `requireRefereeSelfOrAdminRole(roles)` — dual gate for routes serving both referees and admins; populates `refereeId` when the caller is a linked referee (undefined for the wide-view admin roles passed in, e.g. `["admin", "refereeAdmin"]`, signaling admin mode). The wide-view role allowlist is now explicit at each route rather than inferred from a permission.
 
-**Hono sub-router gotcha:** `.use("*", mw)` on a sub-router mounted at a shared prefix (e.g. `/admin`) registers the middleware at the parent's `<prefix>/*` path, so it fires on every sibling sub-router's routes too. Always attach permission middleware per-route instead (the app-level `app.use("/admin/*", requireAuth)` and `app.use("/admin/queues/*", requirePermission("settings", "update"))` in `app.ts` are safe because they live on the parent app, not on a sub-router).
+**Hono sub-router gotcha:** `.use("*", mw)` on a sub-router mounted at a shared prefix (e.g. `/admin`) registers the middleware at the parent's `<prefix>/*` path, so it fires on every sibling sub-router's routes too. Always attach permission middleware per-route instead (the app-level `app.use("/admin/*", requireAuth)` and `app.use("/admin/queues/*", requireAnyRole("superadmin"))` in `app.ts` are safe because they live on the parent app, not on a sub-router).
 
 ### Frontend (web & native)
 
@@ -555,7 +561,8 @@ All resources, actions, and role → permission mappings live in `packages/share
 
 | Role | Grants |
 |---|---|
-| `admin` | Full access to every resource and action. |
+| `superadmin` | Superset of `admin`. Additionally gates the Bull Board queue UI (`/admin/queues/*`) via `requireAnyRole("superadmin")`. **Operational note:** existing `admin` users do NOT inherit this — each must be explicitly granted `superadmin` to keep Bull Board access. `superadmin` is also listed in better-auth's `adminRoles`. |
+| `admin` | Full access to every resource and action (except Bull Board, which now requires `superadmin`). |
 | `refereeAdmin` | Manage referees, assignments; view matches; trigger referee sync. |
 | `venueManager` | Manage venues and bookings; view matches. |
 | `teamManager` | Manage teams; view matches, standings, referees. |
@@ -693,6 +700,7 @@ Located in `apps/api/src/workers/`. Queues configured in `workers/queues.ts`.
 - **referee-reminder.worker** — Scheduled reminders for open referee slots.
 - **task-reminder.worker** — Repeatable sweep every 15 minutes, driven by `apps/api/src/workers/task-reminder.worker.ts`. Loads tasks whose due date is within the next 24 hours (lead) or today past 08:00 UTC (day-of), whose column is not flagged `isDoneColumn`, and whose corresponding `lead_reminder_sent_at` / `due_reminder_sent_at` has not yet fired. Emits `task.due.reminder` events via the outbox.
 - **push-receipt.worker** — Cron, runs every 15 minutes (queue `push-receipt`). Polls Expo Push receipts for `sent_ticket` rows in `notification_log`, marks them `delivered` or `failed`, and purges `push_devices` rows whose tokens returned `DeviceNotRegistered`.
+- **outbox-poll.worker** — BullMQ repeatable job (queue `outbox-poll`, `jobId: "outbox-poll-cron"`, every 30s, concurrency 1) that claims unsent `domain_events` rows and enqueues them. This replaced the old `setInterval` poller; running it as a deduplicated repeatable job means only one poll fires even if the worker is ever scaled past one instance. `/health/deep` reports the `outbox-poll` queue counts alongside the existing outbox lag metric.
 
 ### Redis
 
@@ -747,6 +755,20 @@ Two operational constraints the code relies on but doesn't state inline:
   per-instance rate-limit / dedupe state on the **API** path must live in Redis,
   since up to 10 instances run. Do not raise the worker's `max_instances`
   without first moving that state to Redis.
+
+  Two pieces of worker-only state have since been made multi-instance safe and
+  no longer depend on the single-instance pin:
+  - **Stale-run reclaim is heartbeat-gated.** Each worker process gets an
+    `INSTANCE_ID` (ulid) and writes a Redis heartbeat (`worker:hb:<INSTANCE_ID>`,
+    `EX 60s`, refreshed ~every 20s) via `workers/instance-heartbeat.ts`. Sync
+    runs are stamped with `syncRuns.ownerInstanceId`. On startup a `running` row
+    is reclaimed (marked failed) only when its owner's heartbeat is absent, so a
+    second worker can no longer kill an in-flight run owned by a live instance.
+    Shutdown reclaim is scoped to the shutting-down instance's own runs.
+  - **Notification coalesce is Redis-backed.** The 60s coalesce window uses
+    `redis.set("coalesce:<entityType>:<entityId>", "1", "EX", 60, "NX")` instead
+    of an in-process Map; the claim is released if nothing was dispatched. This
+    coalesces correctly across instances.
 - **Single-tenant ("own club").** The app is deployed once per club. The owning
   club is identified by `teams.isOwnClub` / `referees.isOwnClub` and
   `getClubConfig()`, threaded through routes, services, and sync. There is no

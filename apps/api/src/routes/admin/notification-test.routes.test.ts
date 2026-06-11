@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import type { AppEnv } from "../../types";
+import type * as ExpoPushClientModule from "../../services/notifications/expo-push.client";
 
 const mocks = vi.hoisted(() => ({
   dbSelect: vi.fn(),
@@ -70,7 +71,7 @@ vi.mock("../../config/logger", () => ({
 }));
 
 vi.mock("../../services/notifications/expo-push.client", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../services/notifications/expo-push.client")>();
+  const original = await importOriginal<typeof ExpoPushClientModule>();
   return {
     ...original,
     ExpoPushClient: class {
