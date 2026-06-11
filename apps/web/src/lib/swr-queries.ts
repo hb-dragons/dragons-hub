@@ -1,6 +1,10 @@
 import type { Api } from "@dragons/api-client";
 import { SWR_KEYS } from "./swr-keys";
 import { api } from "./api";
+import {
+  normalizeRefereeGamesQuery,
+  type RawRefereeGamesOpts,
+} from "./referee-games-query";
 
 /**
  * Binds each SWR cache key to a typed fetcher that calls the real factory
@@ -23,24 +27,6 @@ function normReferees(opts: {
     limit: opts.limit ?? 50,
     offset: opts.offset ?? 0,
     ...(opts.search ? { search: opts.search } : {}),
-  };
-}
-
-// The SWR_KEYS builder accepts `league?: string[]` but the factory method
-// accepts `league?: string` (comma-joined). normRefereeGames joins the array
-// before passing to the factory so key + request derive from the same input.
-function normRefereeGames(opts: Parameters<typeof SWR_KEYS.refereeGamesFiltered>[0] = {}) {
-  return {
-    status: opts.status ?? "active",
-    limit: opts.limit ?? 100,
-    offset: opts.offset ?? 0,
-    ...(opts.slotStatus ? { slotStatus: opts.slotStatus } : {}),
-    ...(opts.gameType ? { gameType: opts.gameType } : {}),
-    ...(opts.dateFrom ? { dateFrom: opts.dateFrom } : {}),
-    ...(opts.dateTo ? { dateTo: opts.dateTo } : {}),
-    ...(opts.league?.length ? { league: opts.league.join(",") } : {}),
-    ...(opts.search ? { search: opts.search } : {}),
-    ...(opts.assignedRefereeApiId != null ? { assignedRefereeApiId: opts.assignedRefereeApiId } : {}),
   };
 }
 
@@ -119,10 +105,10 @@ export function makeQueries(api: Api) {
       fetcher: () => api.refereeAdmin.historyGames(query),
     }),
     // referee (self-service / assignment)
-    refereeGamesFiltered: (opts: Parameters<typeof SWR_KEYS.refereeGamesFiltered>[0] = {}) => {
-      const norm = normRefereeGames(opts);
+    refereeGamesFiltered: (opts: RawRefereeGamesOpts = {}) => {
+      const norm = normalizeRefereeGamesQuery(opts);
       return {
-        key: SWR_KEYS.refereeGamesFiltered(opts),
+        key: SWR_KEYS.refereeGamesFiltered(norm),
         fetcher: () => api.referees.getGames(norm),
       };
     },

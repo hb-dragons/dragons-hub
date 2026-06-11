@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { makeQueries } from "./swr-queries";
 import { SWR_KEYS } from "./swr-keys";
+import { normalizeRefereeGamesQuery } from "./referee-games-query";
 import type { Api } from "@dragons/api-client";
 
 /** A typed-enough mock: every method returns a tagged marker so we can assert dispatch. */
@@ -265,8 +266,8 @@ describe("makeQueries", () => {
     const { api, calls } = mockApi();
     const opts = {};
     const q = makeQueries(api).refereeGamesFiltered(opts);
-    // key derives from opts (raw input passed to the SWR_KEYS builder)
-    expect(q.key).toBe(SWR_KEYS.refereeGamesFiltered(opts));
+    // key derives from the normalized form of opts (same input the fetcher uses)
+    expect(q.key).toBe(SWR_KEYS.refereeGamesFiltered(normalizeRefereeGamesQuery(opts)));
     // fetcher uses normalized values (defaults applied)
     await q.fetcher();
     expect(calls[0]).toEqual({
@@ -279,12 +280,37 @@ describe("makeQueries", () => {
     const { api, calls } = mockApi();
     const opts = { status: "active" as const, slotStatus: "open" as const, search: "Schmidt" };
     const q = makeQueries(api).refereeGamesFiltered(opts);
-    expect(q.key).toBe(SWR_KEYS.refereeGamesFiltered(opts));
+    expect(q.key).toBe(SWR_KEYS.refereeGamesFiltered(normalizeRefereeGamesQuery(opts)));
     await q.fetcher();
     expect(calls[0]).toEqual({
       method: "referees.getGames",
       args: [{ status: "active", limit: 100, offset: 0, slotStatus: "open", search: "Schmidt" }],
     });
+  });
+
+  it("refereeGamesFiltered: wire key is stable (defaults-only)", () => {
+    const { api } = mockApi();
+    const q = makeQueries(api).refereeGamesFiltered({});
+    expect(q.key).toBe("/referee/games?status=active&limit=100&offset=0");
+  });
+
+  it("refereeGamesFiltered: wire key is stable (full opts incl. league join)", () => {
+    const { api } = mockApi();
+    const q = makeQueries(api).refereeGamesFiltered({
+      status: "all",
+      limit: 200,
+      offset: 50,
+      slotStatus: "offered",
+      gameType: "both",
+      dateFrom: "2026-01-01",
+      dateTo: "2026-02-28",
+      league: ["U18", "U20"],
+      search: "abc",
+      assignedRefereeApiId: 7,
+    });
+    expect(q.key).toBe(
+      "/referee/games?status=all&limit=200&offset=50&slotStatus=offered&gameType=both&dateFrom=2026-01-01&dateTo=2026-02-28&league=U18%2CU20&search=abc&assignedRefereeApiId=7",
+    );
   });
 
   it("refereeGameByApiMatch(id): key + dispatch", async () => {

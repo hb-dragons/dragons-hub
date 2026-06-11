@@ -1,3 +1,5 @@
+import type { NormalizedRefereeGamesQuery } from "./referee-games-query";
+
 export const SWR_KEYS = {
   syncStatus: "/admin/sync/status",
   dashboardTodayMatches: (date: string) =>
@@ -65,29 +67,19 @@ export const SWR_KEYS = {
   watchRules: "/admin/watch-rules",
   channelConfigs: "/admin/channel-configs",
   channelConfigProviders: "/admin/channel-configs/providers",
-  refereeGamesFiltered: (opts: {
-    status?: "active" | "all";
-    slotStatus?: "open" | "offered" | "any";
-    league?: string[];
-    dateFrom?: string;
-    dateTo?: string;
-    gameType?: "home" | "away" | "both";
-    assignedRefereeApiId?: number;
-    search?: string;
-    limit?: number;
-    offset?: number;
-  } = {}) => {
+  refereeGamesFiltered: (q: NormalizedRefereeGamesQuery) => {
     const qs = new URLSearchParams();
-    qs.set("status", opts.status ?? "active");
-    qs.set("limit", String(opts.limit ?? 100));
-    qs.set("offset", String(opts.offset ?? 0));
-    if (opts.slotStatus) qs.set("slotStatus", opts.slotStatus);
-    if (opts.gameType) qs.set("gameType", opts.gameType);
-    if (opts.dateFrom) qs.set("dateFrom", opts.dateFrom);
-    if (opts.dateTo) qs.set("dateTo", opts.dateTo);
-    if (opts.league?.length) qs.set("league", opts.league.join(","));
-    if (opts.search) qs.set("search", opts.search);
-    if (opts.assignedRefereeApiId != null) qs.set("assignedRefereeApiId", String(opts.assignedRefereeApiId));
+    qs.set("status", q.status);
+    qs.set("limit", String(q.limit));
+    qs.set("offset", String(q.offset));
+    if (q.slotStatus) qs.set("slotStatus", q.slotStatus);
+    if (q.gameType) qs.set("gameType", q.gameType);
+    if (q.dateFrom) qs.set("dateFrom", q.dateFrom);
+    if (q.dateTo) qs.set("dateTo", q.dateTo);
+    if (q.league) qs.set("league", q.league);
+    if (q.search) qs.set("search", q.search);
+    if (q.assignedRefereeApiId != null)
+      qs.set("assignedRefereeApiId", String(q.assignedRefereeApiId));
     return `/referee/games?${qs.toString()}`;
   },
   refereeMatches: "/referee/matches?limit=500&offset=0",

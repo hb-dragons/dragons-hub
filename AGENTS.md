@@ -404,6 +404,7 @@ The same provider-neutral tool registry that backs the in-app chat is served her
 |--------|------|-------------|
 | GET | `/admin/referees` | List referees. Query: `ownClub` (boolean, default true) filters to own-club referees. Includes allowAllHomeGames, allowAwayGames, isOwnClub flags |
 | PATCH | `/admin/referees/:id/visibility` | Update referee visibility flags. Body: `{ allowAllHomeGames: boolean, allowAwayGames: boolean, isOwnClub: boolean }` |
+| GET | `/admin/referees/:id/eligible-open-games` | List open games the referee is eligible to take (used by the admin assign UI). |
 | GET | `/admin/referees/:id/rules` | Get assignment rules for a referee. Requires `isOwnClub=true` (returns 400 NOT_OWN_CLUB otherwise) |
 | PUT | `/admin/referees/:id/rules` | Replace assignment rules. Requires `isOwnClub=true`. Body: `{ rules: [{ teamId, deny, allowSr1, allowSr2 }] }` |
 
@@ -480,6 +481,7 @@ The same provider-neutral tool registry that backs the in-app chat is served her
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/referee/games` | referee/admin | List games. Admin sees all; referee sees only games matching their visibility rules (allowAllHomeGames, allowAwayGames, per-team allowlist). Requires `isOwnClub=true` on referee record. Query: `?search=&league=&status=active&dateFrom=&dateTo=&limit=100&offset=0` |
+| GET | `/referee/games/by-api-match/:apiMatchId` | referee/admin | Fetch a single game by its Basketball-Bund `apiMatchId` (used for deep-link landing from take-intent URLs). |
 | POST | `/referee/games/:spielplanId/assign` | referee/admin | Assign self to a game slot. Requires `isOwnClub=true`. Body: `{ slotNumber: 1\|2, refereeApiId: number }`. Returns: `{ success, slot, status, refereeName }` |
 
 ### Admin Referee Assignment (role: admin)
