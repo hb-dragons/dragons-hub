@@ -4,7 +4,10 @@ import {
   type RefereeAssignedPayload,
 } from "./referee-assigned";
 import { renderRefereeUnassignedPush } from "./referee-unassigned";
-import { renderRefereeReassignedPush } from "./referee-reassigned";
+import {
+  renderRefereeReassignedPush,
+  type RefereeReassignedPushPayload,
+} from "./referee-reassigned";
 import {
   renderRefereeSlotsPush,
   type RefereeSlotsPushPayload,
@@ -53,7 +56,7 @@ function renderForType(
     case "referee.unassigned":
       return renderRefereeUnassignedPush(payload as unknown as RefereeAssignedPayload, locale);
     case "referee.reassigned":
-      return renderRefereeReassignedPush(payload as unknown as RefereeAssignedPayload, locale);
+      return renderRefereeReassignedPush(payload as unknown as RefereeReassignedPushPayload, locale);
     case "referee.slots.needed":
       return renderRefereeSlotsPush(payload as unknown as RefereeSlotsPushPayload, locale, "needed");
     case "referee.slots.reminder":

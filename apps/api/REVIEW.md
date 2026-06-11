@@ -619,7 +619,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M7k. Push template type reuse loses semantic info
 
-- [ ] **Status:** OPEN — templates still borrow RefereeAssignedPayload
+- [x] **Status:** done — `RefereeReassignedPushPayload` defined; push body now shows "newRef replaces oldRef" (de/en); dispatcher casts to the distinct type
 - **Locations:** `templates/push/referee-unassigned.ts:3` and `referee-reassigned.ts:3` borrow `RefereeAssignedPayload`
 - **Problem:** Reassigned should display "from X to Y" — publishing site already includes those fields, template doesn't.
 - **Fix:** Define `RefereeUnassignedPayload` + `RefereeReassignedPayload` separately. Update templates to display old/new.
