@@ -185,15 +185,6 @@ describe("Bull Board admin gate", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns 403 when user does not hold the admin role", async () => {
-    mockGetSession.mockResolvedValue({
-      user: { id: "u1", role: "refereeAdmin" },
-      session: { id: "s1" },
-    });
-    const response = await app.request("/admin/queues");
-    expect(response.status).toBe(403);
-  });
-
   it("returns 403 when user has no role at all", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: null },
@@ -203,9 +194,27 @@ describe("Bull Board admin gate", () => {
     expect(response.status).toBe(403);
   });
 
-  it("passes middleware when user has the admin role", async () => {
+  it("returns 403 when user only has the admin role (not superadmin)", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: "admin" },
+      session: { id: "s1" },
+    });
+    const response = await app.request("/admin/queues");
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 403 when user has a lesser role (e.g. refereeAdmin)", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "refereeAdmin" },
+      session: { id: "s1" },
+    });
+    const response = await app.request("/admin/queues");
+    expect(response.status).toBe(403);
+  });
+
+  it("passes middleware when user has the superadmin role", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "superadmin" },
       session: { id: "s1" },
     });
     const response = await app.request("/admin/queues");

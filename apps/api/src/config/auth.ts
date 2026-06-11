@@ -116,7 +116,7 @@ export const auth = betterAuth({
     admin({
       ac,
       roles,
-      adminRoles: ["admin"],
+      adminRoles: ["admin", "superadmin"],
     }),
     expo(),
   ],

@@ -27,6 +27,11 @@ export const admin = ac.newRole({
   ...allCatalogPerms,
 });
 
+export const superadmin = ac.newRole({
+  ...adminAc.statements,
+  ...allCatalogPerms,
+});
+
 export const refereeAdmin = ac.newRole({
   referee:    ["view", "create", "update", "delete"],
   assignment: ["view", "create", "update", "delete", "claim", "release"],
@@ -57,9 +62,9 @@ export const coach = ac.newRole({
   board:    ["view"],
 });
 
-export const roles = { admin, refereeAdmin, venueManager, teamManager, coach };
+export const roles = { admin, superadmin, refereeAdmin, venueManager, teamManager, coach };
 
-export const ROLE_NAMES = ["admin", "refereeAdmin", "venueManager", "teamManager", "coach"] as const;
+export const ROLE_NAMES = ["admin", "superadmin", "refereeAdmin", "venueManager", "teamManager", "coach"] as const;
 export type RoleName = (typeof ROLE_NAMES)[number];
 export type Resource = keyof typeof statement;
 export type Action<R extends Resource> = (typeof statement)[R][number];

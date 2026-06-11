@@ -213,13 +213,38 @@ describe("isMember", () => {
 });
 
 describe("ROLE_NAMES catalog", () => {
-  it("has exactly the five roles in canonical order", () => {
+  it("has exactly the six roles in canonical order", () => {
     expect(ROLE_NAMES).toEqual([
       "admin",
+      "superadmin",
       "refereeAdmin",
       "venueManager",
       "teamManager",
       "coach",
     ]);
+  });
+});
+
+describe("superadmin role", () => {
+  const superadminUser = { role: "superadmin" };
+
+  it("is a known role", () => {
+    expect(ROLE_NAMES).toContain("superadmin");
+    expect(parseRoles("superadmin")).toEqual(["superadmin"]);
+  });
+
+  it("hasRole detects it", () => {
+    expect(hasRole(superadminUser, "superadmin")).toBe(true);
+  });
+
+  it("holds at least the same powers as admin for representative permissions", () => {
+    // admin permissions spot-checked below — superadmin must hold every one
+    expect(can(superadminUser, "referee", "delete")).toBe(true);
+    expect(can(superadminUser, "venue", "delete")).toBe(true);
+    expect(can(superadminUser, "settings", "update")).toBe(true);
+    expect(can(superadminUser, "sync", "trigger")).toBe(true);
+    expect(can(superadminUser, "board", "delete")).toBe(true);
+    expect(can(superadminUser, "assignment", "claim")).toBe(true);
+    expect(can(superadminUser, "match", "delete")).toBe(true);
   });
 });

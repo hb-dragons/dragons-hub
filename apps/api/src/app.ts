@@ -49,9 +49,9 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 // Require authentication on all admin routes; per-route guards check granular permissions.
 app.use("/admin/*", requireAuth);
 
-// Bull Board queue dashboard: admin role only. Must come before the route
+// Bull Board queue dashboard: superadmin role only. Must come before the route
 // mount so the middleware runs first.
-app.use("/admin/queues/*", requireAnyRole("admin"));
+app.use("/admin/queues/*", requireAnyRole("superadmin"));
 app.route("/admin/queues", serverAdapter.registerPlugin());
 app.route("/", routes);
 // MCP endpoint uses bearer-token auth (MCP_TOKEN), not the session gate.
