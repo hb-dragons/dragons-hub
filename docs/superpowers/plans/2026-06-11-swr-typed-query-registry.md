@@ -582,6 +582,11 @@ const { data: eligibleData } = useSWR(eligibleQ.key, eligibleQ.fetcher);
 
 Delete the local `AssignedResp`/`EligibleResp` interfaces and the `apiFetcher` import; `assignedData`/`eligibleData` are now inferred (`PaginatedResponse<RefereeGameListItem>` and `EligibleOpenGamesResponse`). Their `.items` access keeps working.
 
+> **Gap found during execution:** two of the 28 files use **inline string keys**, not `SWR_KEYS`, so the `SWR_KEYS`-based mapping missed them and they have no factory method:
+> - `push-test-card.tsx` → `GET /admin/notifications/test-push/recent` (only `notificationTest.sendTestPush` POST existed).
+> - `open-slot-detail.tsx` → `GET /referee/games/by-api-match/:apiMatchId` (distinct from the existing `getGameByMatchId` → `/referee/matches/:matchId`).
+> Both are handled by a corrective sub-task (Task 4.0) that adds `notificationTest.recentTestPush()` (+ exported `TestPushRecentResponse`) and `referees.getGameByApiMatchId()` factory methods, two `SWR_KEYS` entries (`testPushRecent`, `refereeGameByApiMatch`), and two registry entries — bringing the registry to 38 entries.
+
 **Files to migrate (all 28):**
 
 - [ ] `apps/web/src/components/admin/dashboard/dashboard-view.tsx`
