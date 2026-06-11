@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { getServerApi } from "@/lib/api.server";
 import { SWRConfig } from "swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 import { ClubConfig } from "@/components/admin/settings/club-config";
 import { TrackedLeagues } from "@/components/admin/settings/tracked-leagues";
 import { BookingConfig } from "@/components/admin/settings/booking-config";
@@ -25,18 +25,22 @@ export default async function SettingsPage() {
   let bookingConfig: { bufferBefore: number; bufferAfter: number; gameDuration: number; dueDaysBefore: number } | null = null;
 
   const serverApi = await getServerApi();
+  const sq = makeQueries(serverApi);
+  const clubQ = sq.settingsClub();
+  const leaguesQ = sq.settingsLeagues();
+  const bookingQ = sq.settingsBooking();
 
   try {
     [clubConfig, leaguesResponse] = await Promise.all([
-      serverApi.settings.getClub(),
-      serverApi.settings.getLeagues(),
+      clubQ.fetcher(),
+      leaguesQ.fetcher(),
     ]);
   } catch {
     // Will show empty state for club and leagues
   }
 
   try {
-    bookingConfig = await serverApi.settings.getBooking();
+    bookingConfig = await bookingQ.fetcher();
   } catch {
     // Will show defaults for booking config
   }
@@ -45,9 +49,9 @@ export default async function SettingsPage() {
     <SWRConfig
       value={{
         fallback: {
-          [SWR_KEYS.settingsClub]: clubConfig,
-          [SWR_KEYS.settingsLeagues]: leaguesResponse,
-          [SWR_KEYS.settingsBooking]: bookingConfig,
+          [clubQ.key]: clubConfig,
+          [leaguesQ.key]: leaguesResponse,
+          [bookingQ.key]: bookingConfig,
         },
       }}
     >

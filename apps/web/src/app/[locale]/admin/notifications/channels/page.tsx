@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/auth-server";
 import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 import { ChannelConfigsList } from "@/components/admin/notifications/channel-configs-list";
 import type { ChannelConfigListResult } from "@/components/admin/notifications/types";
 
@@ -17,8 +17,12 @@ export default async function ChannelConfigsPage() {
   let data: ChannelConfigListResult | null = null;
   let error: string | null = null;
 
+  const sApi = await getServerApi();
+  const sq = makeQueries(sApi);
+  const channelConfigsQ = sq.channelConfigs();
+
   try {
-    data = await (await getServerApi()).channelConfigs.list();
+    data = await channelConfigsQ.fetcher();
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";
   }
@@ -33,7 +37,7 @@ export default async function ChannelConfigsPage() {
         </div>
       ) : (
         <SWRConfig
-          value={{ fallback: { [SWR_KEYS.channelConfigs]: data } }}
+          value={{ fallback: { [channelConfigsQ.key]: data } }}
         >
           <ChannelConfigsList />
         </SWRConfig>

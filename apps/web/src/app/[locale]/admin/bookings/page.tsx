@@ -5,7 +5,7 @@ import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { getServerApi } from "@/lib/api.server";
 import { SWRConfig } from "swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 import { BookingListTable } from "@/components/admin/bookings/booking-list-table";
 import type { BookingListItem } from "@/components/admin/bookings/types";
 
@@ -17,8 +17,12 @@ export default async function BookingsPage() {
   let data: BookingListItem[] | null = null;
   let error: string | null = null;
 
+  const sApi = await getServerApi();
+  const sq = makeQueries(sApi);
+  const bookingsQ = sq.bookings();
+
   try {
-    data = await (await getServerApi()).bookings.list();
+    data = await bookingsQ.fetcher();
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";
   }
@@ -32,7 +36,7 @@ export default async function BookingsPage() {
           {error}
         </div>
       ) : (
-        <SWRConfig value={{ fallback: { [SWR_KEYS.bookings]: data } }}>
+        <SWRConfig value={{ fallback: { [bookingsQ.key]: data } }}>
           <BookingListTable />
         </SWRConfig>
       )}
