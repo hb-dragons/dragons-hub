@@ -91,7 +91,7 @@ notificationTestRoutes.post(
     const text = body.message ?? "Test push from Dragons admin";
     const messages = devices.map((d) => ({
       to: d.token,
-      title: "🏀 Dragons — Test",
+      title: "Dragons — Test",
       body: text,
       data: {
         deepLink: "/",
@@ -120,7 +120,7 @@ notificationTestRoutes.post(
         channelConfigId: pushChannel.id,
         recipientId: callerId,
         recipientToken: d.token,
-        title: "🏀 Dragons — Test",
+        title: "Dragons — Test",
         body: text,
         locale: d.locale ?? "de",
         status: ok ? "sent_ticket" : "failed",
