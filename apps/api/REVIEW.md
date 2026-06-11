@@ -538,7 +538,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M6d. `pickDefined` pattern duplicated
 
-- [ ] **Status:** OPEN — no shared pickDefined helper yet
+- [x] **Status:** done — `services/utils/object.ts#pickDefined` added; applied to booking-admin `updateBooking` + broadcast `upsertBroadcastConfig`; `Record<string, unknown>` set objects removed (also closes L18)
 - **Locations:** `services/admin/booking-admin.service.ts:204-213, 303-311`; `services/broadcast/config.ts:65-72`; others
 - **Fix:** `pickDefined<T>(input: Partial<T>, allowedKeys: (keyof T)[]): Partial<T>` helper.
 
