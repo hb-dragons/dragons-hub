@@ -3,9 +3,9 @@
 import { useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
-import { apiFetcher } from "@/lib/swr";
 import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import {
   Dialog,
   DialogContent,
@@ -22,12 +22,6 @@ import type { ComboboxOption } from "@dragons/ui/components/combobox";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface VenueListItem {
-  id: number;
-  name: string;
-  city: string | null;
-}
-
 interface CreateBookingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,10 +35,8 @@ export function CreateBookingDialog({
 }: CreateBookingDialogProps) {
   const t = useTranslations();
   const { mutate } = useSWRConfig();
-  const { data: venues } = useSWR<VenueListItem[]>(
-    open ? SWR_KEYS.venues : null,
-    apiFetcher,
-  );
+  const venuesQ = queries.venues();
+  const { data: venues } = useSWR(open ? venuesQ.key : null, venuesQ.fetcher);
 
   const [venueId, setVenueId] = useState<number | null>(null);
   const [venueQuery, setVenueQuery] = useState("");

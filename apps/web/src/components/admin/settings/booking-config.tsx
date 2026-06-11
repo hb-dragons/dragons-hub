@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
-import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { api } from "@/lib/api";
 import {
   Card,
@@ -19,19 +19,10 @@ import { Label } from "@dragons/ui/components/label";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
-interface BookingSettings {
-  bufferBefore: number;
-  bufferAfter: number;
-  gameDuration: number;
-  dueDaysBefore: number;
-}
-
 export function BookingConfig() {
   const t = useTranslations();
-  const { data: settings } = useSWR<BookingSettings>(
-    SWR_KEYS.settingsBooking,
-    apiFetcher,
-  );
+  const settingsBookingQ = queries.settingsBooking();
+  const { data: settings } = useSWR(settingsBookingQ.key, settingsBookingQ.fetcher);
   const { mutate } = useSWRConfig();
 
   const [bufferBefore, setBufferBefore] = useState(() => settings?.bufferBefore?.toString() ?? "");

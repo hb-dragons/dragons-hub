@@ -1,23 +1,15 @@
 import useSWR from "swr";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
-import type {
-  BoardData,
-  BoardSummary,
-  TaskCardData,
-  TaskDetail,
-} from "@dragons/shared";
+import { queries } from "@/lib/swr-queries";
 import type { BoardFilters } from "./use-board-filters";
 
 export function useBoards() {
-  return useSWR<BoardSummary[]>(SWR_KEYS.boards, apiFetcher);
+  const boardsQ = queries.boards();
+  return useSWR(boardsQ.key, boardsQ.fetcher);
 }
 
 export function useBoard(boardId: number | null) {
-  return useSWR<BoardData>(
-    boardId ? SWR_KEYS.boardDetail(boardId) : null,
-    apiFetcher,
-  );
+  const boardDetailQ = queries.boardDetail(boardId ?? 0);
+  return useSWR(boardId ? boardDetailQ.key : null, boardDetailQ.fetcher);
 }
 
 export function useBoardTasks(
@@ -31,17 +23,14 @@ export function useBoardTasks(
   const priorityFilter = filters?.priority
     ? { priority: filters.priority }
     : undefined;
-  return useSWR<TaskCardData[]>(
-    boardId
-      ? SWR_KEYS.boardTasks(boardId, { ...serverFilter, ...priorityFilter })
-      : null,
-    apiFetcher,
+  const boardTasksQ = queries.boardTasks(boardId ?? 0, { ...serverFilter, ...priorityFilter });
+  return useSWR(
+    boardId ? boardTasksQ.key : null,
+    boardTasksQ.fetcher,
   );
 }
 
 export function useTaskDetail(taskId: number | null) {
-  return useSWR<TaskDetail>(
-    taskId ? SWR_KEYS.taskDetail(taskId) : null,
-    apiFetcher,
-  );
+  const taskDetailQ = queries.taskDetail(taskId ?? 0);
+  return useSWR(taskId ? taskDetailQ.key : null, taskDetailQ.fetcher);
 }
