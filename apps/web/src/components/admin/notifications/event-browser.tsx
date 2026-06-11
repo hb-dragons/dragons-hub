@@ -4,8 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { api } from "@/lib/api";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
@@ -52,7 +51,6 @@ import {
 } from "lucide-react";
 import type {
   DomainEventItem,
-  DomainEventListResult,
   TriggerEventBody,
 } from "./types";
 
@@ -150,11 +148,18 @@ export function EventBrowser() {
     return params.toString();
   }, [filters, page, pageSize]);
 
-  const swrKey = SWR_KEYS.domainEvents(queryParams);
-  const { data, isLoading, mutate } = useSWR<DomainEventListResult>(
-    swrKey,
-    apiFetcher,
-  );
+  const eventQuery: Parameters<typeof queries.domainEvents>[0] = {
+    page,
+    limit: pageSize,
+    ...(filters.type ? { type: filters.type } : {}),
+    ...(filters.entityType ? { entityType: filters.entityType } : {}),
+    ...(filters.source ? { source: filters.source } : {}),
+    ...(filters.from ? { from: filters.from } : {}),
+    ...(filters.to ? { to: filters.to } : {}),
+    ...(filters.search ? { search: filters.search } : {}),
+  };
+  const eventsQ = queries.domainEvents(eventQuery, queryParams);
+  const { data, isLoading, mutate } = useSWR(eventsQ.key, eventsQ.fetcher);
 
   const events = data?.events ?? [];
   const total = data?.total ?? 0;

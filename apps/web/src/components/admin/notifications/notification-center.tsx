@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
-import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { api } from "@/lib/api";
 import { Link } from "@/lib/navigation";
 import { toast } from "sonner";
@@ -32,9 +32,7 @@ import {
 } from "lucide-react";
 import type {
   NotificationItem,
-  NotificationListResult,
   FailedNotificationItem,
-  FailedNotificationListResult,
 } from "./types";
 
 const PAGE_SIZE = 20;
@@ -75,14 +73,11 @@ export function NotificationCenter() {
   const inboxKey = SWR_KEYS.notifications(PAGE_SIZE, offset);
   const failedKey = SWR_KEYS.domainEventsFailed(failedPage, PAGE_SIZE);
 
-  const { data: inboxData } = useSWR<NotificationListResult>(
-    inboxKey,
-    apiFetcher,
-  );
-  const { data: failedData } = useSWR<FailedNotificationListResult>(
-    failedKey,
-    apiFetcher,
-  );
+  const notificationsQ = queries.notifications(PAGE_SIZE, offset);
+  const domainEventsFailedQ = queries.domainEventsFailed(failedPage, PAGE_SIZE);
+
+  const { data: inboxData } = useSWR(inboxKey, notificationsQ.fetcher);
+  const { data: failedData } = useSWR(failedKey, domainEventsFailedQ.fetcher);
 
   const notifications = inboxData?.notifications ?? [];
   const totalInbox = inboxData?.total ?? 0;
