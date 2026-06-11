@@ -7,6 +7,7 @@ import {
 } from "@dragons/db/schema";
 import type { DomainEventRow } from "@dragons/db/schema";
 import { db } from "../../config/database";
+import { redis } from "../../config/redis";
 import { evaluateRule, type RuleInput } from "./rule-engine";
 import { getDefaultNotificationsForEvent } from "./role-defaults";
 import { renderEventMessage } from "./templates/index";
@@ -27,42 +28,7 @@ type ChannelConfigRow = Awaited<ReturnType<typeof loadRulesAndConfigs>>["configs
 
 // ── Coalescing window ────────────────────────────────────────────────────────
 
-const COALESCE_WINDOW_MS = 60_000;
-
-// In-memory map tracking recent immediate dispatches per entity.
-// Key: "entityType:entityId", Value: timestamp of last dispatch.
-// Entries are cleaned up lazily on access.
-const recentDispatches = new Map<string, number>();
-
-function shouldCoalesce(entityType: string, entityId: number): boolean {
-  const key = `${entityType}:${entityId}`;
-  const lastDispatch = recentDispatches.get(key);
-  const now = Date.now();
-
-  if (lastDispatch && now - lastDispatch < COALESCE_WINDOW_MS) {
-    return true; // skip immediate dispatch, still buffer for digest
-  }
-
-  return false;
-}
-
-function markDispatched(entityType: string, entityId: number): void {
-  const key = `${entityType}:${entityId}`;
-  recentDispatches.set(key, Date.now());
-
-  // Lazy cleanup: remove stale entries when map grows
-  if (recentDispatches.size > 1000) {
-    const cutoff = Date.now() - COALESCE_WINDOW_MS;
-    for (const [k, v] of recentDispatches) {
-      if (v < cutoff) recentDispatches.delete(k);
-    }
-  }
-}
-
-/** Visible for testing */
-export function clearCoalesceCache(): void {
-  recentDispatches.clear();
-}
+const COALESCE_WINDOW_SEC = 60;
 
 // ── Muted event types ────────────────────────────────────────────────────────
 
@@ -384,8 +350,12 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
   const allRecipientIds = defaultMatches.map((m) => m.recipientId);
   const mutedMap = await loadMutedEventTypes(allRecipientIds);
 
-  // Step 5: Check coalescing — determine if we should skip immediate dispatch
-  const coalesced = shouldCoalesce(event.entityType, event.entityId);
+  // Step 5: Check coalescing — atomically claim the dispatch slot via Redis SET NX.
+  // Returns "OK" if this process is the first caller within the window (dispatch proceeds),
+  // or null if another process already claimed the slot (skip immediate dispatch).
+  const coalesceKey = `coalesce:${event.entityType}:${event.entityId}`;
+  const claim = await redis.set(coalesceKey, "1", "EX", COALESCE_WINDOW_SEC, "NX");
+  const coalesced = claim !== "OK";
 
   // Process watch rule matches (watch rules are not subject to user muting —
   // they are admin-configured and always apply)
@@ -449,9 +419,12 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
     }
   }
 
-  // Mark entity as recently dispatched (for coalescing window)
-  if (result.dispatched > 0) {
-    markDispatched(event.entityType, event.entityId);
+  // If we claimed the coalesce key but nothing was actually dispatched (all adapters
+  // returned false), release the key so retries within the window are not wrongly
+  // suppressed.  The old behaviour only marked the entity as dispatched after a
+  // successful send; this restores that semantic.
+  if (claim === "OK" && result.dispatched === 0) {
+    await redis.del(coalesceKey);
   }
 
   return result;

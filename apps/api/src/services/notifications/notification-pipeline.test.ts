@@ -108,9 +108,18 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
+const mockRedisSet = vi.fn();
+const mockRedisDel = vi.fn().mockResolvedValue(1);
+vi.mock("../../config/redis", () => ({
+  redis: {
+    set: (...args: unknown[]) => mockRedisSet(...args),
+    del: (...args: unknown[]) => mockRedisDel(...args),
+  },
+}));
+
 // --- Import after mocks ---
 
-import { processEvent, clearCoalesceCache } from "./notification-pipeline";
+import { processEvent } from "./notification-pipeline";
 
 // --- Helpers ---
 
@@ -217,7 +226,8 @@ function setupDbMocks(opts: {
 describe("processEvent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearCoalesceCache();
+    // Default: first redis SET NX call claims the slot ("OK"), subsequent calls are coalesced (null)
+    mockRedisSet.mockResolvedValue("OK");
     mockGetDefaultNotificationsForEvent.mockReturnValue([]);
     mockRenderEventMessage.mockReturnValue({
       title: "Match Cancelled",
@@ -522,24 +532,26 @@ describe("processEvent", () => {
     });
   });
 
-  describe("coalescing window", () => {
-    it("coalesces rapid-fire immediate events for the same entity", async () => {
+  describe("coalescing window (Redis SET NX)", () => {
+    it("coalesces the second dispatch for the same entity when Redis SET NX returns null", async () => {
       const rule = makeRule();
       const config = makeChannelConfig();
+
+      // First call: Redis SET NX succeeds → dispatch proceeds
+      mockRedisSet.mockResolvedValueOnce("OK");
       setupDbMocks({ rules: [rule], configs: [config] });
       mockEvaluateRule.mockReturnValue({
         matched: true,
         channels: [{ channel: "in_app", targetId: "10" }],
         urgencyOverride: null,
       });
-
-      // First event dispatches normally
       const result1 = await processEvent(makeEvent());
       expect(result1.dispatched).toBe(1);
       expect(result1.coalesced).toBe(0);
 
-      // Reset mocks for second call, re-setup DB mocks
+      // Second call: Redis SET NX returns null → slot already claimed → coalesced
       vi.clearAllMocks();
+      mockRedisSet.mockResolvedValueOnce(null);
       mockRenderEventMessage.mockReturnValue({
         title: "Match Cancelled",
         body: "The match has been cancelled.",
@@ -550,29 +562,29 @@ describe("processEvent", () => {
         channels: [{ channel: "in_app", targetId: "10" }],
         urgencyOverride: null,
       });
-
-      // Second event for same entity within coalescing window → coalesced
       const result2 = await processEvent(makeEvent({ id: "evt-2" }));
       expect(result2.dispatched).toBe(0);
       expect(result2.coalesced).toBe(1);
       expect(result2.buffered).toBe(1); // still buffered for digest
     });
 
-    it("does not coalesce events for different entities", async () => {
+    it("does not coalesce events for different entities (different Redis keys)", async () => {
       const rule = makeRule();
       const config = makeChannelConfig();
+
+      // Both calls claim their distinct key → both return "OK"
+      mockRedisSet.mockResolvedValue("OK");
+
       setupDbMocks({ rules: [rule], configs: [config] });
       mockEvaluateRule.mockReturnValue({
         matched: true,
         channels: [{ channel: "in_app", targetId: "10" }],
         urgencyOverride: null,
       });
-
-      // First event for entity 42
       await processEvent(makeEvent({ entityId: 42 }));
 
-      // Reset for second call
       vi.clearAllMocks();
+      mockRedisSet.mockResolvedValue("OK");
       mockRenderEventMessage.mockReturnValue({
         title: "Match Cancelled",
         body: "The match has been cancelled.",
@@ -583,19 +595,76 @@ describe("processEvent", () => {
         channels: [{ channel: "in_app", targetId: "10" }],
         urgencyOverride: null,
       });
-
-      // Second event for different entity 99 → dispatches normally
       const result = await processEvent(makeEvent({ id: "evt-2", entityId: 99 }));
       expect(result.dispatched).toBe(1);
       expect(result.coalesced).toBe(0);
     });
+
+    it("uses the correct Redis key and 60-second TTL with NX flag", async () => {
+      const rule = makeRule();
+      const config = makeChannelConfig();
+      mockRedisSet.mockResolvedValue("OK");
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "in_app", targetId: "10" }],
+        urgencyOverride: null,
+      });
+
+      await processEvent(makeEvent({ entityType: "match", entityId: 42 }));
+
+      expect(mockRedisSet).toHaveBeenCalledWith("coalesce:match:42", "1", "EX", 60, "NX");
+    });
+
+    it("releases the coalesce key when claim was OK but nothing was dispatched", async () => {
+      // Adapter returns failure so dispatched stays 0, but we claimed the key.
+      // The key must be released so retries are not wrongly suppressed.
+      mockWhatsAppSend.mockResolvedValueOnce({ success: false, error: "WAHA down" });
+      const rule = makeRule({
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+      });
+      const config = makeChannelConfig({
+        id: 10,
+        type: "whatsapp_group",
+        config: { groupId: "120363@g.us", locale: "de" },
+      });
+      mockRedisSet.mockResolvedValue("OK");
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "whatsapp_group", targetId: "10" }],
+        urgencyOverride: "immediate",
+      });
+
+      const result = await processEvent(makeEvent({ entityType: "match", entityId: 42 }));
+
+      expect(result.dispatched).toBe(0);
+      expect(mockRedisDel).toHaveBeenCalledWith("coalesce:match:42");
+    });
+
+    it("does not release the coalesce key when at least one dispatch succeeded", async () => {
+      const rule = makeRule();
+      const config = makeChannelConfig();
+      mockRedisSet.mockResolvedValue("OK");
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "in_app", targetId: "10" }],
+        urgencyOverride: null,
+      });
+
+      const result = await processEvent(makeEvent({ entityType: "match", entityId: 42 }));
+
+      expect(result.dispatched).toBe(1);
+      expect(mockRedisDel).not.toHaveBeenCalled();
+    });
   });
 
-  describe("defaults coalescing", () => {
-    it("coalesces rapid-fire default dispatches for the same entity", async () => {
+  describe("defaults coalescing (Redis SET NX)", () => {
+    it("coalesces rapid-fire default dispatches for the same entity when Redis returns null", async () => {
       const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "admin", locale: "de" } });
 
-      // First event — dispatches normally via defaults
+      mockRedisSet.mockResolvedValueOnce("OK");
       setupDbMocks({ rules: [], configs: [config] });
       mockGetDefaultNotificationsForEvent.mockReturnValue([
         { audience: "admin", channel: "in_app" },
@@ -604,8 +673,8 @@ describe("processEvent", () => {
       expect(result1.dispatched).toBe(1);
       expect(result1.coalesced).toBe(0);
 
-      // Second event for same entity — should be coalesced
       vi.clearAllMocks();
+      mockRedisSet.mockResolvedValueOnce(null);
       mockRenderEventMessage.mockReturnValue({
         title: "Match Cancelled",
         body: "The match has been cancelled.",
@@ -1049,49 +1118,6 @@ describe("processEvent", () => {
       expect(mockPushSend).toHaveBeenCalledTimes(1);
       expect(result.dispatched).toBe(0);
     });
-  });
-
-  describe("coalesce cache lazy cleanup", () => {
-    it("does not crash when recentDispatches grows past 1000 and triggers cleanup", async () => {
-      clearCoalesceCache();
-
-      // Use fake timers so all 1001 entries are added at time 0 (instantly stale
-      // relative to COALESCE_WINDOW_MS=60_000). The 1001st call fires the lazy
-      // cleanup, which removes all stale entries, exercising L54-57.
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(0)); // t=0: all entries stamped at 0
-
-      try {
-        const rule = makeRule();
-        const config = makeChannelConfig();
-
-        // Seed the map with 1001 distinct entity dispatches.
-        for (let i = 0; i < 1001; i++) {
-          setupDbMocks({ rules: [rule], configs: [config] });
-          mockEvaluateRule.mockReturnValue({
-            matched: true,
-            channels: [{ channel: "in_app", targetId: "10" }],
-            urgencyOverride: null,
-          });
-          await processEvent(makeEvent({ entityId: i, id: `evt-${i}` }));
-        }
-
-        // Advance past the coalesce window so entries become stale.
-        vi.advanceTimersByTime(61_000);
-
-        // The 1002nd call (different entity) will trigger cleanup of all stale entries.
-        setupDbMocks({ rules: [rule], configs: [config] });
-        mockEvaluateRule.mockReturnValue({
-          matched: true,
-          channels: [{ channel: "in_app", targetId: "10" }],
-          urgencyOverride: null,
-        });
-        const result = await processEvent(makeEvent({ entityId: 99999, id: "evt-final" }));
-        expect(result.dispatched).toBe(1);
-      } finally {
-        vi.useRealTimers();
-      }
-    }, 60_000);
   });
 
   describe("resolveLocaleForRecipient edge cases", () => {
