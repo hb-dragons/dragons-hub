@@ -35,6 +35,8 @@ export const syncRuns = pgTable(
     durationMs: integer("duration_ms"),
     errorMessage: text("error_message"),
     errorStack: text("error_stack"),
+    failedStep: varchar("failed_step", { length: 40 }),
+    ownerInstanceId: varchar("owner_instance_id", { length: 40 }),
     summary: jsonb("summary").$type<SyncRunSummary>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },

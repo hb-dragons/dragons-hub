@@ -16,6 +16,7 @@ export const SYNC_STATUSES = [
   "running",
   "completed",
   "failed",
+  "partial",
 ] as const;
 export type SyncStatus = (typeof SYNC_STATUSES)[number];
 

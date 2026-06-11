@@ -260,6 +260,13 @@
       "when": 1780912025021,
       "tag": "0036_strange_mulholland_black",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1781179147815,
+      "tag": "0037_jittery_doctor_strange",
+      "breakpoints": true
     }
   ]
 }
