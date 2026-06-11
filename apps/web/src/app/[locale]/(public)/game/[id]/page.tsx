@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getPublicApi } from "@/lib/api-client.server";
+import { getPublicServerApi } from "@/lib/api.server";
 import { getTranslations, getFormatter } from "next-intl/server";
 import { Link } from "@/lib/navigation";
 import type { PublicMatchDetail, FormEntry } from "@dragons/shared";
@@ -138,7 +138,7 @@ export default async function GameDetailPage({
     noData: string;
   };
 
-  const api = getPublicApi();
+  const api = getPublicServerApi();
   const [match, context] = await Promise.all([
     api.getMatch(numId).catch(() => null),
     api.getMatchContext(numId).catch(() => null),

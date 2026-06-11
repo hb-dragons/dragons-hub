@@ -134,8 +134,11 @@ describe("POST /sync/trigger", () => {
 
     const res = await app.request("/sync/trigger", { method: "POST" });
 
-    expect(res.status).toBe(200);
-    expect(await json(res)).toMatchObject({ code: "SYNC_ALREADY_QUEUED" });
+    expect(res.status).toBe(409);
+    expect(await json(res)).toMatchObject({
+      error: "Sync already in progress or queued",
+      code: "SYNC_ALREADY_QUEUED",
+    });
   });
 });
 

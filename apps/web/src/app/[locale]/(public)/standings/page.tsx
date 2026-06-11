@@ -1,4 +1,4 @@
-import { getPublicApi } from "@/lib/api-client.server";
+import { getPublicServerApi } from "@/lib/api.server";
 import { getTranslations } from "next-intl/server";
 import type { StandingItem } from "@dragons/shared";
 import { cn } from "@dragons/ui/lib/utils";
@@ -6,7 +6,7 @@ import { ClubLogo } from "@/components/brand/club-logo";
 
 export default async function StandingsPage() {
   const t = await getTranslations();
-  const standings = await getPublicApi().getStandings().catch(() => []);
+  const standings = await getPublicServerApi().getStandings().catch(() => []);
 
   if (standings.length === 0) {
     return (

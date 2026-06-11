@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getPublicApi } from "@/lib/api-client.server";
+import { getPublicServerApi } from "@/lib/api.server";
 import { getTranslations, getFormatter } from "next-intl/server";
 import { Link } from "@/lib/navigation";
 import type { MatchListItem, LeagueStandings, FormEntry } from "@dragons/shared";
@@ -86,7 +86,7 @@ export default async function TeamDetailPage({
   };
   const gd = tRaw("gameDetail") as { win: string; loss: string };
 
-  const api = getPublicApi();
+  const api = getPublicServerApi();
 
   // Step 1: fetch teams to resolve apiTeamPermanentId
   const teams = await api.getTeams().catch(() => []);

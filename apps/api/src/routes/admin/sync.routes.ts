@@ -43,6 +43,12 @@ syncRoutes.post(
   async (c) => {
     const userId = c.get("user")?.id;
     const result = await triggerManualSync(userId);
+    // triggerManualSync returns an error envelope when a sync is already
+    // active/queued — surface it as 409 so the typed client throws instead of
+    // treating the rejected trigger as a successful TriggerResponse.
+    if ("code" in result) {
+      return c.json(result, 409);
+    }
     return c.json(result);
   },
 );

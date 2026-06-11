@@ -14,6 +14,12 @@ import {
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
+import type {
+  NotificationActionResponse,
+  NotificationListResult,
+  NotificationMarkAllReadResponse,
+  NotificationPreferences,
+} from "@dragons/shared";
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
@@ -36,7 +42,7 @@ notificationRoutes.get(
   }),
   async (c) => {
     const query = c.req.valid("query");
-    const result = await listNotifications(query);
+    const result: NotificationListResult = await listNotifications(query);
     return c.json(result);
   },
 );
@@ -66,7 +72,7 @@ notificationRoutes.patch(
       );
     }
 
-    return c.json({ success: true });
+    return c.json({ success: true } satisfies NotificationActionResponse);
   },
 );
 
@@ -83,7 +89,7 @@ notificationRoutes.patch(
     // Always scope to the caller; a bare update would mark the entire log read
     // across every recipient.
     const count = await markAllRead(c.get("user").id);
-    return c.json({ updated: count });
+    return c.json({ updated: count } satisfies NotificationMarkAllReadResponse);
   },
 );
 
@@ -130,7 +136,7 @@ notificationRoutes.post(
       return c.json({ error: result.error, code: "RETRY_FAILED" }, 400);
     }
 
-    return c.json({ success: true });
+    return c.json({ success: true } satisfies NotificationActionResponse);
   },
 );
 
@@ -144,7 +150,8 @@ notificationRoutes.get(
   }),
   async (c) => {
     const userId = c.get("user").id;
-    const prefs = await getUserNotificationPreferences(userId);
+    const prefs: NotificationPreferences =
+      await getUserNotificationPreferences(userId);
     return c.json(prefs);
   },
 );
@@ -165,7 +172,8 @@ notificationRoutes.patch(
     const userId = c.get("user").id;
     const body = c.req.valid("json");
     try {
-      const prefs = await updateUserNotificationPreferences(userId, body);
+      const prefs: NotificationPreferences =
+        await updateUserNotificationPreferences(userId, body);
       return c.json(prefs);
     } catch (err) {
       if (err instanceof Error && /unknown event type/i.test(err.message)) {

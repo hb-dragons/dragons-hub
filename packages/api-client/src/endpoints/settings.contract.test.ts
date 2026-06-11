@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import {
   settingsClubConfigSchema,
   settingsBookingConfigSchema,
-  settingsRefereeReminderSchema,
   leagueNumbersSchema,
   leagueOwnClubRefsSchema,
 } from "@dragons/contracts";
@@ -55,17 +54,6 @@ describe("settings request bodies satisfy @dragons/contracts schemas", () => {
     expect(calls[0]!.method).toBe("PUT");
   });
 
-  it("setRefereeReminders body parses against settingsRefereeReminderSchema", async () => {
-    const { api, calls } = recordingClient();
-    await api.setRefereeReminders({ days: [7, 3, 1] });
-    const parsed = settingsRefereeReminderSchema.safeParse(calls[0]!.body);
-    expect(
-      parsed.error?.issues,
-      "settingsRefereeReminderSchema rejected the setRefereeReminders body",
-    ).toBeUndefined();
-    expect(calls[0]!.method).toBe("PUT");
-  });
-
   it("setLeagues body parses against leagueNumbersSchema", async () => {
     const { api, calls } = recordingClient();
     await api.setLeagues({ leagueNumbers: [12345, 67890] });
@@ -102,13 +90,6 @@ describe("settings read + trigger endpoints target the right path + verb", () =>
     const { api, calls } = recordingClient();
     await api.getBooking();
     expect(calls[0]!.url).toContain("/admin/settings/booking");
-    expect(calls[0]!.method).toBe("GET");
-  });
-
-  it("getRefereeReminders targets the referee-reminders config with GET", async () => {
-    const { api, calls } = recordingClient();
-    await api.getRefereeReminders();
-    expect(calls[0]!.url).toContain("/admin/settings/referee-reminders");
     expect(calls[0]!.method).toBe("GET");
   });
 

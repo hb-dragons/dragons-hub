@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getPublicApi } from "@/lib/api-client.server";
+import { getPublicServerApi } from "@/lib/api.server";
 import { getTranslations, getFormatter } from "next-intl/server";
 import { Link } from "@/lib/navigation";
 import type { MatchListItem } from "@dragons/shared";
@@ -25,7 +25,7 @@ export default async function H2HPage({
     noMatches: string;
   };
 
-  const api = getPublicApi();
+  const api = getPublicServerApi();
   const matchesData = await api
     .getMatches({ opponentApiId: numId, limit: 100, sort: "desc" })
     .catch(() => ({ items: [] }));

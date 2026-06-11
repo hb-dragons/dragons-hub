@@ -1,10 +1,10 @@
-import { getPublicApi } from "@/lib/api-client.server";
+import { getPublicServerApi } from "@/lib/api.server";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/lib/navigation";
 
 export default async function TeamsPage() {
   const t = await getTranslations("public");
-  const teams = await getPublicApi().getTeams().catch(() => []);
+  const teams = await getPublicServerApi().getTeams().catch(() => []);
 
   const ownTeams = teams.filter((team) => team.isOwnClub);
   const otherTeams = teams.filter((team) => !team.isOwnClub);
