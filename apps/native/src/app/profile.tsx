@@ -174,6 +174,7 @@ export default function ProfileScreen() {
               if (roleNames.length === 0 && !showRefereeBadge) return null;
               const roleLabelKey: Record<RoleName, string> = {
                 admin: "profile.roleAdmin",
+                superadmin: "profile.roleSuperadmin",
                 refereeAdmin: "profile.roleRefereeAdmin",
                 venueManager: "profile.roleVenueManager",
                 teamManager: "profile.roleTeamManager",

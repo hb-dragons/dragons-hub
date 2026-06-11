@@ -89,6 +89,7 @@
     "languageEn": "English",
     "signOut": "Sign Out",
     "roleAdmin": "Admin",
+    "roleSuperadmin": "Superadmin",
     "roleRefereeAdmin": "Referee Admin",
     "roleVenueManager": "Venue Manager",
     "roleTeamManager": "Team Manager",

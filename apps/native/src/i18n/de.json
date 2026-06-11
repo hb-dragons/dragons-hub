@@ -89,6 +89,7 @@
     "languageEn": "English",
     "signOut": "Abmelden",
     "roleAdmin": "Admin",
+    "roleSuperadmin": "Superadmin",
     "roleRefereeAdmin": "Schiri-Admin",
     "roleVenueManager": "Hallenverwaltung",
     "roleTeamManager": "Team-Manager",
