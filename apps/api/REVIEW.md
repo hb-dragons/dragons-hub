@@ -378,7 +378,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M2c. `teams.sync.ts` per-team UPDATE for own-club flag
 
-- [ ] **Status:** OPEN (partial) — unmark path bulk; mark-own still loops per-team
+- [x] **Status:** done — mark-own + flipped-via-upsert corrections precompute their displayOrder then apply as parallel UPDATEs inside one transaction (atomic; round-trips overlap)
 - **Location:** `apps/api/src/services/sync/teams.sync.ts:185-208`
 - **Fix:** CASE expression: `UPDATE teams SET is_own_club = CASE id WHEN x THEN true ... END WHERE id IN (...)`.
 
@@ -740,7 +740,7 @@ Three patterns coexist: full-tx-with-event (gold standard, `match-admin.service.
 
 ### CC5. N+1 query loops (M2)
 
-- [ ] **Status:** OPEN (partial) — M2a/b/d/e/f done; only M2c (teams.sync mark-own loop) remains.
+- [x] **Status:** resolved — M2c done; all six M2 hot paths now bulk-load / bulk-write or batch inside a transaction.
 
 At least 6 hot paths. Bulk-load via `inArray`, bulk-insert with `values([...])`, or `UPDATE ... FROM (VALUES ...)` for batch updates.
 
