@@ -312,6 +312,62 @@ describe("fullSync", () => {
       expect(result.totalErrors[0]).toContain("Unknown error");
     });
 
+    it("sets status=partial and failedStep when a step fails after a write has committed", async () => {
+      // Step 1 (leagues) succeeds → committedAny = true
+      // Step 2 (fetch) is read-only
+      // Step 3 (entities) throws → failedStep = "entities"
+      mockSyncTeams.mockRejectedValue(new Error("Entity crash mid-run"));
+
+      let capturedSet: Record<string, unknown> | undefined;
+      mockUpdate.mockImplementation(() => ({
+        set: (args: Record<string, unknown>) => {
+          capturedSet = args;
+          return {
+            where: vi.fn().mockReturnValue(
+              Object.assign(Promise.resolve(undefined), {
+                returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+              }),
+            ),
+          };
+        },
+      }));
+
+      const result = await fullSync("manual");
+
+      expect(result.status).toBe("partial");
+      expect(capturedSet).toMatchObject({
+        status: "partial",
+        failedStep: "entities",
+      });
+    });
+
+    it("sets status=failed and failedStep when the first step fails (no writes committed)", async () => {
+      // Step 1 (leagues) throws immediately → committedAny = false
+      mockSyncLeagues.mockRejectedValue(new Error("Leagues crash on first step"));
+
+      let capturedSet: Record<string, unknown> | undefined;
+      mockUpdate.mockImplementation(() => ({
+        set: (args: Record<string, unknown>) => {
+          capturedSet = args;
+          return {
+            where: vi.fn().mockReturnValue(
+              Object.assign(Promise.resolve(undefined), {
+                returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+              }),
+            ),
+          };
+        },
+      }));
+
+      const result = await fullSync("manual");
+
+      expect(result.status).toBe("failed");
+      expect(capturedSet).toMatchObject({
+        status: "failed",
+        failedStep: "leagues",
+      });
+    });
+
     it("closes sync logger on success", async () => {
       const mockLogger = {
         close: vi.fn().mockResolvedValue(undefined),

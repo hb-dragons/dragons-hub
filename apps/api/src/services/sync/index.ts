@@ -44,7 +44,7 @@ export interface SyncResult {
     errors: number;
   };
   totalErrors: string[];
-  status: "completed" | "failed";
+  status: "completed" | "failed" | "partial";
 }
 
 export async function fullSync(
@@ -91,16 +91,22 @@ export async function fullSync(
   // Create sync logger for per-item logging
   const syncLogger = createSyncLogger(syncRun.id);
 
+  let currentStep: string | null = null;
+  let committedAny = false;
+
   try {
     await logStep(`Starting full sync (triggered by: ${triggeredBy})`);
 
     // Step 1: Sync leagues (sequential — FK dependency)
     await logStep("Step 1/6: Syncing leagues...");
+    currentStep = "leagues";
     const leaguesResult = await syncLeagues(syncLogger);
+    committedAny = true;
     allErrors.push(...leaguesResult.errors);
 
     // Step 2: Parallel data fetch from SDK
     await logStep("Step 2/6: Fetching all data in parallel...");
+    currentStep = "fetch";
     const syncData = await fetchAllSyncData();
     await logStep(
       `Fetched: ${syncData.leagueData.length} leagues, ${syncData.teams.size} teams, ${syncData.venues.size} venues, ${syncData.referees.size} referees`,
@@ -108,6 +114,7 @@ export async function fullSync(
 
     // Step 3: Parallel entity upserts (independent tables)
     await logStep("Step 3/6: Syncing entities in parallel...");
+    currentStep = "entities";
     const [teamsRes, venuesRes, refereesRes, rolesRes, standingsRes] = await Promise.all([
       syncTeamsFromData(syncData.teams, syncLogger),
       syncVenuesFromData(syncData.venues, syncLogger),
@@ -115,6 +122,7 @@ export async function fullSync(
       syncRefereeRolesFromData(syncData.refereeRoles, syncLogger),
       syncStandingsFromData(syncData.leagueData, syncLogger),
     ]);
+    committedAny = true;
 
     allErrors.push(...teamsRes.errors);
     allErrors.push(...venuesRes.errors);
@@ -123,6 +131,7 @@ export async function fullSync(
 
     // Step 4: Matches sync (needs venue FK lookup)
     await logStep("Step 4/6: Syncing matches...");
+    currentStep = "matches";
     const venueIdLookup = await buildVenueIdLookup();
     const matchesRes = await syncMatchesFromData(
       syncData.leagueData,
@@ -130,10 +139,12 @@ export async function fullSync(
       syncRun.id,
       syncLogger,
     );
+    committedAny = true;
     allErrors.push(...matchesRes.errors);
 
     // Step 5: Referee assignments (needs match + referee FK lookups)
     await logStep("Step 5/6: Syncing referee assignments...");
+    currentStep = "assignments";
     const refereeAssignments = extractRefereeAssignments(syncData.leagueData);
     const matchIdLookup = await buildMatchIdLookup();
     const assignmentsRes = await syncRefereeAssignmentsFromData(
@@ -144,6 +155,7 @@ export async function fullSync(
       syncLogger,
       syncRun.id,
     );
+    committedAny = true;
     allErrors.push(...assignmentsRes.errors);
 
     // Step 5.25: Confirm referee assignment intents
@@ -166,6 +178,7 @@ export async function fullSync(
 
     // Step 6: Finalize
     await logStep("Step 6/6: Finalizing...");
+    currentStep = "finalize";
 
     // Close sync logger (flushes remaining entries)
     await syncLogger.close();
@@ -316,15 +329,18 @@ export async function fullSync(
 
     await syncLogger.close();
 
+    const failureStatus = committedAny ? "partial" : "failed";
+
     await db
       .update(syncRuns)
       .set({
-        status: "failed",
+        status: failureStatus,
         completedAt,
         durationMs: completedAt.getTime() - startedAt.getTime(),
         recordsFailed: allErrors.length,
         errorMessage: message,
         errorStack: error instanceof Error ? error.stack : undefined,
+        failedStep: currentStep,
       })
       .where(eq(syncRuns.id, syncRun.id));
 
@@ -343,7 +359,7 @@ export async function fullSync(
       venues: { created: 0, updated: 0, skipped: 0, errors: 0 },
       referees: { created: 0, updated: 0, skipped: 0, rolesCreated: 0, rolesUpdated: 0, rolesSkipped: 0, assignmentsCreated: 0, errors: 0 },
       totalErrors: allErrors,
-      status: "failed",
+      status: failureStatus,
     };
   }
 }
