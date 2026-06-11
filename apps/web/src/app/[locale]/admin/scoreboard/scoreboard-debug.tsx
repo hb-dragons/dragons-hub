@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import type {
+  ScoreboardHealth,
   ScoreboardSnapshotRow,
   StramatelSnapshot,
 } from "@dragons/shared";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface PublishEvent extends StramatelSnapshot {
   deviceId: string;
@@ -15,33 +16,26 @@ interface PublishEvent extends StramatelSnapshot {
   lastFrameAt: string;
 }
 
-interface Health {
-  deviceId: string;
-  lastFrameAt: string | null;
-  secondsSinceLastFrame: number | null;
-  online: boolean;
-}
-
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
   const [snapshots, setSnapshots] = useState<ScoreboardSnapshotRow[]>([]);
   const [paused, setPaused] = useState(false);
 
-  const { data: health } = useSWR<Health>(
+  const { data: health } = useSWR<ScoreboardHealth>(
     deviceId ? `/admin/scoreboard/health?deviceId=${encodeURIComponent(deviceId)}` : null,
-    (url: string) => fetchAPI<Health>(url),
+    () => api.scoreboard.health(deviceId),
     { refreshInterval: 2000 },
   );
 
   useEffect(() => {
     if (!deviceId) return;
     let cancelled = false;
-    void fetchAPI<ScoreboardSnapshotRow[]>(
-      `/admin/scoreboard/snapshots?deviceId=${encodeURIComponent(deviceId)}&limit=200`,
-    ).then((rows) => {
-      if (!cancelled) setSnapshots(rows);
-    });
+    void api.scoreboard
+      .snapshots({ deviceId, limit: 200 })
+      .then((rows) => {
+        if (!cancelled) setSnapshots(rows);
+      });
     return () => {
       cancelled = true;
     };

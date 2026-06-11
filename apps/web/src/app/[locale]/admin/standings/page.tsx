@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
 import { PageHeader } from "@/components/admin/shared/page-header";
-import { fetchAPIServer } from "@/lib/api.server"
+import { getServerApi } from "@/lib/api.server"
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { StandingsView } from "@/components/admin/standings/standings-view"
@@ -18,7 +18,7 @@ export default async function StandingsPage() {
   let error: string | null = null
 
   try {
-    data = await fetchAPIServer<LeagueStandings[]>("/admin/standings")
+    data = await (await getServerApi()).standings.list()
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API"
   }

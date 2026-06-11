@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@dragons/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dragons/ui/components/card";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { PhotoGrid } from "../photo-grid";
 import type { Background, PlayerPhoto, WizardState } from "../types";
 
@@ -26,7 +26,7 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
     setLoadingPhotos(true);
     setPhotoError(null);
     try {
-      const data = await fetchAPI<PlayerPhoto[]>("/admin/social/player-photos");
+      const data = await api.social.listPlayerPhotos();
       setPhotos(data);
     } catch (err) {
       setPhotoError(err instanceof Error ? err.message : "Fehler beim Laden der Fotos");
@@ -39,7 +39,7 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
     setLoadingBackgrounds(true);
     setBackgroundError(null);
     try {
-      const data = await fetchAPI<Background[]>("/admin/social/backgrounds");
+      const data = await api.social.listBackgrounds();
       setBackgrounds(data);
       // Auto-select the default background if none is selected yet
       if (state.selectedBackgroundId === null) {

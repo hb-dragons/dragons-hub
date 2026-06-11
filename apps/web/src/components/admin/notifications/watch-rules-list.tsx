@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
@@ -153,10 +153,7 @@ export function WatchRulesList() {
 
   async function handleToggleEnabled(rule: WatchRuleItem) {
     try {
-      await fetchAPI(`/admin/watch-rules/${rule.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ enabled: !rule.enabled }),
-      });
+      await api.watchRules.update(rule.id, { enabled: !rule.enabled });
       await mutate(SWR_KEYS.watchRules);
     } catch {
       toast.error(tCommon("failed"));
@@ -165,7 +162,7 @@ export function WatchRulesList() {
 
   async function handleDelete(ruleId: number) {
     try {
-      await fetchAPI(`/admin/watch-rules/${ruleId}`, { method: "DELETE" });
+      await api.watchRules.remove(ruleId);
       await mutate(SWR_KEYS.watchRules);
       toast.success(t("deleted"));
     } catch {
@@ -191,15 +188,9 @@ export function WatchRulesList() {
       };
 
       if (editingRule) {
-        await fetchAPI(`/admin/watch-rules/${editingRule.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        });
+        await api.watchRules.update(editingRule.id, body);
       } else {
-        await fetchAPI("/admin/watch-rules", {
-          method: "POST",
-          body: JSON.stringify(body),
-        });
+        await api.watchRules.create(body);
       }
 
       await mutate(SWR_KEYS.watchRules);

@@ -1,6 +1,6 @@
 import { useSWRConfig } from "swr";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type { TaskAssignee } from "@dragons/shared";
 
@@ -18,10 +18,7 @@ export function useAssigneeMutations(boardId: number) {
     userId: string,
   ): Promise<TaskAssignee> {
     try {
-      const assignee = await fetchAPI<TaskAssignee>(
-        `/admin/tasks/${taskId}/assignees/${encodeURIComponent(userId)}`,
-        { method: "PUT" },
-      );
+      const assignee = await api.boards.addAssignee(taskId, userId);
       await Promise.all([
         mutate(SWR_KEYS.taskDetail(taskId)),
         mutate(matchBoardTasks(boardId)),
@@ -40,10 +37,7 @@ export function useAssigneeMutations(boardId: number) {
     userId: string,
   ): Promise<void> {
     try {
-      await fetchAPI(
-        `/admin/tasks/${taskId}/assignees/${encodeURIComponent(userId)}`,
-        { method: "DELETE" },
-      );
+      await api.boards.removeAssignee(taskId, userId);
       await Promise.all([
         mutate(SWR_KEYS.taskDetail(taskId)),
         mutate(matchBoardTasks(boardId)),

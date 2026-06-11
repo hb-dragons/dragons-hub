@@ -6,7 +6,7 @@ import { useTimeAgo } from "./use-time-ago";
 import { useTranslations } from "next-intl";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
-import { fetchAPI, APIError } from "@/lib/api";
+import { api, APIError } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@dragons/ui/components/select";
 import { Checkbox } from "@dragons/ui/components/checkbox";
@@ -72,9 +72,8 @@ export function RulesSubtab({ referee }: Props) {
   async function save() {
     setStatus("saving");
     try {
-      await fetchAPI(`/admin/referees/${referee.id}/rules`, {
-        method: "PATCH",
-        body: JSON.stringify({ rules: rules.filter((r) => r.deny || r.allowSr1 || r.allowSr2) }),
+      await api.refereeAdmin.updateRules(referee.id, {
+        rules: rules.filter((r) => r.deny || r.allowSr1 || r.allowSr2),
       });
       await swrMutate(SWR_KEYS.refereeRules(referee.id));
       await swrMutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true });
@@ -108,9 +107,10 @@ export function RulesSubtab({ referee }: Props) {
         <p>{t("disabledHint")}</p>
         <Button size="sm" variant="outline" onClick={() => {
           void (async () => {
-            await fetchAPI(`/admin/referees/${referee.id}/visibility`, {
-              method: "PATCH",
-              body: JSON.stringify({ isOwnClub: true, allowAllHomeGames: referee.allowAllHomeGames, allowAwayGames: referee.allowAwayGames }),
+            await api.refereeAdmin.setVisibility(referee.id, {
+              isOwnClub: true,
+              allowAllHomeGames: referee.allowAllHomeGames,
+              allowAwayGames: referee.allowAwayGames,
             });
             await swrMutate(SWR_KEYS.referee(referee.id));
             await swrMutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true });

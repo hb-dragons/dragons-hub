@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, Search } from "lucide-react";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -42,11 +42,8 @@ export function MatchPicker({ open, onOpenChange, onPick }: Props) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    const params = new URLSearchParams({ scope });
-    if (scope === "all" && q) params.set("q", q);
-    void fetchAPI<{ matches: AdminBroadcastMatchListItem[] }>(
-      `/admin/broadcast/matches?${params.toString()}`,
-    ).then((res) => {
+    const query = scope === "all" && q ? { scope, q } : { scope };
+    void api.broadcast.matches(query).then((res) => {
       if (!cancelled) setList(res.matches);
     });
     return () => {

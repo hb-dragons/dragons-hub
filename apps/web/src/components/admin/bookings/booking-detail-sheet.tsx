@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   SheetContent,
   SheetHeader,
@@ -103,7 +103,8 @@ export function BookingDetailSheet({
     let cancelled = false;
     setLoading(true);
 
-    fetchAPI<BookingDetail>(`/admin/bookings/${bookingId}`)
+    api.bookings
+      .get(bookingId)
       .then((result) => {
         if (cancelled) return;
         setBooking(result);
@@ -154,13 +155,9 @@ export function BookingDetailSheet({
     try {
       // Update status if changed
       if (status !== booking.status) {
-        await fetchAPI(
-          `/admin/bookings/${bookingId}/status`,
-          {
-            method: "PATCH",
-            body: JSON.stringify({ status }),
-          },
-        );
+        await api.bookings.updateStatus(bookingId, {
+          status: status as BookingDetail["status"],
+        });
       }
 
       // Send override times only when they differ from calculated
@@ -169,23 +166,15 @@ export function BookingDetailSheet({
       const overrideStart = startTime && startTime !== calcStart ? startTime : null;
       const overrideEnd = endTime && endTime !== calcEnd ? endTime : null;
 
-      await fetchAPI(
-        `/admin/bookings/${bookingId}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            overrideStartTime: overrideStart,
-            overrideEndTime: overrideEnd,
-            overrideReason: overrideReason || null,
-            notes: notes || null,
-          }),
-        },
-      );
+      await api.bookings.update(bookingId, {
+        overrideStartTime: overrideStart,
+        overrideEndTime: overrideEnd,
+        overrideReason: overrideReason || null,
+        notes: notes || null,
+      });
 
       // Re-fetch full detail to get complete BookingDetail shape
-      const result = await fetchAPI<BookingDetail>(
-        `/admin/bookings/${bookingId}`,
-      );
+      const result = await api.bookings.get(bookingId);
       setBooking(result);
       setStatus(result.status);
       setStartTime(result.overrideStartTime ?? result.calculatedStartTime ?? "");
@@ -205,7 +194,7 @@ export function BookingDetailSheet({
     if (bookingId == null) return;
     setDeleting(true);
     try {
-      await fetchAPI(`/admin/bookings/${bookingId}`, { method: "DELETE" });
+      await api.bookings.delete(bookingId);
       onUpdated();
       onOpenChange(false);
       toast.success(t("bookings.toast.deleted"));

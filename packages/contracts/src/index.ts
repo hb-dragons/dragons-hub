@@ -32,6 +32,7 @@ export {
   bookingUpdateBodySchema,
   bookingStatusBodySchema,
   bookingCreateBodySchema,
+  type BookingListQuery,
   type BookingCreateBody,
   type BookingUpdateBody,
   type BookingStatusBody,
@@ -43,6 +44,10 @@ export {
   createChannelConfigSchema,
   updateChannelConfigSchema,
   validateConfigForType,
+  type ChannelConfigIdParam,
+  type ChannelConfigListQuery,
+  type ChannelConfigCreateBody,
+  type ChannelConfigUpdateBody,
 } from "./channel-config";
 
 export {
@@ -57,12 +62,15 @@ export {
   notificationListQuerySchema,
   notificationUserIdQuerySchema,
   notificationPreferencesBodySchema,
+  type NotificationListQuery,
   type NotificationPreferencesBody,
 } from "./notification";
 
 export {
   refereeHistoryFilterSchema,
   refereeHistoryGamesQuerySchema,
+  type RefereeHistoryFilterQuery,
+  type RefereeHistoryGamesQuery,
 } from "./referee-history";
 
 export {
@@ -98,6 +106,9 @@ export {
   syncJobStatusesQuerySchema,
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
+  type SyncLogsQuery,
+  type SyncEntriesQuery,
+  type SyncUpdateScheduleBody,
 } from "./sync";
 
 export {
@@ -143,6 +154,10 @@ export {
   watchRuleListQuerySchema,
   createWatchRuleSchema,
   updateWatchRuleSchema,
+  type WatchRuleIdParam,
+  type WatchRuleListQuery,
+  type WatchRuleCreateBody,
+  type WatchRuleUpdateBody,
 } from "./watch-rule";
 
 export {
@@ -196,6 +211,7 @@ export {
   broadcastMatchesQuerySchema,
   type BroadcastUpsertBody,
   type BroadcastStartStopBody,
+  type BroadcastMatchesQuery,
 } from "./broadcast";
 
 export {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -227,9 +227,7 @@ export function ReconcileDialog({ onReconciled }: ReconcileDialogProps) {
     setLoading(true);
     setPreview(null);
     try {
-      const result = await fetchAPI<ReconcilePreview>(
-        "/admin/bookings/reconcile/preview",
-      );
+      const result = await api.bookings.previewReconcile();
       setPreview(result);
     } catch {
       toast.error(t("toast.updated")); // generic error
@@ -241,7 +239,7 @@ export function ReconcileDialog({ onReconciled }: ReconcileDialogProps) {
   async function handleApply() {
     setApplying(true);
     try {
-      await fetchAPI("/admin/bookings/reconcile", { method: "POST" });
+      await api.bookings.applyReconcile();
       toast.success(t("toast.reconciled"));
       onReconciled();
       setOpen(false);

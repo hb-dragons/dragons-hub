@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useFormatter } from "next-intl";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { MatchListItem } from "@dragons/shared";
-import { publicApi } from "@/lib/api-client";
+import { api } from "@/lib/api";
 import { getColorPreset } from "@dragons/shared";
 import { Calendar } from "@dragons/ui/components/calendar";
 import { Button } from "@dragons/ui/components/button";
@@ -172,7 +172,7 @@ export function CalendarView({
       const end = getMonthEnd(monthDate);
       setLoading(true);
       try {
-        const data = await publicApi.getMatches({
+        const data = await api.public.getMatches({
           dateFrom: toDateString(start),
           dateTo: toDateString(end),
         });

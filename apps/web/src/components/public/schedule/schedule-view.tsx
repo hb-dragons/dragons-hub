@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useFormatter } from "next-intl";
 import type { MatchListItem } from "@dragons/shared";
-import { publicApi } from "@/lib/api-client";
+import { api } from "@/lib/api";
 import { WeekendPicker } from "./weekend-picker";
 import { MatchList } from "./match-list";
 import type { PublicTeam } from "./types";
@@ -71,7 +71,7 @@ export function ScheduleView({
       const sun = getSunday(sat);
       setLoading(true);
       try {
-        const data = await publicApi.getMatches({
+        const data = await api.public.getMatches({
           dateFrom: toDateString(sat),
           dateTo: toDateString(sun),
           ...(teamApiId ? { teamApiId } : {}),

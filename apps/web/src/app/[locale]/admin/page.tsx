@@ -1,14 +1,8 @@
-import { fetchAPIServer } from "@/lib/api.server";
+import { getServerApi } from "@/lib/api.server";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { todayInBerlin } from "@/lib/tz";
 import { DashboardView } from "@/components/admin/dashboard/dashboard-view";
-import type {
-  PaginatedResponse,
-  MatchListItem,
-  LeagueStandings,
-  RefereeListItem,
-} from "@dragons/shared";
 
 export default async function AdminDashboardPage() {
   // Club operates in Europe/Berlin; UTC date would show the wrong day's
@@ -16,14 +10,17 @@ export default async function AdminDashboardPage() {
   // todayInBerlin() so the SWR fallback key lines up.
   const today = todayInBerlin();
 
+  const sApi = await getServerApi();
+
   const [referees, standings, todayMatches] = await Promise.allSettled([
-    fetchAPIServer<PaginatedResponse<RefereeListItem>>(
-      "/admin/referees?scope=own&sort=name&limit=50&offset=0",
-    ),
-    fetchAPIServer<LeagueStandings[]>("/admin/standings"),
-    fetchAPIServer<PaginatedResponse<MatchListItem>>(
-      `/admin/matches?dateFrom=${today}&dateTo=${today}&limit=20&offset=0`,
-    ),
+    sApi.refereeAdmin.listReferees({
+      scope: "own",
+      sort: "name",
+      limit: 50,
+      offset: 0,
+    }),
+    sApi.standings.list(),
+    sApi.matches.list({ dateFrom: today, dateTo: today, limit: 20, offset: 0 }),
   ]);
 
   const fallback: Record<string, unknown> = {};

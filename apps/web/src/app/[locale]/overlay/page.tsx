@@ -1,4 +1,4 @@
-import { fetchAPI } from "@/lib/api";
+import { getServerApi } from "@/lib/api.server";
 import type { BroadcastState } from "@dragons/shared";
 import { OverlayClient } from "./overlay-client";
 
@@ -8,9 +8,7 @@ export default async function OverlayPage() {
   let initial: BroadcastState | null = null;
   if (deviceId) {
     try {
-      initial = await fetchAPI<BroadcastState>(
-        `/public/broadcast/state?deviceId=${encodeURIComponent(deviceId)}`,
-      );
+      initial = await (await getServerApi()).broadcast.state(deviceId);
     } catch {
       initial = null;
     }

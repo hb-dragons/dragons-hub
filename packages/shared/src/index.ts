@@ -45,6 +45,8 @@ export type {
   RefereeSlotInfo,
 } from "./matches";
 
+export type { OwnClubTeam, TeamReorderItem } from "./teams";
+
 export type {
   BookingMatch,
   BookingListItem,
@@ -137,10 +139,32 @@ export type {
 export type { StandingItem, LeagueStandings } from "./standings";
 export type { VenueListItem, VenueSearchResult } from "./venues";
 export type { UserListItem } from "./users";
-export type { NotificationItem, NotificationListResult } from "./notifications";
+export type {
+  NotificationItem,
+  NotificationListResult,
+  NotificationActionResponse,
+  NotificationMarkAllReadResponse,
+  NotificationPreferences,
+  FailedNotificationItem,
+  FailedNotificationListResult,
+  TestPushTicket,
+  TestPushResponse,
+} from "./notifications";
+export type {
+  SocialMatchItem,
+  SocialPlayerPhoto,
+  SocialBackground,
+  SocialActionResponse,
+} from "./social";
 export type { UserToggleableEventType } from "./notification-events";
 export { USER_TOGGLEABLE_EVENTS, isUserToggleableEventType } from "./notification-events";
-export type { ClubConfig, BookingSettings } from "./settings";
+export type {
+  ClubConfig,
+  BookingSettings,
+  RefereeReminderConfig,
+  RefereeGamesSyncResponse,
+  LeagueOwnClubRefsResponse,
+} from "./settings";
 export { BOOKING_DEFAULTS } from "./settings";
 export type {
   ResolvedLeague,
@@ -230,6 +254,7 @@ export type {
   StramatelSnapshot,
   PublicLiveSnapshot,
   ScoreboardSnapshotRow,
+  ScoreboardHealth,
 } from "./scoreboard";
 
 // Broadcast types

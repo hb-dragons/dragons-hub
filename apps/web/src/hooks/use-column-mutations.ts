@@ -1,6 +1,6 @@
 import { useSWRConfig } from "swr";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import type { BoardColumnData } from "@dragons/shared";
 
@@ -22,10 +22,7 @@ export function useColumnMutations(boardId: number) {
 
   async function addColumn(input: ColumnCreateInput): Promise<BoardColumnData> {
     try {
-      const col = await fetchAPI<BoardColumnData>(
-        `/admin/boards/${boardId}/columns`,
-        { method: "POST", body: JSON.stringify(input) },
-      );
+      const col = await api.boards.addColumn(boardId, input);
       await mutate(SWR_KEYS.boardDetail(boardId));
       return col;
     } catch (err) {
@@ -39,10 +36,7 @@ export function useColumnMutations(boardId: number) {
     input: ColumnUpdateInput,
   ): Promise<void> {
     try {
-      await fetchAPI(`/admin/boards/${boardId}/columns/${colId}`, {
-        method: "PATCH",
-        body: JSON.stringify(input),
-      });
+      await api.boards.updateColumn(boardId, colId, input);
       await mutate(SWR_KEYS.boardDetail(boardId));
     } catch (err) {
       toast.error(
@@ -54,9 +48,7 @@ export function useColumnMutations(boardId: number) {
 
   async function deleteColumn(colId: number): Promise<void> {
     try {
-      await fetchAPI(`/admin/boards/${boardId}/columns/${colId}`, {
-        method: "DELETE",
-      });
+      await api.boards.deleteColumn(boardId, colId);
       await mutate(SWR_KEYS.boardDetail(boardId));
     } catch (err) {
       toast.error(
@@ -70,10 +62,7 @@ export function useColumnMutations(boardId: number) {
     columns: { id: number; position: number }[],
   ): Promise<void> {
     try {
-      await fetchAPI(`/admin/boards/${boardId}/columns/reorder`, {
-        method: "PATCH",
-        body: JSON.stringify({ columns }),
-      });
+      await api.boards.reorderColumns(boardId, columns);
       await mutate(SWR_KEYS.boardDetail(boardId));
     } catch (err) {
       await mutate(SWR_KEYS.boardDetail(boardId));

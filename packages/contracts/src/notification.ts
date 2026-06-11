@@ -10,6 +10,8 @@ export const notificationListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 });
 
+export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
+
 export const notificationUserIdQuerySchema = z.object({
   userId: z.string().min(1),
 });

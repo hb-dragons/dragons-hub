@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
@@ -153,9 +153,8 @@ export function ChannelConfigsList() {
 
   async function handleToggleEnabled(channel: ChannelConfigItem) {
     try {
-      await fetchAPI(`/admin/channel-configs/${channel.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ enabled: !channel.enabled }),
+      await api.channelConfigs.update(channel.id, {
+        enabled: !channel.enabled,
       });
       await mutate(SWR_KEYS.channelConfigs);
     } catch {
@@ -169,27 +168,28 @@ export function ChannelConfigsList() {
 
     setSubmitting(true);
     try {
-      const body = {
-        name: form.name.trim(),
-        type: form.type,
-        digestMode: form.digestMode,
-        digestCron:
-          form.digestMode === "scheduled" && form.digestCron
-            ? form.digestCron
-            : null,
-        digestTimezone: form.digestTimezone || "Europe/Berlin",
-        config: buildConfig(form),
-      };
+      const digestCron =
+        form.digestMode === "scheduled" && form.digestCron
+          ? form.digestCron
+          : null;
+      const digestTimezone = form.digestTimezone || "Europe/Berlin";
 
       if (editingChannel) {
-        await fetchAPI(`/admin/channel-configs/${editingChannel.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
+        await api.channelConfigs.update(editingChannel.id, {
+          name: form.name.trim(),
+          digestMode: form.digestMode,
+          digestCron,
+          digestTimezone,
+          config: buildConfig(form),
         });
       } else {
-        await fetchAPI("/admin/channel-configs", {
-          method: "POST",
-          body: JSON.stringify(body),
+        await api.channelConfigs.create({
+          name: form.name.trim(),
+          type: form.type,
+          digestMode: form.digestMode,
+          digestCron,
+          digestTimezone,
+          config: buildConfig(form),
         });
       }
 

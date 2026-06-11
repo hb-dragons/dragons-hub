@@ -35,7 +35,7 @@ import {
   AlertDialogTitle,
 } from "@dragons/ui/components/alert-dialog"
 
-import { fetchAPI } from "@/lib/api"
+import { api } from "@/lib/api"
 
 import { EditUserDialog } from "./edit-user-dialog"
 import { BanUserDialog } from "./ban-user-dialog"
@@ -141,11 +141,7 @@ export function UserActions({
 
   async function handleRemoveReferee() {
     try {
-      await fetchAPI(`/admin/users/${user.id}/referee-link`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refereeId: null }),
-      })
+      await api.users.linkReferee(user.id, { refereeId: null })
       toast.success(t("users.toast.roleChanged"))
       onMutated()
     } catch {

@@ -19,7 +19,7 @@ import { Input } from "@dragons/ui/components/input";
 import { Label } from "@dragons/ui/components/label";
 import { Loader2, Check, Save } from "lucide-react";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { ClubConfig as ClubConfigType } from "./settings-provider";
 
 export function ClubConfig() {
@@ -49,13 +49,10 @@ export function ClubConfig() {
 
     try {
       setSaving(true);
-      const result = await fetchAPI<{ clubId: number; clubName: string }>(
-        "/admin/settings/club",
-        {
-          method: "PUT",
-          body: JSON.stringify({ clubId: id, clubName: clubName.trim() }),
-        },
-      );
+      const result = await api.settings.setClub({
+        clubId: id,
+        clubName: clubName.trim(),
+      });
       await mutate(SWR_KEYS.settingsClub, result, { revalidate: false });
       toast.success(t("settings.club.toast.saved", { name: result.clubName }));
     } catch {

@@ -12,8 +12,11 @@ vi.mock("swr", () => ({
   mutate: vi.fn(),
 }));
 
-const fetchAPI = vi.fn().mockResolvedValue({});
-vi.mock("@/lib/api", () => ({ fetchAPI: (...a: unknown[]) => fetchAPI(...a), APIError: class extends Error {} }));
+const setVisibility = vi.fn().mockResolvedValue({});
+vi.mock("@/lib/api", () => ({
+  api: { refereeAdmin: { setVisibility: (...a: unknown[]) => setVisibility(...a) } },
+  APIError: class extends Error {},
+}));
 
 const messages = { refereeHub: { referees: { profile: {
   visibility: { title: "Visibility", ownClub: "Own-club referee", allHome: "Allow all home", away: "Allow away" },
@@ -24,7 +27,7 @@ function wrap(ui: React.ReactNode) {
   return <NextIntlClientProvider locale="en" messages={messages as never}>{ui}</NextIntlClientProvider>;
 }
 
-beforeEach(() => { vi.useFakeTimers(); fetchAPI.mockClear(); });
+beforeEach(() => { vi.useFakeTimers(); setVisibility.mockClear(); });
 afterEach(() => { vi.useRealTimers(); cleanup(); });
 
 // Tests hit a React 19 + @radix-ui/react-switch max-update-depth bug when
@@ -41,18 +44,11 @@ describe.skip("ProfileSubtab", () => {
     await vi.advanceTimersByTimeAsync(800);
 
     await waitFor(() => {
-      expect(fetchAPI).toHaveBeenCalledWith(
-        "/admin/referees/1/visibility",
-        expect.objectContaining({ method: "PATCH" }),
-      );
-    });
-
-    const visibilityCall = fetchAPI.mock.calls.find((c) => (c[0] as string).endsWith("/visibility"))!;
-    const visibilityBody = JSON.parse((visibilityCall[1] as RequestInit).body as string);
-    expect(visibilityBody).toEqual({
-      allowAllHomeGames: false,
-      allowAwayGames: true,
-      isOwnClub: true,
+      expect(setVisibility).toHaveBeenCalledWith(1, {
+        allowAllHomeGames: false,
+        allowAwayGames: true,
+        isOwnClub: true,
+      });
     });
   });
 
@@ -60,6 +56,6 @@ describe.skip("ProfileSubtab", () => {
     render(wrap(<ProfileSubtab referee={ref} />));
     fireEvent.click(screen.getByRole("switch", { name: /allow all home/i }));
     fireEvent.click(screen.getByRole("button", { name: /save now/i }));
-    await waitFor(() => expect(fetchAPI).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(setVisibility).toHaveBeenCalledTimes(1));
   });
 });

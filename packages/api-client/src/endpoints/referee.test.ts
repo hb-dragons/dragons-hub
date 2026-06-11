@@ -68,7 +68,9 @@ describe("refereeEndpoints", () => {
 
     const url = mockFetch.mock.calls[0]![0] as string;
     expect(url).toContain("/admin/referee/games/123/candidates?");
-    expect(url).toContain("slotNumber=1");
+    // The route reads `slot`, so the client must send `slot`, not `slotNumber`.
+    expect(url).toContain("slot=1");
+    expect(url).not.toContain("slotNumber=");
     expect(url).toContain("search=mu");
     expect(url).toContain("pageFrom=0");
     expect(url).toContain("pageSize=15");

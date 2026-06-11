@@ -239,3 +239,62 @@ describe("ApiClient", () => {
     expect(events).toEqual(["hook", "after-get"]);
   });
 });
+
+function clientReturning(status: number, body: unknown) {
+  const fetchFn = vi.fn(async () =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+  return new ApiClient({ baseUrl: "https://x.test", fetchFn: fetchFn as unknown as typeof fetch });
+}
+
+describe("ApiClient error parsing", () => {
+  it("uses the API's { error, code } envelope for the thrown APIError", async () => {
+    const client = clientReturning(400, { error: "Invalid request data", code: "VALIDATION_ERROR", details: [] });
+    await expect(client.get("/x")).rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR", message: "Invalid request data" });
+  });
+
+  it("falls back to message, then statusText", async () => {
+    const a = clientReturning(500, { message: "boom" });
+    await expect(a.get("/x")).rejects.toMatchObject({ message: "boom" });
+    const b = clientReturning(503, {});
+    await expect(b.get("/x")).rejects.toBeInstanceOf(APIError);
+  });
+});
+
+describe("ApiClient cache option", () => {
+  it("passes a configured cache mode to fetch", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    const client = new ApiClient({ baseUrl: "https://x.test", cache: "no-store", fetchFn });
+    await client.get("/x");
+    expect(fetchFn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+});
+
+describe("ApiClient AbortSignal support", () => {
+  it("passes an AbortSignal to fetch when provided to get", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    const client = new ApiClient({ baseUrl: "https://x.test", fetchFn });
+    const controller = new AbortController();
+    await client.get("/x", undefined, { signal: controller.signal });
+    expect(fetchFn.mock.calls[0]![1]).toMatchObject({ signal: controller.signal });
+  });
+
+  it("does not set signal when none provided", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    const client = new ApiClient({ baseUrl: "https://x.test", fetchFn });
+    await client.get("/x");
+    expect(fetchFn.mock.calls[0]![1]?.signal).toBeUndefined();
+  });
+});

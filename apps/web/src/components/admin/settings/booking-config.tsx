@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -62,18 +62,12 @@ export function BookingConfig() {
   async function handleSave() {
     setSaving(true);
     try {
-      const result = await fetchAPI<BookingSettings>(
-        "/admin/settings/booking",
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            bufferBefore: parseInt(bufferBefore, 10),
-            bufferAfter: parseInt(bufferAfter, 10),
-            gameDuration: parseInt(gameDuration, 10),
-            dueDaysBefore: parseInt(dueDays, 10),
-          }),
-        },
-      );
+      const result = await api.settings.setBooking({
+        bufferBefore: parseInt(bufferBefore, 10),
+        bufferAfter: parseInt(bufferAfter, 10),
+        gameDuration: parseInt(gameDuration, 10),
+        dueDaysBefore: parseInt(dueDays, 10),
+      });
       await mutate(SWR_KEYS.settingsBooking, result, { revalidate: false });
       toast.success(t("common.saved"));
     } catch {

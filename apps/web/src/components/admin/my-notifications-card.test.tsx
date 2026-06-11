@@ -27,13 +27,19 @@ const messages = {
 };
 
 const mocks = vi.hoisted(() => ({
-  fetchAPI: vi.fn(),
+  getPreferences: vi.fn(),
+  updatePreferences: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
-  fetchAPI: mocks.fetchAPI,
+  api: {
+    notifications: {
+      getPreferences: mocks.getPreferences,
+      updatePreferences: mocks.updatePreferences,
+    },
+  },
   APIError: class APIError extends Error {
     constructor(public status: number, message: string) {
       super(message);
@@ -57,7 +63,7 @@ describe("MyNotificationsCard", () => {
   afterEach(cleanup);
 
   it("renders one checkbox per toggleable event", async () => {
-    mocks.fetchAPI.mockResolvedValue({ mutedEventTypes: [], locale: "en" });
+    mocks.getPreferences.mockResolvedValue({ mutedEventTypes: [], locale: "en" });
     render(wrap(<MyNotificationsCard />));
     await waitFor(() => expect(screen.getByText("Assigned")).toBeInTheDocument());
     expect(screen.getByText("Unassigned")).toBeInTheDocument();
@@ -66,7 +72,7 @@ describe("MyNotificationsCard", () => {
   });
 
   it("shows checkboxes as checked for events NOT in mutedEventTypes", async () => {
-    mocks.fetchAPI.mockResolvedValue({
+    mocks.getPreferences.mockResolvedValue({
       mutedEventTypes: ["task.assigned"],
       locale: "en",
     });
@@ -77,9 +83,9 @@ describe("MyNotificationsCard", () => {
     expect(screen.getByRole("checkbox", { name: "Unassigned" })).toBeChecked();
   });
 
-  it("sends PATCH when toggling a checkbox", async () => {
-    mocks.fetchAPI.mockResolvedValueOnce({ mutedEventTypes: [], locale: "en" });
-    mocks.fetchAPI.mockResolvedValueOnce({
+  it("sends a preferences update when toggling a checkbox", async () => {
+    mocks.getPreferences.mockResolvedValueOnce({ mutedEventTypes: [], locale: "en" });
+    mocks.updatePreferences.mockResolvedValueOnce({
       mutedEventTypes: ["task.assigned"],
       locale: "en",
     });
@@ -91,9 +97,9 @@ describe("MyNotificationsCard", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Assigned" }));
 
     await waitFor(() => {
-      expect(mocks.fetchAPI).toHaveBeenLastCalledWith("/admin/notifications/preferences", {
-        method: "PATCH",
-        body: JSON.stringify({ mutedEventTypes: ["task.assigned"], locale: "en" }),
+      expect(mocks.updatePreferences).toHaveBeenLastCalledWith({
+        mutedEventTypes: ["task.assigned"],
+        locale: "en",
       });
     });
     expect(mocks.toastSuccess).toHaveBeenCalled();

@@ -9,7 +9,7 @@ import type {
   TaskPriority,
 } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { fetchAPIServer } from "@/lib/api.server";
+import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { BoardView } from "@/components/admin/board/board-view";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -43,10 +43,11 @@ export default async function BoardDetailPage({
 
   // Match the client SWR key: server-side filter only fires for a single assignee
   // (multi-assignee filtering happens client-side in BoardView).
-  const tasksKey = SWR_KEYS.boardTasks(boardId, {
+  const taskFilters = {
     ...(assigneeIds.length === 1 ? { assigneeId: assigneeIds[0] } : {}),
     ...(priority ? { priority } : {}),
-  });
+  };
+  const tasksKey = SWR_KEYS.boardTasks(boardId, taskFilters);
 
   const t = await getTranslations();
   let board: BoardData | null = null;
@@ -55,10 +56,11 @@ export default async function BoardDetailPage({
   let error: string | null = null;
 
   try {
+    const sApi = await getServerApi();
     [board, tasks, boards] = await Promise.all([
-      fetchAPIServer<BoardData>(`/admin/boards/${boardId}`),
-      fetchAPIServer<TaskCardData[]>(tasksKey),
-      fetchAPIServer<BoardSummary[]>(SWR_KEYS.boards),
+      sApi.boards.getBoard(boardId),
+      sApi.boards.listTasks(boardId, taskFilters),
+      sApi.boards.listBoards(),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to load board";

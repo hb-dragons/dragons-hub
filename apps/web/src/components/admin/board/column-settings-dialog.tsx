@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useSWRConfig } from "swr";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
@@ -66,20 +66,14 @@ export function ColumnSettingsDialog({
       };
 
       if (isEditing) {
-        await fetchAPI(`/admin/boards/${boardId}/columns/${column.id}`, {
-          method: "PATCH",
-          body: JSON.stringify(body),
-        });
+        await api.boards.updateColumn(boardId, column.id, body);
       } else {
-        await fetchAPI(`/admin/boards/${boardId}/columns`, {
-          method: "POST",
-          body: JSON.stringify(body),
-        });
+        await api.boards.addColumn(boardId, body);
       }
       await mutate(SWR_KEYS.boardDetail(boardId));
       onOpenChange(false);
     } catch {
-      // Error surfaced by fetchAPI
+      // Error surfaced by api.boards (toast handled upstream)
     } finally {
       setSaving(false);
     }
@@ -89,14 +83,12 @@ export function ColumnSettingsDialog({
     if (!column) return;
     setDeleting(true);
     try {
-      await fetchAPI(`/admin/boards/${boardId}/columns/${column.id}`, {
-        method: "DELETE",
-      });
+      await api.boards.deleteColumn(boardId, column.id);
       await mutate(SWR_KEYS.boardDetail(boardId));
       await mutate(SWR_KEYS.boardTasks(boardId));
       onOpenChange(false);
     } catch {
-      // Error surfaced by fetchAPI
+      // Error surfaced by api.boards (toast handled upstream)
     } finally {
       setDeleting(false);
     }

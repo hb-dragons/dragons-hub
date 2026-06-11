@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
 import {
@@ -55,6 +55,10 @@ import type {
   DomainEventListResult,
   TriggerEventBody,
 } from "./types";
+
+// Dialog form state: the trigger body fields the user edits directly.
+// `payload` and `urgencyOverride` are assembled at submit time.
+type TriggerEventForm = Omit<TriggerEventBody, "payload" | "urgencyOverride">;
 
 // ---------------------------------------------------------------------------
 // Badge variant helpers
@@ -169,7 +173,7 @@ export function EventBrowser() {
   // ---------------------------------------------------------------------------
 
   const [triggerOpen, setTriggerOpen] = useState(false);
-  const [triggerForm, setTriggerForm] = useState<TriggerEventBody>({
+  const [triggerForm, setTriggerForm] = useState<TriggerEventForm>({
     type: "",
     entityType: "match",
     entityId: 0,
@@ -185,15 +189,12 @@ export function EventBrowser() {
     try {
       const body: TriggerEventBody = {
         ...triggerForm,
-        ...(triggerPayload ? { payload: JSON.parse(triggerPayload) } : {}),
+        payload: triggerPayload ? JSON.parse(triggerPayload) : {},
         ...(triggerUrgency
           ? { urgencyOverride: triggerUrgency as "immediate" | "routine" }
           : {}),
       };
-      await fetchAPI("/admin/events/trigger", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+      await api.events.trigger(body);
       toast.success(t("triggerSuccess"));
       setTriggerOpen(false);
       setTriggerForm({

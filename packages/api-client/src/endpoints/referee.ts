@@ -15,6 +15,9 @@ export interface RefereeGamesQueryParams {
   league?: string;
   dateFrom?: string;
   dateTo?: string;
+  gameType?: "home" | "away" | "both";
+  slotStatus?: "open" | "offered" | "any";
+  assignedRefereeApiId?: number;
 }
 
 export interface ClaimGameParams {
@@ -62,13 +65,13 @@ export function refereeEndpoints(client: ApiClient) {
       spielplanId: number,
       params: CandidateSearchParams,
     ): Promise<CandidateSearchResponse> {
-      return client.get(
-        `/admin/referee/games/${spielplanId}/candidates`,
-        params as unknown as Record<
-          string,
-          string | number | boolean | undefined
-        >,
-      );
+      const { slotNumber, ...rest } = params;
+      // The route reads the slot as `slot` (not `slotNumber`); map it so the
+      // slot-specific eligibility filter is actually applied.
+      return client.get(`/admin/referee/games/${spielplanId}/candidates`, {
+        ...rest,
+        slot: slotNumber,
+      });
     },
     assignReferee(
       spielplanId: number,

@@ -624,9 +624,19 @@ All in `apps/web/src/components/admin/sync/`:
 
 Types: `apps/web/src/components/admin/sync/types.ts`
 
-### API Client
+### Web data layer
 
-`apps/web/src/lib/api.ts` - Fetch wrapper targeting `NEXT_PUBLIC_API_URL` with error handling.
+Every web data call goes through the shared typed client built from `@dragons/api-client`'s `createApi`. There is one entry point per render context:
+
+- **Client components and hooks** import `api` from `@/lib/api` and call it by namespace, e.g. `api.bookings.list()`. The namespaces come from `createApi`, which wraps the exported `browserClient`.
+- **Server components** call `const api = await getServerApi()` from `@/lib/api.server`. Each call builds a per-request client that forwards the incoming cookies, so server-side reads stay authenticated.
+- **SWR client-side reads** use `apiFetcher` from `@/lib/swr`, which wraps the same shared `browserClient.get`. Point a `useSWR` key at an endpoint and `apiFetcher` resolves it through the typed client.
+
+Types come from one place each: request body/query types from `@dragons/contracts`, response types from `@dragons/shared`, and the single `APIError` from `@dragons/api-client`.
+
+To add an endpoint: add an `xEndpoints` factory plus a `.contract.test.ts` in `@dragons/api-client`, register the factory in `create-api.ts`, then consume it as `api.<group>`. The contract test parses the client's request body/query against the `@dragons/contracts` schema so client/server drift fails the build.
+
+Raw `fetch` is lint-banned in web components (`no-restricted-globals` in `apps/web/eslint.config.mjs`, scoped to `src/**` outside `src/lib/**` and tests). The only exceptions are non-JSON requests — blob downloads and multipart uploads — which carry an inline `eslint-disable-next-line no-restricted-globals` with a reason (the social post generator's preview download and photo upload).
 
 ## UI Component Library
 

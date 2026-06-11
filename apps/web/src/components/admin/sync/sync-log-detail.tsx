@@ -32,13 +32,12 @@ import {
   Search,
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
+import type { SyncEntriesQuery } from "@dragons/api-client";
 import type {
   SyncRun,
   SyncRunEntry,
-  SyncRunEntriesResponse,
   MatchFieldChange,
-  MatchChangesResponse,
   EntityType,
   EntryAction,
 } from "./types";
@@ -137,9 +136,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
 
     setMatchChangesCache((prev) => ({ ...prev, [entryId]: "loading" }));
     try {
-      const data = await fetchAPI<MatchChangesResponse>(
-        `/admin/sync/logs/${syncRun.id}/match-changes/${entry.entityId}`,
-      );
+      const data = await api.sync.matchChanges(syncRun.id, Number(entry.entityId));
       setMatchChangesCache((prev) => ({ ...prev, [entryId]: data.changes }));
     } catch {
       setMatchChangesCache((prev) => ({ ...prev, [entryId]: "error" }));
@@ -150,18 +147,19 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
     async (offset = 0, append = false, signal?: AbortSignal) => {
       try {
         setLoading(true);
-        const params = new URLSearchParams({
-          limit: "50",
-          offset: String(offset),
-        });
-        if (entityFilter !== "all") params.set("entityType", entityFilter);
-        if (actionFilter !== "all") params.set("action", actionFilter);
-        if (searchQuery) params.set("search", searchQuery);
+        const query: Partial<SyncEntriesQuery> = {
+          limit: 50,
+          offset,
+        };
+        if (entityFilter !== "all") {
+          query.entityType = entityFilter as SyncEntriesQuery["entityType"];
+        }
+        if (actionFilter !== "all") {
+          query.action = actionFilter as SyncEntriesQuery["action"];
+        }
+        if (searchQuery) query.search = searchQuery;
 
-        const data = await fetchAPI<SyncRunEntriesResponse>(
-          `/admin/sync/logs/${syncRun.id}/entries?${params}`,
-          { signal },
-        );
+        const data = await api.sync.logEntries(syncRun.id, query, { signal });
 
         setEntries((prev) => {
           if (!append) return data.items;

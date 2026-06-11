@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { apiFetcher } from "@/lib/swr";
-import { fetchAPI, APIError } from "@/lib/api";
+import { api, APIError } from "@/lib/api";
 import { toast } from "sonner";
 import {
   Card,
@@ -27,20 +27,7 @@ import {
 } from "@dragons/ui/components/table";
 import { Loader2, Send } from "lucide-react";
 
-const TEST_PUSH_ENDPOINT = "/admin/notifications/test-push";
 const TEST_PUSH_RECENT_ENDPOINT = "/admin/notifications/test-push/recent";
-
-interface TestPushTicket {
-  platform: string;
-  status: "sent_ticket" | "failed" | string;
-  ticketId: string | null;
-  error: string | null;
-}
-
-interface TestPushResponse {
-  deviceCount: number;
-  tickets: TestPushTicket[];
-}
 
 interface TestPushRecentItem {
   id: number;
@@ -89,10 +76,7 @@ export function PushTestCard() {
     try {
       const trimmed = message.trim();
       const body = trimmed.length > 0 ? { message: trimmed } : {};
-      const res = await fetchAPI<TestPushResponse>(TEST_PUSH_ENDPOINT, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+      const res = await api.notificationTest.sendTestPush(body);
       const total = res.tickets.length;
       const failed = res.tickets.filter((t) => t.status === "failed").length;
       if (failed === 0) {

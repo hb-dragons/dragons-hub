@@ -123,4 +123,12 @@ describe("admin-board request bodies satisfy @dragons/contracts schemas", () => 
     const parsed = commentCreateBodySchema.safeParse(calls[0]!.body);
     expect(parsed.error?.issues, "commentCreateBodySchema rejected the request body").toBeUndefined();
   });
+
+  it("addAssignee percent-encodes the userId path segment", async () => {
+    const { api, calls } = recordingClient();
+    await api.addAssignee(3, "user id/with?chars");
+    expect(calls[0]!.url).toContain(
+      `/admin/tasks/3/assignees/${encodeURIComponent("user id/with?chars")}`,
+    );
+  });
 });

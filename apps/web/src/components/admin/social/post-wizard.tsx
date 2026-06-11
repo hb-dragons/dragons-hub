@@ -17,7 +17,7 @@ import {
   toDateString,
 } from "./weekend-utils";
 import { getSunday } from "@/lib/weekend-utils";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 
 const MAX_WEEK_OFFSET = 8;
 
@@ -45,9 +45,7 @@ async function fetchWeekendOption(
   const { week, year } = getISOWeekAndYear(saturday);
   const dateFrom = toDateString(saturday);
   const dateTo = toDateString(getSunday(saturday));
-  const matches = await fetchAPI<MatchItem[]>(
-    `/admin/social/matches?type=${type}&week=${week}&year=${year}`,
-  );
+  const matches = await api.social.matches({ type, week, year });
   const sliced = matches.slice(0, 6);
   return { week, year, dateFrom, dateTo, matchCount: sliced.length, matches: sliced };
 }

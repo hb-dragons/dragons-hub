@@ -21,8 +21,7 @@ import {
 } from "@dragons/ui/components/select";
 import { Loader2, Check, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
-import type { SyncScheduleData } from "./types";
+import { api } from "@/lib/api";
 import { useRefereeSyncSchedule } from "./use-sync";
 import { formatIntervalLabel } from "./utils";
 
@@ -57,17 +56,11 @@ export function RefereeSyncScheduleConfig() {
       setSaving(true);
       setSaveState("idle");
 
-      const updated = await fetchAPI<SyncScheduleData>(
-        "/admin/sync/schedule",
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            syncType: "referee-games",
-            enabled,
-            intervalMinutes: parseInt(interval, 10),
-          }),
-        },
-      );
+      const updated = await api.sync.updateSchedule({
+        syncType: "referee-games",
+        enabled,
+        intervalMinutes: parseInt(interval, 10),
+      });
 
       await scheduleMutate(updated, { revalidate: false });
       setSaveState("success");

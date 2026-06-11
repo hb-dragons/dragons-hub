@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { fetchAPI, APIError } from "@/lib/api";
+import { api, APIError } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
 import { CandidatePicker } from "./candidate-picker";
 
@@ -30,10 +30,7 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
     setBusy(true);
     setError(null);
     try {
-      await fetchAPI(`/admin/referee/games/${gameApiId}/assign`, {
-        method: "POST",
-        body: JSON.stringify({ slotNumber, refereeApiId }),
-      });
+      await api.referees.assignReferee(gameApiId, { slotNumber, refereeApiId });
       onChange();
     } catch (err) {
       setError(err instanceof APIError ? err.message : err instanceof Error ? err.message : "Assign failed");
@@ -46,7 +43,7 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
     setBusy(true);
     setError(null);
     try {
-      await fetchAPI(`/admin/referee/games/${gameApiId}/assignment/${slotNumber}`, { method: "DELETE" });
+      await api.referees.unassignReferee(gameApiId, slotNumber);
       onChange();
     } catch (err) {
       setError(err instanceof APIError ? err.message : err instanceof Error ? err.message : "Unassign failed");

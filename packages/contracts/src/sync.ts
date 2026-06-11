@@ -13,6 +13,8 @@ export const syncLogsQuerySchema = syncPaginationSchema.extend({
   syncType: z.string().optional(),
 });
 
+export type SyncLogsQuery = z.infer<typeof syncLogsQuerySchema>;
+
 export const syncEntryIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
@@ -25,6 +27,8 @@ export const syncEntriesQuerySchema = syncPaginationSchema.extend({
   action: entryActionEnum.optional(),
   search: z.preprocess((v) => (v === "" ? undefined : v), z.string().optional()),
 });
+
+export type SyncEntriesQuery = z.infer<typeof syncEntriesQuerySchema>;
 
 export const syncStreamParamSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -58,6 +62,8 @@ export const syncUpdateScheduleBodySchema = z.object({
   timezone: z.string().min(1).optional(),
   updatedBy: z.string().optional(),
 });
+
+export type SyncUpdateScheduleBody = z.infer<typeof syncUpdateScheduleBodySchema>;
 
 export const syncMatchChangesParamSchema = z.object({
   apiMatchId: z.coerce.number().int().positive(),

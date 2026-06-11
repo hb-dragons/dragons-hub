@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { mutate as swrMutate } from "swr";
 import { useTranslations } from "next-intl";
 import { SWR_KEYS } from "@/lib/swr-keys";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useAutoSave } from "./use-auto-save";
 import { useTimeAgo } from "./use-time-ago";
 import { Switch } from "@dragons/ui/components/switch";
@@ -34,10 +34,7 @@ export function ProfileSubtab({ referee }: Props) {
 
   const { status, lastSavedAt, markDirty, saveNow } = useAutoSave({
     save: async () => {
-      await fetchAPI(`/admin/referees/${referee.id}/visibility`, {
-        method: "PATCH",
-        body: JSON.stringify(visibility),
-      });
+      await api.refereeAdmin.setVisibility(referee.id, visibility);
       await Promise.all([
         swrMutate(SWR_KEYS.referee(referee.id)),
         swrMutate((key) => typeof key === "string" && key.startsWith("/admin/referees?"), undefined, { revalidate: true }),

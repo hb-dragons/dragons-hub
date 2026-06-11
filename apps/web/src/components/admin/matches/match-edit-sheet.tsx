@@ -54,7 +54,8 @@ import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react"
 
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
-import { fetchAPI } from "@/lib/api";
+import type { OwnClubTeam } from "@dragons/shared";
+import { api } from "@/lib/api";
 import {
   formatMatchTime,
   formatPeriodScores,
@@ -62,10 +63,10 @@ import {
 import {
   matchFormSchema,
   type MatchDetail,
-  type MatchDetailResponse,
   type FieldDiff,
   type MatchFormValues,
 } from "./types";
+import type { MatchUpdateBody } from "@dragons/api-client";
 
 // ---------------------------------------------------------------------------
 // OverrideField — conditional layout (#2, #8)
@@ -156,14 +157,6 @@ function getDefaultValues(match: MatchDetail): MatchFormValues {
 // ---------------------------------------------------------------------------
 // Team types & helpers
 // ---------------------------------------------------------------------------
-
-interface OwnClubTeam {
-  id: number;
-  name: string;
-  nameShort: string | null;
-  customName: string | null;
-  leagueName: string | null;
-}
 
 function getTeamDisplayName(team: OwnClubTeam): string {
   return team.customName ?? team.nameShort ?? team.name;
@@ -271,7 +264,8 @@ export function MatchEditSheet({
     let cancelled = false;
     setLoading(true);
 
-    fetchAPI<MatchDetailResponse>(`/admin/matches/${matchId}`)
+    api.matches
+      .get(matchId)
       .then((result) => {
         if (cancelled) return;
         setMatch(result.match);
@@ -288,7 +282,8 @@ export function MatchEditSheet({
         if (!cancelled) setLoading(false);
       });
 
-    fetchAPI<OwnClubTeam[]>("/admin/teams")
+    api.teams
+      .list()
       .then((result) => {
         if (!cancelled) setOwnClubTeams(result);
       })
@@ -323,12 +318,14 @@ export function MatchEditSheet({
       if (!match) return;
       const { dirtyFields: currentDirtyFields } = form.formState;
 
-      const updateData: Record<string, unknown> = {};
+      const dirtyValues: Partial<MatchFormValues> = {};
       for (const key of Object.keys(data) as (keyof typeof data)[]) {
         if (currentDirtyFields[key]) {
-          updateData[key] = data[key];
+          (dirtyValues[key] as MatchFormValues[typeof key]) = data[key];
         }
       }
+
+      const updateData: MatchUpdateBody = { ...dirtyValues };
 
       // Include venueId when a venue was selected from the combobox
       if (currentDirtyFields.venueNameOverride && selectedVenueIdRef.current != null) {
@@ -339,13 +336,7 @@ export function MatchEditSheet({
 
       try {
         setSaving(true);
-        const result = await fetchAPI<MatchDetailResponse>(
-          `/admin/matches/${match.id}`,
-          {
-            method: "PATCH",
-            body: JSON.stringify(updateData),
-          },
-        );
+        const result = await api.matches.update(match.id, updateData);
         setMatch(result.match);
         setDiffs(result.diffs);
         selectedVenueIdRef.current = null;
@@ -367,10 +358,7 @@ export function MatchEditSheet({
       if (!match) return;
       try {
         setSaving(true);
-        const result = await fetchAPI<MatchDetailResponse>(
-          `/admin/matches/${match.id}/overrides/${fieldName}`,
-          { method: "DELETE" },
-        );
+        const result = await api.matches.releaseOverride(match.id, fieldName);
         setMatch(result.match);
         setDiffs(result.diffs);
         selectedVenueIdRef.current = null;
@@ -763,14 +751,7 @@ export function MatchEditSheet({
                           value={field.value ?? ""}
                           onChange={(v) => field.onChange(v || null)}
                           onSearch={async (q) => {
-                            const result = await fetchAPI<{
-                              venues: {
-                                id: number;
-                                name: string;
-                                street: string | null;
-                                city: string | null;
-                              }[];
-                            }>(`/admin/venues/search?q=${encodeURIComponent(q)}`);
+                            const result = await api.venues.search({ q });
                             return result.venues.map(
                               (v): ComboboxOption => ({
                                 value: String(v.id),

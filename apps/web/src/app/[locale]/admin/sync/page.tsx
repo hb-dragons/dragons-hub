@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { fetchAPIServer } from "@/lib/api.server";
+import { getServerApi } from "@/lib/api.server";
 import {
   Tabs,
   TabsContent,
@@ -41,15 +41,14 @@ export default async function SyncPage() {
   let error: string | null = null;
 
   try {
+    const sApi = await getServerApi();
     [status, logs, schedule, refereeStatus, refereeLogs, refereeSchedule] = await Promise.all([
-      fetchAPIServer<SyncStatusResponse>("/admin/sync/status"),
-      fetchAPIServer<PaginatedResponse<SyncRun>>("/admin/sync/logs?limit=20&offset=0"),
-      fetchAPIServer<SyncScheduleData>("/admin/sync/schedule"),
-      fetchAPIServer<SyncStatusResponse>("/admin/sync/status?syncType=referee-games"),
-      fetchAPIServer<PaginatedResponse<SyncRun>>(
-        "/admin/sync/logs?limit=20&offset=0&syncType=referee-games",
-      ),
-      fetchAPIServer<SyncScheduleData>("/admin/sync/schedule?syncType=referee-games"),
+      sApi.sync.status(),
+      sApi.sync.logs({ limit: 20, offset: 0 }),
+      sApi.sync.schedule(),
+      sApi.sync.status("referee-games"),
+      sApi.sync.logs({ limit: 20, offset: 0, syncType: "referee-games" }),
+      sApi.sync.schedule("referee-games"),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";

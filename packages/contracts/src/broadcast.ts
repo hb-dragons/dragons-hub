@@ -18,3 +18,4 @@ export const broadcastMatchesQuerySchema = z.object({
 
 export type BroadcastUpsertBody = z.infer<typeof broadcastUpsertSchema>;
 export type BroadcastStartStopBody = z.infer<typeof broadcastStartStopSchema>;
+export type BroadcastMatchesQuery = z.infer<typeof broadcastMatchesQuerySchema>;

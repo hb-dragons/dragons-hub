@@ -1,4 +1,4 @@
-import { fetchAPI } from "./api";
+import { browserClient } from "./api";
 
 export const apiFetcher = <T>(endpoint: string): Promise<T> =>
-  fetchAPI<T>(endpoint);
+  browserClient.get<T>(endpoint);

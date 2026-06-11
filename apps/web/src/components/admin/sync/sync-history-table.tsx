@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@dragons/ui/lib/utils";
 import { toast } from "sonner";
-import { fetchAPI } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { SyncRun, PaginatedResponse } from "./types";
 import { SyncLogDetail } from "./sync-log-detail";
 import { useSyncLogs, useRefereeSyncLogs } from "./use-sync";
@@ -91,13 +91,13 @@ function formatRecords(run: SyncRun): React.ReactNode {
 interface SyncHistoryTableInnerProps {
   firstPageLogs: SyncRun[];
   firstPageHasMore: boolean;
-  loadMoreUrl: (offset: number) => string;
+  loadMore: (offset: number) => Promise<PaginatedResponse<SyncRun>>;
 }
 
 function SyncHistoryTableInner({
   firstPageLogs,
   firstPageHasMore,
-  loadMoreUrl,
+  loadMore,
 }: SyncHistoryTableInnerProps) {
   const t = useTranslations("sync.history");
   const tStatus = useTranslations("sync.history.status");
@@ -126,9 +126,7 @@ function SyncHistoryTableInner({
     try {
       setLoadingMore(true);
       const currentTotal = firstPageLogs.length + extraLogs.length;
-      const data = await fetchAPI<PaginatedResponse<SyncRun>>(
-        loadMoreUrl(currentTotal),
-      );
+      const data = await loadMore(currentTotal);
       setExtraLogs((prev) => {
         const existingIds = new Set([
           ...firstPageLogs.map((r) => r.id),
@@ -145,7 +143,7 @@ function SyncHistoryTableInner({
     } finally {
       setLoadingMore(false);
     }
-  }, [firstPageLogs, extraLogs.length, tToast, loadMoreUrl]);
+  }, [firstPageLogs, extraLogs.length, tToast, loadMore]);
 
   // Deduplicate by id to prevent React key warnings from race conditions
   // between optimistic updates and polling refreshes
@@ -275,7 +273,7 @@ export function SyncHistoryTable() {
     <SyncHistoryTableInner
       firstPageLogs={logs}
       firstPageHasMore={hasMore}
-      loadMoreUrl={(offset) => `/admin/sync/logs?limit=20&offset=${offset}`}
+      loadMore={(offset) => api.sync.logs({ limit: 20, offset })}
     />
   );
 }
@@ -286,8 +284,8 @@ export function RefereeSyncHistoryTable() {
     <SyncHistoryTableInner
       firstPageLogs={logs}
       firstPageHasMore={hasMore}
-      loadMoreUrl={(offset) =>
-        `/admin/sync/logs?limit=20&offset=${offset}&syncType=referee-games`
+      loadMore={(offset) =>
+        api.sync.logs({ limit: 20, offset, syncType: "referee-games" })
       }
     />
   );

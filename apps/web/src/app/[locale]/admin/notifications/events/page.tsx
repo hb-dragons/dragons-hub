@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
-import { fetchAPIServer } from "@/lib/api.server";
+import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { SWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -18,9 +18,7 @@ export default async function EventsPage() {
   let error: string | null = null;
 
   try {
-    data = await fetchAPIServer<DomainEventListResult>(
-      "/admin/events?limit=50",
-    );
+    data = await (await getServerApi()).events.list({ limit: 50 });
   } catch (e) {
     error = e instanceof Error ? e.message : "Failed to connect to API";
   }

@@ -6,7 +6,14 @@ import { NextIntlClientProvider } from "next-intl";
 import { BroadcastControl } from "./broadcast-control";
 
 vi.mock("@/lib/api", () => ({
-  fetchAPI: vi.fn(async () => ({ config: null, match: null })),
+  api: {
+    broadcast: {
+      config: vi.fn(async () => ({ config: null, match: null })),
+      upsertConfig: vi.fn(async () => ({ config: null })),
+      start: vi.fn(async () => ({ config: null })),
+      stop: vi.fn(async () => ({ config: null })),
+    },
+  },
 }));
 
 vi.mock("./match-picker", () => ({
