@@ -2,6 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // --- Mock setup ---
 
+vi.mock("../../workers/instance-heartbeat", () => ({
+  INSTANCE_ID: "TEST_INSTANCE_ID",
+}));
+
 const mockSyncLogger = vi.hoisted(() => ({
   info: vi.fn(),
   warn: vi.fn(),
@@ -176,9 +180,17 @@ describe("fullSync", () => {
     });
 
     it("creates sync run record", async () => {
+      const mockValues = vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+      });
+      mockInsert.mockReturnValueOnce({ values: mockValues });
+
       await fullSync("cron");
 
       expect(mockInsert).toHaveBeenCalled();
+      expect(mockValues).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerInstanceId: "TEST_INSTANCE_ID" }),
+      );
     });
 
     it("reuses existing sync run when syncRunId is provided", async () => {
@@ -204,7 +216,7 @@ describe("fullSync", () => {
       expect(result.syncRunId).toBe(99);
       expect(mockInsert).not.toHaveBeenCalled();
       expect(mockSet).toHaveBeenCalledWith(
-        expect.objectContaining({ status: "running" }),
+        expect.objectContaining({ status: "running", ownerInstanceId: "TEST_INSTANCE_ID" }),
       );
     });
 

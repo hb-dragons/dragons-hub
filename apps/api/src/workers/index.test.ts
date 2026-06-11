@@ -14,6 +14,16 @@ vi.mock("../config/logger", () => {
   return { logger: log };
 });
 
+const mockStartHeartbeat = vi.fn();
+const mockStopHeartbeat = vi.fn();
+const mockIsInstanceAlive = vi.fn().mockResolvedValue(false);
+vi.mock("./instance-heartbeat", () => ({
+  startHeartbeat: (...args: unknown[]) => mockStartHeartbeat(...args),
+  stopHeartbeat: (...args: unknown[]) => mockStopHeartbeat(...args),
+  isInstanceAlive: (...args: unknown[]) => mockIsInstanceAlive(...args),
+  INSTANCE_ID: "MOCK_INSTANCE_ID",
+}));
+
 const mockInitScheduledJobs = vi.fn().mockResolvedValue(undefined);
 const mockSyncQueueClose = vi.fn().mockResolvedValue(undefined);
 const mockDigestQueueClose = vi.fn().mockResolvedValue(undefined);
@@ -105,11 +115,16 @@ vi.mock("../config/database", () => ({
     update: (...args: unknown[]) => mockDbUpdate(...args),
     select: (...args: unknown[]) => mockDbSelect(...args),
     delete: (...args: unknown[]) => mockDbDelete(...args),
+    insert: vi.fn().mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([]),
+      }),
+    }),
   },
 }));
 
 vi.mock("@dragons/db/schema", () => ({
-  syncRuns: { id: "id", status: "status", startedAt: "startedAt" },
+  syncRuns: { id: "id", status: "status", startedAt: "startedAt", ownerInstanceId: "ownerInstanceId" },
   syncRunEntries: { syncRunId: "syncRunId" },
   domainEvents: { id: "id", occurredAt: "occurredAt" },
   notificationLog: { id: "id", eventId: "eventId" },
@@ -130,6 +145,10 @@ import { logger } from "../config/logger";
 beforeEach(() => {
   vi.clearAllMocks();
 
+  // Default: isInstanceAlive → false (owner is dead, runs should be reclaimed)
+  mockIsInstanceAlive.mockResolvedValue(false);
+
+  // Default: no running rows found during startup reclaim select
   // Default: no stale runs, no old runs
   mockDbUpdate.mockReturnValue({
     set: vi.fn().mockReturnValue({
@@ -138,7 +157,7 @@ beforeEach(() => {
       }),
     }),
   });
-  // Mock supports both `.where()` resolving directly (cleanupOldSyncRuns)
+  // Mock supports both `.where()` resolving directly (cleanupOldSyncRuns / reclaim select)
   // and `.where().limit()` (cleanupOldDomainEvents batched)
   const emptyWhereResult = Promise.resolve([]);
   (emptyWhereResult as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue([]);
@@ -161,13 +180,23 @@ describe("initializeWorkers", () => {
     expect(mockInitScheduledJobs).toHaveBeenCalled();
   });
 
-  it("marks stale running sync runs as failed on startup", async () => {
-    const mockReturning = vi.fn().mockResolvedValue([{ id: 5 }, { id: 8 }]);
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: mockReturning,
-        }),
+  it("starts heartbeat before stale-run reclaim", async () => {
+    await initializeWorkers();
+
+    expect(mockStartHeartbeat).toHaveBeenCalled();
+  });
+
+  it("marks stale running sync runs as failed on startup when owner is dead", async () => {
+    // Select returns two running rows owned by a dead instance
+    mockIsInstanceAlive.mockResolvedValue(false);
+    const emptyWhereResult = Promise.resolve([
+      { id: 5, ownerInstanceId: "dead-instance" },
+      { id: 8, ownerInstanceId: "dead-instance" },
+    ]);
+    (emptyWhereResult as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue([]);
+    mockDbSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue(emptyWhereResult),
       }),
     });
 
@@ -180,6 +209,29 @@ describe("initializeWorkers", () => {
     );
   });
 
+  it("does not reclaim a run owned by a live instance", async () => {
+    // Select returns one running row owned by a LIVE instance
+    mockIsInstanceAlive.mockResolvedValue(true);
+    const emptyWhereResult = Promise.resolve([
+      { id: 42, ownerInstanceId: "live-instance" },
+    ]);
+    (emptyWhereResult as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue([]);
+    mockDbSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue(emptyWhereResult),
+      }),
+    });
+
+    await initializeWorkers();
+
+    // Update should NOT have been called for the reclaim
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalledWith(
+      expect.objectContaining({ ids: [42] }),
+      "Marked stale running sync runs as failed",
+    );
+  });
+
   it("does not log warning when no stale runs found", async () => {
     await initializeWorkers();
 
@@ -187,6 +239,16 @@ describe("initializeWorkers", () => {
   });
 
   it("runs cleanup of old sync runs", async () => {
+    // First select call: startup reclaim — return empty (no running rows to reclaim)
+    const emptyReclaimResult = Promise.resolve([]);
+    (emptyReclaimResult as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue([]);
+    mockDbSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue(emptyReclaimResult),
+      }),
+    });
+
+    // Subsequent select calls: cleanupOldSyncRuns — return two old runs
     const syncRunWhereResult = Promise.resolve([{ id: 10 }, { id: 11 }]);
     (syncRunWhereResult as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue([]);
     mockDbSelect.mockReturnValue({
@@ -205,6 +267,16 @@ describe("initializeWorkers", () => {
   });
 
   it("continues if cleanup fails", async () => {
+    // First select call: startup reclaim (must succeed with empty result)
+    const emptyReclaimResult = Promise.resolve([]);
+    (emptyReclaimResult as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue([]);
+    mockDbSelect.mockReturnValueOnce({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue(emptyReclaimResult),
+      }),
+    });
+
+    // Subsequent select calls: cleanupOldSyncRuns — reject to simulate DB error
     const failWhereResult = Promise.reject(new Error("DB error"));
     (failWhereResult as unknown as Record<string, unknown>).limit = vi.fn().mockRejectedValue(new Error("DB error"));
     // Suppress unhandled rejection from the rejected promise
@@ -353,6 +425,18 @@ describe("shutdownWorkers", () => {
     await shutdownWorkers();
 
     expect(mockDbUpdate).toHaveBeenCalled();
+  });
+
+  it("calls stopHeartbeat on shutdown", async () => {
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    await shutdownWorkers();
+
+    expect(mockStopHeartbeat).toHaveBeenCalled();
   });
 
   it("closes workers and queues", async () => {

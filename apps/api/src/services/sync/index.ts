@@ -1,6 +1,7 @@
 import { db } from "../../config/database";
 import { syncRuns } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
+import { INSTANCE_ID } from "../../workers/instance-heartbeat";
 import { syncLeagues } from "./leagues.sync";
 import { syncTeamsFromData } from "./teams.sync";
 import { syncMatchesFromData } from "./matches.sync";
@@ -65,7 +66,7 @@ export async function fullSync(
   if (syncRunId) {
     const [updated] = await db
       .update(syncRuns)
-      .set({ status: "running", startedAt })
+      .set({ status: "running", startedAt, ownerInstanceId: INSTANCE_ID })
       .where(eq(syncRuns.id, syncRunId))
       .returning();
     if (!updated) {
@@ -80,6 +81,7 @@ export async function fullSync(
         triggeredBy,
         status: "running",
         startedAt,
+        ownerInstanceId: INSTANCE_ID,
       })
       .returning();
     if (!created) {

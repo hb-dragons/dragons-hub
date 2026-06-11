@@ -7,6 +7,7 @@ import { logger } from "../config/logger";
 import { runWithTrace, type TraceCarrier } from "../config/log-context";
 import { db } from "../config/database";
 import { fullSync } from "../services/sync/index";
+import { INSTANCE_ID } from "./instance-heartbeat";
 
 interface SyncJobData {
   type: "full" | "leagues" | "matches" | "standings" | "referee-games";
@@ -63,7 +64,7 @@ export const syncWorker = new Worker<SyncJobData>(
 
           await db
             .update(syncRuns)
-            .set({ status: "running" })
+            .set({ status: "running", ownerInstanceId: INSTANCE_ID })
             .where(eq(syncRuns.id, syncRunId));
 
           const startTime = Date.now();

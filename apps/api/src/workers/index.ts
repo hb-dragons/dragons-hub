@@ -20,24 +20,42 @@ import {
   channelConfigs,
 } from "@dragons/db/schema";
 import { eq, lt, and, inArray } from "drizzle-orm";
+import { startHeartbeat, stopHeartbeat, isInstanceAlive, INSTANCE_ID } from "./instance-heartbeat";
 
 export async function initializeWorkers() {
   logger.info("Initializing workers...");
 
-  // Mark any stale "running" sync runs as failed (from previous crash/deploy)
-  const staleRuns = await db
-    .update(syncRuns)
-    .set({
-      status: "failed",
-      completedAt: new Date(),
-      errorMessage: "Stale: worker restarted",
-    })
-    .where(eq(syncRuns.status, "running"))
-    .returning({ id: syncRuns.id });
+  // Write this instance's heartbeat before probing others, so our own runs
+  // are protected if another instance starts up at the same time.
+  startHeartbeat();
 
-  if (staleRuns.length > 0) {
+  // Reclaim "running" sync runs whose owner instance is no longer alive.
+  // Runs owned by a live instance (rolling deploy) are left untouched.
+  const candidateRuns = await db
+    .select({ id: syncRuns.id, ownerInstanceId: syncRuns.ownerInstanceId })
+    .from(syncRuns)
+    .where(eq(syncRuns.status, "running"));
+
+  const deadRunIds: number[] = [];
+  for (const run of candidateRuns) {
+    const alive = await isInstanceAlive(run.ownerInstanceId);
+    if (!alive) {
+      deadRunIds.push(run.id);
+    }
+  }
+
+  if (deadRunIds.length > 0) {
+    await db
+      .update(syncRuns)
+      .set({
+        status: "failed",
+        completedAt: new Date(),
+        errorMessage: "Stale: worker restarted",
+      })
+      .where(inArray(syncRuns.id, deadRunIds));
+
     logger.warn(
-      { count: staleRuns.length, ids: staleRuns.map((r) => r.id) },
+      { count: deadRunIds.length, ids: deadRunIds },
       "Marked stale running sync runs as failed",
     );
   }
@@ -244,8 +262,10 @@ export async function initializeScheduledDigests(): Promise<void> {
 export async function shutdownWorkers() {
   logger.info("Shutting down workers...");
 
+  stopHeartbeat();
+
   try {
-    // Mark any running sync runs as failed
+    // Mark only this instance's running sync runs as failed
     await db
       .update(syncRuns)
       .set({
@@ -253,7 +273,7 @@ export async function shutdownWorkers() {
         completedAt: new Date(),
         errorMessage: "Server shutdown",
       })
-      .where(eq(syncRuns.status, "running"));
+      .where(and(eq(syncRuns.status, "running"), eq(syncRuns.ownerInstanceId, INSTANCE_ID)));
   } catch (error) {
     logger.error({ err: error }, "Failed to mark running syncs as failed");
   }
