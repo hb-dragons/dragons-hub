@@ -7,3 +7,18 @@ export const scoreboardListQuerySchema = z.object({
 });
 
 export type ScoreboardListQuery = z.infer<typeof scoreboardListQuerySchema>;
+
+/**
+ * The numeric `Last-Event-ID` header for SSE reconnection on
+ * GET /public/scoreboard/stream. A positive int when present; absent or
+ * malformed values yield `undefined` so reconnection degrades gracefully
+ * (a malformed header must NOT reject the stream).
+ */
+export const scoreboardLastEventIdSchema = z.coerce
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .catch(undefined);
+
+export type ScoreboardLastEventId = z.infer<typeof scoreboardLastEventIdSchema>;

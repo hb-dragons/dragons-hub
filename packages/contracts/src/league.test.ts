@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leagueNumbersSchema, leagueOwnClubRefsSchema } from "./league";
+import { leagueNumbersSchema, leagueOwnClubRefsSchema, leagueIdParamSchema } from "./league";
 
 describe("leagueNumbersSchema", () => {
   it("accepts a valid array of positive integers", () => {
@@ -71,5 +71,23 @@ describe("leagueOwnClubRefsSchema", () => {
 
   it("rejects null", () => {
     expect(() => leagueOwnClubRefsSchema.parse({ ownClubRefs: null })).toThrow();
+  });
+});
+
+describe("leagueIdParamSchema", () => {
+  it("coerces a numeric string to a positive integer", () => {
+    expect(leagueIdParamSchema.parse({ id: "9" })).toEqual({ id: 9 });
+  });
+
+  it("rejects a non-numeric string", () => {
+    expect(() => leagueIdParamSchema.parse({ id: "abc" })).toThrow();
+  });
+
+  it("rejects zero", () => {
+    expect(() => leagueIdParamSchema.parse({ id: "0" })).toThrow();
+  });
+
+  it("rejects a negative value", () => {
+    expect(() => leagueIdParamSchema.parse({ id: "-1" })).toThrow();
   });
 });

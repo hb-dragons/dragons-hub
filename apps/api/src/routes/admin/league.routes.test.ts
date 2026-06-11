@@ -196,7 +196,7 @@ describe("PATCH /settings/leagues/:id/own-club-refs", () => {
       body: JSON.stringify({ ownClubRefs: true }),
     });
     expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "BAD_REQUEST" });
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
   it("returns 400 for negative id", async () => {

@@ -1,7 +1,14 @@
 import { Hono } from "hono";
-import { refereeAssignBodySchema } from "@dragons/contracts";
+import { validator } from "hono-openapi";
+import {
+  refereeAssignBodySchema,
+  spielplanIdParamSchema,
+  refAssignmentCandidatesQuerySchema,
+  assignmentSlotParamSchema,
+} from "@dragons/contracts";
 import type { AppEnv } from "../../types";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
 import {
   assignReferee,
   unassignReferee,
@@ -23,24 +30,11 @@ const adminRefereeAssignmentRoutes = new Hono<AppEnv>();
 adminRefereeAssignmentRoutes.get(
   "/referee/games/:spielplanId/candidates",
   requirePermission("assignment", "view"),
+  validator("param", spielplanIdParamSchema, validationHook),
+  validator("query", refAssignmentCandidatesQuerySchema, validationHook),
   async (c) => {
-    const spielplanId = Number(c.req.param("spielplanId"));
-    if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
-      return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
-    }
-
-    const search = c.req.query("search") ?? "";
-    const pageFrom = Number(c.req.query("pageFrom") ?? "0");
-    const pageSize = Number(c.req.query("pageSize") ?? "15");
-    const slotRaw = c.req.query("slot");
-    const slot = slotRaw === "1" ? 1 : slotRaw === "2" ? 2 : undefined;
-
-    if (!Number.isInteger(pageFrom) || pageFrom < 0) {
-      return c.json({ error: "Invalid pageFrom", code: "VALIDATION_ERROR" }, 400);
-    }
-    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
-      return c.json({ error: "Invalid pageSize", code: "VALIDATION_ERROR" }, 400);
-    }
+    const { spielplanId } = c.req.valid("param");
+    const { search, pageFrom, pageSize, slot } = c.req.valid("query");
 
     const eligibilitySlot = slot === 1 ? (1 as const) : slot === 2 ? (2 as const) : ("either" as const);
 
@@ -60,19 +54,11 @@ adminRefereeAssignmentRoutes.get(
 adminRefereeAssignmentRoutes.post(
   "/referee/games/:spielplanId/assign",
   requirePermission("assignment", "create"),
+  validator("param", spielplanIdParamSchema, validationHook),
+  validator("json", refereeAssignBodySchema, validationHook),
   async (c) => {
-    const spielplanId = Number(c.req.param("spielplanId"));
-    if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
-      return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
-    }
-
-    let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
-    }
-    const { slotNumber, refereeApiId } = refereeAssignBodySchema.parse(body);
+    const { spielplanId } = c.req.valid("param");
+    const { slotNumber, refereeApiId } = c.req.valid("json");
 
     try {
       const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
@@ -90,17 +76,9 @@ adminRefereeAssignmentRoutes.post(
 adminRefereeAssignmentRoutes.delete(
   "/referee/games/:spielplanId/assignment/:slotNumber",
   requirePermission("assignment", "delete"),
+  validator("param", assignmentSlotParamSchema, validationHook),
   async (c) => {
-    const spielplanId = Number(c.req.param("spielplanId"));
-    if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
-      return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
-    }
-
-    const slotParam = Number(c.req.param("slotNumber"));
-    if (slotParam !== 1 && slotParam !== 2) {
-      return c.json({ error: "slotNumber must be 1 or 2", code: "VALIDATION_ERROR" }, 400);
-    }
-    const slotNumber = slotParam as 1 | 2;
+    const { spielplanId, slotNumber } = c.req.valid("param");
 
     try {
       const result = await unassignReferee(spielplanId, slotNumber);

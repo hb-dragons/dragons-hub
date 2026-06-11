@@ -17,3 +17,22 @@ export const refereeVisibilityBodySchema = z.object({
 });
 
 export type RefereeVisibilityBody = z.infer<typeof refereeVisibilityBodySchema>;
+
+/** Path param for GET /referee/games/by-api-match/:apiMatchId */
+export const refereeApiMatchParamSchema = z.object({
+  apiMatchId: z.coerce.number().int().positive(),
+});
+
+/** Path param for GET /referee/matches/:matchId */
+export const refereeMatchIdParamSchema = z.object({
+  matchId: z.coerce.number().int().positive(),
+});
+
+/** Path param for GET /referee/games/:id */
+export const refereeGameIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+export type RefereeApiMatchParam = z.infer<typeof refereeApiMatchParamSchema>;
+export type RefereeMatchIdParam = z.infer<typeof refereeMatchIdParamSchema>;
+export type RefereeGameIdParam = z.infer<typeof refereeGameIdParamSchema>;

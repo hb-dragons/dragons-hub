@@ -85,9 +85,24 @@ export {
 export {
   refereeListQuerySchema,
   refereeVisibilityBodySchema,
+  refereeApiMatchParamSchema,
+  refereeMatchIdParamSchema,
+  refereeGameIdParamSchema,
   type RefereeListQuery,
   type RefereeVisibilityBody,
+  type RefereeApiMatchParam,
+  type RefereeMatchIdParam,
+  type RefereeGameIdParam,
 } from "./referee";
+
+export {
+  spielplanIdParamSchema,
+  refAssignmentCandidatesQuerySchema,
+  assignmentSlotParamSchema,
+  type SpielplanIdParam,
+  type RefAssignmentCandidatesQuery,
+  type AssignmentSlotParam,
+} from "./referee-assignment";
 
 export {
   socialMatchesQuerySchema,
@@ -182,13 +197,17 @@ export {
 export {
   leagueNumbersSchema,
   leagueOwnClubRefsSchema,
+  leagueIdParamSchema,
   type LeagueNumbersBody,
   type LeagueOwnClubRefsBody,
+  type LeagueIdParam,
 } from "./league";
 
 export {
   scoreboardListQuerySchema,
+  scoreboardLastEventIdSchema,
   type ScoreboardListQuery,
+  type ScoreboardLastEventId,
 } from "./scoreboard";
 
 export {

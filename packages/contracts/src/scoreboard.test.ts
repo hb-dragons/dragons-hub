@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scoreboardListQuerySchema } from "./scoreboard";
+import { scoreboardListQuerySchema, scoreboardLastEventIdSchema } from "./scoreboard";
 
 describe("scoreboardListQuerySchema", () => {
   it("parses valid query with defaults", () => {
@@ -103,5 +103,24 @@ describe("scoreboardListQuerySchema", () => {
         afterId: "-1",
       }),
     ).toThrow();
+  });
+});
+
+describe("scoreboardLastEventIdSchema", () => {
+  it("coerces a numeric string to a positive integer", () => {
+    expect(scoreboardLastEventIdSchema.parse("42")).toBe(42);
+  });
+
+  it("yields undefined for an absent value", () => {
+    expect(scoreboardLastEventIdSchema.parse(undefined)).toBeUndefined();
+  });
+
+  it("falls back to undefined for a malformed value (no throw)", () => {
+    expect(scoreboardLastEventIdSchema.parse("not-a-number")).toBeUndefined();
+  });
+
+  it("falls back to undefined for a non-positive value", () => {
+    expect(scoreboardLastEventIdSchema.parse("0")).toBeUndefined();
+    expect(scoreboardLastEventIdSchema.parse("-3")).toBeUndefined();
   });
 });

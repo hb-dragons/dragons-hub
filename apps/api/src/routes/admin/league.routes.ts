@@ -8,7 +8,7 @@ import {
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
-import { leagueNumbersSchema, leagueOwnClubRefsSchema } from "@dragons/contracts";
+import { leagueNumbersSchema, leagueOwnClubRefsSchema, leagueIdParamSchema } from "@dragons/contracts";
 
 const leagueRoutes = new Hono<AppEnv>();
 
@@ -50,6 +50,7 @@ leagueRoutes.put(
 leagueRoutes.patch(
   "/settings/leagues/:id/own-club-refs",
   settingsUpdate,
+  validator("param", leagueIdParamSchema, validationHook),
   validator("json", leagueOwnClubRefsSchema, validationHook),
   describeRoute({
     description: "Set whether a league uses own-club referees",
@@ -57,10 +58,7 @@ leagueRoutes.patch(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const leagueId = parseInt(c.req.param("id"), 10);
-    if (!Number.isInteger(leagueId) || leagueId <= 0) {
-      return c.json({ error: "Invalid id", code: "BAD_REQUEST" }, 400);
-    }
+    const { id: leagueId } = c.req.valid("param");
     const { ownClubRefs } = c.req.valid("json");
     await setLeagueOwnClubRefs(leagueId, ownClubRefs);
     return c.json({ ok: true });

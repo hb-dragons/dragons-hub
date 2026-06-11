@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { refereeListQuerySchema, refereeVisibilityBodySchema } from "./referee";
+import {
+  refereeListQuerySchema,
+  refereeVisibilityBodySchema,
+  refereeApiMatchParamSchema,
+  refereeMatchIdParamSchema,
+  refereeGameIdParamSchema,
+} from "./referee";
 
 describe("refereeListQuerySchema", () => {
   it("parses minimal input with defaults", () => {
@@ -174,5 +180,51 @@ describe("refereeVisibilityBodySchema", () => {
         isOwnClub: false,
       }),
     ).toThrow();
+  });
+});
+
+describe("refereeApiMatchParamSchema", () => {
+  it("coerces a numeric string to a positive integer", () => {
+    expect(refereeApiMatchParamSchema.parse({ apiMatchId: "42" })).toEqual({ apiMatchId: 42 });
+  });
+
+  it("rejects a non-numeric string", () => {
+    expect(() => refereeApiMatchParamSchema.parse({ apiMatchId: "abc" })).toThrow();
+  });
+
+  it("rejects zero", () => {
+    expect(() => refereeApiMatchParamSchema.parse({ apiMatchId: "0" })).toThrow();
+  });
+
+  it("rejects a negative value", () => {
+    expect(() => refereeApiMatchParamSchema.parse({ apiMatchId: "-1" })).toThrow();
+  });
+});
+
+describe("refereeMatchIdParamSchema", () => {
+  it("coerces a numeric string to a positive integer", () => {
+    expect(refereeMatchIdParamSchema.parse({ matchId: "7" })).toEqual({ matchId: 7 });
+  });
+
+  it("rejects a non-numeric string", () => {
+    expect(() => refereeMatchIdParamSchema.parse({ matchId: "x" })).toThrow();
+  });
+
+  it("rejects zero", () => {
+    expect(() => refereeMatchIdParamSchema.parse({ matchId: "0" })).toThrow();
+  });
+});
+
+describe("refereeGameIdParamSchema", () => {
+  it("coerces a numeric string to a positive integer", () => {
+    expect(refereeGameIdParamSchema.parse({ id: "13" })).toEqual({ id: 13 });
+  });
+
+  it("rejects a non-numeric string", () => {
+    expect(() => refereeGameIdParamSchema.parse({ id: "nope" })).toThrow();
+  });
+
+  it("rejects a negative value", () => {
+    expect(() => refereeGameIdParamSchema.parse({ id: "-5" })).toThrow();
   });
 });

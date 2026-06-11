@@ -7,6 +7,7 @@ import { createScoreboardStream } from "../../services/scoreboard/sse";
 import { env } from "../../config/env";
 import { tryAcquire, release } from "../../services/scoreboard/connection-cap";
 import { computeSecondsSince } from "../../services/scoreboard/constants";
+import { scoreboardLastEventIdSchema } from "@dragons/contracts";
 
 const publicScoreboardRoutes = new Hono();
 
@@ -59,9 +60,10 @@ publicScoreboardRoutes.get(
       c.header("Retry-After", "5");
       return c.json({ error: "Too many connections", code: "BUSY" }, 503);
     }
-    const lastHeader = c.req.header("Last-Event-ID");
-    const parsed = lastHeader ? Number.parseInt(lastHeader, 10) : Number.NaN;
-    const lastEventId = Number.isFinite(parsed) ? parsed : undefined;
+    // Parse the SSE reconnection header through the contract schema. It
+    // `.catch(undefined)`s, so a malformed header degrades to a fresh stream
+    // rather than rejecting the reconnection.
+    const lastEventId = scoreboardLastEventIdSchema.parse(c.req.header("Last-Event-ID"));
     return createScoreboardStream({
       deviceId,
       lastEventId,
