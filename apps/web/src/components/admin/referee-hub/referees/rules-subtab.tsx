@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import useSWR, { mutate as swrMutate } from "swr";
 import { useTimeAgo } from "./use-time-ago";
 import { useTranslations } from "next-intl";
-import { apiFetcher } from "@/lib/swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { api, APIError } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@dragons/ui/components/select";
@@ -13,9 +13,7 @@ import { Checkbox } from "@dragons/ui/components/checkbox";
 import { Trash2, Plus } from "lucide-react";
 import type { RefereeListItem } from "@dragons/shared";
 
-interface Team { id: number; name: string; customName: string | null; leagueName: string | null }
 interface Rule { teamId: number; deny: boolean; allowSr1: boolean; allowSr2: boolean }
-interface RulesResp { rules: Rule[] }
 
 interface Props { referee: RefereeListItem }
 
@@ -25,8 +23,11 @@ export function RulesSubtab({ referee }: Props) {
   const t = useTranslations("refereeHub.referees.rules");
   const tSave = useTranslations("refereeHub.referees.rules.save");
 
-  const { data: teamsData = [] } = useSWR<Team[]>(SWR_KEYS.teams, apiFetcher);
-  const { data: rulesData } = useSWR<RulesResp>(SWR_KEYS.refereeRules(referee.id), apiFetcher);
+  const teamsQ = queries.teams();
+  const refereeRulesQ = queries.refereeRules(referee.id);
+
+  const { data: teamsData = [] } = useSWR(SWR_KEYS.teams, teamsQ.fetcher);
+  const { data: rulesData } = useSWR(SWR_KEYS.refereeRules(referee.id), refereeRulesQ.fetcher);
 
   const [rules, setRules] = useState<Rule[]>([]);
   const [status, setStatus] = useState<SaveStatus>("idle");

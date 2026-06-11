@@ -2,37 +2,21 @@
 
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import type { RefereeGameListItem, RefereeListItem } from "@dragons/shared";
 
 interface Props {
   referee: RefereeListItem;
 }
 
-interface AssignedResp {
-  items: RefereeGameListItem[];
-  total: number;
-  limit: number;
-  offset: number;
-  hasMore: boolean;
-}
-
-interface EligibleResp {
-  items: RefereeGameListItem[];
-}
-
 export function UpcomingSubtab({ referee }: Props) {
   const t = useTranslations() as (key: string) => string;
 
-  const { data: assignedData } = useSWR<AssignedResp>(
-    SWR_KEYS.refereeGamesFiltered({ assignedRefereeApiId: referee.apiId, status: "active", limit: 100 }),
-    apiFetcher,
-  );
-  const { data: eligibleData } = useSWR<EligibleResp>(
-    SWR_KEYS.refereeEligibleGames(referee.id),
-    apiFetcher,
-  );
+  const assignedQ = queries.refereeGamesFiltered({ assignedRefereeApiId: referee.apiId, status: "active", limit: 100 });
+  const eligibleQ = queries.refereeEligibleGames(referee.id);
+
+  const { data: assignedData } = useSWR(assignedQ.key, assignedQ.fetcher);
+  const { data: eligibleData } = useSWR(eligibleQ.key, eligibleQ.fetcher);
 
   const assigned = assignedData?.items ?? [];
   const eligible = eligibleData?.items ?? [];

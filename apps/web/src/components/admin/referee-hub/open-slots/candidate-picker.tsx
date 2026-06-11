@@ -3,8 +3,7 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@dragons/ui/components/input";
 import { Button } from "@dragons/ui/components/button";
@@ -42,10 +41,8 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
   const debounced = useDebounce(search, 300);
   const [page, setPage] = useState(0);
 
-  const { data } = useSWR<CandidateSearchResponse>(
-    SWR_KEYS.refereeCandidates(gameApiId, debounced, page, slotNumber),
-    apiFetcher,
-  );
+  const candidatesQ = queries.refereeCandidates(gameApiId, debounced, page, slotNumber);
+  const { data } = useSWR(candidatesQ.key, candidatesQ.fetcher);
 
   const results = data?.results ?? [];
   const hasMore = useMemo(() => {

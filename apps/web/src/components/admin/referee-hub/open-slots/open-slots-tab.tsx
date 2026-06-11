@@ -3,21 +3,17 @@
 import useSWR from "swr";
 import { useTranslations } from "next-intl";
 import { useRefereeHubUrl } from "../use-referee-hub-url";
-import { SWR_KEYS } from "@/lib/swr-keys";
-import { apiFetcher } from "@/lib/swr";
+import { queries } from "@/lib/swr-queries";
 import { SlotsFilterSidebar } from "./slots-filter-sidebar";
 import { OpenGamesList } from "./open-games-list";
 import { OpenSlotDetail } from "./open-slot-detail";
-import type { TrackedLeaguesResponse } from "@dragons/shared";
 
 export function OpenSlotsTab() {
   const t = useTranslations("refereeHub.openSlots");
   const { state, update } = useRefereeHubUrl();
 
-  const { data: leagueData } = useSWR<TrackedLeaguesResponse>(
-    SWR_KEYS.settingsLeagues,
-    apiFetcher,
-  );
+  const settingsLeaguesQ = queries.settingsLeagues();
+  const { data: leagueData } = useSWR(settingsLeaguesQ.key, settingsLeaguesQ.fetcher);
   const leagueOptions = (leagueData?.leagues ?? []).map((l) => ({
     value: String(l.apiLigaId),
     label: l.name,

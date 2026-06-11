@@ -4,27 +4,17 @@ import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { FixedSizeList as List, type ListChildComponentProps } from "react-window";
 import { useTranslations } from "next-intl";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import { Input } from "@dragons/ui/components/input";
 import { Badge } from "@dragons/ui/components/badge";
 import { cn } from "@dragons/ui/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
-import type { RefereeGameListItem } from "@dragons/shared";
 import type { HubFilters } from "../use-referee-hub-url";
 
 interface Props {
   filters: HubFilters;
   selectedGameId: number | null;
   onSelect: (gameId: number) => void;
-}
-
-interface ApiResponse {
-  items: RefereeGameListItem[];
-  total: number;
-  limit: number;
-  offset: number;
-  hasMore: boolean;
 }
 
 const ROW_HEIGHT = 64;
@@ -50,7 +40,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
     filters.status === "offered" ? "offered" :
     undefined; // "any" → no slotStatus, server returns everything active
 
-  const key = SWR_KEYS.refereeGamesFiltered({
+  const gamesQ = queries.refereeGamesFiltered({
     status: "active",
     slotStatus,
     league: filters.league,
@@ -62,7 +52,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
     offset: 0,
   });
 
-  const { data, error, isLoading } = useSWR<ApiResponse>(key, apiFetcher, {
+  const { data, error, isLoading } = useSWR(gamesQ.key, gamesQ.fetcher, {
     dedupingInterval: 5000,
   });
 
