@@ -113,6 +113,7 @@ export interface SyncScheduleData {
 export interface TriggerResponse {
   jobId: string;
   syncRunId: number;
+  status: string;
   message: string;
 }
 
