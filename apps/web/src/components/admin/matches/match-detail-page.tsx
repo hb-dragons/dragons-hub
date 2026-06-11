@@ -46,7 +46,7 @@ export function MatchDetailPage({
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
 
   const matchDetailQ = queries.matchDetail(matchId);
-  const { data: detailData, mutate: mutateDetail } = useSWR<MatchDetailResponse>(
+  const { data: detailData, mutate: mutateDetail } = useSWR(
     matchDetailQ.key,
     matchDetailQ.fetcher,
     { fallbackData: initialDetail },

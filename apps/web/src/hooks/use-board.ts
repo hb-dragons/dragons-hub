@@ -8,8 +8,8 @@ export function useBoards() {
 }
 
 export function useBoard(boardId: number | null) {
-  const boardDetailQ = queries.boardDetail(boardId ?? 0);
-  return useSWR(boardId ? boardDetailQ.key : null, boardDetailQ.fetcher);
+  const boardDetailQ = boardId != null ? queries.boardDetail(boardId) : null;
+  return useSWR(boardDetailQ ? boardDetailQ.key : null, boardDetailQ ? boardDetailQ.fetcher : null);
 }
 
 export function useBoardTasks(
@@ -23,14 +23,14 @@ export function useBoardTasks(
   const priorityFilter = filters?.priority
     ? { priority: filters.priority }
     : undefined;
-  const boardTasksQ = queries.boardTasks(boardId ?? 0, { ...serverFilter, ...priorityFilter });
+  const boardTasksQ = boardId != null ? queries.boardTasks(boardId, { ...serverFilter, ...priorityFilter }) : null;
   return useSWR(
-    boardId ? boardTasksQ.key : null,
-    boardTasksQ.fetcher,
+    boardTasksQ ? boardTasksQ.key : null,
+    boardTasksQ ? boardTasksQ.fetcher : null,
   );
 }
 
 export function useTaskDetail(taskId: number | null) {
-  const taskDetailQ = queries.taskDetail(taskId ?? 0);
-  return useSWR(taskId ? taskDetailQ.key : null, taskDetailQ.fetcher);
+  const taskDetailQ = taskId != null ? queries.taskDetail(taskId) : null;
+  return useSWR(taskDetailQ ? taskDetailQ.key : null, taskDetailQ ? taskDetailQ.fetcher : null);
 }

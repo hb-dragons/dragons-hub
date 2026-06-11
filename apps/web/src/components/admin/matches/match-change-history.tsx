@@ -33,7 +33,7 @@ export function MatchChangeHistory({
   const [limit, setLimit] = useState(PAGE_SIZE);
 
   const matchHistoryQ = queries.matchHistory(matchId, limit, 0);
-  const { data, isLoading } = useSWR<MatchChangeHistoryResponse>(
+  const { data, isLoading } = useSWR(
     matchHistoryQ.key,
     matchHistoryQ.fetcher,
     { fallbackData: initialData },

@@ -11,12 +11,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { queries } from "@/lib/swr-queries";
-import type {
-  SyncStatusResponse,
-  PaginatedResponse,
-  SyncScheduleData,
-  SyncRun,
-} from "./types";
+import type { SyncRun } from "./types";
 
 // --- Minimal context for sync run tracking ---
 
@@ -42,7 +37,7 @@ export function useSyncStatus() {
   const isLocalRunning = runningSyncRunId !== null;
 
   const syncStatusQ = queries.syncStatus();
-  const { data, error, mutate } = useSWR<SyncStatusResponse>(
+  const { data, error, mutate } = useSWR(
     syncStatusQ.key,
     syncStatusQ.fetcher,
     {
@@ -63,7 +58,7 @@ export function useSyncLogs() {
   const isRunning = runningSyncRunId !== null;
 
   const syncLogsQ = queries.syncLogs(20, 0);
-  const { data, error, mutate, isLoading } = useSWR<PaginatedResponse<SyncRun>>(
+  const { data, error, mutate, isLoading } = useSWR(
     syncLogsQ.key,
     syncLogsQ.fetcher,
     {
@@ -83,7 +78,7 @@ export function useSyncLogs() {
 
 export function useSyncSchedule() {
   const syncScheduleQ = queries.syncSchedule();
-  const { data, error, mutate } = useSWR<SyncScheduleData>(
+  const { data, error, mutate } = useSWR(
     syncScheduleQ.key,
     syncScheduleQ.fetcher,
   );
@@ -171,7 +166,7 @@ export function useRefereeSyncStatus() {
   const isLocalRunning = runningSyncRunId !== null;
 
   const refereeSyncStatusQ = queries.refereeSyncStatus();
-  const { data, error, mutate } = useSWR<SyncStatusResponse>(
+  const { data, error, mutate } = useSWR(
     refereeSyncStatusQ.key,
     refereeSyncStatusQ.fetcher,
     {
@@ -191,7 +186,7 @@ export function useRefereeSyncLogs() {
   const isRunning = runningSyncRunId !== null;
 
   const refereeSyncLogsQ = queries.refereeSyncLogs(20, 0);
-  const { data, error, mutate, isLoading } = useSWR<PaginatedResponse<SyncRun>>(
+  const { data, error, mutate, isLoading } = useSWR(
     refereeSyncLogsQ.key,
     refereeSyncLogsQ.fetcher,
     {
@@ -211,7 +206,7 @@ export function useRefereeSyncLogs() {
 
 export function useRefereeSyncSchedule() {
   const refereeSyncScheduleQ = queries.refereeSyncSchedule();
-  const { data, error, mutate } = useSWR<SyncScheduleData>(
+  const { data, error, mutate } = useSWR(
     refereeSyncScheduleQ.key,
     refereeSyncScheduleQ.fetcher,
   );
