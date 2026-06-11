@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react"
 import { useTranslations, useFormatter } from "next-intl"
 import useSWR, { useSWRConfig } from "swr"
-import { apiFetcher } from "@/lib/swr"
 import { SWR_KEYS } from "@/lib/swr-keys"
+import { queries } from "@/lib/swr-queries"
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
 import {
   Tooltip,
@@ -32,7 +32,7 @@ import {
   getOwnTeamLabel,
   getOpponentName,
 } from "./utils"
-import type { MatchListItem, PaginatedResponse } from "./types"
+import type { MatchListItem } from "./types"
 import { MatchEditSheet } from "./match-edit-sheet"
 
 function OverrideDot({ match, field }: { match: MatchListItem; field: string }) {
@@ -309,7 +309,8 @@ export function MatchListTable() {
   const tBookings = useTranslations("bookings")
   const format = useFormatter()
   const { mutate } = useSWRConfig()
-  const { data: response } = useSWR<PaginatedResponse<MatchListItem>>(SWR_KEYS.matches, apiFetcher)
+  const matchesQ = queries.matches()
+  const { data: response } = useSWR(matchesQ.key, matchesQ.fetcher)
   const columns = useMemo(() => getColumns(t, tBookings, format), [t, tBookings, format])
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
 

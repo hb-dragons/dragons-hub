@@ -5,8 +5,7 @@ import { useTranslations, useFormatter } from "next-intl";
 import { useRouter } from "@/lib/navigation";
 import { Link } from "@/lib/navigation";
 import useSWR, { useSWRConfig } from "swr";
-import { apiFetcher } from "@/lib/swr";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 import {
   Card,
   CardContent,
@@ -46,9 +45,10 @@ export function MatchDetailPage({
   const [editOpen, setEditOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
 
+  const matchDetailQ = queries.matchDetail(matchId);
   const { data: detailData, mutate: mutateDetail } = useSWR<MatchDetailResponse>(
-    SWR_KEYS.matchDetail(matchId),
-    apiFetcher,
+    matchDetailQ.key,
+    matchDetailQ.fetcher,
     { fallbackData: initialDetail },
   );
 
