@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { syncRuns } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
+import { runWithTrace, type TraceCarrier } from "../config/log-context";
 import { db } from "../config/database";
 import { fullSync } from "../services/sync/index";
 
@@ -11,11 +12,16 @@ interface SyncJobData {
   type: "full" | "leagues" | "matches" | "standings" | "referee-games";
   triggeredBy?: string;
   syncRunId?: number;
+  /** Trace of the request that enqueued this job, restored below. */
+  trace?: TraceCarrier;
 }
 
 export const syncWorker = new Worker<SyncJobData>(
   "sync",
-  async (job: Job<SyncJobData>) => {
+  (job: Job<SyncJobData>) =>
+    // Re-establish the enqueuing request's trace so job logs (and the SDK calls
+    // it makes) correlate to it instead of being anonymous in the trace tree.
+    runWithTrace(job.data.trace, async () => {
     const log = logger.child({ jobId: job.id });
     log.info({ jobName: job.name }, "Starting sync job");
 
@@ -98,7 +104,7 @@ export const syncWorker = new Worker<SyncJobData>(
       log.error({ err: error }, "Sync job failed");
       throw error;
     }
-  },
+    }),
   {
     prefix: "{bull}",
     connection: { url: env.REDIS_URL },

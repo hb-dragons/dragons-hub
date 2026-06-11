@@ -88,6 +88,7 @@ import {
   updateRefereeSyncSchedule,
   initTaskReminders,
 } from "./queues";
+import { runWithLogContext } from "../config/log-context";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -241,6 +242,27 @@ describe("triggerManualSync", () => {
     expect(mockAdd).toHaveBeenCalledWith(
       "manual-sync",
       { type: "full", triggeredBy: "user-1", syncRunId: 42 },
+      { jobId: "manual-sync" },
+    );
+  });
+
+  it("stamps the enqueuing request's trace onto the job (CC6)", async () => {
+    mockGetJob.mockResolvedValue(null);
+    mockGetJobs.mockResolvedValue([]);
+
+    await runWithLogContext(
+      { requestId: "r", traceId: "trace-abc", spanId: "span-1", traceSampled: true },
+      () => triggerManualSync("user-1"),
+    );
+
+    expect(mockAdd).toHaveBeenCalledWith(
+      "manual-sync",
+      {
+        type: "full",
+        triggeredBy: "user-1",
+        syncRunId: 42,
+        trace: { traceId: "trace-abc", spanId: "span-1", traceSampled: true },
+      },
       { jobId: "manual-sync" },
     );
   });

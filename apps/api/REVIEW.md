@@ -9,12 +9,9 @@ This document tracks every finding from the review, ordered for sequential fixin
 
 ## Progress
 
-**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **88 done, 11 deferred, 1 open**.
+**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **89 done, 11 deferred, 0 open**. Every finding and cross-cutting theme is now resolved or has a documented deferral reason.
 
-**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md), CC4 (shared Redis subscriber fanout for the admin sync-log SSE). Deferred after investigation: M3a (every manual `Number()` site already guards → 400; migration would only change the error-body shape) and L19 (production push adapter is template/dedup-driven and doesn't fit the diagnostic test send).
-
-Remaining open item:
-- **Cross-cutting:** CC6 (trace context — `traceId` not threaded into BullMQ jobs, no `traceparent` on outbound SDK fetch). The only substantive item left; a self-contained piece of work (job-data plumbing + worker-side context restore + an SDK fetch header).
+**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md), CC4 (shared Redis subscriber fanout for the admin sync-log SSE), CC6 (trace context threaded through sync jobs + `traceparent` on the SDK fetch). Deferred after investigation: M3a (every manual `Number()` site already guards → 400; migration would only change the error-body shape) and L19 (production push adapter is template/dedup-driven and doesn't fit the diagnostic test send).
 
 After-fix baseline (2026-05-04, fourth pass):
 - 158 test files, 2731 tests passing (was 153 / 2673 pre-review)
@@ -747,7 +744,7 @@ At least 6 hot paths. Bulk-load via `inArray`, bulk-insert with `values([...])`,
 
 ### CC6. Trace context lost at boundaries
 
-- [ ] **Status:** OPEN — untouched; no `traceId` in BullMQ job data, no `traceparent` on outbound SDK fetch.
+- [x] **Status:** done — `captureTrace()` stamps the enqueuing request's trace onto sync jobs (`queues.ts#addSyncJob`); `syncWorker` re-establishes it via `runWithTrace(job.data.trace, …)` so job logs correlate; `currentTraceparent()` adds a W3C `traceparent` to the outbound federation SDK fetches (login + authenticated). Helpers + tests in `config/log-context.ts`.
 
 Excellent in-process: AsyncLocalStorage threads requestId/traceId through `logger.child()`. But: outbound SDK calls don't send `traceparent`; BullMQ jobs don't carry trace context. Sync triggered by `POST /admin/sync/trigger` becomes anonymous to the trace tree. **Action:** thread `traceId` into BullMQ job data; restore context in worker handler before processing. Add `traceparent` to outbound SDK fetch.
 
