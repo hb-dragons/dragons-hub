@@ -95,28 +95,4 @@ export async function pollOutbox(): Promise<number> {
   return enqueued;
 }
 
-let pollerInterval: ReturnType<typeof setInterval> | null = null;
-
-export function startOutboxPoller(intervalMs = 30_000): void {
-  if (pollerInterval) {
-    logger.warn("Outbox poller already running");
-    return;
-  }
-
-  logger.info({ intervalMs }, "Starting outbox poller");
-  pollerInterval = setInterval(() => {
-    pollOutbox().catch((error) => {
-      logger.error({ error }, "Outbox poller iteration failed");
-    });
-  }, intervalMs);
-}
-
-export function stopOutboxPoller(): void {
-  if (pollerInterval) {
-    clearInterval(pollerInterval);
-    pollerInterval = null;
-    logger.info("Outbox poller stopped");
-  }
-}
-
 export { domainEvents };

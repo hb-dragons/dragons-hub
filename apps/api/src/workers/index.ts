@@ -4,8 +4,8 @@ import { digestWorker } from "./digest.worker";
 import { refereeReminderWorker } from "./referee-reminder.worker";
 import { pushReceiptWorker } from "./push-receipt.worker";
 import { taskReminderWorker } from "./task-reminder.worker";
-import { initializeScheduledJobs, initTaskReminders, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue } from "./queues";
-import { startOutboxPoller, stopOutboxPoller } from "../services/events/outbox-poller";
+import { outboxPollWorker } from "./outbox-poll.worker";
+import { initializeScheduledJobs, initTaskReminders, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue, outboxPollQueue } from "./queues";
 import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
 import { syncRefereeGames } from "../services/sync/referee-games.sync";
 import { db } from "../config/database";
@@ -69,9 +69,6 @@ export async function initializeWorkers() {
     logger.warn({ err: error }, "Failed to initialize task reminders");
   }
 
-  // Start outbox poller for domain events
-  startOutboxPoller();
-
   // Initialize scheduled digest jobs for channels with digestMode = "scheduled"
   try {
     await initializeScheduledDigests();
@@ -106,6 +103,7 @@ export async function initializeWorkers() {
   logger.info("Referee reminder worker started");
   logger.info("Push receipt worker started");
   logger.info("Task reminder worker started");
+  logger.info("Outbox poll worker started");
   logger.info("Workers initialized");
 }
 
@@ -260,7 +258,8 @@ export async function shutdownWorkers() {
     logger.error({ err: error }, "Failed to mark running syncs as failed");
   }
 
-  stopOutboxPoller();
+  await outboxPollWorker.close();
+  await outboxPollQueue.close();
   await refereeReminderWorker.close();
   await refereeRemindersQueue.close();
   await pushReceiptWorker.close();
@@ -283,4 +282,5 @@ export { digestWorker };
 export { refereeReminderWorker };
 export { pushReceiptWorker };
 export { taskReminderWorker };
+export { outboxPollWorker };
 export * from "./queues";

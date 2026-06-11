@@ -27,6 +27,7 @@ const mockSyncQueueAdd = vi.fn().mockResolvedValue({ id: "sync-job-1" });
 const mockInitTaskReminders = vi.fn().mockResolvedValue(undefined);
 const mockTaskRemindersQueueGetRepeatableJobs = vi.fn().mockResolvedValue([]);
 const mockTaskRemindersQueueClose = vi.fn().mockResolvedValue(undefined);
+const mockOutboxPollQueueClose = vi.fn().mockResolvedValue(undefined);
 vi.mock("./queues", () => ({
   initializeScheduledJobs: (...args: unknown[]) => mockInitScheduledJobs(...args),
   initTaskReminders: (...args: unknown[]) => mockInitTaskReminders(...args),
@@ -41,6 +42,7 @@ vi.mock("./queues", () => ({
     close: (...args: unknown[]) => mockTaskRemindersQueueClose(...args),
     getRepeatableJobs: () => mockTaskRemindersQueueGetRepeatableJobs(),
   },
+  outboxPollQueue: { close: (...args: unknown[]) => mockOutboxPollQueueClose(...args) },
   digestQueue: {
     close: (...args: unknown[]) => mockDigestQueueClose(...args),
     add: (...args: unknown[]) => mockDigestQueueAdd(...args),
@@ -78,11 +80,13 @@ vi.mock("./task-reminder.worker", () => ({
   taskReminderWorker: { close: (...args: unknown[]) => mockTaskReminderWorkerClose(...args) },
 }));
 
-const mockStartOutboxPoller = vi.fn();
-const mockStopOutboxPoller = vi.fn();
+const mockOutboxPollWorkerClose = vi.fn().mockResolvedValue(undefined);
+vi.mock("./outbox-poll.worker", () => ({
+  outboxPollWorker: { close: (...args: unknown[]) => mockOutboxPollWorkerClose(...args) },
+}));
+
 vi.mock("../services/events/outbox-poller", () => ({
-  startOutboxPoller: (...args: unknown[]) => mockStartOutboxPoller(...args),
-  stopOutboxPoller: (...args: unknown[]) => mockStopOutboxPoller(...args),
+  pollOutbox: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock("../services/notifications/seed-referee-watch-rule", () => ({
@@ -362,6 +366,8 @@ describe("shutdownWorkers", () => {
 
     expect(mockWorkerClose).toHaveBeenCalled();
     expect(mockTaskReminderWorkerClose).toHaveBeenCalled();
+    expect(mockOutboxPollWorkerClose).toHaveBeenCalled();
+    expect(mockOutboxPollQueueClose).toHaveBeenCalled();
     expect(mockSyncQueueClose).toHaveBeenCalled();
     expect(mockDigestQueueClose).toHaveBeenCalled();
     expect(mockDomainEventsQueueClose).toHaveBeenCalled();
@@ -375,6 +381,8 @@ describe("shutdownWorkers", () => {
     await shutdownWorkers();
 
     expect(mockWorkerClose).toHaveBeenCalled();
+    expect(mockOutboxPollWorkerClose).toHaveBeenCalled();
+    expect(mockOutboxPollQueueClose).toHaveBeenCalled();
     expect(mockSyncQueueClose).toHaveBeenCalled();
     expect(mockDigestQueueClose).toHaveBeenCalled();
     expect(mockDomainEventsQueueClose).toHaveBeenCalled();

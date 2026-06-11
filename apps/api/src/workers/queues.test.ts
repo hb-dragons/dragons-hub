@@ -38,8 +38,14 @@ const {
   mockGetJob,
   mockLimit,
   taskRemindersQueueInstance,
+  outboxPollQueueInstance,
 } = vi.hoisted(() => {
   const taskRemindersQueueMocks = {
+    add: vi.fn().mockResolvedValue({ id: "job-1" }),
+    getRepeatableJobs: vi.fn().mockResolvedValue([]),
+    removeRepeatableByKey: vi.fn().mockResolvedValue(undefined),
+  };
+  const outboxPollQueueMocks = {
     add: vi.fn().mockResolvedValue({ id: "job-1" }),
     getRepeatableJobs: vi.fn().mockResolvedValue([]),
     removeRepeatableByKey: vi.fn().mockResolvedValue(undefined),
@@ -52,6 +58,7 @@ const {
     mockGetJob: vi.fn(),
     mockLimit: vi.fn().mockResolvedValue([]),
     taskRemindersQueueInstance: taskRemindersQueueMocks,
+    outboxPollQueueInstance: outboxPollQueueMocks,
   };
 });
 
@@ -64,6 +71,10 @@ vi.mock("bullmq", () => ({
         this.add = taskRemindersQueueInstance.add;
         this.getRepeatableJobs = taskRemindersQueueInstance.getRepeatableJobs;
         this.removeRepeatableByKey = taskRemindersQueueInstance.removeRepeatableByKey;
+      } else if (name === "outbox-poll") {
+        this.add = outboxPollQueueInstance.add;
+        this.getRepeatableJobs = outboxPollQueueInstance.getRepeatableJobs;
+        this.removeRepeatableByKey = outboxPollQueueInstance.removeRepeatableByKey;
       } else {
         this.add = mockAdd;
         this.getRepeatableJobs = mockGetRepeatableJobs;
@@ -98,6 +109,9 @@ beforeEach(() => {
       returning: vi.fn().mockResolvedValue([{ id: 42 }]),
     }),
   });
+  outboxPollQueueInstance.add.mockResolvedValue({ id: "job-1" });
+  outboxPollQueueInstance.getRepeatableJobs.mockResolvedValue([]);
+  outboxPollQueueInstance.removeRepeatableByKey.mockResolvedValue(undefined);
 });
 
 describe("initializeScheduledJobs", () => {
@@ -221,6 +235,31 @@ describe("initializeScheduledJobs", () => {
       expect.objectContaining({
         repeat: expect.objectContaining({ pattern: "0 4 * * *" }),
       }),
+    );
+  });
+
+  it("registers outbox-poll-cron repeatable job every 30s", async () => {
+    await initializeScheduledJobs();
+
+    expect(outboxPollQueueInstance.add).toHaveBeenCalledWith(
+      "poll",
+      {},
+      expect.objectContaining({
+        jobId: "outbox-poll-cron",
+        repeat: { every: 30_000 },
+      }),
+    );
+  });
+
+  it("removes existing outbox-poll repeatables before registering", async () => {
+    outboxPollQueueInstance.getRepeatableJobs.mockResolvedValueOnce([
+      { key: "old-outbox-poll-key" },
+    ]);
+
+    await initializeScheduledJobs();
+
+    expect(outboxPollQueueInstance.removeRepeatableByKey).toHaveBeenCalledWith(
+      "old-outbox-poll-key",
     );
   });
 });

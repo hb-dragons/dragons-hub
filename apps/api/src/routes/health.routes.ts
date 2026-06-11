@@ -4,7 +4,7 @@ import { db } from "../config/database";
 import { redis } from "../config/redis";
 import { sql, eq, isNull, and, desc } from "drizzle-orm";
 import { domainEvents, syncRuns } from "@dragons/db/schema";
-import { syncQueue, domainEventsQueue } from "../workers/queues";
+import { syncQueue, domainEventsQueue, outboxPollQueue } from "../workers/queues";
 
 const healthRoutes = new Hono();
 
@@ -112,6 +112,13 @@ healthRoutes.get(
       checks.eventsQueue = counts;
     } catch {
       checks.eventsQueue = "error";
+    }
+
+    try {
+      const counts = await outboxPollQueue.getJobCounts("waiting", "active", "delayed", "failed");
+      checks.outboxPollQueue = counts;
+    } catch {
+      checks.outboxPollQueue = "error";
     }
 
     const degraded =

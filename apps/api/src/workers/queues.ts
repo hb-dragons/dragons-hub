@@ -66,6 +66,12 @@ export const taskRemindersQueue = new Queue("task-reminders", {
   connection: { url: env.REDIS_URL },
 });
 
+export const outboxPollQueue = new Queue("outbox-poll", {
+  prefix: "{bull}",
+  connection: { url: env.REDIS_URL },
+  defaultJobOptions: { removeOnComplete: { count: 50 }, removeOnFail: { count: 100 } },
+});
+
 interface SyncJobPayload {
   type: "full" | "referee-games";
   triggeredBy?: string;
@@ -217,6 +223,18 @@ export async function initializeScheduledJobs() {
     },
   );
   logger.info("Push receipt reconcile scheduled (every 15m)");
+
+  // Outbox poller — every 30 seconds
+  const outboxPollRepeatables = await outboxPollQueue.getRepeatableJobs();
+  for (const job of outboxPollRepeatables) {
+    await outboxPollQueue.removeRepeatableByKey(job.key);
+  }
+  await outboxPollQueue.add(
+    "poll",
+    {},
+    { jobId: "outbox-poll-cron", repeat: { every: 30_000 }, removeOnComplete: true, removeOnFail: 100 },
+  );
+  logger.info("Outbox poll scheduled (every 30s)");
 }
 
 const MANUAL_SYNC_JOB_ID = "manual-sync";

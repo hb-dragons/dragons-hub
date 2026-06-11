@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../config/logger", () => ({
   logger: {
@@ -36,19 +36,11 @@ vi.mock("../../workers/queues", () => ({
   },
 }));
 
-import {
-  pollOutbox,
-  startOutboxPoller,
-  stopOutboxPoller,
-} from "./outbox-poller";
+import { pollOutbox } from "./outbox-poller";
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockQueueAdd.mockResolvedValue({ id: "job-1" });
-});
-
-afterEach(() => {
-  stopOutboxPoller();
 });
 
 function setClaimedRows(rows: unknown[]) {
@@ -116,42 +108,5 @@ describe("pollOutbox", () => {
     });
     await pollOutbox();
     expect(captured).toBeDefined();
-  });
-});
-
-describe("startOutboxPoller / stopOutboxPoller", () => {
-  it("starts and stops without error", () => {
-    vi.useFakeTimers();
-    startOutboxPoller(1000);
-    stopOutboxPoller();
-    vi.useRealTimers();
-  });
-
-  it("warns when starting a poller that is already running", async () => {
-    vi.useFakeTimers();
-    startOutboxPoller(1000);
-    startOutboxPoller(1000);
-    const { logger } = await import("../../config/logger");
-    expect(logger.warn).toHaveBeenCalledWith("Outbox poller already running");
-    stopOutboxPoller();
-    vi.useRealTimers();
-  });
-
-  it("stopOutboxPoller is safe to call when not running", () => {
-    stopOutboxPoller();
-  });
-
-  it("logs error when pollOutbox rejects inside interval callback", async () => {
-    vi.useFakeTimers();
-    mockTransaction.mockRejectedValue(new Error("DB connection lost"));
-    startOutboxPoller(100);
-    await vi.advanceTimersByTimeAsync(150);
-    const { logger: mockLogger } = await import("../../config/logger");
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.any(Error) }),
-      "Outbox poller iteration failed",
-    );
-    stopOutboxPoller();
-    vi.useRealTimers();
   });
 });
