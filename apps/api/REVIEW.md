@@ -9,13 +9,12 @@ This document tracks every finding from the review, ordered for sequential fixin
 
 ## Progress
 
-**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **88 done, 9 deferred, 3 open**.
+**Checkbox reconciliation (2026-06-11):** every per-item checkbox below was re-synced against the codebase (the narrative rounds had drifted from the boxes), and the Cross-cutting themes section now carries explicit Status lines too. Legend: `[x]` done, `[~]` deferred/decided (reason on the Status line), `[ ]` still open. Current state across findings + cross-cutting themes: **88 done, 11 deferred, 1 open**.
 
-**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md), CC4 (shared Redis subscriber fanout for the admin sync-log SSE).
+**Follow-up pass (2026-06-11):** closed M7k (referee reassign push old→new), M6d+L18 (`pickDefined` helper), M2c+CC5 (batched team own-club corrections in a tx), CC3 + CC8 (transaction-boundary + tenancy docs in AGENTS.md), CC4 (shared Redis subscriber fanout for the admin sync-log SSE). Deferred after investigation: M3a (every manual `Number()` site already guards → 400; migration would only change the error-body shape) and L19 (production push adapter is template/dedup-driven and doesn't fit the diagnostic test send).
 
-Remaining open items:
-- **Findings:** M3a (partial — some routes still parse ids with `Number()` instead of the shared Zod `idSchema`), L19 (notification-test doesn't reuse the production `PushChannelAdapter`)
-- **Cross-cutting:** CC6 (trace context — `traceId` not threaded into BullMQ jobs, no `traceparent` on outbound SDK fetch)
+Remaining open item:
+- **Cross-cutting:** CC6 (trace context — `traceId` not threaded into BullMQ jobs, no `traceparent` on outbound SDK fetch). The only substantive item left; a self-contained piece of work (job-data plumbing + worker-side context restore + an SDK fetch header).
 
 After-fix baseline (2026-05-04, fourth pass):
 - 158 test files, 2731 tests passing (was 153 / 2673 pre-review)
@@ -406,7 +405,7 @@ After-fix baseline (2026-05-04, fourth pass):
 
 #### M3a. Manual `Number(c.req.query(...))` instead of Zod
 
-- [ ] **Status:** OPEN (partial) — some routes still use manual Number() query parse
+- [~] **Status:** deferred — the correctness concern is gone: every remaining manual `Number(...)`/`parseInt(...)` site (referee/games, referee-assignment, public match/team, league, scoreboard) already guards `Number.isInteger`/`isNaN` and returns a 400, so no input reaches a handler as NaN. Migrating the ~21 sites to `@dragons/contracts` validators would change the 400 body shape (central `validationHook` vs. their current `VALIDATION_ERROR`) — a client-facing change for no correctness gain. Left as-is; revisit only if these routes gain contract schemas for other reasons.
 - **Locations:** `routes/referee/games.routes.ts:14-24`, `routes/admin/referee-assignment.routes.ts:32-46, 65-101`, `routes/admin/scoreboard.routes.ts:60-68`, `routes/public/scoreboard.routes.ts:22-58`, `routes/public/broadcast.routes.ts:21-23, 39-41`, `routes/admin/notification.routes.ts:79-81`, `routes/admin/league.routes.ts:65`
 - **Fix:** Pull `idSchema = z.coerce.number().int().positive()` into a shared `schemas/common.ts`. Adopt the Zod pattern from `match.routes.ts` everywhere.
 - **Verify:** invalid numeric inputs return 400 with structured error, not 500.
@@ -695,7 +694,7 @@ After-fix baseline (2026-05-04, fourth pass):
 - [x] L16. `notification.routes.ts:132-170` "preferences" mounted under `/admin/*` but caller-self — semantic mismatch (consider `/api/me/...`)
 - [x] L17. `event-publisher.ts` exports `buildDomainEvent`/`insertDomainEvent`/`enqueueDomainEvent` separately — document why
 - [x] L18. `services/admin/booking-admin.service.ts:204, 303` `set: Record<string, unknown>` — bundled with M6d
-- [ ] L19. `routes/admin/notification-test.routes.ts:124` batch error reused per device — reuse `PushChannelAdapter` from production path  _(OPEN)_
+- [~] L19. `routes/admin/notification-test.routes.ts` batch error reused per device — reuse `PushChannelAdapter` from production path  _(deferred after investigation: the adapter is template-driven (`renderPushTemplate(eventType)` → returns early when no template) and dedup-claim-driven against the unique index. The admin test push sends arbitrary free-text with a fixed title and no `admin.test` template, so routing it through the adapter would render+send nothing and bind a diagnostic path to production dedup machinery. The ~15-line direct send stays.)_
 - [x] L20. `services/scoreboard/ingest.ts:88-91` double-cast in `snapshotsDiffer` — type via `Pick<typeof liveScoreboards.$inferSelect, ...>`
 - [x] L21. `requireRefereeSelfOrPermission` `as number` cast — make `isReferee` narrow `user is User & { refereeId: number }` in `@dragons/shared`
 - [x] L22. `notification-pipeline.ts:155, 156, 203, 204, 286` `event.payload as Record<string, unknown>` — `getEventPayload(event)` helper
