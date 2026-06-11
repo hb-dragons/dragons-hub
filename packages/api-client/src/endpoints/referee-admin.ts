@@ -5,6 +5,7 @@ import type {
   RefereeRulesResponse,
   HistorySummaryResponse,
   HistoryGameItem,
+  EligibleOpenGamesResponse,
 } from "@dragons/shared";
 import type {
   RefereeListQuery,
@@ -36,6 +37,9 @@ export function refereeAdminEndpoints(client: ApiClient) {
     },
     getReferee(id: number): Promise<RefereeListItem> {
       return client.get(`/admin/referees/${id}`);
+    },
+    eligibleOpenGames(id: number): Promise<EligibleOpenGamesResponse> {
+      return client.get(`/admin/referees/${id}/eligible-open-games`);
     },
     setVisibility(
       id: number,
