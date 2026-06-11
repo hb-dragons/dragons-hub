@@ -49,6 +49,7 @@ export type {
 } from "@dragons/contracts";
 
 export { notificationTestEndpoints } from "./notification-test";
+export type { TestPushRecentResponse, TestPushRecentItem } from "./notification-test";
 export type { NotificationTestSendBody } from "@dragons/contracts";
 
 export { socialEndpoints } from "./social";

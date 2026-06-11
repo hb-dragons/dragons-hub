@@ -52,6 +52,9 @@ export function refereeEndpoints(client: ApiClient) {
     getGameByMatchId(matchId: number): Promise<RefereeGameListItem> {
       return client.get(`/referee/matches/${matchId}`);
     },
+    getGameByApiMatchId(apiMatchId: number): Promise<RefereeGameListItem> {
+      return client.get(`/referee/games/by-api-match/${apiMatchId}`);
+    },
     claimGame(
       id: number,
       params?: ClaimGameParams,

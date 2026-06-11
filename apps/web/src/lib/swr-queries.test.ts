@@ -29,6 +29,7 @@ function mockApi() {
     referees: {
       getGames: rec("referees.getGames"),
       searchAssignmentCandidates: rec("referees.searchAssignmentCandidates"),
+      getGameByApiMatchId: rec("referees.getGameByApiMatchId"),
     },
     settings: {
       getClub: rec("settings.getClub"),
@@ -36,6 +37,7 @@ function mockApi() {
       getBooking: rec("settings.getBooking"),
     },
     bookings: { list: rec("bookings.list") },
+    notificationTest: { recentTestPush: rec("notificationTest.recentTestPush") },
     notifications: { list: rec("notifications.list") },
     events: { list: rec("events.list"), failed: rec("events.failed") },
     watchRules: { list: rec("watchRules.list") },
@@ -285,6 +287,14 @@ describe("makeQueries", () => {
     });
   });
 
+  it("refereeGameByApiMatch(id): key + dispatch", async () => {
+    const { api, calls } = mockApi();
+    const q = makeQueries(api).refereeGameByApiMatch(4711);
+    expect(q.key).toBe(SWR_KEYS.refereeGameByApiMatch(4711));
+    await q.fetcher();
+    expect(calls[0]).toEqual({ method: "referees.getGameByApiMatchId", args: [4711] });
+  });
+
   it("refereeCandidates: key + dispatch with all params", async () => {
     const { api, calls } = mockApi();
     const q = makeQueries(api).refereeCandidates(99, "test", 0, 1);
@@ -339,6 +349,15 @@ describe("makeQueries", () => {
     expect(q.key).toBe(SWR_KEYS.bookings);
     await q.fetcher();
     expect(calls[0]).toEqual({ method: "bookings.list", args: [] });
+  });
+
+  // --- notification test ---
+  it("testPushRecent: key + dispatch", async () => {
+    const { api, calls } = mockApi();
+    const q = makeQueries(api).testPushRecent();
+    expect(q.key).toBe(SWR_KEYS.testPushRecent);
+    await q.fetcher();
+    expect(calls[0]).toEqual({ method: "notificationTest.recentTestPush", args: [] });
   });
 
   // --- notifications ---

@@ -109,4 +109,7 @@ export const SWR_KEYS = {
     `/admin/referee/history/leaderboard.csv${qs ? `?${qs}` : ""}`,
   refereeCandidates: (spielplanId: number, search: string, pageFrom: number, slot?: 1 | 2) =>
     `/admin/referee/games/${spielplanId}/candidates?search=${encodeURIComponent(search)}&pageFrom=${pageFrom}&pageSize=15${slot != null ? `&slot=${slot}` : ""}`,
+  testPushRecent: "/admin/notifications/test-push/recent",
+  refereeGameByApiMatch: (apiMatchId: number) =>
+    `/referee/games/by-api-match/${apiMatchId}`,
 } as const;

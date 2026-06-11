@@ -130,6 +130,27 @@ describe("refereeEndpoints", () => {
     expect(result.status).toBe("open");
   });
 
+  it("GETs /referee/games/by-api-match/:apiMatchId", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ id: 7, apiMatchId: 4711, matchId: null }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const client = new ApiClient({
+      baseUrl: "https://example.test",
+      fetchFn: mockFetch as unknown as typeof fetch,
+    });
+    const api = refereeEndpoints(client);
+
+    const result = await api.getGameByApiMatchId(4711);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const url = mockFetch.mock.calls[0]![0] as string;
+    expect(url).toBe("https://example.test/referee/games/by-api-match/4711");
+    expect(result.apiMatchId).toBe(4711);
+  });
+
   it("passes query params when supplied", async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       new Response(

@@ -126,6 +126,10 @@ export function makeQueries(api: Api) {
         fetcher: () => api.referees.getGames(norm),
       };
     },
+    refereeGameByApiMatch: (apiMatchId: number) => ({
+      key: SWR_KEYS.refereeGameByApiMatch(apiMatchId),
+      fetcher: () => api.referees.getGameByApiMatchId(apiMatchId),
+    }),
     refereeCandidates: (
       spielplanId: number,
       search: string,
@@ -154,6 +158,10 @@ export function makeQueries(api: Api) {
     // bookings
     bookings: () => ({ key: SWR_KEYS.bookings, fetcher: () => api.bookings.list() }),
     // notifications / events
+    testPushRecent: () => ({
+      key: SWR_KEYS.testPushRecent,
+      fetcher: () => api.notificationTest.recentTestPush(),
+    }),
     notifications: (limit?: number, offset?: number) => ({
       key: SWR_KEYS.notifications(limit, offset),
       fetcher: () => api.notifications.list({ limit: limit ?? 20, offset: offset ?? 0 }),
