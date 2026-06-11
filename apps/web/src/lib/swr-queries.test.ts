@@ -306,17 +306,6 @@ describe("makeQueries", () => {
     });
   });
 
-  it("refereeCandidates: defaults slotNumber to 1 when slot is omitted", async () => {
-    const { api, calls } = mockApi();
-    const q = makeQueries(api).refereeCandidates(99, "test", 0);
-    expect(q.key).toBe(SWR_KEYS.refereeCandidates(99, "test", 0));
-    await q.fetcher();
-    expect(calls[0]).toEqual({
-      method: "referees.searchAssignmentCandidates",
-      args: [99, { search: "test", pageFrom: 0, pageSize: 15, slotNumber: 1 }],
-    });
-  });
-
   // --- settings ---
   it("settingsClub: key + dispatch to settings.getClub()", async () => {
     const { api, calls } = mockApi();

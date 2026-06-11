@@ -134,7 +134,7 @@ export function makeQueries(api: Api) {
       spielplanId: number,
       search: string,
       pageFrom: number,
-      slot?: 1 | 2,
+      slot: 1 | 2,
     ) => ({
       key: SWR_KEYS.refereeCandidates(spielplanId, search, pageFrom, slot),
       fetcher: () =>
@@ -142,7 +142,7 @@ export function makeQueries(api: Api) {
           search,
           pageFrom,
           pageSize: 15,
-          slotNumber: slot ?? 1,
+          slotNumber: slot,
         }),
     }),
     // settings
