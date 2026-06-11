@@ -1,4 +1,4 @@
-import { getPublicApi } from "@/lib/api-client.server";
+import { getPublicServerApi } from "@/lib/api.server";
 import { getTranslations } from "next-intl/server";
 import type { MatchQueryParams } from "@dragons/api-client";
 import {
@@ -21,7 +21,7 @@ export default async function SchedulePage({
   const teamParam = typeof params.team === "string" ? params.team : undefined;
   const view = params.view === "calendar" ? "calendar" : "weekend";
 
-  const allTeams = await getPublicApi().getTeams().catch(() => []);
+  const allTeams = await getPublicServerApi().getTeams().catch(() => []);
   const ownClubTeams = allTeams.filter((team) => team.isOwnClub);
 
   const saturday = getSaturday(new Date());
@@ -37,7 +37,7 @@ export default async function SchedulePage({
     matchParams.dateTo = toDateString(getSunday(saturday));
   }
 
-  const matchData = await getPublicApi().getMatches(matchParams).catch(() => ({ items: [] }));
+  const matchData = await getPublicServerApi().getMatches(matchParams).catch(() => ({ items: [] }));
 
   return (
     <div className="space-y-4">

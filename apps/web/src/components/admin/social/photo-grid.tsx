@@ -12,6 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@dragons/ui/components/alert-dialog";
+import { browserClient } from "@/lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -82,17 +83,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
       const formData = new FormData();
       formData.append("file", file);
 
-      // eslint-disable-next-line no-restricted-globals -- non-JSON multipart FormData upload; the typed JSON client can't carry a multipart body
-      const res = await fetch(`${API_BASE}${uploadEndpoint}`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { message?: string; error?: string };
-        throw new Error(body.message ?? body.error ?? res.statusText);
-      }
+      await browserClient.postForm(uploadEndpoint, formData);
 
       onUploadComplete();
     } catch (err) {
@@ -109,15 +100,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      // eslint-disable-next-line no-restricted-globals -- co-located with the multipart upload + image-src flow against the same ${API_BASE}/photos endpoint, which has no typed-client namespace
-      const res = await fetch(`${API_BASE}${deleteEndpoint}/${deleteTarget.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { message?: string; error?: string };
-        throw new Error(body.message ?? body.error ?? res.statusText);
-      }
+      await browserClient.delete(`${deleteEndpoint}/${deleteTarget.id}`);
       onDelete(deleteTarget);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");

@@ -6,8 +6,7 @@ import { Button } from "@dragons/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dragons/ui/components/card";
 import { ImagePreview } from "../image-preview";
 import type { WizardState } from "../types";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+import { browserClient } from "@/lib/api";
 
 interface PreviewStepProps {
   state: WizardState;
@@ -34,20 +33,7 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
     };
 
     try {
-      // eslint-disable-next-line no-restricted-globals -- non-JSON blob response (generated PNG); the typed JSON client can't carry an image body
-      const res = await fetch(`${API_BASE}/admin/social/generate`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { message?: string; error?: string };
-        throw new Error(body.message ?? body.error ?? `Fehler: HTTP ${res.status}`);
-      }
-
-      const blob = await res.blob();
+      const blob = await browserClient.postBlob("/admin/social/generate", body);
       const url = URL.createObjectURL(blob);
 
       const a = document.createElement("a");

@@ -1,4 +1,4 @@
-import { getPublicApi } from "@/lib/api-client.server";
+import { getPublicServerApi } from "@/lib/api.server";
 import { getTranslations, getFormatter } from "next-intl/server";
 import { Link } from "@/lib/navigation";
 import { CalendarDays, Trophy, Users, Home } from "lucide-react";
@@ -44,7 +44,7 @@ export default async function HomePage() {
   const countdown = tRaw("countdown") as { today: string; tomorrow: string; inDays: string };
   const stats = tRaw("stats") as { teams: string; wins: string; losses: string; winRate: string };
 
-  const dashboard = await getPublicApi()
+  const dashboard = await getPublicServerApi()
     .getHomeDashboard()
     .catch(() => null);
 
