@@ -4,6 +4,7 @@ import { can } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
 import { getServerApi } from "@/lib/api.server";
 import { SWR_KEYS } from "@/lib/swr-keys";
+import { makeQueries } from "@/lib/swr-queries";
 import { todayInBerlin, plusDaysInBerlin } from "@/lib/tz";
 import { RefereeHubPage } from "@/components/admin/referee-hub/referee-hub";
 
@@ -13,20 +14,20 @@ export default async function RefereesPage() {
 
   const fallback: Record<string, unknown> = {};
 
+  const serverApi = await getServerApi();
+
   const refereesKey = SWR_KEYS.refereesPaginated({ scope: "own", limit: 50 });
 
   const today = todayInBerlin();
   const to = plusDaysInBerlin(14);
 
-  const gamesKey = SWR_KEYS.refereeGamesFiltered({
+  const gamesQ = makeQueries(serverApi).refereeGamesFiltered({
     status: "active",
     dateFrom: today,
     dateTo: to,
     gameType: "both",
     limit: 200,
   });
-
-  const serverApi = await getServerApi();
 
   try {
     fallback[refereesKey] = await serverApi.refereeAdmin.listReferees({
@@ -36,13 +37,7 @@ export default async function RefereesPage() {
   } catch {}
 
   try {
-    fallback[gamesKey] = await serverApi.referees.getGames({
-      status: "active",
-      dateFrom: today,
-      dateTo: to,
-      gameType: "both",
-      limit: 200,
-    });
+    fallback[gamesQ.key] = await gamesQ.fetcher();
   } catch {}
 
   return (
