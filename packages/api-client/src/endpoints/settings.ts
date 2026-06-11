@@ -1,7 +1,6 @@
 import type {
   ClubConfig,
   BookingSettings,
-  RefereeReminderConfig,
   RefereeGamesSyncResponse,
   LeagueOwnClubRefsResponse,
   TrackedLeaguesResponse,
@@ -10,7 +9,6 @@ import type {
 import type {
   SettingsClubConfig,
   SettingsBookingConfig,
-  SettingsRefereeReminder,
   LeagueNumbersBody,
   LeagueOwnClubRefsBody,
 } from "@dragons/contracts";
@@ -29,14 +27,6 @@ export function settingsEndpoints(client: ApiClient) {
     },
     setBooking(body: SettingsBookingConfig): Promise<BookingSettings> {
       return client.put("/admin/settings/booking", body);
-    },
-    getRefereeReminders(): Promise<RefereeReminderConfig> {
-      return client.get("/admin/settings/referee-reminders");
-    },
-    setRefereeReminders(
-      body: SettingsRefereeReminder,
-    ): Promise<RefereeReminderConfig> {
-      return client.put("/admin/settings/referee-reminders", body);
     },
     getLeagues(): Promise<TrackedLeaguesResponse> {
       return client.get("/admin/settings/leagues");

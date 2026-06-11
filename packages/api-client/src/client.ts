@@ -52,6 +52,26 @@ export class ApiClient {
     return this.request<T>("POST", path, undefined, body);
   }
 
+  /**
+   * POST a multipart `FormData` body (file uploads). The runtime sets the
+   * `multipart/form-data` boundary, so we must not send our own `Content-Type`.
+   * The response is parsed as JSON like the other verbs.
+   */
+  async postForm<T>(path: string, form: FormData): Promise<T> {
+    return this.request<T>("POST", path, undefined, form, { isForm: true });
+  }
+
+  /**
+   * POST a JSON body and resolve the response as a binary `Blob` (e.g. a
+   * generated PNG). Non-ok responses still throw an `APIError` parsed from the
+   * JSON error envelope.
+   */
+  async postBlob(path: string, body?: unknown): Promise<Blob> {
+    return this.request<Blob>("POST", path, undefined, body, {
+      responseType: "blob",
+    });
+  }
+
   async put<T>(path: string, body?: unknown): Promise<T> {
     return this.request<T>("PUT", path, undefined, body);
   }
@@ -69,15 +89,21 @@ export class ApiClient {
     path: string,
     params?: Record<string, string | number | boolean | undefined>,
     body?: unknown,
-    opts?: { signal?: AbortSignal },
+    opts?: { signal?: AbortSignal; isForm?: boolean; responseType?: "blob" },
   ): Promise<T> {
     const qs = params ? buildQueryString(params) : "";
     const url = `${this.baseUrl}${path}${qs}`;
 
+    const isForm = opts?.isForm ?? false;
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      Accept: "application/json",
+      // Binary responses accept anything; JSON requests stay strict.
+      Accept: opts?.responseType === "blob" ? "*/*" : "application/json",
     };
+    // For multipart uploads the runtime must set the boundary itself, so we
+    // omit Content-Type entirely.
+    if (!isForm) {
+      headers["Content-Type"] = "application/json";
+    }
 
     if (this.auth) {
       const authHeaders = await this.auth.getHeaders();
@@ -87,7 +113,11 @@ export class ApiClient {
     const init: RequestInit = {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: isForm
+        ? (body as FormData)
+        : body !== undefined
+          ? JSON.stringify(body)
+          : undefined,
     };
     if (this.credentials) {
       init.credentials = this.credentials;
@@ -115,6 +145,10 @@ export class ApiClient {
           (errorRecord["message"] as string) ??
           response.statusText,
       );
+    }
+
+    if (opts?.responseType === "blob") {
+      return (await response.blob()) as T;
     }
 
     return (await response.json()) as T;

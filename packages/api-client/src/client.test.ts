@@ -298,3 +298,82 @@ describe("ApiClient AbortSignal support", () => {
     expect(fetchFn.mock.calls[0]![1]?.signal).toBeUndefined();
   });
 });
+
+describe("ApiClient.postForm (multipart)", () => {
+  const baseUrl = "https://api.example.com";
+
+  it("sends the FormData body verbatim without forcing a JSON Content-Type", async () => {
+    const fetchFn = mockFetch(200, { id: 7 });
+    const client = new ApiClient({ baseUrl, fetchFn });
+    const form = new FormData();
+    form.append("file", new Blob(["x"]), "x.png");
+
+    const result = await client.postForm<{ id: number }>("/uploads", form);
+
+    expect(result).toEqual({ id: 7 });
+    const init = fetchFn.mock.calls[0]![1]!;
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(form);
+    // Must NOT set Content-Type — fetch derives the multipart boundary itself.
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBeUndefined();
+  });
+
+  it("still applies auth headers to multipart uploads", async () => {
+    const fetchFn = mockFetch(200, {});
+    const auth: AuthStrategy = { getHeaders: () => ({ Authorization: "Bearer t" }) };
+    const client = new ApiClient({ baseUrl, fetchFn, auth });
+    await client.postForm("/uploads", new FormData());
+    const headers = fetchFn.mock.calls[0]![1]!.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Bearer t");
+  });
+
+  it("throws APIError on a non-ok multipart response", async () => {
+    const fetchFn = mockFetch(413, { error: "Too large", code: "PAYLOAD_TOO_LARGE" });
+    const client = new ApiClient({ baseUrl, fetchFn });
+    await expect(client.postForm("/uploads", new FormData())).rejects.toMatchObject({
+      status: 413,
+      code: "PAYLOAD_TOO_LARGE",
+      message: "Too large",
+    });
+  });
+});
+
+describe("ApiClient.postBlob (binary response)", () => {
+  const baseUrl = "https://api.example.com";
+
+  function mockBlobFetch(status: number, blob: Blob) {
+    return vi.fn<typeof fetch>().mockResolvedValue({
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: status === 200 ? "OK" : "Error",
+      blob: () => Promise.resolve(blob),
+      json: () => Promise.resolve({}),
+    } as Response);
+  }
+
+  it("POSTs a JSON body and resolves the binary response as a Blob", async () => {
+    const png = new Blob(["fake-png"], { type: "image/png" });
+    const fetchFn = mockBlobFetch(200, png);
+    const client = new ApiClient({ baseUrl, fetchFn });
+    const body = { type: "lineup" };
+
+    const result = await client.postBlob("/social/generate", body);
+
+    expect(result).toBe(png);
+    const init = fetchFn.mock.calls[0]![1]!;
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(JSON.stringify(body));
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("throws APIError (parsing the JSON error envelope) on a non-ok response", async () => {
+    const fetchFn = mockFetch(422, { error: "Bad input", code: "VALIDATION_ERROR" });
+    const client = new ApiClient({ baseUrl, fetchFn });
+    await expect(client.postBlob("/social/generate", {})).rejects.toMatchObject({
+      status: 422,
+      code: "VALIDATION_ERROR",
+    });
+  });
+});
