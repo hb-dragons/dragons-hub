@@ -26,8 +26,8 @@ export function RulesSubtab({ referee }: Props) {
   const teamsQ = queries.teams();
   const refereeRulesQ = queries.refereeRules(referee.id);
 
-  const { data: teamsData = [] } = useSWR(SWR_KEYS.teams, teamsQ.fetcher);
-  const { data: rulesData } = useSWR(SWR_KEYS.refereeRules(referee.id), refereeRulesQ.fetcher);
+  const { data: teamsData = [] } = useSWR(teamsQ.key, teamsQ.fetcher);
+  const { data: rulesData } = useSWR(refereeRulesQ.key, refereeRulesQ.fetcher);
 
   const [rules, setRules] = useState<Rule[]>([]);
   const [status, setStatus] = useState<SaveStatus>("idle");

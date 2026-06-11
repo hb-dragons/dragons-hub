@@ -118,8 +118,8 @@ export function ChannelConfigsList() {
   const channelConfigsQ = queries.channelConfigs();
   const channelConfigProvidersQ = queries.channelConfigProviders();
 
-  const { data: result } = useSWR(SWR_KEYS.channelConfigs, channelConfigsQ.fetcher);
-  const { data: providers } = useSWR(SWR_KEYS.channelConfigProviders, channelConfigProvidersQ.fetcher);
+  const { data: result } = useSWR(channelConfigsQ.key, channelConfigsQ.fetcher);
+  const { data: providers } = useSWR(channelConfigProvidersQ.key, channelConfigProvidersQ.fetcher);
   const { mutate } = useSWRConfig();
 
   const availableTypes = CHANNEL_TYPES.filter(

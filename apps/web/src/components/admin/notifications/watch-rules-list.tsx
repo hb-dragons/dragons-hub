@@ -122,8 +122,8 @@ export function WatchRulesList() {
   const watchRulesQ = queries.watchRules();
   const channelConfigsQ = queries.channelConfigs();
 
-  const { data: rulesResult } = useSWR(SWR_KEYS.watchRules, watchRulesQ.fetcher);
-  const { data: channelsResult } = useSWR(SWR_KEYS.channelConfigs, channelConfigsQ.fetcher);
+  const { data: rulesResult } = useSWR(watchRulesQ.key, watchRulesQ.fetcher);
+  const { data: channelsResult } = useSWR(channelConfigsQ.key, channelConfigsQ.fetcher);
   const { mutate } = useSWRConfig();
 
   const [dialogOpen, setDialogOpen] = useState(false);

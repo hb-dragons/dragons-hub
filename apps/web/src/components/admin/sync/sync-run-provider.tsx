@@ -9,7 +9,7 @@ import type {
   SyncRun,
   SyncScheduleData,
 } from "./types";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { queries } from "@/lib/swr-queries";
 
 function deriveRunningSyncRunId(
   status: SyncStatusResponse | null,
@@ -38,13 +38,17 @@ export function SyncRunProvider({
   );
   const [triggering, setTriggering] = useState(false);
 
+  const statusQ = queries.syncStatus();
+  const logsQ = queries.syncLogs(20, 0);
+  const scheduleQ = queries.syncSchedule();
+
   return (
     <SWRConfig
       value={{
         fallback: {
-          [SWR_KEYS.syncStatus]: initialStatus,
-          [SWR_KEYS.syncLogs(20, 0)]: initialLogs,
-          [SWR_KEYS.syncSchedule]: initialSchedule,
+          [statusQ.key]: initialStatus,
+          [logsQ.key]: initialLogs,
+          [scheduleQ.key]: initialSchedule,
         },
       }}
     >
