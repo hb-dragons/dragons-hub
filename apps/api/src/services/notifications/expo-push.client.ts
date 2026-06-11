@@ -169,6 +169,11 @@ export class ExpoPushClient {
   }
 }
 
+export function mapTicketError(ticket: ExpoPushTicket | undefined): string | null {
+  if (ticket?.status === "ok") return null;
+  return ticket?.message ?? ticket?.details?.error ?? "unknown";
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

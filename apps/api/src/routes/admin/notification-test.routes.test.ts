@@ -69,13 +69,17 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
-vi.mock("../../services/notifications/expo-push.client", () => ({
-  ExpoPushClient: class {
-    sendBatch(messages: unknown[]) {
-      return mocks.sendBatch(messages);
-    }
-  },
-}));
+vi.mock("../../services/notifications/expo-push.client", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../services/notifications/expo-push.client")>();
+  return {
+    ...original,
+    ExpoPushClient: class {
+      sendBatch(messages: unknown[]) {
+        return mocks.sendBatch(messages);
+      }
+    },
+  };
+});
 
 // RBAC middleware pass-through for tests -- we simulate the user via c.set("user", ...)
 vi.mock("../../middleware/rbac", () => ({
@@ -258,7 +262,8 @@ describe("POST /notifications/test-push", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.tickets[0].status).toBe("failed");
-    expect(body.tickets[0].error).toContain("SomeError");
+    // message wins over details.error (unified message-first precedence via mapTicketError)
+    expect(body.tickets[0].error).toBe("oops");
   });
 
   it("handles Expo network error -- returns 200 with all-failed tickets", async () => {

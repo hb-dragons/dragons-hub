@@ -1,5 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ExpoPushClient } from "./expo-push.client";
+import { ExpoPushClient, mapTicketError } from "./expo-push.client";
+
+describe("mapTicketError", () => {
+  it("returns null for an ok ticket", () => {
+    expect(mapTicketError({ status: "ok" })).toBeNull();
+  });
+
+  it("returns the message when only message is present", () => {
+    expect(mapTicketError({ status: "error", message: "X" })).toBe("X");
+  });
+
+  it("returns details.error when only details.error is present", () => {
+    expect(mapTicketError({ status: "error", details: { error: "Y" } })).toBe("Y");
+  });
+
+  it("prefers message over details.error when both are present", () => {
+    expect(mapTicketError({ status: "error", message: "X", details: { error: "Y" } })).toBe("X");
+  });
+
+  it("returns 'unknown' when neither message nor details.error is present", () => {
+    expect(mapTicketError({ status: "error" })).toBe("unknown");
+  });
+
+  it("returns 'unknown' for an undefined ticket", () => {
+    expect(mapTicketError(undefined)).toBe("unknown");
+  });
+});
 
 describe("ExpoPushClient", () => {
   const fetchMock = vi.fn();

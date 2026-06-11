@@ -7,6 +7,7 @@ import {
 } from "@dragons/db/schema";
 import { logger } from "../../../config/logger";
 import type { ExpoPushClient, ExpoPushMessage } from "../expo-push.client";
+import { mapTicketError } from "../expo-push.client";
 import { renderPushTemplate, type Locale } from "../templates/push";
 
 const log = logger.child({ service: "push-adapter" });
@@ -154,7 +155,7 @@ export class PushChannelAdapter {
           ok,
           ticketId: ok ? ticket.id ?? null : null,
           token: o.device.token,
-          error: ok ? null : (ticket?.message ?? ticket?.details?.error ?? "unknown"),
+          error: mapTicketError(ticket),
         });
         byUser.set(o.device.userId, list);
         if (ok) result.sent++;

@@ -9,7 +9,7 @@ import {
   channelConfigs,
   domainEvents,
 } from "@dragons/db/schema";
-import { ExpoPushClient } from "../../services/notifications/expo-push.client";
+import { ExpoPushClient, mapTicketError } from "../../services/notifications/expo-push.client";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
 import { getRedis } from "../../config/redis";
@@ -126,9 +126,7 @@ notificationTestRoutes.post(
         status: ok ? "sent_ticket" : "failed",
         sentAt: ok ? sentAt : null,
         providerTicketId: ok ? (t.id ?? null) : null,
-        errorMessage: ok
-          ? null
-          : (t?.details?.error ?? t?.message ?? "unknown"),
+        errorMessage: mapTicketError(t),
       };
     });
 
