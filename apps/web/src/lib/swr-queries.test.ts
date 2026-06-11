@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { makeQueries } from "./swr-queries";
 import { SWR_KEYS } from "./swr-keys";
+import { normalizeRefereeGamesQuery } from "./referee-games-query";
 import type { Api } from "@dragons/api-client";
 
 /** A typed-enough mock: every method returns a tagged marker so we can assert dispatch. */
@@ -265,8 +266,8 @@ describe("makeQueries", () => {
     const { api, calls } = mockApi();
     const opts = {};
     const q = makeQueries(api).refereeGamesFiltered(opts);
-    // key derives from opts (raw input passed to the SWR_KEYS builder)
-    expect(q.key).toBe(SWR_KEYS.refereeGamesFiltered(opts));
+    // key derives from the normalized form of opts (same input the fetcher uses)
+    expect(q.key).toBe(SWR_KEYS.refereeGamesFiltered(normalizeRefereeGamesQuery(opts)));
     // fetcher uses normalized values (defaults applied)
     await q.fetcher();
     expect(calls[0]).toEqual({
@@ -279,7 +280,7 @@ describe("makeQueries", () => {
     const { api, calls } = mockApi();
     const opts = { status: "active" as const, slotStatus: "open" as const, search: "Schmidt" };
     const q = makeQueries(api).refereeGamesFiltered(opts);
-    expect(q.key).toBe(SWR_KEYS.refereeGamesFiltered(opts));
+    expect(q.key).toBe(SWR_KEYS.refereeGamesFiltered(normalizeRefereeGamesQuery(opts)));
     await q.fetcher();
     expect(calls[0]).toEqual({
       method: "referees.getGames",
