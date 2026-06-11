@@ -8,21 +8,19 @@ export function createRedisClient(): Redis {
 
 let _redis: Redis | undefined;
 
-export const redis: Redis = new Proxy({} as Redis, {
-  get(_target, prop) {
-    if (!_redis) {
-      _redis = new Redis(env.REDIS_URL, {
-        maxRetriesPerRequest: null, // Required by BullMQ
-      });
+export function getRedis(): Redis {
+  if (!_redis) {
+    _redis = new Redis(env.REDIS_URL, {
+      maxRetriesPerRequest: null, // Required by BullMQ
+    });
 
-      _redis.on("connect", () => {
-        logger.info("Redis connected");
-      });
+    _redis.on("connect", () => {
+      logger.info("Redis connected");
+    });
 
-      _redis.on("error", (err) => {
-        logger.error({ err }, "Redis connection error");
-      });
-    }
-    return (_redis as unknown as Record<string | symbol, unknown>)[prop];
-  },
-});
+    _redis.on("error", (err) => {
+      logger.error({ err }, "Redis connection error");
+    });
+  }
+  return _redis;
+}

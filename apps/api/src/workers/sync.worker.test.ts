@@ -26,11 +26,11 @@ const mockDbSelect = vi.fn();
 const mockDbUpdate = vi.fn();
 const mockDbInsert = vi.fn();
 vi.mock("../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mockDbSelect(...args),
     update: (...args: unknown[]) => mockDbUpdate(...args),
     insert: (...args: unknown[]) => mockDbInsert(...args),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

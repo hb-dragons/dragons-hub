@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { matches, teams } from "@dragons/db/schema";
 import { and, eq, gte, lte, isNotNull, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -48,7 +48,7 @@ export async function getWeekendMatches(
       ? isNotNull(matches.homeScore)
       : isNull(matches.homeScore);
 
-  const rows = await db
+  const rows = await getDb()
     .select({
       match: {
         id: matches.id,

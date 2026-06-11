@@ -6,12 +6,12 @@ const mockUpdate = vi.fn();
 const mockTransaction = vi.fn();
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mockSelect(...args),
     selectDistinct: (...args: unknown[]) => mockSelectDistinct(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
     transaction: (cb: (tx: unknown) => unknown) => mockTransaction(cb),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

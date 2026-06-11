@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { broadcastConfigs, liveScoreboards } from "@dragons/db/schema";
 import type {
   BroadcastConfig,
@@ -104,7 +104,7 @@ function rowToScoreboard(
 export async function buildBroadcastState(
   deviceId: string,
 ): Promise<BroadcastState> {
-  const [configRow] = await db
+  const [configRow] = await getDb()
     .select()
     .from(broadcastConfigs)
     .where(eq(broadcastConfigs.deviceId, deviceId))
@@ -125,7 +125,7 @@ export async function buildBroadcastState(
         updatedAt: new Date().toISOString(),
       };
 
-  const [scoreRow] = await db
+  const [scoreRow] = await getDb()
     .select()
     .from(liveScoreboards)
     .where(eq(liveScoreboards.deviceId, deviceId))

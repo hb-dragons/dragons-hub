@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { referees, refereeRoles, matchReferees, matches, matchChanges, refereeAssignmentIntents } from "@dragons/db/schema";
 import { eq, sql, inArray } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
@@ -43,7 +43,7 @@ export async function syncRefereeRolesFromData(
   log.info({ count: rolesMap.size }, "Batch syncing referee roles");
 
   // Pre-load existing roles for lookup (before upsert)
-  const existingRoles = await db
+  const existingRoles = await getDb()
     .select({ id: refereeRoles.id, apiId: refereeRoles.apiId })
     .from(refereeRoles);
   const roleIdLookup = new Map(existingRoles.map((r) => [r.apiId, r.id]));
@@ -59,7 +59,7 @@ export async function syncRefereeRolesFromData(
   }));
 
   try {
-    const upsertResult = await db
+    const upsertResult = await getDb()
       .insert(refereeRoles)
       .values(roleRecords)
       .onConflictDoUpdate({
@@ -129,7 +129,7 @@ export async function syncRefereesFromData(
   log.info({ count: refereesMap.size }, "Batch syncing referees");
 
   // Pre-load existing referees for lookup (before upsert)
-  const existingRefs = await db
+  const existingRefs = await getDb()
     .select({ id: referees.id, apiId: referees.apiId })
     .from(referees);
   const refereeIdLookup = new Map(existingRefs.map((r) => [r.apiId, r.id]));
@@ -151,7 +151,7 @@ export async function syncRefereesFromData(
   }));
 
   try {
-    const upsertResult = await db
+    const upsertResult = await getDb()
       .insert(referees)
       .values(refereeRecords)
       .onConflictDoUpdate({
@@ -206,7 +206,7 @@ export async function syncRefereesFromData(
 }
 
 export async function buildMatchIdLookup(): Promise<Map<number, number>> {
-  const allMatches = await db
+  const allMatches = await getDb()
     .select({ id: matches.id, apiMatchId: matches.apiMatchId })
     .from(matches);
   return new Map(allMatches.map((m) => [m.apiMatchId, m.id]));
@@ -246,7 +246,7 @@ export async function syncRefereeAssignmentsFromData(
   // Batch-load existing assignments to avoid N+1 SELECTs
   const matchIdsToCheck = [...new Set(validAssignments.map((a) => matchIdLookup.get(a.matchApiId)!))];
   const existingAssignments = matchIdsToCheck.length > 0
-    ? await db
+    ? await getDb()
         .select()
         .from(matchReferees)
         .where(inArray(matchReferees.matchId, matchIdsToCheck))
@@ -264,15 +264,15 @@ export async function syncRefereeAssignmentsFromData(
 
   const [refRows, matchRows, roleRows] = await Promise.all([
     allRefereeIds.length > 0
-      ? db.select({ id: referees.id, firstName: referees.firstName, lastName: referees.lastName })
+      ? getDb().select({ id: referees.id, firstName: referees.firstName, lastName: referees.lastName })
           .from(referees).where(inArray(referees.id, allRefereeIds))
       : Promise.resolve([]),
     matchIdsToCheck.length > 0
-      ? db.select({ id: matches.id, matchNo: matches.matchNo, homeTeamApiId: matches.homeTeamApiId, guestTeamApiId: matches.guestTeamApiId, currentRemoteVersion: matches.currentRemoteVersion })
+      ? getDb().select({ id: matches.id, matchNo: matches.matchNo, homeTeamApiId: matches.homeTeamApiId, guestTeamApiId: matches.guestTeamApiId, currentRemoteVersion: matches.currentRemoteVersion })
           .from(matches).where(inArray(matches.id, matchIdsToCheck))
       : Promise.resolve([]),
     allRoleIds.length > 0
-      ? db.select({ id: refereeRoles.id, name: refereeRoles.name })
+      ? getDb().select({ id: refereeRoles.id, name: refereeRoles.name })
           .from(refereeRoles).where(inArray(refereeRoles.id, allRoleIds))
       : Promise.resolve([]),
   ]);
@@ -299,7 +299,7 @@ export async function syncRefereeAssignmentsFromData(
       const existing = existingBySlot.get(`${matchId}-${slotNumber}`) ?? null;
 
       if (!existing) {
-        await db.insert(matchReferees).values({
+        await getDb().insert(matchReferees).values({
           matchId,
           refereeId,
           roleId,
@@ -314,7 +314,7 @@ export async function syncRefereeAssignmentsFromData(
         const roleName = roleNameMap.get(roleId) ?? "Unknown";
 
         try {
-          await db.insert(matchChanges).values({
+          await getDb().insert(matchChanges).values({
             matchId,
             track: "remote",
             versionNumber: matchInfo?.currentRemoteVersion ?? 0,
@@ -361,7 +361,7 @@ export async function syncRefereeAssignmentsFromData(
       } else if (existing.refereeId !== refereeId || existing.roleId !== roleId) {
         const oldRefereeId = existing.refereeId;
 
-        await db
+        await getDb()
           .update(matchReferees)
           .set({ refereeId, roleId })
           .where(eq(matchReferees.id, existing.id));
@@ -374,7 +374,7 @@ export async function syncRefereeAssignmentsFromData(
           const roleName = roleNameMap.get(roleId) ?? "Unknown";
 
           try {
-            await db.insert(matchChanges).values({
+            await getDb().insert(matchChanges).values({
               matchId,
               track: "remote",
               versionNumber: matchInfo?.currentRemoteVersion ?? 0,
@@ -434,7 +434,7 @@ export async function confirmIntentsFromSync(): Promise<number> {
   const now = new Date();
 
   // Single query: update all pending intents that have a matching assignment
-  const result = await db.execute(sql`
+  const result = await getDb().execute(sql`
     UPDATE ${refereeAssignmentIntents}
     SET confirmed_by_sync_at = ${now}
     WHERE ${refereeAssignmentIntents.confirmedBySyncAt} IS NULL

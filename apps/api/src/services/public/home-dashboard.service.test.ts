@@ -17,7 +17,7 @@ let _teamCountResult: unknown[] = [{ count: 3 }];
 let _selectCallCount = 0;
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: vi.fn(() => {
       _selectCallCount++;
       // First call: standings aggregate; second call: team count
@@ -35,7 +35,7 @@ vi.mock("../../config/database", () => ({
       };
       return chain;
     }),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

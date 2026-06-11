@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { logger } from "../../config/logger";
 import {
   venueBookings,
@@ -38,7 +38,7 @@ const DEFAULTS = {
 } as const;
 
 export async function getBookingConfig(): Promise<BookingConfig> {
-  const rows = await db
+  const rows = await getDb()
     .select({ key: appSettings.key, value: appSettings.value })
     .from(appSettings)
     .where(
@@ -81,7 +81,7 @@ interface MatchWithTeam {
 async function queryHomeMatches(matchIds: number[]): Promise<MatchWithTeam[]> {
   if (matchIds.length === 0) return [];
 
-  const rows = await db
+  const rows = await getDb()
     .select({
       matchId: matches.id,
       venueId: matches.venueId,
@@ -128,16 +128,16 @@ function sortMatchesByKickoff(matches: ReconcilePreviewMatch[]): ReconcilePrevie
 async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, ReconcilePreviewMatch>> {
   if (matchIds.length === 0) return new Map();
 
-  const homeTeam = db
+  const homeTeam = getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name, customName: teams.customName })
     .from(teams)
     .as("home_team");
-  const guestTeam = db
+  const guestTeam = getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
     .from(teams)
     .as("guest_team");
 
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: matches.id,
       kickoffTime: matches.kickoffTime,
@@ -169,7 +169,7 @@ async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, Re
 
 async function fetchVenueNames(venueIds: number[]): Promise<Map<number, string>> {
   if (venueIds.length === 0) return new Map();
-  const rows = await db
+  const rows = await getDb()
     .select({ id: venues.id, name: venues.name })
     .from(venues)
     .where(inArray(venues.id, venueIds));
@@ -180,7 +180,7 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
   const preview: ReconcilePreview = { toCreate: [], toUpdate: [], toRemove: [], unchanged: 0 };
 
   // Get all home matches (including forfeited/cancelled so we can show them)
-  const allHomeMatchRows = await db
+  const allHomeMatchRows = await getDb()
     .select({ id: matches.id })
     .from(matches)
     .innerJoin(teams, eq(teams.apiTeamPermanentId, matches.homeTeamApiId))
@@ -204,7 +204,7 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
   }
 
   // Also get existing bookings to find removals
-  const existingBookings = await db
+  const existingBookings = await getDb()
     .select({
       id: venueBookings.id,
       venueId: venueBookings.venueId,
@@ -220,7 +220,7 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
   }
 
   // Get existing junction entries for each booking
-  const allJunctions = await db
+  const allJunctions = await getDb()
     .select({
       venueBookingId: venueBookingMatches.venueBookingId,
       matchId: venueBookingMatches.matchId,
@@ -359,7 +359,7 @@ export async function reconcileBookingsForMatches(
     const activeGames = group.filter(isActiveMatch);
 
     // Find existing booking
-    const [existing] = await db
+    const [existing] = await getDb()
       .select()
       .from(venueBookings)
       .where(
@@ -375,7 +375,7 @@ export async function reconcileBookingsForMatches(
       if (existing) {
         // Remove all junction entries for these matches
         const cancelledMatchIds = group.map((g) => g.matchId);
-        await db
+        await getDb()
           .delete(venueBookingMatches)
           .where(
             and(
@@ -385,13 +385,13 @@ export async function reconcileBookingsForMatches(
           );
 
         // Check if booking has any remaining matches
-        const [remaining] = await db
+        const [remaining] = await getDb()
           .select({ count: sql<number>`count(*)` })
           .from(venueBookingMatches)
           .where(eq(venueBookingMatches.venueBookingId, existing.id));
 
         if (Number(remaining!.count) === 0) {
-          await db.delete(venueBookings).where(eq(venueBookings.id, existing.id));
+          await getDb().delete(venueBookings).where(eq(venueBookings.id, existing.id));
           result.removed++;
         }
         touchedBookingIds.add(existing.id);
@@ -428,7 +428,7 @@ export async function reconcileBookingsForMatches(
           updateData.confirmedBy = null;
         }
 
-        await db
+        await getDb()
           .update(venueBookings)
           .set(updateData)
           .where(eq(venueBookings.id, existing.id));
@@ -436,7 +436,7 @@ export async function reconcileBookingsForMatches(
         // Emit booking.needs_reconfirmation when a confirmed booking's times shift
         if (wasConfirmed) {
           try {
-            const [venueRow] = await db
+            const [venueRow] = await getDb()
               .select({ name: venues.name })
               .from(venues)
               .where(eq(venues.id, venueId))
@@ -470,7 +470,7 @@ export async function reconcileBookingsForMatches(
       await syncBookingMatches(existing.id, activeMatchIds);
       touchedBookingIds.add(existing.id);
     } else {
-      const [created] = await db
+      const [created] = await getDb()
         .insert(venueBookings)
         .values({
           venueId,
@@ -483,7 +483,7 @@ export async function reconcileBookingsForMatches(
         .returning({ id: venueBookings.id });
 
       if (activeMatchIds.length > 0) {
-        await db.insert(venueBookingMatches).values(
+        await getDb().insert(venueBookingMatches).values(
           activeMatchIds.map((matchId) => ({
             venueBookingId: created!.id,
             matchId,
@@ -497,7 +497,7 @@ export async function reconcileBookingsForMatches(
   }
 
   // Clean up stale bookings linked to these matchIds that we didn't touch
-  const allLinkedBookings = await db
+  const allLinkedBookings = await getDb()
     .select({ venueBookingId: venueBookingMatches.venueBookingId })
     .from(venueBookingMatches)
     .where(inArray(venueBookingMatches.matchId, matchIds));
@@ -511,7 +511,7 @@ export async function reconcileBookingsForMatches(
 
   if (staleBookingIds.size > 0) {
     for (const bookingId of staleBookingIds) {
-      await db
+      await getDb()
         .delete(venueBookingMatches)
         .where(
           and(
@@ -523,13 +523,13 @@ export async function reconcileBookingsForMatches(
   }
 
   for (const bookingId of staleBookingIds) {
-    const [remaining] = await db
+    const [remaining] = await getDb()
       .select({ count: sql<number>`count(*)` })
       .from(venueBookingMatches)
       .where(eq(venueBookingMatches.venueBookingId, bookingId));
 
     if (Number(remaining!.count) === 0) {
-      await db.delete(venueBookings).where(eq(venueBookings.id, bookingId));
+      await getDb().delete(venueBookings).where(eq(venueBookings.id, bookingId));
       result.removed++;
     }
   }
@@ -544,7 +544,7 @@ async function syncBookingMatches(
   bookingId: number,
   expectedMatchIds: number[],
 ): Promise<void> {
-  const existing = await db
+  const existing = await getDb()
     .select({ matchId: venueBookingMatches.matchId })
     .from(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, bookingId));
@@ -556,13 +556,13 @@ async function syncBookingMatches(
   const toDelete = [...existingIds].filter((id) => !expectedIds.has(id));
 
   if (toInsert.length > 0) {
-    await db.insert(venueBookingMatches).values(
+    await getDb().insert(venueBookingMatches).values(
       toInsert.map((matchId) => ({ venueBookingId: bookingId, matchId })),
     );
   }
 
   if (toDelete.length > 0) {
-    await db
+    await getDb()
       .delete(venueBookingMatches)
       .where(
         and(
@@ -576,7 +576,7 @@ async function syncBookingMatches(
 // ── Post-sync reconciliation ─────────────────────────────────────────────────
 
 export async function reconcileAfterSync(): Promise<void> {
-  const homeMatchRows = await db
+  const homeMatchRows = await getDb()
     .select({ id: matches.id })
     .from(matches)
     .innerJoin(teams, eq(teams.apiTeamPermanentId, matches.homeTeamApiId))
@@ -595,7 +595,7 @@ export async function reconcileAfterSync(): Promise<void> {
 // ── Single match reconciliation ──────────────────────────────────────────────
 
 export async function reconcileMatch(matchId: number): Promise<void> {
-  const previousLinks = await db
+  const previousLinks = await getDb()
     .select({
       venueBookingId: venueBookingMatches.venueBookingId,
       bookingVenueId: venueBookings.venueId,
@@ -605,7 +605,7 @@ export async function reconcileMatch(matchId: number): Promise<void> {
     .innerJoin(venueBookings, eq(venueBookings.id, venueBookingMatches.venueBookingId))
     .where(eq(venueBookingMatches.matchId, matchId));
 
-  const [currentMatch] = await db
+  const [currentMatch] = await getDb()
     .select({
       venueId: matches.venueId,
       kickoffDate: matches.kickoffDate,
@@ -621,7 +621,7 @@ export async function reconcileMatch(matchId: number): Promise<void> {
         link.bookingDate !== currentMatch.kickoffDate;
 
       if (changed) {
-        await db
+        await getDb()
           .delete(venueBookingMatches)
           .where(
             and(
@@ -630,13 +630,13 @@ export async function reconcileMatch(matchId: number): Promise<void> {
             ),
           );
 
-        const [remaining] = await db
+        const [remaining] = await getDb()
           .select({ count: sql<number>`count(*)` })
           .from(venueBookingMatches)
           .where(eq(venueBookingMatches.venueBookingId, link.venueBookingId));
 
         if (Number(remaining!.count) === 0) {
-          await db
+          await getDb()
             .delete(venueBookings)
             .where(eq(venueBookings.id, link.venueBookingId));
         }

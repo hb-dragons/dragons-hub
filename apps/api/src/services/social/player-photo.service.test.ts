@@ -49,14 +49,14 @@ const { mockDb, mockGcs, mockSharp } = vi.hoisted(() => {
 // --- Module mocks ---
 
 vi.mock("../../config/database", () => ({
-  db: new Proxy(
+  getDb: () => (new Proxy(
     {},
     {
       get(_target, prop) {
         return mockDb[prop as keyof typeof mockDb];
       },
     },
-  ),
+  )),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

@@ -18,29 +18,32 @@ describe("database config", () => {
     mockCreateDb.mockReturnValue({ db: mockDb, pool: mockPool });
   });
 
-  it("creates db lazily on first access", async () => {
-    const { db } = await import("./database");
+  it("creates db lazily on first call", async () => {
+    const { getDb } = await import("./database");
 
-    // Access a property to trigger initialization
-    void db.select;
+    expect(mockCreateDb).not.toHaveBeenCalled();
+
+    // Calling getDb() triggers initialization
+    getDb();
 
     expect(mockCreateDb).toHaveBeenCalledWith("postgresql://test:test@localhost:5432/test");
   });
 
   it("reuses the same db instance", async () => {
-    const { db } = await import("./database");
+    const { getDb } = await import("./database");
 
-    void db.select;
-    void db.insert;
+    const first = getDb();
+    const second = getDb();
 
+    expect(first).toBe(second);
     expect(mockCreateDb).toHaveBeenCalledTimes(1);
   });
 
   it("closeDb() ends the pool", async () => {
-    const { db, closeDb } = await import("./database");
+    const { getDb, closeDb } = await import("./database");
 
     // Trigger initialization
-    void db.select;
+    getDb();
 
     await closeDb();
 

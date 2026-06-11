@@ -1,5 +1,5 @@
 import { and, eq, gt, asc } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   liveScoreboards,
   scoreboardSnapshots,
@@ -24,7 +24,7 @@ export function createScoreboardStream({
     onClose,
     onStart: async (enqueue, isCancelled) => {
       if (lastEventId !== undefined) {
-        const rows = await db
+        const rows = await getDb()
           .select()
           .from(scoreboardSnapshots)
           .where(
@@ -40,7 +40,7 @@ export function createScoreboardStream({
           enqueue(sseEvent(row.id, "snapshot", row));
         }
       } else {
-        const live = await db
+        const live = await getDb()
           .select()
           .from(liveScoreboards)
           .where(eq(liveScoreboards.deviceId, deviceId))

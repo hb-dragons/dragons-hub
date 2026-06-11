@@ -29,12 +29,12 @@ const mockTransaction = vi.fn((fn: (tx: unknown) => unknown) =>
   fn({ update: (...args: unknown[]) => mockUpdate(...args) }),
 );
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     insert: (...args: unknown[]) => mockInsert(...args),
     select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
     transaction: (...args: [(tx: unknown) => unknown]) => mockTransaction(...args),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

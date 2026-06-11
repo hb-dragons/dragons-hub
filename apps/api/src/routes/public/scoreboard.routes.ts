@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { describeRoute } from "hono-openapi";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { liveScoreboards } from "@dragons/db/schema";
 import { createScoreboardStream } from "../../services/scoreboard/sse";
 import { env } from "../../config/env";
@@ -27,7 +27,7 @@ publicScoreboardRoutes.get(
     if (!deviceId) {
       return c.json({ error: "deviceId required", code: "BAD_REQUEST" }, 400);
     }
-    const rows = await db
+    const rows = await getDb()
       .select()
       .from(liveScoreboards)
       .where(eq(liveScoreboards.deviceId, deviceId))

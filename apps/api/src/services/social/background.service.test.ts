@@ -41,7 +41,7 @@ const { mockDb, mockSharp, mockGcs, txMock } = vi.hoisted(() => {
   return { mockDb, mockSharp, mockGcs, txMock };
 });
 
-vi.mock("../../config/database", () => ({ db: mockDb }));
+vi.mock("../../config/database", () => ({ getDb: () => (mockDb) }));
 vi.mock("@dragons/db/schema", () => ({
   socialBackgrounds: { id: "id", isDefault: "isDefault", createdAt: "createdAt" },
 }));

@@ -9,7 +9,7 @@ import {
   lt,
   or,
 } from "drizzle-orm";
-import { db } from "../config/database";
+import { getDb } from "../config/database";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { notificationLog, pushDevices } from "@dragons/db/schema";
@@ -41,7 +41,7 @@ export async function reconcilePushReceipts(
   const pollCutoff = new Date(Date.now() - POLL_INTERVAL_MS);
   const ageCutoff = new Date(Date.now() - MAX_AGE_MS);
 
-  const pending = await db
+  const pending = await getDb()
     .select({
       id: notificationLog.id,
       providerTicketId: notificationLog.providerTicketId,
@@ -113,7 +113,7 @@ export async function reconcilePushReceipts(
   }
 
   if (deliveredIds.length > 0) {
-    await db
+    await getDb()
       .update(notificationLog)
       .set({ status: "delivered", providerReceiptCheckedAt: now })
       .where(inArray(notificationLog.id, deliveredIds));
@@ -121,7 +121,7 @@ export async function reconcilePushReceipts(
   }
 
   if (bumpOnlyIds.length > 0) {
-    await db
+    await getDb()
       .update(notificationLog)
       .set({ providerReceiptCheckedAt: now })
       .where(inArray(notificationLog.id, bumpOnlyIds));
@@ -141,7 +141,7 @@ export async function reconcilePushReceipts(
     }
   }
   for (const [errorCode, ids] of failuresByCode) {
-    await db
+    await getDb()
       .update(notificationLog)
       .set({
         status: "failed",
@@ -152,7 +152,7 @@ export async function reconcilePushReceipts(
   }
 
   if (tokensToPurge.length > 0) {
-    await db.delete(pushDevices).where(inArray(pushDevices.token, tokensToPurge));
+    await getDb().delete(pushDevices).where(inArray(pushDevices.token, tokensToPurge));
     log.info({ count: tokensToPurge.length }, "purged invalid push devices");
   }
 

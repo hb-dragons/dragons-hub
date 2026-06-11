@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/redis", () => ({
-  redis: {
+  getRedis: () => ({
     async set(key: string, value: string, _ex?: string, _ttl?: number, mode?: string) {
       if (mode === "NX" && mocks.redisStore.has(key)) return null;
       mocks.redisStore.set(key, value);
@@ -24,15 +24,15 @@ vi.mock("../../config/redis", () => ({
       for (const k of keys) mocks.redisStore.delete(k);
       return 0;
     },
-  },
+  }),
 }));
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mocks.dbSelect(...args),
     insert: (...args: unknown[]) => mocks.dbInsert(...args),
     transaction: (fn: (tx: unknown) => Promise<unknown>) => mocks.dbTransaction(fn),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

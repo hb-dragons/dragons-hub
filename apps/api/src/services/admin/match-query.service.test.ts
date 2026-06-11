@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 // --- Mock setup ---
 
 vi.mock("../../config/database", () => ({
-  db: {},
+  getDb: () => ({}),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

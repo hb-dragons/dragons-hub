@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
 import { referees, refereeAssignmentRules } from "@dragons/db/schema";
 import {
@@ -113,13 +113,13 @@ export async function getVisibleRefereeGames(
 
     const whereClause = and(...conditions)!;
     const [items, countResult] = await Promise.all([
-      db.select(refereeGameColumns)
+      getDb().select(refereeGameColumns)
         .from(refereeGames)
         .where(whereClause)
         .orderBy(asc(refereeGames.kickoffDate), asc(refereeGames.kickoffTime))
         .limit(limit)
         .offset(offset),
-      db.select({ count: sql<number>`count(*)::int` })
+      getDb().select({ count: sql<number>`count(*)::int` })
         .from(refereeGames)
         .where(whereClause),
     ]);
@@ -138,7 +138,7 @@ export async function getVisibleRefereeGames(
   }
 
   // 1. Load referee flags + federation apiId
-  const [referee] = await db
+  const [referee] = await getDb()
     .select({
       apiId: referees.apiId,
       allowAllHomeGames: referees.allowAllHomeGames,
@@ -157,7 +157,7 @@ export async function getVisibleRefereeGames(
   }
 
   // 2. Load referee rules
-  const rules = await db
+  const rules = await getDb()
     .select({
       teamId: refereeAssignmentRules.teamId,
       deny: refereeAssignmentRules.deny,
@@ -277,13 +277,13 @@ export async function getVisibleRefereeGames(
   const whereClause = and(...conditions)!;
 
   const [items, countResult] = await Promise.all([
-    db.select(refereeGameColumns)
+    getDb().select(refereeGameColumns)
     .from(refereeGames)
     .where(whereClause)
     .orderBy(asc(refereeGames.kickoffDate), asc(refereeGames.kickoffTime))
     .limit(limit)
     .offset(offset),
-    db.select({ count: sql<number>`count(*)::int` })
+    getDb().select({ count: sql<number>`count(*)::int` })
     .from(refereeGames)
     .where(whereClause),
   ]);
@@ -382,7 +382,7 @@ export async function getVisibleRefereeGameByApiMatchId(
   apiMatchId: number,
 ): Promise<RefereeGameListItem | null> {
   if (refereeId === null) {
-    const [row] = await db
+    const [row] = await getDb()
       .select(refereeGameColumns)
       .from(refereeGames)
       .where(eq(refereeGames.apiMatchId, apiMatchId))
@@ -391,7 +391,7 @@ export async function getVisibleRefereeGameByApiMatchId(
     return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
   }
 
-  const [referee] = await db
+  const [referee] = await getDb()
     .select({
       apiId: referees.apiId,
       allowAllHomeGames: referees.allowAllHomeGames,
@@ -403,7 +403,7 @@ export async function getVisibleRefereeGameByApiMatchId(
 
   if (!referee || !referee.isOwnClub) return null;
 
-  const rules = await db
+  const rules = await getDb()
     .select({
       teamId: refereeAssignmentRules.teamId,
       deny: refereeAssignmentRules.deny,
@@ -436,7 +436,7 @@ export async function getVisibleRefereeGameByApiMatchId(
     ? accessParts[0]!
     : or(...accessParts)!;
 
-  const [row] = await db
+  const [row] = await getDb()
     .select(refereeGameColumns)
     .from(refereeGames)
     .where(and(eq(refereeGames.apiMatchId, apiMatchId), accessCondition)!)
@@ -459,7 +459,7 @@ export async function getVisibleRefereeGameByMatchId(
   matchId: number,
 ): Promise<RefereeGameListItem | null> {
   if (refereeId === null) {
-    const [row] = await db
+    const [row] = await getDb()
       .select(refereeGameColumns)
       .from(refereeGames)
       .where(eq(refereeGames.matchId, matchId))
@@ -468,7 +468,7 @@ export async function getVisibleRefereeGameByMatchId(
     return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
   }
 
-  const [referee] = await db
+  const [referee] = await getDb()
     .select({
       apiId: referees.apiId,
       allowAllHomeGames: referees.allowAllHomeGames,
@@ -480,7 +480,7 @@ export async function getVisibleRefereeGameByMatchId(
 
   if (!referee || !referee.isOwnClub) return null;
 
-  const rules = await db
+  const rules = await getDb()
     .select({
       teamId: refereeAssignmentRules.teamId,
       deny: refereeAssignmentRules.deny,
@@ -513,7 +513,7 @@ export async function getVisibleRefereeGameByMatchId(
     ? accessParts[0]!
     : or(...accessParts)!;
 
-  const [row] = await db
+  const [row] = await getDb()
     .select(refereeGameColumns)
     .from(refereeGames)
     .where(and(eq(refereeGames.matchId, matchId), accessCondition)!)
@@ -536,7 +536,7 @@ export async function getVisibleRefereeGameById(
   id: number,
 ): Promise<RefereeGameListItem | null> {
   if (refereeId === null) {
-    const [row] = await db
+    const [row] = await getDb()
       .select(refereeGameColumns)
       .from(refereeGames)
       .where(eq(refereeGames.id, id))
@@ -545,7 +545,7 @@ export async function getVisibleRefereeGameById(
     return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
   }
 
-  const [referee] = await db
+  const [referee] = await getDb()
     .select({
       apiId: referees.apiId,
       allowAllHomeGames: referees.allowAllHomeGames,
@@ -557,7 +557,7 @@ export async function getVisibleRefereeGameById(
 
   if (!referee || !referee.isOwnClub) return null;
 
-  const rules = await db
+  const rules = await getDb()
     .select({
       teamId: refereeAssignmentRules.teamId,
       deny: refereeAssignmentRules.deny,
@@ -590,7 +590,7 @@ export async function getVisibleRefereeGameById(
     ? accessParts[0]!
     : or(...accessParts)!;
 
-  const [row] = await db
+  const [row] = await getDb()
     .select(refereeGameColumns)
     .from(refereeGames)
     .where(and(eq(refereeGames.id, id), accessCondition)!)

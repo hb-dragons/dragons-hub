@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { teams } from "@dragons/db/schema";
 import { desc, asc } from "drizzle-orm";
 import { getTeamStats } from "../../services/public/team-stats.service";
@@ -17,7 +17,7 @@ publicTeamRoutes.get(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const result = await db
+    const result = await getDb()
       .select()
       .from(teams)
       .orderBy(desc(teams.isOwnClub), asc(teams.displayOrder), asc(teams.name));

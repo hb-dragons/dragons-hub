@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../../../config/database";
+import { getDb } from "../../../config/database";
 import { notificationLog } from "@dragons/db/schema";
 import type { ChannelSendParams, DeliveryResult } from "./types";
 import { env } from "../../../config/env";
@@ -15,7 +15,7 @@ export class WhatsAppGroupAdapter {
     // is the delivery audit trail this channel previously lacked.
     let claimId: number;
     try {
-      const rows = await db
+      const rows = await getDb()
         .insert(notificationLog)
         .values({
           eventId: params.eventId,
@@ -44,7 +44,7 @@ export class WhatsAppGroupAdapter {
     // Release the claim on any failure so the event stays retryable.
     const releaseClaim = async () => {
       try {
-        await db.delete(notificationLog).where(eq(notificationLog.id, claimId));
+        await getDb().delete(notificationLog).where(eq(notificationLog.id, claimId));
       } catch (err) {
         log.error({ err, claimId }, "Failed to release WhatsApp claim row");
       }
@@ -80,7 +80,7 @@ export class WhatsAppGroupAdapter {
         return { success: false, error: `WAHA error ${response.status}: ${errorText}` };
       }
 
-      await db
+      await getDb()
         .update(notificationLog)
         .set({ status: "sent", sentAt: new Date() })
         .where(eq(notificationLog.id, claimId));

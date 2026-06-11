@@ -3,7 +3,7 @@ import { and, desc, eq, gt } from "drizzle-orm";
 import { describeRoute, validator } from "hono-openapi";
 import { requireAnyRole } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   liveScoreboards,
   scoreboardSnapshots,
@@ -38,7 +38,7 @@ adminScoreboardRoutes.get(
             gt(scoreboardSnapshots.id, query.afterId),
           )
         : eq(scoreboardSnapshots.deviceId, query.deviceId);
-    const rows = await db
+    const rows = await getDb()
       .select()
       .from(scoreboardSnapshots)
       .where(where)
@@ -61,7 +61,7 @@ adminScoreboardRoutes.get(
     if (!deviceId) {
       return c.json({ error: "deviceId required", code: "BAD_REQUEST" }, 400);
     }
-    const rows = await db
+    const rows = await getDb()
       .select()
       .from(liveScoreboards)
       .where(eq(liveScoreboards.deviceId, deviceId))

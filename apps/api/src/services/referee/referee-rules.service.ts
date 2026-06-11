@@ -1,10 +1,10 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { refereeAssignmentRules, teams } from "@dragons/db/schema";
 import { eq, and } from "drizzle-orm";
 import type { RefereeRulesResponse, UpdateRefereeRulesBody } from "@dragons/shared";
 
 export async function getRulesForReferee(refereeId: number): Promise<RefereeRulesResponse> {
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: refereeAssignmentRules.id,
       teamId: refereeAssignmentRules.teamId,
@@ -24,7 +24,7 @@ export async function updateRulesForReferee(
   refereeId: number,
   body: UpdateRefereeRulesBody,
 ): Promise<RefereeRulesResponse> {
-  await db.transaction(async (tx) => {
+  await getDb().transaction(async (tx) => {
     await tx
       .delete(refereeAssignmentRules)
       .where(eq(refereeAssignmentRules.refereeId, refereeId));
@@ -49,7 +49,7 @@ export async function updateRulesForReferee(
 }
 
 export async function hasAnyRules(refereeId: number): Promise<boolean> {
-  const rows = await db
+  const rows = await getDb()
     .select({ id: refereeAssignmentRules.id })
     .from(refereeAssignmentRules)
     .where(eq(refereeAssignmentRules.refereeId, refereeId))
@@ -62,7 +62,7 @@ export async function getRuleForRefereeAndTeam(
   refereeId: number,
   teamId: number,
 ): Promise<{ deny: boolean; allowSr1: boolean; allowSr2: boolean } | null> {
-  const [rule] = await db
+  const [rule] = await getDb()
     .select({
       deny: refereeAssignmentRules.deny,
       allowSr1: refereeAssignmentRules.allowSr1,
@@ -81,7 +81,7 @@ export async function getRuleForRefereeAndTeam(
 }
 
 export async function getAllowedTeamIdsForReferee(refereeId: number): Promise<number[]> {
-  const rows = await db
+  const rows = await getDb()
     .select({ teamId: refereeAssignmentRules.teamId })
     .from(refereeAssignmentRules)
     .where(eq(refereeAssignmentRules.refereeId, refereeId));

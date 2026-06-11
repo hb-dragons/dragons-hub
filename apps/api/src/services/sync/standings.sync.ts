@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { standings } from "@dragons/db/schema";
 import { sql } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
@@ -102,7 +102,7 @@ export async function syncStandingsFromData(
   log.info({ count: allStandingRecords.length }, "Batch syncing standings");
 
   try {
-    const upsertResult = await db
+    const upsertResult = await getDb()
       .insert(standings)
       .values(allStandingRecords)
       .onConflictDoUpdate({

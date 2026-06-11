@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { referees, refereeAssignmentRules, teams, matchReferees } from "@dragons/db/schema";
 import { sql, asc, desc, ilike, and, or, eq, inArray } from "drizzle-orm";
 import type {
@@ -59,7 +59,7 @@ export async function getReferees(
                               [asc(referees.lastName), asc(referees.firstName)];
 
   const [rows, countResult] = await Promise.all([
-    db
+    getDb()
       .select({
         id: referees.id,
         apiId: referees.apiId,
@@ -80,7 +80,7 @@ export async function getReferees(
       .orderBy(...orderBy)
       .limit(limit)
       .offset(offset),
-    db
+    getDb()
       .select({ count: sql<number>`count(*)::int` })
       .from(referees)
       .where(whereClause),
@@ -108,7 +108,7 @@ export async function getReferees(
 export async function getRefereeById(refereeId: number): Promise<RefereeListItem | null> {
   const matchCountExpr = sql<number>`count(distinct ${matchReferees.matchId})::int`.as("match_count");
 
-  const [row] = await db
+  const [row] = await getDb()
     .select({
       id: referees.id,
       apiId: referees.apiId,
@@ -144,7 +144,7 @@ export async function getRefereeById(refereeId: number): Promise<RefereeListItem
 }
 
 export async function getRefereeCounts(): Promise<RefereeCountsResponse> {
-  const [row] = await db
+  const [row] = await getDb()
     .select({
       own: sql<number>`count(*) filter (where ${referees.isOwnClub})::int`,
       all: sql<number>`count(*)::int`,
@@ -157,7 +157,7 @@ export async function updateRefereeVisibility(
   refereeId: number,
   body: UpdateRefereeVisibilityBody,
 ) {
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(referees)
     .set({
       allowAllHomeGames: body.allowAllHomeGames,
@@ -184,7 +184,7 @@ export async function updateRefereeRules(
   refereeId: number,
   body: UpdateRefereeRulesBody,
 ) {
-  return db.transaction(async (tx) => {
+  return getDb().transaction(async (tx) => {
     const [ref] = await tx
       .select({ isOwnClub: referees.isOwnClub })
       .from(referees)

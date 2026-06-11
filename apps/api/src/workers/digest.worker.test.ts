@@ -43,11 +43,11 @@ vi.mock("../config/logger", () => ({
 }));
 
 vi.mock("../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mockDbSelect(...args),
     transaction: (fn: (tx: unknown) => Promise<unknown>) => mockDbTransaction(fn),
     delete: (...args: unknown[]) => mockDbDelete(...args),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

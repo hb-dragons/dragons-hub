@@ -17,7 +17,7 @@ vi.mock("../../config/auth", () => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: () => ({
       from: () => ({
         where: () => ({
@@ -28,7 +28,7 @@ vi.mock("../../config/database", () => ({
         }),
       }),
     }),
-  },
+  }),
 }));
 
 import { adminScoreboardRoutes } from "./scoreboard.routes";

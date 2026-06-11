@@ -3,14 +3,14 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins/admin";
 import { ac, roles } from "@dragons/shared";
-import { db } from "./database";
+import { getDb } from "./database";
 import { env } from "./env";
-import { redis } from "./redis";
+import { getRedis } from "./redis";
 
 const SECONDARY_STORAGE_PREFIX = "ba:";
 
 export const auth = betterAuth({
-  database: drizzleAdapter(db, { provider: "pg" }),
+  database: drizzleAdapter(getDb(), { provider: "pg" }),
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
   trustedOrigins: [
@@ -25,15 +25,15 @@ export const auth = betterAuth({
   },
   secondaryStorage: {
     async get(key) {
-      return redis.get(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      return getRedis().get(`${SECONDARY_STORAGE_PREFIX}${key}`);
     },
     async set(key, value, ttl) {
       const k = `${SECONDARY_STORAGE_PREFIX}${key}`;
-      if (ttl && ttl > 0) await redis.set(k, value, "EX", ttl);
-      else await redis.set(k, value);
+      if (ttl && ttl > 0) await getRedis().set(k, value, "EX", ttl);
+      else await getRedis().set(k, value);
     },
     async delete(key) {
-      await redis.del(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      await getRedis().del(`${SECONDARY_STORAGE_PREFIX}${key}`);
     },
   },
   rateLimit: {

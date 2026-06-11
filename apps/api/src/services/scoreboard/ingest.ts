@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   broadcastConfigs,
   liveScoreboards,
@@ -66,7 +66,7 @@ export async function processIngest({
   // `decoded` (= snapshot) is non-null here — the null case returned above.
   const { frame, snapshot: decoded } = decodedResult;
 
-  const result = await db.transaction(async (tx) => {
+  const result = await getDb().transaction(async (tx) => {
     const [existing] = await tx
       .select()
       .from(liveScoreboards)
@@ -127,7 +127,7 @@ export async function processIngest({
   }
 
   try {
-    const [cfg] = await db
+    const [cfg] = await getDb()
       .select({ isLive: broadcastConfigs.isLive })
       .from(broadcastConfigs)
       .where(eq(broadcastConfigs.deviceId, deviceId))

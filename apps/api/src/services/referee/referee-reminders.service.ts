@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { appSettings } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import { logger } from "../../config/logger";
@@ -74,7 +74,7 @@ export function computeReminderDelays(
  */
 export async function getReminderDays(): Promise<number[]> {
   try {
-    const [row] = await db
+    const [row] = await getDb()
       .select({ value: appSettings.value })
       .from(appSettings)
       .where(eq(appSettings.key, SETTINGS_KEY))

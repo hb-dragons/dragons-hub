@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { userNotificationPreferences } from "@dragons/db/schema";
 import { isUserToggleableEventType } from "@dragons/shared";
 
@@ -16,7 +16,7 @@ export interface UserNotificationPreferencesPatch {
 export async function getUserNotificationPreferences(
   userId: string,
 ): Promise<UserNotificationPreferences> {
-  const [row] = await db
+  const [row] = await getDb()
     .select({
       mutedEventTypes: userNotificationPreferences.mutedEventTypes,
       locale: userNotificationPreferences.locale,
@@ -47,7 +47,7 @@ export async function updateUserNotificationPreferences(
   if (patch.mutedEventTypes !== undefined) setFields.mutedEventTypes = patch.mutedEventTypes;
   if (patch.locale !== undefined) setFields.locale = patch.locale;
 
-  await db
+  await getDb()
     .insert(userNotificationPreferences)
     .values({
       userId,

@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { digestBuffer, domainEvents, channelConfigs, notificationLog } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
-import { db } from "../config/database";
+import { getDb } from "../config/database";
 import { readLocale } from "../services/notifications/channel-config-parsers";
 import { renderDigestMessage, type DigestItem } from "../services/notifications/templates/digest";
 
@@ -20,7 +20,7 @@ export const digestWorker = new Worker<DigestJobData>(
     log.info("Processing digest job");
 
     // 1. Load the channel config
-    const [config] = await db
+    const [config] = await getDb()
       .select()
       .from(channelConfigs)
       .where(eq(channelConfigs.id, channelConfigId))
@@ -37,7 +37,7 @@ export const digestWorker = new Worker<DigestJobData>(
     }
 
     // 2. Load all buffered events for this channel
-    const bufferedRows = await db
+    const bufferedRows = await getDb()
       .select({
         bufferId: digestBuffer.id,
         eventId: digestBuffer.eventId,
@@ -77,7 +77,7 @@ export const digestWorker = new Worker<DigestJobData>(
     // both read the buffer, both send, and both clear — losing data.
     const bufferIds = bufferedRows.map((r) => r.bufferId);
 
-    await db.transaction(async (tx) => {
+    await getDb().transaction(async (tx) => {
       if (config.type === "in_app") {
         const anchorEventId = bufferedRows[0]!.eventId;
 

@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   matches,
   matchOverrides,
@@ -68,7 +68,7 @@ export async function updateMatchLocal(
   data: MatchUpdateData,
   changedBy: string,
 ): Promise<MatchDetailResponse | null> {
-  return await db.transaction(async (tx) => {
+  return await getDb().transaction(async (tx) => {
     const [locked] = await tx
       .select()
       .from(matches)
@@ -285,7 +285,7 @@ export async function releaseOverride(
   fieldName: string,
   changedBy: string,
 ): Promise<MatchDetailResponse | null> {
-  return await db.transaction(async (tx) => {
+  return await getDb().transaction(async (tx) => {
     const [locked] = await tx
       .select()
       .from(matches)

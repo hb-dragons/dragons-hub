@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => {
       mockSelect(...args);
       return {
@@ -24,7 +24,7 @@ vi.mock("../../config/database", () => ({
         },
       };
     },
-  },
+  }),
 }));
 
 vi.mock("../../services/public/team-stats.service", () => ({

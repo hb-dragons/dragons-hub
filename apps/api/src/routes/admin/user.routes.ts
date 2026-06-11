@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { describeRoute, validator } from "hono-openapi";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { user as userTable, referees } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAnyRole } from "../../middleware/rbac";
@@ -28,7 +28,7 @@ userRoutes.patch(
 
     // Validate referee exists if linking
     if (body.refereeId !== null) {
-      const [referee] = await db
+      const [referee] = await getDb()
         .select({ id: referees.id })
         .from(referees)
         .where(eq(referees.id, body.refereeId))
@@ -39,7 +39,7 @@ userRoutes.patch(
       }
     }
 
-    const [updated] = await db
+    const [updated] = await getDb()
       .update(userTable)
       .set({ refereeId: body.refereeId, updatedAt: new Date() })
       .where(eq(userTable.id, userId))

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { socialBackgrounds } from "@dragons/db/schema";
 import { eq, desc } from "drizzle-orm";
 import sharp from "sharp";
@@ -11,11 +11,11 @@ const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const TARGET_SIZE = 1080;
 
 export async function listBackgrounds() {
-  return db.select().from(socialBackgrounds).orderBy(desc(socialBackgrounds.createdAt));
+  return getDb().select().from(socialBackgrounds).orderBy(desc(socialBackgrounds.createdAt));
 }
 
 export async function getBackgroundById(id: number) {
-  const [record] = await db.select().from(socialBackgrounds).where(eq(socialBackgrounds.id, id));
+  const [record] = await getDb().select().from(socialBackgrounds).where(eq(socialBackgrounds.id, id));
   return record ?? null;
 }
 
@@ -37,7 +37,7 @@ export async function uploadBackground(buffer: Buffer, originalName: string, con
   const filename = `${randomUUID()}.png`;
   await uploadToGcs(`${UPLOAD_PREFIX}/${filename}`, resized, "image/png");
 
-  const [record] = await db
+  const [record] = await getDb()
     .insert(socialBackgrounds)
     .values({ filename, originalName, width: TARGET_SIZE, height: TARGET_SIZE })
     .returning();
@@ -45,13 +45,13 @@ export async function uploadBackground(buffer: Buffer, originalName: string, con
 }
 
 export async function deleteBackground(id: number) {
-  const [record] = await db.delete(socialBackgrounds).where(eq(socialBackgrounds.id, id)).returning();
+  const [record] = await getDb().delete(socialBackgrounds).where(eq(socialBackgrounds.id, id)).returning();
   if (record) await deleteFromGcs(`${UPLOAD_PREFIX}/${record.filename}`);
   return record ?? null;
 }
 
 export async function setDefaultBackground(id: number) {
-  await db.transaction(async (tx) => {
+  await getDb().transaction(async (tx) => {
     await tx.update(socialBackgrounds).set({ isDefault: false }).where(eq(socialBackgrounds.isDefault, true));
     await tx.update(socialBackgrounds).set({ isDefault: true }).where(eq(socialBackgrounds.id, id));
   });

@@ -1,5 +1,5 @@
 import { and, asc, eq, gte, lte } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { matches, venues, venueBookings } from "@dragons/db/schema";
 import { queryMatchWithJoins, getOwnClubMatches } from "../admin/match-query.service";
 import { getVisibleRefereeGameByMatchId } from "../referee/referee-game-visibility.service";
@@ -72,7 +72,7 @@ export async function listVenueBookings(params: z.infer<typeof listVenueBookings
   if (params.venueId != null) {
     where.push(eq(venueBookings.venueId, params.venueId));
   }
-  return db
+  return getDb()
     .select({
       venueId: venueBookings.venueId,
       date: venueBookings.date,
@@ -89,7 +89,7 @@ export async function listVenueBookings(params: z.infer<typeof listVenueBookings
 }
 
 export async function listClubVenues() {
-  return db
+  return getDb()
     .select({ venueId: venues.id, name: venues.name, city: venues.city })
     .from(venues)
     .orderBy(asc(venues.name));
@@ -98,7 +98,7 @@ export async function listClubVenues() {
 export async function getRoundWindow(
   params: z.infer<typeof roundWindowSchema>,
 ): Promise<{ from: string; to: string } | null> {
-  const rows = await db
+  const rows = await getDb()
     .select({ date: matches.kickoffDate })
     .from(matches)
     .where(and(eq(matches.leagueId, params.leagueId), eq(matches.matchDay, params.matchDay)));

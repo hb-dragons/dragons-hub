@@ -6,12 +6,12 @@ const mockDelete = vi.fn();
 const mockTransaction = vi.fn();
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mockSelect(...args),
     insert: (...args: unknown[]) => mockInsert(...args),
     delete: (...args: unknown[]) => mockDelete(...args),
     transaction: (fn: (tx: unknown) => Promise<unknown>) => mockTransaction(fn),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

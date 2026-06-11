@@ -16,9 +16,9 @@ vi.mock("../../config/logger", () => ({
 
 const mockInsert = vi.fn();
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     insert: (...args: unknown[]) => mockInsert(...args),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

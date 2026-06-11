@@ -1,5 +1,5 @@
 import { asc, ilike } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { venues } from "@dragons/db/schema";
 import type { VenueSearchResult, VenueListItem } from "@dragons/shared";
 
@@ -7,7 +7,7 @@ export async function searchVenues(
   query: string,
   limit: number = 10,
 ): Promise<VenueSearchResult[]> {
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: venues.id,
       name: venues.name,
@@ -22,7 +22,7 @@ export async function searchVenues(
 }
 
 export async function getVenues(): Promise<VenueListItem[]> {
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: venues.id,
       apiId: venues.apiId,

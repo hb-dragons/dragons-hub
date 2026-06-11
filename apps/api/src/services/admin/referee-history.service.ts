@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { appSettings, referees, refereeGames } from "@dragons/db/schema";
 import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import type {
@@ -34,7 +34,7 @@ export async function resolveHistoryDateRange(
 ): Promise<HistoryDateRange> {
   if (from && to) return { from, to, source: "user" };
 
-  const rows = await db
+  const rows = await getDb()
     .select({ key: appSettings.key, value: appSettings.value })
     .from(appSettings)
     .where(inArray(appSettings.key, ["currentSeasonStart", "currentSeasonEnd"]));
@@ -59,7 +59,7 @@ export async function resolveHistoryDateRange(
 // Matches games where our club has a slot obligation (home referee duty)
 // OR where one of our own referees is actually assigned to a slot.
 function buildRelevantGamesPredicate() {
-  const ownIds = db
+  const ownIds = getDb()
     .select({ id: referees.apiId })
     .from(referees)
     .where(eq(referees.isOwnClub, true));
@@ -131,7 +131,7 @@ export async function getRefereeHistorySummary(
   const range = await resolveHistoryDateRange(params.dateFrom, params.dateTo);
   const where = buildBaseWhere(params, range.from, range.to);
 
-  const [row] = await db
+  const [row] = await getDb()
     .select({
       games: sql<number>`count(*)::int`,
       obligatedSlots: sql<number>`(
@@ -170,7 +170,7 @@ export async function getRefereeHistorySummary(
   const finalKpis = { ...kpis, distinctReferees: leaderboard.length };
 
   const leagueScope = buildLeagueScopeWhere(params, range.from, range.to);
-  const leagueRows = await db
+  const leagueRows = await getDb()
     .selectDistinct({
       short: refereeGames.leagueShort,
       name: refereeGames.leagueName,
@@ -194,7 +194,7 @@ export async function getRefereeHistoryLeaderboard(
   const where = buildBaseWhere(params, range.from, range.to);
   const limit = options.limit ?? 100;
 
-  const rows = await db.execute(sql`
+  const rows = await getDb().execute(sql`
     WITH appearances AS (
       SELECT ${refereeGames.sr1RefereeApiId} AS api_id,
              ${refereeGames.sr1Name} AS raw_name, 1 AS sr1, 0 AS sr2,
@@ -309,10 +309,10 @@ export async function getRefereeHistoryGames(
   };
 
   const [items, countResult] = await Promise.all([
-    db.select(columns).from(refereeGames).where(where)
+    getDb().select(columns).from(refereeGames).where(where)
       .orderBy(desc(refereeGames.kickoffDate), desc(refereeGames.kickoffTime))
       .limit(params.limit).offset(params.offset),
-    db.select({ count: sql<number>`count(*)::int` })
+    getDb().select({ count: sql<number>`count(*)::int` })
       .from(refereeGames).where(where),
   ]);
 

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { describeRoute, validator } from "hono-openapi";
-import { db } from "../config/database";
+import { getDb } from "../config/database";
 import { pushDevices } from "@dragons/db/schema";
 import { eq, and } from "drizzle-orm";
 import { auth } from "../config/auth";
@@ -29,7 +29,7 @@ deviceRoutes.post(
 
     const { token, platform, locale } = c.req.valid("json");
 
-    await db
+    await getDb()
       .insert(pushDevices)
       .values({ userId: session.user.id, token, platform, locale })
       .onConflictDoUpdate({
@@ -65,7 +65,7 @@ deviceRoutes.delete(
     }
 
     const token = c.req.param("token");
-    await db
+    await getDb()
       .delete(pushDevices)
       .where(
         and(eq(pushDevices.token, token), eq(pushDevices.userId, session.user.id)),

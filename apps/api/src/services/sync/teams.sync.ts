@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { teams } from "@dragons/db/schema";
 import { sql, and, eq, ne, inArray } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
@@ -32,7 +32,7 @@ function teamHashData(teamRef: SdkTeamRef): Record<string, unknown> {
 }
 
 async function getMaxOwnDisplayOrder(): Promise<number> {
-  const [row] = await db
+  const [row] = await getDb()
     .select({ maxOrder: sql<number | null>`MAX(${teams.displayOrder})` })
     .from(teams)
     .where(eq(teams.isOwnClub, true));
@@ -67,7 +67,7 @@ export async function syncTeamsFromData(
   // Find which teamPermanentIds are already in the DB so we know which inserts are new
   // and whether isOwnClub is about to flip
   const refIds = Array.from(teamsMap.keys());
-  const existing = await db
+  const existing = await getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId, isOwnClub: teams.isOwnClub })
     .from(teams)
     .where(inArray(teams.apiTeamPermanentId, refIds));
@@ -105,7 +105,7 @@ export async function syncTeamsFromData(
   });
 
   try {
-    const upsertResult = await db
+    const upsertResult = await getDb()
       .insert(teams)
       .values(teamRecords)
       .onConflictDoUpdate({
@@ -164,7 +164,7 @@ export async function syncTeamsFromData(
   // Corrective pass: fix isOwnClub for teams whose hash didn't change (upsert skipped them)
   if (ownClubId > 0) {
     // Flip-to-true (hash-skipped rows): find own-club rows still marked as non-own
-    const toMarkOwn = await db
+    const toMarkOwn = await getDb()
       .select({ id: teams.id })
       .from(teams)
       .where(and(eq(teams.clubId, ownClubId), eq(teams.isOwnClub, false)));
@@ -172,7 +172,7 @@ export async function syncTeamsFromData(
     // Also assign max+1 to rows that were flipped to own via the upsert (hash changed)
     // These are rows in flippingToOwnIds — their isOwnClub is now true but displayOrder is still 0
     const flippedViaUpsert = flippingToOwnIds.size > 0
-      ? await db
+      ? await getDb()
           .select({ id: teams.id })
           .from(teams)
           .where(inArray(teams.apiTeamPermanentId, Array.from(flippingToOwnIds)))
@@ -198,7 +198,7 @@ export async function syncTeamsFromData(
       .map((row) => ({ id: row.id, displayOrder: nextCorrectionOrder++ }));
 
     if (markOwnUpdates.length > 0 || orderOnlyUpdates.length > 0) {
-      await db.transaction(async (tx) => {
+      await getDb().transaction(async (tx) => {
         await Promise.all([
           ...markOwnUpdates.map((u) =>
             tx
@@ -218,7 +218,7 @@ export async function syncTeamsFromData(
 
     // Flip-to-false: reset displayOrder to 0 in a single bulk UPDATE (hash-skipped rows only;
     // upsert already reset displayOrder via the CASE expression for hash-changed rows)
-    const unmarkOwn = await db
+    const unmarkOwn = await getDb()
       .update(teams)
       .set({ isOwnClub: false, displayOrder: 0, updatedAt: now })
       .where(and(ne(teams.clubId, ownClubId), eq(teams.isOwnClub, true)))
@@ -237,7 +237,7 @@ export async function syncTeamsFromData(
 }
 
 export async function buildTeamIdLookup(): Promise<Map<number, number>> {
-  const allTeams = await db
+  const allTeams = await getDb()
     .select({ id: teams.id, apiTeamPermanentId: teams.apiTeamPermanentId })
     .from(teams);
   return new Map(allTeams.map((t) => [t.apiTeamPermanentId, t.id]));

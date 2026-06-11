@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../../types";
 import { requireRefereeSelf } from "../../middleware/rbac";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { referees } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import {
@@ -48,7 +48,7 @@ refereeAssignmentRoutes.post("/games/:spielplanId/assign", requireRefereeSelf, a
     return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
   }
 
-  const [refereeRow] = await db
+  const [refereeRow] = await getDb()
     .select({ apiId: referees.apiId, isOwnClub: referees.isOwnClub })
     .from(referees)
     .where(eq(referees.id, refereeId))

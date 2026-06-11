@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import { eq } from "drizzle-orm";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
-import { db } from "../config/database";
+import { getDb } from "../config/database";
 import { captureTrace } from "../config/log-context";
 import { syncSchedule, syncRuns } from "@dragons/db/schema";
 
@@ -102,7 +102,7 @@ export async function triggerRefereeGamesSync(
     return null;
   }
 
-  const [syncRun] = await db
+  const [syncRun] = await getDb()
     .insert(syncRuns)
     .values({
       syncType: "referee-games",
@@ -141,7 +141,7 @@ export async function initializeScheduledJobs() {
   let enabled = true;
 
   try {
-    const [schedule] = await db
+    const [schedule] = await getDb()
       .select()
       .from(syncSchedule)
       .where(eq(syncSchedule.syncType, "full"))
@@ -173,7 +173,7 @@ export async function initializeScheduledJobs() {
 
   // Referee games sync — interval-based
   try {
-    const [refereeSchedule] = await db
+    const [refereeSchedule] = await getDb()
       .select()
       .from(syncSchedule)
       .where(eq(syncSchedule.syncType, "referee-games"))
@@ -260,7 +260,7 @@ export async function triggerManualSync(userId?: string) {
     };
   }
 
-  const [syncRun] = await db
+  const [syncRun] = await getDb()
     .insert(syncRuns)
     .values({ syncType: "full", triggeredBy: userId ?? "manual", status: "pending", startedAt: new Date() })
     .returning();

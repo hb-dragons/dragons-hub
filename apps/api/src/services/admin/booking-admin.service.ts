@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   venueBookings,
   venueBookingMatches,
@@ -21,7 +21,7 @@ import { logger } from "../../config/logger";
 const log = logger.child({ service: "booking-admin" });
 
 async function getVenueName(venueId: number): Promise<string> {
-  const [venue] = await db
+  const [venue] = await getDb()
     .select({ name: venues.name })
     .from(venues)
     .where(eq(venues.id, venueId))
@@ -49,7 +49,7 @@ export async function listBookings(
     conditions.push(lte(venueBookings.date, filters.dateTo));
   }
 
-  const matchCountSq = db
+  const matchCountSq = getDb()
     .select({
       venueBookingId: venueBookingMatches.venueBookingId,
       count: count().as("match_count"),
@@ -60,7 +60,7 @@ export async function listBookings(
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: venueBookings.id,
       venueId: venueBookings.venueId,
@@ -104,7 +104,7 @@ export async function listBookings(
 export async function getBookingDetail(
   id: number,
 ): Promise<BookingDetail | null> {
-  const [booking] = await db
+  const [booking] = await getDb()
     .select({
       id: venueBookings.id,
       venueId: venueBookings.venueId,
@@ -131,16 +131,16 @@ export async function getBookingDetail(
   if (!booking) return null;
 
   // Fetch linked matches
-  const homeTeam = db
+  const homeTeam = getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name, customName: teams.customName })
     .from(teams)
     .as("home_team");
-  const guestTeam = db
+  const guestTeam = getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
     .from(teams)
     .as("guest_team");
 
-  const linkedMatches = await db
+  const linkedMatches = await getDb()
     .select({
       id: matches.id,
       matchNo: matches.matchNo,
@@ -212,7 +212,7 @@ export async function updateBooking(
     updatedAt: new Date(),
   };
 
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(venueBookings)
     .set(set)
     .where(eq(venueBookings.id, id))
@@ -232,13 +232,13 @@ export async function updateBooking(
   if (!updated) return null;
 
   // Fetch venue name and match count
-  const [venue] = await db
+  const [venue] = await getDb()
     .select({ name: venues.name })
     .from(venues)
     .where(eq(venues.id, updated.venueId))
     .limit(1);
 
-  const matchCountResult = await db
+  const matchCountResult = await getDb()
     .select({ count: count() })
     .from(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, id));
@@ -306,7 +306,7 @@ export async function updateBookingStatus(
       ? { ...base, confirmedAt: new Date(), needsReconfirmation: false }
       : { ...base, confirmedAt: null, confirmedBy: null };
 
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(venueBookings)
     .set(set)
     .where(eq(venueBookings.id, id))
@@ -325,13 +325,13 @@ export async function updateBookingStatus(
 
   if (!updated) return null;
 
-  const [venue] = await db
+  const [venue] = await getDb()
     .select({ name: venues.name })
     .from(venues)
     .where(eq(venues.id, updated.venueId))
     .limit(1);
 
-  const matchCountResult = await db
+  const matchCountResult = await getDb()
     .select({ count: count() })
     .from(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, id));
@@ -390,7 +390,7 @@ export async function createBooking(
   data: BookingCreateData,
 ): Promise<BookingDetail | null> {
   // Verify venue exists
-  const [venue] = await db
+  const [venue] = await getDb()
     .select({ id: venues.id })
     .from(venues)
     .where(eq(venues.id, data.venueId))
@@ -399,7 +399,7 @@ export async function createBooking(
   if (!venue) return null;
 
   // Check for duplicate (same venue + date)
-  const [existing] = await db
+  const [existing] = await getDb()
     .select({ id: venueBookings.id })
     .from(venueBookings)
     .where(
@@ -412,7 +412,7 @@ export async function createBooking(
 
   if (existing) return null;
 
-  const [created] = await db
+  const [created] = await getDb()
     .insert(venueBookings)
     .values({
       venueId: data.venueId,
@@ -433,7 +433,7 @@ export async function createBooking(
   // Link matches if provided
   if (data.matchIds && data.matchIds.length > 0) {
     for (const matchId of data.matchIds) {
-      await db.insert(venueBookingMatches).values({
+      await getDb().insert(venueBookingMatches).values({
         venueBookingId: created.id,
         matchId,
       });
@@ -467,7 +467,7 @@ export async function createBooking(
 
 export async function deleteBooking(id: number): Promise<boolean> {
   // Fetch booking info before deletion for event emission
-  const [bookingInfo] = await db
+  const [bookingInfo] = await getDb()
     .select({
       venueId: venueBookings.venueId,
       date: venueBookings.date,
@@ -477,11 +477,11 @@ export async function deleteBooking(id: number): Promise<boolean> {
     .limit(1);
 
   // Delete junction entries first (they cascade, but be explicit)
-  await db
+  await getDb()
     .delete(venueBookingMatches)
     .where(eq(venueBookingMatches.venueBookingId, id));
 
-  const [deleted] = await db
+  const [deleted] = await getDb()
     .delete(venueBookings)
     .where(eq(venueBookings.id, id))
     .returning({ id: venueBookings.id });

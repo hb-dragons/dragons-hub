@@ -1,5 +1,5 @@
 import { and, eq, inArray, ne, or } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { matches, teams, venues, venueBookings, venueBookingMatches } from "@dragons/db/schema";
 import { calculateTimeWindow } from "../venue-booking/booking-calculator";
 import { getBookingConfig } from "../venue-booking/venue-booking.service";
@@ -14,7 +14,7 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
   const input = verifySlotInputSchema.parse(rawInput);
   const conflicts: SlotConflict[] = [];
 
-  const [match] = await db
+  const [match] = await getDb()
     .select({
       id: matches.id,
       homeTeamApiId: matches.homeTeamApiId,
@@ -33,7 +33,7 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
     };
   }
 
-  const [venue] = await db
+  const [venue] = await getDb()
     .select({ id: venues.id })
     .from(venues)
     .where(eq(venues.id, input.venueId))
@@ -45,7 +45,7 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
 
   if (venue) {
     const config = await getBookingConfig();
-    const [homeTeam] = await db
+    const [homeTeam] = await getDb()
       .select({ duration: teams.estimatedGameDuration })
       .from(teams)
       .where(eq(teams.apiTeamPermanentId, match.homeTeamApiId))
@@ -57,7 +57,7 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
       config,
     )!;
 
-    const bookingsThatDay = await db
+    const bookingsThatDay = await getDb()
       .select({
         id: venueBookings.id,
         calcStart: venueBookings.calculatedStartTime,
@@ -69,7 +69,7 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
       .where(and(eq(venueBookings.venueId, input.venueId), eq(venueBookings.date, input.date)));
 
     for (const b of bookingsThatDay) {
-      const linked = await db
+      const linked = await getDb()
         .select({ matchId: venueBookingMatches.matchId })
         .from(venueBookingMatches)
         .where(eq(venueBookingMatches.venueBookingId, b.id));
@@ -96,7 +96,7 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
   }
 
   const teamApiIds = [match.homeTeamApiId, match.guestTeamApiId];
-  const sameDay = await db
+  const sameDay = await getDb()
     .select({ id: matches.id, isCancelled: matches.isCancelled, isForfeited: matches.isForfeited })
     .from(matches)
     .where(
@@ -123,7 +123,7 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
       severity: "warning",
     });
   } else {
-    const roundMatches = await db
+    const roundMatches = await getDb()
       .select({ date: matches.kickoffDate })
       .from(matches)
       .where(and(eq(matches.leagueId, match.leagueId), eq(matches.matchDay, match.matchDay)));

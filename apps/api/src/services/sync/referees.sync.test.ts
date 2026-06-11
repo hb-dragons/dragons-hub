@@ -19,12 +19,12 @@ const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
 const mockExecute = vi.fn();
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     insert: (...args: unknown[]) => mockInsert(...args),
     select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
     execute: (...args: unknown[]) => mockExecute(...args),
-  },
+  }),
 }));
 
 const mockPublishDomainEvent = vi.fn().mockResolvedValue({ id: "mock-event-id" });

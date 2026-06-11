@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { standings, teams } from "@dragons/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { getOwnClubMatches } from "../admin/match-query.service";
@@ -33,7 +33,7 @@ export async function getHomeDashboard(): Promise<HomeDashboard> {
         sort: "asc",
         excludeInactive: true,
       }),
-      db
+      getDb()
         .select({
           totalWins: sql<number>`coalesce(sum(${standings.won}),0)::int`,
           totalLosses: sql<number>`coalesce(sum(${standings.lost}),0)::int`,
@@ -43,7 +43,7 @@ export async function getHomeDashboard(): Promise<HomeDashboard> {
         .where(eq(teams.isOwnClub, true)),
     ]);
 
-  const [teamCountRow] = await db
+  const [teamCountRow] = await getDb()
     .select({ count: sql<number>`count(*)::int` })
     .from(teams)
     .where(eq(teams.isOwnClub, true));

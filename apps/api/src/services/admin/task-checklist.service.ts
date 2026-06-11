@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { tasks, taskChecklistItems } from "@dragons/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import type { ChecklistItem } from "@dragons/shared";
@@ -7,7 +7,7 @@ export async function addChecklistItem(
   taskId: number,
   data: { label: string; position?: number },
 ): Promise<ChecklistItem | null> {
-  const [task] = await db
+  const [task] = await getDb()
     .select({ id: tasks.id })
     .from(tasks)
     .where(eq(tasks.id, taskId))
@@ -17,7 +17,7 @@ export async function addChecklistItem(
 
   let position = data.position;
   if (position === undefined) {
-    const [maxPos] = await db
+    const [maxPos] = await getDb()
       .select({
         maxPosition: sql<number>`COALESCE(MAX(${taskChecklistItems.position}), -1)`,
       })
@@ -26,7 +26,7 @@ export async function addChecklistItem(
     position = (maxPos?.maxPosition ?? -1) + 1;
   }
 
-  const [item] = await db
+  const [item] = await getDb()
     .insert(taskChecklistItems)
     .values({
       taskId,
@@ -64,7 +64,7 @@ export async function updateChecklistItem(
     }
   }
 
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(taskChecklistItems)
     .set(updateData)
     .where(
@@ -91,7 +91,7 @@ export async function deleteChecklistItem(
   taskId: number,
   itemId: number,
 ): Promise<boolean> {
-  const [deleted] = await db
+  const [deleted] = await getDb()
     .delete(taskChecklistItems)
     .where(
       and(

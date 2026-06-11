@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { user } from "@dragons/db/schema";
 
 /**
@@ -12,7 +12,7 @@ export async function resolveRecipientUserIds(
   if (recipientId.startsWith("referee:")) {
     const refereeId = Number(recipientId.slice("referee:".length));
     if (!Number.isFinite(refereeId)) return [];
-    const rows = await db
+    const rows = await getDb()
       .select({ id: user.id })
       .from(user)
       .where(eq(user.refereeId, refereeId));
@@ -20,7 +20,7 @@ export async function resolveRecipientUserIds(
   }
 
   if (recipientId === "audience:admin") {
-    const rows = await db
+    const rows = await getDb()
       .select({ id: user.id })
       .from(user)
       .where(eq(user.role, "admin"));

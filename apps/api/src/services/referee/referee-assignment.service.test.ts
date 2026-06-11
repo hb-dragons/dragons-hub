@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 let selectCallIndex = 0;
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: () => {
       const idx = selectCallIndex++;
       return {
@@ -37,7 +37,7 @@ vi.mock("../../config/database", () => ({
       values: () => ({ onConflictDoUpdate: mocks.insertOnConflict }),
     }),
     delete: () => ({ where: mocks.deleteWhere }),
-  },
+  }),
 }));
 
 vi.mock("../sync/sdk-client", () => ({

@@ -16,7 +16,7 @@ vi.mock("../../config/logger", () => ({
 
 const mockInsert = vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
 vi.mock("../../config/database", () => ({
-  db: { insert: (...args: unknown[]) => mockInsert(...args) },
+  getDb: () => ({ insert: (...args: unknown[]) => mockInsert(...args) }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({
@@ -25,9 +25,9 @@ vi.mock("@dragons/db/schema", () => ({
 
 const mockPublish = vi.fn().mockResolvedValue(1);
 vi.mock("../../config/redis", () => ({
-  redis: {
+  getRedis: () => ({
     publish: (...args: unknown[]) => mockPublish(...args),
-  },
+  }),
 }));
 
 import { SyncLogger, createSyncLogger, batchAction, type LogEntry } from "./sync-logger";

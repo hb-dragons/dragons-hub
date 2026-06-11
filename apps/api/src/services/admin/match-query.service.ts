@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import type { Database } from "@dragons/db";
 import {
   matches,
@@ -80,9 +80,9 @@ const guestTeam = alias(teams, "guestTeam");
 
 /**
  * Build the standard match-with-joins select query.
- * Accepts an optional client parameter (Database or TransactionClient); defaults to `db`.
+ * Accepts an optional client parameter (Database or TransactionClient); defaults to `getDb()`.
  */
-export function queryMatchWithJoins(client: Database | TransactionClient = db) {
+export function queryMatchWithJoins(client: Database | TransactionClient = getDb()) {
   return client
     .select({
       id: matches.id,
@@ -165,7 +165,7 @@ export function queryMatchWithJoins(client: Database | TransactionClient = db) {
 /** Row type returned by queryMatchWithJoins */
 export type MatchRow = Awaited<ReturnType<typeof queryMatchWithJoins>>[number];
 
-export async function loadOverrides(matchId: number, client: Database | TransactionClient = db) {
+export async function loadOverrides(matchId: number, client: Database | TransactionClient = getDb()) {
   return client
     .select({
       fieldName: matchOverrides.fieldName,
@@ -417,7 +417,7 @@ export async function buildDetailResponse(
 export async function getOwnClubMatches(params: MatchListParams) {
   const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId, opponentApiId, excludeInactive } = params;
 
-  const ownTeams = await db
+  const ownTeams = await getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId })
     .from(teams)
     .where(eq(teams.isOwnClub, true));
@@ -488,7 +488,7 @@ export async function getOwnClubMatches(params: MatchListParams) {
       .orderBy(orderDirection(matches.kickoffDate), orderDirection(matches.kickoffTime))
       .limit(limit)
       .offset(offset),
-    db
+    getDb()
       .select({ count: sql<number>`count(*)::int` })
       .from(matches)
       .where(whereClause),
@@ -499,7 +499,7 @@ export async function getOwnClubMatches(params: MatchListParams) {
   // Load overrides for all matches in one query
   const matchIds = rows.map((r) => r.id);
   const allOverrides = matchIds.length > 0
-    ? await db
+    ? await getDb()
         .select({ matchId: matchOverrides.matchId, fieldName: matchOverrides.fieldName })
         .from(matchOverrides)
         .where(inArray(matchOverrides.matchId, matchIds))
@@ -513,7 +513,7 @@ export async function getOwnClubMatches(params: MatchListParams) {
   }
 
   const bookingLinks = matchIds.length > 0
-    ? await db
+    ? await getDb()
         .select({
           matchId: venueBookingMatches.matchId,
           bookingId: venueBookings.id,
@@ -542,7 +542,7 @@ export async function getOwnClubMatches(params: MatchListParams) {
 }
 
 export async function getMatchDetail(id: number): Promise<MatchDetailResponse | null> {
-  return buildDetailResponse(db, id);
+  return buildDetailResponse(getDb(), id);
 }
 
 // ── Match change history ───────────────────────────────────────────────────
@@ -553,12 +553,12 @@ export async function getMatchChangeHistory(
 ): Promise<{ changes: MatchChangeHistoryItem[]; total: number }> {
   const { limit, offset } = params;
 
-  const [totalRow] = await db
+  const [totalRow] = await getDb()
     .select({ count: sql<number>`count(*)::int` })
     .from(matchChanges)
     .where(eq(matchChanges.matchId, matchId));
 
-  const rows = await db
+  const rows = await getDb()
     .select()
     .from(matchChanges)
     .where(eq(matchChanges.matchId, matchId))

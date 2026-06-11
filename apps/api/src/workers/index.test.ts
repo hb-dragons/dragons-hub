@@ -111,7 +111,7 @@ const mockDbUpdate = vi.fn();
 const mockDbSelect = vi.fn();
 const mockDbDelete = vi.fn();
 vi.mock("../config/database", () => ({
-  db: {
+  getDb: () => ({
     update: (...args: unknown[]) => mockDbUpdate(...args),
     select: (...args: unknown[]) => mockDbSelect(...args),
     delete: (...args: unknown[]) => mockDbDelete(...args),
@@ -120,7 +120,7 @@ vi.mock("../config/database", () => ({
         returning: vi.fn().mockResolvedValue([]),
       }),
     }),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

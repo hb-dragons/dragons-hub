@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vites
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 vi.mock("../../config/database", () => ({
-  db: new Proxy({}, { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] }),
+  getDb: () => (new Proxy({}, { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] })),
 }));
 
 // --- Imports (after mocks) ---

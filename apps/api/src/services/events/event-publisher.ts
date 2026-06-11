@@ -1,5 +1,5 @@
 import { ulid } from "ulid";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { domainEvents } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import type { EventSource, EventEntityType, EventType } from "@dragons/shared";
@@ -64,7 +64,9 @@ export function buildDomainEvent(params: BuildDomainEventParams): DomainEvent {
   };
 }
 
-export type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type TransactionClient = Parameters<
+  Parameters<ReturnType<typeof getDb>["transaction"]>[0]
+>[0];
 
 /**
  * Insert a domain event into the database.
@@ -75,7 +77,7 @@ export async function insertDomainEvent(
   event: DomainEvent,
   tx?: TransactionClient,
 ): Promise<void> {
-  const client = tx ?? db;
+  const client = tx ?? getDb();
   await client.insert(domainEvents).values({
     id: event.id,
     type: event.type,
@@ -107,7 +109,7 @@ export async function enqueueDomainEvent(event: DomainEvent): Promise<void> {
       entityId: event.entityId,
     });
 
-    await db
+    await getDb()
       .update(domainEvents)
       .set({ enqueuedAt: new Date() })
       .where(eq(domainEvents.id, event.id));

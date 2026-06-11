@@ -1,11 +1,11 @@
 import { eq, and, or, desc, isNotNull } from "drizzle-orm";
 import type { TeamStats, FormEntry } from "@dragons/shared";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { teams, standings, leagues, matches } from "@dragons/db/schema";
 
 export async function getTeamStats(teamId: number): Promise<TeamStats | null> {
   // Look up team by internal id to get apiTeamPermanentId
-  const [team] = await db
+  const [team] = await getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId })
     .from(teams)
     .where(eq(teams.id, teamId))
@@ -18,7 +18,7 @@ export async function getTeamStats(teamId: number): Promise<TeamStats | null> {
   const apiId = team.apiTeamPermanentId;
 
   // Get standing joined with league for this team
-  const [standing] = await db
+  const [standing] = await getDb()
     .select({
       position: standings.position,
       played: standings.played,
@@ -35,7 +35,7 @@ export async function getTeamStats(teamId: number): Promise<TeamStats | null> {
     .limit(1);
 
   // Get last 5 completed matches (both scores present)
-  const recentMatches = await db
+  const recentMatches = await getDb()
     .select({
       id: matches.id,
       homeTeamApiId: matches.homeTeamApiId,

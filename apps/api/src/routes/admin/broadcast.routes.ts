@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { describeRoute, validator } from "hono-openapi";
 import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { matches, leagues, teams } from "@dragons/db/schema";
 import { requireAnyRole } from "../../middleware/rbac";
 import { escapeLikePattern } from "../../services/utils/sql";
@@ -139,7 +139,7 @@ adminBroadcastRoutes.get(
 
     const today = new Date().toISOString().slice(0, 10);
 
-    const ownIds = await db
+    const ownIds = await getDb()
       .select({ id: teams.apiTeamPermanentId })
       .from(teams)
       .where(eq(teams.isOwnClub, true));
@@ -161,7 +161,7 @@ adminBroadcastRoutes.get(
     let textFilter = undefined;
     if (q && q.trim().length > 0) {
       const pattern = `%${escapeLikePattern(q.trim())}%`;
-      const matchedTeams = await db
+      const matchedTeams = await getDb()
         .select({ id: teams.apiTeamPermanentId })
         .from(teams)
         .where(or(ilike(teams.name, pattern), ilike(teams.nameShort, pattern)));
@@ -179,7 +179,7 @@ adminBroadcastRoutes.get(
     if (dateFilter) filters.push(dateFilter);
     if (textFilter) filters.push(textFilter);
 
-    const rows = await db
+    const rows = await getDb()
       .select({
         id: matches.id,
         kickoffDate: matches.kickoffDate,

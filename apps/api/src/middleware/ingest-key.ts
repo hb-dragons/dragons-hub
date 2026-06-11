@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import { env } from "../config/env";
-import { redis } from "../config/redis";
+import { getRedis } from "../config/redis";
 
 const RATE_LIMIT_PER_SECOND = 30;
 const RATE_LIMIT_KEY_PREFIX = "rl:ingest:";
@@ -16,8 +16,8 @@ function constantTimeEquals(a: string, b: string): boolean {
 async function incrementRateLimit(deviceId: string): Promise<number> {
   const window = Math.floor(Date.now() / 1000);
   const key = `${RATE_LIMIT_KEY_PREFIX}${deviceId}:${window}`;
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, 2);
+  const count = await getRedis().incr(key);
+  if (count === 1) await getRedis().expire(key, 2);
   return count;
 }
 

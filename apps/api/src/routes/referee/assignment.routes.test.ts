@@ -52,9 +52,9 @@ vi.mock("../../middleware/rbac", () => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: () => ({ from: () => ({ where: () => ({ limit: mocks.dbSelect }) }) }),
-  },
+  }),
 }));
 
 vi.mock("drizzle-orm", () => ({

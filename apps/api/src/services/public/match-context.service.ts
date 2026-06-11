@@ -1,10 +1,10 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { matches, teams } from "@dragons/db/schema";
 import { eq, and, or, desc, isNotNull } from "drizzle-orm";
 import type { MatchContext, FormEntry, PreviousMeeting } from "@dragons/shared";
 
 export async function getMatchContext(matchId: number): Promise<MatchContext | null> {
-  const [match] = await db
+  const [match] = await getDb()
     .select({ homeTeamApiId: matches.homeTeamApiId, guestTeamApiId: matches.guestTeamApiId })
     .from(matches)
     .where(eq(matches.id, matchId))
@@ -13,7 +13,7 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
 
   const { homeTeamApiId, guestTeamApiId } = match;
 
-  const h2hMatches = await db
+  const h2hMatches = await getDb()
     .select({
       id: matches.id,
       kickoffDate: matches.kickoffDate,
@@ -35,13 +35,13 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
     )
     .orderBy(desc(matches.kickoffDate));
 
-  const [homeTeamRow] = await db
+  const [homeTeamRow] = await getDb()
     .select({ isOwnClub: teams.isOwnClub, name: teams.name })
     .from(teams)
     .where(eq(teams.apiTeamPermanentId, homeTeamApiId))
     .limit(1);
 
-  const [guestTeamRow] = await db
+  const [guestTeamRow] = await getDb()
     .select({ isOwnClub: teams.isOwnClub, name: teams.name })
     .from(teams)
     .where(eq(teams.apiTeamPermanentId, guestTeamApiId))
@@ -86,7 +86,7 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
 }
 
 async function getTeamForm(teamApiId: number): Promise<FormEntry[]> {
-  const recent = await db
+  const recent = await getDb()
     .select({
       id: matches.id,
       homeTeamApiId: matches.homeTeamApiId,

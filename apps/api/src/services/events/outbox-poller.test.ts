@@ -12,10 +12,10 @@ const mockExecute = vi.fn();
 const mockTransaction = vi.fn();
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     execute: (...args: unknown[]) => mockExecute(...args),
     transaction: (fn: (tx: unknown) => Promise<unknown>) => mockTransaction(fn),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

@@ -1,6 +1,6 @@
 import { Worker, type Job } from "bullmq";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { db } from "../config/database";
+import { getDb } from "../config/database";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import {
@@ -29,7 +29,7 @@ async function loadLeadCandidates(): Promise<TaskReminderRow[]> {
   // this exclusion a task due today would match both queries and produce a
   // misleading "Due tomorrow" in-app message alongside the day-of one.
   const todayStr = new Date().toISOString().slice(0, 10);
-  return await db
+  return await getDb()
     .select({
       id: tasks.id,
       boardId: tasks.boardId,
@@ -55,7 +55,7 @@ async function loadDayOfCandidates(): Promise<TaskReminderRow[]> {
   const now = new Date();
   if (now.getUTCHours() < 8) return [];
   const todayStr = now.toISOString().slice(0, 10);
-  return await db
+  return await getDb()
     .select({
       id: tasks.id,
       boardId: tasks.boardId,
@@ -76,7 +76,7 @@ async function loadDayOfCandidates(): Promise<TaskReminderRow[]> {
 }
 
 async function loadAssigneeIds(taskId: number): Promise<string[]> {
-  const rows = await db
+  const rows = await getDb()
     .select({ userId: taskAssignees.userId })
     .from(taskAssignees)
     .where(eq(taskAssignees.taskId, taskId));
@@ -87,7 +87,7 @@ async function emitAndMark(task: TaskReminderRow, kind: "lead" | "day_of"): Prom
   const assigneeUserIds = await loadAssigneeIds(task.id);
   if (assigneeUserIds.length === 0) return;
 
-  await db.transaction(async (tx) => {
+  await getDb().transaction(async (tx) => {
     // publishDomainEvent inserts inside the tx; the outbox poller picks
     // up the row after commit — do not call enqueueDomainEvent here.
     await publishDomainEvent(

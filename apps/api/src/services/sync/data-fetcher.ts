@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { leagues } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import pLimit from "p-limit";
@@ -79,7 +79,7 @@ async function fetchLeagueData(
 }
 
 export async function fetchAllSyncData(): Promise<CollectedSyncData> {
-  const trackedLeagues = await db
+  const trackedLeagues = await getDb()
     .select({ id: leagues.id, apiLigaId: leagues.apiLigaId, name: leagues.name })
     .from(leagues)
     .where(eq(leagues.isTracked, true));

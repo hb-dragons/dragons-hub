@@ -1,5 +1,5 @@
 import { ulid } from "ulid";
-import { redis } from "../config/redis";
+import { getRedis } from "../config/redis";
 import { logger } from "../config/logger";
 
 const log = logger.child({ module: "instance-heartbeat" });
@@ -13,7 +13,7 @@ const HB_REFRESH_MS = 20_000;
 let timer: ReturnType<typeof setInterval> | null = null;
 
 export async function writeHeartbeat(): Promise<void> {
-  await redis.set(HB_KEY(INSTANCE_ID), "1", "EX", HB_TTL_SEC);
+  await getRedis().set(HB_KEY(INSTANCE_ID), "1", "EX", HB_TTL_SEC);
 }
 
 export function startHeartbeat(): void {
@@ -34,5 +34,5 @@ export function stopHeartbeat(): void {
 
 export async function isInstanceAlive(instanceId: string | null): Promise<boolean> {
   if (!instanceId) return false;
-  return (await redis.exists(HB_KEY(instanceId))) === 1;
+  return (await getRedis().exists(HB_KEY(instanceId))) === 1;
 }

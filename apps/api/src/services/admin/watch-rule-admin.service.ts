@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { watchRules } from "@dragons/db/schema";
 import { eq, desc, count } from "drizzle-orm";
 import type {
@@ -37,11 +37,11 @@ export async function listWatchRules(params: {
   const { page = 1, limit = 20 } = params;
   const offset = (page - 1) * limit;
 
-  const [totalRow] = await db
+  const [totalRow] = await getDb()
     .select({ count: count() })
     .from(watchRules);
 
-  const rows = await db
+  const rows = await getDb()
     .select()
     .from(watchRules)
     .orderBy(desc(watchRules.createdAt))
@@ -57,7 +57,7 @@ export async function listWatchRules(params: {
 // ── getWatchRule ────────────────────────────────────────────────────────────
 
 export async function getWatchRule(id: number): Promise<WatchRuleItem | null> {
-  const [row] = await db
+  const [row] = await getDb()
     .select()
     .from(watchRules)
     .where(eq(watchRules.id, id));
@@ -71,7 +71,7 @@ export async function createWatchRule(
   data: CreateWatchRuleBody,
   userId: string,
 ): Promise<WatchRuleItem> {
-  const [row] = await db
+  const [row] = await getDb()
     .insert(watchRules)
     .values({
       name: data.name,
@@ -104,7 +104,7 @@ export async function updateWatchRule(
   if (data.urgencyOverride !== undefined) updates.urgencyOverride = data.urgencyOverride;
   if (data.templateOverride !== undefined) updates.templateOverride = data.templateOverride;
 
-  const [row] = await db
+  const [row] = await getDb()
     .update(watchRules)
     .set(updates)
     .where(eq(watchRules.id, id))
@@ -116,7 +116,7 @@ export async function updateWatchRule(
 // ── deleteWatchRule ─────────────────────────────────────────────────────────
 
 export async function deleteWatchRule(id: number): Promise<boolean> {
-  const [deleted] = await db
+  const [deleted] = await getDb()
     .delete(watchRules)
     .where(eq(watchRules.id, id))
     .returning({ id: watchRules.id });

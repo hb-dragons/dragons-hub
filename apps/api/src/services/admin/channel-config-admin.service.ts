@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { channelConfigs } from "@dragons/db/schema";
 import { eq, desc, count } from "drizzle-orm";
 import type {
@@ -36,11 +36,11 @@ export async function listChannelConfigs(params: {
   const { page = 1, limit = 20 } = params;
   const offset = (page - 1) * limit;
 
-  const [totalRow] = await db
+  const [totalRow] = await getDb()
     .select({ count: count() })
     .from(channelConfigs);
 
-  const rows = await db
+  const rows = await getDb()
     .select()
     .from(channelConfigs)
     .orderBy(desc(channelConfigs.createdAt))
@@ -56,7 +56,7 @@ export async function listChannelConfigs(params: {
 // ── getChannelConfig ────────────────────────────────────────────────────────
 
 export async function getChannelConfig(id: number): Promise<ChannelConfigItem | null> {
-  const [row] = await db
+  const [row] = await getDb()
     .select()
     .from(channelConfigs)
     .where(eq(channelConfigs.id, id));
@@ -69,7 +69,7 @@ export async function getChannelConfig(id: number): Promise<ChannelConfigItem | 
 export async function createChannelConfig(
   data: CreateChannelConfigBody,
 ): Promise<ChannelConfigItem> {
-  const [row] = await db
+  const [row] = await getDb()
     .insert(channelConfigs)
     .values({
       name: data.name,
@@ -100,7 +100,7 @@ export async function updateChannelConfig(
   if (data.digestCron !== undefined) updates.digestCron = data.digestCron;
   if (data.digestTimezone !== undefined) updates.digestTimezone = data.digestTimezone;
 
-  const [row] = await db
+  const [row] = await getDb()
     .update(channelConfigs)
     .set(updates)
     .where(eq(channelConfigs.id, id))
@@ -112,7 +112,7 @@ export async function updateChannelConfig(
 // ── deleteChannelConfig ─────────────────────────────────────────────────────
 
 export async function deleteChannelConfig(id: number): Promise<boolean> {
-  const [deleted] = await db
+  const [deleted] = await getDb()
     .delete(channelConfigs)
     .where(eq(channelConfigs.id, id))
     .returning({ id: channelConfigs.id });

@@ -5,10 +5,10 @@ import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vites
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../../config/database", () => ({
-  db: new Proxy(
+  getDb: () => (new Proxy(
     {},
     { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] },
-  ),
+  )),
 }));
 
 vi.mock("../../../config/logger", () => ({

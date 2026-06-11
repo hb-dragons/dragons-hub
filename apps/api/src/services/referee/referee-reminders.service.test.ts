@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: () => ({
       from: () => ({
         where: () => ({
@@ -17,7 +17,7 @@ vi.mock("../../config/database", () => ({
         }),
       }),
     }),
-  },
+  }),
 }));
 
 vi.mock("../../workers/queues", () => ({

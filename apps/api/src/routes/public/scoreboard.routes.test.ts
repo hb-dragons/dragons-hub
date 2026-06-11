@@ -11,7 +11,7 @@ vi.mock("../../config/env", () => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: () => ({
       from: () => ({
         where: () => ({
@@ -19,7 +19,7 @@ vi.mock("../../config/database", () => ({
         }),
       }),
     }),
-  },
+  }),
 }));
 
 vi.mock("../../services/scoreboard/sse", () => ({

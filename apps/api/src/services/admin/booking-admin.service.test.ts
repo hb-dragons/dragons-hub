@@ -8,12 +8,12 @@ const mockInsert = vi.fn();
 const mockDelete = vi.fn();
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
     insert: (...args: unknown[]) => mockInsert(...args),
     delete: (...args: unknown[]) => mockDelete(...args),
-  },
+  }),
 }));
 
 vi.mock("../events/event-publisher", () => ({

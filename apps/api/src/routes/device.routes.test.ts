@@ -19,10 +19,10 @@ vi.mock("../config/auth", () => ({
 }));
 
 vi.mock("../config/database", () => ({
-  db: {
+  getDb: () => ({
     insert: (...args: unknown[]) => mocks.dbInsert(...args),
     delete: (...args: unknown[]) => mocks.dbDelete(...args),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

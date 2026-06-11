@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { venues } from "@dragons/db/schema";
 import { sql } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
@@ -63,7 +63,7 @@ export async function syncVenuesFromData(
   }));
 
   try {
-    const upsertResult = await db
+    const upsertResult = await getDb()
       .insert(venues)
       .values(venueRecords)
       .onConflictDoUpdate({
@@ -117,7 +117,7 @@ export async function syncVenuesFromData(
 }
 
 export async function buildVenueIdLookup(): Promise<Map<number, number>> {
-  const allVenues = await db
+  const allVenues = await getDb()
     .select({ id: venues.id, apiId: venues.apiId })
     .from(venues);
   return new Map(allVenues.map((v) => [v.apiId, v.id]));

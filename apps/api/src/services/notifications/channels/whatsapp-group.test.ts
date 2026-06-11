@@ -10,10 +10,10 @@ const envHolder = vi.hoisted(() => ({
 const mockFetch = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../config/database", () => ({
-  db: new Proxy(
+  getDb: () => (new Proxy(
     {},
     { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] },
-  ),
+  )),
 }));
 
 vi.mock("../../../config/env", () => ({ env: envHolder }));

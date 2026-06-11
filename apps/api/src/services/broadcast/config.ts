@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   broadcastConfigs,
   leagues,
@@ -41,7 +41,7 @@ export function rowToConfig(
 export async function getBroadcastConfig(
   deviceId: string,
 ): Promise<BroadcastConfig | null> {
-  const rows = await db
+  const rows = await getDb()
     .select()
     .from(broadcastConfigs)
     .where(eq(broadcastConfigs.deviceId, deviceId))
@@ -73,7 +73,7 @@ export async function upsertBroadcastConfig(
     ]),
     updatedAt: now,
   };
-  await db
+  await getDb()
     .insert(broadcastConfigs)
     .values({
       deviceId: input.deviceId,
@@ -105,7 +105,7 @@ export async function setBroadcastLive(
   isLive: boolean,
 ): Promise<BroadcastConfig | null> {
   const now = new Date();
-  await db.transaction(async (tx) => {
+  await getDb().transaction(async (tx) => {
     if (isLive) {
       const [existing] = await tx
         .select()
@@ -147,18 +147,18 @@ export async function loadJoinedMatch(
   inputs: JoinedMatchInputs,
 ): Promise<BroadcastMatch | null> {
   if (inputs.matchId === null) return null;
-  const [match] = await db
+  const [match] = await getDb()
     .select()
     .from(matches)
     .where(eq(matches.id, inputs.matchId))
     .limit(1);
   if (!match) return null;
-  const [home] = await db
+  const [home] = await getDb()
     .select()
     .from(teams)
     .where(eq(teams.apiTeamPermanentId, match.homeTeamApiId))
     .limit(1);
-  const [guest] = await db
+  const [guest] = await getDb()
     .select()
     .from(teams)
     .where(eq(teams.apiTeamPermanentId, match.guestTeamApiId))
@@ -167,7 +167,7 @@ export async function loadJoinedMatch(
 
   let league: { id: number; name: string } | null = null;
   if (match.leagueId !== null) {
-    const [lg] = await db
+    const [lg] = await getDb()
       .select()
       .from(leagues)
       .where(eq(leagues.id, match.leagueId))

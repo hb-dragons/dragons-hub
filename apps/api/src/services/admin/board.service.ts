@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { boards, boardColumns, tasks } from "@dragons/db/schema";
 import { eq, asc, and, count, sql } from "drizzle-orm";
 import type { BoardSummary, BoardData } from "@dragons/shared";
@@ -10,7 +10,7 @@ const DEFAULT_COLUMNS = [
 ];
 
 export async function listBoards(): Promise<BoardSummary[]> {
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: boards.id,
       name: boards.name,
@@ -27,7 +27,7 @@ export async function createBoard(
   description?: string | null,
   createdBy?: string | null,
 ): Promise<BoardData> {
-  const [board] = await db
+  const [board] = await getDb()
     .insert(boards)
     .values({
       name,
@@ -36,7 +36,7 @@ export async function createBoard(
     })
     .returning();
 
-  const columns = await db
+  const columns = await getDb()
     .insert(boardColumns)
     .values(
       DEFAULT_COLUMNS.map((col) => ({
@@ -68,7 +68,7 @@ export async function createBoard(
 }
 
 export async function getBoard(id: number): Promise<BoardData | null> {
-  const [board] = await db
+  const [board] = await getDb()
     .select()
     .from(boards)
     .where(eq(boards.id, id))
@@ -76,7 +76,7 @@ export async function getBoard(id: number): Promise<BoardData | null> {
 
   if (!board) return null;
 
-  const columns = await db
+  const columns = await getDb()
     .select({
       id: boardColumns.id,
       name: boardColumns.name,
@@ -103,7 +103,7 @@ export async function updateBoard(
   id: number,
   data: { name?: string; description?: string | null },
 ): Promise<BoardData | null> {
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(boards)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(boards.id, id))
@@ -111,7 +111,7 @@ export async function updateBoard(
 
   if (!updated) return null;
 
-  const columns = await db
+  const columns = await getDb()
     .select({
       id: boardColumns.id,
       name: boardColumns.name,
@@ -135,7 +135,7 @@ export async function updateBoard(
 }
 
 export async function deleteBoard(id: number): Promise<boolean> {
-  const [deleted] = await db
+  const [deleted] = await getDb()
     .delete(boards)
     .where(eq(boards.id, id))
     .returning({ id: boards.id });
@@ -153,7 +153,7 @@ export async function addColumn(
   color: string | null;
   isDoneColumn: boolean;
 } | null> {
-  return db.transaction(async (tx) => {
+  return getDb().transaction(async (tx) => {
     const [board] = await tx
       .select({ id: boards.id })
       .from(boards)
@@ -212,7 +212,7 @@ export async function updateColumn(
   color: string | null;
   isDoneColumn: boolean;
 } | null> {
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(boardColumns)
     .set({ ...data, updatedAt: new Date() })
     .where(and(eq(boardColumns.id, colId), eq(boardColumns.boardId, boardId)))
@@ -234,7 +234,7 @@ export async function deleteColumn(
   colId: number,
 ): Promise<boolean> {
   // Check if column has tasks
-  const [taskCount] = await db
+  const [taskCount] = await getDb()
     .select({ count: count() })
     .from(tasks)
     .where(eq(tasks.columnId, colId));
@@ -243,7 +243,7 @@ export async function deleteColumn(
     return false;
   }
 
-  const [deleted] = await db
+  const [deleted] = await getDb()
     .delete(boardColumns)
     .where(and(eq(boardColumns.id, colId), eq(boardColumns.boardId, boardId)))
     .returning({ id: boardColumns.id });
@@ -257,7 +257,7 @@ export async function reorderColumns(
 ): Promise<void> {
   if (positions.length === 0) return;
 
-  await db.transaction(async (tx) => {
+  await getDb().transaction(async (tx) => {
     const now = new Date();
     await Promise.all(
       positions.map(({ id, position }) =>

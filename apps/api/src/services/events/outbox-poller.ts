@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { domainEvents } from "@dragons/db/schema";
 import { sql } from "drizzle-orm";
 import { domainEventsQueue } from "../../workers/queues";
@@ -17,7 +17,7 @@ const ENQUEUE_CONCURRENCY = 10;
 
 async function claimBatch(): Promise<ClaimedEvent[]> {
   const oneSecondAgo = new Date(Date.now() - 1000);
-  return await db.transaction(async (tx) => {
+  return await getDb().transaction(async (tx) => {
     const result = await tx.execute<ClaimedEvent>(sql`
       WITH claimed AS (
         SELECT id
@@ -41,7 +41,7 @@ async function claimBatch(): Promise<ClaimedEvent[]> {
 
 async function releaseClaim(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
-  await db.execute(sql`
+  await getDb().execute(sql`
     UPDATE domain_events
     SET enqueued_at = NULL
     WHERE id IN ${sql.raw(`(${ids.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")})`)}

@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { notificationLog, domainEvents, user } from "@dragons/db/schema";
 import { eq, and, desc, count, ne, inArray } from "drizzle-orm";
 import { parseRoles } from "@dragons/shared";
@@ -12,7 +12,7 @@ import { logger } from "../../config/logger";
  */
 export async function recipientKeysForUserId(userId: string): Promise<string[]> {
   const keys = [`user:${userId}`];
-  const [u] = await db
+  const [u] = await getDb()
     .select({ refereeId: user.refereeId, role: user.role })
     .from(user)
     .where(eq(user.id, userId))
@@ -69,12 +69,12 @@ export async function listNotifications(params: {
     ? inArray(notificationLog.recipientId, await recipientKeysForUserId(userId))
     : undefined;
 
-  const [totalRow] = await db
+  const [totalRow] = await getDb()
     .select({ count: count() })
     .from(notificationLog)
     .where(where);
 
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: notificationLog.id,
       eventId: notificationLog.eventId,
@@ -121,7 +121,7 @@ export async function listNotifications(params: {
 
 export async function markRead(id: number, userId: string): Promise<boolean> {
   const keys = await recipientKeysForUserId(userId);
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(notificationLog)
     .set({ status: "read", readAt: new Date() })
     .where(
@@ -139,7 +139,7 @@ export async function markRead(id: number, userId: string): Promise<boolean> {
 
 export async function markAllRead(userId: string): Promise<number> {
   const keys = await recipientKeysForUserId(userId);
-  const result = await db
+  const result = await getDb()
     .update(notificationLog)
     .set({ status: "read", readAt: new Date() })
     .where(
@@ -157,7 +157,7 @@ export async function markAllRead(userId: string): Promise<number> {
 
 export async function getUnreadCount(userId: string): Promise<number> {
   const keys = await recipientKeysForUserId(userId);
-  const [row] = await db
+  const [row] = await getDb()
     .select({ count: count() })
     .from(notificationLog)
     .where(
@@ -176,7 +176,7 @@ export async function retryFailedNotification(
   notificationId: number,
 ): Promise<{ success: boolean; error?: string }> {
   // Load the failed notification and its domain event
-  const [entry] = await db
+  const [entry] = await getDb()
     .select({
       id: notificationLog.id,
       eventId: notificationLog.eventId,
@@ -210,7 +210,7 @@ export async function retryFailedNotification(
   try {
     // Attempt to re-send via in-app adapter
     // For now, we update the existing entry rather than creating a new one
-    await db
+    await getDb()
       .update(notificationLog)
       .set({
         title: message.title,
@@ -231,7 +231,7 @@ export async function retryFailedNotification(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
-    await db
+    await getDb()
       .update(notificationLog)
       .set({
         errorMessage,

@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { tasks, taskAssignees, taskComments } from "@dragons/db/schema";
 import { eq, and } from "drizzle-orm";
 import type { TaskComment } from "@dragons/shared";
@@ -11,7 +11,7 @@ export async function addComment(
   data: { body: string },
   callerId: string,
 ): Promise<TaskComment | null> {
-  return await db.transaction(async (tx) => {
+  return await getDb().transaction(async (tx) => {
     const [task] = await tx
       .select({ id: tasks.id, boardId: tasks.boardId, title: tasks.title })
       .from(tasks)
@@ -70,7 +70,7 @@ export async function updateComment(
   commentId: number,
   data: { body: string },
 ): Promise<TaskComment | null> {
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(taskComments)
     .set({ body: data.body, updatedAt: new Date() })
     .where(
@@ -96,7 +96,7 @@ export async function deleteComment(
   taskId: number,
   commentId: number,
 ): Promise<boolean> {
-  const [deleted] = await db
+  const [deleted] = await getDb()
     .delete(taskComments)
     .where(
       and(

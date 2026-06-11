@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   refereeGames,
   referees,
@@ -32,7 +32,7 @@ export async function claimRefereeGame(
 ): Promise<AssignRefereeResponse> {
   const { refereeId, gameId, slotNumber } = params;
 
-  const [referee] = await db
+  const [referee] = await getDb()
     .select({
       apiId: referees.apiId,
       isOwnClub: referees.isOwnClub,
@@ -57,7 +57,7 @@ export async function claimRefereeGame(
     );
   }
 
-  const [game] = await db
+  const [game] = await getDb()
     .select()
     .from(refereeGames)
     .where(eq(refereeGames.id, gameId))
@@ -70,7 +70,7 @@ export async function claimRefereeGame(
     );
   }
 
-  const rules = await db
+  const rules = await getDb()
     .select({
       teamId: refereeAssignmentRules.teamId,
       deny: refereeAssignmentRules.deny,
@@ -109,7 +109,7 @@ export async function unclaimRefereeGame(
 ): Promise<UnassignRefereeResponse> {
   const { refereeId, gameId } = params;
 
-  const [referee] = await db
+  const [referee] = await getDb()
     .select({ apiId: referees.apiId })
     .from(referees)
     .where(eq(referees.id, refereeId))
@@ -122,7 +122,7 @@ export async function unclaimRefereeGame(
     );
   }
 
-  const [game] = await db
+  const [game] = await getDb()
     .select()
     .from(refereeGames)
     .where(eq(refereeGames.id, gameId))

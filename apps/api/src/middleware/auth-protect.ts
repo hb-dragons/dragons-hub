@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { redis } from "../config/redis";
+import { getRedis } from "../config/redis";
 import type { AppEnv } from "../types";
 
 const FAIL_WINDOW_SEC = 15 * 60;
@@ -41,22 +41,22 @@ function lockKey(email: string): string {
 }
 
 export async function isLockedOut(email: string): Promise<boolean> {
-  const v = await redis.get(lockKey(email));
+  const v = await getRedis().get(lockKey(email));
   return v !== null;
 }
 
 export async function recordAuthFailure(email: string): Promise<void> {
   const key = failKey(email);
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, FAIL_WINDOW_SEC);
+  const count = await getRedis().incr(key);
+  if (count === 1) await getRedis().expire(key, FAIL_WINDOW_SEC);
   if (count >= FAIL_THRESHOLD) {
-    await redis.set(lockKey(email), "1", "EX", LOCKOUT_SEC);
-    await redis.del(key);
+    await getRedis().set(lockKey(email), "1", "EX", LOCKOUT_SEC);
+    await getRedis().del(key);
   }
 }
 
 export async function clearAuthFailures(email: string): Promise<void> {
-  await Promise.all([redis.del(failKey(email)), redis.del(lockKey(email))]);
+  await Promise.all([getRedis().del(failKey(email)), getRedis().del(lockKey(email))]);
 }
 
 export const signInLockout: MiddlewareHandler<AppEnv> = async (c, next) => {

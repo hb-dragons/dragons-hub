@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { leagues } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import pLimit from "p-limit";
@@ -50,7 +50,7 @@ export async function syncLeagues(syncLogger?: SyncLogger): Promise<LeagueSyncRe
   };
 
   try {
-    const trackedLeagues = await db
+    const trackedLeagues = await getDb()
       .select()
       .from(leagues)
       .where(eq(leagues.isTracked, true));
@@ -120,7 +120,7 @@ async function syncOneLeague(
       return;
     }
 
-    await db
+    await getDb()
       .update(leagues)
       .set({
         ligaNr: ligaData.liganr,

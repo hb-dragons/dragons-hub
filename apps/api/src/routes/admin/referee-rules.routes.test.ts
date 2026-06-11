@@ -12,9 +12,9 @@ vi.mock("../../services/referee/referee-rules.service", () => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mocks.dbSelect(...args),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

@@ -24,9 +24,9 @@ vi.mock("../config/env", () => ({
 
 const mockDbSelect = vi.fn();
 vi.mock("../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mockDbSelect(...args),
-  },
+  }),
 }));
 
 vi.mock("drizzle-orm", () => ({

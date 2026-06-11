@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { syncRuns, syncRunEntries, syncSchedule, matches, matchRemoteVersions, matchChanges, user } from "@dragons/db/schema";
 import { desc, eq, sql, and, or, ilike, inArray } from "drizzle-orm";
 import { updateSyncSchedule, updateRefereeSyncSchedule } from "../../workers/queues";
@@ -41,7 +41,7 @@ async function resolveTriggeredByNames(
   )];
   if (userIds.length === 0) return new Map();
 
-  const users = await db
+  const users = await getDb()
     .select({ id: user.id, name: user.name })
     .from(user)
     .where(inArray(user.id, userIds));
@@ -60,14 +60,14 @@ function addTriggeredByName(
 }
 
 export async function getSyncStatus(syncType?: string) {
-  const [lastSync] = await db
+  const [lastSync] = await getDb()
     .select()
     .from(syncRuns)
     .where(syncType ? eq(syncRuns.syncType, syncType) : undefined)
     .orderBy(desc(syncRuns.startedAt))
     .limit(1);
 
-  const [runningSync] = await db
+  const [runningSync] = await getDb()
     .select()
     .from(syncRuns)
     .where(
@@ -91,8 +91,8 @@ export async function getSyncStatus(syncType?: string) {
 export async function getSyncLogs(params: SyncLogsQuery) {
   const { limit, offset, status, syncType } = params;
 
-  let query = db.select().from(syncRuns).$dynamic();
-  let countQuery = db
+  let query = getDb().select().from(syncRuns).$dynamic();
+  let countQuery = getDb()
     .select({ count: sql<number>`count(*)::int` })
     .from(syncRuns)
     .$dynamic();
@@ -128,7 +128,7 @@ export async function getSyncLogs(params: SyncLogsQuery) {
 }
 
 export async function getSyncRun(id: number) {
-  const [syncRun] = await db
+  const [syncRun] = await getDb()
     .select()
     .from(syncRuns)
     .where(eq(syncRuns.id, id))
@@ -166,14 +166,14 @@ export async function getSyncRunEntries(syncRunId: number, params: SyncEntriesQu
   const whereClause = conditions.length === 1 ? conditions[0]! : and(...conditions)!;
 
   const [entries, countResult] = await Promise.all([
-    db
+    getDb()
       .select()
       .from(syncRunEntries)
       .where(whereClause)
       .orderBy(desc(syncRunEntries.createdAt))
       .limit(limit)
       .offset(offset),
-    db
+    getDb()
       .select({ count: sql<number>`count(*)::int` })
       .from(syncRunEntries)
       .where(whereClause),
@@ -181,7 +181,7 @@ export async function getSyncRunEntries(syncRunId: number, params: SyncEntriesQu
 
   const total = countResult[0]?.count ?? 0;
 
-  const summaryCounts = await db
+  const summaryCounts = await getDb()
     .select({
       action: syncRunEntries.action,
       count: sql<number>`count(*)::int`,
@@ -208,7 +208,7 @@ export async function getSyncRunEntries(syncRunId: number, params: SyncEntriesQu
 }
 
 export async function getSchedule(syncType: string = "full") {
-  const [schedule] = await db
+  const [schedule] = await getDb()
     .select()
     .from(syncSchedule)
     .where(eq(syncSchedule.syncType, syncType))
@@ -244,7 +244,7 @@ export async function getSchedule(syncType: string = "full") {
 
 export async function upsertSchedule(data: UpdateScheduleBody) {
   const syncType = data.syncType ?? "full";
-  const [existing] = await db
+  const [existing] = await getDb()
     .select()
     .from(syncSchedule)
     .where(eq(syncSchedule.syncType, syncType))
@@ -252,7 +252,7 @@ export async function upsertSchedule(data: UpdateScheduleBody) {
 
   let schedule;
   if (existing) {
-    [schedule] = await db
+    [schedule] = await getDb()
       .update(syncSchedule)
       .set({
         enabled: data.enabled ?? existing.enabled,
@@ -265,7 +265,7 @@ export async function upsertSchedule(data: UpdateScheduleBody) {
       .where(eq(syncSchedule.id, existing.id))
       .returning();
   } else {
-    [schedule] = await db
+    [schedule] = await getDb()
       .insert(syncSchedule)
       .values({
         syncType,
@@ -291,7 +291,7 @@ export async function upsertSchedule(data: UpdateScheduleBody) {
 }
 
 export async function getMatchChangesForEntry(syncRunId: number, apiMatchId: number) {
-  const [match] = await db
+  const [match] = await getDb()
     .select({ id: matches.id })
     .from(matches)
     .where(eq(matches.apiMatchId, apiMatchId))
@@ -299,7 +299,7 @@ export async function getMatchChangesForEntry(syncRunId: number, apiMatchId: num
 
   if (!match) return null;
 
-  const [version] = await db
+  const [version] = await getDb()
     .select({ versionNumber: matchRemoteVersions.versionNumber })
     .from(matchRemoteVersions)
     .where(
@@ -312,7 +312,7 @@ export async function getMatchChangesForEntry(syncRunId: number, apiMatchId: num
 
   if (!version) return null;
 
-  const changes = await db
+  const changes = await getDb()
     .select({
       fieldName: matchChanges.fieldName,
       oldValue: matchChanges.oldValue,

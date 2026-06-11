@@ -4,7 +4,7 @@ import type { Database } from "@dragons/db";
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 vi.mock("../../config/database", () => ({
-  db: new Proxy({}, { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] }),
+  getDb: () => (new Proxy({}, { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] })),
 }));
 
 import { userNotificationPreferences } from "@dragons/db/schema";

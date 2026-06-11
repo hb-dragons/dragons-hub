@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { taskAssignees, boards, user } from "@dragons/db/schema";
 import { eq, asc, sql } from "drizzle-orm";
 import type { TaskAssignee, EventType } from "@dragons/shared";
@@ -14,7 +14,7 @@ export interface TaskFilters {
 }
 
 export async function fetchAssignees(taskId: number): Promise<TaskAssignee[]> {
-  const rows = await db
+  const rows = await getDb()
     .select({
       userId: taskAssignees.userId,
       name: user.name,
@@ -35,7 +35,7 @@ export async function fetchAssigneesBatch(
   taskIds: number[],
 ): Promise<Map<number, TaskAssignee[]>> {
   if (taskIds.length === 0) return new Map();
-  const rows = await db
+  const rows = await getDb()
     .select({
       taskId: taskAssignees.taskId,
       userId: taskAssignees.userId,

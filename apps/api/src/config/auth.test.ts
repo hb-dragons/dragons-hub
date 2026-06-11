@@ -20,7 +20,7 @@ vi.mock("./env", () => ({
 }));
 
 vi.mock("./database", () => ({
-  db: {},
+  getDb: () => ({}),
 }));
 
 const redisMocks = vi.hoisted(() => ({
@@ -30,11 +30,11 @@ const redisMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./redis", () => ({
-  redis: {
+  getRedis: () => ({
     get: (...a: unknown[]) => redisMocks.get(...a),
     set: (...a: unknown[]) => redisMocks.set(...a),
     del: (...a: unknown[]) => redisMocks.del(...a),
-  },
+  }),
 }));
 
 vi.mock("better-auth", () => ({

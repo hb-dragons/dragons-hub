@@ -8,7 +8,7 @@ import { outboxPollWorker } from "./outbox-poll.worker";
 import { initializeScheduledJobs, initTaskReminders, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue, outboxPollQueue } from "./queues";
 import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
 import { syncRefereeGames } from "../services/sync/referee-games.sync";
-import { db } from "../config/database";
+import { getDb } from "../config/database";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import {
@@ -31,7 +31,7 @@ export async function initializeWorkers() {
 
   // Reclaim "running" sync runs whose owner instance is no longer alive.
   // Runs owned by a live instance (rolling deploy) are left untouched.
-  const candidateRuns = await db
+  const candidateRuns = await getDb()
     .select({ id: syncRuns.id, ownerInstanceId: syncRuns.ownerInstanceId })
     .from(syncRuns)
     .where(eq(syncRuns.status, "running"));
@@ -45,7 +45,7 @@ export async function initializeWorkers() {
   }
 
   if (deadRunIds.length > 0) {
-    await db
+    await getDb()
       .update(syncRuns)
       .set({
         status: "failed",
@@ -129,7 +129,7 @@ export async function cleanupOldSyncRuns(retentionDays: number = 90): Promise<nu
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - retentionDays);
 
-  const oldRuns = await db
+  const oldRuns = await getDb()
     .select({ id: syncRuns.id })
     .from(syncRuns)
     .where(lt(syncRuns.startedAt, cutoff));
@@ -139,8 +139,8 @@ export async function cleanupOldSyncRuns(retentionDays: number = 90): Promise<nu
   const oldRunIds = oldRuns.map((r) => r.id);
 
   // Delete entries first (FK dependency), then runs
-  await db.delete(syncRunEntries).where(inArray(syncRunEntries.syncRunId, oldRunIds));
-  await db.delete(syncRuns).where(inArray(syncRuns.id, oldRunIds));
+  await getDb().delete(syncRunEntries).where(inArray(syncRunEntries.syncRunId, oldRunIds));
+  await getDb().delete(syncRuns).where(inArray(syncRuns.id, oldRunIds));
 
   return oldRuns.length;
 }
@@ -159,7 +159,7 @@ export async function cleanupOldDomainEvents(
 
   // Process in batches to avoid loading thousands of IDs into memory
   while (true) {
-    const batch = await db
+    const batch = await getDb()
       .select({ id: domainEvents.id })
       .from(domainEvents)
       .where(lt(domainEvents.occurredAt, cutoff))
@@ -170,17 +170,17 @@ export async function cleanupOldDomainEvents(
     const ids = batch.map((e) => e.id);
 
     // Delete FK-dependent rows first, then the events
-    const deletedNotifications = await db
+    const deletedNotifications = await getDb()
       .delete(notificationLog)
       .where(inArray(notificationLog.eventId, ids))
       .returning({ id: notificationLog.id });
 
-    const deletedDigest = await db
+    const deletedDigest = await getDb()
       .delete(digestBuffer)
       .where(inArray(digestBuffer.eventId, ids))
       .returning({ id: digestBuffer.id });
 
-    await db.delete(domainEvents).where(inArray(domainEvents.id, ids));
+    await getDb().delete(domainEvents).where(inArray(domainEvents.id, ids));
 
     totalNotifications += deletedNotifications.length;
     totalDigestEntries += deletedDigest.length;
@@ -208,7 +208,7 @@ export async function initializeScheduledDigests(): Promise<void> {
     await digestQueue.removeRepeatableByKey(job.key);
   }
 
-  const scheduledChannels = await db
+  const scheduledChannels = await getDb()
     .select()
     .from(channelConfigs)
     .where(
@@ -266,7 +266,7 @@ export async function shutdownWorkers() {
 
   try {
     // Mark only this instance's running sync runs as failed
-    await db
+    await getDb()
       .update(syncRuns)
       .set({
         status: "failed",

@@ -1,15 +1,15 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("./config/database", () => ({
-  db: {
+  getDb: () => ({
     execute: vi.fn().mockResolvedValue(undefined),
-  },
+  }),
 }));
 
 vi.mock("./config/redis", () => ({
-  redis: {
+  getRedis: () => ({
     ping: vi.fn().mockResolvedValue("PONG"),
-  },
+  }),
 }));
 
 vi.mock("./workers/queues", () => ({

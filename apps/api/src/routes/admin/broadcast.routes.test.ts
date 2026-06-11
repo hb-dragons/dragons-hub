@@ -16,13 +16,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  db: new Proxy(
+  getDb: () => (new Proxy(
     {},
     {
       get: (_t, prop) =>
         (dbHolder.ref as Record<string | symbol, unknown>)[prop],
     },
-  ),
+  )),
 }));
 
 vi.mock("../../middleware/rbac", () => ({

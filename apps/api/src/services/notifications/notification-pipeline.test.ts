@@ -6,10 +6,10 @@ const mockDbSelect = vi.fn();
 const mockDbInsert = vi.fn();
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mockDbSelect(...args),
     insert: (...args: unknown[]) => mockDbInsert(...args),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({
@@ -111,10 +111,10 @@ vi.mock("../../config/logger", () => ({
 const mockRedisSet = vi.fn();
 const mockRedisDel = vi.fn().mockResolvedValue(1);
 vi.mock("../../config/redis", () => ({
-  redis: {
+  getRedis: () => ({
     set: (...args: unknown[]) => mockRedisSet(...args),
     del: (...args: unknown[]) => mockRedisDel(...args),
-  },
+  }),
 }));
 
 // --- Import after mocks ---

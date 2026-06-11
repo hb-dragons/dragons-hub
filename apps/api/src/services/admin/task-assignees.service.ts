@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { tasks, taskAssignees, user } from "@dragons/db/schema";
 import { eq, and } from "drizzle-orm";
 import type { TaskAssignee } from "@dragons/shared";
@@ -10,7 +10,7 @@ export async function addAssignee(
   userId: string,
   callerId: string,
 ): Promise<TaskAssignee | null> {
-  return await db.transaction(async (tx) => {
+  return await getDb().transaction(async (tx) => {
     const [task] = await tx
       .select({ id: tasks.id, boardId: tasks.boardId, title: tasks.title, dueDate: tasks.dueDate, priority: tasks.priority })
       .from(tasks)
@@ -67,7 +67,7 @@ export async function removeAssignee(
   userId: string,
   callerId: string,
 ): Promise<boolean> {
-  return await db.transaction(async (tx) => {
+  return await getDb().transaction(async (tx) => {
     const [task] = await tx
       .select({ id: tasks.id, boardId: tasks.boardId, title: tasks.title, dueDate: tasks.dueDate, priority: tasks.priority })
       .from(tasks)

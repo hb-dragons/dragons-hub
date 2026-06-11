@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   tasks,
   taskChecklistItems,
@@ -41,7 +41,7 @@ export async function listTasks(
     conditions.push(eq(tasks.priority, filters.priority as TaskPriority));
   }
 
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: tasks.id,
       boardId: tasks.boardId,
@@ -59,7 +59,7 @@ export async function listTasks(
   const taskIds = rows.map((r) => r.id);
   if (taskIds.length === 0) return [];
 
-  const checklistCounts = await db
+  const checklistCounts = await getDb()
     .select({
       taskId: taskChecklistItems.taskId,
       total: count(),
@@ -101,7 +101,7 @@ export async function createTask(
   },
   callerId: string,
 ): Promise<TaskDetail | null> {
-  const created = await db.transaction(async (tx) => {
+  const created = await getDb().transaction(async (tx) => {
     const [board] = await tx
       .select({ id: boards.id })
       .from(boards)
@@ -205,7 +205,7 @@ export async function createTask(
 }
 
 export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
-  const [task] = await db
+  const [task] = await getDb()
     .select()
     .from(tasks)
     .where(eq(tasks.id, id))
@@ -213,7 +213,7 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
 
   if (!task) return null;
 
-  const checklist = await db
+  const checklist = await getDb()
     .select({
       id: taskChecklistItems.id,
       label: taskChecklistItems.label,
@@ -226,7 +226,7 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
     .where(eq(taskChecklistItems.taskId, id))
     .orderBy(asc(taskChecklistItems.position));
 
-  const comments = await db
+  const comments = await getDb()
     .select({
       id: taskComments.id,
       authorId: taskComments.authorId,
@@ -288,7 +288,7 @@ export async function updateTask(
     setData.dueReminderSentAt = null;
   }
 
-  const updated = await db.transaction(async (tx) => {
+  const updated = await getDb().transaction(async (tx) => {
     const [row] = await tx
       .update(tasks)
       .set(setData)
@@ -365,7 +365,7 @@ export async function moveTask(
   targetColumnId: number,
   targetPosition: number,
 ): Promise<TaskDetail | null> {
-  const result = await db.transaction(async (tx) => {
+  const result = await getDb().transaction(async (tx) => {
     const [task] = await tx
       .select()
       .from(tasks)
@@ -469,7 +469,7 @@ export async function moveTask(
 }
 
 export async function deleteTask(id: number): Promise<boolean> {
-  const [deleted] = await db
+  const [deleted] = await getDb()
     .delete(tasks)
     .where(eq(tasks.id, id))
     .returning({ id: tasks.id });

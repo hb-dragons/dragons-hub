@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { leagues } from "@dragons/db/schema";
 import { eq, and, notInArray } from "drizzle-orm";
 import { sdkClient } from "../sync/sdk-client";
@@ -38,14 +38,14 @@ export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<Re
 
   // Upsert matched leagues
   for (const liga of matchedByLigaNr.values()) {
-    const [existing] = await db
+    const [existing] = await getDb()
       .select()
       .from(leagues)
       .where(eq(leagues.apiLigaId, liga.ligaId))
       .limit(1);
 
     if (existing) {
-      await db
+      await getDb()
         .update(leagues)
         .set({
           ligaNr: liga.liganr,
@@ -62,7 +62,7 @@ export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<Re
         })
         .where(eq(leagues.id, existing.id));
     } else {
-      await db.insert(leagues).values({
+      await getDb().insert(leagues).values({
         apiLigaId: liga.ligaId,
         ligaNr: liga.liganr,
         name: liga.liganame,
@@ -86,7 +86,7 @@ export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<Re
   let untrackedCount = 0;
 
   if (matchedLigaIds.length > 0) {
-    const untrackedResult = await db
+    const untrackedResult = await getDb()
       .update(leagues)
       .set({ isTracked: false, updatedAt: new Date() })
       .where(and(eq(leagues.isTracked, true), notInArray(leagues.apiLigaId, matchedLigaIds)))
@@ -94,7 +94,7 @@ export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<Re
     untrackedCount = untrackedResult.length;
   } else {
     // No matched leagues — untrack all
-    const untrackedResult = await db
+    const untrackedResult = await getDb()
       .update(leagues)
       .set({ isTracked: false, updatedAt: new Date() })
       .where(eq(leagues.isTracked, true))
@@ -111,7 +111,7 @@ export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<Re
 }
 
 export async function getTrackedLeagues(): Promise<TrackedLeaguesResponse> {
-  const tracked = await db
+  const tracked = await getDb()
     .select({
       id: leagues.id,
       ligaNr: leagues.ligaNr,
@@ -133,7 +133,7 @@ export async function setLeagueOwnClubRefs(
   leagueId: number,
   ownClubRefs: boolean,
 ): Promise<void> {
-  await db
+  await getDb()
     .update(leagues)
     .set({ ownClubRefs, updatedAt: new Date() })
     .where(eq(leagues.id, leagueId));

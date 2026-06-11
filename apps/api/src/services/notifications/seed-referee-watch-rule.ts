@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { channelConfigs, watchRules } from "@dragons/db/schema";
 import { eq, and } from "drizzle-orm";
 import { logger } from "../../config/logger";
@@ -17,7 +17,7 @@ const WATCH_RULE_NAME = "Referee slots → WhatsApp group";
  */
 export async function seedRefereeNotificationConfig(): Promise<void> {
   // 1. Ensure channel config exists
-  const [existingConfig] = await db
+  const [existingConfig] = await getDb()
     .select({ id: channelConfigs.id })
     .from(channelConfigs)
     .where(
@@ -34,7 +34,7 @@ export async function seedRefereeNotificationConfig(): Promise<void> {
     channelConfigId = existingConfig.id;
     log.debug("Referee WhatsApp channel config already exists");
   } else {
-    const [created] = await db
+    const [created] = await getDb()
       .insert(channelConfigs)
       .values({
         name: CHANNEL_CONFIG_NAME,
@@ -53,7 +53,7 @@ export async function seedRefereeNotificationConfig(): Promise<void> {
   }
 
   // 2. Ensure watch rule exists
-  const [existingRule] = await db
+  const [existingRule] = await getDb()
     .select({ id: watchRules.id })
     .from(watchRules)
     .where(eq(watchRules.name, WATCH_RULE_NAME))
@@ -64,7 +64,7 @@ export async function seedRefereeNotificationConfig(): Promise<void> {
     return;
   }
 
-  await db.insert(watchRules).values({
+  await getDb().insert(watchRules).values({
     name: WATCH_RULE_NAME,
     enabled: true,
     createdBy: "system",

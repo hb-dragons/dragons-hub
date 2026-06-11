@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-import { db } from "../../../config/database";
+import { getDb } from "../../../config/database";
 import {
   pushDevices,
   notificationLog,
@@ -48,7 +48,7 @@ export class PushChannelAdapter {
 
     if (params.recipientUserIds.length === 0) return result;
 
-    const devices = (await db
+    const devices = (await getDb()
       .select()
       .from(pushDevices)
       .where(inArray(pushDevices.userId, params.recipientUserIds))) as DeviceRow[];
@@ -58,7 +58,7 @@ export class PushChannelAdapter {
       return result;
     }
 
-    const prefs = (await db
+    const prefs = (await getDb()
       .select()
       .from(userNotificationPreferences)
       .where(inArray(userNotificationPreferences.userId, params.recipientUserIds))) as PrefRow[];
@@ -122,7 +122,7 @@ export class PushChannelAdapter {
       status: "pending",
     }));
 
-    const claimedRows = await db
+    const claimedRows = await getDb()
       .insert(notificationLog)
       .values(claimValues)
       .onConflictDoNothing()
@@ -165,7 +165,7 @@ export class PushChannelAdapter {
         const claimId = claimIdByUser.get(userId)!;
         const okDevice = devices.find((d) => d.ok);
         const firstFail = devices.find((d) => !d.ok);
-        await db
+        await getDb()
           .update(notificationLog)
           .set({
             status: okDevice ? "sent_ticket" : "failed",
@@ -187,7 +187,7 @@ export class PushChannelAdapter {
       // rows, so leaving them as "failed" would block all future delivery for
       // this event. Per-ticket terminal errors (e.g. DeviceNotRegistered) are
       // handled in the success path and keep their "failed" rows.
-      await db
+      await getDb()
         .delete(notificationLog)
         .where(inArray(notificationLog.id, [...claimIdByUser.values()]));
       return { success: false, sent: 0, failed: toSend.length };

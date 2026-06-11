@@ -16,10 +16,10 @@ vi.mock("../../config/logger", () => ({
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

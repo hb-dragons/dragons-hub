@@ -1,9 +1,9 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { syncRunEntries } from "@dragons/db/schema";
 import type { NewSyncRunEntry } from "@dragons/db/schema";
 import { EventEmitter } from "events";
 import type Redis from "ioredis";
-import { redis as sharedRedis } from "../../config/redis";
+import { getRedis } from "../../config/redis";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "sync-logger" });
@@ -48,7 +48,7 @@ export class SyncLogger {
     this.channelName = `sync:${syncRunId}:logs`;
 
     try {
-      this.redis = redisInstance !== undefined ? redisInstance : sharedRedis;
+      this.redis = redisInstance !== undefined ? redisInstance : getRedis();
     } catch {
       log.warn("Redis not available, streaming disabled");
     }
@@ -100,7 +100,7 @@ export class SyncLogger {
     this.entries = [];
 
     try {
-      await db.insert(syncRunEntries).values(toInsert);
+      await getDb().insert(syncRunEntries).values(toInsert);
       this.flushRetries = 0;
     } catch (error) {
       this.flushRetries++;

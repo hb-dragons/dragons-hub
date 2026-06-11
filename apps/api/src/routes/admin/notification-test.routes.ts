@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { eq, like, desc } from "drizzle-orm";
 import { ulid } from "ulid";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   pushDevices,
   notificationLog,
@@ -12,7 +12,7 @@ import {
 import { ExpoPushClient } from "../../services/notifications/expo-push.client";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
-import { redis } from "../../config/redis";
+import { getRedis } from "../../config/redis";
 import { requirePermission } from "../../middleware/rbac";
 import { escapeLikePattern } from "../../services/utils/sql";
 import type { AppEnv } from "../../types";
@@ -53,15 +53,15 @@ notificationTestRoutes.post(
     const callerId = user.id;
 
     const cooldownKey = `${TEST_PUSH_COOLDOWN_KEY_PREFIX}${callerId}`;
-    const claim = await redis.set(cooldownKey, "1", "EX", TEST_PUSH_COOLDOWN_SEC, "NX");
+    const claim = await getRedis().set(cooldownKey, "1", "EX", TEST_PUSH_COOLDOWN_SEC, "NX");
     if (claim !== "OK") {
-      const ttl = await redis.ttl(cooldownKey);
+      const ttl = await getRedis().ttl(cooldownKey);
       const retryAfter = ttl > 0 ? ttl : TEST_PUSH_COOLDOWN_SEC;
       c.header("Retry-After", String(retryAfter));
       return c.json({ error: "rate_limited", retryAfter }, 429);
     }
 
-    const devices = await db
+    const devices = await getDb()
       .select()
       .from(pushDevices)
       .where(eq(pushDevices.userId, callerId));
@@ -76,7 +76,7 @@ notificationTestRoutes.post(
       );
     }
 
-    const pushChannels = await db
+    const pushChannels = await getDb()
       .select()
       .from(channelConfigs)
       .where(eq(channelConfigs.type, "push"));
@@ -134,7 +134,7 @@ notificationTestRoutes.post(
 
     // Synthetic domain_events row so notification_log FK is satisfied.
     // Wrapped in a transaction so the event + log rows land atomically.
-    await db.transaction(async (tx) => {
+    await getDb().transaction(async (tx) => {
       await tx.insert(domainEvents).values({
         id: eventId,
         type: "admin.test_push",
@@ -180,7 +180,7 @@ notificationTestRoutes.get(
     if (!user) return c.json({ error: "Unauthorized" }, 401);
 
     const callerId = user.id;
-    const rows = await db
+    const rows = await getDb()
       .select()
       .from(notificationLog)
       .where(like(notificationLog.eventId, `admin_test:${escapeLikePattern(callerId)}:%`))

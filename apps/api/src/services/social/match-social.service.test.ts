@@ -9,7 +9,7 @@ const { mockDb } = vi.hoisted(() => {
   return { mockDb };
 });
 
-vi.mock("../../config/database", () => ({ db: mockDb }));
+vi.mock("../../config/database", () => ({ getDb: () => (mockDb) }));
 vi.mock("@dragons/db/schema", () => ({
   matches: {
     id: "id",

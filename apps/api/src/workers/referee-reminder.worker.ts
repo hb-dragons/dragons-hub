@@ -1,6 +1,6 @@
 import { Worker, type Job } from "bullmq";
 import { eq } from "drizzle-orm";
-import { db } from "../config/database";
+import { getDb } from "../config/database";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { refereeGames } from "@dragons/db/schema";
@@ -35,7 +35,7 @@ export function shouldEmitReminder(state: MatchSlotState): boolean {
  * Load referee game row from DB.
  */
 async function loadRefereeGame(refereeGameId: number) {
-  const [row] = await db
+  const [row] = await getDb()
     .select()
     .from(refereeGames)
     .where(eq(refereeGames.id, refereeGameId));

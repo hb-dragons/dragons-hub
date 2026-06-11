@@ -12,7 +12,7 @@ vi.mock("../config/logger", () => ({
 
 const mockInsert = vi.fn();
 vi.mock("../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -22,7 +22,7 @@ vi.mock("../config/database", () => ({
       }),
     }),
     insert: (...args: unknown[]) => mockInsert(...args),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

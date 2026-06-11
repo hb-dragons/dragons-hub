@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
 import { and, eq, gte, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
@@ -52,7 +52,7 @@ export function computeMySlot(
 }
 
 export async function getRefereeGameById(id: number): Promise<RefereeGameListItem | null> {
-  const [row] = await db
+  const [row] = await getDb()
     .select(refereeGameColumns)
     .from(refereeGames)
     .where(eq(refereeGames.id, id))
@@ -145,13 +145,13 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
     : undefined;
 
   const [items, countResult] = await Promise.all([
-    db.select(refereeGameColumns)
+    getDb().select(refereeGameColumns)
     .from(refereeGames)
     .where(whereClause)
     .orderBy(asc(refereeGames.kickoffDate), asc(refereeGames.kickoffTime))
     .limit(limit)
     .offset(offset),
-    db.select({ count: sql<number>`count(*)::int` })
+    getDb().select({ count: sql<number>`count(*)::int` })
     .from(refereeGames)
     .where(whereClause),
   ]);

@@ -27,19 +27,19 @@ describe("redis config", () => {
     vi.clearAllMocks();
   });
 
-  it("creates redis lazily on first access", async () => {
-    const { redis } = await import("./redis");
+  it("creates redis lazily on first call", async () => {
+    const { getRedis } = await import("./redis");
 
-    const result = await redis.ping();
+    const result = await getRedis().ping();
 
     expect(result).toBe("PONG");
   });
 
   it("registers connect and error handlers", async () => {
-    const { redis } = await import("./redis");
+    const { getRedis } = await import("./redis");
 
     // Trigger initialization
-    void redis.ping;
+    getRedis();
 
     expect(mockOn).toHaveBeenCalledWith("connect", expect.any(Function));
     expect(mockOn).toHaveBeenCalledWith("error", expect.any(Function));
@@ -47,8 +47,8 @@ describe("redis config", () => {
 
   it("connect handler logs message", async () => {
     const { logger } = await import("./logger");
-    const { redis } = await import("./redis");
-    void redis.ping;
+    const { getRedis } = await import("./redis");
+    getRedis();
 
     const connectHandler = handlers["connect"];
     expect(connectHandler).toBeDefined();
@@ -58,8 +58,8 @@ describe("redis config", () => {
 
   it("error handler logs error message", async () => {
     const { logger } = await import("./logger");
-    const { redis } = await import("./redis");
-    void redis.ping;
+    const { getRedis } = await import("./redis");
+    getRedis();
 
     const err = new Error("connection failed");
     const errorHandler = handlers["error"];

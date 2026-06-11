@@ -12,7 +12,7 @@ vi.mock("./pubsub", () => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: () => ({
       from: () => ({
         where: () => ({
@@ -23,7 +23,7 @@ vi.mock("../../config/database", () => ({
         }),
       }),
     }),
-  },
+  }),
 }));
 
 import { createScoreboardStream } from "./sse";

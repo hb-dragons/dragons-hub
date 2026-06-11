@@ -6,12 +6,12 @@ import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../..
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
-  db: new Proxy(
+  getDb: () => (new Proxy(
     {},
     {
       get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
     },
-  ),
+  )),
 }));
 
 // --- Imports (after mocks) ---

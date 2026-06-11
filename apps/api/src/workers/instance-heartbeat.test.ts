@@ -6,10 +6,10 @@ const mockRedisSet = vi.fn().mockResolvedValue("OK");
 const mockRedisExists = vi.fn().mockResolvedValue(0);
 
 vi.mock("../config/redis", () => ({
-  redis: {
+  getRedis: () => ({
     set: (...args: unknown[]) => mockRedisSet(...args),
     exists: (...args: unknown[]) => mockRedisExists(...args),
-  },
+  }),
 }));
 
 vi.mock("../config/logger", () => {

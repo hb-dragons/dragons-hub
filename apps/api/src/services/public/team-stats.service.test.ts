@@ -24,12 +24,12 @@ const chainable = {
 };
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...args: unknown[]) => {
       mocks.select(...args);
       return chainable;
     },
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

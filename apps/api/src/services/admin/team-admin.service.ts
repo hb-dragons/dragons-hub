@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { teams, standings, leagues } from "@dragons/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
@@ -6,7 +6,7 @@ import type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
 export type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
 
 export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
-  const rows = await db
+  const rows = await getDb()
     .selectDistinctOn([teams.id], {
       id: teams.id,
       name: teams.name,
@@ -38,7 +38,7 @@ export async function updateTeam(
     set.estimatedGameDuration = data.estimatedGameDuration;
   if (data.badgeColor !== undefined) set.badgeColor = data.badgeColor;
 
-  const [updated] = await db
+  const [updated] = await getDb()
     .update(teams)
     .set(set)
     .where(and(eq(teams.id, id), eq(teams.isOwnClub, true)))
@@ -55,7 +55,7 @@ export async function updateTeam(
   if (!updated) return null;
 
   // Fetch league name for the updated team
-  const [standing] = await db
+  const [standing] = await getDb()
     .select({ leagueName: leagues.name })
     .from(standings)
     .innerJoin(leagues, eq(leagues.id, standings.leagueId))
@@ -74,7 +74,7 @@ export async function reorderOwnClubTeams(
     throw new Error("DUPLICATE_TEAM_ID");
   }
 
-  return await db.transaction(async (tx) => {
+  return await getDb().transaction(async (tx) => {
     // Load current own-club team IDs
     const ownClub = await tx
       .select({ id: teams.id })

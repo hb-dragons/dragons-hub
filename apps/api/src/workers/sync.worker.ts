@@ -5,7 +5,7 @@ import { syncRuns } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { runWithTrace, type TraceCarrier } from "../config/log-context";
-import { db } from "../config/database";
+import { getDb } from "../config/database";
 import { fullSync } from "../services/sync/index";
 import { INSTANCE_ID } from "./instance-heartbeat";
 
@@ -48,7 +48,7 @@ export const syncWorker = new Worker<SyncJobData>(
           // For scheduled jobs, create a syncRun record so the UI can track history
           let syncRunId = job.data.syncRunId;
           if (!syncRunId) {
-            const [created] = await db
+            const [created] = await getDb()
               .insert(syncRuns)
               .values({
                 syncType: "referee-games",
@@ -62,7 +62,7 @@ export const syncWorker = new Worker<SyncJobData>(
 
           const syncLogger = createSyncLogger(syncRunId);
 
-          await db
+          await getDb()
             .update(syncRuns)
             .set({ status: "running", ownerInstanceId: INSTANCE_ID })
             .where(eq(syncRuns.id, syncRunId));
@@ -71,7 +71,7 @@ export const syncWorker = new Worker<SyncJobData>(
           try {
             const result = await syncRefereeGames(syncLogger, syncRunId);
             await syncLogger.close();
-            await db
+            await getDb()
               .update(syncRuns)
               .set({
                 status: "completed",
@@ -86,7 +86,7 @@ export const syncWorker = new Worker<SyncJobData>(
             return { completed: true, type: job.data.type, ...result };
           } catch (err) {
             await syncLogger.close();
-            await db
+            await getDb()
               .update(syncRuns)
               .set({
                 status: "failed",
@@ -119,7 +119,7 @@ syncWorker.on("completed", (job) => {
 
     if (job.data.syncRunId) {
       try {
-        const [run] = await db
+        const [run] = await getDb()
           .select({ status: syncRuns.status })
           .from(syncRuns)
           .where(eq(syncRuns.id, job.data.syncRunId));
@@ -128,7 +128,7 @@ syncWorker.on("completed", (job) => {
             { syncRunId: job.data.syncRunId },
             "Sync run still running after job completed, marking as completed",
           );
-          await db
+          await getDb()
             .update(syncRuns)
             .set({ status: "completed", completedAt: new Date() })
             .where(eq(syncRuns.id, job.data.syncRunId));
@@ -149,7 +149,7 @@ syncWorker.on("failed", (job, err) => {
 
     if (job?.data.syncRunId) {
       try {
-        await db
+        await getDb()
           .update(syncRuns)
           .set({
             status: "failed",

@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { domainEvents, notificationLog } from "@dragons/db/schema";
 import { and, desc, eq, gte, lte, ilike, count } from "drizzle-orm";
 import type { DomainEventListResult, EventType, EventEntityType } from "@dragons/shared";
@@ -47,12 +47,12 @@ export async function listDomainEvents(params: {
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [totalRow] = await db
+  const [totalRow] = await getDb()
     .select({ count: count() })
     .from(domainEvents)
     .where(where);
 
-  const rows = await db
+  const rows = await getDb()
     .select()
     .from(domainEvents)
     .where(where)
@@ -133,12 +133,12 @@ export async function listFailedNotifications(params: {
   const { page = 1, limit = 20 } = params;
   const offset = (page - 1) * limit;
 
-  const [totalRow] = await db
+  const [totalRow] = await getDb()
     .select({ count: count() })
     .from(notificationLog)
     .where(eq(notificationLog.status, "failed"));
 
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: notificationLog.id,
       eventId: notificationLog.eventId,

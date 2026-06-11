@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { refereeGames, matches, leagues, teams } from "@dragons/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { logger } from "../../config/logger";
@@ -177,7 +177,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
   // Build ownClubRefs lookup from leagues table
   const leagueApiIds = [...new Set(response.results.map((r) => r.sp.liga.ligaId))];
   const leagueRows = leagueApiIds.length > 0
-    ? await db
+    ? await getDb()
         .select({ apiLigaId: leagues.apiLigaId, ownClubRefs: leagues.ownClubRefs })
         .from(leagues)
         .where(inArray(leagues.apiLigaId, leagueApiIds))
@@ -201,7 +201,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
   ];
 
   const teamRows = allClubIds.length > 0
-    ? await db
+    ? await getDb()
         .select({ id: teams.id, clubId: teams.clubId, isOwnClub: teams.isOwnClub })
         .from(teams)
         .where(inArray(teams.clubId, allClubIds))
@@ -222,7 +222,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
     .filter((id): id is number => typeof id === "number" && id > 0);
 
   const existingRefRows = apiMatchIds.length > 0
-    ? await db
+    ? await getDb()
         .select()
         .from(refereeGames)
         .where(inArray(refereeGames.apiMatchId, apiMatchIds))
@@ -232,7 +232,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
   );
 
   const matchRows = apiMatchIds.length > 0
-    ? await db
+    ? await getDb()
         .select({ id: matches.id, apiMatchId: matches.apiMatchId })
         .from(matches)
         .where(inArray(matches.apiMatchId, apiMatchIds))
@@ -259,7 +259,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
       if (!existing) {
         // INSERT
         const now = new Date();
-        const [inserted] = await db.insert(refereeGames).values({
+        const [inserted] = await getDb().insert(refereeGames).values({
           ...mapped,
           matchId,
           homeTeamId,
@@ -308,7 +308,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
       } else if (existing.dataHash !== hash) {
         // UPDATE
         const now = new Date();
-        await db
+        await getDb()
           .update(refereeGames)
           .set({
             ...mapped,

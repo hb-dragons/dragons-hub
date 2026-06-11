@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   refereeGames,
   referees,
@@ -36,7 +36,7 @@ export async function assignReferee(
   refereeApiId: number,
 ): Promise<AssignRefereeResponse> {
   // 1. Look up game
-  const games = await db
+  const games = await getDb()
     .select()
     .from(refereeGames)
     .where(eq(refereeGames.apiMatchId, spielplanId))
@@ -51,7 +51,7 @@ export async function assignReferee(
   }
 
   // 2. Look up referee
-  const refereeRows = await db
+  const refereeRows = await getDb()
     .select()
     .from(referees)
     .where(eq(referees.apiId, refereeApiId))
@@ -67,7 +67,7 @@ export async function assignReferee(
 
   // 3. Deny check (only when game has a linked match)
   if (game.matchId != null) {
-    const matchRows = await db
+    const matchRows = await getDb()
       .select()
       .from(matches)
       .where(eq(matches.id, game.matchId))
@@ -75,7 +75,7 @@ export async function assignReferee(
 
     const match = matchRows[0];
     if (match) {
-      const teamRows = await db
+      const teamRows = await getDb()
         .select()
         .from(teams)
         .where(inArray(teams.apiTeamPermanentId, [match.homeTeamApiId, match.guestTeamApiId]))
@@ -84,7 +84,7 @@ export async function assignReferee(
       const teamIds = teamRows.map((t) => t.id);
 
       if (teamIds.length > 0) {
-        const denyRules = await db
+        const denyRules = await getDb()
           .select()
           .from(refereeAssignmentRules)
           .where(
@@ -144,14 +144,14 @@ export async function assignReferee(
       ? { sr1Name: refereeName, sr1RefereeApiId: refereeApiId, sr1Status: "assigned" }
       : { sr2Name: refereeName, sr2RefereeApiId: refereeApiId, sr2Status: "assigned" };
 
-  await db
+  await getDb()
     .update(refereeGames)
     .set(slotUpdate)
     .where(eq(refereeGames.apiMatchId, spielplanId));
 
   // 9. Upsert intent (only when game has a linked match)
   if (game.matchId != null) {
-    await db
+    await getDb()
       .insert(refereeAssignmentIntents)
       .values({
         matchId: game.matchId,
@@ -206,7 +206,7 @@ export async function unassignReferee(
   slotNumber: 1 | 2,
 ): Promise<UnassignRefereeResponse> {
   // 1. Look up game
-  const games = await db
+  const games = await getDb()
     .select()
     .from(refereeGames)
     .where(eq(refereeGames.apiMatchId, spielplanId))
@@ -242,7 +242,7 @@ export async function unassignReferee(
       ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" }
       : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" };
 
-  await db
+  await getDb()
     .update(refereeGames)
     .set(slotClear)
     .where(eq(refereeGames.apiMatchId, spielplanId));
@@ -255,7 +255,7 @@ export async function unassignReferee(
       slotNumber === 1 ? game.sr1RefereeApiId : game.sr2RefereeApiId;
 
     if (srApiId != null) {
-      const refereeRows = await db
+      const refereeRows = await getDb()
         .select()
         .from(referees)
         .where(eq(referees.apiId, srApiId))
@@ -264,7 +264,7 @@ export async function unassignReferee(
       const referee = refereeRows[0];
       if (referee) {
         refereeEntityId = referee.id;
-        await db
+        await getDb()
           .delete(refereeAssignmentIntents)
           .where(
             and(

@@ -10,14 +10,14 @@ vi.mock("../config/env", () => ({
 
 const counters = new Map<string, number>();
 vi.mock("../config/redis", () => ({
-  redis: {
+  getRedis: () => ({
     async incr(key: string) {
       const next = (counters.get(key) ?? 0) + 1;
       counters.set(key, next);
       return next;
     },
     async expire() {},
-  },
+  }),
 }));
 
 import { requireIngestKey } from "./ingest-key";

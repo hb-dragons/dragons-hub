@@ -8,11 +8,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: (...a: unknown[]) => mocks.dbSelect(...a),
     update: (...a: unknown[]) => mocks.dbUpdate(...a),
     delete: (...a: unknown[]) => mocks.dbDelete(...a),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

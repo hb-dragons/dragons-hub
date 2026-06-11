@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { eq } from "drizzle-orm";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { referees } from "@dragons/db/schema";
 import { getEligibleOpenGames } from "../../services/referee/eligible-open-games.service";
 import { requirePermission } from "../../middleware/rbac";
@@ -27,7 +27,7 @@ refereeEligibleGamesRoutes.get(
       return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
     }
 
-    const [row] = await db
+    const [row] = await getDb()
       .select({ apiId: referees.apiId })
       .from(referees)
       .where(eq(referees.id, id))

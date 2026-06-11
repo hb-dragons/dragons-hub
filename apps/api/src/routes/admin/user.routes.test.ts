@@ -21,10 +21,10 @@ vi.mock("../../config/database", () => {
     returning: vi.fn().mockImplementation(() => mocks.dbUpdate()),
   };
   return {
-    db: {
+    getDb: () => ({
       select: vi.fn(() => selectChain),
       update: vi.fn(() => updateChain),
-    },
+    }),
   };
 });
 

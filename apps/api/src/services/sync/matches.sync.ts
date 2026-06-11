@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import {
   matches,
   matchOverrides,
@@ -273,7 +273,7 @@ export async function syncMatchesFromData(
 
   const existingMatchesByApiId = new Map<number, typeof matches.$inferSelect>();
   if (allApiMatchIds.length > 0) {
-    const existingMatches = await db
+    const existingMatches = await getDb()
       .select()
       .from(matches)
       .where(inArray(matches.apiMatchId, allApiMatchIds));
@@ -349,7 +349,7 @@ export async function syncMatchesFromData(
           }
 
           // Data changed — lock row and create version snapshot + field changes in transaction
-          const effectiveChanges = await db.transaction(async (tx) => {
+          const effectiveChanges = await getDb().transaction(async (tx) => {
             // Re-read with FOR UPDATE to prevent concurrent version increments
             const [locked] = await tx
               .select()
@@ -630,7 +630,7 @@ export async function syncMatchesFromData(
           // event insert can't lose the event (the old order ran all three
           // outside any transaction). Passing tx inserts the event atomically
           // with the match; the 30s outbox poller enqueues it after commit.
-          await db.transaction(async (tx) => {
+          await getDb().transaction(async (tx) => {
             const [newMatch] = await tx
               .insert(matches)
               .values({

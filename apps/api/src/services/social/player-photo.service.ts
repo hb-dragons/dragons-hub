@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { playerPhotos } from "@dragons/db/schema";
 import { eq, desc } from "drizzle-orm";
 import sharp from "sharp";
@@ -15,11 +15,11 @@ const EXT_BY_CONTENT_TYPE: Record<string, string> = {
 const ALLOWED_TYPES = Object.keys(EXT_BY_CONTENT_TYPE);
 
 export async function listPlayerPhotos() {
-  return db.select().from(playerPhotos).orderBy(desc(playerPhotos.createdAt));
+  return getDb().select().from(playerPhotos).orderBy(desc(playerPhotos.createdAt));
 }
 
 export async function getPlayerPhotoById(id: number) {
-  const [record] = await db.select().from(playerPhotos).where(eq(playerPhotos.id, id));
+  const [record] = await getDb().select().from(playerPhotos).where(eq(playerPhotos.id, id));
   return record ?? null;
 }
 
@@ -34,12 +34,12 @@ export async function uploadPlayerPhoto(buffer: Buffer, originalName: string, co
   const filename = `${randomUUID()}${ext}`;
   await uploadToGcs(`${UPLOAD_PREFIX}/${filename}`, buffer, contentType);
 
-  const [record] = await db.insert(playerPhotos).values({ filename, originalName, width: metadata.width, height: metadata.height }).returning();
+  const [record] = await getDb().insert(playerPhotos).values({ filename, originalName, width: metadata.width, height: metadata.height }).returning();
   return record;
 }
 
 export async function deletePlayerPhoto(id: number) {
-  const [record] = await db.delete(playerPhotos).where(eq(playerPhotos.id, id)).returning();
+  const [record] = await getDb().delete(playerPhotos).where(eq(playerPhotos.id, id)).returning();
   if (record) await deleteFromGcs(`${UPLOAD_PREFIX}/${record.filename}`);
   return record ?? null;
 }

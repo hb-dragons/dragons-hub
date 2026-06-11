@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 let selectCallIndex = 0;
 
 vi.mock("../../config/database", () => ({
-  db: {
+  getDb: () => ({
     select: () => {
       const idx = selectCallIndex++;
       const rows = () => mocks.selectCalls[idx] ?? [];
@@ -27,7 +27,7 @@ vi.mock("../../config/database", () => ({
         }),
       };
     },
-  },
+  }),
 }));
 
 vi.mock("./referee-assignment.service", async () => {

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { describeRoute, validator } from "hono-openapi";
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { referees } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import { getRulesForReferee } from "../../services/referee/referee-rules.service";
@@ -14,7 +14,7 @@ const refereeRulesRoutes = new Hono<AppEnv>();
 const refereeView = requirePermission("referee", "view");
 
 async function requireOwnClubReferee(id: number) {
-  const [referee] = await db
+  const [referee] = await getDb()
     .select({ isOwnClub: referees.isOwnClub })
     .from(referees)
     .where(eq(referees.id, id))

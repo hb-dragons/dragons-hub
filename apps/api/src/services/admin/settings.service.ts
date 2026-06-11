@@ -1,11 +1,11 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { appSettings } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import type { ClubConfig, BookingSettings } from "@dragons/shared";
 import { BOOKING_DEFAULTS } from "@dragons/shared";
 
 export async function getSetting(key: string): Promise<string | null> {
-  const [row] = await db
+  const [row] = await getDb()
     .select({ value: appSettings.value })
     .from(appSettings)
     .where(eq(appSettings.key, key))
@@ -14,7 +14,7 @@ export async function getSetting(key: string): Promise<string | null> {
 }
 
 export async function upsertSetting(key: string, value: string): Promise<void> {
-  await db
+  await getDb()
     .insert(appSettings)
     .values({ key, value, updatedAt: new Date() })
     .onConflictDoUpdate({

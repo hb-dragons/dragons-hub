@@ -1,11 +1,11 @@
-import { db } from "../../../config/database";
+import { getDb } from "../../../config/database";
 import { notificationLog } from "@dragons/db/schema";
 import type { ChannelAdapter, ChannelSendParams, DeliveryResult } from "./types";
 
 export class InAppChannelAdapter implements ChannelAdapter {
   async send(params: ChannelSendParams): Promise<DeliveryResult> {
     try {
-      const rows = await db
+      const rows = await getDb()
         .insert(notificationLog)
         .values({
           eventId: params.eventId,

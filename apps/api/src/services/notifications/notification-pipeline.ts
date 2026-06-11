@@ -6,8 +6,8 @@ import {
   userNotificationPreferences,
 } from "@dragons/db/schema";
 import type { DomainEventRow } from "@dragons/db/schema";
-import { db } from "../../config/database";
-import { redis } from "../../config/redis";
+import { getDb } from "../../config/database";
+import { getRedis } from "../../config/redis";
 import { evaluateRule, type RuleInput } from "./rule-engine";
 import { getDefaultNotificationsForEvent } from "./role-defaults";
 import { renderEventMessage } from "./templates/index";
@@ -50,7 +50,7 @@ export async function loadMutedEventTypes(
   if (refereeRecipients.length === 0 && userRecipients.length === 0) return result;
 
   try {
-    const prefs = await db
+    const prefs = await getDb()
       .select({
         userId: userNotificationPreferences.userId,
         mutedEventTypes: userNotificationPreferences.mutedEventTypes,
@@ -103,8 +103,8 @@ const pushAdapter = new PushChannelAdapter(expoPushClient);
  */
 async function loadRulesAndConfigs() {
   const [rules, configs] = await Promise.all([
-    db.select().from(watchRules).where(eq(watchRules.enabled, true)),
-    db.select().from(channelConfigs).where(eq(channelConfigs.enabled, true)),
+    getDb().select().from(watchRules).where(eq(watchRules.enabled, true)),
+    getDb().select().from(channelConfigs).where(eq(channelConfigs.enabled, true)),
   ]);
   return { rules, configs };
 }
@@ -210,7 +210,7 @@ function evaluateDefaults(
  */
 async function bufferForDigest(eventId: string, channelConfigId: number): Promise<void> {
   try {
-    await db
+    await getDb()
       .insert(digestBuffer)
       .values({ eventId, channelConfigId })
       .onConflictDoNothing();
@@ -228,7 +228,7 @@ async function resolveLocaleForRecipient(
 ): Promise<string> {
   if (recipientId.startsWith("user:")) {
     const userId = recipientId.slice("user:".length);
-    const [pref] = await db
+    const [pref] = await getDb()
       .select({ locale: userNotificationPreferences.locale })
       .from(userNotificationPreferences)
       .where(eq(userNotificationPreferences.userId, userId))
@@ -354,7 +354,7 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
   // Returns "OK" if this process is the first caller within the window (dispatch proceeds),
   // or null if another process already claimed the slot (skip immediate dispatch).
   const coalesceKey = `coalesce:${event.entityType}:${event.entityId}`;
-  const claim = await redis.set(coalesceKey, "1", "EX", COALESCE_WINDOW_SEC, "NX");
+  const claim = await getRedis().set(coalesceKey, "1", "EX", COALESCE_WINDOW_SEC, "NX");
   const coalesced = claim !== "OK";
 
   // Process watch rule matches (watch rules are not subject to user muting —
@@ -424,7 +424,7 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
   // suppressed.  The old behaviour only marked the entity as dispatched after a
   // successful send; this restores that semantic.
   if (claim === "OK" && result.dispatched === 0) {
-    await redis.del(coalesceKey);
+    await getRedis().del(coalesceKey);
   }
 
   return result;

@@ -6,7 +6,7 @@ const ttls = new Map<string, number>();
 const expiries = new Map<string, number>();
 
 vi.mock("../config/redis", () => ({
-  redis: {
+  getRedis: () => ({
     async get(key: string) {
       return store.get(key) ?? null;
     },
@@ -28,7 +28,7 @@ vi.mock("../config/redis", () => ({
       for (const k of keys) store.delete(k);
       return 0;
     },
-  },
+  }),
 }));
 
 import {

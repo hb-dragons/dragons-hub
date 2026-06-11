@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  db: { select: (...args: unknown[]) => mocks.dbSelect(...args) },
+  getDb: () => ({ select: (...args: unknown[]) => mocks.dbSelect(...args) }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

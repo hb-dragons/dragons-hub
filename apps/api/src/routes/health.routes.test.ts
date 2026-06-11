@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../config/database", () => ({
-  db: {
+  getDb: () => ({
     execute: (...a: unknown[]) => mocks.dbExecute(...a),
     select: () => ({
       from: () => ({
@@ -21,13 +21,13 @@ vi.mock("../config/database", () => ({
         }),
       }),
     }),
-  },
+  }),
 }));
 
 vi.mock("../config/redis", () => ({
-  redis: {
+  getRedis: () => ({
     ping: () => mocks.redisPing(),
-  },
+  }),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

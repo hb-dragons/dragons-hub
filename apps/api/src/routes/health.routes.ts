@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
-import { db } from "../config/database";
-import { redis } from "../config/redis";
+import { getDb } from "../config/database";
+import { getRedis } from "../config/redis";
 import { sql, eq, isNull, and, desc } from "drizzle-orm";
 import { domainEvents, syncRuns } from "@dragons/db/schema";
 import { syncQueue, domainEventsQueue, outboxPollQueue } from "../workers/queues";
@@ -19,6 +19,8 @@ healthRoutes.get(
     },
   }),
   async (c) => {
+    const db = getDb();
+    const redis = getRedis();
     let dbStatus: "ok" | "error" = "error";
     let redisStatus: "ok" | "error" = "error";
 
@@ -56,6 +58,8 @@ healthRoutes.get(
     },
   }),
   async (c) => {
+    const db = getDb();
+    const redis = getRedis();
     const checks: Record<string, unknown> = {};
 
     try {

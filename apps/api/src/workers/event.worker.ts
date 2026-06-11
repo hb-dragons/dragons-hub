@@ -5,7 +5,7 @@ import { domainEvents } from "@dragons/db/schema";
 import { EVENT_TYPES } from "@dragons/shared";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
-import { db } from "../config/database";
+import { getDb } from "../config/database";
 import { processEvent } from "../services/notifications/notification-pipeline";
 import { digestQueue } from "./queues";
 
@@ -29,7 +29,7 @@ export const eventWorker = new Worker<EventJobData>(
     log.info({ eventType: job.data.type }, "Processing domain event");
 
     // Load the full event from DB
-    const [event] = await db
+    const [event] = await getDb()
       .select()
       .from(domainEvents)
       .where(eq(domainEvents.id, job.data.eventId))

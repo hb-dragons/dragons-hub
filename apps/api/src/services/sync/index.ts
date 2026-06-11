@@ -1,4 +1,4 @@
-import { db } from "../../config/database";
+import { getDb } from "../../config/database";
 import { syncRuns } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import { INSTANCE_ID } from "../../workers/instance-heartbeat";
@@ -64,7 +64,7 @@ export async function fullSync(
   // Reuse existing sync run (from eager creation) or create a new one
   let syncRun: { id: number };
   if (syncRunId) {
-    const [updated] = await db
+    const [updated] = await getDb()
       .update(syncRuns)
       .set({ status: "running", startedAt, ownerInstanceId: INSTANCE_ID })
       .where(eq(syncRuns.id, syncRunId))
@@ -74,7 +74,7 @@ export async function fullSync(
     }
     syncRun = updated;
   } else {
-    const [created] = await db
+    const [created] = await getDb()
       .insert(syncRuns)
       .values({
         syncType: "full",
@@ -219,7 +219,7 @@ export async function fullSync(
       },
     };
 
-    const [updatedRun] = await db
+    const [updatedRun] = await getDb()
       .update(syncRuns)
       .set({
         status: "completed",
@@ -333,7 +333,7 @@ export async function fullSync(
 
     const failureStatus = committedAny ? "partial" : "failed";
 
-    await db
+    await getDb()
       .update(syncRuns)
       .set({
         status: failureStatus,
