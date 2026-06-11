@@ -3,7 +3,7 @@
   "exclude": ["exports", "types", "enumMembers", "classMembers"],
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.{js,mjs,ts}"],
+      "entry": ["scripts/*.{js,mjs,ts}", "eslint.config.base.mjs"],
       "project": ["scripts/**/*.{js,mjs,ts}"],
       "ignoreDependencies": ["dotenv", "basketball-bund-sdk", "pg"]
     },
