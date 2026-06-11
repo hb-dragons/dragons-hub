@@ -134,30 +134,26 @@ export function EventBrowser() {
   const [pageSize, setPageSize] = useState(50);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Build query params
-  const queryParams = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set("page", String(page));
-    params.set("limit", String(pageSize));
-    if (filters.type) params.set("type", filters.type);
-    if (filters.entityType) params.set("entityType", filters.entityType);
-    if (filters.source) params.set("source", filters.source);
-    if (filters.from) params.set("from", filters.from);
-    if (filters.to) params.set("to", filters.to);
-    if (filters.search) params.set("search", filters.search);
-    return params.toString();
-  }, [filters, page, pageSize]);
-
-  const eventQuery: Parameters<typeof queries.domainEvents>[0] = {
-    page,
-    limit: pageSize,
-    ...(filters.type ? { type: filters.type } : {}),
-    ...(filters.entityType ? { entityType: filters.entityType } : {}),
-    ...(filters.source ? { source: filters.source } : {}),
-    ...(filters.from ? { from: filters.from } : {}),
-    ...(filters.to ? { to: filters.to } : {}),
-    ...(filters.search ? { search: filters.search } : {}),
-  };
+  const eventQuery = useMemo(
+    () => ({
+      page,
+      limit: pageSize,
+      ...(filters.type ? { type: filters.type } : {}),
+      ...(filters.entityType ? { entityType: filters.entityType } : {}),
+      ...(filters.source ? { source: filters.source } : {}),
+      ...(filters.from ? { from: filters.from } : {}),
+      ...(filters.to ? { to: filters.to } : {}),
+      ...(filters.search ? { search: filters.search } : {}),
+    }),
+    [filters, page, pageSize],
+  );
+  const queryParams = useMemo(
+    () =>
+      new URLSearchParams(
+        Object.entries(eventQuery).map(([k, v]) => [k, String(v)]),
+      ).toString(),
+    [eventQuery],
+  );
   const eventsQ = queries.domainEvents(eventQuery, queryParams);
   const { data, isLoading, mutate } = useSWR(eventsQ.key, eventsQ.fetcher);
 

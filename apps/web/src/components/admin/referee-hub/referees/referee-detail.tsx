@@ -11,7 +11,6 @@ import { HistorySubtab } from "./history-subtab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@dragons/ui/components/tabs";
 import { Badge } from "@dragons/ui/components/badge";
 
-
 interface Props { refereeId: number }
 
 export function RefereeDetail({ refereeId }: Props) {

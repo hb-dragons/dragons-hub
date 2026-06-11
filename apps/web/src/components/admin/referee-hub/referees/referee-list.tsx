@@ -32,14 +32,6 @@ export function RefereeList({ selectedId, onSelect }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  const listKey = SWR_KEYS.refereesPaginated({
-    scope: state.scope,
-    search: state.search || undefined,
-    sort: state.sort,
-    limit: 50,
-    offset: 0,
-  });
-
   const refereesPaginatedQ = queries.refereesPaginated({
     scope: state.scope,
     search: state.search || undefined,
@@ -47,6 +39,7 @@ export function RefereeList({ selectedId, onSelect }: Props) {
     limit: 50,
     offset: 0,
   });
+  const listKey = refereesPaginatedQ.key;
   const refereeCountsQ = queries.refereeCounts();
 
   const { data } = useSWR(listKey, refereesPaginatedQ.fetcher);
