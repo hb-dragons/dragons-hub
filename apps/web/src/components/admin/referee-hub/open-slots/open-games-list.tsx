@@ -17,7 +17,9 @@ interface Props {
   onSelect: (gameId: number) => void;
 }
 
-const ROW_HEIGHT = 64;
+// Each row stacks three lines (date·time·league / teams / the two SR badges),
+// so the slot must clear ~76px of content or the badges clip at the bottom.
+const ROW_HEIGHT = 80;
 
 export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
   const t = useTranslations("refereeHub.openSlots");
