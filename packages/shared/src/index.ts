@@ -235,6 +235,7 @@ export {
   can,
   canAll,
   hasRole,
+  satisfiesRole,
   isReferee,
   isMember,
   canViewOpenGames,

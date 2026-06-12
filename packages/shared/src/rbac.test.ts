@@ -8,6 +8,7 @@ import {
   isMember,
   isReferee,
   parseRoles,
+  satisfiesRole,
   type RoleName,
 } from "./rbac";
 
@@ -222,6 +223,33 @@ describe("ROLE_NAMES catalog", () => {
       "teamManager",
       "coach",
     ]);
+  });
+});
+
+describe("satisfiesRole", () => {
+  it("is true when the user literally holds the required role", () => {
+    expect(satisfiesRole({ role: "admin" }, "admin")).toBe(true);
+    expect(satisfiesRole({ role: "refereeAdmin" }, "refereeAdmin")).toBe(true);
+    expect(satisfiesRole({ role: "superadmin" }, "superadmin")).toBe(true);
+  });
+
+  it("treats superadmin as satisfying an admin requirement", () => {
+    expect(satisfiesRole({ role: "superadmin" }, "admin")).toBe(true);
+  });
+
+  it("does NOT treat admin as satisfying a superadmin requirement", () => {
+    expect(satisfiesRole({ role: "admin" }, "superadmin")).toBe(false);
+  });
+
+  it("does not widen superadmin to non-admin roles", () => {
+    expect(satisfiesRole({ role: "superadmin" }, "refereeAdmin")).toBe(false);
+    expect(satisfiesRole({ role: "superadmin" }, "venueManager")).toBe(false);
+  });
+
+  it("is false for null/undefined users", () => {
+    expect(satisfiesRole(null, "admin")).toBe(false);
+    expect(satisfiesRole(undefined, "admin")).toBe(false);
+    expect(satisfiesRole({ role: null }, "admin")).toBe(false);
   });
 });
 

@@ -122,6 +122,17 @@ export function hasRole(
   return parseRoles(user.role).includes(role);
 }
 
+// superadmin is a strict superset of admin: any gate that admits `admin` must
+// also admit `superadmin`. A gate that names `superadmin` still admits
+// superadmin only (admin does NOT satisfy a superadmin requirement).
+export function satisfiesRole(
+  user: { role?: string | null } | null | undefined,
+  role: RoleName,
+): boolean {
+  if (hasRole(user, role)) return true;
+  return role === "admin" && hasRole(user, "superadmin");
+}
+
 export function isReferee<U extends { refereeId?: number | null }>(
   user: U | null | undefined,
 ): user is U & { refereeId: number } {
