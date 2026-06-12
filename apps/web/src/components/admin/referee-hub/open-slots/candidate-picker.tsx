@@ -43,7 +43,7 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
   const [search, setSearch] = useState("");
   const debounced = useDebounce(search, 300);
   const [showIneligible, setShowIneligible] = useState(false);
-  const { candidates, hasMore, isLoadingMore, loadMore, error } = useCandidateSearch(
+  const { candidates, total, hasMore, isLoadingMore, loadMore, error } = useCandidateSearch(
     gameApiId,
     slotNumber,
     debounced,
@@ -136,6 +136,11 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
         )}
         {hasMore && <div ref={sentinelRef} data-testid="scroll-sentinel" className="h-px" />}
       </div>
+      {candidates.length > 0 && (
+        <div className="text-xs text-muted-foreground text-center">
+          {t("resultCount", { loaded: String(candidates.length), total: String(total) })}
+        </div>
+      )}
     </div>
   );
 }

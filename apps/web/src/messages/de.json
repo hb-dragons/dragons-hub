@@ -1283,6 +1283,7 @@
         "hideIneligible": "Nicht Einsetzbare ausblenden",
         "loadingMore": "Lade mehr…",
         "loadError": "Schiedsrichter konnten nicht geladen werden.",
+        "resultCount": "{loaded} von {total} geladen",
         "disposition": {
           "notQualifiedSr1": "Keine SR1-Lizenz",
           "notQualifiedSr2": "Keine SR2-Lizenz",
