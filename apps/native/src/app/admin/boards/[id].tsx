@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
+import { ActionSheetIOS, Platform, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBoard } from "@/hooks/board/useBoard";
@@ -11,7 +11,7 @@ import { useBoardDrag } from "@/hooks/board/useBoardDrag";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager";
 import { TaskDetailSheet, type TaskDetailSheetHandle } from "@/components/board/TaskDetailSheet";
-import { TaskContextMenu, type TaskContextMenuHandle } from "@/components/board/TaskContextMenu";
+import { TaskContextMenu, type TaskContextMenuHandle, type TaskContextAction } from "@/components/board/TaskContextMenu";
 import { MoveToSheet, type MoveToSheetHandle } from "@/components/board/MoveToSheet";
 import { useBoardPickers } from "@/components/board/BoardPickersProvider";
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
@@ -249,32 +249,55 @@ function BoardDetailBody() {
 
   const handleTaskLongPress = useCallback(
     (task: TaskCardData) => {
-      contextMenuRef.current?.open({
-        task,
-        onAction: (action) => {
-          if (action === "move") {
-            moveToSheetRef.current?.open({
-              task,
-              columns,
-              countsByColumn,
-              onMove: async (columnId, position) => {
-                await moveTask(task.id, columnId, position);
-              },
-            });
-          } else if (action === "priority") {
-            pickers.openPriority(task.priority, (p) => {
-              // Mutation hook surfaces failures via toast; swallow rejection.
-              taskMutations.setPriority(task.id, p).catch(() => {});
-            });
-          } else if (action === "due") {
-            pickers.openDue(task.dueDate, (iso) => {
-              taskMutations.setDueDate(task.id, iso).catch(() => {});
-            });
-          } else if (action === "delete") {
-            handleTaskDelete(task);
-          }
-        },
-      });
+      const runAction = (action: TaskContextAction) => {
+        if (action === "move") {
+          moveToSheetRef.current?.open({
+            task,
+            columns,
+            countsByColumn,
+            onMove: async (columnId, position) => {
+              await moveTask(task.id, columnId, position);
+            },
+          });
+        } else if (action === "priority") {
+          pickers.openPriority(task.priority, (p) => {
+            // Mutation hook surfaces failures via toast; swallow rejection.
+            taskMutations.setPriority(task.id, p).catch(() => {});
+          });
+        } else if (action === "due") {
+          pickers.openDue(task.dueDate, (iso) => {
+            taskMutations.setDueDate(task.id, iso).catch(() => {});
+          });
+        } else if (action === "delete") {
+          handleTaskDelete(task);
+        }
+      };
+
+      if (Platform.OS === "ios") {
+        haptics.light();
+        const actions: TaskContextAction[] = ["move", "priority", "due", "delete"];
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            title: task.title,
+            options: [
+              i18n.t("board.task.actions.moveTo"),
+              i18n.t("board.task.actions.setPriority"),
+              i18n.t("board.task.actions.setDue"),
+              i18n.t("board.task.actions.delete"),
+              i18n.t("common.cancel"),
+            ],
+            destructiveButtonIndex: 3,
+            cancelButtonIndex: 4,
+          },
+          (buttonIndex) => {
+            const action = actions[buttonIndex];
+            if (action) runAction(action);
+          },
+        );
+        return;
+      }
+
+      contextMenuRef.current?.open({ task, onAction: runAction });
     },
     [columns, countsByColumn, moveTask, taskMutations, pickers, handleTaskDelete],
   );
