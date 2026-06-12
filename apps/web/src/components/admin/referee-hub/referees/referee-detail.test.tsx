@@ -19,6 +19,10 @@ const messages = { refereeHub: { referees: {
   ownClubBadge: "Own club",
   subtabs: { profile: "Profile", rules: "Rules", upcoming: "Upcoming", history: "History" },
   rules: { disabledHint: "Mark as own club first" },
+  profile: {
+    visibility: { title: "Visibility", ownClub: "Own-club referee", allHome: "Allow all home games", away: "Allow away games" },
+    save: { saving: "Saving…", saved: "Saved {n}s ago", dirty: "Unsaved changes", error: "Save failed", now: "Save now" },
+  },
 } } };
 
 function wrap(ui: React.ReactNode) {
