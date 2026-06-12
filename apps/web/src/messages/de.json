@@ -1251,6 +1251,7 @@
   },
   "refereeHub": {
     "title": "Schiedsrichter",
+    "subtitle": "Schiedsrichter verwalten und offene Spiele besetzen",
     "tabs": {
       "openSlots": "Offene Spiele",
       "referees": "Schiedsrichter"

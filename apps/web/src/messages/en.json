@@ -1251,6 +1251,7 @@
   },
   "refereeHub": {
     "title": "Referees",
+    "subtitle": "Manage referees and fill open game slots",
     "tabs": {
       "openSlots": "Open Slots",
       "referees": "Referees"

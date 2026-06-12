@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useRefereeHubUrl, type HubTab } from "./use-referee-hub-url";
+import { PageHeader } from "@/components/admin/shared/page-header";
 import { Tabs, TabsList, TabsTrigger } from "@dragons/ui/components/tabs";
 
 const TABS = ["open-slots", "referees"] as const satisfies HubTab[];
@@ -11,8 +12,7 @@ export function HubHeader() {
   const { state, update } = useRefereeHubUrl();
 
   return (
-    <div className="flex flex-col gap-3 border-b pb-4 mb-4 sm:flex-row sm:items-center sm:justify-between">
-      <h1 className="text-2xl font-semibold">{t("title")}</h1>
+    <PageHeader title={t("title")} subtitle={t("subtitle")}>
       <Tabs value={state.tab} onValueChange={(v) => update({ tab: v as HubTab })}>
         <TabsList>
           {TABS.map((tab) => (
@@ -22,6 +22,6 @@ export function HubHeader() {
           ))}
         </TabsList>
       </Tabs>
-    </div>
+    </PageHeader>
   );
 }

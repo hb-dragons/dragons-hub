@@ -8,7 +8,7 @@ import { RefereesTab } from "./referees/referees-tab";
 export function RefereeHubPage() {
   const { state } = useRefereeHubUrl();
   return (
-    <div className="space-y-2">
+    <div className="space-y-6">
       <HubHeader />
       {state.tab === "open-slots" ? <OpenSlotsTab /> : <RefereesTab />}
     </div>
