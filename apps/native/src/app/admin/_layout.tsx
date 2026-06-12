@@ -1,5 +1,5 @@
 import { Stack, Redirect } from "expo-router";
-import { hasRole } from "@dragons/shared";
+import { satisfiesRole } from "@dragons/shared";
 import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -8,7 +8,7 @@ export default function AdminLayout() {
   const { colors } = useTheme();
 
   const user = session?.user as { role?: string | null } | null | undefined;
-  if (!hasRole(user, "admin")) {
+  if (!satisfiesRole(user, "admin")) {
     return <Redirect href="/" />;
   }
 
