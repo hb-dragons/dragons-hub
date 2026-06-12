@@ -1277,8 +1277,11 @@
         "searchPlaceholder": "Schiedsrichter suchen…",
         "assign": "SR{n} zuweisen",
         "empty": "Keine passenden Schiedsrichter",
-        "loadMore": "Mehr laden",
         "workload": "{n} Spiele",
+        "assignTrigger": "Schiedsrichter zuweisen…",
+        "showIneligible": "{n} nicht Einsetzbare anzeigen",
+        "hideIneligible": "Nicht Einsetzbare ausblenden",
+        "loadingMore": "Lade mehr…",
         "disposition": {
           "notQualifiedSr1": "Keine SR1-Lizenz",
           "notQualifiedSr2": "Keine SR2-Lizenz",

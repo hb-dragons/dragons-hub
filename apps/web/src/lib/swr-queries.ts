@@ -116,21 +116,6 @@ export function makeQueries(api: Api) {
       key: SWR_KEYS.refereeGameByApiMatch(apiMatchId),
       fetcher: () => api.referees.getGameByApiMatchId(apiMatchId),
     }),
-    refereeCandidates: (
-      spielplanId: number,
-      search: string,
-      pageFrom: number,
-      slot: 1 | 2,
-    ) => ({
-      key: SWR_KEYS.refereeCandidates(spielplanId, search, pageFrom, slot),
-      fetcher: () =>
-        api.referees.searchAssignmentCandidates(spielplanId, {
-          search,
-          pageFrom,
-          pageSize: 15,
-          slotNumber: slot,
-        }),
-    }),
     // settings
     settingsClub: () => ({ key: SWR_KEYS.settingsClub, fetcher: () => api.settings.getClub() }),
     settingsLeagues: () => ({

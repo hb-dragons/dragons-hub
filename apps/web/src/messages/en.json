@@ -1277,8 +1277,11 @@
         "searchPlaceholder": "Search referees…",
         "assign": "Assign SR{n}",
         "empty": "No eligible referees",
-        "loadMore": "Load more",
         "workload": "{n} games",
+        "assignTrigger": "Assign referee…",
+        "showIneligible": "Show {n} ineligible",
+        "hideIneligible": "Hide ineligible",
+        "loadingMore": "Loading more…",
         "disposition": {
           "notQualifiedSr1": "Not qualified as SR1",
           "notQualifiedSr2": "Not qualified as SR2",
