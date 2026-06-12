@@ -68,6 +68,7 @@ const messages = {
         hideIneligible: "Hide ineligible",
         loadingMore: "Loading more…",
         loadError: "Failed to load referees.",
+        resultCount: "{loaded} of {total} loaded",
         disposition: {
           notQualifiedSr1: "Not qualified as SR1",
           notQualifiedSr2: "Not qualified as SR2",
@@ -215,5 +216,18 @@ describe("CandidatePicker", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(toggle);
     expect(screen.getByRole("button", { name: "Hide ineligible" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("shows how many of the total candidates are loaded", () => {
+    hookReturn.total = 42;
+    render(wrap(<CandidatePicker gameApiId={4287} slotNumber={1} onPick={vi.fn()} />));
+    expect(screen.getByText("3 of 42 loaded")).toBeInTheDocument();
+  });
+
+  it("hides the count row when nothing is loaded", () => {
+    hookReturn.candidates = [];
+    hookReturn.total = 0;
+    render(wrap(<CandidatePicker gameApiId={4287} slotNumber={1} onPick={vi.fn()} />));
+    expect(screen.queryByText(/of .* loaded/)).not.toBeInTheDocument();
   });
 });
