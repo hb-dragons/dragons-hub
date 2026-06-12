@@ -18,8 +18,9 @@ import {
 
 const refereeGamesRoutes = new Hono<AppEnv>();
 
-// admin and refereeAdmin get cross-referee (wide) visibility; a referee without
-// either role is scoped to their own games via c.get("refereeId").
+// admin (and superadmin, which satisfies the admin requirement) and refereeAdmin
+// get cross-referee (wide) visibility; a referee without any of these roles is
+// scoped to their own games via c.get("refereeId").
 const gate = requireRefereeSelfOrAdminRole(["admin", "refereeAdmin"]);
 
 refereeGamesRoutes.get(

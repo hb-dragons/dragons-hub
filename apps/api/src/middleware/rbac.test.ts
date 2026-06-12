@@ -110,6 +110,27 @@ describe("requireAnyRole", () => {
     await app.request("/adm/panel");
     expect(mockUserHasPermission).not.toHaveBeenCalled();
   });
+
+  it("passes a superadmin on an admin-named gate", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "superadmin" },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/adm/panel");
+    expect(res.status).toBe(200);
+  });
+
+  it("denies a plain admin on a superadmin-named gate", async () => {
+    const sa = new Hono();
+    sa.use("/sa/*", requireAnyRole("superadmin"));
+    sa.get("/sa/x", (c) => c.json({ ok: true }));
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "admin" },
+      session: { id: "s1" },
+    });
+    const res = await sa.request("/sa/x");
+    expect(res.status).toBe(403);
+  });
 });
 
 // --- requirePermission ---
@@ -298,6 +319,16 @@ describe("requireRefereeSelfOrAdminRole", () => {
   it("passes a refereeAdmin and leaves refereeId unset (wide view)", async () => {
     mockGetSession.mockResolvedValue({
       user: { id: "u1", role: "refereeAdmin", refereeId: null },
+      session: { id: "s1" },
+    });
+    const res = await app.request("/either/games");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ refereeId: null });
+  });
+
+  it("passes a superadmin and leaves refereeId unset (wide view)", async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: "u1", role: "superadmin", refereeId: null },
       session: { id: "s1" },
     });
     const res = await app.request("/either/games");

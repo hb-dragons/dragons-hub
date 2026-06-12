@@ -2,7 +2,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { auth } from "../config/auth";
 import type { Resource, Action, RoleName } from "@dragons/shared";
-import { isReferee, hasRole } from "@dragons/shared";
+import { isReferee, satisfiesRole } from "@dragons/shared";
 
 export const requireAuth: MiddlewareHandler = async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -66,7 +66,7 @@ export function requireAnyRole(...names: RoleName[]): MiddlewareHandler {
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
     const user = session.user as { role?: string | null };
-    if (!names.some((n) => hasRole(user, n))) {
+    if (!names.some((n) => satisfiesRole(user, n))) {
       return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
     }
     c.set("user", session.user);
@@ -100,7 +100,7 @@ export function requireRefereeSelfOrAdminRole(roleNames: RoleName[]): Middleware
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
     const user = session.user as { refereeId?: number | null; role?: string | null };
-    const isAdmin = roleNames.some((n) => hasRole(user, n));
+    const isAdmin = roleNames.some((n) => satisfiesRole(user, n));
     if (!isAdmin && !isReferee(user)) {
       return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
     }
