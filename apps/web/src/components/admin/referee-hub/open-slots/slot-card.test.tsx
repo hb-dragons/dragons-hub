@@ -73,7 +73,7 @@ describe("SlotCard", () => {
     render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
     openPicker();
     fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() => expect(screen.getByText(/federation down/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText(/federation down/).length).toBeGreaterThan(0));
     expect(screen.getByTestId("pick")).toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
   });
@@ -83,8 +83,43 @@ describe("SlotCard", () => {
     render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
     openPicker();
     fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() => expect(screen.getByText("nope")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("nope").length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
     expect(screen.queryByText("nope")).not.toBeInTheDocument();
+  });
+
+  it("disables the trigger while an assign is in flight", async () => {
+    let resolveAssign: (v: unknown) => void = () => {};
+    assignReferee.mockReturnValueOnce(new Promise((res) => { resolveAssign = res; }));
+    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
+    openPicker();
+    fireEvent.click(screen.getByTestId("pick"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /assign referee/i })).toBeDisabled(),
+    );
+    resolveAssign({});
+    await waitFor(() => expect(screen.queryByTestId("pick")).not.toBeInTheDocument());
+  });
+
+  it("shows the assign error inside the open popover", async () => {
+    assignReferee.mockRejectedValueOnce(new Error("federation down"));
+    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
+    openPicker();
+    fireEvent.click(screen.getByTestId("pick"));
+    await waitFor(() => expect(screen.getByTestId("popover-error")).toHaveTextContent("federation down"));
+  });
+
+  it("renders the unassign button (not the trigger) for an assigned slot", () => {
+    render(wrap(
+      <SlotCard
+        gameApiId={1}
+        slotNumber={1}
+        assignment={{ refereeApiId: 9, refereeName: "Kim Becker", status: "assigned" }}
+        onChange={() => {}}
+      />,
+    ));
+    expect(screen.getByRole("button", { name: /unassign/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /assign referee/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Kim Becker")).toBeInTheDocument();
   });
 });

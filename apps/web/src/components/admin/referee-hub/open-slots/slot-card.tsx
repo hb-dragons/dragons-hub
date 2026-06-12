@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronDown } from "lucide-react";
-import { api, APIError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
 import {
   Popover,
@@ -41,7 +41,7 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
       setPickerOpen(false);
       onChange();
     } catch (err) {
-      setError(err instanceof APIError ? err.message : err instanceof Error ? err.message : "Assign failed");
+      setError(err instanceof Error ? err.message : "Assign failed");
     } finally {
       setBusy(false);
     }
@@ -54,7 +54,7 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
       await api.referees.unassignReferee(gameApiId, slotNumber);
       onChange();
     } catch (err) {
-      setError(err instanceof APIError ? err.message : err instanceof Error ? err.message : "Unassign failed");
+      setError(err instanceof Error ? err.message : "Unassign failed");
     } finally {
       setBusy(false);
     }
@@ -85,6 +85,11 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-96 p-2" align="end">
+              {error && (
+                <div className="text-xs text-destructive pb-2" data-testid="popover-error">
+                  {error}
+                </div>
+              )}
               <CandidatePicker
                 gameApiId={gameApiId}
                 slotNumber={slotNumber}
