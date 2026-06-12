@@ -20,10 +20,12 @@ export default function AdminLayout() {
         headerTintColor: colors.foreground,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
+        headerLargeTitle: true,
+        headerLargeTitleShadowVisible: false,
       }}
     >
       <Stack.Screen name="boards/index" options={{ title: "Boards" }} />
-      <Stack.Screen name="boards/[id]" options={{ title: "" }} />
+      <Stack.Screen name="boards/[id]" options={{ title: "", headerLargeTitle: false }} />
     </Stack>
   );
 }

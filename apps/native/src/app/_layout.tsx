@@ -74,6 +74,8 @@ function RootNavigator() {
             headerShown: true,
             headerTitle: i18n.t("refereeTab.title"),
             headerStyle: { backgroundColor: colors.background },
+            headerLargeTitle: true,
+            headerLargeTitleShadowVisible: false,
           }}
         />
         <Stack.Screen name="team/[id]" options={detailHeaderOptions} />
@@ -93,6 +95,8 @@ function RootNavigator() {
             headerShown: true,
             headerTitle: i18n.t("profile.title"),
             headerStyle: { backgroundColor: colors.background },
+            headerLargeTitle: true,
+            headerLargeTitleShadowVisible: false,
           }}
         />
       </Stack>
