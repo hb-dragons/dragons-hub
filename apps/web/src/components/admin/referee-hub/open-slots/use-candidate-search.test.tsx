@@ -38,7 +38,7 @@ function range(from: number, count: number): number[] {
 // Fresh SWR cache per render so tests don't leak state into each other.
 function wrapper({ children }: { children: React.ReactNode }) {
   return (
-    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}>
       {children}
     </SWRConfig>
   );
@@ -110,5 +110,16 @@ describe("useCandidateSearch", () => {
     await waitFor(() => expect(result.current.isLoadingMore).toBe(false));
     expect(result.current.candidates).toHaveLength(0);
     expect(result.current.hasMore).toBe(false);
+    expect(searchAssignmentCandidates).toHaveBeenCalledWith(4287, {
+      search: "zzz", pageFrom: 0, pageSize: 15, slotNumber: 2,
+    });
+  });
+
+  it("stops reporting isLoadingMore when the fetch fails", async () => {
+    searchAssignmentCandidates.mockRejectedValueOnce(new Error("federation down"));
+    const { result } = renderHook(() => useCandidateSearch(4287, 1, ""), { wrapper });
+    await waitFor(() => expect(result.current.error).toBeDefined());
+    expect(result.current.isLoadingMore).toBe(false);
+    expect(result.current.candidates).toHaveLength(0);
   });
 });

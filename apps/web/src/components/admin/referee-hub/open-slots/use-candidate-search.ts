@@ -41,7 +41,7 @@ export function useCandidateSearch(gameApiId: number, slot: 1 | 2, search: strin
   const lastPage = pages[pages.length - 1];
   const total = lastPage !== undefined ? lastPage.total : 0;
   const hasMore = lastPage !== undefined && candidates.length < total;
-  const isLoadingMore = data === undefined || size > pages.length;
+  const isLoadingMore = error === undefined && (data === undefined || size > pages.length);
 
   const loadMore = useCallback(() => {
     void setSize((s) => s + 1);
