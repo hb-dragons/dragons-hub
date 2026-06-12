@@ -139,7 +139,7 @@ export function RulesSubtab({ referee }: Props) {
 
       <div className="space-y-2">
         {rules.map((rule, i) => (
-          <div key={i} className="flex items-center gap-2 border rounded-md p-2">
+          <div key={i} className="flex items-center gap-2 bg-surface-low rounded-md p-2">
             <Select value={String(rule.teamId)} onValueChange={(v) => updateRule(i, { teamId: Number(v) })}>
               <SelectTrigger className="flex-1 min-w-0"><SelectValue placeholder={t("selectTeam")} /></SelectTrigger>
               <SelectContent>
@@ -174,7 +174,7 @@ export function RulesSubtab({ referee }: Props) {
         ))}
       </div>
 
-      <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-background border-t flex items-center justify-between text-xs">
+      <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-surface-low flex items-center justify-between text-xs">
         <span className={status === "error" ? "text-destructive" : "text-muted-foreground"}>
           {status === "saving" ? tSave("saving") :
            status === "dirty"  ? tSave("dirty") :

@@ -72,7 +72,7 @@ interface RowProps {
 
 function Row({ game }: RowProps) {
   return (
-    <div className="flex justify-between border rounded-md p-2 text-sm">
+    <div className="flex justify-between bg-surface-low rounded-md p-2 text-sm">
       <div>
         <div className="text-xs text-muted-foreground">
           {game.kickoffDate} · {game.kickoffTime} · {game.leagueShort ?? ""}

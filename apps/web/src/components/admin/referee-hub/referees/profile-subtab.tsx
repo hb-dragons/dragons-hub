@@ -70,7 +70,7 @@ export function ProfileSubtab({ referee }: Props) {
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b last:border-b-0">
+    <div className="flex items-center justify-between py-2">
       <Label className="text-sm">{label}</Label>
       <div>{children}</div>
     </div>

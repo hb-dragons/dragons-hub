@@ -42,7 +42,7 @@ export function HistorySubtab({ referee }: Props) {
             g.sr2RefereeApiId === referee.apiId ? "SR2" : "—";
           const status = g.isCancelled ? t("statusCancelled") : g.isForfeited ? t("statusForfeited") : t("statusPlayed");
           return (
-            <div key={g.id} className="flex justify-between border rounded-md p-2 text-sm">
+            <div key={g.id} className="flex justify-between bg-surface-low rounded-md p-2 text-sm">
               <div>
                 <div className="text-xs text-muted-foreground">{g.kickoffDate} · {role} · {g.leagueShort ?? ""}</div>
                 <div>{g.homeTeamName} vs {g.guestTeamName}</div>

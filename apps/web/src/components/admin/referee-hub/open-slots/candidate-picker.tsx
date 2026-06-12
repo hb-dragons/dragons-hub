@@ -73,7 +73,7 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
               data-candidate
               data-disabled={blocked}
               className={cn(
-                "flex items-center justify-between p-2 border rounded-md gap-2",
+                "flex items-center justify-between p-2 bg-card rounded-md gap-2",
                 blocked && "opacity-50",
               )}
             >
