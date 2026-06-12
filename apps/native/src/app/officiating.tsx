@@ -11,7 +11,8 @@ import {
 import { useRouter } from "expo-router";
 import useSWR from "swr";
 import { APIError } from "@dragons/api-client";
-import { can, type RefereeGameListItem } from "@dragons/shared";
+import { can, isReferee, type RefereeGameListItem } from "@dragons/shared";
+import { Segmented } from "@/components/ui/Segmented";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
 import { Screen } from "@/components/Screen";
@@ -101,86 +102,31 @@ function partitionGames(
   return { mine, open, past };
 }
 
-function SegmentedControl({
-  segments,
-  selected,
-  onSelect,
-}: {
-  segments: { key: Segment; label: string }[];
-  selected: Segment;
-  onSelect: (key: Segment) => void;
-}) {
-  const { colors, spacing, radius } = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        backgroundColor: colors.surfaceHigh,
-        borderRadius: radius.md + 4,
-        padding: 3,
-        marginBottom: spacing.md,
-      }}
-    >
-      {segments.map((seg) => {
-        const active = seg.key === selected;
-        return (
-          <Pressable
-            key={seg.key}
-            onPress={() => onSelect(seg.key)}
-            style={{
-              flex: 1,
-              paddingVertical: spacing.sm,
-              borderRadius: radius.md + 2,
-              backgroundColor: active ? colors.background : "transparent",
-              alignItems: "center",
-              ...(active
-                ? {
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 2,
-                    elevation: 1,
-                  }
-                : {}),
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 13,
-                fontFamily: active ? fontFamilies.bodySemiBold : fontFamilies.body,
-                color: active ? colors.foreground : colors.mutedForeground,
-              }}
-            >
-              {seg.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 export default function OfficiatingScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
   const router = useRouter();
 
   const { data: session } = authClient.useSession();
-  const isAdmin = can(
-    (session?.user ?? null) as { role?: string | null } | null,
-    "assignment",
-    "view",
-  );
+  const user = (session?.user ?? null) as {
+    role?: string | null;
+    refereeId?: number | null;
+  } | null;
+  const isAdmin = can(user, "assignment", "view");
+  // Admins who are not themselves referees have no "Mine" games. Referees —
+  // including referee-admins — keep the Mine segment.
+  const showMine = isReferee(user) || !isAdmin;
 
-  const [segment, setSegment] = useState<Segment>(isAdmin ? "open" : "mine");
+  const [segment, setSegment] = useState<Segment>(showMine ? "mine" : "open");
   const [assignModal, setAssignModal] = useState<{
     game: RefereeGameListItem;
     slotNumber: 1 | 2;
   } | null>(null);
 
-  // Once we learn the user is admin, snap to "open" if still on default "mine".
+  // Session resolves async: if the user turns out to have no Mine segment,
+  // leave "mine" for "open".
   useEffect(() => {
-    if (isAdmin && segment === "mine") setSegment("open");
-  }, [isAdmin, segment]);
+    if (!showMine && segment === "mine") setSegment("open");
+  }, [showMine, segment]);
 
   const { data, error, isLoading, mutate } = useSWR(
     "referee:games",
@@ -286,14 +232,14 @@ export default function OfficiatingScreen() {
         : "refereeTab.emptyPast";
 
   const segments: { key: Segment; label: string }[] = [
-    ...(isAdmin
-      ? []
-      : [
+    ...(showMine
+      ? [
           {
             key: "mine" as const,
             label: `${i18n.t("refereeTab.segmentMine")}${mineCount > 0 ? ` (${mineCount})` : ""}`,
           },
-        ]),
+        ]
+      : []),
     {
       key: "open",
       label: `${i18n.t("refereeTab.segmentOpen")}${openCount > 0 ? ` (${openCount})` : ""}`,
@@ -363,7 +309,7 @@ export default function OfficiatingScreen() {
 
   return (
     <Screen scroll={false}>
-      <SegmentedControl segments={segments} selected={segment} onSelect={setSegment} />
+      <Segmented segments={segments} selected={segment} onSelect={setSegment} />
       {sections.length === 0 ? (
         <View
           style={{
