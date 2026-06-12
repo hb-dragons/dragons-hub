@@ -5,7 +5,10 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { UpcomingSubtab } from "./upcoming-subtab";
 
-vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
+vi.mock("next-intl", () => ({
+  useTranslations: () => (k: string) => k,
+  useFormatter: () => ({ dateTime: (d: Date) => d.toISOString().slice(0, 10) }),
+}));
 
 const wrap = (ui: React.ReactNode) => (
   <SWRConfig value={{ provider: () => new Map() }}>{ui}</SWRConfig>

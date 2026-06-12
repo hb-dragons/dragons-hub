@@ -1,7 +1,8 @@
 "use client";
 
 import useSWR from "swr";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
+import { formatKickoff } from "@/lib/format-kickoff";
 import { queries } from "@/lib/swr-queries";
 import type { RefereeGameListItem, RefereeListItem } from "@dragons/shared";
 
@@ -71,11 +72,12 @@ interface RowProps {
 }
 
 function Row({ game }: RowProps) {
+  const format = useFormatter();
   return (
     <div className="flex justify-between bg-surface-low rounded-md p-2 text-sm">
       <div>
         <div className="text-xs text-muted-foreground">
-          {game.kickoffDate} · {game.kickoffTime} · {game.leagueShort ?? ""}
+          {formatKickoff(format, game.kickoffDate, game.kickoffTime)} · {game.leagueShort ?? ""}
         </div>
         <div>
           {game.homeTeamName} vs {game.guestTeamName}

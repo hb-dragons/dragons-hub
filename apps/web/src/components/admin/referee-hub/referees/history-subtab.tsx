@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
+import { formatKickoff } from "@/lib/format-kickoff";
 import { queries } from "@/lib/swr-queries";
 import { Button } from "@dragons/ui/components/button";
 import type { RefereeListItem } from "@dragons/shared";
@@ -13,6 +14,7 @@ const PAGE = 50;
 
 export function HistorySubtab({ referee }: Props) {
   const t = useTranslations("refereeHub.referees.history");
+  const format = useFormatter();
   const [pages, setPages] = useState(1);
 
   const qs = new URLSearchParams({
@@ -44,7 +46,7 @@ export function HistorySubtab({ referee }: Props) {
           return (
             <div key={g.id} className="flex justify-between bg-surface-low rounded-md p-2 text-sm">
               <div>
-                <div className="text-xs text-muted-foreground">{g.kickoffDate} · {role} · {g.leagueShort ?? ""}</div>
+                <div className="text-xs text-muted-foreground">{formatKickoff(format, g.kickoffDate)} · {role} · {g.leagueShort ?? ""}</div>
                 <div>{g.homeTeamName} vs {g.guestTeamName}</div>
               </div>
               <span className="text-xs text-muted-foreground">{status}</span>
