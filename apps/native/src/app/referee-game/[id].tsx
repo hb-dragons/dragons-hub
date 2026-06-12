@@ -1,5 +1,5 @@
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, Stack } from "expo-router";
 import useSWR from "swr";
 import { APIError } from "@dragons/api-client";
 import type { RefereeGameListItem } from "@dragons/shared";
@@ -167,7 +167,9 @@ export default function RefereeGameDetailScreen() {
   const address = game.venueCity;
 
   return (
-    <Screen headerOffset={44} onRefresh={() => mutate()}>
+    <>
+      <Stack.Screen options={{ headerTitle: `${game.homeTeamName} – ${game.guestTeamName}` }} />
+      <Screen headerOffset={44} onRefresh={() => mutate()}>
       {/* ── 1. Teams + Kickoff ── */}
       <Card style={{ marginBottom: spacing.md }}>
         <View style={{ alignItems: "center" }}>
@@ -373,6 +375,7 @@ export default function RefereeGameDetailScreen() {
           ) : null}
         </View>
       </View>
-    </Screen>
+      </Screen>
+    </>
   );
 }

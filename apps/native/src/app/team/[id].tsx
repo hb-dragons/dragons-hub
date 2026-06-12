@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { View, Text, ActivityIndicator, FlatList } from "react-native";
 import type { ListRenderItem } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
@@ -177,15 +177,17 @@ export default function TeamDetailScreen() {
   const diff = teamStats?.pointsDiff ?? 0;
 
   return (
-    <Screen
-      headerOffset={44}
-      onRefresh={[
-        () => mutateTeams(),
-        () => mutateStats(),
-        () => mutateMatches(),
-        () => mutateStandings(),
-      ]}
-    >
+    <>
+      <Stack.Screen options={{ headerTitle: team.name }} />
+      <Screen
+        headerOffset={44}
+        onRefresh={[
+          () => mutateTeams(),
+          () => mutateStats(),
+          () => mutateMatches(),
+          () => mutateStandings(),
+        ]}
+      >
         {/* 1. Team Header */}
         <View
           style={{
@@ -407,6 +409,7 @@ export default function TeamDetailScreen() {
           </View>
         )}
       </Screen>
+    </>
   );
 }
 
