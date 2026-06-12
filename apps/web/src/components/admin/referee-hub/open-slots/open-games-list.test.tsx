@@ -6,7 +6,10 @@ import { SWRConfig } from "swr";
 import useSWR from "swr";
 import { OpenGamesList } from "./open-games-list";
 
-vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
+vi.mock("next-intl", () => ({
+  useTranslations: () => (k: string) => k,
+  useFormatter: () => ({ dateTime: (d: Date) => d.toISOString().slice(0, 10) }),
+}));
 vi.mock("swr", async (importActual) => {
   const actual = await importActual<typeof import("swr")>();
   return {

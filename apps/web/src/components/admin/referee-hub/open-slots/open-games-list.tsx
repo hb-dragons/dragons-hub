@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { FixedSizeList as List, type ListChildComponentProps } from "react-window";
-import { useTranslations } from "next-intl";
+import { useTranslations, useFormatter } from "next-intl";
+import { formatKickoff } from "@/lib/format-kickoff";
 import { queries } from "@/lib/swr-queries";
 import { Input } from "@dragons/ui/components/input";
 import { Badge } from "@dragons/ui/components/badge";
@@ -21,6 +22,7 @@ const ROW_HEIGHT = 64;
 
 export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
   const t = useTranslations("refereeHub.openSlots");
+  const format = useFormatter();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -73,7 +75,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
         )}
       >
         <div className="text-xs opacity-70">
-          {g.kickoffDate} · {g.kickoffTime} · {g.leagueShort ?? ""}
+          {formatKickoff(format, g.kickoffDate, g.kickoffTime)} · {g.leagueShort ?? ""}
         </div>
         <div className="text-sm font-medium truncate">{g.homeTeamName} vs {g.guestTeamName}</div>
         <div className="flex gap-1 mt-1">
