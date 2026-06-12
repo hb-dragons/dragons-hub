@@ -17,7 +17,6 @@ import { useBoardPickers } from "@/components/board/BoardPickersProvider";
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
-import { BoardSearchInput } from "@/components/board/BoardSearchInput";
 import {
   AssigneeFilterSheet,
   type AssigneeFilterSheetHandle,
@@ -380,16 +379,20 @@ function BoardDetailBody() {
       <Stack.Screen
         options={{
           title: board.name,
+          headerSearchBarOptions: {
+            placeholder: i18n.t("board.search.placeholder"),
+            hideWhenScrolling: false,
+            onChangeText: (e) => setSearchQuery(e.nativeEvent.text),
+            onCancelButtonPress: () => setSearchQuery(""),
+          },
           headerRight: () => (
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 gap: spacing.xs,
-                maxWidth: 280,
               }}
             >
-              <BoardSearchInput value={searchQuery} onChange={setSearchQuery} />
               <Pressable
                 onPress={() => sortSheetRef.current?.open(sort, setSort)}
                 accessibilityRole="button"
