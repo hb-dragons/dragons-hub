@@ -67,6 +67,7 @@ const messages = {
         showIneligible: "Show {n} ineligible",
         hideIneligible: "Hide ineligible",
         loadingMore: "Loading more…",
+        loadError: "Failed to load referees.",
         disposition: {
           notQualifiedSr1: "Not qualified as SR1",
           notQualifiedSr2: "Not qualified as SR2",
@@ -180,5 +181,39 @@ describe("CandidatePicker", () => {
     hookReturn.isLoadingMore = true;
     render(wrap(<CandidatePicker gameApiId={4287} slotNumber={1} onPick={vi.fn()} />));
     expect(screen.getByText("Loading more…")).toBeInTheDocument();
+  });
+
+  it("does not show the empty state while the first page is loading", () => {
+    hookReturn.candidates = [];
+    hookReturn.total = 0;
+    hookReturn.isLoadingMore = true;
+    render(wrap(<CandidatePicker gameApiId={4287} slotNumber={1} onPick={vi.fn()} />));
+    expect(screen.queryByText("No eligible referees")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading more…")).toBeInTheDocument();
+  });
+
+  it("does not observe the sentinel while a page is in flight", () => {
+    hookReturn.hasMore = true;
+    hookReturn.isLoadingMore = true;
+    render(wrap(<CandidatePicker gameApiId={4287} slotNumber={1} onPick={vi.fn()} />));
+    expect(screen.getByTestId("scroll-sentinel")).toBeInTheDocument();
+    expect(observerCallback).toBeNull();
+  });
+
+  it("shows an error row instead of the empty state when the fetch fails", () => {
+    hookReturn.candidates = [];
+    hookReturn.total = 0;
+    hookReturn.error = new Error("boom");
+    render(wrap(<CandidatePicker gameApiId={4287} slotNumber={1} onPick={vi.fn()} />));
+    expect(screen.getByText("Failed to load referees.")).toBeInTheDocument();
+    expect(screen.queryByText("No eligible referees")).not.toBeInTheDocument();
+  });
+
+  it("marks the ineligible toggle as a disclosure (aria-expanded)", () => {
+    render(wrap(<CandidatePicker gameApiId={4287} slotNumber={1} onPick={vi.fn()} />));
+    const toggle = screen.getByRole("button", { name: "Show 1 ineligible" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Hide ineligible" })).toHaveAttribute("aria-expanded", "true");
   });
 });

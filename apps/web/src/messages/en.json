@@ -1282,6 +1282,7 @@
         "showIneligible": "Show {n} ineligible",
         "hideIneligible": "Hide ineligible",
         "loadingMore": "Loading more…",
+        "loadError": "Failed to load referees.",
         "disposition": {
           "notQualifiedSr1": "Not qualified as SR1",
           "notQualifiedSr2": "Not qualified as SR2",

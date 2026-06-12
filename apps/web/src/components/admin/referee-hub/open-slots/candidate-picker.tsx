@@ -43,7 +43,7 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
   const [search, setSearch] = useState("");
   const debounced = useDebounce(search, 300);
   const [showIneligible, setShowIneligible] = useState(false);
-  const { candidates, hasMore, isLoadingMore, loadMore } = useCandidateSearch(
+  const { candidates, hasMore, isLoadingMore, loadMore, error } = useCandidateSearch(
     gameApiId,
     slotNumber,
     debounced,
@@ -51,18 +51,20 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
 
   const rows = candidates.map((c) => ({ c, reason: getBlockReason(c, slotNumber) }));
   const eligible = rows.filter((r) => r.reason === null);
-  const ineligible = rows.filter((r) => r.reason !== null);
+  const ineligible = rows.filter(
+    (r): r is { c: RefCandidate; reason: BlockReason } => r.reason !== null,
+  );
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || !hasMore) return;
+    if (!el || !hasMore || isLoadingMore) return;
     const io = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) loadMore();
     });
     io.observe(el);
     return () => io.disconnect();
-  }, [hasMore, loadMore]);
+  }, [hasMore, isLoadingMore, loadMore]);
 
   const renderRow = (c: RefCandidate, reasonText: string | null) => {
     const blocked = reasonText !== null;
@@ -107,7 +109,7 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
         autoFocus
       />
       <div className="max-h-80 overflow-y-auto space-y-1">
-        {eligible.length === 0 && !isLoadingMore && (
+        {eligible.length === 0 && !isLoadingMore && error === undefined && (
           <div className="text-sm text-muted-foreground py-3 text-center">{t("empty")}</div>
         )}
         {eligible.map(({ c }) => renderRow(c, null))}
@@ -116,6 +118,7 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
             variant="ghost"
             size="sm"
             className="w-full text-muted-foreground"
+            aria-expanded={showIneligible}
             onClick={() => setShowIneligible((v) => !v)}
           >
             {showIneligible
@@ -124,11 +127,12 @@ export function CandidatePicker({ gameApiId, slotNumber, onPick, disabled }: Pro
           </Button>
         )}
         {showIneligible &&
-          ineligible.map(({ c, reason }) =>
-            renderRow(c, reason === null ? null : blockReasonText(reason, tDisposition)),
-          )}
+          ineligible.map(({ c, reason }) => renderRow(c, blockReasonText(reason, tDisposition)))}
         {isLoadingMore && (
           <div className="text-xs text-muted-foreground py-2 text-center">{t("loadingMore")}</div>
+        )}
+        {error !== undefined && (
+          <div className="text-xs text-destructive py-2 text-center">{t("loadError")}</div>
         )}
         {hasMore && <div ref={sentinelRef} data-testid="scroll-sentinel" className="h-px" />}
       </div>
