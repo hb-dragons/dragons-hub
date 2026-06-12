@@ -1,5 +1,6 @@
 import { Pressable, Text } from "react-native";
 import { useTheme } from "@/hooks/useTheme";
+import { haptics } from "@/lib/haptics";
 
 interface FilterPillProps {
   label: string;
@@ -12,7 +13,10 @@ export function FilterPill({ label, active, onPress }: FilterPillProps) {
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        haptics.selection();
+        onPress();
+      }}
       style={{
         backgroundColor: active ? colors.primary : colors.surfaceHigh,
         borderRadius: radius.pill,

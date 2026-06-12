@@ -21,6 +21,7 @@ import { AssignRefereeModal } from "@/components/AssignRefereeModal";
 import { authClient } from "@/lib/auth-client";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
+import { haptics } from "@/lib/haptics";
 import { fontFamilies } from "@/theme/typography";
 
 type Segment = "mine" | "open" | "past";
@@ -151,8 +152,10 @@ export default function OfficiatingScreen() {
               try {
                 await refereeApi.unassignReferee(game.apiMatchId, slotNumber);
                 await mutate();
+                haptics.success();
                 Alert.alert(i18n.t("refereeGame.admin.removeSuccess"));
               } catch (e) {
+                haptics.warning();
                 const message =
                   e instanceof APIError
                     ? e.message
