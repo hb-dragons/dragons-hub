@@ -615,6 +615,7 @@
     },
     "roles": {
       "admin": "Admin",
+      "superadmin": "Super-Admin",
       "refereeAdmin": "Schiedsrichter-Admin",
       "venueManager": "Hallenverwalter",
       "teamManager": "Team-Manager",
