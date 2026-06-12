@@ -68,14 +68,20 @@ describe("SlotCard", () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it("keeps the popover open and shows the inline error chip on assign failure (no toast)", async () => {
+  it("shows the error in the popover while open, and as a chip after closing", async () => {
     assignReferee.mockRejectedValueOnce(new Error("federation down"));
     render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
     openPicker();
     fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() => expect(screen.getAllByText(/federation down/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByTestId("popover-error")).toHaveTextContent("federation down"));
+    // popover stays open for retry; chip is suppressed while open
     expect(screen.getByTestId("pick")).toBeInTheDocument();
+    expect(screen.getAllByText(/federation down/)).toHaveLength(1);
     expect(toast.error).not.toHaveBeenCalled();
+
+    openPicker(); // toggle closed
+    await waitFor(() => expect(screen.queryByTestId("pick")).not.toBeInTheDocument());
+    expect(screen.getByText(/federation down/)).toBeInTheDocument(); // chip now visible
   });
 
   it("dismiss clears the chip", async () => {
@@ -83,9 +89,45 @@ describe("SlotCard", () => {
     render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
     openPicker();
     fireEvent.click(screen.getByTestId("pick"));
-    await waitFor(() => expect(screen.getAllByText("nope").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getByTestId("popover-error")).toBeInTheDocument());
+    openPicker(); // close popover so the chip shows
+    await waitFor(() => expect(screen.getByText("nope")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
     expect(screen.queryByText("nope")).not.toBeInTheDocument();
+  });
+
+  it("clears a stale error when the picker is reopened", async () => {
+    assignReferee.mockRejectedValueOnce(new Error("old failure"));
+    render(wrap(<SlotCard gameApiId={1} slotNumber={1} assignment={openAssignment} onChange={() => {}} />));
+    openPicker();
+    fireEvent.click(screen.getByTestId("pick"));
+    await waitFor(() => expect(screen.getByTestId("popover-error")).toBeInTheDocument());
+    openPicker(); // close
+    await waitFor(() => expect(screen.getByText("old failure")).toBeInTheDocument());
+    openPicker(); // reopen → error cleared
+    await waitFor(() => expect(screen.getByTestId("pick")).toBeInTheDocument());
+    expect(screen.queryByTestId("popover-error")).not.toBeInTheDocument();
+    expect(screen.queryByText("old failure")).not.toBeInTheDocument();
+  });
+
+  it("unassigns and fires onChange for an assigned slot", async () => {
+    unassignReferee.mockResolvedValueOnce({});
+    const onChange = vi.fn();
+    render(wrap(
+      <SlotCard gameApiId={1} slotNumber={2} assignment={{ refereeApiId: 9, refereeName: "Kim Becker", status: "assigned" }} onChange={onChange} />,
+    ));
+    fireEvent.click(screen.getByRole("button", { name: /unassign/i }));
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(unassignReferee).toHaveBeenCalledWith(1, 2);
+  });
+
+  it("shows the error chip when unassign fails", async () => {
+    unassignReferee.mockRejectedValueOnce(new Error("locked"));
+    render(wrap(
+      <SlotCard gameApiId={1} slotNumber={2} assignment={{ refereeApiId: 9, refereeName: "Kim Becker", status: "assigned" }} onChange={() => {}} />,
+    ));
+    fireEvent.click(screen.getByRole("button", { name: /unassign/i }));
+    await waitFor(() => expect(screen.getByText("locked")).toBeInTheDocument());
   });
 
   it("disables the trigger while an assign is in flight", async () => {

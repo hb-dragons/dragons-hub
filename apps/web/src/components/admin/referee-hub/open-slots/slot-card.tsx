@@ -77,7 +77,13 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
           <Button variant="outline" size="sm" disabled={busy} onClick={() => { void handleUnassign(); }}>{t("slot.unassign")}</Button>
         )}
         {isOpen && (
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <Popover
+            open={pickerOpen}
+            onOpenChange={(open) => {
+              if (open) setError(null);
+              setPickerOpen(open);
+            }}
+          >
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" disabled={busy}>
                 {t("picker.assignTrigger")}
@@ -101,7 +107,7 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
         )}
       </div>
 
-      {error && (
+      {error && !pickerOpen && (
         <div className="flex items-center justify-between text-xs rounded-md bg-destructive/10 text-destructive px-2 py-1">
           <span>{error}</span>
           <Button variant="ghost" size="sm" onClick={() => setError(null)}>{t("errorChip.dismiss")}</Button>

@@ -47,6 +47,10 @@ appending.
 - Successful assign closes the popover and calls the existing `onChange` →
   SWR `mutate` of the game. Assign errors keep using the slot card's existing
   error chip.
+  Decision (final review): while the popover is open, the error renders
+  inside the popover (the floating panel would occlude the chip); the card
+  chip shows only when the popover is closed, and reopening the picker
+  clears a stale error.
 - Search text change resets the list to page 0 (falls out of the SWR key).
 
 ## Components
