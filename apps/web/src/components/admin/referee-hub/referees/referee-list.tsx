@@ -69,60 +69,62 @@ export function RefereeList({ selectedId, onSelect }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b flex gap-2">
-        <Button
-          variant={state.scope === "own" ? "default" : "outline"}
-          size="sm"
-          onClick={() => update({ scope: "own" })}
-        >
-          {t("scope.own", { n: String(counts?.own ?? "") })}
-        </Button>
-        <Button
-          variant={state.scope === "all" ? "default" : "outline"}
-          size="sm"
-          onClick={() => update({ scope: "all" })}
-        >
-          {t("scope.all", { n: String(counts?.all ?? "") })}
-        </Button>
+      <div className="p-3 space-y-3 bg-surface-low">
+        <div className="flex gap-2">
+          <Button
+            variant={state.scope === "own" ? "default" : "outline"}
+            size="sm"
+            onClick={() => update({ scope: "own" })}
+          >
+            {t("scope.own", { n: String(counts?.own ?? "") })}
+          </Button>
+          <Button
+            variant={state.scope === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => update({ scope: "all" })}
+          >
+            {t("scope.all", { n: String(counts?.all ?? "") })}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Kpi label={t("kpi.ownClubRefs")} value={counts?.own ?? 0} />
+          <Kpi label={t("kpi.avgMatches")} value={avg} />
+        </div>
+
+        <div className="flex gap-2">
+          <Input
+            value={searchLocal}
+            onChange={(e) => setSearchLocal(e.target.value)}
+            placeholder={t("search")}
+            aria-label={t("search")}
+          />
+          <Select value={state.sort} onValueChange={(v) => update({ sort: v as never })}>
+            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">{t("sort.name")}</SelectItem>
+              <SelectItem value="workloadDesc">{t("sort.workloadDesc")}</SelectItem>
+              <SelectItem value="workloadAsc">{t("sort.workloadAsc")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="p-3 border-b grid grid-cols-2 gap-2">
-        <Kpi label={t("kpi.ownClubRefs")} value={counts?.own ?? 0} />
-        <Kpi label={t("kpi.avgMatches")} value={avg} />
-      </div>
-
-      <div className="p-3 border-b flex gap-2">
-        <Input
-          value={searchLocal}
-          onChange={(e) => setSearchLocal(e.target.value)}
-          placeholder={t("search")}
-          aria-label={t("search")}
-        />
-        <Select value={state.sort} onValueChange={(v) => update({ sort: v as never })}>
-          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="name">{t("sort.name")}</SelectItem>
-            <SelectItem value="workloadDesc">{t("sort.workloadDesc")}</SelectItem>
-            <SelectItem value="workloadAsc">{t("sort.workloadAsc")}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-surface-low">
         {items.length === 0 && <div className="p-4 text-sm text-muted-foreground">{t("empty")}</div>}
         {items.map((r) => (
           <div
             key={r.id}
             className={cn(
-              "grid grid-cols-[1fr_36px_44px] items-center gap-2 px-3 py-2 border-b cursor-pointer hover:bg-muted/40",
+              "grid grid-cols-[1fr_36px_44px] items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-high",
               selectedId === r.id && "bg-primary text-primary-foreground hover:bg-primary",
             )}
             onClick={() => onSelect(r.id)}
             data-selected={selectedId === r.id}
           >
-            <div>
-              <div className="text-sm font-medium">{r.lastName}, {r.firstName}</div>
-              <div className="text-xs opacity-70">Lic {r.licenseNumber ?? "—"}</div>
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">{r.lastName}, {r.firstName}</div>
+              <div className="text-xs opacity-70 truncate">Lic {r.licenseNumber ?? "—"}</div>
             </div>
             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
               <Checkbox
@@ -141,9 +143,9 @@ export function RefereeList({ selectedId, onSelect }: Props) {
 
 function Kpi({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border p-2 text-center">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-lg font-semibold tabular-nums">{value}</div>
+    <div className="rounded-md bg-card p-2 text-center">
+      <div className="font-display text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="font-display text-lg font-bold tabular-nums">{value}</div>
     </div>
   );
 }

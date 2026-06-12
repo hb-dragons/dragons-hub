@@ -10,14 +10,14 @@ export function RefereesTab() {
   const { state, update } = useRefereeHubUrl();
 
   return (
-    <div className="grid grid-cols-[minmax(320px,1fr)_2fr] border rounded-md overflow-hidden min-h-[600px]">
-      <div className="border-r">
+    <div className="grid grid-cols-[minmax(320px,1fr)_2fr] gap-px bg-border/15 rounded-md overflow-hidden min-h-[600px]">
+      <div className="bg-surface-low">
         <RefereeList
           selectedId={state.refereeId}
           onSelect={(id) => update({ refereeId: id })}
         />
       </div>
-      <div>
+      <div className="bg-card">
         {state.refereeId !== null ? (
           <RefereeDetail refereeId={state.refereeId} />
         ) : (
