@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import useSWR from "swr";
 import { APIError } from "@dragons/api-client";
 import { can, isReferee, type RefereeGameListItem } from "@dragons/shared";
+import { SectionHeader } from "@/components/SectionHeader";
 import { Segmented } from "@/components/ui/Segmented";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
@@ -256,6 +257,7 @@ export default function OfficiatingScreen() {
   if (isLoading) {
     return (
       <Screen scroll={false}>
+        <SectionHeader title={i18n.t("refereeTab.title")} />
         <View
           style={{
             flex: 1,
@@ -273,6 +275,7 @@ export default function OfficiatingScreen() {
   if (error) {
     return (
       <Screen scroll={false}>
+        <SectionHeader title={i18n.t("refereeTab.title")} />
         <View
           style={{
             flex: 1,
@@ -312,6 +315,7 @@ export default function OfficiatingScreen() {
 
   return (
     <Screen scroll={false}>
+      <SectionHeader title={i18n.t("refereeTab.title")} />
       <Segmented segments={segments} selected={segment} onSelect={setSegment} />
       {sections.length === 0 ? (
         <View
