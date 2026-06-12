@@ -116,8 +116,8 @@ export function RefereeList({ selectedId, onSelect }: Props) {
           <div
             key={r.id}
             className={cn(
-              "grid grid-cols-[1fr_36px_44px] items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-high",
-              selectedId === r.id && "bg-primary text-primary-foreground hover:bg-primary",
+              "grid grid-cols-[1fr_36px_44px] items-center gap-2 px-3 py-2 border-l-2 border-l-transparent cursor-pointer hover:bg-surface-high",
+              selectedId === r.id && "bg-primary/10 border-l-primary hover:bg-primary/10",
             )}
             onClick={() => onSelect(r.id)}
             data-selected={selectedId === r.id}

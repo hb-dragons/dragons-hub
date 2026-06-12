@@ -68,8 +68,8 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
         data-selected={selected}
         onClick={() => onSelect(g.apiMatchId)}
         className={cn(
-          "w-full text-left px-3 py-2 hover:bg-surface-high transition-colors block",
-          selected && "bg-primary text-primary-foreground hover:bg-primary",
+          "w-full text-left px-3 py-2 border-l-2 border-l-transparent hover:bg-surface-high transition-colors block",
+          selected && "bg-primary/10 border-l-primary hover:bg-primary/10",
         )}
       >
         <div className="text-xs opacity-70">
@@ -118,5 +118,5 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
 function SlotBadge({ status, who, prefix }: { status: string; who: string | null; prefix: string }) {
   if (status === "assigned") return <Badge variant="secondary">{prefix} {who ?? "?"}</Badge>;
   if (status === "offered") return <Badge variant="outline">{prefix} offered</Badge>;
-  return <Badge variant="destructive">{prefix} open</Badge>;
+  return <Badge variant="outline" className="border-transparent bg-heat/15 text-heat">{prefix} open</Badge>;
 }
