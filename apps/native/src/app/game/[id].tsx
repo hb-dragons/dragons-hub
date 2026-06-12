@@ -1,5 +1,5 @@
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import useSWR from "swr";
 import { getNativeTeamColor, isReferee } from "@dragons/shared";
 import { APIError } from "@dragons/api-client";
@@ -181,14 +181,16 @@ export default function GameDetailScreen() {
   };
 
   return (
-    <Screen
-      headerOffset={44}
-      onRefresh={[
-        () => mutateMatch(),
-        () => mutateContext(),
-        ...(sessionUserIsReferee ? [() => mutateRefereeGame()] : []),
-      ]}
-    >
+    <>
+      <Stack.Screen options={{ headerTitle: `${homeName} – ${guestName}` }} />
+      <Screen
+        headerOffset={44}
+        onRefresh={[
+          () => mutateMatch(),
+          () => mutateContext(),
+          ...(sessionUserIsReferee ? [() => mutateRefereeGame()] : []),
+        ]}
+      >
       {/* ── 1. Score Header ── */}
         <Card
           style={{
@@ -531,5 +533,6 @@ export default function GameDetailScreen() {
           </View>
         </View>
       </Screen>
+    </>
   );
 }

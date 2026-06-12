@@ -1,11 +1,18 @@
 import type { GateUser } from "./rbac";
-import { visibleSurfaces } from "./nav-surfaces";
+import { canViewOpenGames } from "./rbac";
 
-export type TabId = "home" | "schedule" | "standings" | "teams" | "today" | "tools";
+export type TabId =
+  | "home"
+  | "schedule"
+  | "standings"
+  | "teams"
+  | "today"
+  | "officiating";
 
 export function selectTabs(user: GateUser): TabId[] {
   if (!user) return ["home", "schedule", "standings", "teams"];
-  const tabs: TabId[] = ["home", "schedule", "today", "teams"];
-  if (visibleSurfaces(user).length > 0) tabs.push("tools");
-  return tabs;
+  // Officiating replaces Standings for users with assignment duties; standings
+  // stay reachable through team detail. Five tabs for every signed-in user.
+  const third: TabId = canViewOpenGames(user) ? "officiating" : "standings";
+  return ["home", "schedule", third, "today", "teams"];
 }

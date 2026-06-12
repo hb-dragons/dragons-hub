@@ -46,10 +46,10 @@ export const TAB_CONFIG: Record<TabId, TabConfig> = {
     sf: { default: "bolt", selected: "bolt.fill" },
     md: "bolt",
   },
-  tools: {
-    name: "tools",
-    labelKey: "tabs.tools",
-    sf: { default: "wrench.and.screwdriver", selected: "wrench.and.screwdriver.fill" },
-    md: "build",
+  officiating: {
+    name: "officiating",
+    labelKey: "tabs.officiating",
+    sf: { default: "flag.2.crossed", selected: "flag.2.crossed.fill" },
+    md: "sports",
   },
 };

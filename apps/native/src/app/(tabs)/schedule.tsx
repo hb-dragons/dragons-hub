@@ -6,7 +6,6 @@ import {
   SectionList,
   ScrollView,
   ActivityIndicator,
-  Pressable,
   RefreshControl,
 } from "react-native";
 import type { RefreshControlProps } from "react-native";
@@ -22,6 +21,7 @@ import { MatchCardFull } from "@/components/MatchCardFull";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { fontFamilies } from "@/theme/typography";
+import { Segmented } from "@/components/ui/Segmented";
 
 type Segment = "upcoming" | "results";
 type LocationFilter = "all" | "home" | "away";
@@ -60,68 +60,6 @@ function groupByDate(matches: MatchListItem[]): Section[] {
     formattedTitle: formatSectionDate(date),
     data: items,
   }));
-}
-
-/* ── Segmented Control ── */
-function SegmentedControl({
-  segments,
-  selected,
-  onSelect,
-}: {
-  segments: { key: Segment; label: string }[];
-  selected: Segment;
-  onSelect: (key: Segment) => void;
-}) {
-  const { colors, spacing, radius } = useTheme();
-
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        backgroundColor: colors.surfaceHigh,
-        borderRadius: radius.md + 4,
-        padding: 3,
-        marginBottom: spacing.md,
-      }}
-    >
-      {segments.map((seg) => {
-        const active = seg.key === selected;
-        return (
-          <Pressable
-            key={seg.key}
-            onPress={() => onSelect(seg.key)}
-            style={{
-              flex: 1,
-              paddingVertical: spacing.sm,
-              borderRadius: radius.md + 2,
-              backgroundColor: active ? colors.background : "transparent",
-              alignItems: "center",
-              // Subtle shadow on active segment
-              ...(active
-                ? {
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 2,
-                    elevation: 1,
-                  }
-                : {}),
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 13,
-                fontFamily: active ? fontFamilies.bodySemiBold : fontFamilies.body,
-                color: active ? colors.foreground : colors.mutedForeground,
-              }}
-            >
-              {seg.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
 }
 
 /* ── Match List (reusable for both segments) ── */
@@ -281,7 +219,7 @@ export default function ScheduleScreen() {
     <Screen scroll={false}>
       <SectionHeader title={i18n.t("schedule.title")} />
 
-      <SegmentedControl segments={segments} selected={segment} onSelect={setSegment} />
+      <Segmented segments={segments} selected={segment} onSelect={setSegment} />
 
       <ScrollView
         horizontal

@@ -10,13 +10,6 @@ export interface NativeSurface {
 
 /** Surfaces that have a native screen. Add entries as tools are ported. */
 export const NATIVE_SURFACES: Record<string, NativeSurface> = {
-  officiating: {
-    id: "officiating",
-    group: "league",
-    route: "/officiating",
-    labelKey: "tools.officiating",
-    sf: "whistle",
-  },
   boards: {
     id: "boards",
     group: "operations",

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { View, Text, FlatList, ActivityIndicator, RefreshControl } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, Stack } from "expo-router";
 import useSWR from "swr";
 import { Screen } from "../../components/Screen";
 import { MatchCardFull } from "../../components/MatchCardFull";
@@ -19,6 +19,13 @@ export default function H2HScreen() {
   );
 
   const { refreshing, onRefresh } = useRefresh(() => mutate());
+
+  const first = data?.items[0];
+  const opponentName = first
+    ? first.homeIsOwnClub
+      ? first.guestTeamName
+      : first.homeTeamName
+    : null;
 
   const refreshControl = useMemo(
     () => (
@@ -39,7 +46,15 @@ export default function H2HScreen() {
   );
 
   return (
-    <Screen scroll={false} headerOffset={44}>
+    <>
+      <Stack.Screen
+        options={{
+          headerTitle: opponentName
+            ? i18n.t("h2h.title", { opponent: opponentName })
+            : "",
+        }}
+      />
+      <Screen scroll={false} headerOffset={44}>
       {isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
       ) : (
@@ -60,6 +75,7 @@ export default function H2HScreen() {
           }
         />
       )}
-    </Screen>
+      </Screen>
+    </>
   );
 }
