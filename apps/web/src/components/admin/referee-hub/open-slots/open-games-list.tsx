@@ -68,7 +68,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
         data-selected={selected}
         onClick={() => onSelect(g.apiMatchId)}
         className={cn(
-          "w-full text-left px-3 py-2 border-b hover:bg-muted/50 transition-colors block",
+          "w-full text-left px-3 py-2 hover:bg-surface-high transition-colors block",
           selected && "bg-primary text-primary-foreground hover:bg-primary",
         )}
       >
@@ -86,7 +86,7 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b">
+      <div className="p-3 bg-surface-low">
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}

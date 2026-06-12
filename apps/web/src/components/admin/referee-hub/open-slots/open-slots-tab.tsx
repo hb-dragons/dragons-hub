@@ -20,20 +20,20 @@ export function OpenSlotsTab() {
   }));
 
   return (
-    <div className="grid grid-cols-[200px_320px_1fr] border rounded-md overflow-hidden min-h-[600px]">
+    <div className="grid grid-cols-[200px_320px_1fr] gap-px bg-border/15 rounded-md overflow-hidden min-h-[600px]">
       <SlotsFilterSidebar
         filters={state.filters}
         onChange={(patch) => update({ filters: { ...state.filters, ...patch } })}
         leagueOptions={leagueOptions}
       />
-      <div className="border-r">
+      <div className="bg-surface-low">
         <OpenGamesList
           filters={state.filters}
           selectedGameId={state.gameId}
           onSelect={(gameId) => update({ gameId })}
         />
       </div>
-      <div>
+      <div className="bg-card">
         {state.gameId !== null ? (
           <OpenSlotDetail selectedGameId={state.gameId} />
         ) : (

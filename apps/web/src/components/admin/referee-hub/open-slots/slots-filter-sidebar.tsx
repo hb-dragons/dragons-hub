@@ -50,9 +50,9 @@ export function SlotsFilterSidebar({ filters, onChange, leagueOptions }: Props) 
   }
 
   return (
-    <aside className="flex flex-col gap-4 p-3 border-r bg-muted/30 text-sm">
+    <aside className="flex flex-col gap-4 p-3 bg-surface-low text-sm">
       <section>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">{t("status")}</div>
+        <div className="font-display text-xs uppercase tracking-wide text-muted-foreground mb-2">{t("status")}</div>
         {(["open", "offered", "any"] as const).map((s) => (
           <label key={s} className="flex items-center gap-2 py-1">
             <input
@@ -68,7 +68,7 @@ export function SlotsFilterSidebar({ filters, onChange, leagueOptions }: Props) 
       </section>
 
       <section>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">{t("league")}</div>
+        <div className="font-display text-xs uppercase tracking-wide text-muted-foreground mb-2">{t("league")}</div>
         {leagueOptions.length === 0 && (
           <div className="text-xs text-muted-foreground">{t("noLeagues")}</div>
         )}
@@ -85,7 +85,7 @@ export function SlotsFilterSidebar({ filters, onChange, leagueOptions }: Props) 
       </section>
 
       <section>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">{t("date")}</div>
+        <div className="font-display text-xs uppercase tracking-wide text-muted-foreground mb-2">{t("date")}</div>
         {(["14d", "30d", "season", "custom"] as const).map((preset) => (
           <label key={preset} className="flex items-center gap-2 py-1">
             <input
@@ -104,21 +104,21 @@ export function SlotsFilterSidebar({ filters, onChange, leagueOptions }: Props) 
               value={filters.dateFrom ?? ""}
               onChange={(e) => onChange({ dateFrom: e.target.value || null })}
               aria-label={t("dateFrom")}
-              className="border rounded px-2 py-1 text-xs"
+              className="border border-border/20 rounded-md px-2 py-1 text-xs bg-input"
             />
             <input
               type="date"
               value={filters.dateTo ?? ""}
               onChange={(e) => onChange({ dateTo: e.target.value || null })}
               aria-label={t("dateTo")}
-              className="border rounded px-2 py-1 text-xs"
+              className="border border-border/20 rounded-md px-2 py-1 text-xs bg-input"
             />
           </div>
         )}
       </section>
 
       <section>
-        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">{t("gameType")}</div>
+        <div className="font-display text-xs uppercase tracking-wide text-muted-foreground mb-2">{t("gameType")}</div>
         {(["home", "away"] as const).map((kind) => (
           <div key={kind} className="flex items-center gap-2 py-1">
             <Checkbox
