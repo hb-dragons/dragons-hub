@@ -2,8 +2,14 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { ChevronDown } from "lucide-react";
 import { api, APIError } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@dragons/ui/components/popover";
 import { CandidatePicker } from "./candidate-picker";
 
 export type SlotStatus = "open" | "offered" | "assigned";
@@ -25,12 +31,14 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
   const t = useTranslations("refereeHub.openSlots");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   async function handleAssign(refereeApiId: number) {
     setBusy(true);
     setError(null);
     try {
       await api.referees.assignReferee(gameApiId, { slotNumber, refereeApiId });
+      setPickerOpen(false);
       onChange();
     } catch (err) {
       setError(err instanceof APIError ? err.message : err instanceof Error ? err.message : "Assign failed");
@@ -68,6 +76,24 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
         {!isOpen && (
           <Button variant="outline" size="sm" disabled={busy} onClick={() => { void handleUnassign(); }}>{t("slot.unassign")}</Button>
         )}
+        {isOpen && (
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" disabled={busy}>
+                {t("picker.assignTrigger")}
+                <ChevronDown className="size-4 opacity-60" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-96 p-2" align="end">
+              <CandidatePicker
+                gameApiId={gameApiId}
+                slotNumber={slotNumber}
+                onPick={(id) => { void handleAssign(id); }}
+                disabled={busy}
+              />
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
 
       {error && (
@@ -75,15 +101,6 @@ export function SlotCard({ gameApiId, slotNumber, assignment, onChange }: Props)
           <span>{error}</span>
           <Button variant="ghost" size="sm" onClick={() => setError(null)}>{t("errorChip.dismiss")}</Button>
         </div>
-      )}
-
-      {isOpen && (
-        <CandidatePicker
-          gameApiId={gameApiId}
-          slotNumber={slotNumber}
-          onPick={(id) => { void handleAssign(id); }}
-          disabled={busy}
-        />
       )}
     </div>
   );
