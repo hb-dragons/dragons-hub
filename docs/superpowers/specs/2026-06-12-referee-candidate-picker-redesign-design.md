@@ -83,10 +83,16 @@ modus → blocktermin → zeitraum.
 
 ### `use-candidate-search.ts` (new hook)
 
-Wraps `useSWRInfinite`. Key per page index:
-`SWR_KEYS.refereeCandidates(gameApiId, debouncedSearch, pageIndex, slot)`,
-fetcher `api.referees.searchAssignmentCandidates(...)` with `pageSize: 15`
-(reusing the parts of `queries.refereeCandidates`).
+Wraps `useSWRInfinite`. Key per page index: an inline tuple
+`["referee-candidates", gameApiId, slot, search, pageIndex]`, fetcher
+`api.referees.searchAssignmentCandidates(...)` with `pageSize: 15`.
+
+Decision (code review, Task 2): the tuple key replaces the originally
+sketched `SWR_KEYS.refereeCandidates` URL-string key — tuple keys fit
+`useSWRInfinite` better and nothing invalidates candidate caches externally.
+Consequence: once the picker rewrite removes the old `useSWR` call,
+`SWR_KEYS.refereeCandidates` and `queries.refereeCandidates` are dead code
+and must be deleted with it.
 
 ```ts
 export function useCandidateSearch(gameApiId: number, slot: 1 | 2, search: string): {
