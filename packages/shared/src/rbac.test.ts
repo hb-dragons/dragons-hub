@@ -8,7 +8,9 @@ import {
   isMember,
   isReferee,
   parseRoles,
+  roles,
   satisfiesRole,
+  statement,
   type RoleName,
 } from "./rbac";
 
@@ -274,5 +276,47 @@ describe("superadmin role", () => {
     expect(can(superadminUser, "board", "delete")).toBe(true);
     expect(can(superadminUser, "assignment", "claim")).toBe(true);
     expect(can(superadminUser, "match", "delete")).toBe(true);
+  });
+});
+
+describe("superadmin/admin permission parity (full catalog)", () => {
+  // `can` is generically typed per-resource; loosen it for exhaustive iteration.
+  const looseCan = can as unknown as (
+    u: { role: string },
+    resource: string,
+    action: string,
+  ) => boolean;
+
+  it("superadmin holds every permission admin holds", () => {
+    for (const [resource, actions] of Object.entries(statement)) {
+      for (const action of actions) {
+        if (looseCan({ role: "admin" }, resource, action)) {
+          expect(
+            looseCan({ role: "superadmin" }, resource, action),
+            `superadmin is missing ${resource}:${action}`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("better-auth role object authorizes every catalog action for superadmin", () => {
+    // Exercises the exact objects the API's userHasPermission consults:
+    // apps/api/src/config/auth.ts passes `roles` into the admin plugin.
+    for (const [resource, actions] of Object.entries(statement)) {
+      const result = roles.superadmin.authorize({
+        [resource]: [...actions],
+      } as never);
+      expect(result.success, `superadmin denied on ${resource}`).toBe(true);
+    }
+  });
+
+  it("better-auth role object authorizes every catalog action for admin", () => {
+    for (const [resource, actions] of Object.entries(statement)) {
+      const result = roles.admin.authorize({
+        [resource]: [...actions],
+      } as never);
+      expect(result.success, `admin denied on ${resource}`).toBe(true);
+    }
   });
 });
