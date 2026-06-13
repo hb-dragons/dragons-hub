@@ -44,3 +44,24 @@ export function buildTypeCBlock(overrides: Record<number, number> = {}): Buffer 
   }
   return block;
 }
+
+/**
+ * Wrap a type-C payload in the SC24-era framing:
+ *   00 F8 E1 <prefix> C3 00 20 F6 <possession + payload + E5>
+ * Field values match buildTypeCBlock(overrides); only the framing differs
+ * (variable-length prefix, extra 00 + 20 F6 type bytes after C3). The default
+ * prefix is the 2-byte non-shot prefix; pass a longer one to model a
+ * shot-clock-bearing frame.
+ */
+export function buildSc24Block(
+  overrides: Record<number, number> = {},
+  prefix: number[] = [0x78, 0xfc],
+): Buffer {
+  const old = buildTypeCBlock(overrides);
+  return Buffer.concat([
+    Buffer.from([0x00, 0xf8, 0xe1]),
+    Buffer.from(prefix),
+    Buffer.from([0xc3, 0x00, 0x20, 0xf6]),
+    old.subarray(6), // possession byte + 49 payload bytes + 0xE5 terminator
+  ]);
+}

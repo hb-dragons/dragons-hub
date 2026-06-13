@@ -8,6 +8,7 @@ import {
 } from "./stramatel-segment-decoder";
 import {
   BLANK_CELL,
+  buildSc24Block,
   buildTypeCBlock,
   segmentDigit,
 } from "../../test/segment-block-builder";
@@ -304,6 +305,120 @@ describe("decodeSegmentBlock — fixtures", () => {
     expect(decodeFixture("segment-score-3digit.bin")).toMatchObject({
       scoreHome: 101,
       scoreGuest: 117,
+    });
+  });
+});
+
+// Connecting the SC24 shot-clock module changed the framing: the marker is no
+// longer a contiguous 00 F8 E1 C3, the frames are variable length, and the type
+// bytes shifted (C3 00 20 F6 instead of C3 1E 66). The decoder anchors on the
+// possession byte so both framings share one field decoder. See
+// STRAMATEL-PROTOCOL.md "SC24-era framing".
+describe("SC24-era framing (variable prefix)", () => {
+  it("findSegmentFrames extracts a variable-length type-C frame", () => {
+    const frames = findSegmentFrames(buildSc24Block());
+    expect(frames).toHaveLength(1);
+    const f = frames[0]!;
+    expect(f.length).not.toBe(57); // longer than the original framing
+    expect(f[0]).toBe(0x00);
+    expect(f[1]).toBe(0xf8);
+    expect(f[2]).toBe(0xe1);
+    expect(f[f.length - 1]).toBe(0xe5);
+  });
+
+  it("findSegmentFrames handles a long (shot-clock-bearing) prefix", () => {
+    const prefix = [0x18, 0x98, 0x8b, 0x2d, 0x95, 0x95, 0x7f, 0xf0];
+    const frames = findSegmentFrames(buildSc24Block({}, prefix));
+    expect(frames).toHaveLength(1);
+  });
+
+  it("findSegmentFrames ignores a non-type-C SC24 frame", () => {
+    // Non-type-C blocks carry C3 00 E0 EC, not C3 00 20 F6.
+    const block = buildSc24Block();
+    const c3 = block.indexOf(0xc3, 3);
+    block[c3 + 2] = 0xe0;
+    block[c3 + 3] = 0xec;
+    expect(findSegmentFrames(block)).toEqual([]);
+  });
+
+  it("findSegmentFrames separates back-to-back SC24 frames", () => {
+    const a = buildSc24Block({ 13: segmentDigit(7) }); // home 7
+    const b = buildSc24Block({ 16: segmentDigit(3) }); // guest 3
+    const frames = findSegmentFrames(Buffer.concat([a, b]));
+    expect(frames).toHaveLength(2);
+    expect(decodeSegmentBlock(frames[0]!)!.scoreHome).toBe(7);
+    expect(decodeSegmentBlock(frames[1]!)!.scoreGuest).toBe(3);
+  });
+
+  it("decodes the SC24-era baseline identically to the old framing", () => {
+    expect(decodeSegmentBlock(buildSc24Block())).toEqual(
+      decodeSegmentBlock(buildTypeCBlock()),
+    );
+  });
+
+  it("decodes fields the same regardless of prefix length", () => {
+    const overrides = {
+      12: segmentDigit(1),
+      13: segmentDigit(7),
+      17: segmentDigit(3),
+      23: 0x9f,
+    };
+    const shortPrefix = decodeSegmentBlock(buildSc24Block(overrides));
+    const longPrefix = decodeSegmentBlock(
+      buildSc24Block(overrides, [0x18, 0x98, 0x8b, 0x2d, 0x95, 0x95, 0x7f, 0xf0]),
+    );
+    expect(shortPrefix).toEqual(longPrefix);
+    expect(shortPrefix!.scoreHome).toBe(17);
+    expect(shortPrefix!.period).toBe(3);
+    expect(shortPrefix!.clockRunning).toBe(true);
+  });
+
+  it("returns null for a type-C frame too short to hold the core fields", () => {
+    // Valid sync + C3 + new type bytes + possession + terminator, but nothing
+    // after the possession byte.
+    const frame = Buffer.from([
+      0x00, 0xf8, 0xe1, 0xc3, 0x00, 0x20, 0xf6, 0xfb, 0xe5,
+    ]);
+    expect(decodeSegmentBlock(frame)).toBeNull();
+  });
+
+  it("emits empty timeoutDuration when the frame ends before the countdown bytes", () => {
+    // 30-byte frame: core fields (through poss+18) present, but the countdown
+    // bytes (poss+43/44) fall past the terminator.
+    const frame = Buffer.alloc(30, BLANK_CELL);
+    frame[0] = 0x00;
+    frame[1] = 0xf8;
+    frame[2] = 0xe1;
+    frame[3] = 0xc3;
+    frame[4] = 0x00;
+    frame[5] = 0x20;
+    frame[6] = 0xf6;
+    frame[7] = 0xfb; // possession
+    frame[29] = 0xe5;
+    const snapshot = decodeSegmentBlock(frame)!;
+    expect(snapshot).not.toBeNull();
+    expect(snapshot.timeoutDuration).toBe("");
+    expect(snapshot.timeoutActive).toBe(false);
+  });
+
+  it("decodes a real SC24-connected capture (segment-sc24-connected.bin)", () => {
+    // Captured live with the SC24 module connected: shot clock 24, game clock
+    // stopped at 7:45, score 0–0, period 1, no fouls or timeouts.
+    const frames = findSegmentFrames(fixture("segment-sc24-connected.bin"));
+    expect(frames.length).toBeGreaterThan(10);
+    // Variable-length frames, sync at the start, terminator at the end.
+    for (const f of frames) {
+      expect(f[0]).toBe(0x00);
+      expect(f[f.length - 1]).toBe(0xe5);
+    }
+    const snapshot = decodeSegmentBlock(frames[0]!)!;
+    expect(snapshot).toMatchObject({
+      scoreHome: 0,
+      scoreGuest: 0,
+      period: 1,
+      clockText: "07:45",
+      clockRunning: false,
+      timeoutActive: false,
     });
   });
 });
