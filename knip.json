@@ -1,15 +1,15 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "exclude": ["exports", "types", "enumMembers", "classMembers"],
+  "exclude": ["exports", "types", "enumMembers"],
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.{js,mjs,ts}"],
+      "entry": ["scripts/*.{js,mjs,ts}", "eslint.config.base.mjs"],
       "project": ["scripts/**/*.{js,mjs,ts}"],
       "ignoreDependencies": ["dotenv", "basketball-bund-sdk", "pg"]
     },
     "apps/api": {
       "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["pino-pretty", "@modelcontextprotocol/sdk"]
+      "ignoreDependencies": ["pino-pretty"]
     },
     "apps/web": {
       "project": ["src/**/*.{ts,tsx}"],
@@ -33,8 +33,5 @@
       "ignoreDependencies": ["expo-system-ui"]
     }
   },
-  "ignore": [
-    "apps/mobile/**"
-  ],
   "ignoreBinaries": ["drizzle-kit"]
 }
