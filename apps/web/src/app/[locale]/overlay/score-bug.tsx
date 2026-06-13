@@ -91,6 +91,7 @@ export function ScoreBug({ match, scoreboard, stale }: Props) {
               <div className="-ml-4 flex justify-center items-center bg-surface-high rounded-md overflow-hidden">
                 <ShotClockCap
                   shotClock={scoreboard.shotClock}
+                  shotClockText={scoreboard.shotClockText}
                   timeoutActive={scoreboard.timeoutActive}
                 />
               </div>
@@ -176,9 +177,11 @@ function ClockCell({
 
 function ShotClockCap({
   shotClock,
+  shotClockText,
   timeoutActive,
 }: {
-  shotClock: number;
+  shotClock: number | null;
+  shotClockText: string;
   timeoutActive: boolean;
 }) {
   if (timeoutActive) {
@@ -193,7 +196,7 @@ function ShotClockCap({
       </div>
     );
   }
-  const red = shotClock > 0 && shotClock <= SHOT_CLOCK_RED_AT;
+  const red = shotClock != null && shotClock > 0 && shotClock <= SHOT_CLOCK_RED_AT;
   return (
     <div
       className="flex w-12 h-8 shrink-0 items-center justify-center"
@@ -203,7 +206,7 @@ function ShotClockCap({
           className={`text-2xl font-bold tabular-nums leading-none ${red ? "text-heat" : "text-white"
             }`}
         >
-          {String(shotClock).padStart(2, "0")}
+          {shotClockText}
         </span>
       </div>
     </div>

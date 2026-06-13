@@ -109,7 +109,9 @@ describe("decodeSegmentBlock — fields", () => {
       clockText: "10:00",
       clockSeconds: 600,
       clockRunning: false,
-      shotClock: 0,
+      shotClock: null,
+      shotClockText: "",
+      shotClockRunning: false,
       timeoutActive: false,
       timeoutDuration: "",
     });
@@ -227,7 +229,7 @@ describe("decodeSegmentBlock — fixtures", () => {
       clockSeconds: 600,
       clockRunning: false,
       timeoutActive: false,
-      shotClock: 0,
+      shotClock: null,
     });
   });
 
@@ -367,7 +369,21 @@ describe("SC24-era framing (variable prefix)", () => {
     const longPrefix = decodeSegmentBlock(
       buildSc24Block(overrides, [0x18, 0x98, 0x8b, 0x2d, 0x95, 0x95, 0x7f, 0xf0]),
     );
-    expect(shortPrefix).toEqual(longPrefix);
+    // The shot clock legitimately rides in the prefix: the long prefix here
+    // encodes shot 24, while the short prefix carries none. Every other field
+    // must decode identically regardless of prefix length.
+    const stripShot = (s: NonNullable<typeof shortPrefix>) => {
+      const {
+        shotClock: _shotClock,
+        shotClockText: _shotClockText,
+        shotClockRunning: _shotClockRunning,
+        ...rest
+      } = s;
+      return rest;
+    };
+    expect(stripShot(shortPrefix!)).toEqual(stripShot(longPrefix!));
+    expect(shortPrefix!.shotClock).toBeNull();
+    expect(longPrefix!.shotClock).toBe(24);
     expect(shortPrefix!.scoreHome).toBe(17);
     expect(shortPrefix!.period).toBe(3);
     expect(shortPrefix!.clockRunning).toBe(true);
@@ -420,5 +436,21 @@ describe("SC24-era framing (variable prefix)", () => {
       clockRunning: false,
       timeoutActive: false,
     });
+  });
+});
+
+describe("decodeSegmentBlock shot clock", () => {
+  it("emits the shot-clock value from a shot-bearing frame", () => {
+    const snap = findSegmentFrames(fixture("segment-shot-24.bin"))
+      .map((f) => decodeSegmentBlock(f))
+      .find((s) => s?.shotClock != null)!;
+    expect(snap.shotClock).toBe(24);
+    expect(snap.shotClockText).toBe("24");
+  });
+  it("leaves shot clock null on a frame with no shot data", () => {
+    const snap = decodeSegmentBlock(findSegmentFrames(fixture("segment-base.bin"))[0]!)!;
+    expect(snap.shotClock).toBeNull();
+    expect(snap.shotClockText).toBe("");
+    expect(snap.shotClockRunning).toBe(false);
   });
 });

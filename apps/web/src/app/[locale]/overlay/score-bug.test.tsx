@@ -26,6 +26,8 @@ function snapshot(overrides: Partial<PublicLiveSnapshot> = {}): PublicLiveSnapsh
     clockText: "08:17",
     clockRunning: true,
     shotClock: 13,
+    shotClockText: "13",
+    shotClockRunning: false,
     timeoutActive: false,
     updatedAt: new Date().toISOString(),
     ...overrides,
@@ -158,14 +160,26 @@ describe("ScoreBug", () => {
     expect(container.querySelector(".opacity-50")).toBeTruthy();
   });
 
-  it("pads single-digit shot clock to 2 digits", () => {
+  it("renders the shot-clock text verbatim (incl. tenths under 5s)", () => {
     const { container } = render(
       <ScoreBug
         match={match}
-        scoreboard={snapshot({ shotClock: 4 })}
+        scoreboard={snapshot({ shotClock: 4.7, shotClockText: "4.7" })}
         stale={false}
       />,
     );
-    expect(container.textContent ?? "").toContain("04");
+    expect(container.textContent ?? "").toContain("4.7");
+  });
+
+  it("renders blank shot clock when absent", () => {
+    const { container } = render(
+      <ScoreBug
+        match={match}
+        scoreboard={snapshot({ shotClock: null, shotClockText: "" })}
+        stale={false}
+      />,
+    );
+    // No shot-clock digits rendered when SC24 is absent.
+    expect(container.querySelector('[aria-label="Timeout"]')).toBeNull();
   });
 });

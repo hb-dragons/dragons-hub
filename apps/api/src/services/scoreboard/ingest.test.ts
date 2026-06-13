@@ -164,6 +164,17 @@ describe("processIngest", () => {
     expect(live[0]!.scoreGuest).toBe(0);
     expect(mocks.publishSnapshot).toHaveBeenCalledTimes(1);
   });
+
+  it("carries the shot clock forward when a frame has none", async () => {
+    const hex = (name: string) =>
+      readFileSync(resolve(import.meta.dirname, "__fixtures__", name)).toString("hex");
+    // First POST: a shot-bearing buffer at 24.
+    await processIngest({ deviceId: "d1", hex: hex("segment-shot-24.bin") });
+    // Second POST: original-framing buffer with no shot data -> value inherited.
+    await processIngest({ deviceId: "d1", hex: hex("segment-base.bin") });
+    const [live] = await ctx.db.select().from(liveScoreboards);
+    expect(live!.shotClock).toBe(24); // carried forward, not reset to null
+  });
 });
 
 describe("processIngest broadcast publish", () => {

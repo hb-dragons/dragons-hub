@@ -92,6 +92,8 @@ function rowToScoreboard(
     clockSeconds: row.clockSeconds,
     clockRunning: row.clockRunning,
     shotClock: row.shotClock,
+    shotClockText: row.shotClockText,
+    shotClockRunning: row.shotClockRunning,
     timeoutActive: row.timeoutActive,
     timeoutDuration: row.timeoutDuration,
     deviceId: row.deviceId,

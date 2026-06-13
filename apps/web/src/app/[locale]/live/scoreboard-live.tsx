@@ -212,7 +212,10 @@ export function ScoreboardLive({ deviceId, initialSnapshot }: Props) {
   const timeoutsTotal = timeoutPipsForPeriod(snap.period);
   const periodLabel =
     snap.period > 0 ? `${t("period")}${snap.period}` : t("period");
-  const shotLow = snap.shotClock > 0 && snap.shotClock <= SHOT_CLOCK_RED_AT;
+  const shotLow =
+    snap.shotClock != null &&
+    snap.shotClock > 0 &&
+    snap.shotClock <= SHOT_CLOCK_RED_AT;
 
   return (
     <div className="flex min-h-screen w-full flex-col gap-8 p-6 sm:p-10">
@@ -277,7 +280,7 @@ export function ScoreboardLive({ deviceId, initialSnapshot }: Props) {
               }`}
               style={{ fontSize: SIZE_SHOT }}
             >
-              {String(snap.shotClock).padStart(2, "0")}
+              {snap.shotClockText}
             </span>
           </div>
           {snap.timeoutActive && (
