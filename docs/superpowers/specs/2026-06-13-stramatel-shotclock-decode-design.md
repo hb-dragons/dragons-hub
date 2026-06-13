@@ -80,7 +80,9 @@ New function in `apps/api/src/services/scoreboard/stramatel-segment-decoder.ts`.
 - Input: the prefix bytes (sync+3 .. first `C3`).
 - Short prefix (`< 4` bytes) or unknown signature → returns `null` (this frame
   carries no shot data; covers SC24-not-connected → **no regression**).
-- Long prefix → `{ value: number, text: string, runningHint: boolean | null }`.
+- Long prefix → `{ value: number, text: string, runningHint: boolean }` (the
+  hint is `byte4 === 0x2d`; reliable only on 8-byte prefixes, so ingest treats it
+  as a secondary signal under the value-movement inference, not a source of truth).
 - One pure function, fully table-driven, unit-tested against every fixture.
 
 The existing `decodeSegmentBlock` exposes the prefix to this function (it

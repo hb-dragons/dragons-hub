@@ -292,6 +292,12 @@ unreliable. Therefore `shotClockRunning` is **not** read from byte 4. Instead it
 is derived in the ingest layer from value movement: a decreasing carried value
 means the clock is running.
 
+This is best-effort: a manual reset to a *lower* value (e.g. 24 → 14 after an
+offensive rebound) reads as "running" for the single frame of the drop, and a
+reset to a higher or equal value does not flip the flag until the next tick.
+`shotClockRunning` is informational only — the live and overlay scoreboards show
+the value, not the flag.
+
 ### Carry-forward
 
 Because the value is absent on ~90% of frames, the ingest layer holds the last
