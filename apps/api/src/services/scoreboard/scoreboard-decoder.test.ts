@@ -64,4 +64,12 @@ describe("decodeLatestFrame", () => {
     expect(result).not.toBeNull();
     expect(result!.snapshot.scoreHome).toBe(7);
   });
+
+  it("grafts the latest shot reading from the buffer onto the snapshot", () => {
+    // segment-shot-24.bin's newest frame has no shot data; the value 24 lives in
+    // earlier shot-bearing frames and must be grafted onto the chosen snapshot.
+    const result = decodeLatestFrame(fixture("segment-shot-24.bin"))!;
+    expect(result.snapshot.shotClock).toBe(24);
+    expect(result.snapshot.shotClockText).toBe("24");
+  });
 });
