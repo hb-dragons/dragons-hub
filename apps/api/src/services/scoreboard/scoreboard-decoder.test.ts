@@ -72,4 +72,16 @@ describe("decodeLatestFrame", () => {
     expect(result.snapshot.shotClock).toBe(24);
     expect(result.snapshot.shotClockText).toBe("24");
   });
+
+  it("skips the SC24 companion block and decodes the real board", () => {
+    // The newest block in segment-shot-24.bin is the companion block (clock
+    // 0xFB minutes, period 0, timeout-active set). Without the guard,
+    // decodeLatestFrame would publish that phantom, flickering the overlay
+    // between the real board and "00:45 / period 0 / timeout on".
+    const result = decodeLatestFrame(fixture("segment-shot-24.bin"))!;
+    expect(result.snapshot.clockText).toBe("07:45");
+    expect(result.snapshot.clockSeconds).toBe(465);
+    expect(result.snapshot.period).toBe(1);
+    expect(result.snapshot.timeoutActive).toBe(false);
+  });
 });

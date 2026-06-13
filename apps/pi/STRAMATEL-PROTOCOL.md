@@ -93,6 +93,31 @@ whether or not the SC24 module is connected. On the Pi, `Panel2Net.py` syncs on
 the 3-byte `00 F8 E1` (the old 4-byte `00 F8 E1 C3` check stopped matching once
 the prefix appeared, which silently dropped the whole panel into baud-cycling).
 
+### Companion block (the second type-C block per cycle)
+
+The refresh cycle is **A C B C** — type C appears twice. In the original framing
+both C blocks were identical, so the decoder could read either. Under SC24
+framing the **second C block is a different, non-scoreboard "companion" block**
+that shares the type-C signature (`C3 00 20 F6`, possession `FB`) but is laid
+out differently:
+
+- Its **clock minutes-tens cell** (possession+1) carries a **possession-arrow
+  byte** — `FB` none / `EB` left / `DB` right — instead of a digit/blank. These
+  are above the type-C payload alphabet (`0x8D`–`0xBF`), which a real board
+  never places in the clock field.
+- Its **score and period cells are blank** (`BF`), so they decode to 0.
+- Its **timeout-active flag is raised** (`9F`).
+
+Decoded with the lenient digit reader the companion looks like a bogus board:
+`00:SS`, period 0, timeout active, with only the seconds matching the real
+clock. Because the decoder picks the newest type-C block in a buffer, a live
+feed alternates between the real board and this phantom, flickering the minutes
+(→ `00`), period (→ blank), and timeout indicator. **The decoder rejects a
+type-C block whose clock minutes-tens cell is above `0xBF`** (a possession byte
+in the clock field marks the companion) — see `decodeSegmentBlock`. The
+shot-clock prefix decode is unaffected: the companion's prefix carries valid
+shot data and is still scanned for carry-forward.
+
 ## Segment table
 
 Type-C digit cells use a linear encoding:
