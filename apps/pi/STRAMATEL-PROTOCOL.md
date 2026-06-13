@@ -61,6 +61,38 @@ different, non-linear table. **Type C carries every scoreboard field in the
 single linear encoding described below, so the decoder reads type-C blocks
 only** (bytes 4–5 == `1E 66`) and ignores A and B.
 
+## SC24-era framing (shot-clock module connected)
+
+> Reverse-engineered 2026-06-13 after the **MR19SC24A00** shot-clock panel was
+> daisy-chained to the console. **This is the framing the panel emits now.**
+
+Connecting the SC24 module changed the framing. The marker is no longer a
+contiguous `00 F8 E1 C3`; instead the frame is:
+
+```
+00 F8 E1  <prefix…>  C3  00 20 F6  FB  …payload…  E5
+└─ sync ─┘ └ shot ─┘    └─ type ─┘ poss            term
+            clock
+```
+
+- **Sync** is the 3-byte `00 F8 E1`.
+- **Prefix** is variable length: **2 bytes** (`78 FC` / `F0 FC`) on regular
+  frames, **7–8 bytes** on frames that carry shot-clock data. Frame length is
+  therefore variable (≈60/65/66 bytes), not fixed at 57.
+- After `C3` the type bytes shifted from the old `1E 66` to `00 20 F6` for
+  type C (non-type-C frames carry `00 E0 EC`). There is an extra `00` byte, so
+  the possession byte sits at **C3+4** (it was C3+3 / byte 6 in the original
+  framing).
+- The payload after the possession byte is the **same type-C layout** as
+  below — every field is addressed relative to the possession byte, so one
+  decoder serves both framings.
+
+**The decoder anchors on the possession byte** and detects the layout from the
+bytes after `C3` (`1E 66` → poss at C3+3; `00 20 F6` → poss at C3+4). It works
+whether or not the SC24 module is connected. On the Pi, `Panel2Net.py` syncs on
+the 3-byte `00 F8 E1` (the old 4-byte `00 F8 E1 C3` check stopped matching once
+the prefix appeared, which silently dropped the whole panel into baud-cycling).
+
 ## Segment table
 
 Type-C digit cells use a linear encoding:
@@ -132,7 +164,7 @@ Offsets are byte positions **within the 57-byte block**.
 | `clockText` | bytes 7–10 | `MM:SS` zero-padded, or `SS.t` sub-minute — see Clock format |
 | `clockSeconds` | bytes 7–10 | `mm × 60 + ss` for MM:SS; `floor(seconds.tenths)` sub-minute; `null` if unparseable |
 | `clockRunning` | byte 23 | `byte === 0x9F` |
-| `shotClock` | — | not present in this stream; SC24 module not connected — emit `0` |
+| `shotClock` | shot-clock prefix | partially decoded — see **Shot clock**; decoder emits `0` until exact units land |
 | `timeoutActive` | byte 24 | `byte === 0x9F` |
 | `timeoutDuration` | bytes 49–50 | two-digit countdown string; empty/`"0"` when no timeout |
 
@@ -168,10 +200,27 @@ decodes as `_9:22` → `_9:15`, and `clock_run_0045` decodes as `37.5` → `29.9
 
 ## Open questions
 
-- **Shot clock.** The panel has an SC24 shot-clock module, but it was **not
-  connected** during capture, so no shot-clock data appears in this stream.
-  When the module is wired up, re-capture `shot_24` / `shot_run` and extend
-  this spec — the field is likely within the unmapped bytes 25–48.
+- **Shot clock.** The SC24 module is now connected and its data rides in the
+  variable-length frame **prefix** (see SC24-era framing), *not* in bytes 25–48
+  as originally guessed. Partially reverse-engineered 2026-06-13:
+  - The value appears only on the **7–8 byte prefix** frames (~10% of frames),
+    as **multiplexed LED scan data** — not a clean digit cell.
+  - **Tens cell = prefix byte 1**: `0x98` → "2x" (20–24), `0xA8` → "1x"
+    (10–19), `0x68` → blank (0–9; the panel blanks the leading zero — a single
+    digit shows e.g. "9", not "09").
+  - The **units byte is ambiguous**: the same byte maps to different units in
+    different tens decades, and it free-runs (`6D,6F,…7F`, step +2) while the
+    clock is **running** (the display is stable only while stopped/paused).
+  - Under **5.0 s** the shot clock switches to **tenths** (`S.t`, like the game
+    clock's sub-minute mode). Expiry holds **"0"**.
+  - Running indicator candidate: prefix byte 4 is `0x95` stopped, `0x2D`
+    running.
+
+  Decoding an exact **running** value reliably needs either a full
+  multiplex-refresh reconstruction or paused captures at every value 0–24, plus
+  frame-to-frame state in the ingest layer (the value is absent on ~90% of
+  frames). The decoder emits `shotClock: 0` until that work lands; the rest of
+  the scoreboard does not depend on it.
 - **Bytes 25–48.** Constant `0x9F` across all 29 captures. Unmapped; out of
   scope for the current `StramatelSnapshot` contract (no player-level fields).
 - **Timeout countdown range (bytes 49–50).** Only one running timeout value

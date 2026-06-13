@@ -197,9 +197,15 @@ while True:
                             should_post = True
                             RetryCount = 0
 
-                        elif ((response_hex.find(b'00F8E1C3') != -1) and (response_hex.rfind(b'E5') != -1)):
-                            # found Stramatel 452 M segment protocol - ours to forward
-                            StartToken = response_hex.find(b'00F8E1C3')
+                        elif ((response_hex.find(b'00F8E1') != -1) and (response_hex.rfind(b'E5') != -1)):
+                            # found Stramatel 452 M segment protocol - ours to forward.
+                            # Sync on the 3-byte '00 F8 E1'. The 4th marker byte was 'C3'
+                            # until the SC24 shot-clock module was connected; it now inserts a
+                            # variable-length prefix between E1 and C3, so the contiguous
+                            # '00F8E1C3' no longer appears. The 3-byte sync matches both the
+                            # original framing and the SC24-era framing; the API decoder finds
+                            # C3 and decodes relative to the possession byte either way.
+                            StartToken = response_hex.find(b'00F8E1')
                             EndToken = response_hex.rfind(b'E5')
                             # End Token + 2: the 'E5' terminator is two hex chars, no checksum follows
                             remainder_hex = response_hex[EndToken + 2:]
