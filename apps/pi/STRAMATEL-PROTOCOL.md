@@ -164,7 +164,9 @@ Offsets are byte positions **within the 57-byte block**.
 | `clockText` | bytes 7–10 | `MM:SS` zero-padded, or `SS.t` sub-minute — see Clock format |
 | `clockSeconds` | bytes 7–10 | `mm × 60 + ss` for MM:SS; `floor(seconds.tenths)` sub-minute; `null` if unparseable |
 | `clockRunning` | byte 23 | `byte === 0x9F` |
-| `shotClock` | shot-clock prefix | partially decoded — see **Shot clock**; decoder emits `0` until exact units land |
+| `shotClock` | shot-clock prefix + ingest carry-forward | `number | null` seconds — decoded from the prefix (see **Shot clock**), carried forward across the ~90% of frames that omit it |
+| `shotClockText` | shot-clock prefix | display string: `"24"`…`"5"`, `"4.9"`…`"0.1"`, or `"0"` at expiry |
+| `shotClockRunning` | derived in ingest | `true` when the carried value is decreasing — not trusted per-frame (see **Shot clock → Running flag**) |
 | `timeoutActive` | byte 24 | `byte === 0x9F` |
 | `timeoutDuration` | bytes 49–50 | two-digit countdown string; empty/`"0"` when no timeout |
 
@@ -198,29 +200,113 @@ Worked examples:
 The running-clock captures confirm both modes tick correctly: `clock_run_0930`
 decodes as `_9:22` → `_9:15`, and `clock_run_0045` decodes as `37.5` → `29.9`.
 
+## Shot clock
+
+> **SOLVED** 2026-06-14. The SC24 module's value is fully decoded from the
+> variable-length frame **prefix** and validated against committed fixtures.
+
+The shot-clock value rides in the frame **prefix** — the bytes between the
+`00 F8 E1` sync and the first `C3` (see **SC24-era framing**). It is *not* in
+bytes 25–48, where it was originally guessed.
+
+The prefix carries shot data on only **~10% of frames**. The other ~90% carry a
+2-byte prefix with no shot data, so the ingest layer carries the last decoded
+value forward across frames (see **Carry-forward** below).
+
+Prefix **byte 0** flickers between `0x18` / `0x30` / `0x38` and is ignored.
+The decoded value lives in bytes 1–3.
+
+### Classification
+
+Classify on **prefix byte 2 first**, because prefix byte 1 overlaps between
+modes (for example `0x68` is both the single-digit marker and a tenths-mode
+column) while the byte-2 value ranges do not overlap. Once the mode is known,
+the remaining bytes give the value.
+
+### Two-digit (10–24)
+
+Prefix **byte 1** selects the decade and **byte 2** gives the units. Units are
+decade-independent (the same byte-2 value means the same units digit whether the
+tens digit is 1 or 2).
+
+| Byte 1 | Tens |
+|--------|------|
+| `0x98` | 2x (20–24) |
+| `0xA8` | 1x (10–19) |
+
+| Byte 2 | Units | Byte 2 | Units |
+|--------|-------|--------|-------|
+| `0x99` | 0 | `0x27` | 5 |
+| `0x95` | 1 | `0xD3` | 6 |
+| `0x93` | 2 | `0xCD` | 7 |
+| `0x8D` | 3 | `0xCB` | 8 |
+| `0x8B` | 4 | `0xC7` | 9 |
+
+### Single-digit (5–9)
+
+Prefix **byte 1** is `0x68`. The value is keyed on the **pair (byte 2, byte 3)**,
+because byte 2 alone collides — 9 and 5 both use `0x3A`, so byte 3 disambiguates.
+
+| (Byte 2, Byte 3) | Value |
+|------------------|-------|
+| `(0x3A, 0x5A)` | 9 |
+| `(0x5A, 0x5A)` | 8 |
+| `(0x6A, 0x5A)` | 7 |
+| `(0x9A, 0x5A)` | 6 |
+| `(0x3A, 0x6A)` | 5 |
+
+### Tenths (under 5.0 s, shown as `S.t`)
+
+Below 5.0 s the panel shows seconds and tenths (`S.t`), like the game clock's
+sub-minute mode. Prefix **byte 1** encodes the integer second as a multiplex
+column, and **byte 2** gives the tenths.
+
+| Byte 1 | Integer second |
+|--------|----------------|
+| `0x58` | 4 |
+| `0x68` | 3 |
+| `0x98` | 2 |
+| `0xA8` | 1 |
+| `0xC8` | 0 |
+
+Tenths come from byte 2:
+
+```
+tenths = (0x7F - byte2) / 2
+```
+
+So `0x7F` → .0, `0x7D` → .1, … `0x6D` → .9.
+
+**Expiry "0"** encodes identically to 0.0 (byte 1 `0xC8`, byte 2 `0x7F`) and is
+displayed as `"0"` rather than `"0.0"`.
+
+### Running flag
+
+Prefix **byte 4** is `0x2D` when running and `0x95` when stopped, but this is
+reliable **only on 8-byte prefixes**. Two-digit units 6–9 and single-digit 5
+use a **7-byte prefix**, where byte 4 sits in a different position, so the
+per-frame running bit cannot be trusted across all values.
+
+The decoded **value is always correct**; only the per-frame running flag is
+unreliable. Therefore `shotClockRunning` is **not** read from byte 4. Instead it
+is derived in the ingest layer from value movement: a decreasing carried value
+means the clock is running.
+
+### Carry-forward
+
+Because the value is absent on ~90% of frames, the ingest layer holds the last
+decoded value and re-emits it on prefix-less frames. A new prefix value replaces
+the carried one; comparing successive carried values is what drives
+`shotClockRunning`.
+
+### Validation
+
+This decode was validated against committed fixtures
+`apps/api/src/services/scoreboard/__fixtures__/segment-shot-*.bin` — one per
+value across the full 0.0–24 range, plus a complete running descent.
+
 ## Open questions
 
-- **Shot clock.** The SC24 module is now connected and its data rides in the
-  variable-length frame **prefix** (see SC24-era framing), *not* in bytes 25–48
-  as originally guessed. Partially reverse-engineered 2026-06-13:
-  - The value appears only on the **7–8 byte prefix** frames (~10% of frames),
-    as **multiplexed LED scan data** — not a clean digit cell.
-  - **Tens cell = prefix byte 1**: `0x98` → "2x" (20–24), `0xA8` → "1x"
-    (10–19), `0x68` → blank (0–9; the panel blanks the leading zero — a single
-    digit shows e.g. "9", not "09").
-  - The **units byte is ambiguous**: the same byte maps to different units in
-    different tens decades, and it free-runs (`6D,6F,…7F`, step +2) while the
-    clock is **running** (the display is stable only while stopped/paused).
-  - Under **5.0 s** the shot clock switches to **tenths** (`S.t`, like the game
-    clock's sub-minute mode). Expiry holds **"0"**.
-  - Running indicator candidate: prefix byte 4 is `0x95` stopped, `0x2D`
-    running.
-
-  Decoding an exact **running** value reliably needs either a full
-  multiplex-refresh reconstruction or paused captures at every value 0–24, plus
-  frame-to-frame state in the ingest layer (the value is absent on ~90% of
-  frames). The decoder emits `shotClock: 0` until that work lands; the rest of
-  the scoreboard does not depend on it.
 - **Bytes 25–48.** Constant `0x9F` across all 29 captures. Unmapped; out of
   scope for the current `StramatelSnapshot` contract (no player-level fields).
 - **Timeout countdown range (bytes 49–50).** Only one running timeout value
