@@ -33,6 +33,7 @@ const DEDUPE_KEYS = [
   "clockSeconds",
   "clockRunning",
   "shotClock",
+  "shotClockText",
   "timeoutActive",
 ] as const satisfies ReadonlyArray<keyof StramatelSnapshot>;
 
@@ -72,6 +73,18 @@ export async function processIngest({
       .from(liveScoreboards)
       .where(eq(liveScoreboards.deviceId, deviceId))
       .limit(1);
+
+    // Shot clock is absent on ~90% of frames; carry the last known value
+    // forward, and infer "running" from a decreasing value (the per-frame flag
+    // is unreliable on 7-byte prefixes — see the shot-clock decoder).
+    if (decoded.shotClock === null && existing) {
+      decoded.shotClock = existing.shotClock;
+      decoded.shotClockText = existing.shotClockText;
+      decoded.shotClockRunning = existing.shotClockRunning;
+    } else if (decoded.shotClock !== null && existing?.shotClock != null) {
+      const decreased = decoded.shotClock < existing.shotClock;
+      decoded.shotClockRunning = decreased || decoded.shotClockRunning;
+    }
 
     const changed = snapshotsDiffer(existing ?? null, decoded);
 
