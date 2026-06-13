@@ -78,6 +78,8 @@ const initial = {
   clockSeconds: 600,
   clockRunning: false,
   shotClock: 24,
+  shotClockText: "24",
+  shotClockRunning: false,
   timeoutActive: false,
   timeoutDuration: "",
   panelName: null,
@@ -100,6 +102,30 @@ describe("ScoreboardLive", () => {
       es!.dispatch("snapshot", { ...initial, scoreHome: 7 });
     });
     expect(screen.getByText("7")).toBeInTheDocument();
+  });
+
+  it("renders tenths under 5s", async () => {
+    render(wrap(<ScoreboardLive deviceId="d1" initialSnapshot={initial} />));
+    await act(async () => {
+      MockEventSource.instances[0]!.dispatch("snapshot", {
+        ...initial,
+        shotClock: 4.7,
+        shotClockText: "4.7",
+      });
+    });
+    expect(screen.getByText("4.7")).toBeInTheDocument();
+  });
+
+  it("renders blank shot clock when absent", async () => {
+    render(wrap(<ScoreboardLive deviceId="d1" initialSnapshot={initial} />));
+    await act(async () => {
+      MockEventSource.instances[0]!.dispatch("snapshot", {
+        ...initial,
+        shotClock: null,
+        shotClockText: "",
+      });
+    });
+    expect(screen.queryByText("24")).not.toBeInTheDocument();
   });
 
   it("falls back to a placeholder when initialSnapshot is null", () => {

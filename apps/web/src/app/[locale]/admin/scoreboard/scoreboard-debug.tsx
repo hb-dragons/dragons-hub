@@ -67,6 +67,8 @@ export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
           clockSeconds: event.clockSeconds,
           clockRunning: event.clockRunning,
           shotClock: event.shotClock,
+          shotClockText: event.shotClockText,
+          shotClockRunning: event.shotClockRunning,
           timeoutActive: event.timeoutActive,
           timeoutDuration: event.timeoutDuration,
           rawHex: null,
@@ -131,7 +133,13 @@ export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
               <td className="px-2 tabular-nums">{s.scoreGuest}</td>
               <td className="px-2 tabular-nums">{s.period}</td>
               <td className="px-2 tabular-nums">{s.clockText}</td>
-              <td className="px-2 tabular-nums">{s.shotClock}</td>
+              <td className="px-2 tabular-nums">
+                {s.shotClockText || "—"}
+                <span className="ml-1 text-xs text-zinc-500">
+                  ({s.shotClock ?? "null"}
+                  {s.shotClockRunning ? " ▶" : ""})
+                </span>
+              </td>
               <td className="px-2 tabular-nums">
                 {s.foulsHome}/{s.foulsGuest}
               </td>
