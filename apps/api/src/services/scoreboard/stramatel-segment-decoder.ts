@@ -150,12 +150,9 @@ export function decodeSegmentBlock(frame: Buffer): StramatelSnapshot | null {
     clockText,
     clockSeconds,
     clockRunning: at(17) === RUNNING_FLAG,
-    // Shot clock: the SC24 module sends the value as multiplexed LED scan data
-    // in the frame prefix (not a clean digit cell) and only on a minority of
-    // frames, so an exact running value needs frame-to-frame state plus further
-    // reverse engineering — see STRAMATEL-PROTOCOL.md "Shot clock". Emit 0 until
-    // that lands; the rest of the scoreboard does not depend on it.
-    shotClock: 0,
+    shotClock: null,
+    shotClockText: "",
+    shotClockRunning: false,
     timeoutActive: at(18) === RUNNING_FLAG,
     timeoutDuration: decodeTimeoutDuration(toTens, toUnits),
   };

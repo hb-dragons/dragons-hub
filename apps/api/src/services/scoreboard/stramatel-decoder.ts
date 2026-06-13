@@ -110,6 +110,8 @@ export function decodeScoreFrame(frame: Buffer): StramatelSnapshot | null {
     clockSeconds,
     clockRunning,
     shotClock,
+    shotClockText: shotClock != null ? String(shotClock) : "",
+    shotClockRunning: false,
     timeoutActive,
     timeoutDuration,
   };

@@ -13,7 +13,9 @@ export interface StramatelSnapshot {
   clockText: string;
   clockSeconds: number | null;
   clockRunning: boolean;
-  shotClock: number;
+  shotClock: number | null;
+  shotClockText: string;
+  shotClockRunning: boolean;
   timeoutActive: boolean;
   timeoutDuration: string;
 }
