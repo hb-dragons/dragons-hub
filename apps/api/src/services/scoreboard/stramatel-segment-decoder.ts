@@ -1,5 +1,7 @@
 import type { StramatelSnapshot } from "@dragons/shared";
 
+import { decodeShotClock } from "./shot-clock-decoder";
+
 const SYNC = Buffer.from([0x00, 0xf8, 0xe1]);
 const TERMINATOR = 0xe5;
 const C3 = 0xc3;
@@ -129,6 +131,10 @@ export function decodeSegmentBlock(frame: Buffer): StramatelSnapshot | null {
 
   const { clockText, clockSeconds } = decodeClock(at(1), at(2), at(3), at(4));
 
+  const c3 = frame.indexOf(C3, SYNC.length);
+  const prefix = c3 > SYNC.length ? frame.subarray(SYNC.length, c3) : Buffer.alloc(0);
+  const shot = decodeShotClock(prefix);
+
   // Timeout countdown sits well past the core fields (poss+43/44) and may be
   // beyond a minimal frame — read it only when present.
   const toIdx = p + 43;
@@ -150,9 +156,9 @@ export function decodeSegmentBlock(frame: Buffer): StramatelSnapshot | null {
     clockText,
     clockSeconds,
     clockRunning: at(17) === RUNNING_FLAG,
-    shotClock: null,
-    shotClockText: "",
-    shotClockRunning: false,
+    shotClock: shot ? shot.value : null,
+    shotClockText: shot ? shot.text : "",
+    shotClockRunning: shot ? shot.runningHint : false,
     timeoutActive: at(18) === RUNNING_FLAG,
     timeoutDuration: decodeTimeoutDuration(toTens, toUnits),
   };
