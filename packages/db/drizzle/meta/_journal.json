@@ -274,6 +274,13 @@
       "when": 1781388114176,
       "tag": "0038_panoramic_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1781394167267,
+      "tag": "0039_tidy_energizer",
+      "breakpoints": true
     }
   ]
 }

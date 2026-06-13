@@ -175,6 +175,20 @@ describe("processIngest", () => {
     const [live] = await ctx.db.select().from(liveScoreboards);
     expect(live!.shotClock).toBe(24); // carried forward, not reset to null
   });
+
+  it("persists a fractional sub-5s shot clock without dropping the frame", async () => {
+    // Under 5 s the shot clock is fractional (e.g. 3.1). The shot_clock column
+    // must hold that; an int4 column rejects the value, throwing the whole
+    // ingest so nothing persists and the overlay freezes at the last integer.
+    const hex = readFileSync(
+      resolve(import.meta.dirname, "__fixtures__/segment-shot-31.bin"),
+    ).toString("hex");
+    const r = await processIngest({ deviceId: "d1", hex });
+    expect(r.ok).toBe(true);
+    const [live] = await ctx.db.select().from(liveScoreboards);
+    expect(live!.shotClockText).toBe("3.1");
+    expect(live!.shotClock).toBeCloseTo(3.1, 4);
+  });
 });
 
 describe("processIngest broadcast publish", () => {

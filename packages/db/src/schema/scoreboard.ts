@@ -3,6 +3,7 @@ import {
   serial,
   text,
   integer,
+  real,
   boolean,
   timestamp,
   index,
@@ -20,7 +21,9 @@ export const liveScoreboards = pgTable("live_scoreboards", {
   clockText: text("clock_text").notNull().default(""),
   clockSeconds: integer("clock_seconds"),
   clockRunning: boolean("clock_running").notNull().default(false),
-  shotClock: integer("shot_clock"),
+  // Fractional under 5 s (e.g. 4.7), so it must be a float, not int4 — an
+  // int4 column rejects "4.7" and throws the whole ingest. See ingest.ts.
+  shotClock: real("shot_clock"),
   shotClockText: text("shot_clock_text").notNull().default(""),
   shotClockRunning: boolean("shot_clock_running").notNull().default(false),
   timeoutActive: boolean("timeout_active").notNull().default(false),
@@ -49,7 +52,8 @@ export const scoreboardSnapshots = pgTable(
     clockText: text("clock_text").notNull(),
     clockSeconds: integer("clock_seconds"),
     clockRunning: boolean("clock_running").notNull(),
-    shotClock: integer("shot_clock"),
+    // Fractional under 5 s (e.g. 4.7) — must be a float, not int4. See ingest.ts.
+    shotClock: real("shot_clock"),
     shotClockText: text("shot_clock_text").notNull().default(""),
     shotClockRunning: boolean("shot_clock_running").notNull().default(false),
     timeoutActive: boolean("timeout_active").notNull(),
