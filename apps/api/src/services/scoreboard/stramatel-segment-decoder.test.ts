@@ -94,6 +94,30 @@ describe("decodeSegmentBlock — structural guards", () => {
   it("returns null when the terminator is wrong", () => {
     expect(decodeSegmentBlock(buildTypeCBlock({ 56: 0x00 }))).toBeNull();
   });
+
+  // The SC24-era refresh cycle interleaves a second type-C-signature block that
+  // is not the scoreboard: it carries a possession-arrow byte in the clock
+  // minutes-tens cell (byte 7), blanks the period/score cells, and raises the
+  // timeout-active flag. Decoded leniently it would become a phantom "00:SS /
+  // period 0 / timeout on" snapshot, flickering the overlay. The arrow byte
+  // varies with possession (0xFB none / 0xEB left / 0xDB right).
+  it.each([
+    ["none", 0xfb],
+    ["left", 0xeb],
+    ["right", 0xdb],
+  ])("rejects the SC24 companion block (possession %s)", (_label, byte7) => {
+    const companion = buildSc24Block({ 7: byte7, 17: BLANK_CELL, 24: 0x9f });
+    expect(decodeSegmentBlock(companion)).toBeNull();
+  });
+
+  it("still decodes a real SC24 board frame (blank minutes-tens, valid clock)", () => {
+    // Guard against over-rejecting: a real board with minutes < 10 carries 0xBF
+    // (blank), not 0xFB, in the minutes-tens cell and must still decode.
+    const board = buildSc24Block({ 7: BLANK_CELL });
+    const snapshot = decodeSegmentBlock(board);
+    expect(snapshot).not.toBeNull();
+    expect(snapshot!.period).toBe(1);
+  });
 });
 
 describe("decodeSegmentBlock — fields", () => {

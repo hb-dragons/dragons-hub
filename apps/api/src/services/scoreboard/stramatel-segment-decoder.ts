@@ -129,6 +129,19 @@ export function decodeSegmentBlock(frame: Buffer): StramatelSnapshot | null {
 
   const at = (off: number): number => frame[p + off] ?? BLANK_CELL;
 
+  // The SC24-era refresh cycle (A C B C) interleaves a second type-C-signature
+  // block that is NOT the scoreboard: it carries a possession-arrow byte
+  // (0xFB none / 0xEB left / 0xDB right) in the clock minutes-tens cell, blanks
+  // the score/period cells, and raises the timeout-active flag. Those bytes are
+  // above the type-C payload alphabet (0x8D–0xBF), so a real board never holds
+  // one in the clock field. Decoded leniently the companion becomes a phantom
+  // "00:SS / period 0 / timeout on" snapshot, and because decodeLatestFrame
+  // picks the newest decodable block, the live and overlay scoreboards flicker
+  // between the real board and the phantom as ingest alternates between the two
+  // blocks. Drop the companion block here. (A genuinely corrupt clock byte
+  // decodes below the alphabet and is still emitted best-effort — see decodeClock.)
+  if (at(1) > BLANK_CELL) return null;
+
   const { clockText, clockSeconds } = decodeClock(at(1), at(2), at(3), at(4));
 
   const c3 = frame.indexOf(C3, SYNC.length);
