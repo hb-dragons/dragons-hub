@@ -5,7 +5,9 @@ import {
   decodeDigit,
   decodeSegmentBlock,
   findSegmentFrames,
+  findShotFrames,
 } from "./stramatel-segment-decoder";
+import { decodeShotClock } from "./shot-clock-decoder";
 import {
   BLANK_CELL,
   buildSc24Block,
@@ -476,5 +478,39 @@ describe("decodeSegmentBlock shot clock", () => {
     expect(snap.shotClock).toBeNull();
     expect(snap.shotClockText).toBe("");
     expect(snap.shotClockRunning).toBe(false);
+  });
+});
+
+describe("findShotFrames", () => {
+  // A real SC24 companion block captured live: post-C3 signature 00 E0 EC with
+  // FB in the clock-minutes-tens cell. It carries an even-second shot value (12)
+  // in its prefix but blanks score/clock, so findSegmentFrames must reject it as
+  // a main block while findShotFrames must surface it for shot extraction.
+  // Without this, every other countdown value is dropped (2 s overlay steps).
+  const COMPANION_SHOT_12 = Buffer.from(
+    "00F8E118A8932D2D956DF0C300E0ECFBFB6B9791" +
+      "BFBFBFBFBFBFBFBFBFBFBFBF9F9F" +
+      "BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFE5",
+    "hex",
+  );
+
+  it("rejects the companion block as a main type-C frame", () => {
+    expect(findSegmentFrames(COMPANION_SHOT_12)).toHaveLength(0);
+  });
+
+  it("surfaces the companion block so its shot prefix can be read", () => {
+    const frames = findShotFrames(COMPANION_SHOT_12);
+    expect(frames).toHaveLength(1);
+    const f = frames[0]!;
+    const c3 = f.indexOf(0xc3, 3);
+    expect(decodeShotClock(f.subarray(3, c3))?.value).toBe(12);
+  });
+
+  it("returns the main block too, alongside companions", () => {
+    const main = buildTypeCBlock({});
+    const buf = Buffer.concat([main, COMPANION_SHOT_12]);
+    // strict scan finds only the main block; broad scan finds both
+    expect(findSegmentFrames(buf)).toHaveLength(1);
+    expect(findShotFrames(buf)).toHaveLength(2);
   });
 });

@@ -189,6 +189,34 @@ describe("processIngest", () => {
     expect(live!.shotClockText).toBe("3.1");
     expect(live!.shotClock).toBeCloseTo(3.1, 4);
   });
+
+  // A real SC24 companion block (post-C3 00 E0 EC, FB clock cell): carries an
+  // even-second shot value (12) but no usable score/clock. Such a POST has no
+  // main block, yet must still advance the shot clock — carrying the rest of the
+  // board forward — or every other countdown value is lost (2 s overlay steps).
+  const companionShot12 =
+    "00F8E118A8932D2D956DF0C300E0ECFBFB6B9791" +
+    "BFBFBFBFBFBFBFBFBFBFBFBF9F9F" +
+    "BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFE5";
+
+  it("advances the shot clock on a companion-only POST, carrying the board forward", async () => {
+    await processIngest({ deviceId: "d1", hex: frameOk }); // board: home 5, shot 20, 10:00
+    const r = await processIngest({ deviceId: "d1", hex: companionShot12 });
+    expect(r.ok).toBe(true);
+    expect(r.changed).toBe(true);
+    const [live] = await ctx.db.select().from(liveScoreboards);
+    expect(live!.shotClock).toBe(12); // fresh shot from the companion prefix
+    expect(live!.scoreHome).toBe(5); // board carried forward, not blanked
+    expect(live!.clockText).toBe("10:00");
+  });
+
+  it("ignores a companion-only POST before any full board has been seen", async () => {
+    const r = await processIngest({ deviceId: "d1", hex: companionShot12 });
+    expect(r).toEqual({ ok: true, changed: false, snapshotId: null });
+    const live = await ctx.db.select().from(liveScoreboards);
+    expect(live).toHaveLength(0);
+    expect(mocks.publishSnapshot).not.toHaveBeenCalled();
+  });
 });
 
 describe("processIngest broadcast publish", () => {

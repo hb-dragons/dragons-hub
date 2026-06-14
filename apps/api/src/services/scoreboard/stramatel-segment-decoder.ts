@@ -201,3 +201,34 @@ export function findSegmentFrames(buf: Buffer): Buffer[] {
   }
   return frames;
 }
+
+/**
+ * Find every frame that may carry a shot-clock prefix, regardless of block type.
+ *
+ * Above 5 s the SC24 panel alternates two type-C block variants each second: the
+ * main scoreboard block (`C3 00 20 F6`) carries odd-second shot values, and a
+ * companion block (`C3 00 E0 EC`, with `FB` in the clock-minutes-tens cell)
+ * carries the even-second values. `findSegmentFrames` deliberately drops the
+ * companion so it never corrupts score/clock and never makes the overlay
+ * flicker (see the companion guard in `decodeSegmentBlock`) — but the
+ * companion's shot-clock prefix is genuine. If shot extraction sees only the
+ * main block, every other countdown value is lost and the overlay steps every
+ * 2 s instead of 1 s. This walk returns all `00 F8 E1 .. C3 .. E5` frames
+ * without the type-C filter; `decodeShotClock` validates each prefix, so frames
+ * that carry no shot data contribute nothing.
+ */
+export function findShotFrames(buf: Buffer): Buffer[] {
+  const frames: Buffer[] = [];
+  let cursor = 0;
+  while (cursor < buf.length) {
+    const sync = buf.indexOf(SYNC, cursor);
+    if (sync < 0) break;
+    const c3 = buf.indexOf(C3, sync + SYNC.length);
+    if (c3 < 0) break;
+    const end = buf.indexOf(TERMINATOR, c3 + 1);
+    if (end < 0) break;
+    frames.push(buf.subarray(sync, end + 1));
+    cursor = end + 1;
+  }
+  return frames;
+}

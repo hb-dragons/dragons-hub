@@ -73,6 +73,24 @@ describe("decodeLatestFrame", () => {
     expect(result.snapshot.shotClockText).toBe("24");
   });
 
+  it("grafts an even-second shot value carried only by a companion block", () => {
+    // The companion block (post-C3 00 E0 EC, FB clock cell) carries even-second
+    // shot values and is rejected as a main block. decodeLatestFrame must still
+    // read its shot prefix onto the real board's snapshot, else even values are
+    // dropped and the overlay steps every 2 s.
+    const main = buildTypeCBlock({ 13: segmentDigit(5) }); // home score 5, no shot
+    const companion = Buffer.from(
+      "00F8E118A8932D2D956DF0C300E0ECFBFB6B9791" +
+        "BFBFBFBFBFBFBFBFBFBFBFBF9F9F" +
+        "BFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFBFE5",
+      "hex",
+    );
+    const result = decodeLatestFrame(Buffer.concat([main, companion]))!;
+    expect(result.snapshot.scoreHome).toBe(5);
+    expect(result.snapshot.shotClock).toBe(12);
+    expect(result.snapshot.shotClockText).toBe("12");
+  });
+
   it("skips the SC24 companion block and decodes the real board", () => {
     // The newest block in segment-shot-24.bin is the companion block (clock
     // 0xFB minutes, period 0, timeout-active set). Without the guard,
