@@ -93,6 +93,48 @@ logging.basicConfig(level=logging.DEBUG,
                     filename=LogFileName,
                     filemode='w')
 
+# Persistent HTTPS connection — reused across POSTs so each frame does not pay a
+# fresh TLS handshake. The handshake (not the payload) dominated the POST
+# round-trip, and the single-threaded loop blocks on every POST, so that
+# round-trip set the overlay's update cadence. Reusing the connection keeps the
+# cadence near bare network RTT. The socket is recreated on any transport error.
+ssl_context = ssl.create_default_context()
+http_conn = None
+
+
+def close_http_conn():
+    global http_conn
+    if http_conn is not None:
+        try:
+            http_conn.close()
+        except Exception:
+            pass
+        http_conn = None
+
+
+def post_frame(url, body, headers):
+    # Send on the persistent connection. If the transport is stale (server closed
+    # keep-alive, network blip) the first attempt raises; reconnect once and
+    # retry. The response body is always drained so the keep-alive socket is
+    # ready for the next POST — without this, reuse raises ResponseNotReady.
+    global http_conn
+    for attempt in (1, 2):
+        try:
+            if http_conn is None:
+                http_conn = http.client.HTTPSConnection(
+                    RequestServer, RequestPort, timeout=RequestTimeOut, context=ssl_context,
+                )
+            http_conn.request("POST", url, body, headers)
+            reply = http_conn.getresponse()
+            reply.read()
+            return reply.status, reply.reason
+        except (http.client.HTTPException, OSError) as exc:
+            close_http_conn()
+            if attempt == 2:
+                raise
+            logging.debug("post_frame retry after transport error: " + str(exc))
+
+
 ser = serial.Serial()
 ser.port = SerialPort
 ser.baudrate = BaudRate
@@ -281,18 +323,13 @@ while True:
                             headers['Device_ID'] = Device_ID
                             headers['Authorization'] = 'Bearer ' + SCOREBOARD_KEY
 
-                            context = ssl.create_default_context()
-                            conn = http.client.HTTPSConnection(
-                                RequestServer, RequestPort, timeout=RequestTimeOut, context=context,
-                            )
-                            conn.request("POST", RequestURL, response, headers)
-                            httpreply = conn.getresponse()
-                            if httpreply.status == 200:
+                            status, reason = post_frame(RequestURL, response, headers)
+                            if status == 200:
                                 fail_streak = 0
-                                logging.debug(str(httpreply.status) + ' ' + str(httpreply.reason))
+                                logging.debug(str(status) + ' ' + str(reason))
                             else:
                                 fail_streak += 1
-                                logging.error(str(httpreply.status) + ' ' + str(httpreply.reason))
+                                logging.error(str(status) + ' ' + str(reason))
                                 if fail_streak >= 5:
                                     time.sleep(5)
                             RequestCount = RequestCount + 1    
@@ -305,10 +342,10 @@ while True:
                             ElapserTime = int(EnderTime - StarterTime)
                             print("\r#: " + str(RequestCount) + ", Bd: " + str(BaudRate) + ", Panel: stramatel, Len#: "
                              + str(PackageByLength) + ", HT: " + str(ElapserTime)
-                             + " ms: " + str(httpreply.status) + ", Buf: " + str(ser.inWaiting()), end='          ', flush=True)
+                             + " ms: " + str(status) + ", Buf: " + str(ser.inWaiting()), end='          ', flush=True)
                             logging.debug("\rRequestCount: " + str(RequestCount) + ", Package Length: "
                              + str (PackageByLength) + ", Handling Time: " + str(ElapserTime)
-                             + " ms -> " + str(httpreply.status) + ", BufferSize: " + str(ser.inWaiting()))        
+                             + " ms -> " + str(status) + ", BufferSize: " + str(ser.inWaiting()))
                             
                             # Adjust PackageByLength based on Handling Time
                             if ElapserTime > 2000:
