@@ -39,7 +39,7 @@ Also out of scope for this work:
 
 ## Message model & rendering contract
 
-Both platforms iterate `message.parts` **in order** and render each part by type, so the activity timeline interleaves correctly with streamed text:
+Both platforms read `message.parts` and render by type. Tool parts surface as **activity chips above** the assistant prose (matching the design mockups); the message's text parts render as one markdown block beneath them. For Q&A the model calls tools before writing the answer, so the natural order is `[tools…, text]` and this reads as a clean timeline. Each part is handled by type:
 
 - **text part** → markdown prose (assistant) / plain text inside the bubble (user).
 - **tool part** → an activity chip. Detection contract (identical on both platforms, per AI SDK v6 tool-usage docs):
