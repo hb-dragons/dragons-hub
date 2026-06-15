@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BroadcastState } from "@dragons/shared";
 import { PregameCard } from "./pregame-card";
 import { ScoreBug } from "./score-bug";
-import { interpolate, isStale, type ClockAnchor } from "./clock-interpolation";
+import { interpolate, shouldDim, type ClockAnchor } from "./clock-interpolation";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -33,7 +33,6 @@ export function OverlayClient({ deviceId, initial }: Props) {
   // performance.now() is impure, so it is read only in effects / event handlers
   // and surfaced to render as state. The interval bumps it ~10x/s.
   const [now, setNow] = useState(0);
-  const esRef = useRef<EventSource | null>(null);
 
   // Seed the anchor from the server-rendered initial snapshot (effect, not
   // render, so the impure performance.now() inside anchorFrom is allowed).
@@ -55,7 +54,6 @@ export function OverlayClient({ deviceId, initial }: Props) {
       deviceId,
     )}`;
     const es = new EventSource(url);
-    esRef.current = es;
     const onSnapshot = (ev: MessageEvent) => {
       try {
         const next = JSON.parse(ev.data) as BroadcastState;
@@ -72,7 +70,6 @@ export function OverlayClient({ deviceId, initial }: Props) {
     return () => {
       es.removeEventListener("snapshot", onSnapshot);
       es.close();
-      esRef.current = null;
     };
   }, [deviceId]);
 
@@ -88,7 +85,7 @@ export function OverlayClient({ deviceId, initial }: Props) {
   if (state.phase === "live" && state.match && state.scoreboard) {
     const anchor = anchorRef.current;
     const interp = anchor ? interpolate(anchor, now) : null;
-    const stale = state.stale || (anchor ? isStale(anchor, now) : false);
+    const stale = shouldDim(state.stale, anchor, now);
     const scoreboard = interp
       ? {
           ...state.scoreboard,

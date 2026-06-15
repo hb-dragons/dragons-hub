@@ -4,6 +4,7 @@ import {
   formatShotClock,
   interpolate,
   isStale,
+  shouldDim,
   STALE_MS,
   type ClockAnchor,
 } from "./clock-interpolation";
@@ -76,5 +77,31 @@ describe("isStale", () => {
     expect(isStale(anchor({ anchorAt: 0 }), STALE_MS - 1)).toBe(false);
     expect(isStale(anchor({ anchorAt: 0 }), STALE_MS)).toBe(false); // exact boundary holds
     expect(isStale(anchor({ anchorAt: 0 }), STALE_MS + 1)).toBe(true);
+  });
+});
+
+describe("shouldDim", () => {
+  it("always dims when the server flags stale", () => {
+    expect(shouldDim(true, null, 0)).toBe(true);
+    expect(shouldDim(true, anchor({ clockRunning: false, anchorAt: 0 }), 0)).toBe(true);
+  });
+
+  it("dims a running clock that has gone silent past the window (dead feed)", () => {
+    expect(
+      shouldDim(false, anchor({ clockRunning: true, anchorAt: 0 }), STALE_MS + 1),
+    ).toBe(true);
+  });
+
+  it("does NOT dim a legitimately stopped clock, however long the silence", () => {
+    expect(
+      shouldDim(false, anchor({ clockRunning: false, anchorAt: 0 }), STALE_MS + 60_000),
+    ).toBe(false);
+  });
+
+  it("does not dim a running clock that is still fresh, or with no anchor", () => {
+    expect(
+      shouldDim(false, anchor({ clockRunning: true, anchorAt: 0 }), STALE_MS - 1),
+    ).toBe(false);
+    expect(shouldDim(false, null, 0)).toBe(false);
   });
 });

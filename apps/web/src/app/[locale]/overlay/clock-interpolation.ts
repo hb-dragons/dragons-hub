@@ -46,6 +46,24 @@ export function isStale(anchor: ClockAnchor, now: number): boolean {
   return now - anchor.anchorAt > STALE_MS;
 }
 
+/**
+ * Whether the overlay should dim. The server's own `stale` flag always applies.
+ * Client-side staleness only applies while the clock is RUNNING: a running clock
+ * resets the shot clock at least every 24s, so >30s of silence means a dead
+ * feed. A stopped clock (timeout, quarter break) is expected to be silent and
+ * must not dim.
+ */
+export function shouldDim(
+  serverStale: boolean,
+  anchor: ClockAnchor | null,
+  now: number,
+): boolean {
+  return (
+    serverStale ||
+    (anchor !== null && anchor.clockRunning && isStale(anchor, now))
+  );
+}
+
 export function interpolate(
   anchor: ClockAnchor,
   now: number,
