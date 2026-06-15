@@ -95,6 +95,15 @@ function RootNavigator() {
             headerLargeTitleShadowVisible: false,
           }}
         />
+        <Stack.Screen
+          name="assistant"
+          options={{
+            presentation: "modal",
+            headerShown: true,
+            headerTitle: i18n.t("assistant.title"),
+            headerStyle: { backgroundColor: colors.background },
+          }}
+        />
       </Stack>
     </>
   );

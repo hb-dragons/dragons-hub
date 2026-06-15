@@ -390,6 +390,13 @@
     "columnAdded": "Column added",
     "columnDeleted": "Column deleted"
   },
+  "assistant": {
+    "title": "Club assistant",
+    "placeholder": "Ask about games, standings, results",
+    "send": "Send",
+    "empty": "Ask me about the club's games, standings, or results.",
+    "open": "Ask the club assistant"
+  },
   "a11y": {
     "doubleTapToEdit": "Double tap to edit",
     "doubleTapToOpen": "Double tap to open",

@@ -95,6 +95,18 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      {/* Entry point: Club assistant */}
+      {process.env.EXPO_PUBLIC_CHATBOT_ENABLED === "true" && session?.user ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={i18n.t("assistant.open")}
+          onPress={() => router.push("/assistant")}
+          style={{ marginTop: spacing.md }}
+        >
+          <Text style={{ color: colors.primary }}>{i18n.t("assistant.open")}</Text>
+        </Pressable>
+      ) : null}
+
       {/* Section: Next Game */}
       <View style={{ marginTop: spacing.lg }}>
         <View
