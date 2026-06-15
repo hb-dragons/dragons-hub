@@ -15,6 +15,8 @@ export const spacing = {
 export const radius = {
   /** Matches web rounded-md (0.25rem = 4px) */
   md: 4,
+  /** Chat composer / large rounded surfaces */
+  lg: 20,
   /** Pill shape for badges and chips */
   pill: 9999,
 } as const;
