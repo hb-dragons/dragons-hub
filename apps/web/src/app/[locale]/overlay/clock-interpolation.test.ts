@@ -29,6 +29,8 @@ describe("formatShotClock", () => {
   });
   it("renders tenths under 5 and 0 at expiry", () => {
     expect(formatShotClock(4.7)).toBe("4.7");
+    // Just under 5 stays in the tenths regime (don't round back up to "5").
+    expect(formatShotClock(4.999)).toBe("4.9");
     expect(formatShotClock(0)).toBe("0");
     expect(formatShotClock(-1)).toBe("0");
   });
@@ -72,6 +74,7 @@ describe("interpolate", () => {
 describe("isStale", () => {
   it("is true once the gap exceeds STALE_MS", () => {
     expect(isStale(anchor({ anchorAt: 0 }), STALE_MS - 1)).toBe(false);
+    expect(isStale(anchor({ anchorAt: 0 }), STALE_MS)).toBe(false); // exact boundary holds
     expect(isStale(anchor({ anchorAt: 0 }), STALE_MS + 1)).toBe(true);
   });
 });
