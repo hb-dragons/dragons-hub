@@ -1417,7 +1417,32 @@
     "description": "Ask about fixtures, standings, and recent results.",
     "placeholder": "e.g. who plays this weekend? what place is Herren 1 in?",
     "send": "Send",
+    "stop": "Stop",
+    "regenerate": "Regenerate",
+    "copy": "Copy",
+    "copied": "Copied",
+    "close": "Close",
+    "scrollToBottom": "Scroll to latest",
     "empty": "Ask me about the club's games, standings, or results.",
-    "error": "Something went wrong. Please try again."
+    "greetingTitle": "Hi! Ask me about the club.",
+    "greetingSubtitle": "Fixtures, standings, and recent results — straight from the federation sync.",
+    "examplesLabel": "Try asking",
+    "examples": [
+      "Who plays this weekend?",
+      "What place is Herren 1 in?",
+      "How did the last games go?"
+    ],
+    "error": "Something went wrong. Please try again.",
+    "activity": {
+      "checking": "Checking {what}…",
+      "checked": "Checked {what}",
+      "failed": "Couldn't read {what}"
+    },
+    "tools": {
+      "get_standings": "standings",
+      "get_dashboard": "the club overview",
+      "list_matches": "fixtures",
+      "fallback": "club data"
+    }
   }
 }
