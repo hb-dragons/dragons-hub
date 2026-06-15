@@ -5,6 +5,7 @@
 @source "../../../../apps";
 @source "../../../../packages/shared/src";
 @source "..";
+@source "../../../../node_modules/streamdown/dist/*.js";
 
 @import "tw-animate-css";
 
