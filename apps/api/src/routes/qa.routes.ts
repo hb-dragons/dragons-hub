@@ -26,6 +26,8 @@ qaRoutes.post(
       return c.json({ error: "Chatbot is disabled", code: "CHATBOT_DISABLED" }, 503);
     }
     const { messages, locale } = c.req.valid("json");
+    // The contract validates messages as an opaque non-empty array; the AI SDK
+    // validates the UIMessage shape downstream in convertToModelMessages.
     return streamClubQaChat({ messages: messages as UIMessage[], locale });
   },
 );
