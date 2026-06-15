@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
+import type { AppEnv } from "../types";
 
 const m = vi.hoisted(() => ({ incr: vi.fn(), expire: vi.fn() }));
 vi.mock("../config/redis", () => ({ getRedis: () => ({ incr: m.incr, expire: m.expire }) }));
@@ -8,7 +9,7 @@ vi.mock("../config/redis", () => ({ getRedis: () => ({ incr: m.incr, expire: m.e
 import { rateLimit } from "./rate-limit";
 
 function makeApp() {
-  const app = new Hono();
+  const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
     c.set("user", { id: "u1" } as never);
     await next();

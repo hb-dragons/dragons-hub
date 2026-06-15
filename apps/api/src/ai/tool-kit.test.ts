@@ -25,6 +25,6 @@ describe("toAiSdkTools", () => {
     const t = defineTool("echo", "desc", z.object({}), vi.fn());
     const out = toAiSdkTools([t]) as Record<string, { description: string }>;
     expect(Object.keys(out)).toEqual(["echo"]);
-    expect(out.echo.description).toBe("desc");
+    expect(out.echo!.description).toBe("desc");
   });
 });
