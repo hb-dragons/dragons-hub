@@ -70,6 +70,18 @@ variable "scoreboard_device_id" {
   type        = string
 }
 
+variable "chatbot_enabled" {
+  description = "Enable the members-only club Q&A assistant (CHATBOT_ENABLED). Set to \"true\" to activate; defaults to disabled."
+  type        = string
+  default     = "false"
+}
+
+variable "chatbot_model" {
+  description = "AI SDK model ID used by the club Q&A assistant (CHATBOT_MODEL)."
+  type        = string
+  default     = "gemini-2.5-flash"
+}
+
 variable "log_retention_days" {
   description = "Retention for the Cloud Logging _Default bucket. Documented explicitly for GDPR transparency + DSAR handling."
   type        = number
