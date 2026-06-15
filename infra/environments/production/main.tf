@@ -204,16 +204,20 @@ module "secrets" {
     "referee-sdk-password-production",
     "auth-secret-production",
     "scoreboard-ingest-key-production",
+    "google-generative-ai-api-key-production",
+    "mcp-token-production",
   ]
   secret_values = {
-    "database-url-production"          = module.database.database_url
-    "redis-url-production"             = module.valkey.connection_url
-    "sdk-username-production"          = var.sdk_username
-    "sdk-password-production"          = var.sdk_password
-    "referee-sdk-username-production"  = var.referee_sdk_username
-    "referee-sdk-password-production"  = var.referee_sdk_password
-    "auth-secret-production"           = random_password.auth_secret.result
-    "scoreboard-ingest-key-production" = random_password.scoreboard_ingest_key.result
+    "database-url-production"                 = module.database.database_url
+    "redis-url-production"                    = module.valkey.connection_url
+    "sdk-username-production"                 = var.sdk_username
+    "sdk-password-production"                 = var.sdk_password
+    "referee-sdk-username-production"         = var.referee_sdk_username
+    "referee-sdk-password-production"         = var.referee_sdk_password
+    "auth-secret-production"                  = random_password.auth_secret.result
+    "scoreboard-ingest-key-production"        = random_password.scoreboard_ingest_key.result
+    "google-generative-ai-api-key-production" = var.google_generative_ai_api_key
+    "mcp-token-production"                    = var.mcp_token
   }
 
   depends_on = [google_project_service.apis]
@@ -254,6 +258,8 @@ module "api" {
     SCOREBOARD_DEVICE_ID = var.scoreboard_device_id
     CHATBOT_ENABLED      = var.chatbot_enabled
     CHATBOT_MODEL        = var.chatbot_model
+    ASSISTANT_ENABLED    = var.assistant_enabled
+    ASSISTANT_MODEL      = var.assistant_model
   }
 
   secrets = {
@@ -287,6 +293,14 @@ module "api" {
     }
     SCOREBOARD_INGEST_KEY = {
       secret_name = "scoreboard-ingest-key-production"
+      version     = "latest"
+    }
+    GOOGLE_GENERATIVE_AI_API_KEY = {
+      secret_name = "google-generative-ai-api-key-production"
+      version     = "latest"
+    }
+    MCP_TOKEN = {
+      secret_name = "mcp-token-production"
       version     = "latest"
     }
   }
@@ -332,6 +346,8 @@ module "worker" {
     SCOREBOARD_DEVICE_ID = var.scoreboard_device_id
     CHATBOT_ENABLED      = var.chatbot_enabled
     CHATBOT_MODEL        = var.chatbot_model
+    ASSISTANT_ENABLED    = var.assistant_enabled
+    ASSISTANT_MODEL      = var.assistant_model
   }
 
   secrets = {
@@ -365,6 +381,10 @@ module "worker" {
     }
     SCOREBOARD_INGEST_KEY = {
       secret_name = "scoreboard-ingest-key-production"
+      version     = "latest"
+    }
+    GOOGLE_GENERATIVE_AI_API_KEY = {
+      secret_name = "google-generative-ai-api-key-production"
       version     = "latest"
     }
   }

@@ -82,6 +82,30 @@ variable "chatbot_model" {
   default     = "gemini-2.5-flash"
 }
 
+variable "assistant_enabled" {
+  description = "Enable the game rescheduling AI copilot (ASSISTANT_ENABLED). Set to \"true\" to activate; defaults to disabled."
+  type        = string
+  default     = "false"
+}
+
+variable "assistant_model" {
+  description = "Gemini model ID used by the rescheduling assistant (ASSISTANT_MODEL)."
+  type        = string
+  default     = "gemini-2.5-flash"
+}
+
+variable "google_generative_ai_api_key" {
+  description = "Google AI Studio API key (GOOGLE_GENERATIVE_AI_API_KEY). Required when chatbot or assistant is enabled; stored in Secret Manager."
+  type        = string
+  sensitive   = true
+}
+
+variable "mcp_token" {
+  description = "Bearer token for the /mcp endpoint (MCP_TOKEN, min 32 chars). Stored in Secret Manager."
+  type        = string
+  sensitive   = true
+}
+
 variable "log_retention_days" {
   description = "Retention for the Cloud Logging _Default bucket. Documented explicitly for GDPR transparency + DSAR handling."
   type        = number

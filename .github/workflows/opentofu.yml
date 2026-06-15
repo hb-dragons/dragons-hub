@@ -71,6 +71,12 @@ jobs:
       TF_VAR_referee_sdk_username: ${{ secrets.REFEREE_SDK_USERNAME }}
       TF_VAR_referee_sdk_password: ${{ secrets.REFEREE_SDK_PASSWORD }}
       TF_VAR_scoreboard_device_id: ${{ vars.SCOREBOARD_DEVICE_ID }}
+      # Empty `||` fallbacks: an unset repo variable renders "" and would override the
+      # TF default with an empty string (which the API env schema rejects at boot).
+      TF_VAR_chatbot_enabled: ${{ vars.CHATBOT_ENABLED || 'false' }}
+      TF_VAR_assistant_enabled: ${{ vars.ASSISTANT_ENABLED || 'false' }}
+      TF_VAR_google_generative_ai_api_key: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+      TF_VAR_mcp_token: ${{ secrets.MCP_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

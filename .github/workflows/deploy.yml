@@ -177,7 +177,7 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=https://${{ vars.API_DOMAIN }}
             NEXT_PUBLIC_SCOREBOARD_DEVICE_ID=${{ vars.SCOREBOARD_DEVICE_ID }}
-            NEXT_PUBLIC_CHATBOT_ENABLED=${{ vars.CHATBOT_ENABLED }}
+            NEXT_PUBLIC_CHATBOT_ENABLED=${{ vars.CHATBOT_ENABLED || 'false' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

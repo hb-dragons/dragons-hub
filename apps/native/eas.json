@@ -17,14 +17,16 @@
       "channel": "preview",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.app.hbdragons.de"
+        "EXPO_PUBLIC_API_URL": "https://api.app.hbdragons.de",
+        "EXPO_PUBLIC_CHATBOT_ENABLED": "true"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.app.hbdragons.de"
+        "EXPO_PUBLIC_API_URL": "https://api.app.hbdragons.de",
+        "EXPO_PUBLIC_CHATBOT_ENABLED": "true"
       }
     }
   },
