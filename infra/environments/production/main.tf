@@ -252,6 +252,8 @@ module "api" {
     SERVICE_NAME         = "api"
     GCP_PROJECT_ID       = var.project_id
     SCOREBOARD_DEVICE_ID = var.scoreboard_device_id
+    CHATBOT_ENABLED      = var.chatbot_enabled
+    CHATBOT_MODEL        = var.chatbot_model
   }
 
   secrets = {
@@ -328,6 +330,8 @@ module "worker" {
     SERVICE_NAME         = "worker"
     GCP_PROJECT_ID       = var.project_id
     SCOREBOARD_DEVICE_ID = var.scoreboard_device_id
+    CHATBOT_ENABLED      = var.chatbot_enabled
+    CHATBOT_MODEL        = var.chatbot_model
   }
 
   secrets = {

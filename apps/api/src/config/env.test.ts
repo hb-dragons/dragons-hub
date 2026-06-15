@@ -1,4 +1,15 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { envSchema } from "./env";
+
+const baseEnv = {
+  DATABASE_URL: "postgres://x",
+  REDIS_URL: "redis://x",
+  SDK_USERNAME: "u",
+  SDK_PASSWORD: "p",
+  BETTER_AUTH_SECRET: "x".repeat(32),
+  SCOREBOARD_INGEST_KEY: "y".repeat(32),
+  SCOREBOARD_DEVICE_ID: "panel-1",
+};
 
 describe("env config", () => {
   beforeEach(() => {
@@ -183,5 +194,26 @@ describe("assistant env vars", () => {
     delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     const { envSchema } = await import("./env");
     expect(() => envSchema.parse(process.env)).toThrow(/GOOGLE_GENERATIVE_AI_API_KEY/);
+  });
+});
+
+describe("CHATBOT_* env", () => {
+  it("defaults CHATBOT_ENABLED=false and CHATBOT_MODEL=gemini-2.5-flash", () => {
+    const parsed = envSchema.parse(baseEnv);
+    expect(parsed.CHATBOT_ENABLED).toBe(false);
+    expect(parsed.CHATBOT_MODEL).toBe("gemini-2.5-flash");
+  });
+
+  it("requires GOOGLE_GENERATIVE_AI_API_KEY when CHATBOT_ENABLED=true", () => {
+    const result = envSchema.safeParse({ ...baseEnv, CHATBOT_ENABLED: "true" });
+    expect(result.success).toBe(false);
+    expect(result.success ? [] : result.error.issues.map((i) => i.path.join("."))).toContain(
+      "GOOGLE_GENERATIVE_AI_API_KEY",
+    );
+  });
+
+  it("accepts CHATBOT_ENABLED=true with the key present", () => {
+    const parsed = envSchema.parse({ ...baseEnv, CHATBOT_ENABLED: "true", GOOGLE_GENERATIVE_AI_API_KEY: "k" });
+    expect(parsed.CHATBOT_ENABLED).toBe(true);
   });
 });

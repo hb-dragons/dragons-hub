@@ -162,6 +162,10 @@ ASSISTANT_ENABLED=false           # set true to enable the game rescheduling AI 
 ASSISTANT_MODEL=gemini-2.5-flash  # Gemini model ID used by the assistant
 GOOGLE_GENERATIVE_AI_API_KEY=<google ai studio key; required when ASSISTANT_ENABLED=true>
 MCP_TOKEN=<random string min 32 chars; bearer token for the /mcp endpoint>
+CHATBOT_ENABLED=false             # set true to enable the members-only club Q&A assistant; requires GOOGLE_GENERATIVE_AI_API_KEY
+CHATBOT_MODEL=gemini-2.5-flash    # AI SDK model ID for the club Q&A assistant
+NEXT_PUBLIC_CHATBOT_ENABLED=false # web: mount the club assistant widget on public pages; baked into the web bundle at build time
+EXPO_PUBLIC_CHATBOT_ENABLED=false # native: show the club assistant entry point; baked into the native bundle at build time
 ```
 
 ### Production deployment plumbing

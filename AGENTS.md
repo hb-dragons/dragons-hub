@@ -327,6 +327,12 @@ Match list and detail responses include associated venue booking data when avail
 |--------|------|-------------|
 | POST | `/admin/assistant/reschedule/chat` | Rescheduling copilot chat (AI SDK UI message stream). 503 when ASSISTANT_ENABLED=false. Permission: match:update |
 
+### Club Q&A Assistant
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/qa/chat` | Members-only club Q&A assistant (AI SDK UI message stream); auth-gated (`requireAuth`), rate-limited, gated by `CHATBOT_ENABLED`. Returns 503 when `CHATBOT_ENABLED=false`. |
+
 ### MCP server
 
 | Method | Path | Description |

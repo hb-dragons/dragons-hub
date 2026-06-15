@@ -1,5 +1,6 @@
 import { PublicHeader } from "@/components/public/public-header";
 import { PublicBottomTabs } from "@/components/public/public-bottom-tabs";
+import { ClubAssistant } from "@/components/public/club-assistant";
 
 export default function PublicLayout({
   children,
@@ -13,6 +14,7 @@ export default function PublicLayout({
         {children}
       </main>
       <PublicBottomTabs />
+      {process.env.NEXT_PUBLIC_CHATBOT_ENABLED === "true" ? <ClubAssistant /> : null}
     </div>
   );
 }

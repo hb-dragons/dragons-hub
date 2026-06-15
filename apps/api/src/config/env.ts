@@ -40,6 +40,11 @@ export const envSchema = z
       .default("false")
       .transform((v) => v === "true"),
     ASSISTANT_MODEL: z.string().min(1).default("gemini-2.5-flash"),
+    CHATBOT_ENABLED: z
+      .union([z.literal("true"), z.literal("false")])
+      .default("false")
+      .transform((v) => v === "true"),
+    CHATBOT_MODEL: z.string().min(1).default("gemini-2.5-flash"),
     MCP_TOKEN: z.string().min(32).optional(),
 
     SMTP_HOST: z.string().min(1).optional(),
@@ -64,6 +69,13 @@ export const envSchema = z
         code: "custom",
         path: ["GOOGLE_GENERATIVE_AI_API_KEY"],
         message: "GOOGLE_GENERATIVE_AI_API_KEY is required when ASSISTANT_ENABLED=true",
+      });
+    }
+    if (env.CHATBOT_ENABLED && !env.GOOGLE_GENERATIVE_AI_API_KEY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["GOOGLE_GENERATIVE_AI_API_KEY"],
+        message: "GOOGLE_GENERATIVE_AI_API_KEY is required when CHATBOT_ENABLED=true",
       });
     }
     if (env.NODE_ENV === "production") {

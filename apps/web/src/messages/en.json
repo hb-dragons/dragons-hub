@@ -1410,5 +1410,14 @@
       "matchTitle": "Match not found",
       "matchDescription": "This match does not exist or has been removed."
     }
+  },
+  "qa": {
+    "trigger": "Ask the club assistant",
+    "title": "Club assistant",
+    "description": "Ask about fixtures, standings, and recent results.",
+    "placeholder": "e.g. who plays this weekend? what place is Herren 1 in?",
+    "send": "Send",
+    "empty": "Ask me about the club's games, standings, or results.",
+    "error": "Something went wrong. Please try again."
   }
 }
