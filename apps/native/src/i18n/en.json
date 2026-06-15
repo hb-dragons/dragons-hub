@@ -394,9 +394,32 @@
     "title": "Club assistant",
     "placeholder": "Ask about games, standings, results",
     "send": "Send",
+    "stop": "Stop",
+    "regenerate": "Regenerate",
+    "copy": "Copy",
+    "copied": "Copied",
     "empty": "Ask me about the club's games, standings, or results.",
     "open": "Ask the club assistant",
-    "error": "Something went wrong. Please try again."
+    "greetingTitle": "Hi! Ask me about the club.",
+    "greetingSubtitle": "Fixtures, standings, and recent results — straight from the federation sync.",
+    "examplesLabel": "Try asking",
+    "examples": [
+      "Who plays this weekend?",
+      "What place is Herren 1 in?",
+      "How did the last games go?"
+    ],
+    "error": "Something went wrong. Please try again.",
+    "activity": {
+      "checking": "Checking %{what}…",
+      "checked": "Checked %{what}",
+      "failed": "Couldn't read %{what}"
+    },
+    "tools": {
+      "get_standings": "standings",
+      "get_dashboard": "the club overview",
+      "list_matches": "fixtures",
+      "fallback": "club data"
+    }
   },
   "a11y": {
     "doubleTapToEdit": "Double tap to edit",

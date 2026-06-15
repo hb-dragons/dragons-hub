@@ -394,9 +394,32 @@
     "title": "Vereins-Assistent",
     "placeholder": "Frag nach Spielen, Tabellen, Ergebnissen",
     "send": "Senden",
+    "stop": "Stopp",
+    "regenerate": "Neu generieren",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
     "empty": "Frag mich nach Spielen, Tabellen oder Ergebnissen des Vereins.",
     "open": "Den Vereins-Assistenten fragen",
-    "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+    "greetingTitle": "Hallo! Frag mich zum Verein.",
+    "greetingSubtitle": "Spiele, Tabellen und letzte Ergebnisse — direkt aus der Verbands-Synchronisierung.",
+    "examplesLabel": "Zum Beispiel",
+    "examples": [
+      "Wer spielt am Wochenende?",
+      "Auf welchem Platz steht Herren 1?",
+      "Wie liefen die letzten Spiele?"
+    ],
+    "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+    "activity": {
+      "checking": "%{what} wird geprüft…",
+      "checked": "%{what} geprüft",
+      "failed": "%{what} konnte nicht gelesen werden"
+    },
+    "tools": {
+      "get_standings": "Tabellen",
+      "get_dashboard": "die Vereinsübersicht",
+      "list_matches": "Spiele",
+      "fallback": "Vereinsdaten"
+    }
   },
   "a11y": {
     "doubleTapToEdit": "Doppeltippen zum Bearbeiten",
