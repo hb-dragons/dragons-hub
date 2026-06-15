@@ -1,21 +1,29 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { FlatList, Pressable, Text, View } from "react-native";
+import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { fetch as expoFetch } from "expo/fetch";
 import * as Clipboard from "expo-clipboard";
 import { Screen } from "@/components/Screen";
 import { useTheme } from "@/hooks/useTheme";
-import { multilineInput } from "@/components/ui/inputStyles";
 import { resolveApiUrl, authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 import { buildAssistantTransportConfig } from "@/lib/assistant/transport";
 import { messageText, messageSegments } from "@/lib/assistant/messages";
 import type { UiMessageLike } from "@/lib/assistant/messages";
 import { pickDisplayText } from "@/lib/assistant/stream-throttle";
+import {
+  isNearBottom,
+  nextFollowScroll,
+  shouldReArmFollow,
+  countUserMessages,
+  NEAR_BOTTOM,
+} from "@/lib/assistant/scroll";
 import { AssistantMarkdown } from "@/components/assistant/AssistantMarkdown";
 import { ActivityChip } from "@/components/assistant/ActivityChip";
+import { ChatComposer } from "@/components/assistant/ChatComposer";
 
 /** Throttle streamed text to ~100ms so react-native-marked doesn't re-parse on every token. */
 function useThrottledText(full: string, isStreaming: boolean): string {
@@ -88,10 +96,13 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
 }
 
 export default function AssistantScreen() {
-  const theme = useTheme();
-  const { colors, spacing } = theme;
+  const { colors, spacing } = useTheme();
   const [input, setInput] = useState("");
+  const [composerH, setComposerH] = useState(0);
   const listRef = useRef<FlatList>(null);
+  const autoFollow = useRef(true);
+  const contentH = useRef(0);
+  const lastUserCount = useRef(0);
 
   const cfg = buildAssistantTransportConfig({ apiUrl: resolveApiUrl(), cookie: authClient.getCookie(), locale: i18n.locale });
   const { messages, sendMessage, status, error, stop, regenerate } = useChat({
@@ -103,8 +114,18 @@ export default function AssistantScreen() {
     }),
   });
 
+  const scrollToBottom = (animated: boolean) => {
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated }));
+  };
+
+  // Re-arm auto-follow and scroll on the user's own send, not on every token.
   useEffect(() => {
-    if (messages.length > 0) listRef.current?.scrollToEnd({ animated: true });
+    const userCount = countUserMessages(messages as unknown as UiMessageLike[]);
+    if (shouldReArmFollow(userCount, lastUserCount.current)) {
+      autoFollow.current = true;
+      scrollToBottom(true);
+    }
+    lastUserCount.current = userCount;
   }, [messages]);
 
   const send = (text: string) => {
@@ -115,14 +136,25 @@ export default function AssistantScreen() {
   };
   const busy = status === "submitted" || status === "streaming";
 
+  const onListScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    autoFollow.current = isNearBottom({
+      contentOffsetY: contentOffset.y,
+      contentHeight: contentSize.height,
+      layoutHeight: layoutMeasurement.height,
+      threshold: NEAR_BOTTOM,
+    });
+  };
+
   return (
     <Screen scroll={false} edges={[]}>
-      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
         <FlatList
           ref={listRef}
           style={{ flex: 1 }}
           data={messages as unknown as UiMessageLike[]}
           keyExtractor={(msg) => msg.id}
+          contentContainerStyle={{ paddingBottom: composerH + spacing.sm }}
           ListEmptyComponent={<EmptyState onPick={send} />}
           renderItem={({ item, index }) => (
             <MessageItem
@@ -131,29 +163,43 @@ export default function AssistantScreen() {
               onRegenerate={() => void regenerate()}
             />
           )}
+          onContentSizeChange={(_w, h) => {
+            const { scroll } = nextFollowScroll({
+              prevHeight: contentH.current,
+              nextHeight: h,
+              autoFollow: autoFollow.current,
+            });
+            contentH.current = h;
+            if (scroll) scrollToBottom(false);
+          }}
+          onScroll={onListScroll}
+          scrollEventThrottle={16}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         />
-        {status === "submitted" ? <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.sm }} /> : null}
-        {error ? <Text style={{ color: colors.destructive, marginVertical: spacing.sm }}>{i18n.t("assistant.error")}</Text> : null}
-        <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "flex-end", paddingVertical: spacing.sm }}>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            multiline
-            placeholder={i18n.t("assistant.placeholder")}
-            placeholderTextColor={colors.mutedForeground}
-            style={[multilineInput(theme), { flex: 1 }]}
-          />
-          {busy ? (
-            <Pressable accessibilityRole="button" onPress={() => void stop()}>
-              <Text style={{ color: colors.primary, padding: spacing.sm }}>{i18n.t("assistant.stop")}</Text>
-            </Pressable>
-          ) : (
-            <Pressable accessibilityRole="button" disabled={!input.trim()} onPress={() => send(input)}>
-              <Text style={{ color: colors.primary, padding: spacing.sm }}>{i18n.t("assistant.send")}</Text>
-            </Pressable>
-          )}
-        </View>
-      </KeyboardAvoidingView>
+        <KeyboardStickyView style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
+          <View onLayout={(e: LayoutChangeEvent) => setComposerH(e.nativeEvent.layout.height)}>
+            {error ? (
+              <Text
+                style={{
+                  color: colors.destructive,
+                  textAlign: "center",
+                  paddingHorizontal: spacing.lg,
+                  paddingBottom: spacing.xs,
+                }}
+              >
+                {i18n.t("assistant.error")}
+              </Text>
+            ) : null}
+            <ChatComposer
+              value={input}
+              onChangeText={setInput}
+              onSend={() => send(input)}
+              busy={busy}
+              onStop={() => void stop()}
+            />
+          </View>
+        </KeyboardStickyView>
+      </View>
     </Screen>
   );
 }
