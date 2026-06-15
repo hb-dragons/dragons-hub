@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 import { tool as aiTool } from "ai";
 
 export interface ChatTool {
