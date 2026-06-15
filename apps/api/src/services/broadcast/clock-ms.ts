@@ -15,10 +15,10 @@ export function deriveClockMs(
     const s = Number(ss);
     if (Number.isFinite(m) && Number.isFinite(s)) return (m * 60 + s) * 1000;
   } else if (clockText.includes(".")) {
-    const [whole, tenth] = clockText.split(".");
-    const w = Number(whole);
-    const t = Number(tenth);
-    if (Number.isFinite(w) && Number.isFinite(t)) return w * 1000 + t * 100;
+    // Sub-minute "SS.t". Parse as a decimal so the result is correct
+    // regardless of how many fractional digits the panel emits.
+    const value = Number(clockText);
+    if (Number.isFinite(value)) return Math.round(value * 1000);
   }
   return clockSeconds != null ? clockSeconds * 1000 : null;
 }
