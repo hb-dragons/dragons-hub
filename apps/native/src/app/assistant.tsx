@@ -6,7 +6,6 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { fetch as expoFetch } from "expo/fetch";
 import * as Clipboard from "expo-clipboard";
-import { Screen } from "@/components/Screen";
 import { useTheme } from "@/hooks/useTheme";
 import { resolveApiUrl, authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
@@ -147,59 +146,62 @@ export default function AssistantScreen() {
   };
 
   return (
-    <Screen scroll={false} edges={[]}>
-      <View style={{ flex: 1 }}>
-        <FlatList
-          ref={listRef}
-          style={{ flex: 1 }}
-          data={messages as unknown as UiMessageLike[]}
-          keyExtractor={(msg) => msg.id}
-          contentContainerStyle={{ paddingBottom: composerH + spacing.sm }}
-          ListEmptyComponent={<EmptyState onPick={send} />}
-          renderItem={({ item, index }) => (
-            <MessageItem
-              message={item}
-              isStreaming={status === "streaming" && index === messages.length - 1 && item.role === "assistant"}
-              onRegenerate={() => void regenerate()}
-            />
-          )}
-          onContentSizeChange={(_w, h) => {
-            const { scroll } = nextFollowScroll({
-              prevHeight: contentH.current,
-              nextHeight: h,
-              autoFollow: autoFollow.current,
-            });
-            contentH.current = h;
-            if (scroll) scrollToBottom(false);
-          }}
-          onScroll={onListScroll}
-          scrollEventThrottle={16}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-        />
-        <KeyboardStickyView style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
-          <View onLayout={(e: LayoutChangeEvent) => setComposerH(e.nativeEvent.layout.height)}>
-            {error ? (
-              <Text
-                style={{
-                  color: colors.destructive,
-                  textAlign: "center",
-                  paddingHorizontal: spacing.lg,
-                  paddingBottom: spacing.xs,
-                }}
-              >
-                {i18n.t("assistant.error")}
-              </Text>
-            ) : null}
-            <ChatComposer
-              value={input}
-              onChangeText={setInput}
-              onSend={() => send(input)}
-              busy={busy}
-              onStop={() => void stop()}
-            />
-          </View>
-        </KeyboardStickyView>
-      </View>
-    </Screen>
+    // Full-bleed (no Screen content padding) so the floating composer can dock
+    // at the bottom edge; the message list keeps its horizontal inset via
+    // contentContainerStyle. Screen here would only add unwanted content
+    // padding (its SafeAreaView is a no-op with edges={[]}); the top is handled
+    // by the native Stack header.
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <FlatList
+        ref={listRef}
+        style={{ flex: 1 }}
+        data={messages as unknown as UiMessageLike[]}
+        keyExtractor={(msg) => msg.id}
+        contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: composerH + spacing.sm }}
+        ListEmptyComponent={<EmptyState onPick={send} />}
+        renderItem={({ item, index }) => (
+          <MessageItem
+            message={item}
+            isStreaming={status === "streaming" && index === messages.length - 1 && item.role === "assistant"}
+            onRegenerate={() => void regenerate()}
+          />
+        )}
+        onContentSizeChange={(_w, h) => {
+          const { scroll } = nextFollowScroll({
+            prevHeight: contentH.current,
+            nextHeight: h,
+            autoFollow: autoFollow.current,
+          });
+          contentH.current = h;
+          if (scroll) scrollToBottom(false);
+        }}
+        onScroll={onListScroll}
+        scrollEventThrottle={16}
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+      />
+      <KeyboardStickyView style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
+        <View onLayout={(e: LayoutChangeEvent) => setComposerH(e.nativeEvent.layout.height)}>
+          {error ? (
+            <Text
+              style={{
+                color: colors.destructive,
+                textAlign: "center",
+                paddingHorizontal: spacing.lg,
+                paddingBottom: spacing.xs,
+              }}
+            >
+              {i18n.t("assistant.error")}
+            </Text>
+          ) : null}
+          <ChatComposer
+            value={input}
+            onChangeText={setInput}
+            onSend={() => send(input)}
+            busy={busy}
+            onStop={() => void stop()}
+          />
+        </View>
+      </KeyboardStickyView>
+    </View>
   );
 }
