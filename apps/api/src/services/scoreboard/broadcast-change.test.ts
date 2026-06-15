@@ -26,6 +26,10 @@ describe("broadcastRelevantChange", () => {
     expect(broadcastRelevantChange(null, base())).toBe(true);
   });
 
+  it("is false when nothing changed", () => {
+    expect(broadcastRelevantChange(base(), base())).toBe(false);
+  });
+
   it("is true when a discrete field changes", () => {
     expect(broadcastRelevantChange(base(), base({ scoreHome: 12 }))).toBe(true);
     expect(broadcastRelevantChange(base(), base({ clockRunning: false }))).toBe(true);

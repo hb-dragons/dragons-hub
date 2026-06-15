@@ -51,7 +51,8 @@ export function broadcastRelevantChange(
   }
 
   // Game clock: a referee correction or period reset is an increase or a null
-  // toggle. Decrements are interpolated.
+  // toggle. Decrements are interpolated. clockSeconds is whole integer seconds
+  // (the decoder floors it), so no epsilon is needed here.
   if ((prev.clockSeconds == null) !== (next.clockSeconds == null)) return true;
   if (
     prev.clockSeconds != null &&
