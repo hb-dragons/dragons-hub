@@ -29,13 +29,23 @@ function anchorFrom(state: BroadcastState | null): ClockAnchor | null {
 
 export function OverlayClient({ deviceId, initial }: Props) {
   const [state, setState] = useState<BroadcastState | null>(initial);
-  const anchorRef = useRef<ClockAnchor | null>(anchorFrom(initial));
-  const [, setTick] = useState(0);
+  const anchorRef = useRef<ClockAnchor | null>(null);
+  // performance.now() is impure, so it is read only in effects / event handlers
+  // and surfaced to render as state. The interval bumps it ~10x/s.
+  const [now, setNow] = useState(0);
   const esRef = useRef<EventSource | null>(null);
 
-  // ~100ms render loop so the interpolated clocks advance smoothly.
+  // Seed the anchor from the server-rendered initial snapshot (effect, not
+  // render, so the impure performance.now() inside anchorFrom is allowed).
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 100);
+    anchorRef.current = anchorFrom(initial);
+    setNow(performance.now());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once on mount
+  }, []);
+
+  // ~100ms loop advancing the interpolated clocks.
+  useEffect(() => {
+    const id = setInterval(() => setNow(performance.now()), 100);
     return () => clearInterval(id);
   }, []);
 
@@ -49,10 +59,10 @@ export function OverlayClient({ deviceId, initial }: Props) {
     const onSnapshot = (ev: MessageEvent) => {
       try {
         const next = JSON.parse(ev.data) as BroadcastState;
-        // Re-anchor synchronously at event receipt: this captures `now()` at
-        // arrival (no post-paint drift) and ensures the very next render reads
-        // the fresh anchor rather than interpolating one stale frame.
+        // Re-anchor at receipt (event handler — impure now() allowed here) so
+        // the next render interpolates from the fresh value, no stale frame.
         anchorRef.current = anchorFrom(next);
+        setNow(performance.now());
         setState(next);
       } catch {
         // discard
@@ -77,7 +87,6 @@ export function OverlayClient({ deviceId, initial }: Props) {
 
   if (state.phase === "live" && state.match && state.scoreboard) {
     const anchor = anchorRef.current;
-    const now = performance.now();
     const interp = anchor ? interpolate(anchor, now) : null;
     const stale = state.stale || (anchor ? isStale(anchor, now) : false);
     const scoreboard = interp
