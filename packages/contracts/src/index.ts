@@ -237,3 +237,5 @@ export {
   notificationTestSendBodySchema,
   type NotificationTestSendBody,
 } from "./notification-test";
+
+export { qaChatBodySchema, type QaChatBody } from "./qa";
