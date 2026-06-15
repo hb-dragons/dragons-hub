@@ -33,11 +33,6 @@ export function OverlayClient({ deviceId, initial }: Props) {
   const [, setTick] = useState(0);
   const esRef = useRef<EventSource | null>(null);
 
-  // Re-anchor whenever a new broadcast state arrives.
-  useEffect(() => {
-    anchorRef.current = anchorFrom(state);
-  }, [state]);
-
   // ~100ms render loop so the interpolated clocks advance smoothly.
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 100);
@@ -53,7 +48,12 @@ export function OverlayClient({ deviceId, initial }: Props) {
     esRef.current = es;
     const onSnapshot = (ev: MessageEvent) => {
       try {
-        setState(JSON.parse(ev.data) as BroadcastState);
+        const next = JSON.parse(ev.data) as BroadcastState;
+        // Re-anchor synchronously at event receipt: this captures `now()` at
+        // arrival (no post-paint drift) and ensures the very next render reads
+        // the fresh anchor rather than interpolating one stale frame.
+        anchorRef.current = anchorFrom(next);
+        setState(next);
       } catch {
         // discard
       }

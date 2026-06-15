@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { OverlayClient } from "./overlay-client";
 
@@ -22,6 +22,13 @@ class MockEventSource {
 globalThis.EventSource = MockEventSource as unknown as typeof EventSource;
 
 describe("OverlayClient", () => {
+  // Guard against a mid-test failure leaking fake timers / the performance.now
+  // spy into sibling tests.
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   it("renders nothing when phase=idle", () => {
     const { container } = render(
       <OverlayClient
@@ -72,7 +79,7 @@ describe("OverlayClient", () => {
   it("interpolates the game clock between events", async () => {
     vi.useFakeTimers();
     const nowRef = { v: 0 };
-    const nowSpy = vi.spyOn(performance, "now").mockImplementation(() => nowRef.v);
+    vi.spyOn(performance, "now").mockImplementation(() => nowRef.v);
     const initial = {
       deviceId: "d1",
       isLive: true,
@@ -120,7 +127,5 @@ describe("OverlayClient", () => {
       await vi.advanceTimersByTimeAsync(100);
     }
     expect(lastClockText).toBe("04:58");
-    nowSpy.mockRestore();
-    vi.useRealTimers();
   });
 });
