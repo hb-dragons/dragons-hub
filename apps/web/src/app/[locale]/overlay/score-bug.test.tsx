@@ -24,6 +24,7 @@ function snapshot(overrides: Partial<PublicLiveSnapshot> = {}): PublicLiveSnapsh
     timeoutsGuest: 1,
     period: 2,
     clockText: "08:17",
+    clockMs: 497_000,
     clockRunning: true,
     shotClock: 13,
     shotClockText: "13",

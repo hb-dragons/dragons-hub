@@ -14,6 +14,7 @@ import {
 } from "../scoreboard/constants";
 import { computePhase } from "./phase";
 import { loadJoinedMatch, rowToConfig } from "./config";
+import { deriveClockMs } from "./clock-ms";
 
 const MATCH_CACHE_TTL_MS = 30_000;
 
@@ -100,6 +101,7 @@ function rowToScoreboard(
     panelName: row.panelName,
     lastFrameAt: row.lastFrameAt.toISOString(),
     secondsSinceLastFrame: seconds,
+    clockMs: deriveClockMs(row.clockText, row.clockSeconds),
   };
 }
 

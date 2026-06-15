@@ -175,6 +175,16 @@ describe("buildBroadcastState", () => {
     expect(state.match).toBeNull();
     expect(state.isLive).toBe(false);
   });
+
+  it("derives clockMs from clockText on the scoreboard payload", async () => {
+    await seedConfig({
+      isLive: true,
+      withMatch: false,
+      scoreboard: { clockText: "10:00", clockSeconds: 600 },
+    });
+    const state = await buildBroadcastState("d1");
+    expect(state.scoreboard?.clockMs).toBe(600_000);
+  });
 });
 
 describe("publishBroadcastForDevice", () => {
