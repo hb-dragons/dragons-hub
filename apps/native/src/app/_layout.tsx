@@ -1,3 +1,9 @@
+import structuredClonePolyfill from "@ungap/structured-clone";
+import { Platform } from "react-native";
+if (Platform.OS !== "web" && typeof globalThis.structuredClone !== "function") {
+  (globalThis as { structuredClone?: unknown }).structuredClone = structuredClonePolyfill;
+}
+
 import { useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";

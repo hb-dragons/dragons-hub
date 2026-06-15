@@ -13,4 +13,6 @@ config.resolver = {
   sourceExts: [...config.resolver.sourceExts, "svg"],
 };
 
+config.resolver.unstable_enablePackageExports = true;
+
 module.exports = config;
