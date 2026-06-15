@@ -255,7 +255,10 @@ describe("processIngest broadcast publish", () => {
     // The publish helper is mocked at module scope below in Step 2.
     expect(mocks.publishBroadcastForDevice).toHaveBeenCalledWith(
       "d1",
-      expect.any(Object),
+      expect.objectContaining({
+        config: expect.any(Object),
+        scoreboardRow: expect.any(Object),
+      }),
     );
   });
 
@@ -298,6 +301,9 @@ describe("processIngest broadcast publish", () => {
       hex: frameWith({ ss: "04", scoreHome: "  7" }),
     });
     expect(mocks.publishBroadcastForDevice.mock.calls.length).toBe(2);
+    // Frame B was still a real change on the raw channel — only its broadcast
+    // was suppressed, not its snapshot. All three frames publish a snapshot.
+    expect(mocks.publishSnapshot.mock.calls.length).toBe(3);
   });
 
   it("still publishes the raw snapshot on every changed frame", async () => {
