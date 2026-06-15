@@ -105,35 +105,50 @@ function rowToScoreboard(
   };
 }
 
+export interface BuildBroadcastOpts {
+  config?: BroadcastConfig;
+  scoreboardRow?: typeof liveScoreboards.$inferSelect;
+}
+
 export async function buildBroadcastState(
   deviceId: string,
+  opts: BuildBroadcastOpts = {},
 ): Promise<BroadcastState> {
-  const [configRow] = await getDb()
-    .select()
-    .from(broadcastConfigs)
-    .where(eq(broadcastConfigs.deviceId, deviceId))
-    .limit(1);
+  let config: BroadcastConfig;
+  if (opts.config) {
+    config = opts.config;
+  } else {
+    const [configRow] = await getDb()
+      .select()
+      .from(broadcastConfigs)
+      .where(eq(broadcastConfigs.deviceId, deviceId))
+      .limit(1);
+    config = configRow
+      ? rowToConfig(configRow)
+      : {
+          deviceId,
+          matchId: null,
+          isLive: false,
+          homeAbbr: null,
+          guestAbbr: null,
+          homeColorOverride: null,
+          guestColorOverride: null,
+          startedAt: null,
+          endedAt: null,
+          updatedAt: new Date().toISOString(),
+        };
+  }
 
-  const config: BroadcastConfig = configRow
-    ? rowToConfig(configRow)
-    : {
-        deviceId,
-        matchId: null,
-        isLive: false,
-        homeAbbr: null,
-        guestAbbr: null,
-        homeColorOverride: null,
-        guestColorOverride: null,
-        startedAt: null,
-        endedAt: null,
-        updatedAt: new Date().toISOString(),
-      };
-
-  const [scoreRow] = await getDb()
-    .select()
-    .from(liveScoreboards)
-    .where(eq(liveScoreboards.deviceId, deviceId))
-    .limit(1);
+  let scoreRow: typeof liveScoreboards.$inferSelect | undefined;
+  if (opts.scoreboardRow) {
+    scoreRow = opts.scoreboardRow;
+  } else {
+    [scoreRow] = await getDb()
+      .select()
+      .from(liveScoreboards)
+      .where(eq(liveScoreboards.deviceId, deviceId))
+      .limit(1);
+  }
 
   const scoreboard = scoreRow ? rowToScoreboard(scoreRow) : null;
   const match = await getCachedMatch(deviceId, config);
@@ -163,7 +178,8 @@ export async function buildBroadcastState(
 
 export async function publishBroadcastForDevice(
   deviceId: string,
+  opts: BuildBroadcastOpts = {},
 ): Promise<void> {
-  const state = await buildBroadcastState(deviceId);
+  const state = await buildBroadcastState(deviceId, opts);
   await publishBroadcast(deviceId, state);
 }
