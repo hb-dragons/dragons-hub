@@ -17,3 +17,9 @@ function provider() {
 export function assistantModel(): LanguageModel {
   return provider()(env.ASSISTANT_MODEL);
 }
+
+export function chatbotModel(): LanguageModel {
+  // Configurable via CHATBOT_MODEL (default gemini-2.5-flash). To support Claude later,
+  // branch on the model-id prefix here and use @ai-sdk/anthropic for "claude-*".
+  return provider()(env.CHATBOT_MODEL);
+}
