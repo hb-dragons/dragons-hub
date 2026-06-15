@@ -9,6 +9,8 @@ import { decodeLatestFrame, decodeLatestShot } from "./scoreboard-decoder";
 import type { StramatelSnapshot } from "@dragons/shared";
 import { publishSnapshot } from "./pubsub";
 import { publishBroadcastForDevice } from "../broadcast/publisher";
+import { broadcastRelevantChange } from "./broadcast-change";
+import { rowToConfig } from "../broadcast/config";
 import { logger } from "../../config/logger";
 
 export interface IngestResult {
@@ -124,10 +126,12 @@ export async function processIngest({
         snapshotId: null,
         lastFrameAt: new Date().toISOString(),
         decoded: null,
+        broadcastRelevant: false,
       };
     }
 
     const changed = snapshotsDiffer(existing ?? null, decoded);
+    const broadcastRelevant = broadcastRelevantChange(existing ?? null, decoded);
 
     let snapshotId: number | null = null;
     if (changed) {
@@ -162,7 +166,13 @@ export async function processIngest({
         },
       });
 
-    return { changed, snapshotId, lastFrameAt: now.toISOString(), decoded };
+    return {
+      changed,
+      snapshotId,
+      lastFrameAt: now.toISOString(),
+      decoded,
+      broadcastRelevant,
+    };
   });
 
   if (!result.decoded) {
@@ -186,13 +196,23 @@ export async function processIngest({
   }
 
   try {
-    const [cfg] = await getDb()
-      .select({ isLive: broadcastConfigs.isLive })
+    const [cfgRow] = await getDb()
+      .select()
       .from(broadcastConfigs)
       .where(eq(broadcastConfigs.deviceId, deviceId))
       .limit(1);
-    if (cfg?.isLive === true) {
-      await publishBroadcastForDevice(deviceId);
+    if (cfgRow?.isLive === true && result.broadcastRelevant) {
+      const now = new Date(result.lastFrameAt);
+      await publishBroadcastForDevice(deviceId, {
+        config: rowToConfig(cfgRow),
+        scoreboardRow: {
+          deviceId,
+          ...decoded,
+          panelName: deviceId,
+          lastFrameAt: now,
+          updatedAt: now,
+        },
+      });
     }
   } catch (err) {
     logger.warn(

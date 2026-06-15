@@ -29,6 +29,8 @@ export interface PublicLiveSnapshot extends StramatelSnapshot {
   panelName: string | null;
   lastFrameAt: string;
   secondsSinceLastFrame: number;
+  /** Whole ms remaining on the game clock; seeds overlay interpolation. */
+  clockMs: number | null;
 }
 
 /**

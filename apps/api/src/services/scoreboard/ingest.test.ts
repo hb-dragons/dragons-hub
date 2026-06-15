@@ -219,6 +219,31 @@ describe("processIngest", () => {
   });
 });
 
+// A frame parameterised on the seconds digits of the clock and the score-home
+// digits, built off the frameOk layout so it varies exactly one field at a time.
+const frameWith = ({ ss, scoreHome }: { ss: string; scoreHome: string }) =>
+  "f833" +
+  Buffer.from(
+    "  " + // 0..2 filler
+      "10" + // 2..4 mm
+      ss + // 4..6 ss -> MM:SS branch
+      scoreHome + // 6..9 scoreHome
+      "  3" + // 9..12 scoreGuest
+      "1" + // 12 period
+      "0" + // 13 foulsHome
+      "0" + // 14 foulsGuest
+      "0" + // 15 timeoutsHome
+      "0" + // 16 timeoutsGuest
+      " " + // 17 filler
+      " " + // 18 status -> running
+      " " + // 19 timeout -> inactive
+      "                        " + // 20..44 filler (24)
+      "00" + // 44..46 timeoutDuration
+      "20", // 46..48 shotClock
+    "ascii",
+  ).toString("hex") +
+  "0d";
+
 describe("processIngest broadcast publish", () => {
   it("publishes broadcast state when isLive=true", async () => {
     await ctx.db.insert(broadcastConfigs).values({
@@ -228,7 +253,13 @@ describe("processIngest broadcast publish", () => {
     });
     await processIngest({ deviceId: "d1", hex: frameOk });
     // The publish helper is mocked at module scope below in Step 2.
-    expect(mocks.publishBroadcastForDevice).toHaveBeenCalledWith("d1");
+    expect(mocks.publishBroadcastForDevice).toHaveBeenCalledWith(
+      "d1",
+      expect.objectContaining({
+        config: expect.any(Object),
+        scoreboardRow: expect.any(Object),
+      }),
+    );
   });
 
   it("does not publish broadcast when isLive=false", async () => {
@@ -244,5 +275,53 @@ describe("processIngest broadcast publish", () => {
   it("does not publish broadcast when no config row exists", async () => {
     await processIngest({ deviceId: "d1", hex: frameOk });
     expect(mocks.publishBroadcastForDevice).not.toHaveBeenCalled();
+  });
+
+  it("publishes broadcast on a real change but not on a plain clock decrement", async () => {
+    const deviceId = "gate-clock";
+    await ctx.db.insert(broadcastConfigs).values({
+      deviceId,
+      matchId: null,
+      isLive: true,
+      updatedAt: new Date(),
+    });
+    // Frame A establishes state — the first frame is always broadcast-relevant.
+    await processIngest({
+      deviceId,
+      hex: frameWith({ ss: "05", scoreHome: "  5" }),
+    });
+    // Frame B only decrements the game clock (10:05 -> 10:04); nothing else moves.
+    await processIngest({
+      deviceId,
+      hex: frameWith({ ss: "04", scoreHome: "  5" }),
+    });
+    // Frame C changes a score — broadcast-relevant again.
+    await processIngest({
+      deviceId,
+      hex: frameWith({ ss: "04", scoreHome: "  7" }),
+    });
+    expect(mocks.publishBroadcastForDevice.mock.calls.length).toBe(2);
+    // Frame B was still a real change on the raw channel — only its broadcast
+    // was suppressed, not its snapshot. All three frames publish a snapshot.
+    expect(mocks.publishSnapshot.mock.calls.length).toBe(3);
+  });
+
+  it("still publishes the raw snapshot on every changed frame", async () => {
+    const deviceId = "gate-raw";
+    await ctx.db.insert(broadcastConfigs).values({
+      deviceId,
+      matchId: null,
+      isLive: true,
+      updatedAt: new Date(),
+    });
+    await processIngest({
+      deviceId,
+      hex: frameWith({ ss: "05", scoreHome: "  5" }),
+    });
+    await processIngest({
+      deviceId,
+      hex: frameWith({ ss: "04", scoreHome: "  5" }),
+    });
+    expect(mocks.publishSnapshot.mock.calls.length).toBe(2);
   });
 });

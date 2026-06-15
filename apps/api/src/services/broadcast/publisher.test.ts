@@ -175,6 +175,80 @@ describe("buildBroadcastState", () => {
     expect(state.match).toBeNull();
     expect(state.isLive).toBe(false);
   });
+
+  it("derives clockMs from clockText on the scoreboard payload", async () => {
+    await seedConfig({
+      isLive: true,
+      withMatch: false,
+      scoreboard: { clockText: "10:00", clockSeconds: 600 },
+    });
+    const state = await buildBroadcastState("d1");
+    expect(state.scoreboard?.clockMs).toBe(600_000);
+  });
+
+  it("uses an injected scoreboardRow instead of querying live_scoreboards", async () => {
+    // Seed a live row showing scoreHome 10 — the injected row overrides this.
+    await ctx.db.insert(liveScoreboards).values({
+      deviceId: "d1",
+      scoreHome: 10,
+      scoreGuest: 0,
+      foulsHome: 0,
+      foulsGuest: 0,
+      timeoutsHome: 0,
+      timeoutsGuest: 0,
+      period: 1,
+      clockText: "10:00",
+      clockSeconds: 600,
+      clockRunning: false,
+      shotClock: null,
+      shotClockText: "",
+      shotClockRunning: false,
+      timeoutActive: false,
+      timeoutDuration: "",
+      panelName: "d1",
+      lastFrameAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const injected: typeof liveScoreboards.$inferSelect = {
+      deviceId: "d1",
+      scoreHome: 99,
+      scoreGuest: 0,
+      foulsHome: 0,
+      foulsGuest: 0,
+      timeoutsHome: 0,
+      timeoutsGuest: 0,
+      period: 1,
+      clockText: "05:00",
+      clockSeconds: 300,
+      clockRunning: true,
+      shotClock: 18,
+      shotClockText: "18",
+      shotClockRunning: false,
+      timeoutActive: false,
+      timeoutDuration: "",
+      panelName: "d1",
+      lastFrameAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const config = {
+      deviceId: "d1",
+      matchId: null,
+      isLive: true,
+      homeAbbr: null,
+      guestAbbr: null,
+      homeColorOverride: null,
+      guestColorOverride: null,
+      startedAt: null,
+      endedAt: null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const state = await buildBroadcastState("d1", { config, scoreboardRow: injected });
+    expect(state.scoreboard?.scoreHome).toBe(99);
+    expect(state.scoreboard?.clockMs).toBe(300_000);
+    expect(state.match).toBeNull(); // matchId null keeps the test focused on injection
+  });
 });
 
 describe("publishBroadcastForDevice", () => {
