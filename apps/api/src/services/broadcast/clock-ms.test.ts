@@ -12,6 +12,10 @@ describe("deriveClockMs", () => {
     expect(deriveClockMs("9.0", 9)).toBe(9_000);
   });
 
+  it("parses the fractional part as a decimal, not a fixed single digit", () => {
+    expect(deriveClockMs("4.25", 4)).toBe(4_250);
+  });
+
   it("falls back to clockSeconds when text is unparseable", () => {
     expect(deriveClockMs("--:--", 12)).toBe(12_000);
     expect(deriveClockMs("--:--", null)).toBeNull();
