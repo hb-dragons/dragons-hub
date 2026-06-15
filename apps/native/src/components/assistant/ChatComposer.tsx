@@ -62,29 +62,39 @@ export function ChatComposer({
             padding: spacing.xs,
           }}
         >
-          <TextInput
-            value={value}
-            onChangeText={onChangeText}
-            multiline
-            scrollEnabled={height >= COMPOSER_MAX}
-            onContentSizeChange={(e) =>
-              setHeight(clampComposerHeight(e.nativeEvent.contentSize.height))
-            }
-            placeholder={i18n.t("assistant.placeholder")}
-            placeholderTextColor={colors.mutedForeground}
-            style={{
-              flex: 1,
-              height,
-              color: colors.foreground,
-              fontSize: 15,
-              paddingHorizontal: spacing.sm,
-              paddingTop: Platform.OS === "ios" ? 10 : 8,
-              paddingBottom: Platform.OS === "ios" ? 10 : 8,
-              textAlignVertical: "top",
-              // NOTE: lineHeight intentionally omitted — setting it on a multiline
-              // TextInput corrupts the auto-grow contentSize.height on iOS.
-            }}
-          />
+          {/* Wrap the input in a plain flex:1 View so the row's available width
+              (rowWidth − send button − gap) is resolved geometrically by the
+              wrapper rather than negotiated through the TextInput leaf's own
+              native measure function. The input then stretches to that definite
+              width and its multiline text wraps + grows vertically instead of
+              running off the row horizontally (where the surface's
+              overflow:"hidden" would clip it). flex:1 stays on the wrapper, not
+              the input — the input's height is driven by the auto-grow state.
+              minWidth:0 lets the wrapper shrink below its content's width. */}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <TextInput
+              value={value}
+              onChangeText={onChangeText}
+              multiline
+              scrollEnabled={height >= COMPOSER_MAX}
+              onContentSizeChange={(e) =>
+                setHeight(clampComposerHeight(e.nativeEvent.contentSize.height))
+              }
+              placeholder={i18n.t("assistant.placeholder")}
+              placeholderTextColor={colors.mutedForeground}
+              style={{
+                height,
+                color: colors.foreground,
+                fontSize: 15,
+                paddingHorizontal: spacing.sm,
+                paddingTop: Platform.OS === "ios" ? 10 : 8,
+                paddingBottom: Platform.OS === "ios" ? 10 : 8,
+                textAlignVertical: "top",
+                // NOTE: lineHeight intentionally omitted — setting it on a multiline
+                // TextInput corrupts the auto-grow contentSize.height on iOS.
+              }}
+            />
+          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={label}
