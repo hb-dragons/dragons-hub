@@ -5,6 +5,11 @@ import {
   parseFilters,
   type SerialisableBoardFilters,
 } from "@dragons/shared";
+import {
+  boardFiltersKey,
+  boardSortKey,
+  isPersistableBoardId,
+} from "@/lib/board/secure-store-keys";
 
 /**
  * Per-board filter persistence keyed by `board:<id>:filters`. Backed by
@@ -31,9 +36,6 @@ function isSortMode(v: unknown): v is BoardSortMode {
   return typeof v === "string" && (SORT_MODES as readonly string[]).includes(v);
 }
 
-const filtersKey = (boardId: number) => `board:${boardId}:filters`;
-const sortKey = (boardId: number) => `board:${boardId}:sort`;
-
 interface PersistedState {
   filters: SerialisableBoardFilters;
   sort: BoardSortMode;
@@ -56,12 +58,19 @@ export function useBoardFilterPersistence(boardId: number) {
   useEffect(() => {
     let cancelled = false;
     hydratedRef.current = false;
+    // A malformed id (NaN, non-positive) can't build a valid storage key —
+    // skip persistence entirely rather than throw inside SecureStore.
+    if (!isPersistableBoardId(boardId)) {
+      setState((s) => ({ ...s, hydrating: false }));
+      hydratedRef.current = false;
+      return;
+    }
     setState((s) => ({ ...s, hydrating: true }));
     void (async () => {
       try {
         const [rawFilters, rawSort] = await Promise.all([
-          SecureStore.getItemAsync(filtersKey(boardId)),
-          SecureStore.getItemAsync(sortKey(boardId)),
+          SecureStore.getItemAsync(boardFiltersKey(boardId)),
+          SecureStore.getItemAsync(boardSortKey(boardId)),
         ]);
         if (cancelled) return;
         const parsedFilters = parseFilters(rawFilters);
@@ -78,17 +87,17 @@ export function useBoardFilterPersistence(boardId: number) {
 
   // Persist filters whenever they change post-hydration.
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!hydratedRef.current || !isPersistableBoardId(boardId)) return;
     void SecureStore.setItemAsync(
-      filtersKey(boardId),
+      boardFiltersKey(boardId),
       serializeFilters(state.filters),
     );
   }, [boardId, state.filters]);
 
   // Persist sort mode post-hydration.
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    void SecureStore.setItemAsync(sortKey(boardId), state.sort);
+    if (!hydratedRef.current || !isPersistableBoardId(boardId)) return;
+    void SecureStore.setItemAsync(boardSortKey(boardId), state.sort);
   }, [boardId, state.sort]);
 
   const setFilters = useCallback(

@@ -73,6 +73,7 @@ export default function BoardListScreen() {
       <FlatList
         data={data ?? []}
         keyExtractor={(b) => String(b.id)}
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, flexGrow: 1 }}
         refreshControl={
           <RefreshControl

@@ -91,8 +91,7 @@ function RootNavigator() {
             headerShown: true,
             headerTitle: i18n.t("profile.title"),
             headerStyle: { backgroundColor: colors.background },
-            headerLargeTitle: true,
-            headerLargeTitleShadowVisible: false,
+            headerShadowVisible: false,
           }}
         />
         <Stack.Screen

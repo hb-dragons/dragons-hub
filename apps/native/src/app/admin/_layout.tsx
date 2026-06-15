@@ -16,16 +16,17 @@ export default function AdminLayout() {
     <Stack
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: colors.background },
+        // No headerStyle background: on iOS 26 an explicit opaque color is
+        // painted as a solid bar and then swapped for the system glass header
+        // during push transitions, which flashes. The system header adapts to
+        // light/dark on its own.
         headerTintColor: colors.foreground,
         headerShadowVisible: false,
         contentStyle: { backgroundColor: colors.background },
-        headerLargeTitle: true,
-        headerLargeTitleShadowVisible: false,
       }}
     >
       <Stack.Screen name="boards/index" options={{ title: "Boards" }} />
-      <Stack.Screen name="boards/[id]" options={{ title: "", headerLargeTitle: false }} />
+      <Stack.Screen name="boards/[id]" options={{ title: "" }} />
     </Stack>
   );
 }

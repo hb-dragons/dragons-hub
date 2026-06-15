@@ -4,6 +4,7 @@ import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh, type RefreshFn } from "@/hooks/useRefresh";
+import { contentInsetBehaviorForEdges } from "@/lib/ui/scroll-inset";
 
 const DEFAULT_EDGES: readonly Edge[] = ["top"];
 
@@ -76,6 +77,7 @@ export function Screen({
           style={styles.scrollView}
           contentContainerStyle={contentStyle}
           showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior={contentInsetBehaviorForEdges(edges)}
           refreshControl={refreshControl}
         >
           {children}

@@ -214,6 +214,9 @@ importers:
       '@react-native-segmented-control/segmented-control':
         specifier: 2.5.7
         version: 2.5.7(react-native@0.83.4(@babel/core@7.29.0)(@react-native/metro-config@0.85.2(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6)
+      '@react-navigation/elements':
+        specifier: 2.9.14
+        version: 2.9.14(@react-navigation/native@7.2.4(react-native@0.83.4(@babel/core@7.29.0)(@react-native/metro-config@0.85.2(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6))(react-native-safe-area-context@5.7.0(react-native@0.83.4(@babel/core@7.29.0)(@react-native/metro-config@0.85.2(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6))(react-native@0.83.4(@babel/core@7.29.0)(@react-native/metro-config@0.85.2(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6)
       '@react-navigation/native':
         specifier: ^7.2.4
         version: 7.2.4(react-native@0.83.4(@babel/core@7.29.0)(@react-native/metro-config@0.85.2(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.6))(react@19.2.6)
