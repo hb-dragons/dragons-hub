@@ -13,6 +13,12 @@ const qaRoutes = new Hono<AppEnv>();
 
 qaRoutes.post(
   "/chat",
+  async (c, next) => {
+    if (!env.CHATBOT_ENABLED) {
+      return c.json({ error: "Chatbot is disabled", code: "CHATBOT_DISABLED" }, 503);
+    }
+    return next();
+  },
   requireAuth,
   rateLimit({ limit: 20, windowSeconds: 60, keyPrefix: "qa-chat" }),
   validator("json", qaChatBodySchema, validationHook),
@@ -22,9 +28,6 @@ qaRoutes.post(
     responses: { 200: { description: "UI message stream" }, 503: { description: "Chatbot disabled" } },
   }),
   async (c) => {
-    if (!env.CHATBOT_ENABLED) {
-      return c.json({ error: "Chatbot is disabled", code: "CHATBOT_DISABLED" }, 503);
-    }
     const { messages, locale } = c.req.valid("json");
     // The contract validates messages as an opaque non-empty array; the AI SDK
     // validates the UIMessage shape downstream in convertToModelMessages.

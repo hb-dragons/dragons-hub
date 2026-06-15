@@ -23,7 +23,7 @@ export default function AssistantScreen() {
     cookie: authClient.getCookie(),
     locale: i18n.locale,
   });
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: cfg.api,
       headers: cfg.headers,
@@ -46,6 +46,7 @@ export default function AssistantScreen() {
             </View>
           )}
         />
+        {error ? <Text style={{ color: colors.destructive }}>{i18n.t("assistant.error")}</Text> : null}
         <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "flex-end", paddingVertical: spacing.sm }}>
           <TextInput
             value={input}

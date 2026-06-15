@@ -395,7 +395,8 @@
     "placeholder": "Frag nach Spielen, Tabellen, Ergebnissen",
     "send": "Senden",
     "empty": "Frag mich nach Spielen, Tabellen oder Ergebnissen des Vereins.",
-    "open": "Den Vereins-Assistenten fragen"
+    "open": "Den Vereins-Assistenten fragen",
+    "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
   },
   "a11y": {
     "doubleTapToEdit": "Doppeltippen zum Bearbeiten",

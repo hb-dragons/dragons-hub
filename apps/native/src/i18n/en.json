@@ -395,7 +395,8 @@
     "placeholder": "Ask about games, standings, results",
     "send": "Send",
     "empty": "Ask me about the club's games, standings, or results.",
-    "open": "Ask the club assistant"
+    "open": "Ask the club assistant",
+    "error": "Something went wrong. Please try again."
   },
   "a11y": {
     "doubleTapToEdit": "Double tap to edit",

@@ -17,7 +17,7 @@ export function ClubAssistant() {
   const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: `${API_BASE}/qa/chat`,
       credentials: "include",
@@ -52,7 +52,11 @@ export function ClubAssistant() {
                 </div>
               ))
             )}
+            {(status === "submitted" || status === "streaming") && (
+              <p className="text-sm text-muted-foreground">…</p>
+            )}
           </div>
+          {error ? <p className="text-sm text-destructive">{t("error")}</p> : null}
           <form
             className="flex items-end gap-2"
             onSubmit={(e) => {
