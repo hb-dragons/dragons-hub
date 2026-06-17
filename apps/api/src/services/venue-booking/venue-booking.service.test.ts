@@ -685,19 +685,78 @@ describe("reconcileBookingsForMatches", () => {
     const m2 = await insertMatch({ api_match_id: 9002, venue_id: venueId, kickoff_date: "2025-03-22" });
     const m3 = await insertMatch({ api_match_id: 9003, venue_id: venueId, kickoff_date: "2025-03-29" });
 
-    const querySpy = vi.spyOn(ctx.client, "query");
+    // Writes run inside a transaction, so capture the SQL issued on the tx client.
+    const bookingInserts: string[] = [];
+    const realTransaction = ctx.client.transaction.bind(ctx.client);
+    const txSpy = vi
+      .spyOn(ctx.client, "transaction")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .mockImplementation(((cb: (tx: any) => unknown) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        realTransaction(async (tx: any) => {
+          const origQuery = tx.query.bind(tx);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tx.query = (...args: any[]) => {
+            if (typeof args[0] === "string" && /insert into "venue_bookings"/i.test(args[0])) {
+              bookingInserts.push(args[0]);
+            }
+            return origQuery(...args);
+          };
+          return cb(tx);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        })) as any);
 
     const result = await reconcileBookingsForMatches([m1, m2, m3]);
 
     expect(result.created).toBe(3);
-
-    const bookingInserts = querySpy.mock.calls.filter((c) =>
-      typeof c[0] === "string" && /insert into "venue_bookings"/i.test(c[0] as string),
-    );
     // Set-based: one INSERT statement covers all three bookings, not one per booking.
     expect(bookingInserts).toHaveLength(1);
 
-    querySpy.mockRestore();
+    txSpy.mockRestore();
+  });
+
+  it("applies its writes inside a single transaction", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const matchId = await insertMatch({ venue_id: venueId });
+
+    const txSpy = vi.spyOn(ctx.client, "transaction");
+
+    const result = await reconcileBookingsForMatches([matchId]);
+
+    expect(result.created).toBe(1);
+    expect(txSpy).toHaveBeenCalledTimes(1);
+
+    txSpy.mockRestore();
+  });
+
+  it("emits the reconfirmation event inside the write transaction (post-commit enqueue)", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "18:00:00" });
+
+    const bookingId = await insertBooking({
+      venue_id: venueId,
+      date: "2025-03-15",
+      calculated_start_time: "16:00:00",
+      calculated_end_time: "18:00:00",
+      status: "confirmed",
+      needs_reconfirmation: false,
+      confirmed_at: "2025-03-01T12:00:00Z",
+      confirmed_by: "admin-user",
+    });
+    await insertBookingMatch(bookingId, matchId);
+
+    await reconcileBookingsForMatches([matchId]);
+
+    // The event row is persisted, and (emitted via the tx path) left for the
+    // outbox poller — enqueued_at stays null rather than being sent mid-flight.
+    const events = await ctx.client.query(
+      "SELECT * FROM domain_events WHERE type = $1",
+      ["booking.needs_reconfirmation"],
+    );
+    expect(events.rows).toHaveLength(1);
+    expect((events.rows[0] as { enqueued_at: unknown }).enqueued_at).toBeNull();
   });
 });
 

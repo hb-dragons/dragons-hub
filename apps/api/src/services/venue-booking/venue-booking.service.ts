@@ -343,136 +343,154 @@ export async function reconcileBookingsForMatches(
   const venueNames =
     reconfirmVenueIds.length > 0 ? await fetchVenueNames(reconfirmVenueIds) : new Map<number, string>();
 
-  // Junction rows to insert/delete, accumulated across creates + updates +
-  // removals so they go out as single set-based statements.
-  const junctionInserts: { venueBookingId: number; matchId: number }[] = [];
-  const junctionDeletes: { venueBookingId: number; matchId: number }[] = [];
+  // Apply the whole plan atomically: a crash mid-flight rolls back every
+  // booking/junction change together, and reconfirmation events are inserted
+  // via the transaction so the outbox only enqueues them after commit.
+  await getDb().transaction(async (tx) => {
+    // Junction rows to insert/delete, accumulated across creates + updates +
+    // removals so they go out as single set-based statements.
+    const junctionInserts: { venueBookingId: number; matchId: number }[] = [];
+    const junctionDeletes: { venueBookingId: number; matchId: number }[] = [];
 
-  // Creates — one multi-row booking insert, then map ids back by venue+date.
-  if (plan.creates.length > 0) {
-    const createdRows = await getDb()
-      .insert(venueBookings)
-      .values(
-        plan.creates.map((c) => ({
-          venueId: c.venueId,
-          date: c.date,
-          calculatedStartTime: c.calculatedStartTime,
-          calculatedEndTime: c.calculatedEndTime,
-          status: "pending" as const,
-          needsReconfirmation: false,
-        })),
-      )
-      .returning({ id: venueBookings.id, venueId: venueBookings.venueId, date: venueBookings.date });
+    // Creates — one multi-row booking insert, then map ids back by venue+date.
+    // onConflictDoUpdate converges a booking a concurrent reconcile created for
+    // the same (venueId, date) instead of throwing the unique violation as a 500.
+    if (plan.creates.length > 0) {
+      const createdRows = await tx
+        .insert(venueBookings)
+        .values(
+          plan.creates.map((c) => ({
+            venueId: c.venueId,
+            date: c.date,
+            calculatedStartTime: c.calculatedStartTime,
+            calculatedEndTime: c.calculatedEndTime,
+            status: "pending" as const,
+            needsReconfirmation: false,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [venueBookings.venueId, venueBookings.date],
+          set: {
+            calculatedStartTime: sql`excluded.calculated_start_time`,
+            calculatedEndTime: sql`excluded.calculated_end_time`,
+            updatedAt: new Date(),
+          },
+        })
+        .returning({ id: venueBookings.id, venueId: venueBookings.venueId, date: venueBookings.date });
 
-    const createdIdByKey = new Map(createdRows.map((r) => [`${r.venueId}:${r.date}`, r.id]));
-    for (const c of plan.creates) {
-      const bookingId = createdIdByKey.get(`${c.venueId}:${c.date}`)!;
-      for (const matchId of c.matchIds) {
-        junctionInserts.push({ venueBookingId: bookingId, matchId });
-      }
-    }
-    result.created += plan.creates.length;
-  }
-
-  // Updates — per-booking UPDATE (distinct SET values) + accumulated junction deltas.
-  for (const u of plan.updates) {
-    if (u.windowChanged) {
-      const wasConfirmed = u.status === "confirmed";
-      const updateData: Record<string, unknown> = {
-        calculatedStartTime: u.newStartTime,
-        calculatedEndTime: u.newEndTime,
-        needsReconfirmation: wasConfirmed
-          ? true
-          : bookingById.get(u.bookingId)?.needsReconfirmation ?? false,
-        updatedAt: new Date(),
-      };
-      if (wasConfirmed) {
-        updateData.status = "pending";
-        updateData.confirmedAt = null;
-        updateData.confirmedBy = null;
-      }
-
-      await getDb()
-        .update(venueBookings)
-        .set(updateData)
-        .where(eq(venueBookings.id, u.bookingId));
-
-      if (wasConfirmed) {
-        try {
-          const venueName = venueNames.get(u.venueId) ?? "Unknown";
-          await publishDomainEvent({
-            type: EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION,
-            source: "reconciliation",
-            entityType: "booking",
-            entityId: u.bookingId,
-            entityName: `${venueName} - ${u.date}`,
-            deepLinkPath: `/admin/bookings/${u.bookingId}`,
-            payload: {
-              venueName,
-              date: u.date,
-              reason: "Time window changed after sync reconciliation",
-            },
-          });
-        } catch (error) {
-          log.warn({ err: error, bookingId: u.bookingId }, "Failed to emit booking.needs_reconfirmation event");
+      const createdIdByKey = new Map(createdRows.map((r) => [`${r.venueId}:${r.date}`, r.id]));
+      for (const c of plan.creates) {
+        const bookingId = createdIdByKey.get(`${c.venueId}:${c.date}`)!;
+        for (const matchId of c.matchIds) {
+          junctionInserts.push({ venueBookingId: bookingId, matchId });
         }
       }
-
-      result.updated++;
-    } else {
-      result.unchanged++;
+      result.created += plan.creates.length;
     }
 
-    for (const matchId of u.addedMatchIds) {
-      junctionInserts.push({ venueBookingId: u.bookingId, matchId });
-    }
-    for (const matchId of u.removedMatchIds) {
-      junctionDeletes.push({ venueBookingId: u.bookingId, matchId });
-    }
-  }
-  result.unchanged += plan.unchanged;
+    // Updates — per-booking UPDATE (distinct SET values) + accumulated junction deltas.
+    for (const u of plan.updates) {
+      if (u.windowChanged) {
+        const wasConfirmed = u.status === "confirmed";
+        const updateData: Record<string, unknown> = {
+          calculatedStartTime: u.newStartTime,
+          calculatedEndTime: u.newEndTime,
+          needsReconfirmation: wasConfirmed
+            ? true
+            : bookingById.get(u.bookingId)?.needsReconfirmation ?? false,
+          updatedAt: new Date(),
+        };
+        if (wasConfirmed) {
+          updateData.status = "pending";
+          updateData.confirmedAt = null;
+          updateData.confirmedBy = null;
+        }
 
-  // Removals (all-cancelled groups + scoped stale bookings).
-  const bookingDeletes: number[] = [];
-  for (const r of plan.removals) {
-    if (r.deletesBooking) {
-      bookingDeletes.push(r.bookingId);
-    } else {
-      for (const matchId of r.removeMatchIds) {
-        junctionDeletes.push({ venueBookingId: r.bookingId, matchId });
+        await tx
+          .update(venueBookings)
+          .set(updateData)
+          .where(eq(venueBookings.id, u.bookingId));
+
+        if (wasConfirmed) {
+          try {
+            const venueName = venueNames.get(u.venueId) ?? "Unknown";
+            await publishDomainEvent(
+              {
+                type: EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION,
+                source: "reconciliation",
+                entityType: "booking",
+                entityId: u.bookingId,
+                entityName: `${venueName} - ${u.date}`,
+                deepLinkPath: `/admin/bookings/${u.bookingId}`,
+                payload: {
+                  venueName,
+                  date: u.date,
+                  reason: "Time window changed after sync reconciliation",
+                },
+              },
+              tx,
+            );
+          } catch (error) {
+            log.warn({ err: error, bookingId: u.bookingId }, "Failed to emit booking.needs_reconfirmation event");
+          }
+        }
+
+        result.updated++;
+      } else {
+        result.unchanged++;
+      }
+
+      for (const matchId of u.addedMatchIds) {
+        junctionInserts.push({ venueBookingId: u.bookingId, matchId });
+      }
+      for (const matchId of u.removedMatchIds) {
+        junctionDeletes.push({ venueBookingId: u.bookingId, matchId });
       }
     }
-  }
+    result.unchanged += plan.unchanged;
 
-  // Set-based junction insert.
-  if (junctionInserts.length > 0) {
-    await getDb().insert(venueBookingMatches).values(junctionInserts);
-  }
+    // Removals (all-cancelled groups + scoped stale bookings).
+    const bookingDeletes: number[] = [];
+    for (const r of plan.removals) {
+      if (r.deletesBooking) {
+        bookingDeletes.push(r.bookingId);
+      } else {
+        for (const matchId of r.removeMatchIds) {
+          junctionDeletes.push({ venueBookingId: r.bookingId, matchId });
+        }
+      }
+    }
 
-  // Set-based junction delete for partial removals + match moves.
-  if (junctionDeletes.length > 0) {
-    await getDb()
-      .delete(venueBookingMatches)
-      .where(
-        or(
-          ...junctionDeletes.map((d) =>
-            and(
-              eq(venueBookingMatches.venueBookingId, d.venueBookingId),
-              eq(venueBookingMatches.matchId, d.matchId),
+    // Set-based junction insert (DoNothing tolerates a racing duplicate link).
+    if (junctionInserts.length > 0) {
+      await tx.insert(venueBookingMatches).values(junctionInserts).onConflictDoNothing();
+    }
+
+    // Set-based junction delete for partial removals + match moves.
+    if (junctionDeletes.length > 0) {
+      await tx
+        .delete(venueBookingMatches)
+        .where(
+          or(
+            ...junctionDeletes.map((d) =>
+              and(
+                eq(venueBookingMatches.venueBookingId, d.venueBookingId),
+                eq(venueBookingMatches.matchId, d.matchId),
+              ),
             ),
           ),
-        ),
-      );
-  }
+        );
+    }
 
-  // Set-based booking delete (drops their junction rows too) for full removals.
-  if (bookingDeletes.length > 0) {
-    await getDb()
-      .delete(venueBookingMatches)
-      .where(inArray(venueBookingMatches.venueBookingId, bookingDeletes));
-    await getDb().delete(venueBookings).where(inArray(venueBookings.id, bookingDeletes));
-    result.removed += bookingDeletes.length;
-  }
+    // Set-based booking delete (drops their junction rows too) for full removals.
+    if (bookingDeletes.length > 0) {
+      await tx
+        .delete(venueBookingMatches)
+        .where(inArray(venueBookingMatches.venueBookingId, bookingDeletes));
+      await tx.delete(venueBookings).where(inArray(venueBookings.id, bookingDeletes));
+      result.removed += bookingDeletes.length;
+    }
+  });
 
   log.info(result, "Reconciliation complete");
   return result;
