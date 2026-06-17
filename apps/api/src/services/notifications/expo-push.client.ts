@@ -71,8 +71,22 @@ export class ExpoPushClient {
     const tickets: ExpoPushTicket[] = [];
     for (let i = 0; i < messages.length; i += SEND_BATCH_LIMIT) {
       const chunk = messages.slice(i, i + SEND_BATCH_LIMIT);
-      const chunkTickets = await this.postSend(chunk);
-      tickets.push(...chunkTickets);
+      try {
+        const chunkTickets = await this.postSend(chunk);
+        // Keep a 1:1 message↔ticket alignment even if Expo returns fewer tickets.
+        for (let j = 0; j < chunk.length; j++) {
+          tickets.push(chunkTickets[j] ?? undeliveredTicket());
+        }
+      } catch (err) {
+        // A whole chunk failed to send (HTTP error / network / bad shape). Mark
+        // its messages undelivered — index-aligned — so the caller retries only
+        // these, instead of discarding the chunks that already succeeded.
+        log.error(
+          { err, chunkStart: i, chunkSize: chunk.length },
+          "Expo push send chunk failed; marking it undelivered for retry",
+        );
+        for (let j = 0; j < chunk.length; j++) tickets.push(undeliveredTicket());
+      }
     }
     return tickets;
   }
@@ -167,6 +181,24 @@ export class ExpoPushClient {
       clearTimeout(timer);
     }
   }
+}
+
+// Sentinel error code for a message whose whole send-chunk never reached Expo
+// (transient failure). Distinct from a per-ticket Expo rejection (e.g.
+// DeviceNotRegistered): undelivered messages are retryable, Expo rejections are
+// terminal. sendBatch returns these in place of throwing on a chunk failure.
+export const UNDELIVERED_ERROR = "ChunkUndelivered";
+
+function undeliveredTicket(): ExpoPushTicket {
+  return {
+    status: "error",
+    message: "push send chunk not delivered (transient failure)",
+    details: { error: UNDELIVERED_ERROR },
+  };
+}
+
+export function isUndeliveredTicket(ticket: ExpoPushTicket | undefined): boolean {
+  return ticket?.status === "error" && ticket.details?.error === UNDELIVERED_ERROR;
 }
 
 export function mapTicketError(ticket: ExpoPushTicket | undefined): string | null {
