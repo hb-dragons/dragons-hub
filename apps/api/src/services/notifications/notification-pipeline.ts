@@ -271,8 +271,12 @@ async function resolveLocaleForRecipient(
 
 /**
  * Step 5: Dispatch an immediate notification via channel adapter.
+ *
+ * Exported so the admin "retry failed notification" path can re-run delivery for
+ * a single (event, channel, recipient) through the same adapters instead of
+ * faking a "sent" status.
  */
-async function dispatchImmediate(params: {
+export async function dispatchImmediate(params: {
   event: DomainEventRow;
   config: { id: number; type: string; config: unknown };
   watchRuleId: number | null;
