@@ -37,6 +37,11 @@ async function loadFonts() {
         greaterTheory: toArrayBuffer(gtBuf),
       };
     })();
+    // Don't cache a rejection: one transient GCS error would otherwise poison
+    // all future generations until restart. Clear the cache so the next call retries.
+    fontPromise.catch(() => {
+      fontPromise = null;
+    });
   }
   return fontPromise;
 }

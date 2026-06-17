@@ -214,6 +214,24 @@ describe("generatePostImage", () => {
     });
   });
 
+  describe("font cache poisoning regression", () => {
+    it("retries font load after a transient GCS failure instead of caching the rejection", async () => {
+      // Fresh module so fontPromise starts unset (other tests already loaded it).
+      vi.resetModules();
+      const { generatePostImage: gen } = await import("./social-image.service");
+
+      // First font download rejects → loadFonts() rejects, generation fails.
+      mocks.downloadFromGcs.mockRejectedValueOnce(new Error("transient GCS error"));
+      await expect(gen({ type: "preview", ...baseParams })).rejects.toThrow();
+
+      // GCS recovers. A second call must retry the font load, not replay the
+      // cached rejection.
+      mocks.downloadFromGcs.mockImplementation((_path: string) => Promise.resolve(Buffer.from("data")));
+      const result = await gen({ type: "preview", ...baseParams });
+      expect(result).toBeInstanceOf(Buffer);
+    });
+  });
+
   describe("font caching", () => {
     it("font paths use assets/fonts/ prefix", async () => {
       // Verify the service uses the expected font GCS paths.
