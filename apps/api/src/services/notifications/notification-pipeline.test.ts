@@ -120,6 +120,7 @@ vi.mock("../../config/redis", () => ({
 // --- Import after mocks ---
 
 import { processEvent } from "./notification-pipeline";
+import { inArray } from "drizzle-orm";
 
 // --- Helpers ---
 
@@ -819,6 +820,23 @@ describe("processEvent", () => {
       expect(mockInAppSend).toHaveBeenCalledTimes(1);
       expect(result.muted).toBe(0);
     });
+
+    it("constrains the preferences query to the known recipient ids, not a full scan (#72)", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
+      setupDbMocks({
+        rules: [],
+        configs: [config],
+        prefs: [{ userId: "referee:77", mutedEventTypes: ["match.created"] }],
+      });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "referee", channel: "in_app", refereeId: 77 },
+      ]);
+
+      await processEvent(makeEvent());
+
+      // The prefs load must be filtered by the resolved recipient ids.
+      expect(inArray).toHaveBeenCalledWith("userId", ["referee:77"]);
+    });
   });
 
   describe("loadMutedEventTypes error handling", () => {
@@ -842,12 +860,15 @@ describe("processEvent", () => {
             }),
           };
         }
-        // Prefs query — throw
+        // Prefs query — throw. loadMutedEventTypes now filters with .where(),
+        // so the rejecting thenable must hang off .where() (not just .from()).
         const rejected = Promise.reject(new Error("DB error"));
         return {
           from: vi.fn().mockReturnValue({
-            then: rejected.then.bind(rejected),
-            catch: rejected.catch.bind(rejected),
+            where: vi.fn().mockReturnValue({
+              then: rejected.then.bind(rejected),
+              catch: rejected.catch.bind(rejected),
+            }),
           }),
         };
       });

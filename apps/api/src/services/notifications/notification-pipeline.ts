@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   watchRules,
   channelConfigs,
@@ -49,13 +49,23 @@ export async function loadMutedEventTypes(
   const userRecipients = recipientIds.filter((r) => r.startsWith("user:"));
   if (refereeRecipients.length === 0 && userRecipients.length === 0) return result;
 
+  // The stored user_id is the literal "referee:<id>" for referee prefs but the
+  // bare id for user prefs (the recipient strips the "user:" prefix below), so
+  // build the lookup set to match both keyings — and constrain the query to it
+  // instead of scanning the whole preferences table on every event.
+  const lookupIds = [
+    ...refereeRecipients,
+    ...userRecipients.map((r) => r.slice("user:".length)),
+  ];
+
   try {
     const prefs = await getDb()
       .select({
         userId: userNotificationPreferences.userId,
         mutedEventTypes: userNotificationPreferences.mutedEventTypes,
       })
-      .from(userNotificationPreferences);
+      .from(userNotificationPreferences)
+      .where(inArray(userNotificationPreferences.userId, lookupIds));
 
     const userMutedMap = new Map<string, Set<string>>();
     for (const pref of prefs) {
