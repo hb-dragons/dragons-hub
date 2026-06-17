@@ -282,6 +282,49 @@ describe("fullSync", () => {
       expect(mockSyncAssignments).toHaveBeenCalled();
     });
 
+    it("does not start standings until teams sync has resolved (FK ordering, issue #47)", async () => {
+      // standings.teamApiId has a non-deferrable FK on teams.apiTeamPermanentId, so the
+      // standings INSERT must run only after teams have committed. Running both in the
+      // same Step-3 Promise.all raced the teams upsert and dropped the whole standings
+      // batch on a league's first sync.
+      const events: string[] = [];
+      let resolveTeams!: (value: unknown) => void;
+
+      mockSyncTeams.mockImplementation(() => {
+        events.push("teams:start");
+        return new Promise((resolve) => {
+          resolveTeams = (value) => {
+            events.push("teams:resolve");
+            resolve(value);
+          };
+        });
+      });
+
+      mockSyncStandings.mockImplementation(() => {
+        events.push("standings:start");
+        return Promise.resolve({
+          total: 10, created: 5, updated: 5, skipped: 0, failed: 0, errors: [], durationMs: 40,
+        });
+      });
+
+      const syncPromise = fullSync("manual");
+
+      // Flush all pending microtasks so the orchestrator reaches (and runs past) Step 3.
+      // Teams is still pending, so if standings runs concurrently it gets invoked here.
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(events).toContain("teams:start");
+      expect(events).not.toContain("standings:start");
+
+      resolveTeams({
+        total: 5, created: 3, updated: 2, skipped: 0, failed: 0, errors: [], durationMs: 50,
+      });
+      await syncPromise;
+
+      expect(events).toContain("standings:start");
+      expect(events.indexOf("standings:start")).toBeGreaterThan(events.indexOf("teams:resolve"));
+    });
+
     it("calls the jobLogger", async () => {
       const jobLogger = vi.fn();
 
