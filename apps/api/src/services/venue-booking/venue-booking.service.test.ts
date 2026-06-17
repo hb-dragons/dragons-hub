@@ -730,6 +730,44 @@ describe("reconcileBookingsForMatches", () => {
     txSpy.mockRestore();
   });
 
+  it("leaves a booking created concurrently for the same venue+date untouched", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const matchId = await insertMatch({ venue_id: venueId, kickoff_time: "18:00:00" });
+
+    // Simulate a concurrent writer inserting a confirmed booking for this
+    // venue+date AFTER reconcile snapshots existingBookings but before its insert,
+    // by injecting the row at the start of the write transaction.
+    const realTransaction = ctx.client.transaction.bind(ctx.client);
+    const txSpy = vi
+      .spyOn(ctx.client, "transaction")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .mockImplementation(((cb: (tx: any) => unknown) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        realTransaction(async (tx: any) => {
+          await tx.query(
+            `INSERT INTO venue_bookings
+               (venue_id, date, calculated_start_time, calculated_end_time, status, needs_reconfirmation, confirmed_at, confirmed_by)
+             VALUES ($1, $2, '09:00:00', '10:00:00', 'confirmed', false, '2025-03-01T12:00:00Z', 'admin-user')`,
+            [venueId, "2025-03-15"],
+          );
+          return cb(tx);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        })) as any);
+
+    await reconcileBookingsForMatches([matchId]);
+
+    txSpy.mockRestore();
+
+    const bookings = await getBookings();
+    expect(bookings).toHaveLength(1);
+    // The concurrently-created confirmed booking must not be re-windowed or have
+    // its confirmation state silently corrupted.
+    expect(bookings[0]!.calculated_start_time).toBe("09:00:00");
+    expect(bookings[0]!.calculated_end_time).toBe("10:00:00");
+    expect(bookings[0]!.status).toBe("confirmed");
+  });
+
   it("emits the reconfirmation event inside the write transaction (post-commit enqueue)", async () => {
     await seedBasicTeams();
     const venueId = await insertVenue();

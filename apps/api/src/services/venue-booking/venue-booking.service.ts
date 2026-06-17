@@ -353,8 +353,10 @@ export async function reconcileBookingsForMatches(
     const junctionDeletes: { venueBookingId: number; matchId: number }[] = [];
 
     // Creates — one multi-row booking insert, then map ids back by venue+date.
-    // onConflictDoUpdate converges a booking a concurrent reconcile created for
-    // the same (venueId, date) instead of throwing the unique violation as a 500.
+    // onConflictDoNothing tolerates a booking a concurrent reconcile/manual
+    // create inserted for the same (venueId, date) between our snapshot read and
+    // this write: instead of a 500, we skip it and leave that row (and its
+    // confirmation state) untouched for the next reconcile to converge.
     if (plan.creates.length > 0) {
       const createdRows = await tx
         .insert(venueBookings)
@@ -368,24 +370,20 @@ export async function reconcileBookingsForMatches(
             needsReconfirmation: false,
           })),
         )
-        .onConflictDoUpdate({
-          target: [venueBookings.venueId, venueBookings.date],
-          set: {
-            calculatedStartTime: sql`excluded.calculated_start_time`,
-            calculatedEndTime: sql`excluded.calculated_end_time`,
-            updatedAt: new Date(),
-          },
-        })
+        .onConflictDoNothing({ target: [venueBookings.venueId, venueBookings.date] })
         .returning({ id: venueBookings.id, venueId: venueBookings.venueId, date: venueBookings.date });
 
       const createdIdByKey = new Map(createdRows.map((r) => [`${r.venueId}:${r.date}`, r.id]));
       for (const c of plan.creates) {
-        const bookingId = createdIdByKey.get(`${c.venueId}:${c.date}`)!;
+        const bookingId = createdIdByKey.get(`${c.venueId}:${c.date}`);
+        // A conflicted create returns no row — its booking already exists and is
+        // owned by the concurrent writer, so skip linking here.
+        if (bookingId === undefined) continue;
         for (const matchId of c.matchIds) {
           junctionInserts.push({ venueBookingId: bookingId, matchId });
         }
       }
-      result.created += plan.creates.length;
+      result.created += createdRows.length;
     }
 
     // Updates — per-booking UPDATE (distinct SET values) + accumulated junction deltas.
