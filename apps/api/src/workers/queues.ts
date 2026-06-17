@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { getDb } from "../config/database";
+import { getRedis } from "../config/redis";
 import { captureTrace } from "../config/log-context";
 import { syncSchedule, syncRuns } from "@dragons/db/schema";
 
@@ -97,37 +98,66 @@ function addSyncJob(
   return syncQueue.add(name, trace ? { ...data, trace } : data, opts);
 }
 
+// Short-lived Redis lock that serializes the check-then-insert critical section
+// of the manual sync triggers. The check-and-enqueue is sub-second; the TTL is a
+// crash safety net (a trigger that dies mid-section self-heals). Acquired before
+// the queue-state guards so two concurrent triggers can't both pass the guard and
+// each write a sync_runs row.
+const SYNC_LOCK_TTL_SECONDS = 30;
+
+async function acquireSyncLock(key: string): Promise<boolean> {
+  const acquired = await getRedis().set(key, "1", "EX", SYNC_LOCK_TTL_SECONDS, "NX");
+  return acquired === "OK";
+}
+
+async function releaseSyncLock(key: string): Promise<void> {
+  try {
+    await getRedis().del(key);
+  } catch (err) {
+    logger.warn({ err, key }, "Failed to release sync lock (will expire via TTL)");
+  }
+}
+
 export async function triggerRefereeGamesSync(
   triggeredBy?: string,
 ): Promise<{ syncRunId: number; status: string } | null> {
-  const activeJobs = await syncQueue.getJobs(["active", "waiting"], 0, 100, false);
-  const hasPending = activeJobs.some((job) => job.data?.type === "referee-games");
-  if (hasPending) {
-    logger.info("Referee games sync already queued, skipping");
+  const lockKey = "lock:sync:referee-games";
+  if (!(await acquireSyncLock(lockKey))) {
+    logger.info("Referee games sync trigger lost the lock race, skipping");
     return null;
   }
+  try {
+    const activeJobs = await syncQueue.getJobs(["active", "waiting"], 0, 100, false);
+    const hasPending = activeJobs.some((job) => job.data?.type === "referee-games");
+    if (hasPending) {
+      logger.info("Referee games sync already queued, skipping");
+      return null;
+    }
 
-  const [syncRun] = await getDb()
-    .insert(syncRuns)
-    .values({
-      syncType: "referee-games",
-      triggeredBy: triggeredBy ?? "manual",
-      status: "pending",
-      startedAt: new Date(),
-    })
-    .returning();
+    const [syncRun] = await getDb()
+      .insert(syncRuns)
+      .values({
+        syncType: "referee-games",
+        triggeredBy: triggeredBy ?? "manual",
+        status: "pending",
+        startedAt: new Date(),
+      })
+      .returning();
 
-  await addSyncJob(
-    "referee-games-sync",
-    { type: "referee-games", syncRunId: syncRun!.id },
-    {
-      jobId: `referee-games-sync-${syncRun!.id}`,
-      removeOnComplete: true,
-      removeOnFail: 100,
-    },
-  );
+    await addSyncJob(
+      "referee-games-sync",
+      { type: "referee-games", syncRunId: syncRun!.id },
+      {
+        jobId: `referee-games-sync-${syncRun!.id}`,
+        removeOnComplete: true,
+        removeOnFail: 100,
+      },
+    );
 
-  return { syncRunId: syncRun!.id, status: "queued" };
+    return { syncRunId: syncRun!.id, status: "queued" };
+  } finally {
+    await releaseSyncLock(lockKey);
+  }
 }
 
 // NOTE: syncRuns and syncRunEntries tables grow unbounded.
@@ -245,43 +275,54 @@ export async function initializeScheduledJobs() {
 const MANUAL_SYNC_JOB_ID = "manual-sync";
 
 export async function triggerManualSync(userId?: string) {
-  const existing = await syncQueue.getJob(MANUAL_SYNC_JOB_ID);
-  if (existing) {
-    const state = await existing.getState();
-    if (state === "active" || state === "waiting" || state === "delayed") {
-      return {
-        error: "Sync already in progress or queued",
-        code: "SYNC_ALREADY_QUEUED",
-      };
-    }
-    await existing.remove();
-  }
-
-  const dailyActive = await syncQueue.getJobs(["active", "waiting"], 0, 100, false);
-  if (dailyActive.some((j) => j.name === "daily-sync" && j.data?.type === "full")) {
+  const lockKey = "lock:sync:full";
+  if (!(await acquireSyncLock(lockKey))) {
     return {
       error: "Sync already in progress or queued",
       code: "SYNC_ALREADY_QUEUED",
     };
   }
+  try {
+    const existing = await syncQueue.getJob(MANUAL_SYNC_JOB_ID);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === "active" || state === "waiting" || state === "delayed") {
+        return {
+          error: "Sync already in progress or queued",
+          code: "SYNC_ALREADY_QUEUED",
+        };
+      }
+      await existing.remove();
+    }
 
-  const [syncRun] = await getDb()
-    .insert(syncRuns)
-    .values({ syncType: "full", triggeredBy: userId ?? "manual", status: "pending", startedAt: new Date() })
-    .returning();
+    const dailyActive = await syncQueue.getJobs(["active", "waiting"], 0, 100, false);
+    if (dailyActive.some((j) => j.name === "daily-sync" && j.data?.type === "full")) {
+      return {
+        error: "Sync already in progress or queued",
+        code: "SYNC_ALREADY_QUEUED",
+      };
+    }
 
-  const job = await addSyncJob(
-    "manual-sync",
-    { type: "full", triggeredBy: userId, syncRunId: syncRun!.id },
-    { jobId: MANUAL_SYNC_JOB_ID },
-  );
+    const [syncRun] = await getDb()
+      .insert(syncRuns)
+      .values({ syncType: "full", triggeredBy: userId ?? "manual", status: "pending", startedAt: new Date() })
+      .returning();
 
-  return {
-    jobId: job.id,
-    syncRunId: syncRun!.id,
-    status: "queued",
-    message: "Sync job has been queued",
-  };
+    const job = await addSyncJob(
+      "manual-sync",
+      { type: "full", triggeredBy: userId, syncRunId: syncRun!.id },
+      { jobId: MANUAL_SYNC_JOB_ID },
+    );
+
+    return {
+      jobId: job.id,
+      syncRunId: syncRun!.id,
+      status: "queued",
+      message: "Sync job has been queued",
+    };
+  } finally {
+    await releaseSyncLock(lockKey);
+  }
 }
 
 export async function getJobStatus(jobId: string) {
