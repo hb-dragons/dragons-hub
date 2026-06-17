@@ -258,9 +258,9 @@ describe("processEvent", () => {
   });
 
   describe("rule matching with immediate dispatch", () => {
-    it("dispatches via in-app adapter and buffers for digest", async () => {
+    it("dispatches via in-app adapter using the config's audience as recipientId, not the config id", async () => {
       const rule = makeRule();
-      const config = makeChannelConfig();
+      const config = makeChannelConfig({ config: { audienceRole: "admin", locale: "de" } });
       setupDbMocks({ rules: [rule], configs: [config] });
       mockEvaluateRule.mockReturnValue({
         matched: true,
@@ -276,7 +276,8 @@ describe("processEvent", () => {
           eventId: "evt-1",
           watchRuleId: 1,
           channelConfigId: 10,
-          recipientId: "10",
+          // must be an inbox-addressable recipient, NOT the bare config id "10"
+          recipientId: "audience:admin",
           title: "Match Cancelled",
           body: "The match has been cancelled.",
           locale: "de",
@@ -284,6 +285,23 @@ describe("processEvent", () => {
       );
       expect(mockDbInsert).toHaveBeenCalled();
       expect(result).toMatchObject({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
+    });
+
+    it("routes a referee-audience in_app config to audience:referee", async () => {
+      const rule = makeRule();
+      const config = makeChannelConfig({ config: { audienceRole: "referee", locale: "de" } });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "in_app", targetId: "10" }],
+        urgencyOverride: null,
+      });
+
+      await processEvent(makeEvent());
+
+      expect(mockInAppSend).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: "audience:referee" }),
+      );
     });
 
     it("uses urgencyOverride from rule when present", async () => {
@@ -885,6 +903,9 @@ describe("processEvent", () => {
         expect.objectContaining({
           eventId: "evt-1",
           channelConfigId: 10,
+          // group-delivered channels (no audienceRole) get a non-user label,
+          // never the bare config id
+          recipientId: "channel:10",
         }),
         "120363@g.us",
       );

@@ -160,6 +160,27 @@ function evaluateWatchRules(
 }
 
 /**
+ * Derive the recipient key a watch-rule match addresses, from its channel
+ * config. `in_app` configs carry an audienceRole ("admin" | "referee") which
+ * maps to `audience:<role>` — an inbox-addressable, push-resolvable key.
+ * Channels without an audience (whatsapp_group, email) deliver to a fixed
+ * target, not a user inbox, so they get a non-resolvable label that never
+ * masquerades as a user or audience. Never the bare channel-config id, which
+ * matches no inbox key and resolves to zero push recipients.
+ */
+function watchRuleRecipientId(config: { id: number; config: unknown }): string {
+  const cfg = config.config;
+  const audienceRole =
+    cfg && typeof cfg === "object"
+      ? (cfg as Record<string, unknown>).audienceRole
+      : undefined;
+  if (audienceRole === "admin" || audienceRole === "referee") {
+    return `audience:${audienceRole}`;
+  }
+  return `channel:${config.id}`;
+}
+
+/**
  * Step 3: Evaluate role-based defaults.
  */
 function evaluateDefaults(
@@ -377,7 +398,7 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
           event,
           config: match.config,
           watchRuleId: match.watchRuleId,
-          recipientId: match.channelTarget.targetId,
+          recipientId: watchRuleRecipientId(match.config),
           channelType: match.channelTarget.channel,
         });
         if (sent) result.dispatched++;
