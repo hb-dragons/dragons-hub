@@ -77,10 +77,13 @@ healthRoutes.get(
     }
 
     try {
+      // Measure lag over *unprocessed* events (processed_at IS NULL), not merely
+      // un-enqueued ones — so an event that was enqueued but never delivered
+      // (stranded) shows up as lag and trips `degraded`.
       const [oldest] = await db
         .select({ createdAt: domainEvents.createdAt })
         .from(domainEvents)
-        .where(isNull(domainEvents.enqueuedAt))
+        .where(isNull(domainEvents.processedAt))
         .orderBy(domainEvents.createdAt)
         .limit(1);
       checks.outboxLagSeconds = oldest

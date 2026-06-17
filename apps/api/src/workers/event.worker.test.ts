@@ -42,9 +42,12 @@ vi.mock("../config/env", () => ({
 // --- Mock database ---
 
 const mockDbSelect = vi.fn();
+const mockDbUpdate = vi.fn();
+const mockUpdateSet = vi.fn();
 vi.mock("../config/database", () => ({
   getDb: () => ({
     select: (...args: unknown[]) => mockDbSelect(...args),
+    update: (...args: unknown[]) => mockDbUpdate(...args),
   }),
 }));
 
@@ -158,6 +161,42 @@ describe("event worker processor", () => {
       coalesced: 0,
       muted: 0,
       configs: [],
+    });
+    mockDbUpdate.mockReturnValue({
+      set: (...a: unknown[]) => {
+        mockUpdateSet(...a);
+        return { where: () => Promise.resolve(undefined) };
+      },
+    });
+  });
+
+  describe("marking processed", () => {
+    it("stamps processed_at after a successful pipeline run", async () => {
+      setupDbMocks({ event: makeEvent() });
+
+      await capturedProcessor!(makeJob());
+
+      expect(mockDbUpdate).toHaveBeenCalledTimes(1);
+      expect(mockUpdateSet).toHaveBeenCalledWith(
+        expect.objectContaining({ processedAt: expect.any(Date) }),
+      );
+    });
+
+    it("does not stamp processed_at when the pipeline throws (event stays reclaimable)", async () => {
+      setupDbMocks({ event: makeEvent() });
+      mockProcessEvent.mockRejectedValueOnce(new Error("pipeline boom"));
+
+      await expect(capturedProcessor!(makeJob())).rejects.toThrow("pipeline boom");
+
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it("does not stamp processed_at when the event is not found", async () => {
+      setupDbMocks({ event: null });
+
+      await capturedProcessor!(makeJob());
+
+      expect(mockDbUpdate).not.toHaveBeenCalled();
     });
   });
 
