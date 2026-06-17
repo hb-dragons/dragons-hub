@@ -6,6 +6,11 @@ import { WeekendPreview, WeekendResults } from "@dragons/shared/social-templates
 import type { MatchRow } from "@dragons/shared/social-templates";
 
 const SIZE = 1080;
+// Cap the composited player surface. The longest edge of a stored photo is
+// SIZE px (player-photo.service normalizes on upload) and scale maxes at 5, so
+// SIZE * 5 never shrinks a legitimate image — it only bounds legacy
+// full-resolution uploads, keeping the sharp surface from triggering an OOM.
+const MAX_PLAYER_DIMENSION = SIZE * 5;
 
 // Font cache — loaded from GCS on first use, guarded against concurrent requests
 // Uses static font files because Satori's opentype.js cannot parse variable font fvar tables.
@@ -89,8 +94,16 @@ export async function generatePostImage(params: GenerateParams): Promise<Buffer>
 
   // 4. Scale player photo
   const meta = await sharp(playerBuffer).metadata();
-  const w = Math.round((meta.width ?? 500) * playerPosition.scale);
-  const h = Math.round((meta.height ?? 750) * playerPosition.scale);
+  let w = Math.round((meta.width ?? 500) * playerPosition.scale);
+  let h = Math.round((meta.height ?? 750) * playerPosition.scale);
+  // Clamp the longest edge so a large source at high scale can't force a huge
+  // sharp surface (memory spike / OOM). Preserve aspect ratio.
+  const longest = Math.max(w, h);
+  if (longest > MAX_PLAYER_DIMENSION) {
+    const factor = MAX_PLAYER_DIMENSION / longest;
+    w = Math.round(w * factor);
+    h = Math.round(h * factor);
+  }
   const resizedPlayer = await sharp(playerBuffer).resize(w, h).ensureAlpha().png().toBuffer();
 
   // 5. Composite: background → player → text
