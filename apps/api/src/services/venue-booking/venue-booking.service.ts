@@ -8,8 +8,9 @@ import {
   venues,
   appSettings,
 } from "@dragons/db/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
-import { calculateTimeWindow, type BookingConfig } from "./booking-calculator";
+import { eq, and, or, inArray, sql } from "drizzle-orm";
+import { type BookingConfig } from "./booking-calculator";
+import { planReconciliation } from "./booking-planner";
 import type {
   ReconcilePreview,
   ReconcilePreviewMatch,
@@ -115,10 +116,6 @@ function groupByVenueDate(games: MatchWithTeam[]): Map<string, MatchWithTeam[]> 
   return groups;
 }
 
-function isActiveMatch(m: MatchWithTeam): boolean {
-  return m.isForfeited !== true && m.isCancelled !== true;
-}
-
 function sortMatchesByKickoff(matches: ReconcilePreviewMatch[]): ReconcilePreviewMatch[] {
   return matches.sort((a, b) => a.kickoffTime.localeCompare(b.kickoffTime));
 }
@@ -193,17 +190,7 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
   const homeGames = await queryHomeMatches(allMatchIds);
   const groups = groupByVenueDate(homeGames);
 
-  // Collect all match IDs and venue IDs for display info
-  const allMatchIdsForDisplay = new Set<number>();
-  const allVenueIds = new Set<number>();
-  for (const group of groups.values()) {
-    for (const g of group) {
-      allMatchIdsForDisplay.add(g.matchId);
-      allVenueIds.add(g.venueId);
-    }
-  }
-
-  // Also get existing bookings to find removals
+  // Existing bookings + junction links feed the shared planner.
   const existingBookings = await getDb()
     .select({
       id: venueBookings.id,
@@ -215,118 +202,76 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
     })
     .from(venueBookings);
 
-  for (const b of existingBookings) {
-    allVenueIds.add(b.venueId);
+  const bookingMatchMap = await loadBookingMatchMap();
+
+  const plan = planReconciliation({
+    groups,
+    existingBookings,
+    bookingMatchMap,
+    config,
+    scope: { kind: "all" },
+  });
+
+  // Collect the match + venue IDs the preview will render.
+  const displayMatchIds = new Set<number>();
+  const venueIds = new Set<number>();
+  for (const c of plan.creates) {
+    venueIds.add(c.venueId);
+    c.matchIds.forEach((id) => displayMatchIds.add(id));
   }
-
-  // Get existing junction entries for each booking
-  const allJunctions = await getDb()
-    .select({
-      venueBookingId: venueBookingMatches.venueBookingId,
-      matchId: venueBookingMatches.matchId,
-    })
-    .from(venueBookingMatches);
-
-  const bookingMatchMap = new Map<number, number[]>();
-  for (const j of allJunctions) {
-    const list = bookingMatchMap.get(j.venueBookingId) ?? [];
-    list.push(j.matchId);
-    bookingMatchMap.set(j.venueBookingId, list);
-    allMatchIdsForDisplay.add(j.matchId);
+  for (const u of plan.updates) {
+    venueIds.add(u.venueId);
+    u.addedMatchIds.forEach((id) => displayMatchIds.add(id));
+    u.removedMatchIds.forEach((id) => displayMatchIds.add(id));
+  }
+  for (const r of plan.removals) {
+    venueIds.add(r.venueId);
+    r.displayMatchIds.forEach((id) => displayMatchIds.add(id));
   }
 
   const [matchDisplay, venueNames] = await Promise.all([
-    fetchMatchDisplayInfo([...allMatchIdsForDisplay]),
-    fetchVenueNames([...allVenueIds]),
+    fetchMatchDisplayInfo([...displayMatchIds]),
+    fetchVenueNames([...venueIds]),
   ]);
 
-  const touchedBookingIds = new Set<number>();
+  const nameOf = (venueId: number) => venueNames.get(venueId) ?? "Unknown";
+  const displayOf = (ids: number[]) =>
+    sortMatchesByKickoff(ids.map((id) => matchDisplay.get(id)!).filter(Boolean));
 
-  for (const [, group] of groups) {
-    const { venueId, kickoffDate } = group[0]!;
-    const activeGames = group.filter(isActiveMatch);
-    const venueName = venueNames.get(venueId) ?? "Unknown";
-
-    // Find existing booking for this venue+date
-    const existing = existingBookings.find(
-      (b) => b.venueId === venueId && b.date === kickoffDate,
-    );
-
-    if (activeGames.length === 0) {
-      // All matches forfeited/cancelled
-      if (existing) {
-        touchedBookingIds.add(existing.id);
-        preview.toRemove.push({
-          bookingId: existing.id,
-          venueName,
-          date: kickoffDate,
-          status: existing.status as BookingStatus,
-          reason: "all_matches_cancelled",
-          matches: sortMatchesByKickoff(group.map((g) => matchDisplay.get(g.matchId)!).filter(Boolean)),
-        });
-      }
-      continue;
-    }
-
-    const matchInputs = activeGames.map((g) => ({
-      kickoffTime: g.kickoffTime,
-      teamGameDuration: g.estimatedGameDuration,
-    }));
-    const window = calculateTimeWindow(matchInputs, config)!;
-    const activeMatchIds = new Set(activeGames.map((g) => g.matchId));
-
-    if (existing) {
-      touchedBookingIds.add(existing.id);
-      const currentMatchIds = new Set(bookingMatchMap.get(existing.id) ?? []);
-
-      const windowChanged =
-        existing.calculatedStartTime !== window.calculatedStartTime ||
-        existing.calculatedEndTime !== window.calculatedEndTime;
-
-      const added = [...activeMatchIds].filter((id) => !currentMatchIds.has(id));
-      const removed = [...currentMatchIds].filter((id) => !activeMatchIds.has(id));
-
-      if (windowChanged || added.length > 0 || removed.length > 0) {
-        preview.toUpdate.push({
-          bookingId: existing.id,
-          venueName,
-          date: kickoffDate,
-          status: existing.status as BookingStatus,
-          currentStartTime: existing.calculatedStartTime,
-          currentEndTime: existing.calculatedEndTime,
-          newStartTime: window.calculatedStartTime,
-          newEndTime: window.calculatedEndTime,
-          matchesAdded: sortMatchesByKickoff(added.map((id) => matchDisplay.get(id)!).filter(Boolean)),
-          matchesRemoved: sortMatchesByKickoff(removed.map((id) => matchDisplay.get(id)!).filter(Boolean)),
-        });
-      } else {
-        preview.unchanged++;
-      }
-    } else {
-      preview.toCreate.push({
-        venueName,
-        date: kickoffDate,
-        calculatedStartTime: window.calculatedStartTime,
-        calculatedEndTime: window.calculatedEndTime,
-        matches: sortMatchesByKickoff(activeGames.map((g) => matchDisplay.get(g.matchId)!).filter(Boolean)),
-      });
-    }
+  for (const c of plan.creates) {
+    preview.toCreate.push({
+      venueName: nameOf(c.venueId),
+      date: c.date,
+      calculatedStartTime: c.calculatedStartTime,
+      calculatedEndTime: c.calculatedEndTime,
+      matches: displayOf(c.matchIds),
+    });
   }
-
-  // Find existing bookings not touched (no matching home games at all)
-  for (const b of existingBookings) {
-    if (!touchedBookingIds.has(b.id)) {
-      const linkedMatchIds = bookingMatchMap.get(b.id) ?? [];
-      preview.toRemove.push({
-        bookingId: b.id,
-        venueName: venueNames.get(b.venueId) ?? "Unknown",
-        date: b.date,
-        status: b.status as BookingStatus,
-        reason: "no_matches",
-        matches: sortMatchesByKickoff(linkedMatchIds.map((id) => matchDisplay.get(id)!).filter(Boolean)),
-      });
-    }
+  for (const u of plan.updates) {
+    preview.toUpdate.push({
+      bookingId: u.bookingId,
+      venueName: nameOf(u.venueId),
+      date: u.date,
+      status: u.status as BookingStatus,
+      currentStartTime: u.currentStartTime,
+      currentEndTime: u.currentEndTime,
+      newStartTime: u.newStartTime,
+      newEndTime: u.newEndTime,
+      matchesAdded: displayOf(u.addedMatchIds),
+      matchesRemoved: displayOf(u.removedMatchIds),
+    });
   }
+  for (const r of plan.removals) {
+    preview.toRemove.push({
+      bookingId: r.bookingId,
+      venueName: nameOf(r.venueId),
+      date: r.date,
+      status: r.status as BookingStatus,
+      reason: r.reason,
+      matches: displayOf(r.displayMatchIds),
+    });
+  }
+  preview.unchanged = plan.unchanged;
 
   const byDateAsc = (a: { date: string }, b: { date: string }) =>
     a.date.localeCompare(b.date);
@@ -335,6 +280,24 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
   preview.toRemove.sort(byDateAsc);
 
   return preview;
+}
+
+/** Batch-load every booking's current junction match ids. */
+async function loadBookingMatchMap(): Promise<Map<number, number[]>> {
+  const rows = await getDb()
+    .select({
+      venueBookingId: venueBookingMatches.venueBookingId,
+      matchId: venueBookingMatches.matchId,
+    })
+    .from(venueBookingMatches);
+
+  const map = new Map<number, number[]>();
+  for (const j of rows) {
+    const list = map.get(j.venueBookingId) ?? [];
+    list.push(j.matchId);
+    map.set(j.venueBookingId, list);
+  }
+  return map;
 }
 
 // ── Reconciliation ───────────────────────────────────────────────────────────
@@ -350,114 +313,123 @@ export async function reconcileBookingsForMatches(
   const homeGames = await queryHomeMatches(matchIds);
   const groups = groupByVenueDate(homeGames);
 
-  const touchedBookingIds = new Set<number>();
+  // Batch-load bookings + junctions once; the pure planner decides everything.
+  const existingBookings = await getDb()
+    .select({
+      id: venueBookings.id,
+      venueId: venueBookings.venueId,
+      date: venueBookings.date,
+      status: venueBookings.status,
+      calculatedStartTime: venueBookings.calculatedStartTime,
+      calculatedEndTime: venueBookings.calculatedEndTime,
+      needsReconfirmation: venueBookings.needsReconfirmation,
+    })
+    .from(venueBookings);
+  const bookingById = new Map(existingBookings.map((b) => [b.id, b]));
+  const bookingMatchMap = await loadBookingMatchMap();
 
-  for (const [, group] of groups) {
-    const { venueId, kickoffDate } = group[0]!;
+  const plan = planReconciliation({
+    groups,
+    existingBookings,
+    bookingMatchMap,
+    config,
+    scope: { kind: "matchIds", matchIds },
+  });
 
-    // Only active (non-forfeited, non-cancelled) matches count
-    const activeGames = group.filter(isActiveMatch);
+  // Venue names for any reconfirmation events.
+  const reconfirmVenueIds = plan.updates
+    .filter((u) => u.windowChanged && u.status === "confirmed")
+    .map((u) => u.venueId);
+  const venueNames =
+    reconfirmVenueIds.length > 0 ? await fetchVenueNames(reconfirmVenueIds) : new Map<number, string>();
 
-    // Find existing booking
-    const [existing] = await getDb()
-      .select()
-      .from(venueBookings)
-      .where(
-        and(
-          eq(venueBookings.venueId, venueId),
-          eq(venueBookings.date, kickoffDate),
-        ),
-      )
-      .limit(1);
+  // Apply the whole plan atomically: a crash mid-flight rolls back every
+  // booking/junction change together, and reconfirmation events are inserted
+  // via the transaction so the outbox only enqueues them after commit.
+  await getDb().transaction(async (tx) => {
+    // Junction rows to insert/delete, accumulated across creates + updates +
+    // removals so they go out as single set-based statements.
+    const junctionInserts: { venueBookingId: number; matchId: number }[] = [];
+    const junctionDeletes: { venueBookingId: number; matchId: number }[] = [];
 
-    if (activeGames.length === 0) {
-      // All matches are forfeited/cancelled — mark existing booking for cleanup
-      if (existing) {
-        // Remove all junction entries for these matches
-        const cancelledMatchIds = group.map((g) => g.matchId);
-        await getDb()
-          .delete(venueBookingMatches)
-          .where(
-            and(
-              eq(venueBookingMatches.venueBookingId, existing.id),
-              inArray(venueBookingMatches.matchId, cancelledMatchIds),
-            ),
-          );
+    // Creates — one multi-row booking insert, then map ids back by venue+date.
+    // onConflictDoNothing tolerates a booking a concurrent reconcile/manual
+    // create inserted for the same (venueId, date) between our snapshot read and
+    // this write: instead of a 500, we skip it and leave that row (and its
+    // confirmation state) untouched for the next reconcile to converge.
+    if (plan.creates.length > 0) {
+      const createdRows = await tx
+        .insert(venueBookings)
+        .values(
+          plan.creates.map((c) => ({
+            venueId: c.venueId,
+            date: c.date,
+            calculatedStartTime: c.calculatedStartTime,
+            calculatedEndTime: c.calculatedEndTime,
+            status: "pending" as const,
+            needsReconfirmation: false,
+          })),
+        )
+        .onConflictDoNothing({ target: [venueBookings.venueId, venueBookings.date] })
+        .returning({ id: venueBookings.id, venueId: venueBookings.venueId, date: venueBookings.date });
 
-        // Check if booking has any remaining matches
-        const [remaining] = await getDb()
-          .select({ count: sql<number>`count(*)` })
-          .from(venueBookingMatches)
-          .where(eq(venueBookingMatches.venueBookingId, existing.id));
-
-        if (Number(remaining!.count) === 0) {
-          await getDb().delete(venueBookings).where(eq(venueBookings.id, existing.id));
-          result.removed++;
+      const createdIdByKey = new Map(createdRows.map((r) => [`${r.venueId}:${r.date}`, r.id]));
+      for (const c of plan.creates) {
+        const bookingId = createdIdByKey.get(`${c.venueId}:${c.date}`);
+        // A conflicted create returns no row — its booking already exists and is
+        // owned by the concurrent writer, so skip linking here.
+        if (bookingId === undefined) continue;
+        for (const matchId of c.matchIds) {
+          junctionInserts.push({ venueBookingId: bookingId, matchId });
         }
-        touchedBookingIds.add(existing.id);
       }
-      continue;
+      result.created += createdRows.length;
     }
 
-    const activeMatchIds = activeGames.map((g) => g.matchId);
-
-    // Calculate time window from active matches only
-    const matchInputs = activeGames.map((g) => ({
-      kickoffTime: g.kickoffTime,
-      teamGameDuration: g.estimatedGameDuration,
-    }));
-    const window = calculateTimeWindow(matchInputs, config)!;
-
-    if (existing) {
-      const windowChanged =
-        existing.calculatedStartTime !== window.calculatedStartTime ||
-        existing.calculatedEndTime !== window.calculatedEndTime;
-
-      if (windowChanged) {
-        const wasConfirmed = existing.status === "confirmed";
+    // Updates — per-booking UPDATE (distinct SET values) + accumulated junction deltas.
+    for (const u of plan.updates) {
+      if (u.windowChanged) {
+        const wasConfirmed = u.status === "confirmed";
         const updateData: Record<string, unknown> = {
-          calculatedStartTime: window.calculatedStartTime,
-          calculatedEndTime: window.calculatedEndTime,
-          needsReconfirmation: wasConfirmed ? true : existing.needsReconfirmation,
+          calculatedStartTime: u.newStartTime,
+          calculatedEndTime: u.newEndTime,
+          needsReconfirmation: wasConfirmed
+            ? true
+            : bookingById.get(u.bookingId)?.needsReconfirmation ?? false,
           updatedAt: new Date(),
         };
-
         if (wasConfirmed) {
           updateData.status = "pending";
           updateData.confirmedAt = null;
           updateData.confirmedBy = null;
         }
 
-        await getDb()
+        await tx
           .update(venueBookings)
           .set(updateData)
-          .where(eq(venueBookings.id, existing.id));
+          .where(eq(venueBookings.id, u.bookingId));
 
-        // Emit booking.needs_reconfirmation when a confirmed booking's times shift
         if (wasConfirmed) {
           try {
-            const [venueRow] = await getDb()
-              .select({ name: venues.name })
-              .from(venues)
-              .where(eq(venues.id, venueId))
-              .limit(1);
-            const venueName = venueRow?.name ?? "Unknown";
-
-            await publishDomainEvent({
-              type: EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION,
-              source: "reconciliation",
-              entityType: "booking",
-              entityId: existing.id,
-              entityName: `${venueName} - ${kickoffDate}`,
-              deepLinkPath: `/admin/bookings/${existing.id}`,
-              payload: {
-                venueName,
-                date: kickoffDate,
-                reason: "Time window changed after sync reconciliation",
+            const venueName = venueNames.get(u.venueId) ?? "Unknown";
+            await publishDomainEvent(
+              {
+                type: EVENT_TYPES.BOOKING_NEEDS_RECONFIRMATION,
+                source: "reconciliation",
+                entityType: "booking",
+                entityId: u.bookingId,
+                entityName: `${venueName} - ${u.date}`,
+                deepLinkPath: `/admin/bookings/${u.bookingId}`,
+                payload: {
+                  venueName,
+                  date: u.date,
+                  reason: "Time window changed after sync reconciliation",
+                },
               },
-            });
+              tx,
+            );
           } catch (error) {
-            log.warn({ err: error, bookingId: existing.id }, "Failed to emit booking.needs_reconfirmation event");
+            log.warn({ err: error, bookingId: u.bookingId }, "Failed to emit booking.needs_reconfirmation event");
           }
         }
 
@@ -466,111 +438,60 @@ export async function reconcileBookingsForMatches(
         result.unchanged++;
       }
 
-      // Sync junction entries — only active matches
-      await syncBookingMatches(existing.id, activeMatchIds);
-      touchedBookingIds.add(existing.id);
-    } else {
-      const [created] = await getDb()
-        .insert(venueBookings)
-        .values({
-          venueId,
-          date: kickoffDate,
-          calculatedStartTime: window.calculatedStartTime,
-          calculatedEndTime: window.calculatedEndTime,
-          status: "pending",
-          needsReconfirmation: false,
-        })
-        .returning({ id: venueBookings.id });
-
-      if (activeMatchIds.length > 0) {
-        await getDb().insert(venueBookingMatches).values(
-          activeMatchIds.map((matchId) => ({
-            venueBookingId: created!.id,
-            matchId,
-          })),
-        );
+      for (const matchId of u.addedMatchIds) {
+        junctionInserts.push({ venueBookingId: u.bookingId, matchId });
       }
-
-      result.created++;
-      touchedBookingIds.add(created!.id);
+      for (const matchId of u.removedMatchIds) {
+        junctionDeletes.push({ venueBookingId: u.bookingId, matchId });
+      }
     }
-  }
+    result.unchanged += plan.unchanged;
 
-  // Clean up stale bookings linked to these matchIds that we didn't touch
-  const allLinkedBookings = await getDb()
-    .select({ venueBookingId: venueBookingMatches.venueBookingId })
-    .from(venueBookingMatches)
-    .where(inArray(venueBookingMatches.matchId, matchIds));
-
-  const staleBookingIds = new Set<number>();
-  for (const row of allLinkedBookings) {
-    if (!touchedBookingIds.has(row.venueBookingId)) {
-      staleBookingIds.add(row.venueBookingId);
+    // Removals (all-cancelled groups + scoped stale bookings).
+    const bookingDeletes: number[] = [];
+    for (const r of plan.removals) {
+      if (r.deletesBooking) {
+        bookingDeletes.push(r.bookingId);
+      } else {
+        for (const matchId of r.removeMatchIds) {
+          junctionDeletes.push({ venueBookingId: r.bookingId, matchId });
+        }
+      }
     }
-  }
 
-  if (staleBookingIds.size > 0) {
-    for (const bookingId of staleBookingIds) {
-      await getDb()
+    // Set-based junction insert (DoNothing tolerates a racing duplicate link).
+    if (junctionInserts.length > 0) {
+      await tx.insert(venueBookingMatches).values(junctionInserts).onConflictDoNothing();
+    }
+
+    // Set-based junction delete for partial removals + match moves.
+    if (junctionDeletes.length > 0) {
+      await tx
         .delete(venueBookingMatches)
         .where(
-          and(
-            eq(venueBookingMatches.venueBookingId, bookingId),
-            inArray(venueBookingMatches.matchId, matchIds),
+          or(
+            ...junctionDeletes.map((d) =>
+              and(
+                eq(venueBookingMatches.venueBookingId, d.venueBookingId),
+                eq(venueBookingMatches.matchId, d.matchId),
+              ),
+            ),
           ),
         );
     }
-  }
 
-  for (const bookingId of staleBookingIds) {
-    const [remaining] = await getDb()
-      .select({ count: sql<number>`count(*)` })
-      .from(venueBookingMatches)
-      .where(eq(venueBookingMatches.venueBookingId, bookingId));
-
-    if (Number(remaining!.count) === 0) {
-      await getDb().delete(venueBookings).where(eq(venueBookings.id, bookingId));
-      result.removed++;
+    // Set-based booking delete (drops their junction rows too) for full removals.
+    if (bookingDeletes.length > 0) {
+      await tx
+        .delete(venueBookingMatches)
+        .where(inArray(venueBookingMatches.venueBookingId, bookingDeletes));
+      await tx.delete(venueBookings).where(inArray(venueBookings.id, bookingDeletes));
+      result.removed += bookingDeletes.length;
     }
-  }
+  });
 
   log.info(result, "Reconciliation complete");
   return result;
-}
-
-// ── Junction sync ────────────────────────────────────────────────────────────
-
-async function syncBookingMatches(
-  bookingId: number,
-  expectedMatchIds: number[],
-): Promise<void> {
-  const existing = await getDb()
-    .select({ matchId: venueBookingMatches.matchId })
-    .from(venueBookingMatches)
-    .where(eq(venueBookingMatches.venueBookingId, bookingId));
-
-  const existingIds = new Set(existing.map((r) => r.matchId));
-  const expectedIds = new Set(expectedMatchIds);
-
-  const toInsert = [...expectedIds].filter((id) => !existingIds.has(id));
-  const toDelete = [...existingIds].filter((id) => !expectedIds.has(id));
-
-  if (toInsert.length > 0) {
-    await getDb().insert(venueBookingMatches).values(
-      toInsert.map((matchId) => ({ venueBookingId: bookingId, matchId })),
-    );
-  }
-
-  if (toDelete.length > 0) {
-    await getDb()
-      .delete(venueBookingMatches)
-      .where(
-        and(
-          eq(venueBookingMatches.venueBookingId, bookingId),
-          inArray(venueBookingMatches.matchId, toDelete),
-        ),
-      );
-  }
 }
 
 // ── Post-sync reconciliation ─────────────────────────────────────────────────

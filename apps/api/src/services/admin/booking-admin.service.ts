@@ -212,6 +212,20 @@ export async function updateBooking(
     updatedAt: new Date(),
   };
 
+  // Capture pre-update times so a real reschedule can be detected after the UPDATE.
+  const [before] = await getDb()
+    .select({
+      overrideStartTime: venueBookings.overrideStartTime,
+      overrideEndTime: venueBookings.overrideEndTime,
+      calculatedStartTime: venueBookings.calculatedStartTime,
+      calculatedEndTime: venueBookings.calculatedEndTime,
+    })
+    .from(venueBookings)
+    .where(eq(venueBookings.id, id))
+    .limit(1);
+
+  if (!before) return null;
+
   const [updated] = await getDb()
     .update(venueBookings)
     .set(set)
@@ -248,11 +262,11 @@ export async function updateBooking(
     data.overrideStartTime !== undefined || data.overrideEndTime !== undefined;
   if (timeChanged && venue) {
     try {
-      // Fetch old values for comparison
-      const oldStart = updated.overrideStartTime ?? updated.calculatedStartTime;
-      const oldEnd = updated.overrideEndTime ?? updated.calculatedEndTime;
-      const newStart = data.overrideStartTime ?? oldStart;
-      const newEnd = data.overrideEndTime ?? oldEnd;
+      // Compare the pre-update effective times against the post-update ones.
+      const oldStart = before.overrideStartTime ?? before.calculatedStartTime;
+      const oldEnd = before.overrideEndTime ?? before.calculatedEndTime;
+      const newStart = updated.overrideStartTime ?? updated.calculatedStartTime;
+      const newEnd = updated.overrideEndTime ?? updated.calculatedEndTime;
 
       if (oldStart !== newStart || oldEnd !== newEnd) {
         await publishDomainEvent({
