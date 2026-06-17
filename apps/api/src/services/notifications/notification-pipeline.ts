@@ -374,7 +374,10 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
   // Step 5: Check coalescing — atomically claim the dispatch slot via Redis SET NX.
   // Returns "OK" if this process is the first caller within the window (dispatch proceeds),
   // or null if another process already claimed the slot (skip immediate dispatch).
-  const coalesceKey = `coalesce:${event.entityType}:${event.entityId}`;
+  // Key on the event type too — without it, two distinct events on the same
+  // entity within the window (e.g. schedule + venue change from one admin edit)
+  // collide and the second is dropped (a push-only default never reaches digest).
+  const coalesceKey = `coalesce:${event.type}:${event.entityType}:${event.entityId}`;
   const claim = await getRedis().set(coalesceKey, "1", "EX", COALESCE_WINDOW_SEC, "NX");
   const coalesced = claim !== "OK";
 

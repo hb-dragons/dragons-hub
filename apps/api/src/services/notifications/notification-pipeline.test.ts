@@ -631,7 +631,31 @@ describe("processEvent", () => {
 
       await processEvent(makeEvent({ entityType: "match", entityId: 42 }));
 
-      expect(mockRedisSet).toHaveBeenCalledWith("coalesce:match:42", "1", "EX", 60, "NX");
+      expect(mockRedisSet).toHaveBeenCalledWith("coalesce:match.cancelled:match:42", "1", "EX", 60, "NX");
+    });
+
+    it("embeds event.type in the coalesce key so different event types on one entity don't collide (#61)", async () => {
+      const rule = makeRule();
+      const config = makeChannelConfig();
+      mockRedisSet.mockResolvedValue("OK");
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "in_app", targetId: "10" }],
+        urgencyOverride: null,
+      });
+
+      await processEvent(makeEvent({ type: "match.venue.changed", entityType: "match", entityId: 42 }));
+
+      // Key must include the event type — otherwise a second, distinct event on
+      // the same entity within the window collides and is dropped.
+      expect(mockRedisSet).toHaveBeenCalledWith(
+        "coalesce:match.venue.changed:match:42",
+        "1",
+        "EX",
+        60,
+        "NX",
+      );
     });
 
     it("releases the coalesce key when claim was OK but nothing was dispatched", async () => {
@@ -657,7 +681,7 @@ describe("processEvent", () => {
       const result = await processEvent(makeEvent({ entityType: "match", entityId: 42 }));
 
       expect(result.dispatched).toBe(0);
-      expect(mockRedisDel).toHaveBeenCalledWith("coalesce:match:42");
+      expect(mockRedisDel).toHaveBeenCalledWith("coalesce:match.cancelled:match:42");
     });
 
     it("does not release the coalesce key when at least one dispatch succeeded", async () => {
