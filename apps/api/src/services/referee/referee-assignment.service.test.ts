@@ -62,7 +62,13 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@dragons/db/schema", () => ({
-  refereeGames: { apiMatchId: "rg.apiMatchId", matchId: "rg.matchId" },
+  refereeGames: {
+    apiMatchId: "rg.apiMatchId",
+    matchId: "rg.matchId",
+    id: "rg.id",
+    sr1Status: "rg.sr1Status",
+    sr2Status: "rg.sr2Status",
+  },
   referees: { apiId: "r.apiId", id: "r.id" },
   matches: { id: "m.id", homeTeamApiId: "m.homeTeamApiId", guestTeamApiId: "m.guestTeamApiId" },
   teams: { id: "t.id", apiTeamPermanentId: "t.apiTeamPermanentId" },
@@ -170,6 +176,14 @@ describe("assignReferee", () => {
     // Event role should be SR2
     const eventCall = mocks.publishDomainEvent.mock.calls[0]![0];
     expect(eventCall.payload.role).toBe("SR2");
+
+    // Slot-2 path must gate on sr2_status (not sr1) being open.
+    expect(mocks.updateWhere).toHaveBeenCalledWith({
+      and: [
+        { eq: ["rg.apiMatchId", 12345] },
+        { eq: ["rg.sr2Status", "open"] },
+      ],
+    });
   });
 
   it("GAME_NOT_FOUND: throws AssignmentError when game not in refereeGames", async () => {
@@ -347,6 +361,15 @@ describe("assignReferee", () => {
       name: "AssignmentError",
     });
 
+    // The atomic guard must gate the write on the slot still being open — this
+    // locks the WHERE clause so the fix can't silently regress to an
+    // unconditional update.
+    expect(mocks.updateWhere).toHaveBeenCalledWith({
+      and: [
+        { eq: ["rg.apiMatchId", 12345] },
+        { eq: ["rg.sr1Status", "open"] },
+      ],
+    });
     // The race loser must not write an intent or publish an assignment event.
     expect(mocks.insertOnConflict).not.toHaveBeenCalled();
     expect(mocks.publishDomainEvent).not.toHaveBeenCalled();

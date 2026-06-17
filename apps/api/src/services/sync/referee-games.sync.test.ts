@@ -451,12 +451,24 @@ describe("syncRefereeGames", () => {
 
     await syncRefereeGames();
 
-    expect(onConflictDoUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        target: "apiMatchId",
-        set: expect.objectContaining({ dataHash: expect.anything() }),
-      }),
+    const upsertArg = onConflictDoUpdate.mock.calls[0]![0];
+    expect(upsertArg.target).toBe("apiMatchId");
+    // The conflict set must mirror the UPDATE branch's columns, so the upsert
+    // can't silently rot into a partial set that drops fields on conflict.
+    expect(Object.keys(upsertArg.set)).toEqual(
+      expect.arrayContaining([
+        "matchId",
+        "homeTeamId",
+        "guestTeamId",
+        "ownClubRefs",
+        "isHomeGame",
+        "isGuestGame",
+        "dataHash",
+        "lastSyncedAt",
+        "updatedAt",
+      ]),
     );
+    expect(upsertArg.set.dataHash).toBeDefined();
   });
 
   it("skips unchanged games", async () => {
