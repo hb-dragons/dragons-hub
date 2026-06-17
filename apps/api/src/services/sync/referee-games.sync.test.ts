@@ -414,7 +414,9 @@ describe("syncRefereeGames", () => {
 
     // Insert returns the new row
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -429,6 +431,31 @@ describe("syncRefereeGames", () => {
     );
     expect(mockScheduleReminderJobs).toHaveBeenCalledWith(
       1001, 1, "2026-04-25", "14:00",
+    );
+  });
+
+  it("upserts on apiMatchId conflict so a concurrent run can't drop the insert (#69)", async () => {
+    const result = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    // No existing row in this run's snapshot → INSERT branch.
+    setupSelectMock(async () => []);
+
+    const returning = vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]);
+    const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+    // values() exposes BOTH so the current (returning-only) chain still runs;
+    // only the new code reaches onConflictDoUpdate.
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({ onConflictDoUpdate, returning }),
+    });
+
+    await syncRefereeGames();
+
+    expect(onConflictDoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: "apiMatchId",
+        set: expect.objectContaining({ dataHash: expect.anything() }),
+      }),
     );
   });
 
@@ -528,12 +555,14 @@ describe("syncRefereeGames", () => {
     let insertCall = 0;
     mockInsert.mockImplementation(() => ({
       values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockImplementation(() => {
-          insertCall++;
-          if (insertCall === 1) {
-            return Promise.reject(new Error("DB connection lost"));
-          }
-          return Promise.resolve([{ id: 2, apiMatchId: 2002 }]);
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockImplementation(() => {
+            insertCall++;
+            if (insertCall === 1) {
+              return Promise.reject(new Error("DB connection lost"));
+            }
+            return Promise.resolve([{ id: 2, apiMatchId: 2002 }]);
+          }),
         }),
       }),
     }));
@@ -676,7 +705,9 @@ describe("syncRefereeGames", () => {
     setupSelectMock(async () => []);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -699,7 +730,9 @@ describe("syncRefereeGames", () => {
     ]);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -718,7 +751,9 @@ describe("syncRefereeGames", () => {
     setupSelectMock(async () => [], []);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -741,7 +776,9 @@ describe("syncRefereeGames", () => {
     ]);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -813,7 +850,9 @@ describe("syncRefereeGames", () => {
     setupSelectMock(async () => []);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
