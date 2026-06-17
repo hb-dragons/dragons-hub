@@ -350,6 +350,7 @@ export async function buildDetailResponse(
   // Load referee assignments for this match
   const refAssignments = await client
     .select({
+      slotNumber: matchReferees.slotNumber,
       refereeId: matchReferees.refereeId,
       roleId: matchReferees.roleId,
       roleName: refereeRoles.name,
@@ -381,8 +382,9 @@ export async function buildDetailResponse(
     const slotKey = `sr${slotNumber}Open` as keyof typeof row;
     const isOpen = (row[slotKey] as boolean) ?? false;
 
-    // Find assigned referee for this slot (by role ordering convention)
-    const assignment = refAssignments[slotNumber - 1] ?? null;
+    // Find the assignment for this slot by its real slotNumber — assignments
+    // can be non-contiguous (e.g. only slot 2 filled) and come back unordered.
+    const assignment = refAssignments.find((a) => a.slotNumber === slotNumber) ?? null;
 
     // Find intent for this slot
     const intentRow = intentsRows.find((i) => i.slotNumber === slotNumber) ?? null;

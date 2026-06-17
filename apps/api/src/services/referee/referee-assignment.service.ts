@@ -106,12 +106,25 @@ export async function assignReferee(
     }
   }
 
-  // 4. Find candidate in federation getRefs
-  const refsResponse = await sdkClient.searchRefereesForGame(spielplanId, {
-    pageSize: 200,
-  });
-
-  const candidate = refsResponse.results.find((sr) => sr.srId === refereeApiId);
+  // 4. Find candidate in federation getRefs. Results are distance-sorted and
+  // paginated, so a single 200-row window can exclude a genuinely-qualified
+  // far-ranked referee. Page through (offset by rows returned) until the
+  // referee is found or the federation's reported total is exhausted.
+  const REFS_PAGE_SIZE = 200;
+  let candidate: Awaited<ReturnType<typeof sdkClient.searchRefereesForGame>>["results"][number] | undefined;
+  let pageFrom = 0;
+  let total = Infinity;
+  while (pageFrom < total) {
+    const refsResponse = await sdkClient.searchRefereesForGame(spielplanId, {
+      pageFrom,
+      pageSize: REFS_PAGE_SIZE,
+    });
+    total = refsResponse.total;
+    candidate = refsResponse.results.find((sr) => sr.srId === refereeApiId);
+    if (candidate) break;
+    if (refsResponse.results.length === 0) break;
+    pageFrom += refsResponse.results.length;
+  }
   if (!candidate) {
     throw new AssignmentError(
       `Referee ${refereeApiId} is not qualified or available for game ${spielplanId}`,
@@ -144,10 +157,29 @@ export async function assignReferee(
       ? { sr1Name: refereeName, sr1RefereeApiId: refereeApiId, sr1Status: "assigned" }
       : { sr2Name: refereeName, sr2RefereeApiId: refereeApiId, sr2Status: "assigned" };
 
-  await getDb()
+  // Gate the write on the slot still being open so two referees racing for the
+  // same slot can't both win: the conditional UPDATE is atomic, and 0 affected
+  // rows means another claim got there first. (The federation submit above is
+  // the remote authority; this closes the local DB-state race.)
+  const slotStatusColumn =
+    slotNumber === 1 ? refereeGames.sr1Status : refereeGames.sr2Status;
+  const claimed = await getDb()
     .update(refereeGames)
     .set(slotUpdate)
-    .where(eq(refereeGames.apiMatchId, spielplanId));
+    .where(
+      and(
+        eq(refereeGames.apiMatchId, spielplanId),
+        eq(slotStatusColumn, "open"),
+      ),
+    )
+    .returning({ id: refereeGames.id });
+
+  if (claimed.length === 0) {
+    throw new AssignmentError(
+      `Slot ${slotNumber} for game ${spielplanId} was already taken`,
+      "SLOT_TAKEN",
+    );
+  }
 
   // 9. Upsert intent (only when game has a linked match)
   if (game.matchId != null) {
