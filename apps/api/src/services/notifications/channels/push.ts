@@ -7,7 +7,7 @@ import {
 } from "@dragons/db/schema";
 import { logger } from "../../../config/logger";
 import type { ExpoPushClient, ExpoPushMessage } from "../expo-push.client";
-import { mapTicketError } from "../expo-push.client";
+import { mapTicketError, isUndeliveredTicket } from "../expo-push.client";
 import { renderPushTemplate, type Locale } from "../templates/push";
 
 const log = logger.child({ service: "push-adapter" });
@@ -145,14 +145,16 @@ export class PushChannelAdapter {
       // already was — only one row survived per user). Aggregate every device's
       // ticket onto that user's single claim row: sent_ticket if any device
       // succeeded, else failed, keeping the first ok ticket's id/token.
-      type DeviceResult = { ok: boolean; ticketId: string | null; token: string; error: string | null };
+      type DeviceResult = { ok: boolean; undelivered: boolean; ticketId: string | null; token: string; error: string | null };
       const byUser = new Map<string, DeviceResult[]>();
       toSend.forEach((o, i) => {
         const ticket = tickets[i];
         const ok = ticket?.status === "ok";
+        const undelivered = isUndeliveredTicket(ticket);
         const list = byUser.get(o.device.userId) ?? [];
         list.push({
           ok,
+          undelivered,
           ticketId: ok ? ticket.id ?? null : null,
           token: o.device.token,
           error: mapTicketError(ticket),
@@ -162,9 +164,18 @@ export class PushChannelAdapter {
         else result.failed++;
       });
 
+      // Users whose every device was undelivered (a transient chunk that never
+      // reached Expo) must have their claim RELEASED, not marked failed — so the
+      // outbox retries only them. Delivered users keep their sent_ticket row, and
+      // terminal per-ticket errors keep their failed row, so neither is re-sent.
+      const releasedClaimIds: number[] = [];
       for (const [userId, devices] of byUser) {
         const claimId = claimIdByUser.get(userId)!;
         const okDevice = devices.find((d) => d.ok);
+        if (!okDevice && devices.every((d) => d.undelivered)) {
+          releasedClaimIds.push(claimId);
+          continue;
+        }
         const firstFail = devices.find((d) => !d.ok);
         await getDb()
           .update(notificationLog)
@@ -176,6 +187,12 @@ export class PushChannelAdapter {
             errorMessage: okDevice ? null : (firstFail?.error ?? "unknown"),
           })
           .where(eq(notificationLog.id, claimId));
+      }
+
+      if (releasedClaimIds.length > 0) {
+        await getDb()
+          .delete(notificationLog)
+          .where(inArray(notificationLog.id, releasedClaimIds));
       }
 
       if (result.failed > 0) result.success = false;

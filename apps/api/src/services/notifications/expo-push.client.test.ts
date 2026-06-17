@@ -82,6 +82,37 @@ describe("ExpoPushClient", () => {
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
+    it("preserves earlier-chunk tickets and marks a failed chunk undelivered instead of throwing (#62)", async () => {
+      const messages = Array.from({ length: 150 }, (_, i) => ({
+        to: `ExponentPushToken[${i}]`,
+        title: "t",
+        body: "b",
+      }));
+      let call = 0;
+      fetchMock.mockImplementation(async () => {
+        call++;
+        if (call === 1) {
+          return {
+            ok: true,
+            json: async () => ({
+              data: Array.from({ length: 100 }, (_, i) => ({ status: "ok", id: `id${i}` })),
+            }),
+          };
+        }
+        // chunk 2: malformed response shape → postSend throws (no retry)
+        return { ok: true, json: async () => ({ unexpected: true }) };
+      });
+
+      const tickets = await client.sendBatch(messages);
+
+      // chunk 1 delivered tickets must survive; chunk 2 marked undelivered, not lost.
+      expect(tickets).toHaveLength(150);
+      expect(tickets.slice(0, 100).every((t) => t.status === "ok")).toBe(true);
+      expect(
+        tickets.slice(100).every((t) => t.status === "error" && t.details?.error === "ChunkUndelivered"),
+      ).toBe(true);
+    });
+
     it("includes Authorization header when accessToken set", async () => {
       const authClient = new ExpoPushClient({ accessToken: "abc" });
       fetchMock.mockResolvedValueOnce({
@@ -103,14 +134,15 @@ describe("ExpoPushClient", () => {
       expect((init.headers as Record<string, string>)["Authorization"]).toBeUndefined();
     });
 
-    it("throws on non-ok HTTP response after retries are exhausted", async () => {
+    it("marks the message undelivered on a non-ok HTTP response after retries are exhausted", async () => {
       const ok500 = { ok: false, status: 500, text: async () => "boom" };
       fetchMock.mockResolvedValueOnce(ok500);
       fetchMock.mockResolvedValueOnce(ok500);
       fetchMock.mockResolvedValueOnce(ok500);
-      await expect(
-        client.sendBatch([{ to: "ExponentPushToken[a]", title: "t", body: "b" }]),
-      ).rejects.toThrow(/500/);
+      const tickets = await client.sendBatch([{ to: "ExponentPushToken[a]", title: "t", body: "b" }]);
+      expect(tickets).toEqual([
+        expect.objectContaining({ status: "error", details: { error: "ChunkUndelivered" } }),
+      ]);
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
@@ -129,11 +161,12 @@ describe("ExpoPushClient", () => {
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
-    it("throws on network error", async () => {
+    it("marks the message undelivered on a network error", async () => {
       fetchMock.mockRejectedValueOnce(new Error("ECONNREFUSED"));
-      await expect(
-        client.sendBatch([{ to: "ExponentPushToken[a]", title: "t", body: "b" }]),
-      ).rejects.toThrow(/ECONNREFUSED/);
+      const tickets = await client.sendBatch([{ to: "ExponentPushToken[a]", title: "t", body: "b" }]);
+      expect(tickets).toEqual([
+        expect.objectContaining({ status: "error", details: { error: "ChunkUndelivered" } }),
+      ]);
     });
   });
 
