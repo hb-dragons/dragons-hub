@@ -98,6 +98,12 @@ const SUCCESS_RESPONSE = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // clearAllMocks keeps queued mockResolvedValueOnce values + implementations;
+  // reset the SDK mocks so per-test setup is fully isolated (each test below
+  // configures its own search/submit behaviour).
+  mocks.searchRefereesForGame.mockReset();
+  mocks.submitRefereeAssignment.mockReset();
+  mocks.submitRefereeUnassignment.mockReset();
   selectCallIndex = 0;
   mocks.selectCalls = [];
 });
@@ -271,6 +277,53 @@ describe("assignReferee", () => {
 
     // No intent upsert since matchId is null
     expect(mocks.insertOnConflict).not.toHaveBeenCalled();
+  });
+
+  it("pages past the first result window to find a distance-ranked referee (#68)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+    ];
+    const OTHER = { ...CANDIDATE, srId: 1234 };
+    // Target referee (srId 9001) is NOT on the first page; total signals more.
+    mocks.searchRefereesForGame
+      .mockResolvedValueOnce({ results: [OTHER], total: 2 })
+      .mockResolvedValueOnce({ results: [CANDIDATE], total: 2 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+
+    const result = await assignReferee(12345, 1, 9001);
+
+    expect(result.success).toBe(true);
+    expect(mocks.searchRefereesForGame).toHaveBeenCalledTimes(2);
+    expect(mocks.searchRefereesForGame.mock.calls[0]![1]).toMatchObject({ pageFrom: 0, pageSize: 200 });
+    expect(mocks.searchRefereesForGame.mock.calls[1]![1]).toMatchObject({ pageFrom: 1, pageSize: 200 });
+    // The candidate found on page 2 is the one submitted to the federation.
+    expect(mocks.submitRefereeAssignment).toHaveBeenCalledWith(12345, 1, CANDIDATE);
+  });
+
+  it("stops paging and throws NOT_QUALIFIED once total is exhausted (#68)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+    ];
+    const OTHER = { ...CANDIDATE, srId: 1234 };
+    // Two pages, neither contains srId 9001 → exhaust total, then NOT_QUALIFIED.
+    mocks.searchRefereesForGame
+      .mockResolvedValueOnce({ results: [OTHER], total: 2 })
+      .mockResolvedValueOnce({ results: [{ ...CANDIDATE, srId: 5678 }], total: 2 });
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "NOT_QUALIFIED",
+      name: "AssignmentError",
+    });
+    expect(mocks.searchRefereesForGame).toHaveBeenCalledTimes(2);
+    expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
   });
 });
 

@@ -106,12 +106,25 @@ export async function assignReferee(
     }
   }
 
-  // 4. Find candidate in federation getRefs
-  const refsResponse = await sdkClient.searchRefereesForGame(spielplanId, {
-    pageSize: 200,
-  });
-
-  const candidate = refsResponse.results.find((sr) => sr.srId === refereeApiId);
+  // 4. Find candidate in federation getRefs. Results are distance-sorted and
+  // paginated, so a single 200-row window can exclude a genuinely-qualified
+  // far-ranked referee. Page through (offset by rows returned) until the
+  // referee is found or the federation's reported total is exhausted.
+  const REFS_PAGE_SIZE = 200;
+  let candidate: Awaited<ReturnType<typeof sdkClient.searchRefereesForGame>>["results"][number] | undefined;
+  let pageFrom = 0;
+  let total = Infinity;
+  while (pageFrom < total) {
+    const refsResponse = await sdkClient.searchRefereesForGame(spielplanId, {
+      pageFrom,
+      pageSize: REFS_PAGE_SIZE,
+    });
+    total = refsResponse.total;
+    candidate = refsResponse.results.find((sr) => sr.srId === refereeApiId);
+    if (candidate) break;
+    if (refsResponse.results.length === 0) break;
+    pageFrom += refsResponse.results.length;
+  }
   if (!candidate) {
     throw new AssignmentError(
       `Referee ${refereeApiId} is not qualified or available for game ${spielplanId}`,
