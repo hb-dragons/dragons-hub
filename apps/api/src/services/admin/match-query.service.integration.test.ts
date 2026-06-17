@@ -13,7 +13,7 @@ vi.mock("../../config/database", () => ({
     ),
 }));
 
-import { buildDetailResponse } from "./match-query.service";
+import { getMatchDetail } from "./match-query.service";
 import {
   teams,
   matches,
@@ -81,8 +81,8 @@ describe("buildDetailResponse — referee slot resolution (issue #65)", () => {
     // Referee assigned to slot 2 only; slot 1 is empty (non-contiguous).
     await ctx.db.insert(matchReferees).values({ matchId, refereeId, roleId, slotNumber: 2 });
 
-    const result = await buildDetailResponse(ctx.db, matchId);
-    const slots = result!.match.refereeSlots;
+    const result = await getMatchDetail(matchId);
+    const slots = result!.match.refereeSlots!;
 
     expect(slots[0]!.referee).toBeNull(); // slot 1 must be empty
     expect(slots[1]!.slotNumber).toBe(2);
@@ -97,8 +97,8 @@ describe("buildDetailResponse — referee slot resolution (issue #65)", () => {
     await ctx.db.insert(matchReferees).values({ matchId, refereeId: refC, roleId, slotNumber: 3 });
     await ctx.db.insert(matchReferees).values({ matchId, refereeId: refA, roleId, slotNumber: 1 });
 
-    const result = await buildDetailResponse(ctx.db, matchId);
-    const slots = result!.match.refereeSlots;
+    const result = await getMatchDetail(matchId);
+    const slots = result!.match.refereeSlots!;
 
     expect(slots[0]!.referee?.id).toBe(refA); // slot 1
     expect(slots[1]!.referee).toBeNull(); // slot 2 empty
