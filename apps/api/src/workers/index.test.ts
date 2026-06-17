@@ -38,9 +38,11 @@ const mockInitTaskReminders = vi.fn().mockResolvedValue(undefined);
 const mockTaskRemindersQueueGetRepeatableJobs = vi.fn().mockResolvedValue([]);
 const mockTaskRemindersQueueClose = vi.fn().mockResolvedValue(undefined);
 const mockOutboxPollQueueClose = vi.fn().mockResolvedValue(undefined);
+const mockTriggerRefereeGamesSync = vi.fn().mockResolvedValue(null);
 vi.mock("./queues", () => ({
   initializeScheduledJobs: (...args: unknown[]) => mockInitScheduledJobs(...args),
   initTaskReminders: (...args: unknown[]) => mockInitTaskReminders(...args),
+  triggerRefereeGamesSync: (...args: unknown[]) => mockTriggerRefereeGamesSync(...args),
   syncQueue: {
     close: (...args: unknown[]) => mockSyncQueueClose(...args),
     add: (...args: unknown[]) => mockSyncQueueAdd(...args),
@@ -103,8 +105,9 @@ vi.mock("../services/notifications/seed-referee-watch-rule", () => ({
   seedRefereeNotificationConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
+const mockSyncRefereeGames = vi.fn().mockResolvedValue({ created: 0, updated: 0, unchanged: 0 });
 vi.mock("../services/sync/referee-games.sync", () => ({
-  syncRefereeGames: vi.fn().mockResolvedValue({ created: 0, updated: 0, unchanged: 0 }),
+  syncRefereeGames: (...args: unknown[]) => mockSyncRefereeGames(...args),
 }));
 
 const mockDbUpdate = vi.fn();
@@ -178,6 +181,34 @@ describe("initializeWorkers", () => {
     await initializeWorkers();
 
     expect(mockInitScheduledJobs).toHaveBeenCalled();
+  });
+
+  it("routes the post-sync referee trigger through the queue, not a direct sync (#70)", async () => {
+    await initializeWorkers();
+
+    const completedHandler = mockWorkerOn.mock.calls.find(([evt]) => evt === "completed")?.[1] as
+      | ((job: { data: { type: string } }) => void)
+      | undefined;
+    expect(completedHandler).toBeDefined();
+
+    completedHandler!({ data: { type: "full" } });
+    await new Promise((r) => setImmediate(r)); // flush the fire-and-forget handler
+
+    expect(mockTriggerRefereeGamesSync).toHaveBeenCalledWith("post-full-sync");
+    expect(mockSyncRefereeGames).not.toHaveBeenCalled();
+  });
+
+  it("does not re-trigger a referee sync when a referee-games job completes (#70)", async () => {
+    await initializeWorkers();
+
+    const completedHandler = mockWorkerOn.mock.calls.find(([evt]) => evt === "completed")?.[1] as
+      | ((job: { data: { type: string } }) => void)
+      | undefined;
+
+    completedHandler!({ data: { type: "referee-games" } });
+    await new Promise((r) => setImmediate(r));
+
+    expect(mockTriggerRefereeGamesSync).not.toHaveBeenCalled();
   });
 
   it("starts heartbeat before stale-run reclaim", async () => {

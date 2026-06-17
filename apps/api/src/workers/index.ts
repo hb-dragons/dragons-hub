@@ -5,9 +5,8 @@ import { refereeReminderWorker } from "./referee-reminder.worker";
 import { pushReceiptWorker } from "./push-receipt.worker";
 import { taskReminderWorker } from "./task-reminder.worker";
 import { outboxPollWorker } from "./outbox-poll.worker";
-import { initializeScheduledJobs, initTaskReminders, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue, outboxPollQueue } from "./queues";
+import { initializeScheduledJobs, initTaskReminders, triggerRefereeGamesSync, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue, outboxPollQueue } from "./queues";
 import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
-import { syncRefereeGames } from "../services/sync/referee-games.sync";
 import { getDb } from "../config/database";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
@@ -101,14 +100,16 @@ export async function initializeWorkers() {
     logger.warn({ err: error }, "Failed to seed referee notification config");
   }
 
-  // Trigger referee games sync after main sync completes
+  // Trigger referee games sync after main sync completes. Enqueue via the queue
+  // (not a direct in-process call) so the run is tracked with a syncRunId, shows
+  // in admin history, and is deduped against the scheduled/manual referee runs.
   syncWorker.on("completed", (job) => {
     if (job?.data?.type !== "referee-games") {
       void (async () => {
         try {
-          await syncRefereeGames();
+          await triggerRefereeGamesSync("post-full-sync");
         } catch (error) {
-          logger.warn({ err: error }, "Failed to run referee games sync after main sync");
+          logger.warn({ err: error }, "Failed to enqueue referee games sync after main sync");
         }
       })();
     }
