@@ -8,7 +8,7 @@ import {
   venues,
   appSettings,
 } from "@dragons/db/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, or, inArray, sql } from "drizzle-orm";
 import { type BookingConfig } from "./booking-calculator";
 import { planReconciliation } from "./booking-planner";
 import type {
@@ -343,29 +343,38 @@ export async function reconcileBookingsForMatches(
   const venueNames =
     reconfirmVenueIds.length > 0 ? await fetchVenueNames(reconfirmVenueIds) : new Map<number, string>();
 
-  // Creates
-  for (const c of plan.creates) {
-    const [created] = await getDb()
-      .insert(venueBookings)
-      .values({
-        venueId: c.venueId,
-        date: c.date,
-        calculatedStartTime: c.calculatedStartTime,
-        calculatedEndTime: c.calculatedEndTime,
-        status: "pending",
-        needsReconfirmation: false,
-      })
-      .returning({ id: venueBookings.id });
+  // Junction rows to insert/delete, accumulated across creates + updates +
+  // removals so they go out as single set-based statements.
+  const junctionInserts: { venueBookingId: number; matchId: number }[] = [];
+  const junctionDeletes: { venueBookingId: number; matchId: number }[] = [];
 
-    if (c.matchIds.length > 0) {
-      await getDb().insert(venueBookingMatches).values(
-        c.matchIds.map((matchId) => ({ venueBookingId: created!.id, matchId })),
-      );
+  // Creates — one multi-row booking insert, then map ids back by venue+date.
+  if (plan.creates.length > 0) {
+    const createdRows = await getDb()
+      .insert(venueBookings)
+      .values(
+        plan.creates.map((c) => ({
+          venueId: c.venueId,
+          date: c.date,
+          calculatedStartTime: c.calculatedStartTime,
+          calculatedEndTime: c.calculatedEndTime,
+          status: "pending" as const,
+          needsReconfirmation: false,
+        })),
+      )
+      .returning({ id: venueBookings.id, venueId: venueBookings.venueId, date: venueBookings.date });
+
+    const createdIdByKey = new Map(createdRows.map((r) => [`${r.venueId}:${r.date}`, r.id]));
+    for (const c of plan.creates) {
+      const bookingId = createdIdByKey.get(`${c.venueId}:${c.date}`)!;
+      for (const matchId of c.matchIds) {
+        junctionInserts.push({ venueBookingId: bookingId, matchId });
+      }
     }
-    result.created++;
+    result.created += plan.creates.length;
   }
 
-  // Updates
+  // Updates — per-booking UPDATE (distinct SET values) + accumulated junction deltas.
   for (const u of plan.updates) {
     if (u.windowChanged) {
       const wasConfirmed = u.status === "confirmed";
@@ -414,41 +423,55 @@ export async function reconcileBookingsForMatches(
       result.unchanged++;
     }
 
-    // Apply the junction delta the planner computed.
-    if (u.addedMatchIds.length > 0) {
-      await getDb().insert(venueBookingMatches).values(
-        u.addedMatchIds.map((matchId) => ({ venueBookingId: u.bookingId, matchId })),
-      );
+    for (const matchId of u.addedMatchIds) {
+      junctionInserts.push({ venueBookingId: u.bookingId, matchId });
     }
-    if (u.removedMatchIds.length > 0) {
-      await getDb()
-        .delete(venueBookingMatches)
-        .where(
-          and(
-            eq(venueBookingMatches.venueBookingId, u.bookingId),
-            inArray(venueBookingMatches.matchId, u.removedMatchIds),
-          ),
-        );
+    for (const matchId of u.removedMatchIds) {
+      junctionDeletes.push({ venueBookingId: u.bookingId, matchId });
     }
   }
   result.unchanged += plan.unchanged;
 
-  // Removals (all-cancelled groups + scoped stale bookings)
+  // Removals (all-cancelled groups + scoped stale bookings).
+  const bookingDeletes: number[] = [];
   for (const r of plan.removals) {
-    if (r.removeMatchIds.length > 0) {
-      await getDb()
-        .delete(venueBookingMatches)
-        .where(
-          and(
-            eq(venueBookingMatches.venueBookingId, r.bookingId),
-            inArray(venueBookingMatches.matchId, r.removeMatchIds),
-          ),
-        );
-    }
     if (r.deletesBooking) {
-      await getDb().delete(venueBookings).where(eq(venueBookings.id, r.bookingId));
-      result.removed++;
+      bookingDeletes.push(r.bookingId);
+    } else {
+      for (const matchId of r.removeMatchIds) {
+        junctionDeletes.push({ venueBookingId: r.bookingId, matchId });
+      }
     }
+  }
+
+  // Set-based junction insert.
+  if (junctionInserts.length > 0) {
+    await getDb().insert(venueBookingMatches).values(junctionInserts);
+  }
+
+  // Set-based junction delete for partial removals + match moves.
+  if (junctionDeletes.length > 0) {
+    await getDb()
+      .delete(venueBookingMatches)
+      .where(
+        or(
+          ...junctionDeletes.map((d) =>
+            and(
+              eq(venueBookingMatches.venueBookingId, d.venueBookingId),
+              eq(venueBookingMatches.matchId, d.matchId),
+            ),
+          ),
+        ),
+      );
+  }
+
+  // Set-based booking delete (drops their junction rows too) for full removals.
+  if (bookingDeletes.length > 0) {
+    await getDb()
+      .delete(venueBookingMatches)
+      .where(inArray(venueBookingMatches.venueBookingId, bookingDeletes));
+    await getDb().delete(venueBookings).where(inArray(venueBookings.id, bookingDeletes));
+    result.removed += bookingDeletes.length;
   }
 
   log.info(result, "Reconciliation complete");

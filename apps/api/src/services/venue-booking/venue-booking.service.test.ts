@@ -677,6 +677,28 @@ describe("reconcileBookingsForMatches", () => {
 
     expect(result).toEqual({ created: 0, updated: 0, removed: 0, unchanged: 0 });
   });
+
+  it("creates multiple bookings with set-based writes (no per-booking INSERT)", async () => {
+    await seedBasicTeams();
+    const venueId = await insertVenue();
+    const m1 = await insertMatch({ api_match_id: 9001, venue_id: venueId, kickoff_date: "2025-03-15" });
+    const m2 = await insertMatch({ api_match_id: 9002, venue_id: venueId, kickoff_date: "2025-03-22" });
+    const m3 = await insertMatch({ api_match_id: 9003, venue_id: venueId, kickoff_date: "2025-03-29" });
+
+    const querySpy = vi.spyOn(ctx.client, "query");
+
+    const result = await reconcileBookingsForMatches([m1, m2, m3]);
+
+    expect(result.created).toBe(3);
+
+    const bookingInserts = querySpy.mock.calls.filter((c) =>
+      typeof c[0] === "string" && /insert into "venue_bookings"/i.test(c[0] as string),
+    );
+    // Set-based: one INSERT statement covers all three bookings, not one per booking.
+    expect(bookingInserts).toHaveLength(1);
+
+    querySpy.mockRestore();
+  });
 });
 
 describe("reconcileAfterSync", () => {
