@@ -427,6 +427,32 @@ describe("retryFailedNotification", () => {
     expect(rows.rows).toHaveLength(0);
   });
 
+  it("re-prefixes a push row's bare userId so dispatch can resolve it (#57)", async () => {
+    // Push rows are keyed by the BARE userId (the push adapter resolved the
+    // prefixed recipient to userIds and stored each row by userId).
+    await ctx.client.query(
+      "INSERT INTO channel_configs (id, name, type, config) VALUES ($1, $2, $3, $4)",
+      [7, "push-channel", "push", JSON.stringify({})],
+    );
+    const eventId = await insertEvent({ type: "referee.assigned" });
+    const id = await insertNotification({
+      event_id: eventId,
+      channel_config_id: 7,
+      status: "failed",
+      recipient_id: "user-99",
+    });
+    mockDispatchImmediate.mockResolvedValue(true);
+
+    const result = await retryFailedNotification(id);
+
+    expect(result.success).toBe(true);
+    // dispatchImmediate's push branch resolves via resolveRecipientUserIds, which
+    // only matches the prefixed "user:<id>" form — the bare row id must be restored.
+    expect(mockDispatchImmediate).toHaveBeenCalledWith(
+      expect.objectContaining({ channelType: "push", recipientId: "user:user-99" }),
+    );
+  });
+
   it("reports failure and does not resurrect the stale row when dispatch does not deliver (#57)", async () => {
     const id = await insertNotification({ status: "failed", recipient_id: "user:user-1" });
     mockDispatchImmediate.mockResolvedValue(false);
@@ -453,5 +479,15 @@ describe("retryFailedNotification", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Cannot retry");
+  });
+
+  it("returns error and does not dispatch when the row has no recipient", async () => {
+    const id = await insertNotification({ status: "failed", recipient_id: null });
+
+    const result = await retryFailedNotification(id);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("no recipient");
+    expect(mockDispatchImmediate).not.toHaveBeenCalled();
   });
 });

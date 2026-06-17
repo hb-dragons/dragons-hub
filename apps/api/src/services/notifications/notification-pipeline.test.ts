@@ -44,7 +44,7 @@ vi.mock("./templates/index", () => ({
   renderEventMessage: (...args: unknown[]) => mockRenderEventMessage(...args),
 }));
 
-const mockInAppSend = vi.fn().mockResolvedValue(undefined);
+const mockInAppSend = vi.fn().mockResolvedValue({ success: true });
 vi.mock("./channels/in-app", () => ({
   InAppChannelAdapter: class {
     send(...args: unknown[]) {

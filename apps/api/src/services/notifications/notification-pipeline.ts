@@ -290,7 +290,7 @@ export async function dispatchImmediate(params: {
   const message = renderEventMessage(event.type, payload, event.entityName, locale);
 
   if (channelType === "in_app") {
-    await inAppAdapter.send({
+    const sendResult = await inAppAdapter.send({
       eventId: event.id,
       watchRuleId,
       channelConfigId: config.id,
@@ -299,7 +299,7 @@ export async function dispatchImmediate(params: {
       body: message.body,
       locale,
     });
-    return true;
+    return sendResult.success;
   }
 
   if (channelType === "whatsapp_group") {

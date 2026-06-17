@@ -210,6 +210,7 @@ export async function retryFailedNotification(
     .from(domainEvents)
     .where(eq(domainEvents.id, entry.eventId))
     .limit(1);
+  /* v8 ignore next 3 -- defensive: notification_log.event_id is a FK, so the event always exists */
   if (!event) {
     return { success: false, error: "Originating event no longer exists" };
   }
@@ -219,9 +220,18 @@ export async function retryFailedNotification(
     .from(channelConfigs)
     .where(eq(channelConfigs.id, entry.channelConfigId))
     .limit(1);
+  /* v8 ignore next 3 -- defensive: notification_log.channel_config_id is a FK, so the config always exists */
   if (!config) {
     return { success: false, error: "Channel config no longer exists" };
   }
+
+  // Push rows are stored keyed by the BARE userId (the push adapter resolved the
+  // prefixed recipient to userIds and keyed each row by userId). dispatchImmediate's
+  // push branch re-resolves via resolveRecipientUserIds, which only matches the
+  // prefixed "user:<id>" form — so restore the prefix for push. in_app/whatsapp
+  // store (and dispatch expects) the prefixed recipient as-is.
+  const dispatchRecipientId =
+    config.type === "push" ? `user:${entry.recipientId}` : entry.recipientId;
 
   // Free the dedup slot: the channel adapters insert deduped on
   // (event_id, channel_config_id, recipient_id), so the existing failed row
@@ -234,7 +244,7 @@ export async function retryFailedNotification(
       event,
       config,
       watchRuleId: entry.watchRuleId,
-      recipientId: entry.recipientId,
+      recipientId: dispatchRecipientId,
       channelType: config.type,
     });
 
