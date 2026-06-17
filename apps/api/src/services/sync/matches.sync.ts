@@ -22,7 +22,6 @@ import {
   validScoreOrNull,
 } from "./period-scores";
 import {
-  detectFieldChanges as detectFieldChangesFn,
   computeEffectiveChanges as computeEffectiveChangesFn,
   classifyMatchChanges,
 } from "./match-change-classifier";
@@ -159,19 +158,15 @@ function snapshotToHashData(snapshot: RemoteSnapshot): Record<string, unknown> {
   };
 }
 
-/** Fields tracked for remote change detection */
-const TRACKED_FIELDS = [
-  "matchNo",
-  "matchDay",
-  "kickoffDate",
-  "kickoffTime",
-  "homeTeamApiId",
-  "guestTeamApiId",
-  "isConfirmed",
-  "isForfeited",
-  "isCancelled",
-  "homeScore",
-  "guestScore",
+/**
+ * Detail-sourced fields that `toRemoteSnapshot` can only populate from game
+ * details. When the detail fetch fails they arrive at their "missing" default
+ * (null for the scores, `false` for the sr*Open flags) even though the real
+ * values are still persisted, so both the hash and the persisted row must fall
+ * back to the existing values. Single source of truth for `resolveSnapshotForHash`
+ * and the preservation block in the update path. (issue #49)
+ */
+const PRESERVED_DETAIL_FIELDS = [
   "homeHalftimeScore",
   "guestHalftimeScore",
   "periodFormat",
@@ -192,15 +187,26 @@ const TRACKED_FIELDS = [
   "sr3Open",
 ] as const;
 
-function detectFieldChanges(
-  existing: typeof matches.$inferSelect,
+/**
+ * Build the snapshot used for hashing and version snapshots. When game details
+ * are unavailable, refill the detail-sourced fields from the already-persisted
+ * row so the hash reflects what is actually stored. Without this the hash flips
+ * on every detail-fetch failure, defeating the O(1) skip and churning the
+ * version history with all-null snapshots. (issue #49)
+ */
+function resolveSnapshotForHash(
   snapshot: RemoteSnapshot,
-) {
-  return detectFieldChangesFn(
-    existing as unknown as Record<string, FieldValueShape>,
-    snapshot as unknown as Record<string, FieldValueShape>,
-    TRACKED_FIELDS as unknown as readonly string[],
-  );
+  details: SdkGetGameResponse | null,
+  existing: typeof matches.$inferSelect | null,
+): RemoteSnapshot {
+  // With details the snapshot is authoritative. Without them every detail field
+  // is a "missing" default, so fall back to the persisted row for all of them.
+  if (details || !existing) return snapshot;
+  const resolved: RemoteSnapshot = { ...snapshot };
+  for (const field of PRESERVED_DETAIL_FIELDS) {
+    resolved[field] = existing[field] as never;
+  }
+  return resolved;
 }
 
 function computeEffectiveChanges(
@@ -325,9 +331,17 @@ export async function syncMatchesFromData(
           details,
           data.leagueDbId,
         );
-        const newHash = computeEntityHash(snapshotToHashData(remoteSnapshot));
-
         const existing = existingMatchesByApiId.get(apiMatchId) ?? null;
+
+        // Hash (and snapshot) the values we will actually persist: when details
+        // are unavailable the detail fields are refilled from the existing row so
+        // an availability flip doesn't thrash the hash. (issue #49)
+        const hashSnapshot = resolveSnapshotForHash(
+          remoteSnapshot,
+          details,
+          existing,
+        );
+        const newHash = computeEntityHash(snapshotToHashData(hashSnapshot));
 
         const apiVenueId = remoteSnapshot.venueApiId;
         const internalVenueId = apiVenueId
@@ -359,44 +373,6 @@ export async function syncMatchesFromData(
 
             if (!locked) return [];
 
-            const newVersionNumber = locked.currentRemoteVersion + 1;
-            const fieldChanges = detectFieldChanges(locked, remoteSnapshot);
-
-            // Venue change detection (venueApiId in snapshot → venueId in DB, not in TRACKED_FIELDS)
-            const resolvedVenueId = details
-              ? internalVenueId
-              : (internalVenueId ?? locked.venueId);
-            if (String(locked.venueId ?? "") !== String(resolvedVenueId ?? "")) {
-              fieldChanges.push({
-                fieldName: "venueId",
-                oldValue: locked.venueId != null ? String(locked.venueId) : null,
-                newValue: resolvedVenueId != null ? String(resolvedVenueId) : null,
-              });
-            }
-
-            // Create version snapshot
-            await tx.insert(matchRemoteVersions).values({
-              matchId: locked.id,
-              versionNumber: newVersionNumber,
-              syncRunId,
-              snapshot: remoteSnapshot as unknown as CurrentRemoteSnapshot,
-              dataHash: newHash,
-            });
-
-            // Create field-level changes (audit trail)
-            if (fieldChanges.length > 0) {
-              await tx.insert(matchChanges).values(
-                fieldChanges.map((change) => ({
-                  matchId: locked.id,
-                  track: "remote" as const,
-                  versionNumber: newVersionNumber,
-                  fieldName: change.fieldName,
-                  oldValue: change.oldValue,
-                  newValue: change.newValue,
-                })),
-              );
-            }
-
             // Load active overrides for this match
             const overrides = await tx
               .select({ fieldName: matchOverrides.fieldName })
@@ -418,45 +394,15 @@ export async function syncMatchesFromData(
               ? internalVenueId
               : (internalVenueId ?? locked.venueId);
 
-            // When game details are unavailable, preserve existing detail-sourced
-            // fields to avoid regressing valid data to null.
+            // When game details are unavailable, preserve every detail-sourced
+            // field (scores arrive null, sr*Open flags arrive false) from the
+            // persisted row so a detail-fetch failure neither regresses data nor
+            // churns the version/audit history. Overridden fields keep their local
+            // value and were already left out of the update set above. (issue #49)
             if (!details) {
-              if (
-                remoteSnapshot.homeHalftimeScore == null &&
-                !overriddenSet.has("homeHalftimeScore")
-              ) {
-                updateSet.homeHalftimeScore = locked.homeHalftimeScore;
-              }
-              if (
-                remoteSnapshot.guestHalftimeScore == null &&
-                !overriddenSet.has("guestHalftimeScore")
-              ) {
-                updateSet.guestHalftimeScore = locked.guestHalftimeScore;
-              }
-              // Preserve period scores when details unavailable and snapshot has nulls
-              if (
-                remoteSnapshot.periodFormat == null &&
-                !overriddenSet.has("periodFormat")
-              ) {
-                updateSet.periodFormat = locked.periodFormat;
-              }
-              const periodFields = [
-                "homeQ1",
-                "guestQ1",
-                "homeQ2",
-                "guestQ2",
-                "homeQ3",
-                "guestQ3",
-                "homeQ4",
-                "guestQ4",
-                "homeOt1",
-                "guestOt1",
-                "homeOt2",
-                "guestOt2",
-              ] as const;
-              for (const pf of periodFields) {
-                if (remoteSnapshot[pf] == null && !overriddenSet.has(pf)) {
-                  updateSet[pf] = locked[pf];
+              for (const field of PRESERVED_DETAIL_FIELDS) {
+                if (!overriddenSet.has(field)) {
+                  updateSet[field] = locked[field];
                 }
               }
             }
@@ -471,6 +417,39 @@ export async function syncMatchesFromData(
                 oldValue: locked.venueId != null ? String(locked.venueId) : null,
                 newValue: updateSet.venueId != null ? String(updateSet.venueId as number) : null,
               });
+            }
+
+            // Only snapshot a new remote version, bump currentRemoteVersion, and
+            // write audit rows when something is actually persisted. A detail-fetch
+            // failure leaves the snapshot's detail fields null, but the preservation
+            // block above keeps the stored values, so `effective` is empty — we must
+            // not churn the version history or write "X -> null" audit rows. Audit
+            // rows derive from `effective` (the real persisted diff), never the raw
+            // snapshot. (issue #49)
+            const newVersionNumber =
+              effective.length > 0
+                ? locked.currentRemoteVersion + 1
+                : locked.currentRemoteVersion;
+
+            if (effective.length > 0) {
+              await tx.insert(matchRemoteVersions).values({
+                matchId: locked.id,
+                versionNumber: newVersionNumber,
+                syncRunId,
+                snapshot: hashSnapshot as unknown as CurrentRemoteSnapshot,
+                dataHash: newHash,
+              });
+
+              await tx.insert(matchChanges).values(
+                effective.map((change) => ({
+                  matchId: locked.id,
+                  track: "remote" as const,
+                  versionNumber: newVersionNumber,
+                  fieldName: change.fieldName,
+                  oldValue: change.oldValue,
+                  newValue: change.newValue,
+                })),
+              );
             }
 
             // Auto-release or conflict: check each overridden field
