@@ -30,6 +30,7 @@ import {
   markAllRead,
   getUnreadCount,
   retryFailedNotification,
+  recipientKeysForUserId,
 } from "./notification-admin.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
@@ -68,13 +69,21 @@ async function ensureChannelConfig(id: number = 1): Promise<void> {
 
 async function seedUser(
   id: string,
-  opts: { role?: string | null } = {},
+  opts: { role?: string | null; refereeId?: number } = {},
 ): Promise<void> {
   await ctx.client.query(
-    `INSERT INTO "user" (id, name, email, email_verified, role, created_at, updated_at)
-     VALUES ($1, $2, $3, false, $4, now(), now())`,
-    [id, id, `${id}@test.de`, opts.role ?? null],
+    `INSERT INTO "user" (id, name, email, email_verified, role, referee_id, created_at, updated_at)
+     VALUES ($1, $2, $3, false, $4, $5, now(), now())`,
+    [id, id, `${id}@test.de`, opts.role ?? null, opts.refereeId ?? null],
   );
+}
+
+async function seedReferee(apiId: number): Promise<number> {
+  const r = await ctx.client.query<{ id: number }>(
+    `INSERT INTO referees (api_id, first_name) VALUES ($1, 'Ref') RETURNING id`,
+    [apiId],
+  );
+  return r.rows[0]!.id;
 }
 
 async function insertEvent(overrides: Record<string, unknown> = {}): Promise<string> {
@@ -132,6 +141,28 @@ async function insertNotification(overrides: Record<string, unknown> = {}) {
 }
 
 // --- Tests ---
+
+describe("recipientKeysForUserId", () => {
+  it("addresses a referee-linked user via referee:<id> and audience:referee", async () => {
+    const refId = await seedReferee(901);
+    await seedUser("ref-user", { refereeId: refId });
+
+    const keys = await recipientKeysForUserId("ref-user");
+
+    expect(keys).toEqual(
+      expect.arrayContaining(["user:ref-user", `referee:${refId}`, "audience:referee"]),
+    );
+  });
+
+  it("does not grant audience:referee to a non-referee user", async () => {
+    await seedUser("admin-user", { role: "admin" });
+
+    const keys = await recipientKeysForUserId("admin-user");
+
+    expect(keys).toContain("audience:admin");
+    expect(keys).not.toContain("audience:referee");
+  });
+});
 
 describe("listNotifications", () => {
   it("returns empty list when no notifications exist", async () => {

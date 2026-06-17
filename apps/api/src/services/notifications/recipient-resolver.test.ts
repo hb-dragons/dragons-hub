@@ -14,6 +14,7 @@ vi.mock("@dragons/db/schema", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col: string, val: unknown) => ({ eq: [col, val] })),
+  isNotNull: vi.fn((col: string) => ({ isNotNull: col })),
 }));
 
 import { resolveRecipientUserIds } from "./recipient-resolver";
@@ -54,6 +55,12 @@ describe("resolveRecipientUserIds", () => {
     mockSelectReturning([{ id: "admin_1" }, { id: "admin_2" }]);
     const result = await resolveRecipientUserIds("audience:admin");
     expect(result).toEqual(["admin_1", "admin_2"]);
+  });
+
+  it("resolves audience:referee to all referee-linked user ids", async () => {
+    mockSelectReturning([{ id: "ref_u1" }, { id: "ref_u2" }]);
+    const result = await resolveRecipientUserIds("audience:referee");
+    expect(result).toEqual(["ref_u1", "ref_u2"]);
   });
 
   it("resolves user:X to [X] without a DB query", async () => {

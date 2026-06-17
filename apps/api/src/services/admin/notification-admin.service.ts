@@ -17,7 +17,12 @@ export async function recipientKeysForUserId(userId: string): Promise<string[]> 
     .from(user)
     .where(eq(user.id, userId))
     .limit(1);
-  if (u?.refereeId != null) keys.push(`referee:${u.refereeId}`);
+  if (u?.refereeId != null) {
+    keys.push(`referee:${u.refereeId}`);
+    // Referees carry no role post-RBAC-cleanup, so the referee link — not a
+    // role — is what makes them part of the "referee" audience.
+    keys.push("audience:referee");
+  }
   for (const role of parseRoles(u?.role)) keys.push(`audience:${role}`);
   return keys;
 }
