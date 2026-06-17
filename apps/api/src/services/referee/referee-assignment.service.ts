@@ -157,10 +157,29 @@ export async function assignReferee(
       ? { sr1Name: refereeName, sr1RefereeApiId: refereeApiId, sr1Status: "assigned" }
       : { sr2Name: refereeName, sr2RefereeApiId: refereeApiId, sr2Status: "assigned" };
 
-  await getDb()
+  // Gate the write on the slot still being open so two referees racing for the
+  // same slot can't both win: the conditional UPDATE is atomic, and 0 affected
+  // rows means another claim got there first. (The federation submit above is
+  // the remote authority; this closes the local DB-state race.)
+  const slotStatusColumn =
+    slotNumber === 1 ? refereeGames.sr1Status : refereeGames.sr2Status;
+  const claimed = await getDb()
     .update(refereeGames)
     .set(slotUpdate)
-    .where(eq(refereeGames.apiMatchId, spielplanId));
+    .where(
+      and(
+        eq(refereeGames.apiMatchId, spielplanId),
+        eq(slotStatusColumn, "open"),
+      ),
+    )
+    .returning({ id: refereeGames.id });
+
+  if (claimed.length === 0) {
+    throw new AssignmentError(
+      `Slot ${slotNumber} for game ${spielplanId} was already taken`,
+      "SLOT_TAKEN",
+    );
+  }
 
   // 9. Upsert intent (only when game has a linked match)
   if (game.matchId != null) {

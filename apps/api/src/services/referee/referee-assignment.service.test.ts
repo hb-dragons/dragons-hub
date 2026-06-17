@@ -4,7 +4,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   selectCalls: [] as unknown[][],
-  updateWhere: vi.fn().mockResolvedValue(undefined),
+  // .where() returns a thenable-ish object exposing .returning(); assignReferee
+  // now reads the affected-row count, unassignReferee just awaits and ignores it.
+  updateReturning: vi.fn().mockResolvedValue([{ id: 1 }]),
+  updateWhere: vi.fn(() => ({ returning: mocks.updateReturning })),
   insertOnConflict: vi.fn().mockResolvedValue(undefined),
   deleteWhere: vi.fn().mockResolvedValue(undefined),
   searchRefereesForGame: vi.fn(),
@@ -324,6 +327,29 @@ describe("assignReferee", () => {
     });
     expect(mocks.searchRefereesForGame).toHaveBeenCalledTimes(2);
     expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
+  });
+
+  it("SLOT_TAKEN: throws when the conditional slot update affects 0 rows (#67)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    // The guarded UPDATE ... WHERE sr1_status='open' matched no row → slot taken.
+    mocks.updateReturning.mockResolvedValue([]);
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "SLOT_TAKEN",
+      name: "AssignmentError",
+    });
+
+    // The race loser must not write an intent or publish an assignment event.
+    expect(mocks.insertOnConflict).not.toHaveBeenCalled();
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
   });
 });
 
