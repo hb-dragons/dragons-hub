@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { domainEvents } from "@dragons/db/schema";
-import { sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { domainEventsQueue } from "../../workers/queues";
 import { logger } from "../../config/logger";
 
@@ -15,15 +15,25 @@ interface ClaimedEvent extends Record<string, unknown> {
 const BATCH_LIMIT = 100;
 const ENQUEUE_CONCURRENCY = 10;
 
+// How long an enqueued-but-unprocessed event is left alone before the poller
+// reclaims it. Must comfortably exceed the worker's retry window (attempts ×
+// backoff) so a job that is still retrying isn't enqueued a second time.
+const CLAIM_LEASE_MS = 5 * 60 * 1000;
+
 async function claimBatch(): Promise<ClaimedEvent[]> {
   const oneSecondAgo = new Date(Date.now() - 1000);
+  const leaseExpiry = new Date(Date.now() - CLAIM_LEASE_MS);
   return await getDb().transaction(async (tx) => {
+    // Claim events that are not yet processed AND are either never enqueued or
+    // whose lease has expired (the prior delivery attempt failed or was lost).
+    // enqueued_at acts as the lease stamp; processed_at is the done flag.
     const result = await tx.execute<ClaimedEvent>(sql`
       WITH claimed AS (
         SELECT id
         FROM domain_events
-        WHERE enqueued_at IS NULL
+        WHERE processed_at IS NULL
           AND created_at <= ${oneSecondAgo}
+          AND (enqueued_at IS NULL OR enqueued_at <= ${leaseExpiry})
         ORDER BY created_at ASC
         LIMIT ${BATCH_LIMIT}
         FOR UPDATE SKIP LOCKED
@@ -41,11 +51,10 @@ async function claimBatch(): Promise<ClaimedEvent[]> {
 
 async function releaseClaim(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
-  await getDb().execute(sql`
-    UPDATE domain_events
-    SET enqueued_at = NULL
-    WHERE id IN ${sql.raw(`(${ids.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")})`)}
-  `);
+  await getDb()
+    .update(domainEvents)
+    .set({ enqueuedAt: null })
+    .where(inArray(domainEvents.id, ids));
 }
 
 export async function pollOutbox(): Promise<number> {

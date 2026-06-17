@@ -31,7 +31,7 @@ vi.mock("../config/redis", () => ({
 }));
 
 vi.mock("@dragons/db/schema", () => ({
-  domainEvents: { createdAt: "createdAt", enqueuedAt: "enqueuedAt" },
+  domainEvents: { createdAt: "createdAt", enqueuedAt: "enqueuedAt", processedAt: "processedAt" },
   syncRuns: { syncType: "syncType", status: "status", completedAt: "completedAt" },
 }));
 

@@ -10,7 +10,12 @@ export const domainEventsQueue = new Queue("domain-events", {
   prefix: "{bull}",
   connection: { url: env.REDIS_URL },
   defaultJobOptions: {
-    attempts: 1, // events are idempotent; outbox poller handles retries
+    // Retry transient processing failures fast (downstream notification_log /
+    // digest_buffer unique constraints make re-delivery idempotent). If all
+    // attempts are exhausted the event keeps processed_at = NULL, so the outbox
+    // poller reclaims it after the lease and retries again — at-least-once.
+    attempts: 3,
+    backoff: { type: "exponential", delay: 5000 },
     removeOnComplete: { count: 1000 },
     removeOnFail: { count: 5000 },
   },

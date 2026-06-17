@@ -281,6 +281,13 @@
       "when": 1781394167267,
       "tag": "0039_tidy_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1781694285752,
+      "tag": "0040_brainy_photon",
+      "breakpoints": true
     }
   ]
 }
