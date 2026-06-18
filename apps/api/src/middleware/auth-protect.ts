@@ -32,31 +32,38 @@ export const trustForwardedFor: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
 };
 
-function failKey(email: string): string {
-  return `auth:fail:${email.toLowerCase()}`;
+// Lockout is keyed on IP + email so an attacker can't lock a victim's account
+// by hammering their email from an unrelated IP — the victim's own IP keeps a
+// separate counter. The trusted client IP is set upstream by trustForwardedFor.
+function identity(ip: string, email: string): string {
+  return `${ip}:${email.toLowerCase()}`;
 }
 
-function lockKey(email: string): string {
-  return `auth:lock:${email.toLowerCase()}`;
+function failKey(ip: string, email: string): string {
+  return `auth:fail:${identity(ip, email)}`;
 }
 
-export async function isLockedOut(email: string): Promise<boolean> {
-  const v = await getRedis().get(lockKey(email));
+function lockKey(ip: string, email: string): string {
+  return `auth:lock:${identity(ip, email)}`;
+}
+
+export async function isLockedOut(ip: string, email: string): Promise<boolean> {
+  const v = await getRedis().get(lockKey(ip, email));
   return v !== null;
 }
 
-export async function recordAuthFailure(email: string): Promise<void> {
-  const key = failKey(email);
+export async function recordAuthFailure(ip: string, email: string): Promise<void> {
+  const key = failKey(ip, email);
   const count = await getRedis().incr(key);
   if (count === 1) await getRedis().expire(key, FAIL_WINDOW_SEC);
   if (count >= FAIL_THRESHOLD) {
-    await getRedis().set(lockKey(email), "1", "EX", LOCKOUT_SEC);
+    await getRedis().set(lockKey(ip, email), "1", "EX", LOCKOUT_SEC);
     await getRedis().del(key);
   }
 }
 
-export async function clearAuthFailures(email: string): Promise<void> {
-  await Promise.all([getRedis().del(failKey(email)), getRedis().del(lockKey(email))]);
+export async function clearAuthFailures(ip: string, email: string): Promise<void> {
+  await Promise.all([getRedis().del(failKey(ip, email)), getRedis().del(lockKey(ip, email))]);
 }
 
 export const signInLockout: MiddlewareHandler<AppEnv> = async (c, next) => {
@@ -74,7 +81,11 @@ export const signInLockout: MiddlewareHandler<AppEnv> = async (c, next) => {
     // body unreadable — let better-auth reject it
   }
 
-  if (email && (await isLockedOut(email))) {
+  // trustForwardedFor has already normalized x-forwarded-for to the single
+  // trusted client IP. Fall back to a shared bucket only when it's absent.
+  const ip = c.req.header("x-forwarded-for")?.trim() || "unknown";
+
+  if (email && (await isLockedOut(ip, email))) {
     return c.json({ error: "Too many failed attempts. Try again later." }, 429);
   }
 
@@ -84,8 +95,10 @@ export const signInLockout: MiddlewareHandler<AppEnv> = async (c, next) => {
 
   const status = c.res.status;
   if (status === 200 || status === 201) {
-    await clearAuthFailures(email);
-  } else if (status === 401 || status === 400 || status === 403) {
-    await recordAuthFailure(email);
+    await clearAuthFailures(ip, email);
+  } else if (status === 401 || status === 403) {
+    // 400 is a malformed/validation rejection, not a credential failure — it
+    // must not count toward lockout, or an attacker could trip it with junk.
+    await recordAuthFailure(ip, email);
   }
 };

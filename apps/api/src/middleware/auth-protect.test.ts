@@ -99,17 +99,23 @@ describe("trustForwardedFor", () => {
 
 describe("auth-protect lockout helpers", () => {
   it("locks out after threshold failures and clears on success", async () => {
-    for (let i = 0; i < 9; i++) await recordAuthFailure("a@b.com");
-    expect(await isLockedOut("a@b.com")).toBe(false);
-    await recordAuthFailure("a@b.com");
-    expect(await isLockedOut("a@b.com")).toBe(true);
-    await clearAuthFailures("a@b.com");
-    expect(await isLockedOut("a@b.com")).toBe(false);
+    for (let i = 0; i < 9; i++) await recordAuthFailure("1.1.1.1", "a@b.com");
+    expect(await isLockedOut("1.1.1.1", "a@b.com")).toBe(false);
+    await recordAuthFailure("1.1.1.1", "a@b.com");
+    expect(await isLockedOut("1.1.1.1", "a@b.com")).toBe(true);
+    await clearAuthFailures("1.1.1.1", "a@b.com");
+    expect(await isLockedOut("1.1.1.1", "a@b.com")).toBe(false);
   });
 
   it("treats email case-insensitively", async () => {
-    for (let i = 0; i < 10; i++) await recordAuthFailure("A@B.COM");
-    expect(await isLockedOut("a@b.com")).toBe(true);
+    for (let i = 0; i < 10; i++) await recordAuthFailure("1.1.1.1", "A@B.COM");
+    expect(await isLockedOut("1.1.1.1", "a@b.com")).toBe(true);
+  });
+
+  it("scopes the counter to the IP — the same email from another IP is independent", async () => {
+    for (let i = 0; i < 10; i++) await recordAuthFailure("1.1.1.1", "a@b.com");
+    expect(await isLockedOut("1.1.1.1", "a@b.com")).toBe(true);
+    expect(await isLockedOut("2.2.2.2", "a@b.com")).toBe(false);
   });
 });
 
@@ -122,8 +128,8 @@ describe("signInLockout middleware", () => {
   }
 
   it("clears failures on 200 response", async () => {
-    await recordAuthFailure("user@x.com");
-    expect(Number(store.get("auth:fail:user@x.com"))).toBe(1);
+    await recordAuthFailure("unknown", "user@x.com");
+    expect(Number(store.get("auth:fail:unknown:user@x.com"))).toBe(1);
     const app = makeApp((c) => c.json({ ok: true }));
     const res = await app.request("/api/auth/sign-in/email", {
       method: "POST",
@@ -131,7 +137,7 @@ describe("signInLockout middleware", () => {
       body: JSON.stringify({ email: "user@x.com", password: "p" }),
     });
     expect(res.status).toBe(200);
-    expect(store.get("auth:fail:user@x.com")).toBeUndefined();
+    expect(store.get("auth:fail:unknown:user@x.com")).toBeUndefined();
   });
 
   it("records failure on 401", async () => {
@@ -141,11 +147,11 @@ describe("signInLockout middleware", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "user@x.com" }),
     });
-    expect(store.get("auth:fail:user@x.com")).toBe("1");
+    expect(store.get("auth:fail:unknown:user@x.com")).toBe("1");
   });
 
   it("returns 429 when locked out without invoking handler", async () => {
-    for (let i = 0; i < 10; i++) await recordAuthFailure("user@x.com");
+    for (let i = 0; i < 10; i++) await recordAuthFailure("unknown", "user@x.com");
     const handler = vi.fn(() => new Response("ok"));
     const app = new Hono();
     app.use("/api/auth/sign-in/email", signInLockout);
@@ -197,6 +203,59 @@ describe("signInLockout middleware", () => {
     expect(res.status).toBe(200);
   });
 
+  it("locks out per IP+email so an attacker can't lock the victim's own IP", async () => {
+    const app = new Hono();
+    app.use("/api/auth/sign-in/email", signInLockout);
+    app.post("/api/auth/sign-in/email", (c) => c.json({ error: "bad" }, 401));
+    const attacker = { "Content-Type": "application/json", "x-forwarded-for": "6.6.6.6" };
+
+    // Attacker hammers 10 failures against the victim's email from their own IP.
+    for (let i = 0; i < 10; i++) {
+      await app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: attacker,
+        body: JSON.stringify({ email: "victim@x.com" }),
+      });
+    }
+    // The attacker's own IP is now locked.
+    const attackerRes = await app.request("/api/auth/sign-in/email", {
+      method: "POST",
+      headers: attacker,
+      body: JSON.stringify({ email: "victim@x.com" }),
+    });
+    expect(attackerRes.status).toBe(429);
+
+    // The victim, signing in from a different IP, is NOT locked out.
+    const victimRes = await app.request("/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "9.9.9.9" },
+      body: JSON.stringify({ email: "victim@x.com" }),
+    });
+    expect(victimRes.status).toBe(401);
+  });
+
+  it("does not count 400 validation responses toward lockout", async () => {
+    const app = new Hono();
+    app.use("/api/auth/sign-in/email", signInLockout);
+    app.post("/api/auth/sign-in/email", (c) => c.json({ error: "invalid" }, 400));
+    const headers = { "Content-Type": "application/json", "x-forwarded-for": "1.1.1.1" };
+
+    // Well past the threshold of 400s — none should count.
+    for (let i = 0; i < 15; i++) {
+      await app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ email: "user@x.com" }),
+      });
+    }
+    const res = await app.request("/api/auth/sign-in/email", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ email: "user@x.com" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("does not record on 500 server errors", async () => {
     const app = new Hono();
     app.use("/api/auth/sign-in/email", signInLockout);
@@ -206,6 +265,6 @@ describe("signInLockout middleware", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "user@x.com" }),
     });
-    expect(store.get("auth:fail:user@x.com")).toBeUndefined();
+    expect(store.get("auth:fail:unknown:user@x.com")).toBeUndefined();
   });
 });
