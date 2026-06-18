@@ -188,6 +188,7 @@ export async function retryFailedNotification(
       channelConfigId: notificationLog.channelConfigId,
       recipientId: notificationLog.recipientId,
       status: notificationLog.status,
+      retryCount: notificationLog.retryCount,
     })
     .from(notificationLog)
     .where(eq(notificationLog.id, notificationId))
@@ -255,6 +256,20 @@ export async function retryFailedNotification(
       );
       return { success: false, error: "Re-delivery failed" };
     }
+
+    // The adapter's fresh row carries the default retry_count (0), losing the
+    // 'retried N times' audit the admin UI and CSV export read. Carry the prior
+    // count forward (+1) onto the freshly-inserted row, located by the dedup key.
+    await getDb()
+      .update(notificationLog)
+      .set({ retryCount: (entry.retryCount ?? 0) + 1 })
+      .where(
+        and(
+          eq(notificationLog.eventId, entry.eventId),
+          eq(notificationLog.channelConfigId, entry.channelConfigId),
+          eq(notificationLog.recipientId, entry.recipientId),
+        ),
+      );
 
     logger.info(
       { notificationId, eventId: entry.eventId, channelType: config.type },

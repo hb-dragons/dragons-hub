@@ -68,6 +68,8 @@ vi.mock("@dragons/db/schema", () => ({
     id: "rg.id",
     sr1Status: "rg.sr1Status",
     sr2Status: "rg.sr2Status",
+    sr1RefereeApiId: "rg.sr1RefereeApiId",
+    sr2RefereeApiId: "rg.sr2RefereeApiId",
   },
   referees: { apiId: "r.apiId", id: "r.id" },
   matches: { id: "m.id", homeTeamApiId: "m.homeTeamApiId", guestTeamApiId: "m.guestTeamApiId" },
@@ -113,6 +115,11 @@ beforeEach(() => {
   mocks.searchRefereesForGame.mockReset();
   mocks.submitRefereeAssignment.mockReset();
   mocks.submitRefereeUnassignment.mockReset();
+  // clearAllMocks does not reset mockResolvedValue, so a test that sets the
+  // guarded UPDATE to 0 rows would otherwise leak that into later tests. Restore
+  // the default "claim succeeded" so test order doesn't matter.
+  mocks.updateReturning.mockReset();
+  mocks.updateReturning.mockResolvedValue([{ id: 1 }]);
   selectCallIndex = 0;
   mocks.selectCalls = [];
 });
@@ -271,9 +278,42 @@ describe("assignReferee", () => {
       name: "AssignmentError",
     });
 
-    // No db update or event on federation failure
-    expect(mocks.updateWhere).not.toHaveBeenCalled();
+    // #84: we now win the atomic local claim BEFORE submitting to the
+    // federation, so on a federation rejection we must roll the slot back to
+    // open (claim UPDATE + rollback UPDATE = 2 calls). The rollback is a
+    // compare-and-set guarded on THIS caller still holding the slot, so it can't
+    // clobber a referee a concurrent caller validly assigned in the meantime.
+    expect(mocks.updateWhere).toHaveBeenCalledTimes(2);
+    expect(mocks.updateWhere).toHaveBeenLastCalledWith({
+      and: [
+        { eq: ["rg.apiMatchId", 12345] },
+        { eq: ["rg.sr1RefereeApiId", 9001] },
+        { eq: ["rg.sr1Status", "assigned"] },
+      ],
+    });
+    expect(mocks.insertOnConflict).not.toHaveBeenCalled();
     expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("race loser never writes the federation: 0-row claim short-circuits before submit (#84)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+      // re-read: a rival referee already holds the slot
+      [{ ...GAME_ROW, sr1Status: "assigned", sr1RefereeApiId: 5555 }],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    mocks.updateReturning.mockResolvedValue([]); // lost the atomic guard
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "SLOT_TAKEN",
+    });
+    // The federation has no compare-and-set; the loser must not submit there.
+    expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
   });
 
   it("skips deny check when matchId is null", async () => {
@@ -372,6 +412,59 @@ describe("assignReferee", () => {
     });
     // The race loser must not write an intent or publish an assignment event.
     expect(mocks.insertOnConflict).not.toHaveBeenCalled();
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("idempotent self-reclaim: 0-row update but slot already held by the SAME referee returns success (#86)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+      // 6th select: re-read after the 0-row guard shows the slot is already
+      // held by this same referee (a re-submit / double-click), not a rival.
+      [{ ...GAME_ROW, sr1Status: "assigned", sr1RefereeApiId: 9001, sr1Name: "Max Muster" }],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    mocks.updateReturning.mockResolvedValue([]); // guard matched 0 rows
+
+    const result = await assignReferee(12345, 1, 9001);
+
+    expect(result).toMatchObject({
+      success: true,
+      slot: "sr1",
+      status: "assigned",
+      refereeName: "Max Muster",
+    });
+    // The federation already holds this referee, so we don't re-submit.
+    expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
+    // We still (idempotently) upsert the intent, so an original call that died
+    // after the federation submit but before persisting the intent is recovered.
+    expect(mocks.insertOnConflict).toHaveBeenCalledOnce();
+    // But we do NOT re-publish REFEREE_ASSIGNED — replaying it on a re-claim
+    // would spam a stale "just assigned" notification.
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("SLOT_TAKEN: 0-row update with the slot held by a DIFFERENT referee still throws (#86)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+      // re-read shows a rival referee won the slot
+      [{ ...GAME_ROW, sr1Status: "assigned", sr1RefereeApiId: 5555, sr1Name: "Other Ref" }],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    mocks.updateReturning.mockResolvedValue([]);
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "SLOT_TAKEN",
+    });
     expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
   });
 });

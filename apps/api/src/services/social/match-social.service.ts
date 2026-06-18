@@ -2,7 +2,7 @@ import { getDb } from "../../config/database";
 import { matches, teams } from "@dragons/db/schema";
 import { and, eq, gte, lte, isNotNull, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { startOfISOWeek, endOfISOWeek, setISOWeek, setYear } from "date-fns";
+import { startOfISOWeek, endOfISOWeek, setISOWeek, setYear, format } from "date-fns";
 
 interface WeekendMatchesParams {
   type: "preview" | "results";
@@ -40,13 +40,18 @@ export async function getWeekendMatches(
   const refDate = setISOWeek(setYear(new Date(year, 0, 4), year), week);
   const weekStart = startOfISOWeek(refDate);
   const weekEnd = endOfISOWeek(refDate);
-  const weekStartStr = weekStart.toISOString().split("T")[0]!;
-  const weekEndStr = weekEnd.toISOString().split("T")[0]!;
+  // Format in local time. toISOString() converts to UTC, which in a positive
+  // offset zone (Europe/Berlin) rolls local-midnight Monday back to the previous
+  // day, shifting the whole ISO-week window off by one against kickoffDate.
+  const weekStartStr = format(weekStart, "yyyy-MM-dd");
+  const weekEndStr = format(weekEnd, "yyyy-MM-dd");
 
+  // A finished match has both scores; an upcoming one has neither. Gating only
+  // on homeScore would miscategorise a row with a partial/one-sided score.
   const scoreCondition =
     type === "results"
-      ? isNotNull(matches.homeScore)
-      : isNull(matches.homeScore);
+      ? and(isNotNull(matches.homeScore), isNotNull(matches.guestScore))
+      : and(isNull(matches.homeScore), isNull(matches.guestScore));
 
   const rows = await getDb()
     .select({

@@ -325,6 +325,38 @@ describe("PushChannelAdapter", () => {
     expect(rows[0]!.status).toBe("sent_ticket");
   });
 
+  it("releases the claim when a user's devices straddle a terminal error and an undelivered chunk (#88)", async () => {
+    await seedDevice("user_a", "ExponentPushToken[term]");
+    await seedDevice("user_a", "ExponentPushToken[undel]");
+    // One device got a terminal Expo error (DeviceNotRegistered — reached Expo,
+    // not retryable); the other's chunk never reached Expo (undelivered).
+    sendBatch.mockResolvedValueOnce([
+      { status: "error", message: "DeviceNotRegistered", details: { error: "DeviceNotRegistered" } },
+      { status: "error", details: { error: "ChunkUndelivered" } },
+    ]);
+
+    const adapter = new PushChannelAdapter(mockClient);
+    const result = await adapter.send(baseParams(["user_a"]));
+
+    // No delivered device AND at least one undelivered → release so the
+    // transient device retries (the terminal device just errors again, harmless).
+    const rows = await getLogs();
+    expect(rows.some((r) => r.recipient_id === "user_a")).toBe(false);
+    expect(result.success).toBe(false);
+
+    // Reprocess re-sends both of the user's devices.
+    sendBatch.mockResolvedValueOnce([
+      { status: "error", message: "DeviceNotRegistered", details: { error: "DeviceNotRegistered" } },
+      { status: "ok", id: "tkt_undel" },
+    ]);
+    await adapter.send(baseParams(["user_a"]));
+    const sentSecond = sendBatch.mock.calls[1]![0] as Array<{ to: string }>;
+    expect(sentSecond.map((m) => m.to).sort()).toEqual([
+      "ExponentPushToken[term]",
+      "ExponentPushToken[undel]",
+    ]);
+  });
+
   it("prefers the user preference locale over the device locale", async () => {
     await seedDevice("user_a", "ExponentPushToken[a]", "de-DE");
     await seedPref("user_a", { locale: "en" });

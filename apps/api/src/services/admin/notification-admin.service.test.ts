@@ -453,6 +453,35 @@ describe("retryFailedNotification", () => {
     );
   });
 
+  it("carries the prior retry_count forward (+1) onto the freshly dispatched row (#87)", async () => {
+    const eventId = await insertEvent({ type: "match.cancelled" });
+    const id = await insertNotification({
+      event_id: eventId,
+      status: "failed",
+      retry_count: 2,
+      recipient_id: "user:user-1",
+    });
+    // Simulate the channel adapter inserting a fresh row (default retry_count 0)
+    // on a successful re-dispatch.
+    mockDispatchImmediate.mockImplementation(async () => {
+      await ctx.client.query(
+        "INSERT INTO notification_log (event_id, channel_config_id, recipient_id, title, body, locale, status, sent_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+        [eventId, 1, "user:user-1", "T", "B", "de", "sent", new Date().toISOString()],
+      );
+      return true;
+    });
+
+    const result = await retryFailedNotification(id);
+
+    expect(result.success).toBe(true);
+    const rows = await ctx.client.query(
+      "SELECT retry_count FROM notification_log WHERE event_id = $1 AND channel_config_id = 1 AND recipient_id = $2",
+      [eventId, "user:user-1"],
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect((rows.rows[0] as { retry_count: number }).retry_count).toBe(3);
+  });
+
   it("reports failure and does not resurrect the stale row when dispatch does not deliver (#57)", async () => {
     const id = await insertNotification({ status: "failed", recipient_id: "user:user-1" });
     mockDispatchImmediate.mockResolvedValue(false);

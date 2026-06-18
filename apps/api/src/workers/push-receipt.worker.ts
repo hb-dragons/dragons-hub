@@ -2,7 +2,6 @@ import { Worker, type Job } from "bullmq";
 import {
   and,
   eq,
-  gt,
   inArray,
   isNotNull,
   isNull,
@@ -46,13 +45,15 @@ export async function reconcilePushReceipts(
       id: notificationLog.id,
       providerTicketId: notificationLog.providerTicketId,
       recipientToken: notificationLog.recipientToken,
+      createdAt: notificationLog.createdAt,
     })
     .from(notificationLog)
     .where(
       and(
         eq(notificationLog.status, "sent_ticket"),
         isNotNull(notificationLog.providerTicketId),
-        gt(notificationLog.createdAt, ageCutoff),
+        // No createdAt floor: aged rows must still be picked up so they can be
+        // finalized below instead of polling as sent_ticket forever.
         or(
           isNull(notificationLog.providerReceiptCheckedAt),
           lt(notificationLog.providerReceiptCheckedAt, pollCutoff),
@@ -64,7 +65,7 @@ export async function reconcilePushReceipts(
   // Filter rows that still have a ticket (defensive — SQL filter already does this,
   // but keeps types simpler downstream)
   const usable = pending.filter(
-    (p): p is { id: number; providerTicketId: string; recipientToken: string | null } =>
+    (p): p is { id: number; providerTicketId: string; recipientToken: string | null; createdAt: Date } =>
       typeof p.providerTicketId === "string" && p.providerTicketId.length > 0,
   );
 
@@ -97,7 +98,14 @@ export async function reconcilePushReceipts(
   for (const row of usable) {
     const receipt = receipts[row.providerTicketId];
     if (!receipt) {
-      bumpOnlyIds.push(row.id);
+      // Expo retains receipts ~24h. Once a row ages past that window with no
+      // error receipt, no failure was ever reported — finalize it as delivered
+      // instead of bumping it forever. Younger rows keep polling.
+      if (row.createdAt.getTime() < ageCutoff.getTime()) {
+        deliveredIds.push(row.id);
+      } else {
+        bumpOnlyIds.push(row.id);
+      }
       continue;
     }
     if (receipt.status === "ok") {

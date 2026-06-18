@@ -168,7 +168,7 @@ describe("reconcilePushReceipts", () => {
 
   it("bumps providerReceiptCheckedAt without changing status when receipt not yet ready", async () => {
     mockSelectReturning([
-      { id: 4, providerTicketId: "tkt_pending", recipientToken: "ExponentPushToken[p]" },
+      { id: 4, providerTicketId: "tkt_pending", recipientToken: "ExponentPushToken[p]", createdAt: new Date() },
     ]);
     mocks.getReceipts.mockResolvedValueOnce({}); // no entry
     const { setCall } = captureUpdate();
@@ -183,6 +183,25 @@ describe("reconcilePushReceipts", () => {
     // status should not have been set
     const args = setCall.mock.calls[0]![0] as Record<string, unknown>;
     expect(args["status"]).toBeUndefined();
+  });
+
+  it("finalizes an aged sent_ticket row with no receipt as delivered (#82)", async () => {
+    const aged = new Date(Date.now() - 25 * 60 * 60 * 1000); // older than the 24h receipt window
+    mockSelectReturning([
+      { id: 9, providerTicketId: "tkt_aged", recipientToken: "ExponentPushToken[a]", createdAt: aged },
+    ]);
+    mocks.getReceipts.mockResolvedValueOnce({}); // Expo no longer retains a receipt
+    const { setCall } = captureUpdate();
+
+    const client = new ExpoPushClient();
+    const result = await reconcilePushReceipts(client);
+
+    // Past the window with no error receipt → finalize as delivered, not left
+    // polling forever as sent_ticket.
+    expect(result.delivered).toBe(1);
+    expect(setCall).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "delivered", providerReceiptCheckedAt: expect.any(Date) }),
+    );
   });
 
   it("skips rows with missing providerTicketId", async () => {
@@ -200,6 +219,7 @@ describe("reconcilePushReceipts", () => {
       id: i,
       providerTicketId: `tkt_${i}`,
       recipientToken: null,
+      createdAt: new Date(),
     }));
     mockSelectReturning(rows);
     mocks.getReceipts.mockResolvedValue({});

@@ -373,8 +373,8 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
         } else {
           // Check if a slot opened (was assigned, now not)
           const slotOpened =
-            (existing.sr1OurClub && existing.sr1Status === "assigned" && mapped.sr1Status !== "assigned") ||
-            (existing.sr2OurClub && existing.sr2Status === "assigned" && mapped.sr2Status !== "assigned");
+            (mapped.sr1OurClub && existing.sr1Status === "assigned" && mapped.sr1Status !== "assigned") ||
+            (mapped.sr2OurClub && existing.sr2Status === "assigned" && mapped.sr2Status !== "assigned");
 
           if (slotOpened && !nowCancelledOrForfeited) {
             try {

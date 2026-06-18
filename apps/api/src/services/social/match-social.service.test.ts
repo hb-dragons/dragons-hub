@@ -269,6 +269,55 @@ describe("getWeekendMatches", () => {
     });
   });
 
+  describe("weekend window + score filter (#82)", () => {
+    it("requires BOTH scores present for results, not just homeScore", async () => {
+      const chain = makeSelectChain([]);
+      mockDb.select.mockReturnValue(chain);
+
+      await getWeekendMatches({ type: "results", week: 10, year: 2026 });
+
+      const whereArg = chain.where.mock.calls[0]![0] as { and: unknown[] };
+      expect(whereArg.and[2]).toEqual({
+        and: [{ isNotNull: "homeScore" }, { isNotNull: "guestScore" }],
+      });
+    });
+
+    it("requires BOTH scores absent for previews", async () => {
+      const chain = makeSelectChain([]);
+      mockDb.select.mockReturnValue(chain);
+
+      await getWeekendMatches({ type: "preview", week: 10, year: 2026 });
+
+      const whereArg = chain.where.mock.calls[0]![0] as { and: unknown[] };
+      expect(whereArg.and[2]).toEqual({
+        and: [{ isNull: "homeScore" }, { isNull: "guestScore" }],
+      });
+    });
+
+    it("computes the ISO-week window in local time, not shifted UTC", async () => {
+      const prevTz = process.env.TZ;
+      process.env.TZ = "Europe/Berlin";
+      try {
+        const chain = makeSelectChain([]);
+        mockDb.select.mockReturnValue(chain);
+
+        await getWeekendMatches({ type: "results", week: 10, year: 2026 });
+
+        const whereArg = chain.where.mock.calls[0]![0] as {
+          and: Array<{ gte?: [unknown, string]; lte?: [unknown, string] }>;
+        };
+        const gteStr = whereArg.and[0]!.gte![1];
+        const lteStr = whereArg.and[1]!.lte![1];
+        // ISO week runs Monday..Sunday. A UTC toISOString() in a positive-offset
+        // zone (Berlin, CET in week 10) shifts these back to Sunday..Saturday.
+        expect(new Date(`${gteStr}T12:00:00Z`).getUTCDay()).toBe(1); // Monday
+        expect(new Date(`${lteStr}T12:00:00Z`).getUTCDay()).toBe(0); // Sunday
+      } finally {
+        process.env.TZ = prevTz;
+      }
+    });
+  });
+
   describe("query construction", () => {
     it("calls db.select and chains from/innerJoin/where/orderBy", async () => {
       const chain = makeSelectChain([]);
