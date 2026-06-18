@@ -113,6 +113,11 @@ beforeEach(() => {
   mocks.searchRefereesForGame.mockReset();
   mocks.submitRefereeAssignment.mockReset();
   mocks.submitRefereeUnassignment.mockReset();
+  // clearAllMocks does not reset mockResolvedValue, so a test that sets the
+  // guarded UPDATE to 0 rows would otherwise leak that into later tests. Restore
+  // the default "claim succeeded" so test order doesn't matter.
+  mocks.updateReturning.mockReset();
+  mocks.updateReturning.mockResolvedValue([{ id: 1 }]);
   selectCallIndex = 0;
   mocks.selectCalls = [];
 });
@@ -271,9 +276,36 @@ describe("assignReferee", () => {
       name: "AssignmentError",
     });
 
-    // No db update or event on federation failure
-    expect(mocks.updateWhere).not.toHaveBeenCalled();
+    // #84: we now win the atomic local claim BEFORE submitting to the
+    // federation, so on a federation rejection we must roll the slot back to
+    // open (claim UPDATE + rollback UPDATE = 2 calls; last one clears the slot).
+    expect(mocks.updateWhere).toHaveBeenCalledTimes(2);
+    expect(mocks.updateWhere).toHaveBeenLastCalledWith({
+      eq: ["rg.apiMatchId", 12345],
+    });
+    expect(mocks.insertOnConflict).not.toHaveBeenCalled();
     expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("race loser never writes the federation: 0-row claim short-circuits before submit (#84)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+      // re-read: a rival referee already holds the slot
+      [{ ...GAME_ROW, sr1Status: "assigned", sr1RefereeApiId: 5555 }],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    mocks.updateReturning.mockResolvedValue([]); // lost the atomic guard
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "SLOT_TAKEN",
+    });
+    // The federation has no compare-and-set; the loser must not submit there.
+    expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
   });
 
   it("skips deny check when matchId is null", async () => {

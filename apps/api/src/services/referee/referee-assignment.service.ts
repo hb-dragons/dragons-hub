@@ -132,35 +132,21 @@ export async function assignReferee(
     );
   }
 
-  // 5. Submit assignment to federation
-  const submitResponse = await sdkClient.submitRefereeAssignment(
-    spielplanId,
-    slotNumber,
-    candidate,
-  );
-
-  // 6. Check federation success
-  if (!submitResponse.gameInfoMessages.includes(FEDERATION_SUCCESS)) {
-    throw new AssignmentError(
-      `Federation rejected assignment: ${submitResponse.gameInfoMessages.join(", ")}`,
-      "FEDERATION_ERROR",
-    );
-  }
-
-  // 7. Build referee name
+  // 5. Build referee name + the slot update
   const refereeName = `${candidate.vorname} ${candidate.nachName}`;
   const slotKey = slotNumber === 1 ? "sr1" : "sr2";
 
-  // 8. Update refereeGames slot fields
   const slotUpdate =
     slotNumber === 1
       ? { sr1Name: refereeName, sr1RefereeApiId: refereeApiId, sr1Status: "assigned" }
       : { sr2Name: refereeName, sr2RefereeApiId: refereeApiId, sr2Status: "assigned" };
 
-  // Gate the write on the slot still being open so two referees racing for the
-  // same slot can't both win: the conditional UPDATE is atomic, and 0 affected
-  // rows means another claim got there first. (The federation submit above is
-  // the remote authority; this closes the local DB-state race.)
+  // 6. Win the slot locally BEFORE submitting to the federation. The federation
+  // has no compare-and-set (submitRefereeAssignment is an unconditional set), so
+  // if we submitted first two concurrent callers could both write the federation
+  // (last-writer-wins divergence). Gating on the atomic conditional UPDATE
+  // (status still "open", 0 affected rows = a rival got there first) means only
+  // the single caller that wins this guard goes on to submit to the federation.
   const slotStatusColumn =
     slotNumber === 1 ? refereeGames.sr1Status : refereeGames.sr2Status;
   const claimed = await getDb()
@@ -175,11 +161,10 @@ export async function assignReferee(
     .returning({ id: refereeGames.id });
 
   if (claimed.length === 0) {
-    // 0 rows means the slot was not "open" when we tried to claim it. Re-read
-    // the current holder: if it's already this same referee (a re-submit or
-    // double-click — the federation submit above is idempotent), treat it as an
-    // idempotent success instead of surfacing a spurious SLOT_TAKEN. Only a
-    // rival holder is a genuine conflict.
+    // 0 rows means the slot was not "open". Re-read the current holder: if it's
+    // already this same referee (a re-submit or double-click; the federation
+    // already has them), treat it as an idempotent success instead of a spurious
+    // SLOT_TAKEN. Only a rival holder is a genuine conflict.
     const currentRows = await getDb()
       .select()
       .from(refereeGames)
@@ -205,7 +190,43 @@ export async function assignReferee(
     };
   }
 
-  // 9. Upsert intent (only when game has a linked match)
+  // 7. Submit to the federation now that we hold the local claim. If the
+  // federation rejects (or the call throws), roll the slot back to open so we
+  // don't leave a local "assigned" the federation never accepted.
+  const rollbackClaim = async () => {
+    const slotClear =
+      slotNumber === 1
+        ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" }
+        : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" };
+    await getDb()
+      .update(refereeGames)
+      .set(slotClear)
+      .where(eq(refereeGames.apiMatchId, spielplanId));
+  };
+
+  let submitResponse: Awaited<
+    ReturnType<typeof sdkClient.submitRefereeAssignment>
+  >;
+  try {
+    submitResponse = await sdkClient.submitRefereeAssignment(
+      spielplanId,
+      slotNumber,
+      candidate,
+    );
+  } catch (err) {
+    await rollbackClaim();
+    throw err;
+  }
+
+  if (!submitResponse.gameInfoMessages.includes(FEDERATION_SUCCESS)) {
+    await rollbackClaim();
+    throw new AssignmentError(
+      `Federation rejected assignment: ${submitResponse.gameInfoMessages.join(", ")}`,
+      "FEDERATION_ERROR",
+    );
+  }
+
+  // 8. Upsert intent (only when game has a linked match)
   if (game.matchId != null) {
     await getDb()
       .insert(refereeAssignmentIntents)
