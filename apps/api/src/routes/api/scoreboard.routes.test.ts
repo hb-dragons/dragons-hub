@@ -16,6 +16,10 @@ vi.mock("../../config/env", () => ({
   },
 }));
 
+vi.mock("../../config/logger", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
 const counters = new Map<string, number>();
 vi.mock("../../config/redis", () => ({
   getRedis: () => ({
