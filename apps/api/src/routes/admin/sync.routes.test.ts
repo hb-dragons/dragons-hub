@@ -566,6 +566,22 @@ describe("PUT /sync/schedule", () => {
     );
   });
 
+  it("passes a null actor when no session user is present", async () => {
+    mocks.upsertSchedule.mockResolvedValue({ id: 1, enabled: true });
+    const bare = new Hono<AppEnv>();
+    bare.onError(errorHandler);
+    bare.route("/", syncRoutes);
+
+    const res = await bare.request("/sync/schedule", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: true }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.upsertSchedule).toHaveBeenCalledWith(expect.anything(), null);
+  });
+
   it("returns 400 for invalid cron expression", async () => {
     const res = await app.request("/sync/schedule", {
       method: "PUT",

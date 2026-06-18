@@ -234,6 +234,37 @@ describe("signInLockout middleware", () => {
     expect(victimRes.status).toBe(401);
   });
 
+  it("records failure on 403 forbidden responses", async () => {
+    const app = makeApp((c) => c.json({ error: "forbidden" }, 403));
+    await app.request("/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "user@x.com" }),
+    });
+    expect(store.get("auth:fail:unknown:user@x.com")).toBe("1");
+  });
+
+  it("keys the lockout on the IP that trustForwardedFor normalized, not the client-supplied segment", async () => {
+    // Chain both middlewares as production does (app.ts:45-46). GLB appends its
+    // own IP, so the trusted client IP is the second-to-last segment (5.6.7.8);
+    // the left-most 1.2.3.4 is attacker-controlled and must be ignored.
+    const app = new Hono();
+    app.use("/api/auth/sign-in/email", trustForwardedFor);
+    app.use("/api/auth/sign-in/email", signInLockout);
+    app.post("/api/auth/sign-in/email", (c) => c.json({ error: "bad" }, 401));
+    const headers = { "Content-Type": "application/json", "x-forwarded-for": "1.2.3.4, 5.6.7.8, 9.10.11.12" };
+
+    for (let i = 0; i < 10; i++) {
+      await app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ email: "u@x.com" }),
+      });
+    }
+    expect(store.get("auth:lock:5.6.7.8:u@x.com")).toBe("1");
+    expect(store.get("auth:lock:1.2.3.4:u@x.com")).toBeUndefined();
+  });
+
   it("does not count 400 validation responses toward lockout", async () => {
     const app = new Hono();
     app.use("/api/auth/sign-in/email", signInLockout);
