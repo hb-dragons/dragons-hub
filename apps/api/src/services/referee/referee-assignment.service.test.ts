@@ -68,6 +68,8 @@ vi.mock("@dragons/db/schema", () => ({
     id: "rg.id",
     sr1Status: "rg.sr1Status",
     sr2Status: "rg.sr2Status",
+    sr1RefereeApiId: "rg.sr1RefereeApiId",
+    sr2RefereeApiId: "rg.sr2RefereeApiId",
   },
   referees: { apiId: "r.apiId", id: "r.id" },
   matches: { id: "m.id", homeTeamApiId: "m.homeTeamApiId", guestTeamApiId: "m.guestTeamApiId" },
@@ -278,10 +280,16 @@ describe("assignReferee", () => {
 
     // #84: we now win the atomic local claim BEFORE submitting to the
     // federation, so on a federation rejection we must roll the slot back to
-    // open (claim UPDATE + rollback UPDATE = 2 calls; last one clears the slot).
+    // open (claim UPDATE + rollback UPDATE = 2 calls). The rollback is a
+    // compare-and-set guarded on THIS caller still holding the slot, so it can't
+    // clobber a referee a concurrent caller validly assigned in the meantime.
     expect(mocks.updateWhere).toHaveBeenCalledTimes(2);
     expect(mocks.updateWhere).toHaveBeenLastCalledWith({
-      eq: ["rg.apiMatchId", 12345],
+      and: [
+        { eq: ["rg.apiMatchId", 12345] },
+        { eq: ["rg.sr1RefereeApiId", 9001] },
+        { eq: ["rg.sr1Status", "assigned"] },
+      ],
     });
     expect(mocks.insertOnConflict).not.toHaveBeenCalled();
     expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
@@ -430,8 +438,13 @@ describe("assignReferee", () => {
       status: "assigned",
       refereeName: "Max Muster",
     });
-    // Idempotent no-op: no duplicate intent write or assignment event.
-    expect(mocks.insertOnConflict).not.toHaveBeenCalled();
+    // The federation already holds this referee, so we don't re-submit.
+    expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
+    // We still (idempotently) upsert the intent, so an original call that died
+    // after the federation submit but before persisting the intent is recovered.
+    expect(mocks.insertOnConflict).toHaveBeenCalledOnce();
+    // But we do NOT re-publish REFEREE_ASSIGNED — replaying it on a re-claim
+    // would spam a stale "just assigned" notification.
     expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
   });
 

@@ -160,10 +160,16 @@ export async function assignReferee(
     )
     .returning({ id: refereeGames.id });
 
+  const slotRefereeApiIdColumn =
+    slotNumber === 1
+      ? refereeGames.sr1RefereeApiId
+      : refereeGames.sr2RefereeApiId;
+
+  let idempotentReclaim = false;
   if (claimed.length === 0) {
     // 0 rows means the slot was not "open". Re-read the current holder: if it's
     // already this same referee (a re-submit or double-click; the federation
-    // already has them), treat it as an idempotent success instead of a spurious
+    // already has them), treat it as an idempotent reclaim instead of a spurious
     // SLOT_TAKEN. Only a rival holder is a genuine conflict.
     const currentRows = await getDb()
       .select()
@@ -182,17 +188,15 @@ export async function assignReferee(
       );
     }
 
-    return {
-      success: true,
-      slot: slotKey,
-      status: "assigned",
-      refereeName,
-    };
+    idempotentReclaim = true;
   }
 
-  // 7. Submit to the federation now that we hold the local claim. If the
-  // federation rejects (or the call throws), roll the slot back to open so we
-  // don't leave a local "assigned" the federation never accepted.
+  // 7. Submit to the federation now that we hold the local claim. Skip on an
+  // idempotent reclaim — the federation already holds this referee. If the
+  // federation rejects (or the call throws), roll the slot back to open. The
+  // rollback is a compare-and-set guarded on THIS caller still holding the slot
+  // so it can't clobber a referee a concurrent caller validly assigned while our
+  // submit was in flight.
   const rollbackClaim = async () => {
     const slotClear =
       slotNumber === 1
@@ -201,32 +205,42 @@ export async function assignReferee(
     await getDb()
       .update(refereeGames)
       .set(slotClear)
-      .where(eq(refereeGames.apiMatchId, spielplanId));
+      .where(
+        and(
+          eq(refereeGames.apiMatchId, spielplanId),
+          eq(slotRefereeApiIdColumn, refereeApiId),
+          eq(slotStatusColumn, "assigned"),
+        ),
+      );
   };
 
-  let submitResponse: Awaited<
-    ReturnType<typeof sdkClient.submitRefereeAssignment>
-  >;
-  try {
-    submitResponse = await sdkClient.submitRefereeAssignment(
-      spielplanId,
-      slotNumber,
-      candidate,
-    );
-  } catch (err) {
-    await rollbackClaim();
-    throw err;
+  if (!idempotentReclaim) {
+    let submitResponse: Awaited<
+      ReturnType<typeof sdkClient.submitRefereeAssignment>
+    >;
+    try {
+      submitResponse = await sdkClient.submitRefereeAssignment(
+        spielplanId,
+        slotNumber,
+        candidate,
+      );
+    } catch (err) {
+      await rollbackClaim();
+      throw err;
+    }
+
+    if (!submitResponse.gameInfoMessages.includes(FEDERATION_SUCCESS)) {
+      await rollbackClaim();
+      throw new AssignmentError(
+        `Federation rejected assignment: ${submitResponse.gameInfoMessages.join(", ")}`,
+        "FEDERATION_ERROR",
+      );
+    }
   }
 
-  if (!submitResponse.gameInfoMessages.includes(FEDERATION_SUCCESS)) {
-    await rollbackClaim();
-    throw new AssignmentError(
-      `Federation rejected assignment: ${submitResponse.gameInfoMessages.join(", ")}`,
-      "FEDERATION_ERROR",
-    );
-  }
-
-  // 8. Upsert intent (only when game has a linked match)
+  // 8. Upsert intent (only when game has a linked match). Runs on the idempotent
+  // reclaim too: the upsert is idempotent, so it recovers a missing intent if
+  // the original call died after the federation submit but before persisting it.
   if (game.matchId != null) {
     await getDb()
       .insert(refereeAssignmentIntents)
@@ -246,28 +260,32 @@ export async function assignReferee(
       });
   }
 
-  // 10. Publish domain event
-  await publishDomainEvent({
-    type: EVENT_TYPES.REFEREE_ASSIGNED,
-    source: "manual",
-    entityType: "referee",
-    entityId: referee.id,
-    entityName: refereeName,
-    deepLinkPath: "/admin/referees",
-    payload: {
-      matchNo: game.matchNo,
-      homeTeam: game.homeTeamName,
-      guestTeam: game.guestTeamName,
-      refereeName,
-      role: slotKey.toUpperCase(),
-      teamIds: [],
-      refereeId: referee.id,
-      matchId: game.matchId,
-      kickoffDate: game.kickoffDate,
-      kickoffTime: game.kickoffTime,
-      deepLink: `/referee-game/${game.id}`,
-    },
-  });
+  // 10. Publish domain event — only for a fresh assignment. On an idempotent
+  // reclaim the assignment isn't happening now, so replaying REFEREE_ASSIGNED
+  // would spam a stale "just assigned" notification.
+  if (!idempotentReclaim) {
+    await publishDomainEvent({
+      type: EVENT_TYPES.REFEREE_ASSIGNED,
+      source: "manual",
+      entityType: "referee",
+      entityId: referee.id,
+      entityName: refereeName,
+      deepLinkPath: "/admin/referees",
+      payload: {
+        matchNo: game.matchNo,
+        homeTeam: game.homeTeamName,
+        guestTeam: game.guestTeamName,
+        refereeName,
+        role: slotKey.toUpperCase(),
+        teamIds: [],
+        refereeId: referee.id,
+        matchId: game.matchId,
+        kickoffDate: game.kickoffDate,
+        kickoffTime: game.kickoffTime,
+        deepLink: `/referee-game/${game.id}`,
+      },
+    });
+  }
 
   // 11. Return response
   return {
