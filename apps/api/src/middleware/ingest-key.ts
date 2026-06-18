@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import { env } from "../config/env";
+import { logger } from "../config/logger";
 import { getRedis } from "../config/redis";
 
 const RATE_LIMIT_PER_SECOND = 30;
@@ -42,10 +43,16 @@ export const requireIngestKey: MiddlewareHandler = async (c, next) => {
     );
   }
 
-  const count = await incrementRateLimit(deviceId);
-  if (count > RATE_LIMIT_PER_SECOND) {
-    c.header("Retry-After", "1");
-    return c.json({ error: "Rate limited", code: "RATE_LIMITED" }, 429);
+  try {
+    const count = await incrementRateLimit(deviceId);
+    if (count > RATE_LIMIT_PER_SECOND) {
+      c.header("Retry-After", "1");
+      return c.json({ error: "Rate limited", code: "RATE_LIMITED" }, 429);
+    }
+  } catch (err) {
+    // Fail open: scoreboard ingest must keep working during a Redis outage
+    // (auth above is already enforced; ingest itself doesn't need Redis).
+    logger.warn({ err, deviceId }, "Ingest rate limiter Redis error; failing open");
   }
 
   c.set("scoreboardDeviceId" as never, deviceId as never);
