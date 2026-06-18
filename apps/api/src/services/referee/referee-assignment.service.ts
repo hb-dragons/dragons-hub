@@ -175,10 +175,34 @@ export async function assignReferee(
     .returning({ id: refereeGames.id });
 
   if (claimed.length === 0) {
-    throw new AssignmentError(
-      `Slot ${slotNumber} for game ${spielplanId} was already taken`,
-      "SLOT_TAKEN",
-    );
+    // 0 rows means the slot was not "open" when we tried to claim it. Re-read
+    // the current holder: if it's already this same referee (a re-submit or
+    // double-click — the federation submit above is idempotent), treat it as an
+    // idempotent success instead of surfacing a spurious SLOT_TAKEN. Only a
+    // rival holder is a genuine conflict.
+    const currentRows = await getDb()
+      .select()
+      .from(refereeGames)
+      .where(eq(refereeGames.apiMatchId, spielplanId))
+      .limit(1);
+    const currentApiId =
+      slotNumber === 1
+        ? currentRows[0]?.sr1RefereeApiId
+        : currentRows[0]?.sr2RefereeApiId;
+
+    if (currentApiId !== refereeApiId) {
+      throw new AssignmentError(
+        `Slot ${slotNumber} for game ${spielplanId} was already taken`,
+        "SLOT_TAKEN",
+      );
+    }
+
+    return {
+      success: true,
+      slot: slotKey,
+      status: "assigned",
+      refereeName,
+    };
   }
 
   // 9. Upsert intent (only when game has a linked match)

@@ -374,6 +374,54 @@ describe("assignReferee", () => {
     expect(mocks.insertOnConflict).not.toHaveBeenCalled();
     expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
   });
+
+  it("idempotent self-reclaim: 0-row update but slot already held by the SAME referee returns success (#86)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+      // 6th select: re-read after the 0-row guard shows the slot is already
+      // held by this same referee (a re-submit / double-click), not a rival.
+      [{ ...GAME_ROW, sr1Status: "assigned", sr1RefereeApiId: 9001, sr1Name: "Max Muster" }],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    mocks.updateReturning.mockResolvedValue([]); // guard matched 0 rows
+
+    const result = await assignReferee(12345, 1, 9001);
+
+    expect(result).toMatchObject({
+      success: true,
+      slot: "sr1",
+      status: "assigned",
+      refereeName: "Max Muster",
+    });
+    // Idempotent no-op: no duplicate intent write or assignment event.
+    expect(mocks.insertOnConflict).not.toHaveBeenCalled();
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("SLOT_TAKEN: 0-row update with the slot held by a DIFFERENT referee still throws (#86)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+      // re-read shows a rival referee won the slot
+      [{ ...GAME_ROW, sr1Status: "assigned", sr1RefereeApiId: 5555, sr1Name: "Other Ref" }],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    mocks.updateReturning.mockResolvedValue([]);
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "SLOT_TAKEN",
+    });
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
 });
 
 describe("unassignReferee", () => {
