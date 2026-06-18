@@ -538,11 +538,32 @@ describe("PUT /sync/schedule", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(updated);
-    expect(mocks.upsertSchedule).toHaveBeenCalledWith({
-      enabled: false,
-      cronExpression: "0 6 * * *",
-      timezone: "UTC",
+    expect(mocks.upsertSchedule).toHaveBeenCalledWith(
+      {
+        enabled: false,
+        cronExpression: "0 6 * * *",
+        timezone: "UTC",
+      },
+      "test-user-123",
+    );
+  });
+
+  it("ignores a client-supplied updatedBy and uses the session user id", async () => {
+    mocks.upsertSchedule.mockResolvedValue({ id: 1, enabled: true });
+
+    const res = await app.request("/sync/schedule", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: true, updatedBy: "attacker-spoof" }),
     });
+
+    expect(res.status).toBe(200);
+    // The spoofed audit field must never reach the service; the actor is
+    // derived server-side from the session.
+    expect(mocks.upsertSchedule).toHaveBeenCalledWith(
+      expect.not.objectContaining({ updatedBy: "attacker-spoof" }),
+      "test-user-123",
+    );
   });
 
   it("returns 400 for invalid cron expression", async () => {

@@ -26,7 +26,6 @@ export interface UpdateScheduleBody {
   cronExpression?: string | null;
   intervalMinutes?: number;
   timezone?: string;
-  updatedBy?: string;
 }
 
 /**
@@ -242,7 +241,7 @@ export async function getSchedule(syncType: string = "full") {
   return schedule;
 }
 
-export async function upsertSchedule(data: UpdateScheduleBody) {
+export async function upsertSchedule(data: UpdateScheduleBody, updatedBy: string | null) {
   const syncType = data.syncType ?? "full";
   const [existing] = await getDb()
     .select()
@@ -260,7 +259,7 @@ export async function upsertSchedule(data: UpdateScheduleBody) {
         intervalMinutes: data.intervalMinutes ?? existing.intervalMinutes,
         timezone: data.timezone ?? existing.timezone,
         lastUpdatedAt: new Date(),
-        lastUpdatedBy: data.updatedBy ?? null,
+        lastUpdatedBy: updatedBy,
       })
       .where(eq(syncSchedule.id, existing.id))
       .returning();
@@ -274,7 +273,7 @@ export async function upsertSchedule(data: UpdateScheduleBody) {
         intervalMinutes: data.intervalMinutes ?? (syncType === "referee-games" ? 30 : null),
         timezone: data.timezone ?? "Europe/Berlin",
         lastUpdatedAt: new Date(),
-        lastUpdatedBy: data.updatedBy ?? null,
+        lastUpdatedBy: updatedBy,
       })
       .returning();
   }

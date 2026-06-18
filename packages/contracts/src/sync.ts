@@ -60,7 +60,8 @@ export const syncUpdateScheduleBodySchema = z.object({
     .nullable(),
   intervalMinutes: z.number().int().min(5).max(1440).optional(),
   timezone: z.string().min(1).optional(),
-  updatedBy: z.string().optional(),
+  // No updatedBy: the audit actor is set server-side from the session, never
+  // accepted from the client (it would be spoofable otherwise).
 });
 
 export type SyncUpdateScheduleBody = z.infer<typeof syncUpdateScheduleBodySchema>;

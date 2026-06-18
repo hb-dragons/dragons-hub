@@ -181,9 +181,13 @@ describe("syncUpdateScheduleBodySchema", () => {
       enabled: false,
       cronExpression: "*/5 * * * *",
       timezone: "UTC",
-      updatedBy: "admin",
     };
     expect(syncUpdateScheduleBodySchema.parse(input)).toEqual(input);
+  });
+
+  it("strips a client-supplied updatedBy (audit actor is set server-side)", () => {
+    const result = syncUpdateScheduleBodySchema.parse({ enabled: true, updatedBy: "attacker" });
+    expect(result).not.toHaveProperty("updatedBy");
   });
 
   it("allows empty object", () => {
@@ -191,7 +195,6 @@ describe("syncUpdateScheduleBodySchema", () => {
     expect(result.enabled).toBeUndefined();
     expect(result.cronExpression).toBeUndefined();
     expect(result.timezone).toBeUndefined();
-    expect(result.updatedBy).toBeUndefined();
   });
 
   it("rejects empty timezone string", () => {
