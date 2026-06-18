@@ -5,6 +5,9 @@ import type { AppEnv } from "../types";
 const m = vi.hoisted(() => ({ incr: vi.fn(), expire: vi.fn() }));
 vi.mock("../config/redis", () => ({ getRedis: () => ({ incr: m.incr, expire: m.expire }) }));
 
+const log = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }));
+vi.mock("../config/logger", () => ({ logger: log }));
+
 // --- Imports (after mocks) ---
 import { rateLimit } from "./rate-limit";
 
@@ -34,5 +37,21 @@ describe("rateLimit", () => {
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("60");
     expect(await res.json()).toMatchObject({ code: "RATE_LIMITED" });
+  });
+
+  it("fails open with a warning when Redis errors", async () => {
+    m.incr.mockRejectedValue(new Error("redis down"));
+    const res = await makeApp().request("/x", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true });
+    expect(log.warn).toHaveBeenCalled();
+  });
+
+  it("fails open when expire errors on the first hit", async () => {
+    m.incr.mockResolvedValue(1);
+    m.expire.mockRejectedValue(new Error("redis down"));
+    const res = await makeApp().request("/x", { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(log.warn).toHaveBeenCalled();
   });
 });
