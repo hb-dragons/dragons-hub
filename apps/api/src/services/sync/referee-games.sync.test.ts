@@ -671,6 +671,51 @@ describe("syncRefereeGames", () => {
     );
   });
 
+  it("uses the current (mapped) ourClub flag for slot-opened detection, not the stale row (#82)", async () => {
+    // sr1 assigned -> open. The stored row's sr1OurClub is stale (false), but
+    // this sync marks the slot as our club's (sr1MeinVerein true). Gating on the
+    // stale flag would suppress the event; gating on the mapped flag emits it.
+    const result = makeApiResult({
+      sr1: null,
+      sr1MeinVerein: true,
+      sr1OffenAngeboten: false,
+    });
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    let perGameCall = 0;
+    setupSelectMock(async () => {
+      perGameCall++;
+      if (perGameCall === 1) {
+        return [{
+          id: 1,
+          apiMatchId: 1001,
+          dataHash: "old-hash",
+          sr1Status: "assigned",
+          sr2Status: "offered",
+          sr1OurClub: false, // STALE: previously not flagged as our club
+          sr2OurClub: false,
+          kickoffDate: "2026-04-25",
+          kickoffTime: "14:00",
+          isCancelled: false,
+          isForfeited: false,
+        }];
+      }
+      return [{ id: 50 }];
+    });
+
+    const mockSet = vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    });
+    mockUpdate.mockReturnValue({ set: mockSet });
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.updated).toBe(1);
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "referee.slots.needed" }),
+    );
+  });
+
   it("cancels reminders when game is cancelled on update", async () => {
     const result = makeApiResult();
     result.sp.abgesagt = true;
