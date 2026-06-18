@@ -164,15 +164,18 @@ export class PushChannelAdapter {
         else result.failed++;
       });
 
-      // Users whose every device was undelivered (a transient chunk that never
-      // reached Expo) must have their claim RELEASED, not marked failed — so the
-      // outbox retries only them. Delivered users keep their sent_ticket row, and
-      // terminal per-ticket errors keep their failed row, so neither is re-sent.
+      // A user with no delivered device but at least one undelivered chunk (it
+      // never reached Expo) must have their claim RELEASED, not marked failed —
+      // so the outbox retries them. Using `some` (not `every`) also releases a
+      // user whose devices straddle a terminal error and an undelivered chunk:
+      // the transient device gets its retry, and the terminal device simply
+      // errors again, which is harmless. Delivered users keep their sent_ticket
+      // row, and users with only terminal errors keep their failed row.
       const releasedClaimIds: number[] = [];
       for (const [userId, devices] of byUser) {
         const claimId = claimIdByUser.get(userId)!;
         const okDevice = devices.find((d) => d.ok);
-        if (!okDevice && devices.every((d) => d.undelivered)) {
+        if (!okDevice && devices.some((d) => d.undelivered)) {
           releasedClaimIds.push(claimId);
           continue;
         }
