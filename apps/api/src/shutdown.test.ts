@@ -9,36 +9,38 @@ const log = vi.hoisted(() => ({
 }));
 vi.mock("./config/logger", () => ({ logger: log }));
 
-import { createShutdown, registerProcessHandlers } from "./shutdown";
+import {
+  createShutdown,
+  registerProcessHandlers,
+  type ShutdownDeps,
+} from "./shutdown";
 
 function makeDeps() {
   const calls: string[] = [];
-  return {
-    calls,
-    deps: {
-      httpServer: {
-        close: (cb?: (err?: Error) => void) => {
-          calls.push("server");
-          cb?.();
-        },
-      },
-      shutdownWorkers: async () => {
-        calls.push("workers");
-      },
-      closeDb: async () => {
-        calls.push("db");
-      },
-      closeRedis: async () => {
-        calls.push("redis");
-      },
-      flushLogger: async () => {
-        calls.push("flush");
-      },
-      exit: (code: number) => {
-        calls.push(`exit:${code}`);
+  const deps: ShutdownDeps = {
+    httpServer: {
+      close: (cb?: (err?: Error) => void) => {
+        calls.push("server");
+        cb?.();
       },
     },
+    shutdownWorkers: async () => {
+      calls.push("workers");
+    },
+    closeDb: async () => {
+      calls.push("db");
+    },
+    closeRedis: async () => {
+      calls.push("redis");
+    },
+    flushLogger: async () => {
+      calls.push("flush");
+    },
+    exit: (code: number) => {
+      calls.push(`exit:${code}`);
+    },
   };
+  return { calls, deps };
 }
 
 describe("createShutdown", () => {
@@ -102,18 +104,41 @@ describe("createShutdown", () => {
     await createShutdown(minimal)();
     expect(calls).toEqual(["db", "redis", "flush", "exit:0"]);
   });
+
+  it("forces a non-zero exit when teardown exceeds the timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, deps } = makeDeps();
+      deps.timeoutMs = 5000;
+      deps.closeDb = () => new Promise<void>(() => {}); // never resolves
+      const done = createShutdown(deps)();
+      await vi.advanceTimersByTimeAsync(5000);
+      await done;
+      expect(log.error).toHaveBeenCalled();
+      expect(calls).toContain("flush");
+      expect(calls).toContain("exit:1");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("exits with the requested code (crash path uses non-zero)", async () => {
+    const { calls, deps } = makeDeps();
+    await createShutdown(deps)(1);
+    expect(calls[calls.length - 1]).toBe("exit:1");
+  });
 });
 
 describe("registerProcessHandlers", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("logs fatal and shuts down on uncaughtException", () => {
+  it("logs fatal and shuts down with a non-zero code on uncaughtException", () => {
     const proc = new EventEmitter();
     const shutdown = vi.fn().mockResolvedValue(undefined);
     registerProcessHandlers(shutdown, proc);
     proc.emit("uncaughtException", new Error("boom"));
     expect(log.fatal).toHaveBeenCalled();
-    expect(shutdown).toHaveBeenCalled();
+    expect(shutdown).toHaveBeenCalledWith(1);
   });
 
   it("logs error on unhandledRejection without exiting", () => {
