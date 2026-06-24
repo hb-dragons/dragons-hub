@@ -2,13 +2,12 @@ import { Hono } from "hono";
 import { describeRoute, validator } from "hono-openapi";
 import {
   getTrackedLeagues,
-  resolveAndSaveLeagues,
   setLeagueOwnClubRefs,
 } from "../../services/admin/league-discovery.service";
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
-import { leagueNumbersSchema, leagueOwnClubRefsSchema, leagueIdParamSchema } from "@dragons/contracts";
+import { leagueOwnClubRefsSchema, leagueIdParamSchema } from "@dragons/contracts";
 
 const leagueRoutes = new Hono<AppEnv>();
 
@@ -25,23 +24,6 @@ leagueRoutes.get(
   }),
   async (c) => {
     const result = await getTrackedLeagues();
-    return c.json(result);
-  },
-);
-
-// PUT /admin/settings/leagues - Set tracked leagues by liganr
-leagueRoutes.put(
-  "/settings/leagues",
-  settingsUpdate,
-  validator("json", leagueNumbersSchema, validationHook),
-  describeRoute({
-    description: "Set tracked leagues by league number",
-    tags: ["Leagues"],
-    responses: { 200: { description: "Success" } },
-  }),
-  async (c) => {
-    const { leagueNumbers } = c.req.valid("json");
-    const result = await resolveAndSaveLeagues(leagueNumbers);
     return c.json(result);
   },
 );

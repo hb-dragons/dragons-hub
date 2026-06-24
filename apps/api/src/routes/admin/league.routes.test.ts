@@ -6,13 +6,11 @@ import type { AppEnv } from "../../types";
 
 const mocks = vi.hoisted(() => ({
   getTrackedLeagues: vi.fn(),
-  resolveAndSaveLeagues: vi.fn(),
   setLeagueOwnClubRefs: vi.fn(),
 }));
 
 vi.mock("../../services/admin/league-discovery.service", () => ({
   getTrackedLeagues: mocks.getTrackedLeagues,
-  resolveAndSaveLeagues: mocks.resolveAndSaveLeagues,
   setLeagueOwnClubRefs: mocks.setLeagueOwnClubRefs,
 }));
 
@@ -69,86 +67,6 @@ describe("GET /settings/leagues", () => {
     const body = await json(res);
     expect(body.leagueNumbers).toEqual([]);
     expect(body.leagues).toHaveLength(0);
-  });
-});
-
-describe("PUT /settings/leagues", () => {
-  it("resolves and saves league numbers", async () => {
-    const result = {
-      resolved: [{ ligaNr: 4102, ligaId: 58001, name: "Regionalliga West", seasonName: "2025/26" }],
-      notFound: [],
-      tracked: 1,
-      untracked: 0,
-    };
-    mocks.resolveAndSaveLeagues.mockResolvedValue(result);
-
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: [4102] }),
-    });
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual(result);
-    expect(mocks.resolveAndSaveLeagues).toHaveBeenCalledWith([4102]);
-  });
-
-  it("accepts empty league numbers array", async () => {
-    const result = { resolved: [], notFound: [], tracked: 0, untracked: 2 };
-    mocks.resolveAndSaveLeagues.mockResolvedValue(result);
-
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: [] }),
-    });
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual(result);
-  });
-
-  it("returns 400 for missing leagueNumbers", async () => {
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-
-  it("returns 400 for non-array leagueNumbers", async () => {
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: "4102" }),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-
-  it("returns 400 for negative numbers", async () => {
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: [-1] }),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-
-  it("returns 400 for non-integer numbers", async () => {
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: [4102.5] }),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });
 
