@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -12,10 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@dragons/ui/components/card";
-import { Button } from "@dragons/ui";
-import { Input } from "@dragons/ui/components/input";
-import { Label } from "@dragons/ui/components/label";
-import { Loader2, Save } from "lucide-react";
 import { Switch } from "@dragons/ui/components/switch";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -36,57 +31,12 @@ export function TrackedLeagues() {
     ownClubRefs: l.ownClubRefs ?? false,
   })) ?? [];
 
-  const initialValue = trackedLeagues.map((l) => l.ligaNr).join(", ");
-  const [input, setInput] = useState(initialValue);
-  const [saving, setSaving] = useState(false);
-  const [lastNotFound, setLastNotFound] = useState<number[]>([]);
-
-  function parseInput(value: string): number[] {
-    return value
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s !== "")
-      .map((s) => parseInt(s, 10))
-      .filter((n) => !isNaN(n) && n > 0);
-  }
-
   async function handleToggleOwnClubRefs(leagueId: number, ownClubRefs: boolean) {
     try {
       await api.settings.setLeagueOwnClubRefs(leagueId, { ownClubRefs });
       await mutate(SWR_KEYS.settingsLeagues);
     } catch {
       toast.error(t("settings.leagues.toast.saveFailed"));
-    }
-  }
-
-  async function handleSave() {
-    const leagueNumbers = parseInput(input);
-
-    try {
-      setSaving(true);
-      setLastNotFound([]);
-
-      const result = await api.settings.setLeagues({ leagueNumbers });
-
-      // Revalidate from server to get full league data
-      await mutate(SWR_KEYS.settingsLeagues);
-      setLastNotFound(result.notFound);
-
-      if (result.notFound.length > 0) {
-        toast.warning(
-          t("settings.leagues.toast.partial", {
-            tracked: String(result.tracked),
-            notFoundCount: String(result.notFound.length),
-            notFoundList: result.notFound.join(", "),
-          }),
-        );
-      } else {
-        toast.success(t("settings.leagues.toast.saved", { count: String(result.tracked) }));
-      }
-    } catch {
-      toast.error(t("settings.leagues.toast.saveFailed"));
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -99,40 +49,9 @@ export function TrackedLeagues() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid max-w-md gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="league-numbers">{t("settings.leagues.numbersLabel")}</Label>
-            <Input
-              id="league-numbers"
-              placeholder={t("settings.leagues.numbersPlaceholder")}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={!clubConfig}
-            />
-          </div>
-          <Button
-            onClick={() => { void handleSave(); }}
-            disabled={!clubConfig || saving}
-            className="w-fit"
-          >
-            {saving ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
-            )}
-            {saving ? t("common.saving") : t("common.save")}
-          </Button>
-        </div>
-
         {!clubConfig && (
           <p className="text-sm text-muted-foreground">
             {t("settings.leagues.configureClubFirst")}
-          </p>
-        )}
-
-        {lastNotFound.length > 0 && (
-          <p className="text-sm text-destructive">
-            {t("settings.leagues.notFound", { numbers: lastNotFound.join(", ") })}
           </p>
         )}
 

@@ -1,46 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leagueNumbersSchema, leagueOwnClubRefsSchema, leagueIdParamSchema } from "./league";
-
-describe("leagueNumbersSchema", () => {
-  it("accepts a valid array of positive integers", () => {
-    const result = leagueNumbersSchema.parse({ leagueNumbers: [4102, 4105] });
-    expect(result).toEqual({ leagueNumbers: [4102, 4105] });
-  });
-
-  it("accepts an empty array", () => {
-    const result = leagueNumbersSchema.parse({ leagueNumbers: [] });
-    expect(result).toEqual({ leagueNumbers: [] });
-  });
-
-  it("accepts a single element array", () => {
-    const result = leagueNumbersSchema.parse({ leagueNumbers: [1] });
-    expect(result).toEqual({ leagueNumbers: [1] });
-  });
-
-  it("rejects missing leagueNumbers field", () => {
-    expect(() => leagueNumbersSchema.parse({})).toThrow();
-  });
-
-  it("rejects non-array leagueNumbers", () => {
-    expect(() => leagueNumbersSchema.parse({ leagueNumbers: "4102" })).toThrow();
-  });
-
-  it("rejects negative numbers in array", () => {
-    expect(() => leagueNumbersSchema.parse({ leagueNumbers: [-1] })).toThrow();
-  });
-
-  it("rejects zero in array", () => {
-    expect(() => leagueNumbersSchema.parse({ leagueNumbers: [0] })).toThrow();
-  });
-
-  it("rejects non-integer numbers in array", () => {
-    expect(() => leagueNumbersSchema.parse({ leagueNumbers: [4102.5] })).toThrow();
-  });
-
-  it("rejects string values in array", () => {
-    expect(() => leagueNumbersSchema.parse({ leagueNumbers: ["4102"] })).toThrow();
-  });
-});
+import { leagueOwnClubRefsSchema, leagueIdParamSchema } from "./league";
 
 describe("leagueOwnClubRefsSchema", () => {
   it("accepts true", () => {

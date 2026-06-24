@@ -59,7 +59,6 @@ export type {
   SettingsClubConfig,
   SettingsBookingConfig,
   SettingsRefereeReminder,
-  LeagueNumbersBody,
   LeagueOwnClubRefsBody,
 } from "@dragons/contracts";
 

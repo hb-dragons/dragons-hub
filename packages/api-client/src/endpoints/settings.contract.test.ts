@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import {
   settingsClubConfigSchema,
   settingsBookingConfigSchema,
-  leagueNumbersSchema,
   leagueOwnClubRefsSchema,
 } from "@dragons/contracts";
 import { ApiClient } from "../client";
@@ -50,17 +49,6 @@ describe("settings request bodies satisfy @dragons/contracts schemas", () => {
     expect(
       parsed.error?.issues,
       "settingsBookingConfigSchema rejected the setBooking body",
-    ).toBeUndefined();
-    expect(calls[0]!.method).toBe("PUT");
-  });
-
-  it("setLeagues body parses against leagueNumbersSchema", async () => {
-    const { api, calls } = recordingClient();
-    await api.setLeagues({ leagueNumbers: [12345, 67890] });
-    const parsed = leagueNumbersSchema.safeParse(calls[0]!.body);
-    expect(
-      parsed.error?.issues,
-      "leagueNumbersSchema rejected the setLeagues body",
     ).toBeUndefined();
     expect(calls[0]!.method).toBe("PUT");
   });

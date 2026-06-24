@@ -64,7 +64,6 @@ export type {
   SettingsClubConfig,
   SettingsBookingConfig,
   SettingsRefereeReminder,
-  LeagueNumbersBody,
   LeagueOwnClubRefsBody,
   BookingListQuery,
   BookingCreateBody,

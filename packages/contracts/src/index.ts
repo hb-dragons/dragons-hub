@@ -195,10 +195,8 @@ export {
 } from "./devices";
 
 export {
-  leagueNumbersSchema,
   leagueOwnClubRefsSchema,
   leagueIdParamSchema,
-  type LeagueNumbersBody,
   type LeagueOwnClubRefsBody,
   type LeagueIdParam,
 } from "./league";

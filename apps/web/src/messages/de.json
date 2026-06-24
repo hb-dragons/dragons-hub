@@ -912,10 +912,7 @@
     "leagues": {
       "title": "Verfolgte Ligen",
       "description": "Liganummern (liganr) eingeben, die synchronisiert werden sollen, getrennt durch Kommas.",
-      "numbersLabel": "Liganummern",
-      "numbersPlaceholder": "z.B. 4102, 4105, 4003",
       "configureClubFirst": "Bitte zuerst oben einen Verein konfigurieren.",
-      "notFound": "Nicht gefunden: {numbers}",
       "columns": {
         "ligaNr": "Liga Nr",
         "name": "Name",
@@ -923,8 +920,6 @@
         "ownClubRefs": "Vereins-SR"
       },
       "toast": {
-        "partial": "{tracked} Liga(s) gespeichert. {notFoundCount} nicht gefunden: {notFoundList}",
-        "saved": "{count} Liga(s) werden verfolgt",
         "saveFailed": "Liga-Einstellungen konnten nicht gespeichert werden"
       }
     },

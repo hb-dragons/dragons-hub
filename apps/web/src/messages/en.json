@@ -912,10 +912,7 @@
     "leagues": {
       "title": "Tracked Leagues",
       "description": "Enter the league numbers (liganr) you want to sync, separated by commas.",
-      "numbersLabel": "League Numbers",
-      "numbersPlaceholder": "e.g. 4102, 4105, 4003",
       "configureClubFirst": "Configure a club above before setting leagues.",
-      "notFound": "Not found: {numbers}",
       "columns": {
         "ligaNr": "Liga Nr",
         "name": "Name",
@@ -923,8 +920,6 @@
         "ownClubRefs": "Own Refs"
       },
       "toast": {
-        "partial": "Saved {tracked} league(s). {notFoundCount} not found: {notFoundList}",
-        "saved": "Tracking {count} league(s)",
         "saveFailed": "Failed to save league settings"
       }
     },
