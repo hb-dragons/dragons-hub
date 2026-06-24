@@ -175,6 +175,9 @@ export type {
   TrackedLeaguesResponse,
 } from "./leagues";
 
+// Seasons
+export * from "./seasons";
+
 // Domain events
 export * from "./domain-events";
 export {
