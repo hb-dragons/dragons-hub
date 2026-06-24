@@ -7,6 +7,7 @@ import { buildCalendarFeed } from "../../services/public/calendar.service";
 import { matchListQuerySchema, publicScheduleIcsQuerySchema } from "@dragons/contracts";
 import { validationHook } from "../../middleware/validation";
 import { env } from "../../config/env";
+import { getActiveSeasonId } from "../../services/admin/season.service";
 
 function resolveIcsHostname(): string {
   try {
@@ -31,10 +32,12 @@ publicMatchRoutes.get(
   async (c) => {
     const query = c.req.valid("query");
     const opponentApiId = c.req.query("opponentApiId");
+    const activeSeasonId = await getActiveSeasonId();
     const result = await getOwnClubMatches({
       ...query,
       opponentApiId: opponentApiId ? Number(opponentApiId) : undefined,
       excludeInactive: true,
+      seasonId: activeSeasonId ?? -1,
     });
     return c.json(result);
   },
@@ -67,6 +70,7 @@ publicMatchRoutes.get(
 
     const toDateStr = (d: Date) => d.toISOString().split("T")[0];
 
+    const activeSeasonId = await getActiveSeasonId();
     const result = await getOwnClubMatches({
       limit: 1000,
       offset: 0,
@@ -76,6 +80,7 @@ publicMatchRoutes.get(
       leagueId: query.leagueId,
       dateFrom: query.dateFrom ?? toDateStr(defaultFrom),
       dateTo: query.dateTo ?? toDateStr(defaultTo),
+      seasonId: activeSeasonId ?? -1,
     });
 
     const ics = buildCalendarFeed(result.items, {

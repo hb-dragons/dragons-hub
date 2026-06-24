@@ -42,6 +42,7 @@ export interface MatchListParams {
   teamApiId?: number;
   opponentApiId?: number;
   excludeInactive?: boolean;
+  seasonId?: number;
 }
 
 export interface MatchUpdateData {
@@ -415,7 +416,7 @@ export async function buildDetailResponse(
 }
 
 export async function getOwnClubMatches(params: MatchListParams) {
-  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId, opponentApiId, excludeInactive } = params;
+  const { limit, offset, leagueId, dateFrom, dateTo, sort = "asc", hasScore, teamApiId, opponentApiId, excludeInactive, seasonId } = params;
 
   const ownTeams = await getDb()
     .select({ apiTeamPermanentId: teams.apiTeamPermanentId })
@@ -477,6 +478,9 @@ export async function getOwnClubMatches(params: MatchListParams) {
       or(isNull(matches.isCancelled), eq(matches.isCancelled, false))!,
     );
   }
+  if (seasonId !== undefined) {
+    conditions.push(eq(leagues.seasonRefId, seasonId));
+  }
 
   const whereClause = conditions.length === 1 ? conditions[0]! : and(...conditions)!;
 
@@ -488,10 +492,18 @@ export async function getOwnClubMatches(params: MatchListParams) {
       .orderBy(orderDirection(matches.kickoffDate), orderDirection(matches.kickoffTime))
       .limit(limit)
       .offset(offset),
-    getDb()
-      .select({ count: sql<number>`count(*)::int` })
-      .from(matches)
-      .where(whereClause),
+    // When filtering by season, the WHERE clause references leagues.season_ref_id,
+    // so the count query must include the leagues join (via queryMatchWithJoins).
+    seasonId !== undefined
+      ? getDb()
+          .select({ count: sql<number>`count(*)::int` })
+          .from(matches)
+          .leftJoin(leagues, eq(matches.leagueId, leagues.id))
+          .where(whereClause)
+      : getDb()
+          .select({ count: sql<number>`count(*)::int` })
+          .from(matches)
+          .where(whereClause),
   ]);
 
   const total = countResult[0]?.count ?? 0;

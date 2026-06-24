@@ -18,6 +18,7 @@ import {
   matchUpdateBodySchema,
   releaseOverrideParamsSchema,
 } from "@dragons/contracts";
+import { getActiveSeasonId } from "../../services/admin/season.service";
 
 const matchRoutes = new Hono<AppEnv>();
 
@@ -33,7 +34,8 @@ matchRoutes.get(
   }),
   async (c) => {
     const query = c.req.valid("query");
-    const result = await getOwnClubMatches(query);
+    const seasonId = query.seasonId ?? (await getActiveSeasonId()) ?? -1;
+    const result = await getOwnClubMatches({ ...query, seasonId });
     return c.json(result);
   },
 );

@@ -13,6 +13,7 @@ export const matchListQuerySchema = z.object({
     .transform((v) => v === "true")
     .optional(),
   teamApiId: z.coerce.number().int().positive().optional(),
+  seasonId: z.coerce.number().int().positive().optional(),
 });
 
 export const matchIdParamSchema = z.object({

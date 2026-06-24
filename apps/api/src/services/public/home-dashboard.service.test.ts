@@ -5,23 +5,29 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({
   getOwnClubMatches: vi.fn(),
   dbSelect: vi.fn(),
+  withActiveSeason: vi.fn(),
 }));
 
 vi.mock("../admin/match-query.service", () => ({
   getOwnClubMatches: mocks.getOwnClubMatches,
 }));
 
+vi.mock("../season-scope", () => ({
+  withActiveSeason: mocks.withActiveSeason,
+}));
+
 // Mock drizzle db with chainable query builder
-let _statsResult: unknown[] = [{ totalWins: 6, totalLosses: 4 }];
 let _teamCountResult: unknown[] = [{ count: 3 }];
+let _statsResult: unknown[] = [{ totalWins: 6, totalLosses: 4 }];
 let _selectCallCount = 0;
 
 vi.mock("../../config/database", () => ({
   getDb: () => ({
     select: vi.fn(() => {
       _selectCallCount++;
-      // First call: standings aggregate; second call: team count
-      const result = _selectCallCount % 2 === 1 ? _statsResult : _teamCountResult;
+      // First call: team count query (outside withActiveSeason)
+      // Second call: standings aggregate (inside withActiveSeason)
+      const result = _selectCallCount % 2 === 1 ? _teamCountResult : _statsResult;
       const chain = {
         from: vi.fn().mockReturnThis(),
         innerJoin: vi.fn().mockReturnThis(),
@@ -39,12 +45,14 @@ vi.mock("../../config/database", () => ({
 }));
 
 vi.mock("@dragons/db/schema", () => ({
-  standings: { won: "won", lost: "lost", teamApiId: "team_api_id" },
+  standings: { won: "won", lost: "lost", teamApiId: "team_api_id", leagueId: "league_id" },
   teams: { isOwnClub: "is_own_club", apiTeamPermanentId: "api_team_permanent_id" },
+  leagues: { id: "leagues.id", seasonRefId: "leagues.season_ref_id" },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+  and: vi.fn(),
   sql: vi.fn((strings: TemplateStringsArray) => strings[0]),
 }));
 
@@ -53,6 +61,23 @@ vi.mock("drizzle-orm", () => ({
 import { getHomeDashboard } from "./home-dashboard.service";
 
 // --- Helpers ---
+
+const ACTIVE_SEASON_ID = 5;
+
+function setupWithActiveSeason() {
+  mocks.withActiveSeason.mockImplementation(
+    async (fn: (id: number) => Promise<unknown>, _empty: unknown) => fn(ACTIVE_SEASON_ID),
+  );
+}
+
+function setupWithActiveSeasonEmpty(empty: unknown) {
+  mocks.withActiveSeason.mockImplementation(
+    async (_fn: unknown, emptyVal: unknown) => {
+      void empty;
+      return emptyVal;
+    },
+  );
+}
 
 function makeMatch(id: number) {
   return {
@@ -68,8 +93,8 @@ function makeMatch(id: number) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  _statsResult = [{ totalWins: 6, totalLosses: 4 }];
   _teamCountResult = [{ count: 3 }];
+  _statsResult = [{ totalWins: 6, totalLosses: 4 }];
   _selectCallCount = 0;
 });
 
@@ -79,6 +104,7 @@ describe("getHomeDashboard", () => {
     const recentMatches = [makeMatch(9), makeMatch(8)];
     const upcomingMatches = [makeMatch(10), makeMatch(11), makeMatch(12)];
 
+    setupWithActiveSeason();
     mocks.getOwnClubMatches
       .mockResolvedValueOnce({ items: [nextMatch], total: 1 })
       .mockResolvedValueOnce({ items: recentMatches, total: 2 })
@@ -99,7 +125,22 @@ describe("getHomeDashboard", () => {
     });
   });
 
+  it("returns empty dashboard when there is no active season", async () => {
+    setupWithActiveSeasonEmpty(null);
+
+    const result = await getHomeDashboard();
+
+    expect(result.nextGame).toBeNull();
+    expect(result.recentResults).toEqual([]);
+    expect(result.upcomingGames).toEqual([]);
+    expect(result.clubStats.totalWins).toBe(0);
+    expect(result.clubStats.totalLosses).toBe(0);
+    // teamCount still comes from real query even with no season
+    expect(result.clubStats.teamCount).toBe(3);
+  });
+
   it("sets nextGame to null when no upcoming games", async () => {
+    setupWithActiveSeason();
     mocks.getOwnClubMatches
       .mockResolvedValueOnce({ items: [], total: 0 })
       .mockResolvedValueOnce({ items: [], total: 0 })
@@ -113,6 +154,7 @@ describe("getHomeDashboard", () => {
   it("sets winPercentage to 0 when no games played", async () => {
     _statsResult = [{ totalWins: 0, totalLosses: 0 }];
 
+    setupWithActiveSeason();
     mocks.getOwnClubMatches
       .mockResolvedValueOnce({ items: [], total: 0 })
       .mockResolvedValueOnce({ items: [], total: 0 })
@@ -126,6 +168,7 @@ describe("getHomeDashboard", () => {
   it("computes winPercentage correctly when all wins", async () => {
     _statsResult = [{ totalWins: 10, totalLosses: 0 }];
 
+    setupWithActiveSeason();
     mocks.getOwnClubMatches
       .mockResolvedValueOnce({ items: [], total: 0 })
       .mockResolvedValueOnce({ items: [], total: 0 })
@@ -139,6 +182,7 @@ describe("getHomeDashboard", () => {
   it("rounds winPercentage to nearest integer", async () => {
     _statsResult = [{ totalWins: 1, totalLosses: 2 }];
 
+    setupWithActiveSeason();
     mocks.getOwnClubMatches
       .mockResolvedValueOnce({ items: [], total: 0 })
       .mockResolvedValueOnce({ items: [], total: 0 })
@@ -151,6 +195,7 @@ describe("getHomeDashboard", () => {
   });
 
   it("calls getOwnClubMatches with correct params for nextGame", async () => {
+    setupWithActiveSeason();
     mocks.getOwnClubMatches
       .mockResolvedValueOnce({ items: [], total: 0 })
       .mockResolvedValueOnce({ items: [], total: 0 })
@@ -169,11 +214,13 @@ describe("getHomeDashboard", () => {
         hasScore: false,
         sort: "asc",
         excludeInactive: true,
+        seasonId: ACTIVE_SEASON_ID,
       }),
     );
   });
 
   it("calls getOwnClubMatches with correct params for recentResults", async () => {
+    setupWithActiveSeason();
     mocks.getOwnClubMatches
       .mockResolvedValueOnce({ items: [], total: 0 })
       .mockResolvedValueOnce({ items: [], total: 0 })
@@ -192,11 +239,13 @@ describe("getHomeDashboard", () => {
         hasScore: true,
         sort: "desc",
         excludeInactive: true,
+        seasonId: ACTIVE_SEASON_ID,
       }),
     );
   });
 
   it("calls getOwnClubMatches with correct params for upcomingGames", async () => {
+    setupWithActiveSeason();
     mocks.getOwnClubMatches
       .mockResolvedValueOnce({ items: [], total: 0 })
       .mockResolvedValueOnce({ items: [], total: 0 })
@@ -215,6 +264,7 @@ describe("getHomeDashboard", () => {
         hasScore: false,
         sort: "asc",
         excludeInactive: true,
+        seasonId: ACTIVE_SEASON_ID,
       }),
     );
   });
@@ -223,6 +273,7 @@ describe("getHomeDashboard", () => {
     _statsResult = [];
     _teamCountResult = [];
 
+    setupWithActiveSeason();
     mocks.getOwnClubMatches
       .mockResolvedValueOnce({ items: [], total: 0 })
       .mockResolvedValueOnce({ items: [], total: 0 })
@@ -230,11 +281,8 @@ describe("getHomeDashboard", () => {
 
     const result = await getHomeDashboard();
 
-    expect(result.clubStats).toEqual({
-      teamCount: 0,
-      totalWins: 0,
-      totalLosses: 0,
-      winPercentage: 0,
-    });
+    expect(result.clubStats.totalWins).toBe(0);
+    expect(result.clubStats.totalLosses).toBe(0);
+    expect(result.clubStats.winPercentage).toBe(0);
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // --- Mocks (hoisted before imports) ---
 
 const mocks = vi.hoisted(() => ({
+  withActiveSeason: vi.fn(),
   // Chainable query builder returned by db.select()
   select: vi.fn(),
   from: vi.fn(),
@@ -23,6 +24,10 @@ const chainable = {
   orderBy: mocks.orderBy,
 };
 
+vi.mock("../season-scope", () => ({
+  withActiveSeason: mocks.withActiveSeason,
+}));
+
 vi.mock("../../config/database", () => ({
   getDb: () => ({
     select: (...args: unknown[]) => {
@@ -38,13 +43,14 @@ vi.mock("@dragons/db/schema", () => ({
     teamApiId: "standings.team_api_id",
     leagueId: "standings.league_id",
   },
-  leagues: { id: "leagues.id", name: "leagues.name" },
+  leagues: { id: "leagues.id", name: "leagues.name", seasonRefId: "leagues.season_ref_id" },
   matches: {
     homeTeamApiId: "matches.home_team_api_id",
     guestTeamApiId: "matches.guest_team_api_id",
     homeScore: "matches.home_score",
     guestScore: "matches.guest_score",
     kickoffDate: "matches.kickoff_date",
+    leagueId: "matches.league_id",
   },
 }));
 
@@ -62,6 +68,21 @@ import { getTeamStats } from "./team-stats.service";
 
 // --- Helpers ---
 
+const ACTIVE_SEASON_ID = 7;
+
+function setupWithActiveSeason() {
+  // withActiveSeason calls fn(seasonId) and returns its result
+  mocks.withActiveSeason.mockImplementation(
+    async (fn: (id: number) => Promise<unknown>, _empty: unknown) => fn(ACTIVE_SEASON_ID),
+  );
+}
+
+function setupWithActiveSeasonEmpty() {
+  mocks.withActiveSeason.mockImplementation(
+    async (_fn: unknown, empty: unknown) => empty,
+  );
+}
+
 function setupTeamQuery(result: { apiTeamPermanentId: number }[] | []) {
   // 1st select: teams lookup → select().from().where().limit()
   chainable.from.mockReturnValueOnce(chainable);
@@ -70,7 +91,7 @@ function setupTeamQuery(result: { apiTeamPermanentId: number }[] | []) {
 }
 
 function setupStandingQuery(result: unknown[]) {
-  // 2nd select: standings + innerJoin → select().from().innerJoin().where().limit()
+  // 2nd select: standings + innerJoin leagues → select().from().innerJoin().where().limit()
   chainable.from.mockReturnValueOnce(chainable);
   chainable.innerJoin.mockReturnValueOnce(chainable);
   chainable.where.mockReturnValueOnce(chainable);
@@ -78,8 +99,9 @@ function setupStandingQuery(result: unknown[]) {
 }
 
 function setupMatchQuery(result: unknown[]) {
-  // 3rd select: matches → select().from().where().orderBy().limit()
+  // 3rd select: matches + innerJoin leagues → select().from().innerJoin().where().orderBy().limit()
   chainable.from.mockReturnValueOnce(chainable);
+  chainable.innerJoin.mockReturnValueOnce(chainable);
   chainable.where.mockReturnValueOnce(chainable);
   chainable.orderBy.mockReturnValueOnce(chainable);
   chainable.limit.mockResolvedValueOnce(result);
@@ -103,8 +125,18 @@ describe("getTeamStats", () => {
     expect(result).toBeNull();
   });
 
+  it("returns null when there is no active season", async () => {
+    setupTeamQuery([{ apiTeamPermanentId: 42 }]);
+    setupWithActiveSeasonEmpty();
+
+    const result = await getTeamStats(1);
+
+    expect(result).toBeNull();
+  });
+
   it("returns stats with standing and form when all data present", async () => {
     setupTeamQuery([{ apiTeamPermanentId: 42 }]);
+    setupWithActiveSeason();
     setupStandingQuery([
       {
         position: 2,
@@ -145,6 +177,7 @@ describe("getTeamStats", () => {
 
   it("returns stats with null position and zero counters when no standing exists", async () => {
     setupTeamQuery([{ apiTeamPermanentId: 42 }]);
+    setupWithActiveSeason();
     setupStandingQuery([]);
     setupMatchQuery([]);
 
@@ -166,6 +199,7 @@ describe("getTeamStats", () => {
 
   it("marks guest-side win correctly", async () => {
     setupTeamQuery([{ apiTeamPermanentId: 7 }]);
+    setupWithActiveSeason();
     setupStandingQuery([]);
     setupMatchQuery([
       { id: 1, homeTeamApiId: 50, guestTeamApiId: 7, homeScore: 55, guestScore: 80 },
@@ -178,6 +212,7 @@ describe("getTeamStats", () => {
 
   it("marks guest-side loss correctly", async () => {
     setupTeamQuery([{ apiTeamPermanentId: 7 }]);
+    setupWithActiveSeason();
     setupStandingQuery([]);
     setupMatchQuery([
       { id: 2, homeTeamApiId: 50, guestTeamApiId: 7, homeScore: 90, guestScore: 70 },
@@ -190,6 +225,7 @@ describe("getTeamStats", () => {
 
   it("marks home-side loss correctly", async () => {
     setupTeamQuery([{ apiTeamPermanentId: 7 }]);
+    setupWithActiveSeason();
     setupStandingQuery([]);
     setupMatchQuery([
       { id: 3, homeTeamApiId: 7, guestTeamApiId: 50, homeScore: 60, guestScore: 88 },
