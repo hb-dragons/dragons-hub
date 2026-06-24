@@ -1,4 +1,5 @@
 export * from "./app-settings";
+export * from "./seasons";
 export * from "./leagues";
 export * from "./teams";
 export * from "./venues";
