@@ -945,6 +945,7 @@
     "seasons": {
       "title": "Seasons",
       "activate": "Activate",
+      "createSeason": "Create season",
       "confirmEmptyActivate": "This season has no leagues. Activating it will show an empty schedule on the public site. Continue?",
       "status": {
         "upcoming": "Upcoming",
@@ -954,6 +955,15 @@
       "toast": {
         "activated": "Season activated",
         "activateFailed": "Failed to activate season"
+      },
+      "wizard": {
+        "nameLabel": "Season name",
+        "next": "Next",
+        "saveAndSync": "Save and sync",
+        "syncing": "Syncing…",
+        "done": "Done",
+        "synced": "Season synced successfully",
+        "syncFailed": "Sync failed — check the sync log"
       }
     },
     "pushTest": {

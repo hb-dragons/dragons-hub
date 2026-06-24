@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { useTranslations } from "next-intl";
 import { queries } from "@/lib/swr-queries";
@@ -13,12 +14,14 @@ import {
 } from "@dragons/ui/components/card";
 import { Button } from "@dragons/ui/components/button";
 import type { SeasonWithCounts } from "@dragons/shared";
+import { SeasonWizard } from "./season-wizard";
 
 export function SeasonsList() {
   const t = useTranslations();
   const q = queries.seasons();
   const { data: seasons } = useSWR(q.key, q.fetcher);
   const { mutate } = useSWRConfig();
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   async function activate(season: SeasonWithCounts) {
     if (
@@ -37,9 +40,12 @@ export function SeasonsList() {
   }
 
   return (
+    <>
+    <SeasonWizard open={wizardOpen} onOpenChange={setWizardOpen} />
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{t("settings.seasons.title")}</CardTitle>
+        <Button onClick={() => setWizardOpen(true)}>{t("settings.seasons.createSeason")}</Button>
       </CardHeader>
       <CardContent className="space-y-2">
         {(seasons ?? []).map((s) => (
@@ -57,5 +63,6 @@ export function SeasonsList() {
         ))}
       </CardContent>
     </Card>
+    </>
   );
 }

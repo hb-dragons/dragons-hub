@@ -16,7 +16,10 @@ vi.mock("swr", () => ({
 vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/api", () => ({
-  api: { seasons: { activate: vi.fn(), list: vi.fn() } },
+  api: {
+    seasons: { activate: vi.fn(), list: vi.fn(), create: vi.fn(), discover: vi.fn(), setLeagues: vi.fn() },
+    sync: { trigger: vi.fn() },
+  },
 }));
 
 describe("SeasonsList", () => {

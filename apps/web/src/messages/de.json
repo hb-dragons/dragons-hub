@@ -945,6 +945,7 @@
     "seasons": {
       "title": "Saisons",
       "activate": "Aktivieren",
+      "createSeason": "Saison erstellen",
       "confirmEmptyActivate": "Diese Saison hat keine Ligen. Das Aktivieren zeigt einen leeren Spielplan auf der öffentlichen Seite. Fortfahren?",
       "status": {
         "upcoming": "Bevorstehend",
@@ -954,6 +955,15 @@
       "toast": {
         "activated": "Saison aktiviert",
         "activateFailed": "Saison konnte nicht aktiviert werden"
+      },
+      "wizard": {
+        "nameLabel": "Saisonname",
+        "next": "Weiter",
+        "saveAndSync": "Speichern und synchronisieren",
+        "syncing": "Synchronisierung läuft…",
+        "done": "Fertig",
+        "synced": "Saison erfolgreich synchronisiert",
+        "syncFailed": "Synchronisierung fehlgeschlagen — Sync-Log prüfen"
       }
     },
     "pushTest": {
