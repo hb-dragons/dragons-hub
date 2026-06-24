@@ -109,3 +109,6 @@ export { standingsEndpoints } from "./standings";
 export { userEndpoints } from "./user";
 export type { UserRefereeLinkResult } from "./user";
 export type { UserRefereeLinkBody } from "@dragons/contracts";
+
+export { seasonsEndpoints } from "./seasons";
+export type { CreateSeasonBody, SeasonLeaguesBody } from "@dragons/contracts";
