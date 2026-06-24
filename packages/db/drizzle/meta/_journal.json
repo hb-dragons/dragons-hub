@@ -281,6 +281,13 @@
       "when": 1781394167267,
       "tag": "0039_tidy_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1782304282065,
+      "tag": "0040_flashy_squadron_supreme",
+      "breakpoints": true
     }
   ]
 }
