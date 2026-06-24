@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
-import { leagues } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
+import { leagues, seasons } from "@dragons/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import pLimit from "p-limit";
 import { sdkClient } from "./sdk-client";
 import { logger } from "../../config/logger";
@@ -82,7 +82,8 @@ export async function fetchAllSyncData(): Promise<CollectedSyncData> {
   const trackedLeagues = await getDb()
     .select({ id: leagues.id, apiLigaId: leagues.apiLigaId, name: leagues.name })
     .from(leagues)
-    .where(eq(leagues.isTracked, true));
+    .innerJoin(seasons, eq(leagues.seasonRefId, seasons.id))
+    .where(and(eq(leagues.isTracked, true), inArray(seasons.status, ["active", "upcoming"])));
 
   if (trackedLeagues.length === 0) {
     log.warn("No tracked leagues found in database. Configure leagues first.");

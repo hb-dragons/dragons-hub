@@ -27,11 +27,18 @@ vi.mock("@dragons/db/schema", () => ({
     apiLigaId: "apiLigaId",
     id: "id",
     isTracked: "isTracked",
+    seasonRefId: "seasonRefId",
+  },
+  seasons: {
+    id: "id",
+    status: "status",
   },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
+  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
 }));
 
 const mockGetTabelleResponse = vi.fn();
@@ -78,17 +85,24 @@ function makeTrackedLeague(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Returns a mock select chain that resolves with the given rows (shaped as { leagues: row }). */
+function mockSelectChain(rows: ReturnType<typeof makeTrackedLeague>[]) {
+  mockSelect.mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      innerJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(rows.map((r) => ({ leagues: r }))),
+      }),
+    }),
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("syncLeagues", () => {
   it("returns empty result when no tracked leagues in DB", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([]),
-      }),
-    });
+    mockSelectChain([]);
 
     const result = await syncLeagues();
 
@@ -97,11 +111,7 @@ describe("syncLeagues", () => {
   });
 
   it("updates league metadata from tabelle response", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague()]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague()]);
     mockGetTabelleResponse.mockResolvedValue({
       ligaData: makeLigaData(),
       tabelle: { entries: [] },
@@ -120,11 +130,7 @@ describe("syncLeagues", () => {
   });
 
   it("skips league when hash matches", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague({ dataHash: "hash-abc" })]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague({ dataHash: "hash-abc" })]);
     mockGetTabelleResponse.mockResolvedValue({
       ligaData: makeLigaData(),
       tabelle: { entries: [] },
@@ -137,11 +143,7 @@ describe("syncLeagues", () => {
   });
 
   it("skips league when no ligaData in response", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague()]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague()]);
     mockGetTabelleResponse.mockResolvedValue({
       ligaData: null,
       tabelle: { entries: [] },
@@ -153,11 +155,7 @@ describe("syncLeagues", () => {
   });
 
   it("skips league when tabelle response is null", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague()]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague()]);
     mockGetTabelleResponse.mockResolvedValue(null);
 
     const result = await syncLeagues();
@@ -166,11 +164,7 @@ describe("syncLeagues", () => {
   });
 
   it("handles per-league errors gracefully", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague()]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague()]);
     mockGetTabelleResponse.mockRejectedValue(new Error("API error"));
 
     const result = await syncLeagues();
@@ -180,11 +174,7 @@ describe("syncLeagues", () => {
   });
 
   it("handles non-Error thrown objects", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague()]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague()]);
     mockGetTabelleResponse.mockRejectedValue("string error");
 
     const result = await syncLeagues();
@@ -214,11 +204,7 @@ describe("syncLeagues", () => {
   });
 
   it("passes logger on update", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague()]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague()]);
     mockGetTabelleResponse.mockResolvedValue({
       ligaData: makeLigaData(),
       tabelle: { entries: [] },
@@ -238,11 +224,7 @@ describe("syncLeagues", () => {
   });
 
   it("passes logger on skip (hash match)", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague({ dataHash: "hash-abc" })]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague({ dataHash: "hash-abc" })]);
     mockGetTabelleResponse.mockResolvedValue({
       ligaData: makeLigaData(),
       tabelle: { entries: [] },
@@ -257,11 +239,7 @@ describe("syncLeagues", () => {
   });
 
   it("passes logger on skip (no ligaData)", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague()]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague()]);
     mockGetTabelleResponse.mockResolvedValue({ ligaData: null });
 
     const mockLogger = { log: vi.fn() };
@@ -273,11 +251,7 @@ describe("syncLeagues", () => {
   });
 
   it("passes logger on error", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague()]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague()]);
     mockGetTabelleResponse.mockRejectedValue(new Error("fail"));
 
     const mockLogger = { log: vi.fn() };
@@ -289,11 +263,7 @@ describe("syncLeagues", () => {
   });
 
   it("includes durationMs in result", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([]),
-      }),
-    });
+    mockSelectChain([]);
 
     const result = await syncLeagues();
 
@@ -301,14 +271,10 @@ describe("syncLeagues", () => {
   });
 
   it("handles multiple tracked leagues", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([
-          makeTrackedLeague({ id: 10, apiLigaId: 1 }),
-          makeTrackedLeague({ id: 20, apiLigaId: 2, dataHash: "hash-abc" }),
-        ]),
-      }),
-    });
+    mockSelectChain([
+      makeTrackedLeague({ id: 10, apiLigaId: 1 }),
+      makeTrackedLeague({ id: 20, apiLigaId: 2, dataHash: "hash-abc" }),
+    ]);
     mockGetTabelleResponse.mockResolvedValue({
       ligaData: makeLigaData(),
       tabelle: { entries: [] },
@@ -327,11 +293,7 @@ describe("syncLeagues", () => {
   });
 
   it("uses fallback name when ligaData.liganame is empty", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague({ name: "Original Name" })]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague({ name: "Original Name" })]);
     mockGetTabelleResponse.mockResolvedValue({
       ligaData: makeLigaData({ liganame: "" }),
       tabelle: { entries: [] },
@@ -349,11 +311,7 @@ describe("syncLeagues", () => {
   });
 
   it("uses fallback seasonName when ligaData.seasonName is empty", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague({ seasonName: "2024" })]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague({ seasonName: "2024" })]);
     vi.mocked(computeEntityHash).mockReturnValue("different-hash");
     mockGetTabelleResponse.mockResolvedValue({
       ligaData: makeLigaData({ seasonName: "" }),
@@ -372,11 +330,7 @@ describe("syncLeagues", () => {
   });
 
   it("handles null optional fields in ligaData", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([makeTrackedLeague()]),
-      }),
-    });
+    mockSelectChain([makeTrackedLeague()]);
     mockGetTabelleResponse.mockResolvedValue({
       ligaData: makeLigaData({
         skName: null,

@@ -23,11 +23,14 @@ vi.mock("../../config/database", () => ({
 }));
 
 vi.mock("@dragons/db/schema", () => ({
-  leagues: { id: "id", apiLigaId: "apiLigaId", isTracked: "isTracked" },
+  leagues: { id: "id", apiLigaId: "apiLigaId", isTracked: "isTracked", seasonRefId: "seasonRefId" },
+  seasons: { id: "id", status: "status" },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+  and: vi.fn(),
+  inArray: vi.fn(),
 }));
 
 const mockPLimit = vi.fn();
@@ -155,7 +158,9 @@ describe("fetchAllSyncData", () => {
   it("returns empty data when no tracked leagues in DB", async () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
       }),
     });
 
@@ -170,10 +175,12 @@ describe("fetchAllSyncData", () => {
   it("fetches data for tracked leagues", async () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([
           { id: 1, apiLigaId: 1001, name: "Test Liga" },
           { id: 2, apiLigaId: 1002, name: "Test Liga 2" },
         ]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -190,7 +197,9 @@ describe("fetchAllSyncData", () => {
   it("collects unique teams from match data", async () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -211,7 +220,9 @@ describe("fetchAllSyncData", () => {
     const gameResp = makeGameResponse();
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -256,7 +267,9 @@ describe("fetchAllSyncData", () => {
     });
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -273,7 +286,9 @@ describe("fetchAllSyncData", () => {
   it("handles matches with no matchId", async () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -289,7 +304,9 @@ describe("fetchAllSyncData", () => {
   it("skips teams with no teamPermanentId and warns for null teams", async () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -316,7 +333,9 @@ describe("fetchAllSyncData", () => {
   it("warns for zero teamPermanentId in spielplan", async () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -343,7 +362,9 @@ describe("fetchAllSyncData", () => {
   it("collects teams from tabelle entries", async () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -367,7 +388,9 @@ describe("fetchAllSyncData", () => {
   it("skips tabelle entries with zero teamPermanentId", async () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -394,7 +417,9 @@ describe("fetchAllSyncData", () => {
 
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -426,7 +451,9 @@ describe("fetchAllSyncData", () => {
 
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);
@@ -442,10 +469,12 @@ describe("fetchAllSyncData", () => {
   it("limits league fetch concurrency to 3", async () => {
     mockSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([
           { id: 1, apiLigaId: 100, name: "League A" },
           { id: 2, apiLigaId: 200, name: "League B" },
         ]),
+        }),
       }),
     });
     mockEnsureAuthenticated.mockResolvedValue(undefined);

@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
-import { leagues } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
+import { leagues, seasons } from "@dragons/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import pLimit from "p-limit";
 import { sdkClient } from "./sdk-client";
 import { computeEntityHash } from "./hash";
@@ -51,16 +51,17 @@ export async function syncLeagues(syncLogger?: SyncLogger): Promise<LeagueSyncRe
 
   try {
     const trackedLeagues = await getDb()
-      .select()
+      .select({ leagues })
       .from(leagues)
-      .where(eq(leagues.isTracked, true));
+      .innerJoin(seasons, eq(leagues.seasonRefId, seasons.id))
+      .where(and(eq(leagues.isTracked, true), inArray(seasons.status, ["active", "upcoming"])));
 
     log.info({ count: trackedLeagues.length }, "Refreshing metadata for tracked leagues");
 
     const limit = pLimit(LEAGUE_SYNC_CONCURRENCY);
     await Promise.all(
-      trackedLeagues.map((league) =>
-        limit(() => syncOneLeague(league, result, syncLogger)),
+      trackedLeagues.map((row) =>
+        limit(() => syncOneLeague(row.leagues, result, syncLogger)),
       ),
     );
   } catch (error) {
