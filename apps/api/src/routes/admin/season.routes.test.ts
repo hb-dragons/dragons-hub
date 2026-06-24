@@ -8,8 +8,21 @@ const mocks = vi.hoisted(() => ({
   createSeason: vi.fn(),
   activateSeason: vi.fn(),
   archiveSeason: vi.fn(),
+  browseLeagues: vi.fn(),
+  setSeasonLeagues: vi.fn(),
+  getTrackedLeagues: vi.fn(),
 }));
-vi.mock("../../services/admin/season.service", () => mocks);
+vi.mock("../../services/admin/season.service", () => ({
+  listSeasons: mocks.listSeasons,
+  createSeason: mocks.createSeason,
+  activateSeason: mocks.activateSeason,
+  archiveSeason: mocks.archiveSeason,
+}));
+vi.mock("../../services/admin/league-discovery.service", () => ({
+  browseLeagues: mocks.browseLeagues,
+  setSeasonLeagues: mocks.setSeasonLeagues,
+  getTrackedLeagues: mocks.getTrackedLeagues,
+}));
 vi.mock("../../middleware/rbac", () => ({
   requirePermission: vi.fn(() => async (_c: unknown, next: () => Promise<void>) => next()),
 }));
@@ -77,6 +90,61 @@ describe("POST /seasons/:id/archive", () => {
   });
   it("returns 400 for non-numeric id on archive", async () => {
     const res = await app.request("/seasons/abc/archive", { method: "POST" });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /seasons/:id/discover", () => {
+  it("returns browsable leagues", async () => {
+    mocks.browseLeagues.mockResolvedValue([{ ligaId: 54136, vorabliga: true, alreadyTracked: false }]);
+    const res = await app.request("/seasons/3/discover?vorabligaOnly=true");
+    expect(res.status).toBe(200);
+    expect(mocks.browseLeagues).toHaveBeenCalledWith({ vorabligaOnly: true, seasonId: 3 });
+  });
+  it("returns 400 for non-numeric id", async () => {
+    const res = await app.request("/seasons/abc/discover");
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /seasons/:id/leagues", () => {
+  it("returns tracked leagues for a season", async () => {
+    mocks.getTrackedLeagues.mockResolvedValue({ leagueNumbers: [54136], leagues: [{ id: 1, ligaNr: 54136, apiLigaId: 54136, name: "Regionalliga West", seasonName: "2025/26", ownClubRefs: false }] });
+    const res = await app.request("/seasons/3/leagues");
+    expect(res.status).toBe(200);
+    expect(mocks.getTrackedLeagues).toHaveBeenCalledWith(3);
+  });
+  it("returns 400 for non-numeric id", async () => {
+    const res = await app.request("/seasons/abc/leagues");
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("PUT /seasons/:id/leagues", () => {
+  it("sets season leagues", async () => {
+    mocks.setSeasonLeagues.mockResolvedValue({ tracked: 1, untracked: 0 });
+    const res = await app.request("/seasons/3/leagues", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ligaIds: [54136] }),
+    });
+    expect(res.status).toBe(200);
+    expect(mocks.setSeasonLeagues).toHaveBeenCalledWith(3, [54136]);
+  });
+  it("returns 400 for a non-array ligaIds", async () => {
+    const res = await app.request("/seasons/3/leagues", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ligaIds: "x" }),
+    });
+    expect(res.status).toBe(400);
+  });
+  it("returns 400 for non-numeric id", async () => {
+    const res = await app.request("/seasons/abc/leagues", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ligaIds: [54136] }),
+    });
     expect(res.status).toBe(400);
   });
 });

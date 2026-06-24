@@ -6,10 +6,20 @@ import {
   activateSeason,
   archiveSeason,
 } from "../../services/admin/season.service";
+import {
+  browseLeagues,
+  setSeasonLeagues,
+  getTrackedLeagues,
+} from "../../services/admin/league-discovery.service";
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
-import { createSeasonSchema, seasonIdParamSchema } from "@dragons/contracts";
+import {
+  createSeasonSchema,
+  seasonIdParamSchema,
+  browseLeaguesQuerySchema,
+  seasonLeaguesSchema,
+} from "@dragons/contracts";
 
 const seasonRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
@@ -59,6 +69,52 @@ seasonRoutes.post(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => c.json(await archiveSeason(c.req.valid("param").id)),
+);
+
+seasonRoutes.get(
+  "/seasons/:id/discover",
+  settingsUpdate,
+  validator("param", seasonIdParamSchema, validationHook),
+  validator("query", browseLeaguesQuerySchema, validationHook),
+  describeRoute({
+    description: "Browse federation leagues to track for a season",
+    tags: ["Seasons"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const { vorabligaOnly } = c.req.valid("query");
+    return c.json(await browseLeagues({ vorabligaOnly, seasonId: id }));
+  },
+);
+
+seasonRoutes.get(
+  "/seasons/:id/leagues",
+  settingsUpdate,
+  validator("param", seasonIdParamSchema, validationHook),
+  describeRoute({
+    description: "Tracked leagues for a season",
+    tags: ["Seasons"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => c.json(await getTrackedLeagues(c.req.valid("param").id)),
+);
+
+seasonRoutes.put(
+  "/seasons/:id/leagues",
+  settingsUpdate,
+  validator("param", seasonIdParamSchema, validationHook),
+  validator("json", seasonLeaguesSchema, validationHook),
+  describeRoute({
+    description: "Set tracked leagues for a season",
+    tags: ["Seasons"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const { ligaIds } = c.req.valid("json");
+    return c.json(await setSeasonLeagues(id, ligaIds));
+  },
 );
 
 export { seasonRoutes };
