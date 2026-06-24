@@ -70,12 +70,9 @@ function setupWithActiveSeason() {
   );
 }
 
-function setupWithActiveSeasonEmpty(empty: unknown) {
+function setupWithActiveSeasonEmpty() {
   mocks.withActiveSeason.mockImplementation(
-    async (_fn: unknown, emptyVal: unknown) => {
-      void empty;
-      return emptyVal;
-    },
+    async (_fn: unknown, emptyVal: unknown) => emptyVal,
   );
 }
 
@@ -126,7 +123,7 @@ describe("getHomeDashboard", () => {
   });
 
   it("returns empty dashboard when there is no active season", async () => {
-    setupWithActiveSeasonEmpty(null);
+    setupWithActiveSeasonEmpty();
 
     const result = await getHomeDashboard();
 
@@ -281,8 +278,11 @@ describe("getHomeDashboard", () => {
 
     const result = await getHomeDashboard();
 
-    expect(result.clubStats.totalWins).toBe(0);
-    expect(result.clubStats.totalLosses).toBe(0);
-    expect(result.clubStats.winPercentage).toBe(0);
+    expect(result.clubStats).toEqual({
+      teamCount: 0,
+      totalWins: 0,
+      totalLosses: 0,
+      winPercentage: 0,
+    });
   });
 });
