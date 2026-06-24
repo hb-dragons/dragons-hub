@@ -16,6 +16,7 @@ vi.mock("../../config/database", () => ({
 // --- Imports (after mocks) ---
 
 import { getStandings } from "./standings-admin.service";
+import { invalidateActiveSeasonCache } from "./season.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- PGlite setup ---
@@ -34,6 +35,7 @@ beforeEach(async () => {
     `INSERT INTO seasons (name, status) VALUES ('2025/26', 'active') RETURNING id`,
   );
   activeSeasonId = result.rows[0]!.id;
+  invalidateActiveSeasonCache();
   vi.clearAllMocks();
 });
 
@@ -261,5 +263,40 @@ describe("getStandings", () => {
 
     // Own-club league first, foreign leagues alphabetical after
     expect(result.map((r) => r.leagueName)).toEqual(["Own Liga", "Bar Liga", "Foo Liga"]);
+  });
+
+  it("only returns standings from the active season", async () => {
+    // The active season (id = activeSeasonId) is already seeded in beforeEach.
+    const upcomingResult = await ctx.client.query<{ id: number }>(
+      `INSERT INTO seasons (name, status) VALUES ('2026/27', 'upcoming') RETURNING id`,
+    );
+    const upcomingId = upcomingResult.rows[0]!.id;
+
+    const activeLeague = await insertLeague({ api_liga_id: 1 });
+    const upcomingLeague = await insertLeague({ api_liga_id: 2, liga_nr: 4103, name: "Next", season_ref_id: upcomingId });
+
+    await insertTeam({ api_team_permanent_id: 1000, name: "Team A" });
+    await insertTeam({ api_team_permanent_id: 2000, name: "Team B", season_team_id: 2, team_competition_id: 2 });
+
+    await insertStanding(activeLeague, 1000, { position: 1 });
+    await insertStanding(upcomingLeague, 2000, { position: 1 });
+
+    const result = await getStandings();
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.leagueId).toBe(activeLeague);
+  });
+
+  it("returns empty array when there is no active season", async () => {
+    await ctx.client.query(`UPDATE seasons SET status = 'archived'`);
+    invalidateActiveSeasonCache();
+
+    const leagueId = await insertLeague({ api_liga_id: 1 });
+    await insertTeam({ api_team_permanent_id: 1000, name: "Team A" });
+    await insertStanding(leagueId, 1000, { position: 1 });
+
+    const result = await getStandings();
+
+    expect(result).toEqual([]);
   });
 });
