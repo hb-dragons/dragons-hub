@@ -48,17 +48,24 @@ import {
   broadcastConfigs,
   leagues,
   matches,
+  seasons,
   teams,
 } from "@dragons/db/schema";
 import { processIngest } from "../scoreboard/ingest";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 beforeAll(async () => {
   ctx = await setupTestDb();
   dbHolder.ref = ctx.db;
 });
 beforeEach(async () => {
   await resetTestDb(ctx);
+  const [season] = await ctx.db
+    .insert(seasons)
+    .values({ name: "2025/26", status: "active" })
+    .returning();
+  activeSeasonId = season!.id;
   mocks.publishSnapshot.mockReset();
   mocks.publishBroadcast.mockReset();
   mocks.publishSnapshot.mockResolvedValue(undefined);
@@ -96,6 +103,7 @@ async function seed(): Promise<void> {
     name: "Liga",
     seasonId: 2026,
     seasonName: "2025/26",
+    seasonRefId: activeSeasonId,
   });
   await ctx.db.insert(teams).values([
     {

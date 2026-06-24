@@ -42,10 +42,16 @@ vi.mock("../sync/sdk-client", () => ({
   },
 }));
 
+const mockGetActiveSeasonId = vi.fn();
+vi.mock("./season.service", () => ({
+  getActiveSeasonId: (...args: unknown[]) => mockGetActiveSeasonId(...args),
+}));
+
 import { resolveAndSaveLeagues, getTrackedLeagues } from "./league-discovery.service";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetActiveSeasonId.mockResolvedValue(1);
 });
 
 // --- Helpers ---

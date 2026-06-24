@@ -44,6 +44,7 @@ import {
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -52,6 +53,10 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetTestDb(ctx);
+  const result = await ctx.client.query<{ id: number }>(
+    `INSERT INTO seasons (name, status) VALUES ('2025/26', 'active') RETURNING id`,
+  );
+  activeSeasonId = result.rows[0]!.id;
   vi.clearAllMocks();
 });
 
@@ -68,6 +73,7 @@ async function insertLeague(overrides: Record<string, unknown> = {}) {
     name: "Test League",
     season_id: 2025,
     season_name: "2024/2025",
+    season_ref_id: activeSeasonId,
   };
   const data = { ...defaults, ...overrides };
   const cols = Object.keys(data);

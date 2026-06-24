@@ -7,19 +7,25 @@ vi.mock("../../config/database", () => ({
 
 // --- Imports (after mocks) ---
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
-import { matches, teams, venues, leagues, venueBookings, venueBookingMatches } from "@dragons/db/schema";
+import { matches, teams, venues, leagues, seasons, venueBookings, venueBookingMatches } from "@dragons/db/schema";
 import { verifySlot } from "./verify-slot.service";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 beforeAll(async () => { ctx = await setupTestDb(); dbHolder.ref = ctx.db; });
-beforeEach(async () => { await resetTestDb(ctx); vi.clearAllMocks(); });
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  const [season] = await ctx.db.insert(seasons).values({ name: "2025/26", status: "active" }).returning();
+  activeSeasonId = season!.id;
+  vi.clearAllMocks();
+});
 afterAll(async () => { await closeTestDb(ctx); });
 
 async function seedOwnTeam(apiId: number, name = `T${apiId}`) {
   await ctx.db.insert(teams).values({ apiTeamPermanentId: apiId, seasonTeamId: apiId, teamCompetitionId: apiId, name, clubId: 1, isOwnClub: true });
 }
 async function seedVenue(id: number) { await ctx.db.insert(venues).values({ id, apiId: 1000 + id, name: `Hall ${id}` }); }
-async function seedLeague(id: number) { await ctx.db.insert(leagues).values({ id, apiLigaId: 9000 + id, ligaNr: id, name: `L${id}`, seasonId: 1, seasonName: "25/26" }); }
+async function seedLeague(id: number) { await ctx.db.insert(leagues).values({ id, apiLigaId: 9000 + id, ligaNr: id, name: `L${id}`, seasonId: 1, seasonName: "25/26", seasonRefId: activeSeasonId }); }
 async function seedMatch(o: { id: number; apiMatchId: number; home: number; guest: number; date: string; time: string; venueId: number | null; leagueId: number | null; matchDay: number; }) {
   await ctx.db.insert(matches).values({ id: o.id, apiMatchId: o.apiMatchId, matchNo: o.id, matchDay: o.matchDay, kickoffDate: o.date, kickoffTime: o.time, homeTeamApiId: o.home, guestTeamApiId: o.guest, venueId: o.venueId, leagueId: o.leagueId });
 }

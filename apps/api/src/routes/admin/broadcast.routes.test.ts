@@ -52,17 +52,25 @@ import {
   broadcastConfigs,
   leagues,
   matches,
+  seasons,
   teams,
 } from "@dragons/db/schema";
 import { adminBroadcastRoutes } from "./broadcast.routes";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
+
 beforeAll(async () => {
   ctx = await setupTestDb();
   dbHolder.ref = ctx.db;
 });
 beforeEach(async () => {
   await resetTestDb(ctx);
+  const [season] = await ctx.db
+    .insert(seasons)
+    .values({ name: "2025/26", status: "active" })
+    .returning();
+  activeSeasonId = season!.id;
   mocks.publishBroadcastForDevice.mockReset();
   mocks.publishBroadcastForDevice.mockResolvedValue(undefined);
 });
@@ -82,6 +90,7 @@ async function seedMatch(): Promise<{ matchId: number }> {
     name: "Liga",
     seasonId: 2026,
     seasonName: "2025/26",
+    seasonRefId: activeSeasonId,
   });
   await ctx.db.insert(teams).values([
     {
@@ -227,6 +236,7 @@ describe("GET /admin/broadcast/matches", () => {
       name: "Liga",
       seasonId: 2026,
       seasonName: "2025/26",
+      seasonRefId: activeSeasonId,
     });
     await ctx.db.insert(teams).values([
       {
@@ -302,6 +312,7 @@ describe("GET /admin/broadcast/matches", () => {
       name: "Liga",
       seasonId: 2026,
       seasonName: "2025/26",
+      seasonRefId: activeSeasonId,
     });
     await ctx.db.insert(teams).values([
       {

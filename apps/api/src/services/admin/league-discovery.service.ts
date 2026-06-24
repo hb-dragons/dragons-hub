@@ -2,6 +2,7 @@ import { getDb } from "../../config/database";
 import { leagues } from "@dragons/db/schema";
 import { eq, and, notInArray } from "drizzle-orm";
 import { sdkClient } from "../sync/sdk-client";
+import { getActiveSeasonId } from "./season.service";
 import type { SdkLiga } from "@dragons/sdk";
 import type {
   ResolvedLeague,
@@ -10,6 +11,11 @@ import type {
 } from "@dragons/shared";
 
 export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<ResolveResult> {
+  const activeSeasonId = await getActiveSeasonId();
+  if (activeSeasonId === null) {
+    throw new Error("No active season; cannot resolve leagues");
+  }
+
   const allLigen = await sdkClient.getAllLigen();
   const matchedByLigaNr = new Map<number, SdkLiga>();
 
@@ -52,6 +58,7 @@ export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<Re
           name: liga.liganame,
           seasonId: liga.seasonId ?? 0,
           seasonName: liga.seasonName ?? "",
+          seasonRefId: activeSeasonId,
           skName: liga.skName || null,
           akName: liga.akName || null,
           geschlecht: liga.geschlecht || null,
@@ -68,6 +75,7 @@ export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<Re
         name: liga.liganame,
         seasonId: liga.seasonId ?? 0,
         seasonName: liga.seasonName ?? "",
+        seasonRefId: activeSeasonId,
         skName: liga.skName || null,
         akName: liga.akName || null,
         geschlecht: liga.geschlecht || null,

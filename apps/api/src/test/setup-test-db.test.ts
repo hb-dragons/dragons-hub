@@ -5,7 +5,7 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "./setup-test-db";
-import { leagues } from "@dragons/db/schema";
+import { leagues, seasons } from "@dragons/db/schema";
 
 let ctx: TestDbContext;
 
@@ -36,6 +36,10 @@ describe("setupTestDb", () => {
   });
 
   it("supports Drizzle ORM insert and select", async () => {
+    const [season] = await ctx.db
+      .insert(seasons)
+      .values({ name: "2025/26", status: "active" })
+      .returning();
     const [league] = await ctx.db
       .insert(leagues)
       .values({
@@ -44,6 +48,7 @@ describe("setupTestDb", () => {
         name: "Regionalliga West",
         seasonId: 100,
         seasonName: "2025/26",
+        seasonRefId: season!.id,
       })
       .returning();
 
@@ -53,8 +58,15 @@ describe("setupTestDb", () => {
 });
 
 describe("resetTestDb", () => {
+  let activeSeasonId: number;
+
   beforeEach(async () => {
     await resetTestDb(ctx);
+    const [season] = await ctx.db
+      .insert(seasons)
+      .values({ name: "2025/26", status: "active" })
+      .returning();
+    activeSeasonId = season!.id;
   });
 
   it("truncates all data", async () => {
@@ -64,6 +76,7 @@ describe("resetTestDb", () => {
       name: "Test",
       seasonId: 1,
       seasonName: "Test",
+      seasonRefId: activeSeasonId,
     });
 
     await resetTestDb(ctx);
@@ -81,6 +94,7 @@ describe("resetTestDb", () => {
         name: "First",
         seasonId: 1,
         seasonName: "Test",
+        seasonRefId: activeSeasonId,
       })
       .returning();
 
