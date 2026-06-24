@@ -942,6 +942,20 @@
       "light": "Hell",
       "dark": "Dunkel"
     },
+    "seasons": {
+      "title": "Saisons",
+      "activate": "Aktivieren",
+      "confirmEmptyActivate": "Diese Saison hat keine Ligen. Das Aktivieren zeigt einen leeren Spielplan auf der öffentlichen Seite. Fortfahren?",
+      "status": {
+        "upcoming": "Bevorstehend",
+        "active": "Aktiv",
+        "archived": "Archiviert"
+      },
+      "toast": {
+        "activated": "Saison aktiviert",
+        "activateFailed": "Saison konnte nicht aktiviert werden"
+      }
+    },
     "pushTest": {
       "pageTitle": "Benachrichtigungen",
       "pageDescription": "Tests und Diagnose für Push-Benachrichtigungen.",

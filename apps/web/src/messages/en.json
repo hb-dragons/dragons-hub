@@ -942,6 +942,20 @@
       "light": "Light",
       "dark": "Dark"
     },
+    "seasons": {
+      "title": "Seasons",
+      "activate": "Activate",
+      "confirmEmptyActivate": "This season has no leagues. Activating it will show an empty schedule on the public site. Continue?",
+      "status": {
+        "upcoming": "Upcoming",
+        "active": "Active",
+        "archived": "Archived"
+      },
+      "toast": {
+        "activated": "Season activated",
+        "activateFailed": "Failed to activate season"
+      }
+    },
     "pushTest": {
       "pageTitle": "Notifications",
       "pageDescription": "Push notification testing and diagnostics.",

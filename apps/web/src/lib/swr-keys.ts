@@ -102,4 +102,5 @@ export const SWR_KEYS = {
   testPushRecent: "/admin/notifications/test-push/recent",
   refereeGameByApiMatch: (apiMatchId: number) =>
     `/referee/games/by-api-match/${apiMatchId}`,
+  seasons: "/admin/seasons",
 } as const;

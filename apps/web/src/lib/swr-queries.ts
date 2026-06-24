@@ -172,6 +172,8 @@ export function makeQueries(api: Api) {
       key: SWR_KEYS.taskDetail(id),
       fetcher: () => api.boards.getTask(id),
     }),
+    // seasons
+    seasons: () => ({ key: SWR_KEYS.seasons, fetcher: () => api.seasons.list() }),
   } as const;
 }
 
