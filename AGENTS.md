@@ -66,7 +66,8 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | Table | File | Key Columns |
 |-------|------|-------------|
 | `appSettings` | `packages/db/src/schema/app-settings.ts` | key (unique), value — stores club_id, club_name |
-| `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId, isTracked, discoveredAt, dataHash |
+| `seasons` | `packages/db/src/schema/seasons.ts` | id, name, sdkSeasonId (nullable int), status (`upcoming`\|`active`\|`archived`), startDate, endDate, createdAt, updatedAt — partial-unique index enforces at most one `active` row at a time; `activateSeason()` archives the current active in the same transaction |
+| `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId (legacy SDK int), seasonRefId (FK → seasons.id, NOT NULL), vorabliga (boolean), isTracked, discoveredAt, dataHash — season scoping for matches/standings flows through `leagues.seasonRefId`; sync gates to active+upcoming seasons; public reads are active-season-only; admin reads accept an optional `seasonId` query param (defaulting to the active season) |
 | `teams` | `packages/db/src/schema/teams.ts` | apiTeamPermanentId (unique), name, clubId, isOwnClub, dataHash |
 | `venues` | `packages/db/src/schema/venues.ts` | apiId (unique), name, street, postalCode, city, lat/lng, dataHash |
 | `matches` | `packages/db/src/schema/matches.ts` | apiMatchId (unique), leagueId FK, venueId FK, scores, sr1Open, sr2Open, sr3Open, JSONB fields, versioning |
@@ -302,12 +303,25 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 | GET | `/admin/settings/club` | Get current club config (clubId, clubName) or null |
 | PUT | `/admin/settings/club` | Set club config `{ clubId, clubName }` |
 
+### Admin - Seasons
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/seasons` | List all seasons with per-season league counts |
+| POST | `/admin/seasons` | Create a new season (`upcoming` status by default) |
+| POST | `/admin/seasons/:id/activate` | Archive the current active season and activate the target |
+| POST | `/admin/seasons/:id/archive` | Archive a season (does not activate another) |
+| GET | `/admin/seasons/:id/discover` | Discover leagues available for this season from the federation |
+| GET | `/admin/seasons/:id/leagues` | List leagues assigned to a season |
+| PUT | `/admin/seasons/:id/leagues` | Replace the full league list for a season |
+
 ### Admin - League Management
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/admin/leagues/discover` | Discover leagues for configured club |
 | GET | `/admin/leagues` | All leagues grouped by season with tracking status |
+| GET | `/admin/settings/leagues` | Active-season-scoped league list (formerly `PUT /admin/settings/leagues` paste-by-number flow is removed; list remains) |
 | PUT | `/admin/leagues/:id/tracking` | Toggle `{ isTracked: boolean }` |
 
 ### Admin - Matches
