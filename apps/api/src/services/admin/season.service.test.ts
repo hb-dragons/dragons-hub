@@ -72,4 +72,12 @@ describe("season.service", () => {
     invalidateActiveSeasonCache();
     expect(await getActiveSeasonId()).toBeNull(); // fresh read
   });
+
+  it("archiveSeason sets a season to archived", async () => {
+    const r = await ctx.client.query<{ id: number }>(
+      `INSERT INTO seasons (name, status) VALUES ('2026/27','upcoming') RETURNING id`,
+    );
+    const archived = await archiveSeason(r.rows[0]!.id);
+    expect(archived.status).toBe("archived");
+  });
 });
