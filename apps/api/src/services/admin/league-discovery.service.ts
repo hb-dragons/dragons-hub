@@ -4,11 +4,13 @@ import { eq, and, notInArray } from "drizzle-orm";
 import { sdkClient } from "../sync/sdk-client";
 import { getActiveSeasonId } from "./season.service";
 import { getClubConfig } from "./settings.service";
-import type { SdkLiga } from "@dragons/sdk";
+import type { SdkLiga, SdkTeamRef } from "@dragons/sdk";
 import type {
   BrowsableLeague,
   SetSeasonLeaguesResult,
   TrackedLeaguesResponse,
+  LeagueTeamsResponse,
+  LeagueTeam,
 } from "@dragons/shared";
 
 // The federation never flags the top tiers (Regionalliga and up) as `vorabliga`:
@@ -157,4 +159,36 @@ export async function setLeagueOwnClubRefs(leagueId: number, ownClubRefs: boolea
     .update(leagues)
     .set({ ownClubRefs, updatedAt: new Date() })
     .where(eq(leagues.id, leagueId));
+}
+
+// List the teams assigned to a league, so an operator can confirm they are
+// tracking the right one. The standings table lists the roster even for a
+// preliminary (vorabliga) league; fall back to the schedule if it is empty.
+export async function getLeagueTeams(ligaId: number): Promise<LeagueTeamsResponse> {
+  const ownClubId = (await getClubConfig())?.clubId ?? null;
+
+  const refs: SdkTeamRef[] = [];
+  const table = await sdkClient.getTabelle(ligaId);
+  if (table.length > 0) {
+    for (const entry of table) refs.push(entry.team);
+  } else {
+    const matches = await sdkClient.getSpielplan(ligaId);
+    for (const m of matches) {
+      if (m.homeTeam) refs.push(m.homeTeam);
+      if (m.guestTeam) refs.push(m.guestTeam);
+    }
+  }
+
+  const byId = new Map<number, LeagueTeam>();
+  for (const ref of refs) {
+    if (byId.has(ref.teamPermanentId)) continue;
+    const clubId = ref.clubId ?? null;
+    byId.set(ref.teamPermanentId, {
+      teamPermanentId: ref.teamPermanentId,
+      name: ref.teamname,
+      clubId,
+      isOwnClub: clubId !== null && ownClubId !== null && clubId === ownClubId,
+    });
+  }
+  return { teams: [...byId.values()] };
 }

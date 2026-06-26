@@ -25,3 +25,14 @@ export interface TrackedLeaguesResponse {
   leagueNumbers: number[];
   leagues: TrackedLeague[];
 }
+
+export interface LeagueTeam {
+  teamPermanentId: number;
+  name: string;
+  clubId: number | null;
+  isOwnClub: boolean;
+}
+
+export interface LeagueTeamsResponse {
+  teams: LeagueTeam[];
+}

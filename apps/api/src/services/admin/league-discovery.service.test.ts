@@ -1,16 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { setupTestDb, resetTestDb, type TestDbContext } from "../../test/setup-test-db";
 
-const { dbHolder, getAllLigen, getClubMatches } = vi.hoisted(() => ({
+const { dbHolder, getAllLigen, getClubMatches, getTabelle, getSpielplan } = vi.hoisted(() => ({
   dbHolder: { ref: null as unknown },
   getAllLigen: vi.fn(),
   getClubMatches: vi.fn(),
+  getTabelle: vi.fn(),
+  getSpielplan: vi.fn(),
 }));
 vi.mock("../../config/database", () => ({
   getDb: () =>
     new Proxy({}, { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] }),
 }));
-vi.mock("../sync/sdk-client", () => ({ sdkClient: { getAllLigen, getClubMatches } }));
+vi.mock("../sync/sdk-client", () => ({
+  sdkClient: { getAllLigen, getClubMatches, getTabelle, getSpielplan },
+}));
 
 const mockGetActiveSeasonId = vi.fn();
 vi.mock("./season.service", () => ({
@@ -28,6 +32,7 @@ import {
   setSeasonLeagues,
   getTrackedLeagues,
   setLeagueOwnClubRefs,
+  getLeagueTeams,
 } from "./league-discovery.service";
 
 let ctx: TestDbContext;
@@ -230,5 +235,44 @@ describe("setLeagueOwnClubRefs", () => {
       [leagueId],
     );
     expect(check.rows[0]!.own_club_refs).toBe(true);
+  });
+});
+
+describe("getLeagueTeams", () => {
+  function teamRef(teamPermanentId: number, teamname: string, clubId: number | null) {
+    return { seasonTeamId: 0, teamCompetitionId: 0, teamPermanentId, teamname, teamnameSmall: "", clubId, verzicht: false };
+  }
+
+  it("lists teams from the standings table and marks our club", async () => {
+    getTabelle.mockResolvedValue([
+      { team: teamRef(1, "Opponents", 9999) },
+      { team: teamRef(2, "Hanover Dragons I", 4121) },
+    ]);
+    const res = await getLeagueTeams(54141);
+    expect(getSpielplan).not.toHaveBeenCalled();
+    expect(res.teams).toEqual([
+      { teamPermanentId: 1, name: "Opponents", clubId: 9999, isOwnClub: false },
+      { teamPermanentId: 2, name: "Hanover Dragons I", clubId: 4121, isOwnClub: true },
+    ]);
+  });
+
+  it("falls back to the schedule when the table is empty, deduping by teamPermanentId", async () => {
+    getTabelle.mockResolvedValue([]);
+    getSpielplan.mockResolvedValue([
+      { homeTeam: teamRef(1, "A", 4121), guestTeam: teamRef(2, "B", 10) },
+      { homeTeam: teamRef(1, "A", 4121), guestTeam: null },
+    ]);
+    const res = await getLeagueTeams(54141);
+    expect(res.teams.map((t) => t.teamPermanentId)).toEqual([1, 2]);
+    expect(res.teams[0]).toMatchObject({ isOwnClub: true });
+  });
+
+  it("keeps placeholder slots (clubId null) and never marks them own-club", async () => {
+    mockGetClubConfig.mockResolvedValue(null); // no club configured
+    getTabelle.mockResolvedValue([{ team: teamRef(5, "Platzhalter 6", null) }]);
+    const res = await getLeagueTeams(54144);
+    expect(res.teams).toEqual([
+      { teamPermanentId: 5, name: "Platzhalter 6", clubId: null, isOwnClub: false },
+    ]);
   });
 });

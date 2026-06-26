@@ -173,6 +173,8 @@ export type {
   ResolveResult,
   TrackedLeague,
   TrackedLeaguesResponse,
+  LeagueTeam,
+  LeagueTeamsResponse,
 } from "./leagues";
 
 // Seasons
