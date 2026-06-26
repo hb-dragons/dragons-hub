@@ -31,7 +31,11 @@ async function ownClubLigaIds(): Promise<Set<number> | null> {
   const club = await getClubConfig();
   if (!club) return null; // not configured → cannot filter, fall back to unfiltered
   const res = await sdkClient.getClubMatches(club.clubId);
-  return new Set(res.matches.map((m) => m.ligaData.ligaId));
+  return new Set(
+    res.matches
+      .map((m) => m.ligaData?.ligaId)
+      .filter((id): id is number => id != null),
+  );
 }
 
 export async function browseLeagues(

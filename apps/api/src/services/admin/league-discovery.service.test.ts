@@ -118,6 +118,20 @@ describe("browseLeagues", () => {
     expect(getClubMatches).toHaveBeenCalledWith(4121);
   });
 
+  it("does not throw and skips null ligaData entries in club matches", async () => {
+    getAllLigen.mockResolvedValue([liga(54141, true), liga(54142, true), liga(54143, true)]);
+    getClubMatches.mockResolvedValue({
+      club: { vereinId: 4121, vereinsname: "Dragons" },
+      matches: [
+        { matchId: 1, ligaData: { ligaId: 54141 } },
+        { matchId: 2, ligaData: null },
+        { matchId: 3, ligaData: { ligaId: 54143 } },
+      ],
+    });
+    const rows = await browseLeagues({ vorabligaOnly: true, ownClubOnly: true });
+    expect(rows.map((r) => r.ligaId).sort((a, b) => a - b)).toEqual([54141, 54143]);
+  });
+
   it("does not filter by club when ownClubOnly is set but no club is configured", async () => {
     mockGetClubConfig.mockResolvedValue(null);
     getAllLigen.mockResolvedValue([liga(54141, true), liga(54142, true)]);
