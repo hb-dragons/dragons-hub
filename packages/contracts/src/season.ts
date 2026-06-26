@@ -13,11 +13,15 @@ export const seasonIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
+const optionalBoolFromQuery = z
+  .enum(["true", "false"])
+  .transform((v) => v === "true")
+  .optional();
+
 export const browseLeaguesQuerySchema = z.object({
-  vorabligaOnly: z
-    .enum(["true", "false"])
-    .transform((v) => v === "true")
-    .optional(),
+  vorabligaOnly: optionalBoolFromQuery,
+  // Narrow the result to leagues our own club actually plays in.
+  ownClubOnly: optionalBoolFromQuery,
 });
 
 export const seasonLeaguesSchema = z.object({

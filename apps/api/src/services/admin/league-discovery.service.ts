@@ -3,6 +3,7 @@ import { leagues } from "@dragons/db/schema";
 import { eq, and, notInArray } from "drizzle-orm";
 import { sdkClient } from "../sync/sdk-client";
 import { getActiveSeasonId } from "./season.service";
+import { getClubConfig } from "./settings.service";
 import type { SdkLiga } from "@dragons/sdk";
 import type {
   BrowsableLeague,
@@ -10,11 +11,37 @@ import type {
   TrackedLeaguesResponse,
 } from "@dragons/shared";
 
+// The federation never flags the top tiers (Regionalliga and up) as `vorabliga`:
+// promotion/relegation there is settled before the season, so they're published
+// as committed leagues from the start. A club playing in the Regionalliga still
+// needs to pick it during new-season onboarding, so the vorabliga-only browse
+// surfaces these alongside the genuine vorabligas. Matched on `skName` (the
+// Spielklasse tier), e.g. "1.Regionalliga" / "2.Regionalliga".
+function isOnboardableTopTier(l: SdkLiga): boolean {
+  return (l.skName ?? "").toLowerCase().includes("regionalliga");
+}
+
+// The WAM liga-list carries no club/team reference, so to narrow the browse to
+// leagues our own club plays in we ask the federation's club-matches endpoint
+// which leagues our club has fixtures in and intersect by ligaId. One call, and
+// it covers vorabligas too — preliminary leagues already ship full schedules.
+async function ownClubLigaIds(): Promise<Set<number> | null> {
+  const club = await getClubConfig();
+  if (!club) return null; // not configured → cannot filter, fall back to unfiltered
+  const res = await sdkClient.getClubMatches(club.clubId);
+  return new Set(res.matches.map((m) => m.ligaData.ligaId));
+}
+
 export async function browseLeagues(
-  opts: { vorabligaOnly?: boolean; seasonId?: number } = {},
+  opts: { vorabligaOnly?: boolean; ownClubOnly?: boolean; seasonId?: number } = {},
 ): Promise<BrowsableLeague[]> {
   const all = await sdkClient.getAllLigen();
-  const filtered = opts.vorabligaOnly ? all.filter((l) => l.vorabliga === true) : all;
+  const byTier = opts.vorabligaOnly
+    ? all.filter((l) => l.vorabliga === true || isOnboardableTopTier(l))
+    : all;
+
+  const ourLigaIds = opts.ownClubOnly ? await ownClubLigaIds() : null;
+  const filtered = ourLigaIds ? byTier.filter((l) => ourLigaIds.has(l.ligaId)) : byTier;
 
   const trackedIds = new Set<number>();
   if (opts.seasonId !== undefined) {

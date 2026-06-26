@@ -55,13 +55,26 @@ function deferred<T>() {
 }
 
 describe("SeasonWizard", () => {
-  it("browses vorabliga leagues after naming the season, without creating it yet", async () => {
+  it("browses our club's vorabliga leagues after naming the season, without creating it yet", async () => {
     render(<SeasonWizard open onOpenChange={() => {}} />);
     nameAndAdvance();
-    await waitFor(() => expect(browse).toHaveBeenCalledWith({ vorabligaOnly: true }));
+    // Defaults to the club filter on.
+    await waitFor(() =>
+      expect(browse).toHaveBeenCalledWith({ vorabligaOnly: true, ownClubOnly: true }),
+    );
     expect(await screen.findByText("Oberliga Herren Ost")).toBeInTheDocument();
     // Discover-before-create: advancing must not persist a season.
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("re-browses without the club filter when the toggle is switched off", async () => {
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("settings.seasons.wizard.ownClubOnly"));
+    await waitFor(() =>
+      expect(browse).toHaveBeenLastCalledWith({ vorabligaOnly: true, ownClubOnly: false }),
+    );
   });
 
   it("creates the season, saves the picked leagues and syncs only on confirm", async () => {

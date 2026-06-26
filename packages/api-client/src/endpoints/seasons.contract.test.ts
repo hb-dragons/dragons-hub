@@ -49,4 +49,11 @@ describe("seasons request bodies satisfy @dragons/contracts schemas", () => {
     expect(q.vorabligaOnly).toBe("true");
     expect(browseLeaguesQuerySchema.safeParse(q).error?.issues).toBeUndefined();
   });
+  it("browse encodes ownClubOnly and parses against the contract", async () => {
+    const { api, calls } = recordingClient();
+    await api.browse({ vorabligaOnly: true, ownClubOnly: true });
+    const q = Object.fromEntries(new URL(calls[0]!.url).searchParams);
+    expect(q.ownClubOnly).toBe("true");
+    expect(browseLeaguesQuerySchema.safeParse(q).error?.issues).toBeUndefined();
+  });
 });

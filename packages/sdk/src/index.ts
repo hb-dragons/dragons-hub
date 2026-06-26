@@ -1,7 +1,6 @@
 // Types
 export type {
   SdkClubSearchResult,
-  SdkDiscoveredCompetition,
   SdkClubMatch,
   SdkClubMatchesResponse,
 } from "./types/club";

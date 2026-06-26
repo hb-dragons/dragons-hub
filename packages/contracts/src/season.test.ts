@@ -15,4 +15,9 @@ describe("season contracts", () => {
     const p = browseLeaguesQuerySchema.parse({ vorabligaOnly: "true" });
     expect(p.vorabligaOnly).toBe(true);
   });
+  it("coerces ownClubOnly query string to boolean", () => {
+    expect(browseLeaguesQuerySchema.parse({ ownClubOnly: "true" }).ownClubOnly).toBe(true);
+    expect(browseLeaguesQuerySchema.parse({ ownClubOnly: "false" }).ownClubOnly).toBe(false);
+    expect(browseLeaguesQuerySchema.parse({}).ownClubOnly).toBeUndefined();
+  });
 });

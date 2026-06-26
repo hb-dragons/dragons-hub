@@ -18,6 +18,7 @@ import {
 import { Input } from "@dragons/ui/components/input";
 import { Button } from "@dragons/ui/components/button";
 import { Checkbox } from "@dragons/ui/components/checkbox";
+import { Switch } from "@dragons/ui/components/switch";
 import { Badge } from "@dragons/ui/components/badge";
 
 type Step = "name" | "select" | "syncing" | "done";
@@ -30,6 +31,9 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
   const [leagues, setLeagues] = useState<BrowsableLeague[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState("");
+  // Default to our own club's leagues — onboarding almost always tracks the
+  // club's own teams, and the unfiltered federation list runs to hundreds.
+  const [ownClubOnly, setOwnClubOnly] = useState(true);
   // The federation league fetch paginates ~hundreds of leagues, so both async
   // steps need visible progress; without it the dialog reads as frozen.
   const [loadingLeagues, setLoadingLeagues] = useState(false);
@@ -50,6 +54,7 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     setLeagues([]);
     setSelected(new Set());
     setFilter("");
+    setOwnClubOnly(true);
     setLoadingLeagues(false);
     setSubmitting(false);
     setCreatedId(null);
@@ -60,13 +65,14 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     onOpenChange(v);
   }
 
-  // Browse vorabliga leagues from the federation. Nothing is persisted yet —
-  // the season does not exist until the user confirms their selection.
-  async function loadLeagues() {
+  // Browse the upcoming season's leagues from the federation: the vorabligas
+  // plus the top tiers (Regionalliga) that are never flagged vorabliga. Nothing
+  // is persisted yet — the season does not exist until the user confirms.
+  async function loadLeagues(clubOnly = ownClubOnly) {
     setStep("select");
     setLoadingLeagues(true);
     try {
-      const found = await api.seasons.browse({ vorabligaOnly: true });
+      const found = await api.seasons.browse({ vorabligaOnly: true, ownClubOnly: clubOnly });
       if (!openRef.current) return; // closed mid-fetch — don't resurrect stale state
       setLeagues(found);
     } catch {
@@ -76,6 +82,13 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     } finally {
       if (openRef.current) setLoadingLeagues(false);
     }
+  }
+
+  // Re-browse when the club filter is toggled. The toggle stays visible even
+  // when the filtered list is empty, so the user can always switch it back off.
+  function toggleOwnClubOnly(v: boolean) {
+    setOwnClubOnly(v);
+    void loadLeagues(v);
   }
 
   // Final commit: create the season, persist the picked leagues, then sync.
@@ -171,6 +184,17 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
 
         {step === "select" && (
           <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Switch
+                id="own-club-only"
+                checked={ownClubOnly}
+                disabled={loadingLeagues}
+                onCheckedChange={toggleOwnClubOnly}
+              />
+              <label htmlFor="own-club-only" className="cursor-pointer">
+                {t("settings.seasons.wizard.ownClubOnly")}
+              </label>
+            </div>
             {loadingLeagues ? (
               <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />

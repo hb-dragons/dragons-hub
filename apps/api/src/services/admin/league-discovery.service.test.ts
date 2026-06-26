@@ -1,20 +1,26 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { setupTestDb, resetTestDb, type TestDbContext } from "../../test/setup-test-db";
 
-const { dbHolder, getAllLigen } = vi.hoisted(() => ({
+const { dbHolder, getAllLigen, getClubMatches } = vi.hoisted(() => ({
   dbHolder: { ref: null as unknown },
   getAllLigen: vi.fn(),
+  getClubMatches: vi.fn(),
 }));
 vi.mock("../../config/database", () => ({
   getDb: () =>
     new Proxy({}, { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] }),
 }));
-vi.mock("../sync/sdk-client", () => ({ sdkClient: { getAllLigen } }));
+vi.mock("../sync/sdk-client", () => ({ sdkClient: { getAllLigen, getClubMatches } }));
 
 const mockGetActiveSeasonId = vi.fn();
 vi.mock("./season.service", () => ({
   getActiveSeasonId: (...args: unknown[]) => mockGetActiveSeasonId(...args),
   invalidateActiveSeasonCache: vi.fn(),
+}));
+
+const mockGetClubConfig = vi.fn();
+vi.mock("./settings.service", () => ({
+  getClubConfig: (...args: unknown[]) => mockGetClubConfig(...args),
 }));
 
 import {
@@ -36,16 +42,23 @@ beforeEach(async () => {
   await resetTestDb(ctx);
   vi.clearAllMocks();
   mockGetActiveSeasonId.mockResolvedValue(null);
+  mockGetClubConfig.mockResolvedValue({ clubId: 4121, clubName: "Dragons" });
+  getClubMatches.mockResolvedValue({ club: { vereinId: 4121, vereinsname: "Dragons" }, matches: [] });
 });
 
-function liga(ligaId: number, vorabliga: boolean, liganr: number | null = null) {
+function liga(
+  ligaId: number,
+  vorabliga: boolean,
+  liganr: number | null = null,
+  skName = "Oberliga",
+) {
   return {
     ligaId,
     liganr,
     liganame: `Liga ${ligaId}`,
     seasonId: 2026,
     seasonName: "2026/27",
-    skName: "Oberliga",
+    skName,
     akName: "Senioren",
     geschlecht: "männlich",
     verbandId: 7,
@@ -69,6 +82,43 @@ describe("browseLeagues", () => {
     getAllLigen.mockResolvedValue([liga(54136, true), liga(48666, false, 4001)]);
     const rows = await browseLeagues({ vorabligaOnly: true });
     expect(rows.map((r) => r.ligaId)).toEqual([54136]);
+  });
+
+  it("includes Regionalliga leagues under vorabligaOnly even though they are not flagged vorabliga", async () => {
+    // The federation never marks the top tiers vorabliga (promotion/relegation is
+    // settled before the season), but a Regionalliga club still needs to pick its
+    // league during new-season onboarding.
+    getAllLigen.mockResolvedValue([
+      liga(54136, true), // vorabliga Oberliga — included
+      liga(48666, false, 4001), // committed Oberliga — excluded
+      liga(47756, false, 4002, "1.Regionalliga"), // committed Regionalliga — included
+      liga(49733, false, 4003, "2.Regionalliga"), // committed Regionalliga — included
+    ]);
+    const rows = await browseLeagues({ vorabligaOnly: true });
+    expect(rows.map((r) => r.ligaId).sort((a, b) => a - b)).toEqual([47756, 49733, 54136]);
+  });
+
+  it("narrows to leagues our club plays in when ownClubOnly is set", async () => {
+    getAllLigen.mockResolvedValue([liga(54141, true), liga(54142, true), liga(54143, true)]);
+    getClubMatches.mockResolvedValue({
+      club: { vereinId: 4121, vereinsname: "Dragons" },
+      matches: [
+        { matchId: 1, ligaData: { ligaId: 54141 } },
+        { matchId: 2, ligaData: { ligaId: 54143 } },
+        { matchId: 3, ligaData: { ligaId: 54141 } }, // duplicate league — deduped
+      ],
+    });
+    const rows = await browseLeagues({ vorabligaOnly: true, ownClubOnly: true });
+    expect(rows.map((r) => r.ligaId).sort((a, b) => a - b)).toEqual([54141, 54143]);
+    expect(getClubMatches).toHaveBeenCalledWith(4121);
+  });
+
+  it("does not filter by club when ownClubOnly is set but no club is configured", async () => {
+    mockGetClubConfig.mockResolvedValue(null);
+    getAllLigen.mockResolvedValue([liga(54141, true), liga(54142, true)]);
+    const rows = await browseLeagues({ vorabligaOnly: true, ownClubOnly: true });
+    expect(rows.map((r) => r.ligaId)).toEqual([54141, 54142]);
+    expect(getClubMatches).not.toHaveBeenCalled();
   });
 
   it("marks alreadyTracked leagues for the season", async () => {

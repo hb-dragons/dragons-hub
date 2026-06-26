@@ -107,6 +107,12 @@ describe("GET /seasons/browse", () => {
     expect(res.status).toBe(200);
     expect(mocks.browseLeagues).toHaveBeenCalledWith({ vorabligaOnly: undefined });
   });
+  it("threads the ownClubOnly query flag through to the service", async () => {
+    mocks.browseLeagues.mockResolvedValue([]);
+    const res = await app.request("/seasons/browse?vorabligaOnly=true&ownClubOnly=true");
+    expect(res.status).toBe(200);
+    expect(mocks.browseLeagues).toHaveBeenCalledWith({ vorabligaOnly: true, ownClubOnly: true });
+  });
 });
 
 describe("GET /seasons/:id/discover", () => {

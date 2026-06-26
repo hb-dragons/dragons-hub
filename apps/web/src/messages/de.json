@@ -958,6 +958,7 @@
         "next": "Weiter",
         "selectDescription": "Wähle die zu verfolgenden Vorabliga-Ligen für diese Saison aus.",
         "searchPlaceholder": "Ligen suchen…",
+        "ownClubOnly": "Nur Ligen meines Vereins",
         "selectedCount": "{count} ausgewählt",
         "loadingLeagues": "Ligen werden geladen…",
         "noLeagues": "Keine Ligen gefunden",

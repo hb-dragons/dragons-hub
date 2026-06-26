@@ -48,8 +48,8 @@ seasonRoutes.get(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const { vorabligaOnly } = c.req.valid("query");
-    return c.json(await browseLeagues({ vorabligaOnly }));
+    const { vorabligaOnly, ownClubOnly } = c.req.valid("query");
+    return c.json(await browseLeagues({ vorabligaOnly, ownClubOnly }));
   },
 );
 
@@ -101,8 +101,8 @@ seasonRoutes.get(
   }),
   async (c) => {
     const { id } = c.req.valid("param");
-    const { vorabligaOnly } = c.req.valid("query");
-    return c.json(await browseLeagues({ vorabligaOnly, seasonId: id }));
+    const { vorabligaOnly, ownClubOnly } = c.req.valid("query");
+    return c.json(await browseLeagues({ vorabligaOnly, ownClubOnly, seasonId: id }));
   },
 );
 
