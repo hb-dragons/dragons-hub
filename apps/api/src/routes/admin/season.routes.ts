@@ -35,6 +35,24 @@ seasonRoutes.get(
   async (c) => c.json(await listSeasons()),
 );
 
+// Browse federation leagues before a season exists (new-season onboarding).
+// Hono's router prioritises this static segment over the `/seasons/:id/...`
+// param routes, so "browse" is never matched as an id (verified in tests).
+seasonRoutes.get(
+  "/seasons/browse",
+  settingsUpdate,
+  validator("query", browseLeaguesQuerySchema, validationHook),
+  describeRoute({
+    description: "Browse federation leagues for onboarding (not tied to a season)",
+    tags: ["Seasons"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const { vorabligaOnly } = c.req.valid("query");
+    return c.json(await browseLeagues({ vorabligaOnly }));
+  },
+);
+
 seasonRoutes.post(
   "/seasons",
   settingsUpdate,

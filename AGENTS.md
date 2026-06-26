@@ -309,6 +309,7 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 |--------|------|-------------|
 | GET | `/admin/seasons` | List all seasons with per-season league counts |
 | POST | `/admin/seasons` | Create a new season (`upcoming` status by default) |
+| GET | `/admin/seasons/browse` | Browse federation leagues for onboarding (not tied to a season) |
 | POST | `/admin/seasons/:id/activate` | Archive the current active season and activate the target |
 | POST | `/admin/seasons/:id/archive` | Archive a season (does not activate another) |
 | GET | `/admin/seasons/:id/discover` | Discover leagues available for this season from the federation |

@@ -22,6 +22,12 @@ export function seasonsEndpoints(client: ApiClient) {
     archive(id: number): Promise<Season> {
       return client.post(`/admin/seasons/${id}/archive`);
     },
+    browse(query?: { vorabligaOnly?: boolean }): Promise<BrowsableLeague[]> {
+      return client.get(
+        "/admin/seasons/browse",
+        query as Record<string, string | number | boolean | undefined>,
+      );
+    },
     discover(id: number, query?: { vorabligaOnly?: boolean }): Promise<BrowsableLeague[]> {
       return client.get(
         `/admin/seasons/${id}/discover`,

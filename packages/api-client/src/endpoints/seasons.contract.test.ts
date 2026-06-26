@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { createSeasonSchema, seasonLeaguesSchema } from "@dragons/contracts";
+import { createSeasonSchema, seasonLeaguesSchema, browseLeaguesQuerySchema } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { seasonsEndpoints } from "./seasons";
 
@@ -39,5 +39,14 @@ describe("seasons request bodies satisfy @dragons/contracts schemas", () => {
     await api.discover(3, { vorabligaOnly: true });
     const q = Object.fromEntries(new URL(calls[0]!.url).searchParams);
     expect(q.vorabligaOnly).toBe("true");
+  });
+  it("browse hits the season-independent path and encodes vorabligaOnly", async () => {
+    const { api, calls } = recordingClient();
+    await api.browse({ vorabligaOnly: true });
+    expect(calls[0]!.url).toContain("/admin/seasons/browse");
+    expect(calls[0]!.method).toBe("GET");
+    const q = Object.fromEntries(new URL(calls[0]!.url).searchParams);
+    expect(q.vorabligaOnly).toBe("true");
+    expect(browseLeaguesQuerySchema.safeParse(q).error?.issues).toBeUndefined();
   });
 });

@@ -952,13 +952,24 @@
         "activateFailed": "Failed to activate season"
       },
       "wizard": {
+        "title": "New season",
         "nameLabel": "Season name",
+        "nameDescription": "Name the upcoming season, then pick its leagues.",
         "next": "Next",
-        "saveAndSync": "Save and sync",
+        "selectDescription": "Select the preliminary (Vorabliga) leagues to track this season.",
+        "searchPlaceholder": "Search leagues…",
+        "selectedCount": "{count} selected",
+        "loadingLeagues": "Loading leagues…",
+        "noLeagues": "No leagues found",
+        "noMatches": "No leagues match your search",
+        "confirm": "Create & sync",
         "syncing": "Syncing…",
-        "done": "Done",
+        "done": "Season created.",
+        "close": "Close",
         "synced": "Season synced successfully",
-        "syncFailed": "Sync failed — check the sync log"
+        "syncFailed": "Sync failed — check the sync log",
+        "discoverFailed": "Could not load leagues from the federation",
+        "createFailed": "Could not create the season"
       }
     },
     "pushTest": {

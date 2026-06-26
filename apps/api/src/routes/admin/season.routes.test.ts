@@ -94,6 +94,21 @@ describe("POST /seasons/:id/archive", () => {
   });
 });
 
+describe("GET /seasons/browse", () => {
+  it("browses leagues without a season scope", async () => {
+    mocks.browseLeagues.mockResolvedValue([{ ligaId: 54136, vorabliga: true, alreadyTracked: false }]);
+    const res = await app.request("/seasons/browse?vorabligaOnly=true");
+    expect(res.status).toBe(200);
+    expect(mocks.browseLeagues).toHaveBeenCalledWith({ vorabligaOnly: true });
+  });
+  it("does not treat 'browse' as a season id", async () => {
+    mocks.browseLeagues.mockResolvedValue([]);
+    const res = await app.request("/seasons/browse");
+    expect(res.status).toBe(200);
+    expect(mocks.browseLeagues).toHaveBeenCalledWith({ vorabligaOnly: undefined });
+  });
+});
+
 describe("GET /seasons/:id/discover", () => {
   it("returns browsable leagues", async () => {
     mocks.browseLeagues.mockResolvedValue([{ ligaId: 54136, vorabliga: true, alreadyTracked: false }]);

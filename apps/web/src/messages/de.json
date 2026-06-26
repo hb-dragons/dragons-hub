@@ -952,13 +952,24 @@
         "activateFailed": "Saison konnte nicht aktiviert werden"
       },
       "wizard": {
+        "title": "Neue Saison",
         "nameLabel": "Saisonname",
+        "nameDescription": "Benenne die kommende Saison und wähle anschließend ihre Ligen.",
         "next": "Weiter",
-        "saveAndSync": "Speichern und synchronisieren",
+        "selectDescription": "Wähle die zu verfolgenden Vorabliga-Ligen für diese Saison aus.",
+        "searchPlaceholder": "Ligen suchen…",
+        "selectedCount": "{count} ausgewählt",
+        "loadingLeagues": "Ligen werden geladen…",
+        "noLeagues": "Keine Ligen gefunden",
+        "noMatches": "Keine Ligen passen zur Suche",
+        "confirm": "Erstellen & synchronisieren",
         "syncing": "Synchronisierung läuft…",
-        "done": "Fertig",
+        "done": "Saison erstellt.",
+        "close": "Schließen",
         "synced": "Saison erfolgreich synchronisiert",
-        "syncFailed": "Synchronisierung fehlgeschlagen — Sync-Log prüfen"
+        "syncFailed": "Synchronisierung fehlgeschlagen — Sync-Log prüfen",
+        "discoverFailed": "Ligen konnten nicht vom Verband geladen werden",
+        "createFailed": "Saison konnte nicht erstellt werden"
       }
     },
     "pushTest": {
