@@ -7,11 +7,13 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   getTrackedLeagues: vi.fn(),
   setLeagueOwnClubRefs: vi.fn(),
+  getLeagueTeams: vi.fn(),
 }));
 
 vi.mock("../../services/admin/league-discovery.service", () => ({
   getTrackedLeagues: mocks.getTrackedLeagues,
   setLeagueOwnClubRefs: mocks.setLeagueOwnClubRefs,
+  getLeagueTeams: mocks.getLeagueTeams,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -124,5 +126,27 @@ describe("PATCH /settings/leagues/:id/own-club-refs", () => {
       body: JSON.stringify({ ownClubRefs: true }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /leagues/:ligaId/teams", () => {
+  it("returns the league's teams", async () => {
+    const result = {
+      teams: [
+        { teamPermanentId: 1, name: "Opponents", clubId: 9999, isOwnClub: false },
+        { teamPermanentId: 2, name: "Hanover Dragons I", clubId: 4121, isOwnClub: true },
+      ],
+    };
+    mocks.getLeagueTeams.mockResolvedValue(result);
+    const res = await app.request("/leagues/54141/teams");
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(result);
+    expect(mocks.getLeagueTeams).toHaveBeenCalledWith(54141);
+  });
+
+  it("rejects a non-numeric ligaId with 400", async () => {
+    const res = await app.request("/leagues/abc/teams");
+    expect(res.status).toBe(400);
+    expect(mocks.getLeagueTeams).not.toHaveBeenCalled();
   });
 });

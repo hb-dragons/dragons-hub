@@ -11,3 +11,10 @@ export const leagueIdParamSchema = z.object({
 
 export type LeagueOwnClubRefsBody = z.infer<typeof leagueOwnClubRefsSchema>;
 export type LeagueIdParam = z.infer<typeof leagueIdParamSchema>;
+
+/** Path param for GET /admin/leagues/:ligaId/teams (federation ligaId). */
+export const ligaIdParamSchema = z.object({
+  ligaId: z.coerce.number().int().positive(),
+});
+
+export type LigaIdParam = z.infer<typeof ligaIdParamSchema>;

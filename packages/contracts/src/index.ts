@@ -197,8 +197,10 @@ export {
 export {
   leagueOwnClubRefsSchema,
   leagueIdParamSchema,
+  ligaIdParamSchema,
   type LeagueOwnClubRefsBody,
   type LeagueIdParam,
+  type LigaIdParam,
 } from "./league";
 
 export {

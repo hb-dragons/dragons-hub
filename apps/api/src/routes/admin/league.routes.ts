@@ -3,11 +3,12 @@ import { describeRoute, validator } from "hono-openapi";
 import {
   getTrackedLeagues,
   setLeagueOwnClubRefs,
+  getLeagueTeams,
 } from "../../services/admin/league-discovery.service";
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
-import { leagueOwnClubRefsSchema, leagueIdParamSchema } from "@dragons/contracts";
+import { leagueOwnClubRefsSchema, leagueIdParamSchema, ligaIdParamSchema } from "@dragons/contracts";
 
 const leagueRoutes = new Hono<AppEnv>();
 
@@ -44,6 +45,22 @@ leagueRoutes.patch(
     const { ownClubRefs } = c.req.valid("json");
     await setLeagueOwnClubRefs(leagueId, ownClubRefs);
     return c.json({ ok: true });
+  },
+);
+
+// GET /admin/leagues/:ligaId/teams - list a federation league's team roster
+leagueRoutes.get(
+  "/leagues/:ligaId/teams",
+  settingsUpdate,
+  validator("param", ligaIdParamSchema, validationHook),
+  describeRoute({
+    description: "List the teams in a federation league",
+    tags: ["Leagues"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const { ligaId } = c.req.valid("param");
+    return c.json(await getLeagueTeams(ligaId));
   },
 );
 

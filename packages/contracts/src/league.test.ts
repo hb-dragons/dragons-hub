@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leagueOwnClubRefsSchema, leagueIdParamSchema } from "./league";
+import { leagueOwnClubRefsSchema, leagueIdParamSchema, ligaIdParamSchema } from "./league";
 
 describe("leagueOwnClubRefsSchema", () => {
   it("accepts true", () => {
@@ -48,5 +48,13 @@ describe("leagueIdParamSchema", () => {
 
   it("rejects a negative value", () => {
     expect(() => leagueIdParamSchema.parse({ id: "-1" })).toThrow();
+  });
+});
+
+describe("ligaIdParamSchema", () => {
+  it("coerces ligaId path param to a positive integer", () => {
+    expect(ligaIdParamSchema.parse({ ligaId: "54141" }).ligaId).toBe(54141);
+    expect(ligaIdParamSchema.safeParse({ ligaId: "abc" }).success).toBe(false);
+    expect(ligaIdParamSchema.safeParse({ ligaId: "-1" }).success).toBe(false);
   });
 });
