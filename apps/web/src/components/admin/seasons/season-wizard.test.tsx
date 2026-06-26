@@ -14,7 +14,7 @@ const { browse, create, setLeagues, trigger, toastError, toastSuccess } = vi.hoi
 
 vi.mock("@/lib/api", () => ({
   api: {
-    seasons: { browse, create, setLeagues, discover: vi.fn() },
+    seasons: { browse, create, setLeagues, discover: vi.fn(), leagueTeams: vi.fn() },
     sync: { trigger },
   },
 }));

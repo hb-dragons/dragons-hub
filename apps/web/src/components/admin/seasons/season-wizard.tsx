@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSWRConfig } from "swr";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
@@ -17,9 +17,7 @@ import {
 } from "@dragons/ui/components/dialog";
 import { Input } from "@dragons/ui/components/input";
 import { Button } from "@dragons/ui/components/button";
-import { Checkbox } from "@dragons/ui/components/checkbox";
-import { Switch } from "@dragons/ui/components/switch";
-import { Badge } from "@dragons/ui/components/badge";
+import { LeaguePicker } from "./league-picker";
 
 type Step = "name" | "select" | "syncing" | "done";
 
@@ -129,14 +127,6 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     });
   }
 
-  const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    if (!q) return leagues;
-    return leagues.filter((l) =>
-      [l.name, l.skName, l.akName, l.geschlecht].some((s) => s?.toLowerCase().includes(q)),
-    );
-  }, [leagues, filter]);
-
   const description =
     step === "select"
       ? t("settings.seasons.wizard.selectDescription")
@@ -184,71 +174,23 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
 
         {step === "select" && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Switch
-                id="own-club-only"
-                checked={ownClubOnly}
-                disabled={loadingLeagues}
-                onCheckedChange={toggleOwnClubOnly}
-              />
-              <label htmlFor="own-club-only" className="cursor-pointer">
-                {t("settings.seasons.wizard.ownClubOnly")}
-              </label>
-            </div>
-            {loadingLeagues ? (
-              <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                {t("settings.seasons.wizard.loadingLeagues")}
-              </div>
-            ) : leagues.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                {t("settings.seasons.wizard.noLeagues")}
-              </p>
-            ) : (
-              <>
-                <div className="flex items-center justify-between gap-2">
-                  <Input
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    placeholder={t("settings.seasons.wizard.searchPlaceholder")}
-                    aria-label={t("settings.seasons.wizard.searchPlaceholder")}
-                  />
-                  <Badge variant="secondary" className="shrink-0">
-                    {t("settings.seasons.wizard.selectedCount", { count: selected.size })}
-                  </Badge>
-                </div>
-                <ul className="max-h-72 overflow-auto rounded-md bg-surface-low p-1">
-                  {filtered.length === 0 ? (
-                    <li className="px-3 py-6 text-center text-sm text-muted-foreground">
-                      {t("settings.seasons.wizard.noMatches")}
-                    </li>
-                  ) : (
-                    filtered.map((l) => (
-                      <li key={l.ligaId}>
-                        <label className="flex cursor-pointer items-start gap-3 rounded-md px-3 py-2.5 hover:bg-surface-high">
-                          <Checkbox
-                            className="mt-0.5"
-                            checked={selected.has(l.ligaId)}
-                            onCheckedChange={(c) => toggle(l.ligaId, c === true)}
-                          />
-                          <span className="flex flex-col">
-                            <span className="text-sm font-medium">{l.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {[l.skName, l.akName, l.geschlecht].filter(Boolean).join(" · ")}
-                            </span>
-                          </span>
-                        </label>
-                      </li>
-                    ))
-                  )}
-                </ul>
-                <DialogFooter>
-                  <Button disabled={selected.size === 0 || submitting} onClick={() => { void confirm(); }}>
-                    {submitting && <Loader2 className="size-4 animate-spin" />}
-                    {t("settings.seasons.wizard.confirm")}
-                  </Button>
-                </DialogFooter>
-              </>
+            <LeaguePicker
+              leagues={leagues}
+              selected={selected}
+              onToggle={toggle}
+              filter={filter}
+              onFilterChange={setFilter}
+              ownClubOnly={ownClubOnly}
+              onOwnClubOnlyChange={toggleOwnClubOnly}
+              loading={loadingLeagues}
+            />
+            {!loadingLeagues && leagues.length > 0 && (
+              <DialogFooter>
+                <Button disabled={selected.size === 0 || submitting} onClick={() => { void confirm(); }}>
+                  {submitting && <Loader2 className="size-4 animate-spin" />}
+                  {t("settings.seasons.wizard.confirm")}
+                </Button>
+              </DialogFooter>
             )}
           </div>
         )}
