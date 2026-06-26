@@ -15,6 +15,7 @@ import {
 import { Button } from "@dragons/ui/components/button";
 import type { SeasonWithCounts } from "@dragons/shared";
 import { SeasonWizard } from "./season-wizard";
+import { ManageLeaguesDialog } from "./manage-leagues-dialog";
 
 export function SeasonsList() {
   const t = useTranslations();
@@ -22,6 +23,7 @@ export function SeasonsList() {
   const { data: seasons } = useSWR(q.key, q.fetcher);
   const { mutate } = useSWRConfig();
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [manageSeasonId, setManageSeasonId] = useState<number | null>(null);
 
   async function activate(season: SeasonWithCounts) {
     if (
@@ -42,6 +44,11 @@ export function SeasonsList() {
   return (
     <>
     <SeasonWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+    <ManageLeaguesDialog
+      seasonId={manageSeasonId ?? 0}
+      open={manageSeasonId !== null}
+      onOpenChange={(v) => { if (!v) setManageSeasonId(null); }}
+    />
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{t("settings.seasons.title")}</CardTitle>
@@ -55,9 +62,14 @@ export function SeasonsList() {
               {s.leagueCount}
             </span>
             {s.status === "upcoming" && (
-              <Button onClick={() => { void activate(s); }}>
-                {t("settings.seasons.activate")}
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setManageSeasonId(s.id)}>
+                  {t("settings.seasons.manage.button")}
+                </Button>
+                <Button onClick={() => { void activate(s); }}>
+                  {t("settings.seasons.activate")}
+                </Button>
+              </div>
             )}
           </div>
         ))}
