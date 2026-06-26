@@ -43,7 +43,7 @@ export function ManageLeaguesDialog({
   // Load the season's current leagues plus the browse candidates, then merge so
   // a currently-tracked league that the active filter would hide still appears
   // (checked) and can be removed.
-  async function load(clubOnly = ownClubOnly) {
+  async function load(clubOnly = ownClubOnly, seed = false) {
     setLoading(true);
     try {
       const [tracked, candidates] = await Promise.all([
@@ -70,7 +70,7 @@ export function ManageLeaguesDialog({
         }
       }
       setLeaguesState([...byId.values()]);
-      setSelected(trackedIds);
+      if (seed) setSelected(trackedIds);
     } catch {
       if (!openRef.current) return;
       toast.error(t("settings.seasons.manage.loadFailed"));
@@ -84,7 +84,7 @@ export function ManageLeaguesDialog({
     if (open) {
       setFilter("");
       setOwnClubOnly(true);
-      void load(true);
+      void load(true, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, seasonId]);

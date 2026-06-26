@@ -61,4 +61,17 @@ describe("ManageLeaguesDialog", () => {
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("settings.seasons.manage.saveFailed"));
     expect(screen.getByText("settings.seasons.manage.save")).toBeInTheDocument();
   });
+
+  it("preserves in-progress league edits when the club-filter toggle is flipped", async () => {
+    render(<ManageLeaguesDialog seasonId={9} open onOpenChange={() => {}} />);
+    await screen.findByText("Landesliga Damen 2");
+    // Check league 2 (pending add — not yet persisted).
+    fireEvent.click(screen.getAllByRole("checkbox")[1]!);
+    // Flip the own-club-only switch to trigger a reload.
+    fireEvent.click(screen.getByLabelText("settings.seasons.wizard.ownClubOnly"));
+    // Wait for the second discover call (reload completed).
+    await waitFor(() => expect(discover).toHaveBeenCalledTimes(2));
+    // Pending selection must survive the filter-toggle reload.
+    expect(screen.getAllByRole("checkbox")[1]).toBeChecked();
+  });
 });
