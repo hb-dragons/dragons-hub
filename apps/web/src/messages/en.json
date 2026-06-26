@@ -951,6 +951,15 @@
         "activated": "Season activated",
         "activateFailed": "Failed to activate season"
       },
+      "manage": {
+        "button": "Manage leagues",
+        "title": "Manage leagues",
+        "description": "Add or remove the leagues this season tracks.",
+        "save": "Save & sync",
+        "saved": "Leagues updated",
+        "saveFailed": "Could not save leagues",
+        "loadFailed": "Could not load leagues from the federation"
+      },
       "wizard": {
         "title": "New season",
         "nameLabel": "Season name",

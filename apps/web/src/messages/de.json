@@ -951,6 +951,15 @@
         "activated": "Saison aktiviert",
         "activateFailed": "Saison konnte nicht aktiviert werden"
       },
+      "manage": {
+        "button": "Ligen verwalten",
+        "title": "Ligen verwalten",
+        "description": "Ligen dieser Saison hinzufügen oder entfernen.",
+        "save": "Speichern & synchronisieren",
+        "saved": "Ligen aktualisiert",
+        "saveFailed": "Ligen konnten nicht gespeichert werden",
+        "loadFailed": "Ligen konnten nicht vom Verband geladen werden"
+      },
       "wizard": {
         "title": "Neue Saison",
         "nameLabel": "Saisonname",
