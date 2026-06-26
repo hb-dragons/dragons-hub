@@ -4,6 +4,7 @@ import type {
   BrowsableLeague,
   SetSeasonLeaguesResult,
   TrackedLeaguesResponse,
+  LeagueTeamsResponse,
 } from "@dragons/shared";
 import type { CreateSeasonBody, SeasonLeaguesBody } from "@dragons/contracts";
 import type { ApiClient } from "../client";
@@ -39,6 +40,9 @@ export function seasonsEndpoints(client: ApiClient) {
     },
     getLeagues(id: number): Promise<TrackedLeaguesResponse> {
       return client.get(`/admin/seasons/${id}/leagues`);
+    },
+    leagueTeams(ligaId: number): Promise<LeagueTeamsResponse> {
+      return client.get(`/admin/leagues/${ligaId}/teams`);
     },
     setLeagues(id: number, body: SeasonLeaguesBody): Promise<SetSeasonLeaguesResult> {
       return client.put(`/admin/seasons/${id}/leagues`, body);

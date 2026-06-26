@@ -56,4 +56,10 @@ describe("seasons request bodies satisfy @dragons/contracts schemas", () => {
     expect(q.ownClubOnly).toBe("true");
     expect(browseLeaguesQuerySchema.safeParse(q).error?.issues).toBeUndefined();
   });
+  it("leagueTeams hits the federation-league teams path", async () => {
+    const { api, calls } = recordingClient();
+    await api.leagueTeams(54141);
+    expect(calls[0]!.url).toContain("/admin/leagues/54141/teams");
+    expect(calls[0]!.method).toBe("GET");
+  });
 });
