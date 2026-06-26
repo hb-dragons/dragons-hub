@@ -324,6 +324,7 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 | GET | `/admin/leagues` | All leagues grouped by season with tracking status |
 | GET | `/admin/settings/leagues` | Active-season-scoped league list (formerly `PUT /admin/settings/leagues` paste-by-number flow is removed; list remains) |
 | PUT | `/admin/leagues/:id/tracking` | Toggle `{ isTracked: boolean }` |
+| GET | `/admin/leagues/:ligaId/teams` | List a federation league's team roster (own club marked) |
 
 ### Admin - Matches
 
