@@ -1,5 +1,5 @@
 export { ApiClient } from "./client";
-export type { AuthStrategy, ApiClientOptions } from "./client";
+export type { AuthStrategy, ApiClientOptions, BlobResponse } from "./client";
 
 export { APIError } from "./errors";
 
