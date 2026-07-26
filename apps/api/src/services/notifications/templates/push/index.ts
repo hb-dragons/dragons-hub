@@ -1,3 +1,4 @@
+import { EVENT_TYPES } from "@dragons/shared";
 import type { Locale, PushTemplateOutput } from "./types";
 import {
   renderRefereeAssignedPush,
@@ -17,9 +18,9 @@ import {
   type MatchCancelledPayload,
 } from "./match-cancelled";
 import {
-  renderMatchRescheduledPush,
-  type MatchRescheduledPayload,
-} from "./match-rescheduled";
+  renderMatchScheduleChangedPush,
+  type MatchScheduleChangedPushPayload,
+} from "./match-schedule-changed";
 
 export interface RenderArgs {
   eventType: string;
@@ -50,21 +51,28 @@ function renderForType(
   payload: Record<string, unknown>,
   locale: Locale,
 ): PushTemplateOutput | null {
+  // Cases are EVENT_TYPES constants, never restated string literals: this
+  // switch used to key on "match.rescheduled", which is not a member of
+  // EVENT_TYPES, so its template was unreachable dead code. Referencing the
+  // constant makes any such name a compile error.
   switch (eventType) {
-    case "referee.assigned":
+    case EVENT_TYPES.REFEREE_ASSIGNED:
       return renderRefereeAssignedPush(payload as unknown as RefereeAssignedPayload, locale);
-    case "referee.unassigned":
+    case EVENT_TYPES.REFEREE_UNASSIGNED:
       return renderRefereeUnassignedPush(payload as unknown as RefereeAssignedPayload, locale);
-    case "referee.reassigned":
+    case EVENT_TYPES.REFEREE_REASSIGNED:
       return renderRefereeReassignedPush(payload as unknown as RefereeReassignedPushPayload, locale);
-    case "referee.slots.needed":
+    case EVENT_TYPES.REFEREE_SLOTS_NEEDED:
       return renderRefereeSlotsPush(payload as unknown as RefereeSlotsPushPayload, locale, "needed");
-    case "referee.slots.reminder":
+    case EVENT_TYPES.REFEREE_SLOTS_REMINDER:
       return renderRefereeSlotsPush(payload as unknown as RefereeSlotsPushPayload, locale, "reminder");
-    case "match.cancelled":
+    case EVENT_TYPES.MATCH_CANCELLED:
       return renderMatchCancelledPush(payload as unknown as MatchCancelledPayload, locale);
-    case "match.rescheduled":
-      return renderMatchRescheduledPush(payload as unknown as MatchRescheduledPayload, locale);
+    case EVENT_TYPES.MATCH_SCHEDULE_CHANGED:
+      return renderMatchScheduleChangedPush(
+        payload as unknown as MatchScheduleChangedPushPayload,
+        locale,
+      );
     default:
       return null;
   }
@@ -74,4 +82,4 @@ export type { PushTemplateOutput, Locale } from "./types";
 export type { RefereeAssignedPayload } from "./referee-assigned";
 export type { RefereeSlotsPushPayload } from "./referee-slots";
 export type { MatchCancelledPayload } from "./match-cancelled";
-export type { MatchRescheduledPayload } from "./match-rescheduled";
+export type { MatchScheduleChangedPushPayload } from "./match-schedule-changed";
