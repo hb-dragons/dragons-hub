@@ -352,6 +352,58 @@ export async function dispatchImmediate(params: {
   return false;
 }
 
+/**
+ * Claim the coalescing slot for ONE dispatch target and deliver it.
+ *
+ * The claim is per (event, channel config, channel, recipient) — the same
+ * granularity as the in-run `dedupKey` — not per event. That is what makes a
+ * partially-failed attempt resumable: a retry re-delivers exactly the targets
+ * that never went out, while the ones that already landed stay claimed and are
+ * not sent twice.
+ *
+ * `SET NX` is still taken *before* the attempt, so two concurrent workers
+ * handling duplicate events cannot both dispatch. The claim is then released in
+ * a `finally` whenever delivery did not succeed — including when
+ * `dispatchImmediate` throws, which is the case the old release path was
+ * written for but could never reach (it ran only on the success path, after the
+ * throw had already unwound out of the pipeline). Wrapping the whole call also
+ * makes every throw site inside `dispatchImmediate` safe, including
+ * `resolveLocaleForRecipient` and the push adapter's reads.
+ *
+ * Returns "coalesced" when another attempt or a duplicate event holds the slot,
+ * "dispatched" on delivery, "failed" when the adapter reported failure.
+ */
+async function claimAndDispatch(params: {
+  event: DomainEventRow;
+  config: { id: number; type: string; config: unknown };
+  watchRuleId: number | null;
+  recipientId: string;
+  channelType: string;
+  dedupKey: string;
+}): Promise<"dispatched" | "failed" | "coalesced"> {
+  const { event, dedupKey, ...target } = params;
+  const coalesceKey = `coalesce:${event.type}:${event.entityType}:${event.entityId}:${dedupKey}`;
+
+  const claim = await getRedis().set(coalesceKey, "1", "EX", COALESCE_WINDOW_SEC, "NX");
+  if (claim !== "OK") return "coalesced";
+
+  let sent = false;
+  try {
+    sent = await dispatchImmediate({ event, ...target });
+    return sent ? "dispatched" : "failed";
+  } finally {
+    if (!sent) {
+      try {
+        await getRedis().del(coalesceKey);
+      } catch (err) {
+        // Never let the release failure mask the dispatch error that is
+        // unwinding; the key expires on its own within the window.
+        logger.warn({ coalesceKey, err }, "Failed to release coalesce claim");
+      }
+    }
+  }
+}
+
 // ── Main pipeline ────────────────────────────────────────────────────────────
 
 /**
@@ -362,9 +414,9 @@ export async function dispatchImmediate(params: {
  * 2. Evaluate watch rules (condition matching)
  * 3. Evaluate role-based defaults
  * 4. Load muted event types for targeted recipients
- * 5. Check coalescing window (skip rapid-fire immediate dispatches)
- * 6. Buffer for digest (unless muted)
- * 7. Dispatch immediate notifications (unless muted or coalesced)
+ * 5. Buffer for digest (unless muted)
+ * 6. Claim the per-target coalescing slot and dispatch immediate notifications
+ *    (unless muted or coalesced)
  */
 export async function processEvent(event: DomainEventRow): Promise<PipelineResult> {
   const result: PipelineResult = { dispatched: 0, buffered: 0, coalesced: 0, muted: 0, configs: [] };
@@ -385,15 +437,12 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
   const allRecipientIds = defaultMatches.map((m) => m.recipientId);
   const mutedMap = await loadMutedEventTypes(allRecipientIds);
 
-  // Step 5: Check coalescing — atomically claim the dispatch slot via Redis SET NX.
-  // Returns "OK" if this process is the first caller within the window (dispatch proceeds),
-  // or null if another process already claimed the slot (skip immediate dispatch).
-  // Key on the event type too — without it, two distinct events on the same
-  // entity within the window (e.g. schedule + venue change from one admin edit)
-  // collide and the second is dropped (a push-only default never reaches digest).
-  const coalesceKey = `coalesce:${event.type}:${event.entityType}:${event.entityId}`;
-  const claim = await getRedis().set(coalesceKey, "1", "EX", COALESCE_WINDOW_SEC, "NX");
-  const coalesced = claim !== "OK";
+  // Coalescing is claimed per dispatch target inside claimAndDispatch below.
+  // The key is on the event type, entity and target — without the event type,
+  // two distinct events on the same entity within the window (e.g. schedule +
+  // venue change from one admin edit) collide and the second is dropped (a
+  // push-only default never reaches digest); without the target, a single
+  // channel failing takes every other channel's notification down with it.
 
   // Process watch rule matches (watch rules are not subject to user muting —
   // they are admin-configured and always apply)
@@ -408,18 +457,16 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
     // Dispatch immediately if urgent (or in_app, which has no delivery cost) and not coalesced
     const shouldDispatchRule = match.urgency === "immediate" || match.channelTarget.channel === "in_app";
     if (shouldDispatchRule) {
-      if (coalesced) {
-        result.coalesced++;
-      } else {
-        const sent = await dispatchImmediate({
-          event,
-          config: match.config,
-          watchRuleId: match.watchRuleId,
-          recipientId: watchRuleRecipientId(match.config),
-          channelType: match.channelTarget.channel,
-        });
-        if (sent) result.dispatched++;
-      }
+      const outcome = await claimAndDispatch({
+        event,
+        config: match.config,
+        watchRuleId: match.watchRuleId,
+        recipientId: watchRuleRecipientId(match.config),
+        channelType: match.channelTarget.channel,
+        dedupKey: match.dedupKey,
+      });
+      if (outcome === "coalesced") result.coalesced++;
+      else if (outcome === "dispatched") result.dispatched++;
     }
   }
 
@@ -442,27 +489,17 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
     // Dispatch immediately if urgent (or in_app, which has no delivery cost) and not coalesced
     const shouldDispatchDefault = match.urgency === "immediate" || match.config.type === "in_app";
     if (shouldDispatchDefault) {
-      if (coalesced) {
-        result.coalesced++;
-      } else {
-        const sent = await dispatchImmediate({
-          event,
-          config: match.config,
-          watchRuleId: null,
-          recipientId: match.recipientId,
-          channelType: match.config.type,
-        });
-        if (sent) result.dispatched++;
-      }
+      const outcome = await claimAndDispatch({
+        event,
+        config: match.config,
+        watchRuleId: null,
+        recipientId: match.recipientId,
+        channelType: match.config.type,
+        dedupKey: match.dedupKey,
+      });
+      if (outcome === "coalesced") result.coalesced++;
+      else if (outcome === "dispatched") result.dispatched++;
     }
-  }
-
-  // If we claimed the coalesce key but nothing was actually dispatched (all adapters
-  // returned false), release the key so retries within the window are not wrongly
-  // suppressed.  The old behaviour only marked the entity as dispatched after a
-  // successful send; this restores that semantic.
-  if (claim === "OK" && result.dispatched === 0) {
-    await getRedis().del(coalesceKey);
   }
 
   return result;
