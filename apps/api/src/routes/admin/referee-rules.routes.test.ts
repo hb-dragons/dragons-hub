@@ -80,7 +80,7 @@ const refereeRuleShape: RefereeRule = {
 };
 
 /** Assert `actual` carries exactly the keys and primitive types of `exemplar`. */
-function expectShapeOf(actual: unknown, exemplar: Record<string, unknown>): void {
+function expectShapeOf<T extends object>(actual: unknown, exemplar: T): void {
   expect(actual).toBeTypeOf("object");
   expect(actual).not.toBeNull();
   const value = actual as Record<string, unknown>;
