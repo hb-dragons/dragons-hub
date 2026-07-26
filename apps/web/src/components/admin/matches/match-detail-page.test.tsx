@@ -90,6 +90,52 @@ function renderPage() {
   );
 }
 
+/**
+ * The app pins every formatter to Europe/Berlin (see i18n/request.ts), so the
+ * anchor has to survive being built in a different runtime zone — a UTC SSR
+ * container, or an admin travelling. Never assert this under Europe/Berlin:
+ * that is the one zone where the old midnight anchor looked right.
+ */
+const formats = {
+  dateTime: {
+    matchDate: { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit" },
+  },
+} as const;
+
+function renderPageInBerlin() {
+  return render(
+    <NextIntlClientProvider
+      locale="de"
+      timeZone="Europe/Berlin"
+      messages={messages}
+      formats={formats}
+    >
+      <MatchDetailPage
+        matchId={1}
+        initialDetail={detail as never}
+        initialHistory={{ entries: [], total: 0 } as never}
+      />
+    </NextIntlClientProvider>,
+  );
+}
+
+describe("MatchDetailPage kickoff date anchor", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    cleanup();
+  });
+
+  it.each(["UTC", "America/New_York", "Pacific/Kiritimati", "Pacific/Honolulu"])(
+    "renders the match's own Berlin calendar day (TZ=%s)",
+    (tz) => {
+      vi.stubEnv("TZ", tz);
+      renderPageInBerlin();
+      // detail.match.kickoffDate is 2026-04-01.
+      expect(screen.getByText(/01\.04\.26/)).toBeInTheDocument();
+    },
+  );
+});
+
 describe("MatchDetailPage reschedule copilot entry point", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
