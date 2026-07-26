@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EVENT_TYPES, validateEventPayload } from "./index";
+import { EVENT_TYPES, TASK_PRIORITIES, validateEventPayload } from "./index";
 
 describe("validateEventPayload", () => {
   it("accepts a well-formed match.created payload", () => {
@@ -72,10 +72,30 @@ describe("validateEventPayload", () => {
       assigneeUserIds: ["u1"],
       assignedBy: "Alice",
       dueDate: null,
-      priority: "urgent",
+      priority: "catastrophic",
     });
     expect(r.valid).toBe(false);
   });
+
+  // Structural guard: the task.assigned priority enum must be derived from
+  // TASK_PRIORITIES, not restated. Adding a value to TASK_PRIORITIES without
+  // it reaching the schema fails here.
+  it.each(TASK_PRIORITIES)(
+    "accepts task.assigned with the shared priority %s",
+    (priority) => {
+      const r = validateEventPayload(EVENT_TYPES.TASK_ASSIGNED, {
+        taskId: 1,
+        boardId: 1,
+        boardName: "Tasks",
+        title: "Do the thing",
+        assigneeUserIds: ["u1"],
+        assignedBy: "Alice",
+        dueDate: null,
+        priority,
+      });
+      expect(r).toEqual({ valid: true });
+    },
+  );
 
   it("override.conflict accepts both `field`/`overrideValue` and the legacy `fieldName`/`localValue` shape", () => {
     const a = validateEventPayload(EVENT_TYPES.OVERRIDE_CONFLICT, {

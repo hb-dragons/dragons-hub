@@ -2,7 +2,18 @@
 
 export type EventSource = "sync" | "manual" | "reconciliation";
 export type EventUrgency = "immediate" | "routine";
-export type EventEntityType = "match" | "booking" | "referee" | "task";
+/**
+ * Every entity a domain event can be raised against. Single source of truth —
+ * the manual-trigger request contract derives its `entityType` enum from this
+ * array rather than restating the literals.
+ */
+export const EVENT_ENTITY_TYPES = [
+  "match",
+  "booking",
+  "referee",
+  "task",
+] as const;
+export type EventEntityType = (typeof EVENT_ENTITY_TYPES)[number];
 
 // ── Event type constants ─────────────────────────────────────────────────────
 

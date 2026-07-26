@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { ENTITY_TYPES, ENTRY_ACTIONS } from "@dragons/shared";
+import { ENTITY_TYPES, ENTRY_ACTIONS, SYNC_STATUSES } from "@dragons/shared";
 
 export const syncPaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-const syncRunStatusEnum = z.enum(["running", "completed", "failed"]);
+const syncRunStatusEnum = z.enum(SYNC_STATUSES);
 
 export const syncLogsQuerySchema = syncPaginationSchema.extend({
   status: syncRunStatusEnum.optional(),

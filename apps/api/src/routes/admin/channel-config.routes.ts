@@ -17,7 +17,12 @@ import {
   updateChannelConfigSchema,
   validateConfigForType,
 } from "@dragons/contracts";
-import type { CreateChannelConfigBody, UpdateChannelConfigBody } from "@dragons/shared";
+import { CHANNEL_TYPES } from "@dragons/shared";
+import type {
+  CreateChannelConfigBody,
+  ProviderAvailability,
+  UpdateChannelConfigBody,
+} from "@dragons/shared";
 import { env } from "../../config/env";
 
 const channelConfigRoutes = new Hono<AppEnv>();
@@ -26,6 +31,10 @@ const settingsUpdate = requirePermission("settings", "update");
 function isProviderConfigured(type: string): boolean {
   switch (type) {
     case "in_app":
+      return true;
+    case "push":
+      // Expo Push needs no credentials — EXPO_ACCESS_TOKEN only upgrades the
+      // send tier, so the provider is always available.
       return true;
     case "whatsapp_group":
       return !!env.WAHA_BASE_URL;
@@ -52,11 +61,15 @@ channelConfigRoutes.get(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    return c.json({
-      in_app: { configured: isProviderConfigured("in_app") },
-      whatsapp_group: { configured: isProviderConfigured("whatsapp_group") },
-      email: { configured: isProviderConfigured("email") },
-    });
+    // Built from CHANNEL_TYPES so a new channel type is reported automatically
+    // instead of silently missing from the response.
+    const availability = Object.fromEntries(
+      CHANNEL_TYPES.map((type) => [
+        type,
+        { configured: isProviderConfigured(type) },
+      ]),
+    ) as ProviderAvailability;
+    return c.json(availability);
   },
 );
 

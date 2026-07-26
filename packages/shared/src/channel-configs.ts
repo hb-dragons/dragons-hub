@@ -1,6 +1,18 @@
 // ── Channel types ────────────────────────────────────────────────────────────
 
-export type ChannelType = "in_app" | "whatsapp_group" | "email";
+/**
+ * Every deliverable notification channel. Single source of truth — the request
+ * contract (`@dragons/contracts`), the watch-rule channel target and the
+ * provider-availability response all derive from this array rather than
+ * restating the literals.
+ */
+export const CHANNEL_TYPES = [
+  "in_app",
+  "whatsapp_group",
+  "push",
+  "email",
+] as const;
+export type ChannelType = (typeof CHANNEL_TYPES)[number];
 export type DigestMode = "per_sync" | "scheduled" | "none";
 
 // ── Per-channel config shapes ───────────────────────────────────────────────
@@ -19,7 +31,16 @@ export interface EmailConfig {
   locale: "de" | "en";
 }
 
-export type ChannelConfig = InAppConfig | WhatsAppGroupConfig | EmailConfig;
+export interface PushConfig {
+  provider: "expo";
+  locale?: "de" | "en";
+}
+
+export type ChannelConfig =
+  | InAppConfig
+  | WhatsAppGroupConfig
+  | EmailConfig
+  | PushConfig;
 
 // ── API response types ───────────────────────────────────────────────────────
 

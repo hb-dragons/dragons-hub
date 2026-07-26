@@ -26,47 +26,22 @@ export type {
   ChannelTarget,
 } from "@dragons/shared";
 
-// Channel config shapes
-export interface InAppConfig {
-  audienceRole: "admin" | "referee";
-  locale: "de" | "en";
-}
-
-export interface WhatsAppGroupConfig {
-  groupId: string;
-  locale: "de" | "en";
-}
-
-export interface EmailConfig {
-  locale: "de" | "en";
-}
-
-export type ChannelConfig = InAppConfig | WhatsAppGroupConfig | EmailConfig;
-
-// Channel config from GET /admin/channel-configs
-export interface ChannelConfigItem {
-  id: number;
-  name: string;
-  type: "in_app" | "whatsapp_group" | "email";
-  enabled: boolean;
-  config: ChannelConfig;
-  digestMode: "per_sync" | "scheduled" | "none";
-  digestCron: string | null;
-  digestTimezone: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ChannelConfigListResult {
-  configs: ChannelConfigItem[];
-  total: number;
-}
-
-export interface ProviderStatus {
-  configured: boolean;
-}
-
-export type ProviderAvailability = Record<string, ProviderStatus>;
+// Channel config shapes live in @dragons/shared (the API's ChannelType /
+// per-channel config shapes / ChannelConfigItem+ListResult / provider
+// availability); re-export so call sites keep one name.
+export { CHANNEL_TYPES } from "@dragons/shared";
+export type {
+  ChannelType,
+  InAppConfig,
+  WhatsAppGroupConfig,
+  EmailConfig,
+  PushConfig,
+  ChannelConfig,
+  ChannelConfigItem,
+  ChannelConfigListResult,
+  ProviderStatus,
+  ProviderAvailability,
+} from "@dragons/shared";
 
 // Trigger event body is the request contract; re-export from the API client
 // (inferred from @dragons/contracts) so call sites keep one name.

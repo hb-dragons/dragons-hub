@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { CHANNEL_TYPES } from "@dragons/shared";
+import type { ChannelType } from "@dragons/shared";
 
 export const channelConfigIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -32,15 +34,28 @@ const emailConfigSchema = z.object({
   locale: localeSchema,
 });
 
-const configSchemaByType = {
+// Push delivery is fanned out per user device by the Expo adapter, so the
+// config carries the provider rather than a fixed target. Locale is optional:
+// the pipeline prefers the recipient's own preference.
+const pushConfigSchema = z.object({
+  provider: z.literal("expo"),
+  locale: localeSchema.optional(),
+});
+
+/**
+ * Exhaustive over ChannelType — a channel type added to CHANNEL_TYPES is a
+ * compile error here until it is given a config shape.
+ */
+const configSchemaByType: Record<ChannelType, z.ZodType> = {
   in_app: inAppConfigSchema,
   whatsapp_group: whatsappGroupConfigSchema,
+  push: pushConfigSchema,
   email: emailConfigSchema,
-} as const;
+};
 
 // ── Create schema ───────────────────────────────────────────────────────────
 
-const channelTypeSchema = z.enum(["in_app", "whatsapp_group", "email"]);
+const channelTypeSchema = z.enum(CHANNEL_TYPES);
 
 export const createChannelConfigSchema = z
   .object({

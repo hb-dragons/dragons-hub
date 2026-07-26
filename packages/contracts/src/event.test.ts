@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eventListQuerySchema, triggerEventSchema } from "./event";
+import { EVENT_ENTITY_TYPES } from "@dragons/shared";
 
 describe("eventListQuerySchema", () => {
   it("parses empty input with no defaults", () => {
@@ -90,6 +91,17 @@ describe("triggerEventSchema", () => {
     entityName: "Dragons vs. Tigers",
     deepLinkPath: "/admin/matches/42",
   };
+
+  // Structural guard: the entityType enum must be derived from
+  // EVENT_ENTITY_TYPES, not restated. Adding a value to EVENT_ENTITY_TYPES
+  // without it reaching the schema fails here.
+  it.each(EVENT_ENTITY_TYPES)(
+    "accepts the shared event entity type %s",
+    (entityType) => {
+      const result = triggerEventSchema.parse({ ...validBody, entityType });
+      expect(result.entityType).toBe(entityType);
+    },
+  );
 
   it("accepts a valid full body", () => {
     const result = triggerEventSchema.parse({
