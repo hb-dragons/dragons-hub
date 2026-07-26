@@ -100,7 +100,15 @@ jobs:
 
       - name: Plan
         id: plan
-        run: tofu plan -input=false -out=tfplan -no-color 2>&1 | tee plan_output.txt
+        # `run:` steps execute under `bash -e` (no pipefail), so piping through
+        # `tee` for the PR-comment log would otherwise always report success
+        # via tee's own exit code, no matter what `tofu plan` does. `set -o
+        # pipefail` makes the step's exit code reflect the pipeline's first
+        # failure so `continue-on-error` + `steps.plan.outcome` below actually
+        # observe a failed plan.
+        run: |
+          set -o pipefail
+          tofu plan -input=false -out=tfplan -no-color 2>&1 | tee plan_output.txt
         continue-on-error: true
 
       - name: Comment Plan on PR
