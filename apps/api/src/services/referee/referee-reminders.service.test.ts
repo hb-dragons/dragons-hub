@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 
 // drizzle-orm and @dragons/db/schema are deliberately NOT mocked (issue #110).
 // `getReminderDays` is a scoped read — the row for one settings key, not just
@@ -51,9 +51,6 @@ import {
   cancelReminderJobs,
 } from "./referee-reminders.service";
 import { appSettings } from "@dragons/db/schema";
-// Imported here rather than on line 1 so this migration does not collide with
-// the in-flight timezone work on the same file (#96).
-import { beforeAll, afterAll } from "vitest";
 import {
   setupTestDb,
   resetTestDb,
@@ -131,14 +128,18 @@ describe("computeReminderDelays", () => {
 });
 
 describe("computeReminderDelays - timezone correctness (issue #96)", () => {
-  const originalTZ = process.env.TZ;
-
+  // `vi.stubEnv`, not `process.env.TZ = original`. TZ is unset on developer
+  // machines that get their zone from /etc/localtime, so restoring by
+  // assignment writes the literal string "undefined", which Node treats as an
+  // invalid zone and falls back to UTC — silently leaving every later test in
+  // this worker in a different timezone than it started in. `unstubAllEnvs`
+  // deletes a key that was originally absent, which assignment cannot do.
   afterEach(() => {
-    process.env.TZ = originalTZ;
+    vi.unstubAllEnvs();
   });
 
   it("resolves the exact UTC instant for a CEST (summer) Berlin kickoff under a non-Berlin process TZ", () => {
-    process.env.TZ = "UTC";
+    vi.stubEnv("TZ", "UTC");
     // 19:30 Berlin time in July is CEST (UTC+2) -> 17:30Z
     const now = new Date("2026-07-01T00:00:00Z");
     const delays = computeReminderDelays("2026-07-15", "19:30", [0], now);
@@ -149,7 +150,7 @@ describe("computeReminderDelays - timezone correctness (issue #96)", () => {
   });
 
   it("resolves the exact UTC instant for a CET (winter) Berlin kickoff under a non-Berlin process TZ", () => {
-    process.env.TZ = "UTC";
+    vi.stubEnv("TZ", "UTC");
     // 19:30 Berlin time in January is CET (UTC+1) -> 18:30Z
     const now = new Date("2026-01-01T00:00:00Z");
     const delays = computeReminderDelays("2026-01-15", "19:30", [0], now);
@@ -160,7 +161,7 @@ describe("computeReminderDelays - timezone correctness (issue #96)", () => {
   });
 
   it("resolves the same correct UTC instant under America/New_York process TZ", () => {
-    process.env.TZ = "America/New_York";
+    vi.stubEnv("TZ", "America/New_York");
     const now = new Date("2026-07-01T00:00:00Z");
     const delays = computeReminderDelays("2026-07-15", "19:30", [0], now);
 
@@ -170,7 +171,7 @@ describe("computeReminderDelays - timezone correctness (issue #96)", () => {
   });
 
   it("still excludes an already-passed kickoff under a non-Berlin process TZ", () => {
-    process.env.TZ = "UTC";
+    vi.stubEnv("TZ", "UTC");
     // "now" is after the CEST kickoff instant (17:30Z), so the 0-day reminder must be excluded
     const now = new Date("2026-07-15T18:00:00Z");
     const delays = computeReminderDelays("2026-07-15", "19:30", [0], now);
