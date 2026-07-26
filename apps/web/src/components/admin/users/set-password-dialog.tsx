@@ -22,11 +22,13 @@ import { Field, FieldLabel, FieldError } from "@dragons/ui/components/field"
 
 import type { UserListItem } from "./types"
 
-const setPasswordSchema = z.object({
-  password: z.string().min(8, "Password must be at least 8 characters"),
-})
+function buildSetPasswordSchema(t: ReturnType<typeof useTranslations>) {
+  return z.object({
+    password: z.string().min(8, t("users.validation.passwordTooShort")),
+  })
+}
 
-type SetPasswordFormValues = z.infer<typeof setPasswordSchema>
+type SetPasswordFormValues = z.infer<ReturnType<typeof buildSetPasswordSchema>>
 
 interface SetPasswordDialogProps {
   user: UserListItem | null
@@ -43,7 +45,7 @@ export function SetPasswordDialog({
   const [submitting, setSubmitting] = useState(false)
 
   const form = useForm<SetPasswordFormValues>({
-    resolver: zodResolver(setPasswordSchema),
+    resolver: zodResolver(buildSetPasswordSchema(t)),
     defaultValues: { password: "" },
   })
 
@@ -90,8 +92,9 @@ export function SetPasswordDialog({
             name="password"
             render={({ field, fieldState }) => (
               <Field>
-                <FieldLabel>{t("users.setPasswordDialog.passwordLabel")}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{t("users.setPasswordDialog.passwordLabel")}</FieldLabel>
                 <Input
+                  id={field.name}
                   type="password"
                   placeholder={t("users.setPasswordDialog.passwordPlaceholder")}
                   {...field}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Download, Loader2 } from "lucide-react";
 import { Button } from "@dragons/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dragons/ui/components/card";
@@ -16,6 +17,7 @@ interface PreviewStepProps {
 }
 
 export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
+  const t = useTranslations("socialWizard");
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +47,7 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unbekannter Fehler beim Generieren");
+      setError(err instanceof Error ? err.message : t("generateError"));
     } finally {
       setGenerating(false);
     }
@@ -54,11 +56,11 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Vorschau</CardTitle>
+        <CardTitle>{t("previewLabel")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Spielerfoto per Drag & Drop positionieren und mit den Ecken skalieren.
+          {t("dragHelpText")}
         </p>
 
         <div className="flex justify-center">
@@ -72,25 +74,25 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
               onClick={() => void handleGenerate()}
               className="ml-2 underline hover:no-underline"
             >
-              Erneut versuchen
+              {t("retryLabel")}
             </button>
           </div>
         )}
 
         <div className="flex justify-between pt-2">
           <Button variant="outline" onClick={onBack} disabled={generating}>
-            Zurück
+            {t("back")}
           </Button>
           <Button onClick={() => void handleGenerate()} disabled={generating}>
             {generating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Wird generiert…
+                {t("generating")}
               </>
             ) : (
               <>
                 <Download className="mr-2 h-4 w-4" />
-                Generieren & Herunterladen
+                {t("generateAndDownload")}
               </>
             )}
           </Button>

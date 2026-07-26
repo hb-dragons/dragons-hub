@@ -40,6 +40,7 @@ const messages = {
       search: "Search…",
       sort: { name: "Name", workloadDesc: "Games (desc)", workloadAsc: "Games (asc)" },
       empty: "No referees",
+      licenseLabel: "Lic {number}",
     },
   },
   errors: {
@@ -83,6 +84,33 @@ describe("RefereeList", () => {
     render(wrap(<RefereeList selectedId={null} onSelect={() => {}} />));
     expect(screen.getByText("Müller, Anna")).toBeInTheDocument();
     expect(screen.queryByText(/Schiedsrichter|SR1|SR2/)).toBeNull();
+  });
+
+  it("renders the license number through the catalog, not a hardcoded 'Lic' prefix", () => {
+    render(wrap(<RefereeList selectedId={null} onSelect={vi.fn()} />));
+    expect(screen.getByText("Lic 12345")).toBeInTheDocument();
+  });
+
+  it("exposes each referee row as a keyboard-focusable, named control", () => {
+    render(wrap(<RefereeList selectedId={null} onSelect={vi.fn()} />));
+    const row = screen.getByRole("button", { name: /müller, anna/i });
+    expect(row).toHaveAttribute("tabindex", "0");
+  });
+
+  it("activates a row's onSelect via the Enter key", () => {
+    const onSelect = vi.fn();
+    render(wrap(<RefereeList selectedId={null} onSelect={onSelect} />));
+    const row = screen.getByRole("button", { name: /müller, anna/i });
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it("does not steal Space from the nested own-club checkbox", () => {
+    const onSelect = vi.fn();
+    render(wrap(<RefereeList selectedId={null} onSelect={onSelect} />));
+    const checkbox = screen.getAllByRole("checkbox", { name: /own/i })[0]!;
+    fireEvent.keyDown(checkbox, { key: " " });
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("renders Own (N) | All (M) chip group from /counts", async () => {

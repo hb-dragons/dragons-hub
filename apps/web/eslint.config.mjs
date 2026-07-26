@@ -15,6 +15,10 @@ export default defineConfig([
     // Test files are excluded from tsconfig (vitest env); skip typed linting for them.
     "src/**/*.test.{ts,tsx}",
     "vitest.config.ts",
+    // Standalone Node scripts (CI checks, tooling) — plain JS/mjs, not part
+    // of the app's tsconfig program, same reasoning as the test-file
+    // exclusion above. Their own test file is exercised by `pnpm test`.
+    "scripts/**",
   ]),
   {
     rules: {

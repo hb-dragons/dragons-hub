@@ -9,12 +9,14 @@ interface TimePickerProps {
   onChange: (value: string | null) => void
   className?: string
   disabled?: boolean
+  id?: string
 }
 
-function TimePicker({ value, onChange, className, disabled }: TimePickerProps) {
+function TimePicker({ value, onChange, className, disabled, id }: TimePickerProps) {
   return (
     <input
       type="time"
+      id={id}
       data-slot="time-picker"
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value || null)}

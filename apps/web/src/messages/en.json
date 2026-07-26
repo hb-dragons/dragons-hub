@@ -236,7 +236,8 @@
     "release": "Release",
     "unsavedChanges": "Unsaved changes",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "toggleTheme": "Toggle theme"
   },
   "matches": {
     "title": "Matches",
@@ -270,9 +271,9 @@
       "description": "Describe your constraints; I'll suggest valid dates and venues.",
       "placeholder": "e.g. next 3 weeks, prefer Saturday evenings, keep our gym",
       "stop": "Stop",
-        "retry": "Retry",
-        "error": "Something went wrong. Please try again.",
-        "send": "Send"
+      "retry": "Retry",
+      "error": "Something went wrong. Please try again.",
+      "send": "Send"
     }
   },
   "matchDetail": {
@@ -723,6 +724,11 @@
       "passwordSetFailed": "Failed to set password",
       "refereeLinked": "Referee linked successfully",
       "refereeLinkFailed": "Failed to link referee"
+    },
+    "validation": {
+      "nameRequired": "Name is required",
+      "emailInvalid": "Enter a valid email address",
+      "passwordTooShort": "Password must be at least 8 characters"
     }
   },
   "board": {
@@ -820,7 +826,8 @@
       "updated": "Task updated",
       "deleted": "Task deleted",
       "moved": "Task moved"
-    }
+    },
+    "moreActions": "Board actions"
   },
   "bookings": {
     "title": "Venue Bookings",
@@ -1254,7 +1261,47 @@
       "sync": "Sync",
       "manual": "Manual",
       "reconciliation": "Reconciliation"
-    }
+    },
+    "count": "{count, plural, one {# event} other {# events}}",
+    "entityTypes": {
+      "match": "match",
+      "booking": "booking",
+      "referee": "referee",
+      "task": "task"
+    },
+    "urgencyLabels": {
+      "immediate": "immediate",
+      "routine": "routine"
+    },
+    "allFilter": "All",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Search...",
+    "rowsPerPage": "Rows per page",
+    "pageOf": "Page {page} of {total}",
+    "loading": "Loading...",
+    "id": "ID",
+    "entityTypeField": "Entity Type",
+    "entityIdField": "Entity ID",
+    "entityNameField": "Entity Name",
+    "deepLinkPathField": "Deep Link Path",
+    "payloadJson": "Payload (JSON)",
+    "deepLink": "Deep Link",
+    "syncRun": "Sync Run",
+    "enqueued": "Enqueued",
+    "pagination": {
+      "first": "First page",
+      "previous": "Previous page",
+      "next": "Next page",
+      "last": "Last page"
+    },
+    "triggerTypePlaceholder": "match.time_changed",
+    "entityNamePlaceholder": "Dragons vs. Tigers",
+    "deepLinkPathPlaceholder": "/admin/matches/123",
+    "urgencyDefaultPlaceholder": "Default",
+    "payloadPlaceholder": "'{\"field\": \"value\"}'",
+    "typeFilterPlaceholder": "match.*"
   },
   "refereeHub": {
     "title": "Referees",
@@ -1406,7 +1453,8 @@
       "scope": {
         "own": "Own ({n})",
         "all": "All ({n})"
-      }
+      },
+      "licenseLabel": "Lic {number}"
     }
   },
   "errors": {
@@ -1453,5 +1501,59 @@
       "list_matches": "fixtures",
       "fallback": "club data"
     }
+  },
+  "socialWizard": {
+    "pageTitle": "Social Post Generator",
+    "createTitle": "Create Social Post",
+    "back": "Back",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "resultsLabel": "Results",
+    "previewLabel": "Preview",
+    "lastWeekendLabel": "Last weekend",
+    "nextWeekendLabel": "Upcoming weekend",
+    "resultsCountSuffix": "matches with a result",
+    "previewCountSuffix": "matches scheduled",
+    "weekAndRange": "Week {week} · {range}",
+    "defaultWeekLabel": "Default week",
+    "chooseOtherWeekLabel": "Choose a different week",
+    "prevWeekAria": "Previous week",
+    "nextWeekAria": "Next week",
+    "weekLabel": "Week {a} / {b}",
+    "loadError": "Failed to load",
+    "step1Summary": "Week {week} ({label})",
+    "matchesCount": "{count, plural, one {# match} other {# matches}}",
+    "photoAlt": "Player photo",
+    "backgroundAlt": "Background",
+    "photoAndBackgroundLabel": "Photo & background",
+    "selectMatchesTitle": "Select matches",
+    "loadingMatches": "Loading matches…",
+    "noMatchesFound": "No matches found",
+    "moveUpAria": "Move up",
+    "moveDownAria": "Move down",
+    "vsLabel": "vs",
+    "homeLabel": "Home",
+    "awayLabel": "Away",
+    "removeMatchAria": "Remove match",
+    "selectAssetsLabel": "Select assets",
+    "selectAssetsTitle": "Select assets",
+    "photosLoadError": "Failed to load photos",
+    "backgroundsLoadError": "Failed to load backgrounds",
+    "loadingPhotos": "Loading photos…",
+    "loadingBackgrounds": "Loading backgrounds…",
+    "photoLabel": "Player photo",
+    "backgroundLabel": "Background",
+    "dragHelpText": "Drag the player photo into place and resize using the corners.",
+    "generateError": "Unknown error while generating",
+    "retryLabel": "Try again",
+    "generating": "Generating…",
+    "generateAndDownload": "Generate & Download",
+    "uploadFailed": "Upload failed",
+    "deleteFailed": "Delete failed",
+    "deleteItemAria": "Delete {name}",
+    "uploadImageAria": "Upload image",
+    "deleteImageTitle": "Delete image?",
+    "deleteImageDescription": "“{name}” will be permanently deleted. This action cannot be undone."
   }
 }

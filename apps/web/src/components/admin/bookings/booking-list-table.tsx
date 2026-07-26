@@ -110,7 +110,15 @@ export function BookingListTable() {
             <TableRow
               key={booking.id}
               className="cursor-pointer hover:bg-muted/50"
+              role="button"
+              tabIndex={0}
               onClick={() => setSelectedBookingId(booking.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedBookingId(booking.id);
+                }
+              }}
             >
               <TableCell className="font-medium tabular-nums">
                 {format.dateTime(clubDayAnchor(booking.date), "matchDate")}

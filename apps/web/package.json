@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "i18n:check": "i18n-check -l src/messages -s en -f next-intl",
+    "i18n:check": "i18n-check -l src/messages -s en -f next-intl && node scripts/check-i18n-literals.mjs",
     "test": "vitest run",
     "coverage": "vitest run --coverage"
   },

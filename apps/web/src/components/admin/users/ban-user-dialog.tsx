@@ -97,8 +97,9 @@ export function BanUserDialog({
             name="banReason"
             render={({ field }) => (
               <Field>
-                <FieldLabel>{t("users.banDialog.reasonLabel")}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{t("users.banDialog.reasonLabel")}</FieldLabel>
                 <Input
+                  id={field.name}
                   placeholder={t("users.banDialog.reasonPlaceholder")}
                   {...field}
                 />
@@ -110,8 +111,9 @@ export function BanUserDialog({
             name="banExpiresInDays"
             render={({ field }) => (
               <Field>
-                <FieldLabel>{t("users.banDialog.expiresLabel")}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{t("users.banDialog.expiresLabel")}</FieldLabel>
                 <Input
+                  id={field.name}
                   type="number"
                   min="1"
                   placeholder={t("users.banDialog.expiresPlaceholder")}

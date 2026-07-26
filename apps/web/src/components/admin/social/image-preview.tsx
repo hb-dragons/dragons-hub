@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Rnd } from "react-rnd";
 import { WeekendPreview, WeekendResults } from "@dragons/shared/social-templates";
 import type { MatchRow } from "@dragons/shared/social-templates";
@@ -28,6 +29,7 @@ function toMatchRows(state: WizardState): MatchRow[] {
 }
 
 export function ImagePreview({ state, onUpdate }: ImagePreviewProps) {
+  const t = useTranslations("socialWizard");
   const photo = state.selectedPhoto;
 
   // Derive display-space dimensions for the player photo
@@ -51,7 +53,7 @@ export function ImagePreview({ state, onUpdate }: ImagePreviewProps) {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={`${API_BASE}/admin/social/backgrounds/${state.selectedBackgroundId}/image`}
-          alt="Hintergrund"
+          alt={t("backgroundAlt")}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
           crossOrigin="use-credentials"
         />
@@ -109,7 +111,7 @@ export function ImagePreview({ state, onUpdate }: ImagePreviewProps) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`${API_BASE}/admin/social/player-photos/${state.selectedPhotoId}/image`}
-            alt="Spielerfoto"
+            alt={t("photoAlt")}
             style={{ width: "100%", height: "100%", objectFit: "fill", display: "block" }}
             crossOrigin="use-credentials"
             draggable={false}

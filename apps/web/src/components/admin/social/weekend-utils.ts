@@ -55,35 +55,35 @@ export function getISOWeekAndYear(date: Date): { week: number; year: number } {
   return { week, year: d.getUTCFullYear() };
 }
 
-const MONTH_NAMES = [
-  "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
-  "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
-];
-
-/** Format a weekend date range for display: "Sa 7. – So 8. Mär" */
-export function formatWeekendLabel(saturday: Date): string {
+/**
+ * Format a weekend date range for display, e.g. "Sat 7. – Sun 8. Mar" (en)
+ * or "Sa 7. – So 8. Mär" (de). Weekday/month abbreviations come from
+ * `Intl.DateTimeFormat` for the given locale rather than a hardcoded German
+ * table — the previous version always rendered "Sa"/"So" and German month
+ * abbreviations regardless of the active locale.
+ */
+export function formatWeekendLabel(saturday: Date, locale: string): string {
   const sunday = getSunday(saturday);
-  const satDay = saturday.getDate();
-  const sunDay = sunday.getDate();
-  const satMonth = MONTH_NAMES[saturday.getMonth()]!;
-  const sunMonth = MONTH_NAMES[sunday.getMonth()]!;
-
-  if (satMonth === sunMonth) {
-    return `Sa ${satDay}. – So ${sunDay}. ${satMonth}`;
-  }
-  return `Sa ${satDay}. ${satMonth} – So ${sunDay}. ${sunMonth}`;
+  return formatRange(saturday, sunday, locale);
 }
 
-/** Format a date range from YYYY-MM-DD strings: "Sa 7. – So 8. Mär" */
-export function formatDateRange(dateFrom: string, dateTo: string): string {
+/** Format a date range from YYYY-MM-DD strings, locale-aware (see `formatWeekendLabel`). */
+export function formatDateRange(dateFrom: string, dateTo: string, locale: string): string {
   const sat = new Date(dateFrom + "T12:00:00");
   const sun = new Date(dateTo + "T12:00:00");
-  const satMonth = MONTH_NAMES[sat.getMonth()]!;
-  const sunMonth = MONTH_NAMES[sun.getMonth()]!;
+  return formatRange(sat, sun, locale);
+}
+
+function formatRange(sat: Date, sun: Date, locale: string): string {
+  const satWeekday = sat.toLocaleDateString(locale, { weekday: "short" });
+  const sunWeekday = sun.toLocaleDateString(locale, { weekday: "short" });
+  const satMonth = sat.toLocaleDateString(locale, { month: "short" });
+  const sunMonth = sun.toLocaleDateString(locale, { month: "short" });
+
   if (satMonth === sunMonth) {
-    return `Sa ${sat.getDate()}. – So ${sun.getDate()}. ${satMonth}`;
+    return `${satWeekday} ${sat.getDate()}. – ${sunWeekday} ${sun.getDate()}. ${satMonth}`;
   }
-  return `Sa ${sat.getDate()}. ${satMonth} – So ${sun.getDate()}. ${sunMonth}`;
+  return `${satWeekday} ${sat.getDate()}. ${satMonth} – ${sunWeekday} ${sun.getDate()}. ${sunMonth}`;
 }
 
 export { toDateString, previousSaturday, nextSaturday } from "@/lib/weekend-utils";

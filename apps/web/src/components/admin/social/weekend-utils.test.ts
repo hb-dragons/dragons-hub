@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { toDateString } from "@/lib/weekend-utils";
-import { getLastWeekendSaturday, getNextWeekendSaturday, getISOWeekAndYear } from "./weekend-utils";
+import {
+  getLastWeekendSaturday,
+  getNextWeekendSaturday,
+  getISOWeekAndYear,
+  formatDateRange,
+} from "./weekend-utils";
 
 describe("getLastWeekendSaturday", () => {
   it("returns previous Saturday when today is Monday", () => {
@@ -60,5 +65,24 @@ describe("getISOWeekAndYear", () => {
   it("handles year boundary (Jan 1 2026 is week 1)", () => {
     const result = getISOWeekAndYear(new Date(2026, 0, 1));
     expect(result).toEqual({ week: 1, year: 2026 });
+  });
+});
+
+describe("formatDateRange locale-awareness", () => {
+  it("uses German weekday/month abbreviations for locale=de", () => {
+    const result = formatDateRange("2026-03-07", "2026-03-08", "de");
+    expect(result).toBe("Sa 7. – So 8. Mär");
+  });
+
+  it("uses English weekday/month abbreviations for locale=en, not hardcoded German", () => {
+    const result = formatDateRange("2026-03-07", "2026-03-08", "en");
+    expect(result).not.toContain("Sa ");
+    expect(result).not.toContain("So ");
+    expect(result).toMatch(/^Sat 7\. – Sun 8\./);
+  });
+
+  it("spans a month boundary correctly in English", () => {
+    const result = formatDateRange("2026-02-28", "2026-03-01", "en");
+    expect(result).toBe("Sat 28. Feb – Sun 1. Mar");
   });
 });

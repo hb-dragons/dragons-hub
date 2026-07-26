@@ -335,7 +335,7 @@ export function MatchListTable() {
     { label: t("status.forfeited"), value: "forfeited", icon: CircleOff },
   ]
 
-  function handleRowClick(row: Row<MatchListItem>, e: React.MouseEvent) {
+  function handleRowClick(row: Row<MatchListItem>, e: React.MouseEvent | React.KeyboardEvent) {
     const href = `/admin/matches/${row.original.id}`
     if (e.metaKey || e.ctrlKey) {
       window.open(href, "_blank")

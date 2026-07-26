@@ -124,16 +124,29 @@ export function RefereeList({ selectedId, onSelect }: Props) {
         {items.map((r) => (
           <div
             key={r.id}
+            role="button"
+            tabIndex={0}
             className={cn(
               "grid grid-cols-[1fr_36px_44px] items-center gap-2 px-3 py-2 border-l-2 border-l-transparent cursor-pointer hover:bg-surface-high",
               selectedId === r.id && "bg-primary/10 border-l-primary hover:bg-primary/10",
             )}
             onClick={() => onSelect(r.id)}
+            onKeyDown={(e) => {
+              // Only act when the row itself is focused — a nested control
+              // (the own-club checkbox) handles its own Enter/Space.
+              if (e.target !== e.currentTarget) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(r.id);
+              }
+            }}
             data-selected={selectedId === r.id}
           >
             <div className="min-w-0">
               <div className="text-sm font-medium truncate">{r.lastName}, {r.firstName}</div>
-              <div className="text-xs opacity-70 truncate">Lic {r.licenseNumber ?? "—"}</div>
+              <div className="text-xs opacity-70 truncate">
+                {t("licenseLabel", { number: r.licenseNumber ?? "—" })}
+              </div>
             </div>
             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
               <Checkbox
