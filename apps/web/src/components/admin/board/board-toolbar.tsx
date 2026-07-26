@@ -45,7 +45,7 @@ export function BoardToolbar({ boardId, onAddColumn }: BoardToolbarProps) {
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm">
+            <Button variant="ghost" size="icon-sm" aria-label={t("moreActions")}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>

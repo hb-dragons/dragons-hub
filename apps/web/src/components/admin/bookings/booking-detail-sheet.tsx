@@ -307,8 +307,9 @@ export function BookingDetailSheet({
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <Field>
-                    <FieldLabel>{t("bookings.detail.startTime")}</FieldLabel>
+                    <FieldLabel htmlFor="booking-start-time">{t("bookings.detail.startTime")}</FieldLabel>
                     <TimePicker
+                      id="booking-start-time"
                       value={startTime.slice(0, 5) || null}
                       onChange={(v) => setStartTime(v ? v + ":00" : "")}
                       className="h-9 w-full"
@@ -321,8 +322,9 @@ export function BookingDetailSheet({
                     )}
                   </Field>
                   <Field>
-                    <FieldLabel>{t("bookings.detail.endTime")}</FieldLabel>
+                    <FieldLabel htmlFor="booking-end-time">{t("bookings.detail.endTime")}</FieldLabel>
                     <TimePicker
+                      id="booking-end-time"
                       value={endTime.slice(0, 5) || null}
                       onChange={(v) => setEndTime(v ? v + ":00" : "")}
                       className="h-9 w-full"
@@ -337,7 +339,7 @@ export function BookingDetailSheet({
                 </div>
                 {booking.calculatedStartTime && (startTime !== booking.calculatedStartTime || endTime !== booking.calculatedEndTime) && (
                   <Field>
-                    <FieldLabel>{t("bookings.override.reason")}</FieldLabel>
+                    <FieldLabel htmlFor="override-reason">{t("bookings.override.reason")}</FieldLabel>
                     <Input
                       id="override-reason"
                       value={overrideReason}

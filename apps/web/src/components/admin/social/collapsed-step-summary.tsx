@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { WizardState } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -11,36 +12,40 @@ interface CollapsedStepSummaryProps {
 }
 
 function StepOneSummary({ state }: { state: WizardState }) {
-  const typeLabel = state.postType === "results" ? "Ergebnisse" : "Vorschau";
+  const t = useTranslations("socialWizard");
+  const typeLabel = state.postType === "results" ? t("resultsLabel") : t("previewLabel");
   return (
     <span className="text-sm">
       <span className="font-medium">{typeLabel}</span>
       <span className="text-muted-foreground">
-        {" · "}KW {state.calendarWeek} ({state.weekendLabel})
+        {" · "}
+        {t("step1Summary", { week: state.calendarWeek, label: state.weekendLabel })}
       </span>
     </span>
   );
 }
 
 function StepTwoSummary({ state }: { state: WizardState }) {
+  const t = useTranslations("socialWizard");
   const count = state.matches.length;
   const labels = state.matches.map((m) => m.teamLabel).join(", ");
   return (
     <span className="text-sm">
-      <span className="font-medium">{count} Spiele</span>
+      <span className="font-medium">{t("matchesCount", { count })}</span>
       <span className="text-muted-foreground"> · {labels}</span>
     </span>
   );
 }
 
 function StepThreeSummary({ state }: { state: WizardState }) {
+  const t = useTranslations("socialWizard");
   return (
     <span className="flex items-center gap-2 text-sm">
       {state.selectedPhotoId !== null && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={`${API_BASE}/admin/social/player-photos/${state.selectedPhotoId}/image`}
-          alt="Spielerfoto"
+          alt={t("photoAlt")}
           className="h-10 w-10 rounded object-cover"
           crossOrigin="use-credentials"
         />
@@ -49,12 +54,12 @@ function StepThreeSummary({ state }: { state: WizardState }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={`${API_BASE}/admin/social/backgrounds/${state.selectedBackground.id}/image`}
-          alt="Hintergrund"
+          alt={t("backgroundAlt")}
           className="h-10 w-10 rounded object-cover"
           crossOrigin="use-credentials"
         />
       )}
-      <span className="text-muted-foreground">Foto & Hintergrund</span>
+      <span className="text-muted-foreground">{t("photoAndBackgroundLabel")}</span>
     </span>
   );
 }
@@ -64,6 +69,7 @@ export function CollapsedStepSummary({
   state,
   onEdit,
 }: CollapsedStepSummaryProps) {
+  const t = useTranslations("socialWizard");
   return (
     <div className="flex items-center justify-between rounded-md border bg-card px-4 py-3">
       <div className="flex items-center gap-3">
@@ -79,7 +85,7 @@ export function CollapsedStepSummary({
         className="text-sm text-primary hover:underline"
         type="button"
       >
-        Ändern
+        {t("edit")}
       </button>
     </div>
   );

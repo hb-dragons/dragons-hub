@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@dragons/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dragons/ui/components/card";
 import { api } from "@/lib/api";
@@ -15,6 +16,7 @@ interface AssetSelectStepProps {
 }
 
 export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelectStepProps) {
+  const t = useTranslations("socialWizard");
   const [photos, setPhotos] = useState<PlayerPhoto[]>([]);
   const [backgrounds, setBackgrounds] = useState<Background[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(true);
@@ -29,7 +31,7 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
       const data = await api.social.listPlayerPhotos();
       setPhotos(data);
     } catch (err) {
-      setPhotoError(err instanceof Error ? err.message : "Fehler beim Laden der Fotos");
+      setPhotoError(err instanceof Error ? err.message : t("photosLoadError"));
     } finally {
       setLoadingPhotos(false);
     }
@@ -49,7 +51,7 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
         }
       }
     } catch (err) {
-      setBackgroundError(err instanceof Error ? err.message : "Fehler beim Laden der Hintergründe");
+      setBackgroundError(err instanceof Error ? err.message : t("backgroundsLoadError"));
     } finally {
       setLoadingBackgrounds(false);
     }
@@ -78,12 +80,12 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Assets auswählen</CardTitle>
+        <CardTitle>{t("selectAssetsTitle")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {loadingPhotos ? (
           <div className="flex items-center justify-center py-4 text-muted-foreground">
-            <span className="animate-pulse">Fotos werden geladen…</span>
+            <span className="animate-pulse">{t("loadingPhotos")}</span>
           </div>
         ) : photoError ? (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -104,14 +106,14 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
                 onUpdate({ selectedPhotoId: null, selectedPhoto: null });
               }
             }}
-            label="Spielerfoto"
+            label={t("photoLabel")}
             aspectRatio="3/4"
           />
         )}
 
         {loadingBackgrounds ? (
           <div className="flex items-center justify-center py-4 text-muted-foreground">
-            <span className="animate-pulse">Hintergründe werden geladen…</span>
+            <span className="animate-pulse">{t("loadingBackgrounds")}</span>
           </div>
         ) : backgroundError ? (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -132,17 +134,17 @@ export function AssetSelectStep({ state, onUpdate, onNext, onBack }: AssetSelect
                 onUpdate({ selectedBackgroundId: null, selectedBackground: null });
               }
             }}
-            label="Hintergrund"
+            label={t("backgroundLabel")}
             aspectRatio="1/1"
           />
         )}
 
         <div className="flex justify-between pt-2">
           <Button variant="outline" onClick={onBack}>
-            Zurück
+            {t("back")}
           </Button>
           <Button onClick={onNext} disabled={!canProceed}>
-            Vorschau
+            {t("previewLabel")}
           </Button>
         </div>
       </CardContent>

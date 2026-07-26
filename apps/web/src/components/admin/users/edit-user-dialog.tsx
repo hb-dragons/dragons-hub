@@ -22,12 +22,14 @@ import { Field, FieldLabel, FieldError } from "@dragons/ui/components/field"
 
 import type { UserListItem } from "./types"
 
-const editUserSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-})
+function buildEditUserSchema(t: ReturnType<typeof useTranslations>) {
+  return z.object({
+    name: z.string().min(1, t("users.validation.nameRequired")),
+    email: z.string().email(t("users.validation.emailInvalid")),
+  })
+}
 
-type EditUserFormValues = z.infer<typeof editUserSchema>
+type EditUserFormValues = z.infer<ReturnType<typeof buildEditUserSchema>>
 
 interface EditUserDialogProps {
   user: UserListItem | null
@@ -46,7 +48,7 @@ export function EditUserDialog({
   const [submitting, setSubmitting] = useState(false)
 
   const form = useForm<EditUserFormValues>({
-    resolver: zodResolver(editUserSchema),
+    resolver: zodResolver(buildEditUserSchema(t)),
     defaultValues: { name: "", email: "" },
   })
 
@@ -91,8 +93,8 @@ export function EditUserDialog({
             name="name"
             render={({ field, fieldState }) => (
               <Field>
-                <FieldLabel>{t("users.editDialog.nameLabel")}</FieldLabel>
-                <Input {...field} />
+                <FieldLabel htmlFor={field.name}>{t("users.editDialog.nameLabel")}</FieldLabel>
+                <Input id={field.name} {...field} />
                 <FieldError>{fieldState.error?.message}</FieldError>
               </Field>
             )}
@@ -102,8 +104,8 @@ export function EditUserDialog({
             name="email"
             render={({ field, fieldState }) => (
               <Field>
-                <FieldLabel>{t("users.editDialog.emailLabel")}</FieldLabel>
-                <Input type="email" {...field} />
+                <FieldLabel htmlFor={field.name}>{t("users.editDialog.emailLabel")}</FieldLabel>
+                <Input id={field.name} type="email" {...field} />
                 <FieldError>{fieldState.error?.message}</FieldError>
               </Field>
             )}

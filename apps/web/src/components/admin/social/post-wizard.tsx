@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import type { MatchItem, PostType, WeekendOption, WizardState } from "./types";
 import { PostTypeStep } from "./steps/post-type-step";
 import { MatchReviewStep } from "./steps/match-review-step";
@@ -51,6 +52,8 @@ async function fetchWeekendOption(
 }
 
 export function PostWizard() {
+  const t = useTranslations("socialWizard");
+  const locale = useLocale();
   const [state, setState] = useState<WizardState>(getInitialState);
 
   // Weekend navigation state
@@ -79,7 +82,10 @@ export function PostWizard() {
 
   const currentResultsSat = applyOffset(baseSatResults, weekOffset);
   const currentPreviewSat = applyOffset(baseSatPreview, weekOffset);
-  const weekLabel = `KW ${getISOWeekAndYear(currentResultsSat).week} / ${getISOWeekAndYear(currentPreviewSat).week}`;
+  const weekLabel = t("weekLabel", {
+    a: getISOWeekAndYear(currentResultsSat).week,
+    b: getISOWeekAndYear(currentPreviewSat).week,
+  });
 
   // Fetch weekend data whenever offset changes
   useEffect(() => {
@@ -99,7 +105,7 @@ export function PostWizard() {
       })
       .catch((err) => {
         if (!cancelled) {
-          setCardError(err instanceof Error ? err.message : "Fehler beim Laden");
+          setCardError(err instanceof Error ? err.message : t("loadError"));
         }
       })
       .finally(() => {
@@ -119,7 +125,7 @@ export function PostWizard() {
   function handleSelectCard(type: PostType, option: WeekendOption) {
     const source = matchSourceRef.current;
     const needsNewMatches = !source || source.week !== option.week || source.type !== type;
-    const label = formatDateRange(option.dateFrom, option.dateTo);
+    const label = formatDateRange(option.dateFrom, option.dateTo, locale);
 
     setState((prev) => ({
       ...prev,
