@@ -212,19 +212,48 @@ Display title for all admin pages. Every admin page must use this.
 
 ### StatCard
 
-KPI metric card with label, value, optional icon and trend indicator.
+KPI metric card with label, value, optional icon and trend indicator. `trend` is
+the already-formatted string to show next to the value; `trendUp` picks its
+colour (`text-primary` when true, `text-heat` when false).
 
 ```tsx
-<StatCard label="Referees" value="24" icon={Users} trend={{ value: 3, positive: true }} />
+<StatCard label="Referees" value="24" icon={Users} trend="+3" trendUp />
 ```
 
-### SummaryStrip
+### PageError
 
-Bottom-of-page stat aggregation row using CSS grid with `bg-surface-low` gap-px separator.
+Failure notice for a page whose data is fetched during the server render.
+`ErrorState` (`components/ui/error-state.tsx`) is the interactive counterpart
+and requires an `onRetry`; a server component has no client handler to offer.
 
 ```tsx
-<SummaryStrip items={[{ label: "Total", value: "124" }]} />
+<PageError message={error} />
 ```
+
+### TeamBadge
+
+The one team badge. Always pass `badgeColor` — without it the preset falls back
+to a hash of the name, so a team with a configured colour renders differently on
+every surface that forgets it. Never pick `preset.light` or `preset.dark` by
+hand: `preset.className` carries both modes.
+
+```tsx
+<TeamBadge name="Dragons U18" badgeColor={match.homeBadgeColor} />
+```
+
+## Enforcement
+
+`pnpm check:design-tokens` (run in CI) compiles every colour utility found in
+`apps/web/src` and `packages/ui/src` against this file's tokens and fails on any
+Tailwind cannot resolve. A token that does not exist emits no CSS rule and no
+error, so `text-mint-shade` passes typecheck, lint and every render test while
+showing the user nothing — that check is the only thing that catches it.
+
+Two consequences for how you write classes:
+
+- Invent a token in `globals.css` before you use it, or use one that exists.
+- Class names must appear verbatim in source. Building one at runtime
+  (`` `bg-${colour}-500` ``) produces no rule, and the check cannot see it either.
 
 ## Do's and Don'ts
 
