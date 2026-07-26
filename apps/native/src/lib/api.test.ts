@@ -23,20 +23,18 @@ vi.mock("@/lib/auth-client", () => ({
 vi.mock("@/lib/push/registration", () => ({
   unregisterForPush: vi.fn().mockResolvedValue(undefined),
 }));
+// `lib/api.ts` -> `lib/auth/sign-out.ts` -> `lib/swr-config.ts` ->
+// `lib/swr-native-adapters.ts`, which imports these for real. Neither is
+// invoked here (see sign-out.test.ts for why they're safe to leave inert).
+vi.mock("react-native", () => ({
+  AppState: { currentState: "active", addEventListener: vi.fn() },
+}));
+vi.mock("expo-network", () => ({ addNetworkStateListener: vi.fn() }));
 
-import { cache } from "swr/_internal";
 import { ApiClient } from "@dragons/api-client";
 import { router } from "expo-router";
 import { authClient } from "@/lib/auth-client";
 import { unregisterForPush } from "@/lib/push/registration";
-
-// See sign-out.test.ts: viewed as the plain Map it is at runtime so we can
-// seed/reset/read the exact singleton SWR's own `mutate` operates on.
-const store = cache as unknown as Map<string, { data?: unknown }>;
-
-function seed(key: string, data: unknown) {
-  store.set(key, { data });
-}
 
 function getOnResponse(): (response: Response) => Promise<void> {
   const ctorCall = vi.mocked(ApiClient).mock.calls[0];
@@ -47,9 +45,31 @@ function getOnResponse(): (response: Response) => Promise<void> {
   return options.onResponse;
 }
 
+/**
+ * Each test calls `vi.resetModules()` so `lib/api.ts`'s once-guard dedup
+ * latch starts fresh. That also means a *new* `swrCache` Map is created each
+ * time `lib/swr-config.ts` is re-evaluated — so `swrCache` must be imported
+ * fresh, from the same reset generation, alongside `lib/api.ts` itself,
+ * rather than once at the top of this file. Importing it separately still
+ * resolves to the exact same instance `lib/api.ts`'s dependency chain uses,
+ * because both imports land in the same post-reset module registry.
+ */
+async function loadApiUnderTest() {
+  await vi.resetModules();
+  const [{ apiClient }, { swrCache }] = await Promise.all([
+    import("@/lib/api"),
+    import("@/lib/swr-config"),
+  ]);
+  void apiClient; // constructed for its side effect of registering onResponse
+  return { onResponse: getOnResponse(), swrCache };
+}
+
+function seed(swrCache: Map<string, { data?: unknown }>, key: string, data: unknown) {
+  swrCache.set(key, { data });
+}
+
 describe("api.ts 401 handling", () => {
   beforeEach(() => {
-    store.clear();
     vi.clearAllMocks();
     vi.mocked(authClient.signOut).mockResolvedValue(undefined as never);
     vi.mocked(unregisterForPush).mockResolvedValue(undefined);
@@ -58,36 +78,27 @@ describe("api.ts 401 handling", () => {
   it("deregisters the device's push token on a 401 (previously only the manual sign-out did this)", async () => {
     // Regression guard: silently-signed-out users must stop receiving push
     // for a device they no longer control the session on.
-    await vi.resetModules();
-    const { apiClient } = await import("@/lib/api");
-    void apiClient; // constructed for its side effect of registering onResponse
-    const onResponse = getOnResponse();
+    const { onResponse } = await loadApiUnderTest();
 
     await onResponse({ status: 401 } as Response);
 
     expect(unregisterForPush).toHaveBeenCalledTimes(1);
   });
 
-  it("wipes the SWR cache on a 401 so the next signed-in user can't read the previous session's data", async () => {
-    await vi.resetModules();
-    const { apiClient } = await import("@/lib/api");
-    void apiClient;
-    const onResponse = getOnResponse();
+  it("wipes the app's actual SWR cache on a 401 so the next signed-in user can't read the previous session's data", async () => {
+    const { onResponse, swrCache } = await loadApiUnderTest();
 
-    seed("referee:games", { items: [{ id: 1, opponent: "Rival Referee Assignment" }] });
-    seed("admin/boards/9/tasks", { items: [{ id: 2, title: "Confidential board task" }] });
+    seed(swrCache, "referee:games", { items: [{ id: 1, opponent: "Rival Referee Assignment" }] });
+    seed(swrCache, "admin/boards/9/tasks", { items: [{ id: 2, title: "Confidential board task" }] });
 
     await onResponse({ status: 401 } as Response);
 
-    expect(store.get("referee:games")?.data).toBeUndefined();
-    expect(store.get("admin/boards/9/tasks")?.data).toBeUndefined();
+    expect(swrCache.has("referee:games")).toBe(false);
+    expect(swrCache.has("admin/boards/9/tasks")).toBe(false);
   });
 
   it("navigates home and only runs the sign-out routine once for a concurrent burst of 401s", async () => {
-    await vi.resetModules();
-    const { apiClient } = await import("@/lib/api");
-    void apiClient;
-    const onResponse = getOnResponse();
+    const { onResponse } = await loadApiUnderTest();
 
     await Promise.all([
       onResponse({ status: 401 } as Response),
@@ -100,10 +111,7 @@ describe("api.ts 401 handling", () => {
   });
 
   it("does not touch sign-out state for a non-401 response", async () => {
-    await vi.resetModules();
-    const { apiClient } = await import("@/lib/api");
-    void apiClient;
-    const onResponse = getOnResponse();
+    const { onResponse } = await loadApiUnderTest();
 
     await onResponse({ status: 200 } as Response);
 

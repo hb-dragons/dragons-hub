@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Leaf dependencies are mocked; the SWR cache itself is real so we can assert
-// on its actual contents afterwards — an attacker reading the cache doesn't
-// care whether `mutate` was "called", only whether the previous user's data
-// is still sitting there.
+// Leaf dependencies are mocked; the SWR cache itself is real — specifically
+// `swrCache` from `swr-config.ts`, the exact Map instance `_layout.tsx`
+// wires in as the app's `provider`. That is deliberately NOT the same object
+// as `swr`'s own top-level `cache`/`mutate` (a separate default Map created
+// at module init): once a custom `provider` is configured, nothing in the
+// app reads from that default cache, so seeding *that* one and asserting
+// against it would pass without proving anything about what a real screen
+// would show the next user. `react-native`/`expo-network` are mocked only
+// because `swr-config.ts` transitively imports `swr-native-adapters.ts`,
+// which references them — neither is ever invoked here.
 vi.mock("expo-router", () => ({ router: { replace: vi.fn() } }));
 vi.mock("@/lib/auth-client", () => ({
   authClient: { signOut: vi.fn().mockResolvedValue(undefined) },
@@ -11,33 +17,31 @@ vi.mock("@/lib/auth-client", () => ({
 vi.mock("@/lib/push/registration", () => ({
   unregisterForPush: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("react-native", () => ({
+  AppState: { currentState: "active", addEventListener: vi.fn() },
+}));
+vi.mock("expo-network", () => ({ addNetworkStateListener: vi.fn() }));
 
-import { cache } from "swr/_internal";
 import { router } from "expo-router";
 import { authClient } from "@/lib/auth-client";
 import { unregisterForPush } from "@/lib/push/registration";
+import { swrCache } from "@/lib/swr-config";
 import { performSignOut } from "@/lib/auth/sign-out";
 
-// The real global cache singleton, viewed as the plain Map it is at runtime —
-// `Cache<Data>`'s public type doesn't expose `.clear()`, and internal state
-// (`_k` etc.) isn't part of `State<Data>`, but we need both to seed/reset the
-// exact object SWR's own `mutate` reads and writes.
-const store = cache as unknown as Map<string, { data?: unknown }>;
-
-/** Seed the real SWR cache the way a live screen would have populated it. */
+/** Seed the real app cache the way a live screen would have populated it. */
 function seed(key: string, data: unknown) {
-  store.set(key, { data });
+  swrCache.set(key, { data });
 }
 
 describe("performSignOut", () => {
   beforeEach(() => {
-    store.clear();
+    swrCache.clear();
     vi.clearAllMocks();
     vi.mocked(authClient.signOut).mockResolvedValue(undefined as never);
     vi.mocked(unregisterForPush).mockResolvedValue(undefined);
   });
 
-  it("wipes every SWR cache entry so the next user can't read user A's data", async () => {
+  it("wipes every entry in the app's actual SWR cache so the next user can't read user A's data", async () => {
     seed("referee:games", { items: [{ id: 1, opponent: "Rival Club Referee" }] });
     seed("today:referee", { items: [{ id: 2, title: "Assigned: Cup Final" }] });
     seed("admin/boards", { items: [{ id: 3, name: "U16 Board" }] });
@@ -55,7 +59,8 @@ describe("performSignOut", () => {
       "admin/boards/3/tasks",
       "admin/tasks/4",
     ]) {
-      expect(store.get(key)?.data).toBeUndefined();
+      expect(swrCache.has(key)).toBe(false);
+      expect(swrCache.get(key)?.data).toBeUndefined();
     }
   });
 
@@ -64,7 +69,7 @@ describe("performSignOut", () => {
 
     await performSignOut();
 
-    expect(store.get("some/future/endpoint/not/yet/invented")?.data).toBeUndefined();
+    expect(swrCache.has("some/future/endpoint/not/yet/invented")).toBe(false);
   });
 
   it("deregisters the push token before clearing the auth session", async () => {
@@ -93,7 +98,7 @@ describe("performSignOut", () => {
 
     await performSignOut();
 
-    expect(store.get("referee:games")?.data).toBeUndefined();
+    expect(swrCache.has("referee:games")).toBe(false);
     expect(router.replace).toHaveBeenCalledWith("/");
   });
 });
