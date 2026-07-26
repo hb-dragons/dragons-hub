@@ -1,6 +1,26 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
 
 // --- Mock setup ---
+//
+// drizzle-orm is NOT mocked here. This worker's sync_runs bookkeeping is all
+// `where(eq(syncRuns.id, syncRunId))`: claim the run as running, then stamp it
+// completed or failed. With `eq` stubbed to a bare `vi.fn()` and a chainable db
+// mock, `expect(mockDbUpdate).toHaveBeenCalled()` passes even when the update
+// hits every referee-games run in the table, and neither the status nor the
+// record counts are checked at all. So this runs against a real (PGlite,
+// in-process) Postgres and reads the rows back.
+
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+
+vi.mock("../config/database", () => ({
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
+}));
 
 const mockChildLogger = vi.hoisted(() => ({
   info: vi.fn(),
@@ -22,25 +42,6 @@ vi.mock("../services/sync/index", () => ({
   fullSync: (...args: unknown[]) => mockFullSync(...args),
 }));
 
-const mockDbSelect = vi.fn();
-const mockDbUpdate = vi.fn();
-const mockDbInsert = vi.fn();
-vi.mock("../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockDbSelect(...args),
-    update: (...args: unknown[]) => mockDbUpdate(...args),
-    insert: (...args: unknown[]) => mockDbInsert(...args),
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  syncRuns: { id: "id", status: "status" },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-}));
-
 const mockSyncRefereeGames = vi.fn();
 vi.mock("../services/sync/referee-games.sync", () => ({
   syncRefereeGames: (...args: unknown[]) => mockSyncRefereeGames(...args),
@@ -48,8 +49,9 @@ vi.mock("../services/sync/referee-games.sync", () => ({
 
 const mockSyncLoggerClose = vi.fn();
 const mockSyncLogger = { close: mockSyncLoggerClose, info: vi.fn(), error: vi.fn() };
+const mockCreateSyncLogger = vi.fn().mockReturnValue(mockSyncLogger);
 vi.mock("../services/sync/sync-logger", () => ({
-  createSyncLogger: vi.fn().mockReturnValue(mockSyncLogger),
+  createSyncLogger: (...args: unknown[]) => mockCreateSyncLogger(...args),
 }));
 
 const mockOnCompleted = vi.fn();
@@ -78,10 +80,85 @@ vi.mock("bullmq", () => ({
 // Import after mocks
 await import("./sync.worker");
 import { logger } from "../config/logger";
+import { INSTANCE_ID } from "./instance-heartbeat";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../test/setup-test-db";
 
-beforeEach(() => {
-  vi.clearAllMocks();
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  vi.clearAllMocks();
+  mockCreateSyncLogger.mockReturnValue(mockSyncLogger);
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
+
+// --- Helpers ---
+
+interface SyncRunRow {
+  id: number;
+  sync_type: string;
+  status: string;
+  triggered_by: string;
+  owner_instance_id: string | null;
+  records_created: number | null;
+  records_updated: number | null;
+  records_skipped: number | null;
+  records_failed: number | null;
+  duration_ms: number | null;
+  error_message: string | null;
+  completed_at: Date | null;
+}
+
+async function syncRunRows(): Promise<SyncRunRow[]> {
+  const r = await ctx.client.query<SyncRunRow>(
+    `SELECT id, sync_type, status, triggered_by, owner_instance_id, records_created,
+            records_updated, records_skipped, records_failed, duration_ms,
+            error_message, completed_at
+     FROM sync_runs ORDER BY id`,
+  );
+  return r.rows;
+}
+
+/**
+ * The `completed` / `failed` handlers kick off their DB work in a
+ * `void (async () => ...)()`, so awaiting the handler itself proves nothing.
+ * Wait for that detached work to drain before asserting — including for the
+ * negative assertions, where the point is that nothing landed.
+ */
+async function settle(): Promise<void> {
+  for (let i = 0; i < 10; i++) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  await new Promise((resolve) => setTimeout(resolve, 50));
+}
+
+async function seedRun(opts: {
+  syncType?: string;
+  status?: string;
+  triggeredBy?: string;
+} = {}): Promise<number> {
+  const r = await ctx.client.query<{ id: number }>(
+    `INSERT INTO sync_runs (sync_type, status, triggered_by, started_at)
+     VALUES ($1, $2, $3, now()) RETURNING id`,
+    [opts.syncType ?? "referee-games", opts.status ?? "pending", opts.triggeredBy ?? "manual"],
+  );
+  return r.rows[0]!.id;
+}
+
+// --- Tests ---
 
 describe("sync worker processor", () => {
   it("runs full sync for type=full", async () => {
@@ -100,6 +177,8 @@ describe("sync worker processor", () => {
       result: { status: "completed" },
     });
     expect(mockFullSync).toHaveBeenCalledWith("cron", expect.any(Function), undefined);
+    // fullSync owns its own sync_runs bookkeeping; the worker adds none.
+    expect(await syncRunRows()).toEqual([]);
   });
 
   it("uses manual trigger for non-daily jobs", async () => {
@@ -152,16 +231,16 @@ describe("sync worker processor", () => {
     ).rejects.toThrow("sync failed");
   });
 
-  it("runs referee-games sync with existing syncRunId", async () => {
+  it("claims and completes the given referee-games run without touching a sibling run", async () => {
+    const target = await seedRun({ status: "pending" });
+    // A second referee-games run that must be left exactly as it is.
+    const bystander = await seedRun({ status: "running" });
     mockSyncRefereeGames.mockResolvedValue({ created: 5, updated: 3, unchanged: 10 });
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-    });
 
     const result = await processorFn({
       id: "job-ref-1",
       name: "manual-sync",
-      data: { type: "referee-games", syncRunId: 77 },
+      data: { type: "referee-games", syncRunId: target },
       log: vi.fn(),
     });
 
@@ -172,50 +251,60 @@ describe("sync worker processor", () => {
       updated: 3,
       unchanged: 10,
     });
-    expect(mockDbInsert).not.toHaveBeenCalled();
-    expect(mockSyncRefereeGames).toHaveBeenCalled();
+    expect(mockCreateSyncLogger).toHaveBeenCalledWith(target);
+    expect(mockSyncRefereeGames).toHaveBeenCalledWith(mockSyncLogger, target);
     expect(mockSyncLoggerClose).toHaveBeenCalled();
+
+    const rows = await syncRunRows();
+    // No extra run created when the job already carries one.
+    expect(rows).toHaveLength(2);
+    const targetRow = rows.find((r) => r.id === target)!;
+    expect(targetRow).toMatchObject({
+      status: "completed",
+      records_created: 5,
+      records_updated: 3,
+      records_skipped: 10,
+      records_failed: 0,
+      owner_instance_id: INSTANCE_ID,
+    });
+    expect(targetRow.completed_at).not.toBeNull();
+    expect(targetRow.duration_ms).not.toBeNull();
+
+    const bystanderRow = rows.find((r) => r.id === bystander)!;
+    expect(bystanderRow).toMatchObject({
+      status: "running",
+      owner_instance_id: null,
+      completed_at: null,
+    });
   });
 
-  it("runs referee-games sync without syncRunId (creates one)", async () => {
-    mockSyncRefereeGames.mockResolvedValue({ created: 5, updated: 3, unchanged: 10 });
-    mockDbInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 99 }]),
-      }),
-    });
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-    });
+  it("creates its own pending run when the job carries no syncRunId", async () => {
+    mockSyncRefereeGames.mockResolvedValue({ created: 1, updated: 0, unchanged: 2 });
 
-    const result = await processorFn({
+    await processorFn({
       id: "job-ref-2",
       name: "manual-sync",
       data: { type: "referee-games" },
       log: vi.fn(),
     });
 
-    expect(result).toEqual({
-      completed: true,
-      type: "referee-games",
-      created: 5,
-      updated: 3,
-      unchanged: 10,
+    const rows = await syncRunRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      sync_type: "referee-games",
+      triggered_by: "manual",
+      status: "completed",
+      records_created: 1,
+      records_skipped: 2,
+      owner_instance_id: INSTANCE_ID,
     });
-    expect(mockDbInsert).toHaveBeenCalled();
-    expect(mockSyncRefereeGames).toHaveBeenCalled();
+    // The created run is the one the sync logger and sync were handed.
+    expect(mockCreateSyncLogger).toHaveBeenCalledWith(rows[0]!.id);
   });
 
-  it("marks sync run as failed on referee-games error", async () => {
+  it("marks only the failing run as failed with its error message", async () => {
+    const bystander = await seedRun({ status: "running" });
     mockSyncRefereeGames.mockRejectedValue(new Error("referee sync failed"));
-    mockDbInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 99 }]),
-      }),
-    });
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-    });
 
     await expect(
       processorFn({
@@ -227,19 +316,21 @@ describe("sync worker processor", () => {
     ).rejects.toThrow("referee sync failed");
 
     expect(mockSyncLoggerClose).toHaveBeenCalled();
-    expect(mockDbUpdate).toHaveBeenCalled();
+    const rows = await syncRunRows();
+    const created = rows.find((r) => r.id !== bystander)!;
+    expect(created).toMatchObject({
+      status: "failed",
+      error_message: "referee sync failed",
+    });
+    expect(created.completed_at).not.toBeNull();
+    expect(rows.find((r) => r.id === bystander)).toMatchObject({
+      status: "running",
+      error_message: null,
+    });
   });
 
-  it("uses 'cron' triggeredBy for scheduled referee-games job", async () => {
+  it("records 'cron' as triggeredBy for the scheduled referee-games job", async () => {
     mockSyncRefereeGames.mockResolvedValue({ created: 0, updated: 0, unchanged: 0 });
-    mockDbInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 100 }]),
-      }),
-    });
-    mockDbUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-    });
 
     await processorFn({
       id: "job-ref-4",
@@ -248,16 +339,18 @@ describe("sync worker processor", () => {
       log: vi.fn(),
     });
 
-    // Verify insert was called (since no syncRunId), the triggeredBy logic
-    // uses "cron" for scheduled jobs (name contains "scheduled")
-    expect(mockDbInsert).toHaveBeenCalled();
+    const rows = await syncRunRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.triggered_by).toBe("cron");
   });
 
   it("logger function calls job.log", async () => {
-    mockFullSync.mockImplementation(async (_triggeredBy: unknown, logger: (msg: string) => Promise<void>) => {
-      await logger("test message");
-      return { status: "completed" };
-    });
+    mockFullSync.mockImplementation(
+      async (_triggeredBy: unknown, log: (msg: string) => Promise<void>) => {
+        await log("test message");
+        return { status: "completed" };
+      },
+    );
     const mockLog = vi.fn();
 
     await processorFn({
@@ -273,65 +366,65 @@ describe("sync worker processor", () => {
 
 describe("sync worker event handlers", () => {
   describe("completed handler", () => {
-    it("logs completion without syncRunId", async () => {
+    it("logs completion without syncRunId and touches no row", async () => {
+      const id = await seedRun({ status: "running" });
+
       await mockOnCompleted({ id: "job-1", data: {} });
+      await settle();
 
       expect(logger.info).toHaveBeenCalledWith({ jobId: "job-1" }, "Sync job completed");
-      expect(mockDbSelect).not.toHaveBeenCalled();
+      expect((await syncRunRows()).find((r) => r.id === id)!.status).toBe("running");
     });
 
-    it("verifies and fixes stale running sync run on completion", async () => {
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ status: "running" }]),
-        }),
-      });
-      mockDbUpdate.mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      });
+    it("reconciles only the still-running run named by the job", async () => {
+      const target = await seedRun({ status: "running" });
+      const bystander = await seedRun({ status: "running" });
 
-      await mockOnCompleted({ id: "job-1", data: { syncRunId: 42 } });
+      await mockOnCompleted({ id: "job-1", data: { syncRunId: target } });
+      await settle();
 
-      expect(mockDbSelect).toHaveBeenCalled();
-      expect(mockDbUpdate).toHaveBeenCalled();
+      const rows = await syncRunRows();
+      expect(rows.find((r) => r.id === target)).toMatchObject({ status: "completed" });
+      expect(rows.find((r) => r.id === target)!.completed_at).not.toBeNull();
+      expect(rows.find((r) => r.id === bystander)).toMatchObject({ status: "running" });
       expect(logger.warn).toHaveBeenCalledWith(
-        { syncRunId: 42 },
+        { syncRunId: target },
         "Sync run still running after job completed, marking as completed",
       );
     });
 
-    it("does not update when sync run is already completed", async () => {
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ status: "completed" }]),
-        }),
-      });
+    it("does not touch a run that already completed itself", async () => {
+      const id = await seedRun({ status: "completed" });
 
-      await mockOnCompleted({ id: "job-1", data: { syncRunId: 42 } });
+      await mockOnCompleted({ id: "job-1", data: { syncRunId: id } });
+      await settle();
 
-      expect(mockDbUpdate).not.toHaveBeenCalled();
+      const row = (await syncRunRows()).find((r) => r.id === id)!;
+      expect(row.status).toBe("completed");
+      expect(row.completed_at).toBeNull();
+      expect(logger.warn).not.toHaveBeenCalled();
     });
 
-    it("does not update when sync run is not found", async () => {
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      });
-
+    it("does nothing when the sync run is not found", async () => {
       await mockOnCompleted({ id: "job-1", data: { syncRunId: 999 } });
+      await settle();
 
-      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(await syncRunRows()).toEqual([]);
+      expect(logger.warn).not.toHaveBeenCalled();
     });
 
     it("logs an error when reconciliation DB work throws", async () => {
-      mockDbSelect.mockImplementation(() => {
-        throw new Error("db down");
-      });
-
-      await mockOnCompleted({ id: "job-1", data: { syncRunId: 42 } });
+      dbHolder.ref = {
+        select: () => {
+          throw new Error("db down");
+        },
+      };
+      try {
+        await mockOnCompleted({ id: "job-1", data: { syncRunId: 42 } });
+        await settle();
+      } finally {
+        dbHolder.ref = ctx.db;
+      }
 
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ jobId: "job-1", syncRunId: 42 }),
@@ -341,42 +434,61 @@ describe("sync worker event handlers", () => {
   });
 
   describe("failed handler", () => {
-    it("logs failure without syncRunId", async () => {
+    it("logs failure without syncRunId and touches no row", async () => {
+      const id = await seedRun({ status: "running" });
       const err = new Error("fail");
+
       await mockOnFailed({ id: "job-1", data: {} }, err);
+      await settle();
 
       expect(logger.error).toHaveBeenCalledWith({ jobId: "job-1", err }, "Sync job failed");
-      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect((await syncRunRows()).find((r) => r.id === id)!.status).toBe("running");
     });
 
-    it("marks sync run as failed in DB", async () => {
-      mockDbUpdate.mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-      });
-
+    it("marks only the job's own sync run as failed", async () => {
+      const target = await seedRun({ status: "running" });
+      const bystander = await seedRun({ status: "running" });
       const err = new Error("sync crashed");
-      await mockOnFailed({ id: "job-1", data: { syncRunId: 42 } }, err);
 
-      expect(mockDbUpdate).toHaveBeenCalled();
+      await mockOnFailed({ id: "job-1", data: { syncRunId: target } }, err);
+      await settle();
+
+      const rows = await syncRunRows();
+      expect(rows.find((r) => r.id === target)).toMatchObject({
+        status: "failed",
+        error_message: "sync crashed",
+      });
+      expect(rows.find((r) => r.id === target)!.completed_at).not.toBeNull();
+      expect(rows.find((r) => r.id === bystander)).toMatchObject({
+        status: "running",
+        error_message: null,
+      });
     });
 
     it("handles null job in failed handler", async () => {
+      const id = await seedRun({ status: "running" });
       const err = new Error("fail");
+
       await mockOnFailed(null, err);
+      await settle();
 
       expect(logger.error).toHaveBeenCalled();
-      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect((await syncRunRows()).find((r) => r.id === id)!.status).toBe("running");
     });
 
     it("logs an error when the DB update throws", async () => {
-      mockDbUpdate.mockImplementation(() => {
-        throw new Error("db down");
-      });
-
+      dbHolder.ref = {
+        update: () => {
+          throw new Error("db down");
+        },
+      };
       const err = new Error("sync crashed");
-      await mockOnFailed({ id: "job-1", data: { syncRunId: 42 } }, err);
+      try {
+        await mockOnFailed({ id: "job-1", data: { syncRunId: 42 } }, err);
+        await settle();
+      } finally {
+        dbHolder.ref = ctx.db;
+      }
 
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ jobId: "job-1", syncRunId: 42 }),

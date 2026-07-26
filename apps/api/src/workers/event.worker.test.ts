@@ -1,4 +1,27 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import { EVENT_TYPES } from "@dragons/shared";
+
+// --- Mock setup ---
+//
+// drizzle-orm is NOT mocked here. The worker's load is
+// `eq(domainEvents.id, job.data.eventId)` and its completion stamp is
+// `update(domainEvents).set({processedAt}).where(eq(domainEvents.id, event.id))`.
+// With an identity `eq` stub the select hands back whatever the test pre-canned
+// and `expect(mockDbUpdate).toHaveBeenCalled()` passes even if the stamp lands on
+// every event of that type. So the DB is a real (PGlite, in-process) Postgres and
+// the assertions read `processed_at` back per row.
+
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+
+vi.mock("../config/database", () => ({
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
+}));
 
 // --- Capture the processor function from BullMQ Worker ---
 
@@ -13,8 +36,6 @@ vi.mock("bullmq", () => ({
   },
   Job: class MockJob {},
 }));
-
-// --- Mock logger ---
 
 vi.mock("../config/logger", () => ({
   logger: {
@@ -31,46 +52,16 @@ vi.mock("../config/logger", () => ({
   },
 }));
 
-// --- Mock env ---
-
 vi.mock("../config/env", () => ({
   env: {
     REDIS_URL: "redis://localhost:6379",
   },
 }));
 
-// --- Mock database ---
-
-const mockDbSelect = vi.fn();
-const mockDbUpdate = vi.fn();
-const mockUpdateSet = vi.fn();
-vi.mock("../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockDbSelect(...args),
-    update: (...args: unknown[]) => mockDbUpdate(...args),
-  }),
-}));
-
-// --- Mock schema ---
-
-vi.mock("@dragons/db/schema", () => ({
-  domainEvents: { id: "id" },
-}));
-
-// --- Mock drizzle-orm ---
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((_col: unknown, val: unknown) => ({ _eq: val })),
-}));
-
-// --- Mock notification pipeline ---
-
 const mockProcessEvent = vi.fn();
 vi.mock("../services/notifications/notification-pipeline", () => ({
   processEvent: (...args: unknown[]) => mockProcessEvent(...args),
 }));
-
-// --- Mock queues ---
 
 const mockDigestQueueAdd = vi.fn().mockResolvedValue({ id: "digest-job-1" });
 vi.mock("./queues", () => ({
@@ -79,17 +70,40 @@ vi.mock("./queues", () => ({
   },
 }));
 
-// --- Mock shared ---
-
-vi.mock("@dragons/shared", () => ({
-  EVENT_TYPES: {
-    SYNC_COMPLETED: "sync.completed",
-  },
-}));
-
 // --- Import the module (triggers Worker constructor, captures processor) ---
 
 await import("./event.worker");
+
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../test/setup-test-db";
+
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  vi.clearAllMocks();
+  mockProcessEvent.mockResolvedValue({
+    dispatched: 0,
+    buffered: 0,
+    coalesced: 0,
+    muted: 0,
+    configs: [],
+  });
+  mockDigestQueueAdd.mockResolvedValue({ id: "digest-job-1" });
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
 // --- Helpers ---
 
@@ -107,18 +121,31 @@ function makeJob(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeEvent(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "evt-1",
-    type: "match.cancelled",
-    urgency: "immediate",
-    payload: { matchId: 42, reason: "weather" },
-    source: "sync",
-    entityName: "Dragons vs. Tigers",
-    entityType: "match",
-    entityId: 42,
-    ...overrides,
-  };
+interface SeedEventInput {
+  id?: string;
+  type?: string;
+  urgency?: string;
+  entityId?: number;
+}
+
+async function seedEvent(input: SeedEventInput = {}): Promise<string> {
+  const id = input.id ?? "evt-1";
+  await ctx.client.query(
+    `INSERT INTO domain_events
+       (id, type, source, urgency, occurred_at, entity_type, entity_id,
+        entity_name, deep_link_path, payload, enqueued_at)
+     VALUES ($1, $2, 'sync', $3, now(), 'match', $4, 'Dragons vs. Tigers',
+             '/admin/matches/42', '{"matchId":42,"reason":"weather"}'::jsonb, now())`,
+    [id, input.type ?? "match.cancelled", input.urgency ?? "immediate", input.entityId ?? 42],
+  );
+  return id;
+}
+
+async function processedIds(): Promise<string[]> {
+  const r = await ctx.client.query<{ id: string }>(
+    `SELECT id FROM domain_events WHERE processed_at IS NOT NULL ORDER BY id`,
+  );
+  return r.rows.map((row) => row.id);
 }
 
 function makeChannelConfig(overrides: Record<string, unknown> = {}) {
@@ -132,90 +159,51 @@ function makeChannelConfig(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Set up DB mocks for event lookup */
-function setupDbMocks(opts: {
-  event?: Record<string, unknown> | null;
-}) {
-  const event = opts.event === undefined ? makeEvent() : opts.event;
-  const data = event ? [event] : [];
-
-  mockDbSelect.mockImplementation(() => ({
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockImplementation(() => {
-        const result = Promise.resolve(data);
-        (result as unknown as Record<string, unknown>).limit = vi.fn().mockResolvedValue(data);
-        return result;
-      }),
-    }),
-  }));
-}
-
 // --- Tests ---
 
 describe("event worker processor", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockProcessEvent.mockResolvedValue({
-      dispatched: 0,
-      buffered: 0,
-      coalesced: 0,
-      muted: 0,
-      configs: [],
-    });
-    mockDbUpdate.mockReturnValue({
-      set: (...a: unknown[]) => {
-        mockUpdateSet(...a);
-        return { where: () => Promise.resolve(undefined) };
-      },
-    });
-  });
-
-  describe("marking processed", () => {
-    it("stamps processed_at after a successful pipeline run", async () => {
-      setupDbMocks({ event: makeEvent() });
-
-      await capturedProcessor!(makeJob());
-
-      expect(mockDbUpdate).toHaveBeenCalledTimes(1);
-      expect(mockUpdateSet).toHaveBeenCalledWith(
-        expect.objectContaining({ processedAt: expect.any(Date) }),
-      );
-    });
-
-    it("does not stamp processed_at when the pipeline throws (event stays reclaimable)", async () => {
-      setupDbMocks({ event: makeEvent() });
-      mockProcessEvent.mockRejectedValueOnce(new Error("pipeline boom"));
-
-      await expect(capturedProcessor!(makeJob())).rejects.toThrow("pipeline boom");
-
-      expect(mockDbUpdate).not.toHaveBeenCalled();
-    });
-
-    it("does not stamp processed_at when the event is not found", async () => {
-      setupDbMocks({ event: null });
-
-      await capturedProcessor!(makeJob());
-
-      expect(mockDbUpdate).not.toHaveBeenCalled();
-    });
-  });
-
   it("captures the processor function from BullMQ Worker", () => {
     expect(capturedProcessor).toBeTypeOf("function");
   });
 
+  describe("marking processed", () => {
+    it("stamps processed_at on the handled event only", async () => {
+      await seedEvent({ id: "evt-1" });
+      // A sibling of the same type on a different entity. If the stamp's
+      // predicate keys on anything but the id, this row is stamped too.
+      await seedEvent({ id: "evt-2", entityId: 99 });
+
+      await capturedProcessor!(makeJob());
+
+      expect(await processedIds()).toEqual(["evt-1"]);
+    });
+
+    it("does not stamp processed_at when the pipeline throws (event stays reclaimable)", async () => {
+      await seedEvent();
+      mockProcessEvent.mockRejectedValueOnce(new Error("pipeline boom"));
+
+      await expect(capturedProcessor!(makeJob())).rejects.toThrow("pipeline boom");
+
+      expect(await processedIds()).toEqual([]);
+    });
+
+    it("does not stamp processed_at when the event is not found", async () => {
+      await seedEvent({ id: "some-other-event" });
+
+      await capturedProcessor!(makeJob());
+
+      expect(await processedIds()).toEqual([]);
+    });
+  });
+
   describe("event not found", () => {
     it("returns skipped result when event is not in DB", async () => {
-      setupDbMocks({ event: null });
-
       const result = await capturedProcessor!(makeJob());
 
       expect(result).toEqual({ skipped: true, reason: "event_not_found" });
     });
 
     it("does not call processEvent when event is missing", async () => {
-      setupDbMocks({ event: null });
-
       await capturedProcessor!(makeJob());
 
       expect(mockProcessEvent).not.toHaveBeenCalled();
@@ -223,28 +211,47 @@ describe("event worker processor", () => {
   });
 
   describe("pipeline delegation", () => {
-    it("calls processEvent with the full event from DB", async () => {
-      const event = makeEvent();
-      setupDbMocks({ event });
+    it("passes the full persisted row — not the thin job payload — to processEvent", async () => {
+      await seedEvent();
 
       await capturedProcessor!(makeJob());
 
       expect(mockProcessEvent).toHaveBeenCalledTimes(1);
+      // The job data carries only 5 fields; the pipeline needs the row's
+      // payload, entityName and deepLinkPath to render a message at all.
       expect(mockProcessEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "evt-1",
           type: "match.cancelled",
+          source: "sync",
+          urgency: "immediate",
+          entityName: "Dragons vs. Tigers",
+          deepLinkPath: "/admin/matches/42",
+          payload: { matchId: 42, reason: "weather" },
         }),
       );
     });
 
+    it("loads the event named by the job, not just any event", async () => {
+      await seedEvent({ id: "evt-other", type: "match.created" });
+      await seedEvent({ id: "evt-wanted", type: "match.cancelled" });
+
+      await capturedProcessor!(makeJob({ eventId: "evt-wanted" }));
+
+      expect(mockProcessEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "evt-wanted" }),
+      );
+      expect(await processedIds()).toEqual(["evt-wanted"]);
+    });
+
     it("returns dispatched and buffered counts from pipeline", async () => {
-      setupDbMocks({ event: makeEvent() });
+      await seedEvent();
       mockProcessEvent.mockResolvedValue({
         dispatched: 3,
         buffered: 5,
         coalesced: 1,
         muted: 0,
+        configs: [],
       });
 
       const result = await capturedProcessor!(makeJob());
@@ -253,7 +260,7 @@ describe("event worker processor", () => {
     });
 
     it("returns zero counts when pipeline processes nothing", async () => {
-      setupDbMocks({ event: makeEvent() });
+      await seedEvent();
 
       const result = await capturedProcessor!(makeJob());
 
@@ -262,17 +269,21 @@ describe("event worker processor", () => {
   });
 
   describe("digest triggering for sync.completed", () => {
+    async function seedSyncCompleted() {
+      await seedEvent({ id: "evt-1", type: EVENT_TYPES.SYNC_COMPLETED, urgency: "routine" });
+    }
+
     it("enqueues digest jobs for per_sync channel configs from pipeline result", async () => {
-      const config1 = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
-      const config2 = makeChannelConfig({ id: 20, digestMode: "per_sync", enabled: true });
-      const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event });
+      await seedSyncCompleted();
       mockProcessEvent.mockResolvedValue({
         dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
-        configs: [config1, config2],
+        configs: [
+          makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true }),
+          makeChannelConfig({ id: 20, digestMode: "per_sync", enabled: true }),
+        ],
       });
 
-      await capturedProcessor!(makeJob({ type: "sync.completed" }));
+      await capturedProcessor!(makeJob({ type: EVENT_TYPES.SYNC_COMPLETED }));
 
       expect(mockDigestQueueAdd).toHaveBeenCalledTimes(2);
       expect(mockDigestQueueAdd).toHaveBeenCalledWith(
@@ -283,19 +294,24 @@ describe("event worker processor", () => {
         "digest:20",
         expect.objectContaining({ channelConfigId: 20 }),
       );
+      // Both digest jobs share one run id so the digest worker can group them.
+      const runIds = mockDigestQueueAdd.mock.calls.map(
+        (c) => (c[1] as { digestRunId: number }).digestRunId,
+      );
+      expect(new Set(runIds).size).toBe(1);
     });
 
     it("skips configs that are not per_sync", async () => {
-      const config1 = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
-      const config2 = makeChannelConfig({ id: 20, digestMode: "scheduled", enabled: true });
-      const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event });
+      await seedSyncCompleted();
       mockProcessEvent.mockResolvedValue({
         dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
-        configs: [config1, config2],
+        configs: [
+          makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true }),
+          makeChannelConfig({ id: 20, digestMode: "scheduled", enabled: true }),
+        ],
       });
 
-      await capturedProcessor!(makeJob({ type: "sync.completed" }));
+      await capturedProcessor!(makeJob({ type: EVENT_TYPES.SYNC_COMPLETED }));
 
       expect(mockDigestQueueAdd).toHaveBeenCalledTimes(1);
       expect(mockDigestQueueAdd).toHaveBeenCalledWith(
@@ -305,54 +321,51 @@ describe("event worker processor", () => {
     });
 
     it("skips disabled configs for per_sync digest", async () => {
-      const config = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: false });
-      const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event });
+      await seedSyncCompleted();
       mockProcessEvent.mockResolvedValue({
         dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
-        configs: [config],
+        configs: [makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: false })],
       });
 
-      await capturedProcessor!(makeJob({ type: "sync.completed" }));
+      await capturedProcessor!(makeJob({ type: EVENT_TYPES.SYNC_COMPLETED }));
 
       expect(mockDigestQueueAdd).not.toHaveBeenCalled();
     });
 
     it("does not enqueue digest jobs when configs list is empty", async () => {
-      const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event });
+      await seedSyncCompleted();
+
+      await capturedProcessor!(makeJob({ type: EVENT_TYPES.SYNC_COMPLETED }));
+
+      expect(mockDigestQueueAdd).not.toHaveBeenCalled();
+    });
+
+    it("keys the digest decision off the stored event type, not the job payload", async () => {
+      // The job says sync.completed but the persisted row is a match event —
+      // the row wins, so no digest is triggered.
+      await seedEvent({ id: "evt-1", type: "match.cancelled" });
       mockProcessEvent.mockResolvedValue({
         dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
-        configs: [],
+        configs: [makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true })],
       });
 
-      await capturedProcessor!(makeJob({ type: "sync.completed" }));
+      await capturedProcessor!(makeJob({ type: EVENT_TYPES.SYNC_COMPLETED }));
 
       expect(mockDigestQueueAdd).not.toHaveBeenCalled();
     });
 
-    it("does not trigger digests for non-sync.completed events", async () => {
-      setupDbMocks({ event: makeEvent() });
-
-      await capturedProcessor!(makeJob());
-
-      expect(mockDigestQueueAdd).not.toHaveBeenCalled();
-    });
-
-    it("handles digest queue add failure gracefully", async () => {
-      const config = makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true });
-      const event = makeEvent({ type: "sync.completed", urgency: "routine" });
-      setupDbMocks({ event });
+    it("still stamps processed_at when the digest enqueue fails", async () => {
+      await seedSyncCompleted();
       mockProcessEvent.mockResolvedValue({
         dispatched: 0, buffered: 0, coalesced: 0, muted: 0,
-        configs: [config],
+        configs: [makeChannelConfig({ id: 10, digestMode: "per_sync", enabled: true })],
       });
       mockDigestQueueAdd.mockRejectedValueOnce(new Error("Redis error"));
 
-      // Should not throw
-      const result = await capturedProcessor!(makeJob({ type: "sync.completed" }));
+      const result = await capturedProcessor!(makeJob({ type: EVENT_TYPES.SYNC_COMPLETED }));
 
       expect(result).toEqual({ dispatched: 0, buffered: 0 });
+      expect(await processedIds()).toEqual(["evt-1"]);
     });
   });
 });
