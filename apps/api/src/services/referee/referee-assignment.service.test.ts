@@ -59,6 +59,7 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((_a: unknown, _b: unknown) => ({ eq: [_a, _b] })),
   and: vi.fn((...args: unknown[]) => ({ and: args })),
   inArray: vi.fn((_col: unknown, vals: unknown) => ({ inArray: vals })),
+  isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

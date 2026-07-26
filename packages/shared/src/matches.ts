@@ -1,25 +1,42 @@
 import type { BookingStatus, DiffStatus } from "./constants";
-export interface RefereeSlotInfo {
-  slotNumber: number;
-  isOpen: boolean;
-  referee: {
-    id: number;
-    firstName: string | null;
-    lastName: string | null;
-  } | null;
-  role: {
-    id: number;
-    name: string;
-    shortName: string | null;
-  } | null;
-  intent: {
-    refereeId: number;
-    refereeFirstName: string | null;
-    refereeLastName: string | null;
-    clickedAt: string;
-    confirmedBySyncAt: string | null;
-  } | null;
+export interface RefereeSlotReferee {
+  id: number;
+  firstName: string | null;
+  lastName: string | null;
 }
+
+export interface RefereeSlotRole {
+  id: number;
+  name: string;
+  shortName: string | null;
+}
+
+export interface RefereeSlotIntent {
+  refereeId: number;
+  refereeFirstName: string | null;
+  refereeLastName: string | null;
+  clickedAt: string;
+  confirmedBySyncAt: string | null;
+}
+
+interface RefereeSlotBase {
+  slotNumber: number;
+  intent: RefereeSlotIntent | null;
+}
+
+/**
+ * A slot is either open or filled — never both (issue #105). Encoding that as a
+ * union rather than as three independent fields means a caller physically
+ * cannot build `{ isOpen: true, referee: {...} }`, so the contradiction cannot
+ * reappear at some other call site.
+ */
+export type RefereeSlotInfo =
+  | (RefereeSlotBase & { isOpen: true; referee: null; role: null })
+  | (RefereeSlotBase & {
+      isOpen: false;
+      referee: RefereeSlotReferee | null;
+      role: RefereeSlotRole | null;
+    });
 
 export interface FieldDiff {
   field: string;

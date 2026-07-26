@@ -7,7 +7,7 @@ import {
   refereeAssignmentRules,
   refereeAssignmentIntents,
 } from "@dragons/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { sdkClient } from "../sync/sdk-client";
 import { publishDomainEvent } from "../events/event-publisher";
 import { EVENT_TYPES } from "@dragons/shared";
@@ -35,11 +35,11 @@ export async function assignReferee(
   slotNumber: 1 | 2,
   refereeApiId: number,
 ): Promise<AssignRefereeResponse> {
-  // 1. Look up game
+  // 1. Look up game (a withdrawn game — issue #105 — is not actionable)
   const games = await getDb()
     .select()
     .from(refereeGames)
-    .where(eq(refereeGames.apiMatchId, spielplanId))
+    .where(and(eq(refereeGames.apiMatchId, spielplanId), isNull(refereeGames.removedAt)))
     .limit(1);
 
   const game = games[0];
@@ -300,11 +300,11 @@ export async function unassignReferee(
   spielplanId: number,
   slotNumber: 1 | 2,
 ): Promise<UnassignRefereeResponse> {
-  // 1. Look up game
+  // 1. Look up game (a withdrawn game — issue #105 — is not actionable)
   const games = await getDb()
     .select()
     .from(refereeGames)
-    .where(eq(refereeGames.apiMatchId, spielplanId))
+    .where(and(eq(refereeGames.apiMatchId, spielplanId), isNull(refereeGames.removedAt)))
     .limit(1);
 
   const game = games[0];

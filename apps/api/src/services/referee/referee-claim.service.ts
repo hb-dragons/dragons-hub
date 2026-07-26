@@ -4,7 +4,7 @@ import {
   referees,
   refereeAssignmentRules,
 } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type {
   AssignRefereeResponse,
   UnassignRefereeResponse,
@@ -60,7 +60,8 @@ export async function claimRefereeGame(
   const [game] = await getDb()
     .select()
     .from(refereeGames)
-    .where(eq(refereeGames.id, gameId))
+    // A withdrawn game (issue #105) is not actionable.
+    .where(and(eq(refereeGames.id, gameId), isNull(refereeGames.removedAt)))
     .limit(1);
 
   if (!game) {
@@ -125,7 +126,8 @@ export async function unclaimRefereeGame(
   const [game] = await getDb()
     .select()
     .from(refereeGames)
-    .where(eq(refereeGames.id, gameId))
+    // A withdrawn game (issue #105) is not actionable.
+    .where(and(eq(refereeGames.id, gameId), isNull(refereeGames.removedAt)))
     .limit(1);
 
   if (!game) {

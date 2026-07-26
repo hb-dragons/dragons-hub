@@ -50,6 +50,7 @@ vi.mock("drizzle-orm", () => ({
   ilike: vi.fn((...args: unknown[]) => ({ ilike: args })),
   asc: vi.fn((...args: unknown[]) => ({ asc: args })),
   inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
+  isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
   sql: Object.assign(
     vi.fn((...args: unknown[]) => ({ sql: args, as: vi.fn().mockReturnValue("sql_aliased") })),
     { raw: vi.fn((s: string) => ({ raw: s })) },

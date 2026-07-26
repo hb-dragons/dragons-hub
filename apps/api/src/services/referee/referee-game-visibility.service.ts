@@ -56,7 +56,8 @@ export async function getVisibleRefereeGames(
       and(eq(refereeGames.sr1OurClub, true), eq(refereeGames.sr1Status, "open")),
       and(eq(refereeGames.sr2OurClub, true), eq(refereeGames.sr2Status, "open")),
     )!;
-    const conditions = [openOurClubSlot];
+    // Withdrawn games are tombstoned, never visible (issue #105).
+    const conditions = [isNull(refereeGames.removedAt), openOurClubSlot];
 
     if (status === "cancelled") conditions.push(eq(refereeGames.isCancelled, true));
     else if (status === "forfeited") conditions.push(eq(refereeGames.isForfeited, true));
@@ -211,7 +212,8 @@ export async function getVisibleRefereeGames(
     : or(...baseParts)!;
 
   // 4. Standard filters
-  const conditions = [baseCondition];
+  // Withdrawn games are tombstoned, never visible (issue #105).
+  const conditions = [isNull(refereeGames.removedAt), baseCondition];
 
   // Status
   if (status === "cancelled") conditions.push(eq(refereeGames.isCancelled, true));
@@ -385,7 +387,7 @@ export async function getVisibleRefereeGameByApiMatchId(
     const [row] = await getDb()
       .select(refereeGameColumns)
       .from(refereeGames)
-      .where(eq(refereeGames.apiMatchId, apiMatchId))
+      .where(and(eq(refereeGames.apiMatchId, apiMatchId), isNull(refereeGames.removedAt)))
       .limit(1);
     if (!row) return null;
     return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
@@ -439,7 +441,7 @@ export async function getVisibleRefereeGameByApiMatchId(
   const [row] = await getDb()
     .select(refereeGameColumns)
     .from(refereeGames)
-    .where(and(eq(refereeGames.apiMatchId, apiMatchId), accessCondition)!)
+    .where(and(eq(refereeGames.apiMatchId, apiMatchId), isNull(refereeGames.removedAt), accessCondition)!)
     .limit(1);
 
   if (!row) return null;
@@ -462,7 +464,7 @@ export async function getVisibleRefereeGameByMatchId(
     const [row] = await getDb()
       .select(refereeGameColumns)
       .from(refereeGames)
-      .where(eq(refereeGames.matchId, matchId))
+      .where(and(eq(refereeGames.matchId, matchId), isNull(refereeGames.removedAt)))
       .limit(1);
     if (!row) return null;
     return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
@@ -516,7 +518,7 @@ export async function getVisibleRefereeGameByMatchId(
   const [row] = await getDb()
     .select(refereeGameColumns)
     .from(refereeGames)
-    .where(and(eq(refereeGames.matchId, matchId), accessCondition)!)
+    .where(and(eq(refereeGames.matchId, matchId), isNull(refereeGames.removedAt), accessCondition)!)
     .limit(1);
 
   if (!row) return null;
@@ -539,7 +541,7 @@ export async function getVisibleRefereeGameById(
     const [row] = await getDb()
       .select(refereeGameColumns)
       .from(refereeGames)
-      .where(eq(refereeGames.id, id))
+      .where(and(eq(refereeGames.id, id), isNull(refereeGames.removedAt)))
       .limit(1);
     if (!row) return null;
     return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
@@ -593,7 +595,7 @@ export async function getVisibleRefereeGameById(
   const [row] = await getDb()
     .select(refereeGameColumns)
     .from(refereeGames)
-    .where(and(eq(refereeGames.id, id), accessCondition)!)
+    .where(and(eq(refereeGames.id, id), isNull(refereeGames.removedAt), accessCondition)!)
     .limit(1);
 
   if (!row) return null;

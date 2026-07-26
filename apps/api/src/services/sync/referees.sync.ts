@@ -1,12 +1,18 @@
 import { getDb } from "../../config/database";
-import { referees, refereeRoles, matchReferees, matches, matchChanges, refereeAssignmentIntents } from "@dragons/db/schema";
-import { eq, sql, inArray } from "drizzle-orm";
+import { referees, refereeRoles, matchReferees, matches, matchChanges, refereeAssignmentIntents, refereeGames, teams } from "@dragons/db/schema";
+import { and, eq, isNull, sql, inArray } from "drizzle-orm";
 import { computeEntityHash } from "./hash";
 import type {
   ExtractedReferee,
   ExtractedRefereeRole,
   ExtractedRefereeAssignment,
+  LeagueFetchedData,
 } from "./data-fetcher";
+import {
+  assessGameDetailCoverage,
+  evaluateFetchCoverage,
+  evaluateRemovalBlastRadius,
+} from "./removal-guard";
 import { batchAction, type SyncLogger } from "./sync-logger";
 import { logger } from "../../config/logger";
 import { publishDomainEvent } from "../events/event-publisher";
@@ -249,7 +255,10 @@ export async function syncRefereeAssignmentsFromData(
     ? await getDb()
         .select()
         .from(matchReferees)
-        .where(inArray(matchReferees.matchId, matchIdsToCheck))
+        // Tombstoned rows (issue #105) must not shadow a slot: a referee who
+        // comes back to a slot they were dropped from has to insert a fresh
+        // live row, not resurrect the history entry.
+        .where(and(inArray(matchReferees.matchId, matchIdsToCheck), isNull(matchReferees.removedAt)))
     : [];
   const existingBySlot = new Map(
     existingAssignments.map((r) => [`${r.matchId}-${r.slotNumber}`, r]),
@@ -430,6 +439,342 @@ export async function syncRefereeAssignmentsFromData(
   return { created, errors };
 }
 
+export interface RefereeAssignmentRemovalResult {
+  /** Assignments tombstoned by this pass. */
+  removed: number;
+  /** True when a guard refused to consider any removal at all. */
+  skipped: boolean;
+  /** Why the pass was skipped, for the sync log. */
+  reason: string | null;
+  errors: string[];
+}
+
+/**
+ * Tombstone referee assignments the federation has stopped reporting (issue #105).
+ *
+ * Removal semantics, decided for #105:
+ *  - **Soft delete.** Rows get `removed_at`; nothing is ever hard-deleted, so the
+ *    history behind a `referee.unassigned` notification stays auditable and a
+ *    slot can be refilled (the unique index is partial on `removed_at is null`).
+ *  - **Absence only counts on a verifiably complete fetch.** Three gates in
+ *    `removal-guard.ts` stand between a short response and a DELETE: per-match
+ *    evidence, run-level coverage, and a mass-removal circuit breaker. A match
+ *    whose game details did not come back is never a removal candidate.
+ *  - **Events.** Each removal emits `referee.unassigned`, and re-advertises the
+ *    slot with `referee.slots.needed` when the federation itself now flags that
+ *    slot open and it is one of our club's slots.
+ */
+export async function removeStaleRefereeAssignments(
+  leagueData: LeagueFetchedData[],
+  assignments: ExtractedRefereeAssignment[],
+  matchIdLookup: Map<number, number>,
+  syncLogger?: SyncLogger,
+  syncRunId?: number | null,
+): Promise<RefereeAssignmentRemovalResult> {
+  const errors: string[] = [];
+  const nothingRemoved = (skipped: boolean, reason: string | null): RefereeAssignmentRemovalResult => ({
+    removed: 0,
+    skipped,
+    reason,
+    errors,
+  });
+
+  // Gate 1 + 2 — how much of this run's fetch actually landed.
+  const { coverage, observedMatchApiIds } = assessGameDetailCoverage(leagueData);
+  const coverageGate = evaluateFetchCoverage(coverage);
+  if (!coverageGate.allowed) {
+    log.warn(
+      { ...coverage, reason: coverageGate.reason },
+      "Skipping referee assignment removal — fetch is not verifiably complete",
+    );
+    await syncLogger?.log({
+      entityType: "referee",
+      entityId: "removal",
+      action: "skipped",
+      message: `Referee assignment removal skipped: ${coverageGate.reason}`,
+      metadata: { ...coverage },
+    });
+    return nothingRemoved(true, coverageGate.reason);
+  }
+
+  // Only matches we have first-hand referee evidence for are candidates.
+  const observedMatchDbIds: number[] = [];
+  for (const apiMatchId of observedMatchApiIds) {
+    const matchId = matchIdLookup.get(apiMatchId);
+    if (matchId !== undefined) observedMatchDbIds.push(matchId);
+  }
+  if (observedMatchDbIds.length === 0) {
+    return nothingRemoved(false, null);
+  }
+
+  const liveRows = await getDb()
+    .select()
+    .from(matchReferees)
+    .where(and(inArray(matchReferees.matchId, observedMatchDbIds), isNull(matchReferees.removedAt)));
+  if (liveRows.length === 0) {
+    return nothingRemoved(false, null);
+  }
+
+  // Every slot the feed still reports as occupied, whoever occupies it. Built
+  // from the *raw* extraction rather than the resolvable subset: a referee we
+  // failed to resolve locally is still a referee the federation reported, and
+  // must never read as "slot vacated".
+  const upstreamSlots = new Set<string>();
+  for (const assignment of assignments) {
+    const matchId = matchIdLookup.get(assignment.matchApiId);
+    if (matchId !== undefined) {
+      upstreamSlots.add(`${matchId}-${assignment.slotNumber}`);
+    }
+  }
+
+  const stale = liveRows.filter((row) => !upstreamSlots.has(`${row.matchId}-${row.slotNumber}`));
+  if (stale.length === 0) {
+    return nothingRemoved(false, null);
+  }
+
+  // Gate 3 — circuit breaker on the size of the removal set.
+  const blastGate = evaluateRemovalBlastRadius(stale.length, liveRows.length);
+  if (!blastGate.allowed) {
+    log.error(
+      { candidates: stale.length, live: liveRows.length, reason: blastGate.reason },
+      "Refusing referee assignment removal — blast radius too large",
+    );
+    await syncLogger?.log({
+      entityType: "referee",
+      entityId: "removal",
+      action: "skipped",
+      message: `Referee assignment removal skipped: ${blastGate.reason}`,
+      metadata: { candidates: stale.length, live: liveRows.length },
+    });
+    return nothingRemoved(true, blastGate.reason);
+  }
+
+  const context = await loadRemovalContext(stale);
+  const now = new Date();
+  let removed = 0;
+
+  for (const row of stale) {
+    try {
+      const result = await getDb()
+        .update(matchReferees)
+        .set({ removedAt: now })
+        .where(and(eq(matchReferees.id, row.id), isNull(matchReferees.removedAt)))
+        .returning({ id: matchReferees.id });
+      if (result.length === 0) continue;
+      removed++;
+
+      const refName = context.refereeNames.get(row.refereeId) ?? "Unknown";
+      const roleName = context.roleNames.get(row.roleId) ?? "Unknown";
+      const match = context.matches.get(row.matchId);
+
+      try {
+        await getDb().insert(matchChanges).values({
+          matchId: row.matchId,
+          track: "remote",
+          versionNumber: match?.currentRemoteVersion ?? 0,
+          fieldName: `referee_slot_${row.slotNumber}`,
+          oldValue: `${refName} (${roleName})`,
+          newValue: null,
+        });
+      } catch (error) {
+        log.warn({ err: error, matchId: row.matchId }, "Failed to record referee removal in match history");
+      }
+
+      try {
+        if (match) {
+          await publishDomainEvent({
+            type: EVENT_TYPES.REFEREE_UNASSIGNED,
+            source: "sync",
+            entityType: "referee",
+            entityId: row.refereeId,
+            entityName: refName,
+            deepLinkPath: `/admin/matches/${row.matchId}`,
+            syncRunId: syncRunId ?? null,
+            payload: {
+              matchNo: match.matchNo,
+              homeTeam: match.homeTeamName,
+              guestTeam: match.guestTeamName,
+              refereeName: refName,
+              role: roleName,
+              refereeId: row.refereeId,
+              matchId: row.matchId,
+              kickoffDate: match.kickoffDate,
+              kickoffTime: match.kickoffTime,
+              teamIds: match.teamIds,
+              deepLink: `/admin/matches/${row.matchId}`,
+            },
+          });
+        }
+      } catch (error) {
+        log.warn({ err: error, matchId: row.matchId }, "Failed to emit referee.unassigned event");
+      }
+
+      await advertiseReopenedSlot(row.matchId, row.slotNumber, context, syncRunId);
+
+      await syncLogger?.log({
+        entityType: "referee",
+        entityId: `${row.matchId}-${row.refereeId}-${row.roleId}`,
+        action: "updated",
+        message: `Removed referee assignment for match ${row.matchId} slot ${row.slotNumber}`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      errors.push(`Failed to remove assignment for match ${row.matchId}: ${message}`);
+      await syncLogger?.log({
+        entityType: "referee",
+        entityId: `${row.matchId}-${row.refereeId}-${row.roleId}`,
+        action: "failed",
+        message: `Failed to remove assignment: ${message}`,
+      });
+    }
+  }
+
+  log.info({ removed, candidates: stale.length }, "Removed stale referee assignments");
+  return { removed, skipped: false, reason: null, errors };
+}
+
+interface RemovalMatchInfo {
+  matchNo: number;
+  homeTeamName: string;
+  guestTeamName: string;
+  kickoffDate: string;
+  kickoffTime: string;
+  teamIds: number[];
+  currentRemoteVersion: number | null;
+  slotOpen: Record<number, boolean>;
+}
+
+interface RemovalContext {
+  refereeNames: Map<number, string>;
+  roleNames: Map<number, string>;
+  matches: Map<number, RemovalMatchInfo>;
+  refereeGames: Map<number, typeof refereeGames.$inferSelect>;
+}
+
+/** Batch-load everything the removal events need, keyed by row. */
+async function loadRemovalContext(
+  stale: (typeof matchReferees.$inferSelect)[],
+): Promise<RemovalContext> {
+  const matchIds = [...new Set(stale.map((r) => r.matchId))];
+  const refereeIds = [...new Set(stale.map((r) => r.refereeId))];
+  const roleIds = [...new Set(stale.map((r) => r.roleId))];
+
+  const [refRows, roleRows, matchRows, gameRows] = await Promise.all([
+    getDb()
+      .select({ id: referees.id, firstName: referees.firstName, lastName: referees.lastName })
+      .from(referees)
+      .where(inArray(referees.id, refereeIds)),
+    getDb()
+      .select({ id: refereeRoles.id, name: refereeRoles.name })
+      .from(refereeRoles)
+      .where(inArray(refereeRoles.id, roleIds)),
+    getDb()
+      .select({
+        id: matches.id,
+        matchNo: matches.matchNo,
+        kickoffDate: matches.kickoffDate,
+        kickoffTime: matches.kickoffTime,
+        homeTeamApiId: matches.homeTeamApiId,
+        guestTeamApiId: matches.guestTeamApiId,
+        currentRemoteVersion: matches.currentRemoteVersion,
+        sr1Open: matches.sr1Open,
+        sr2Open: matches.sr2Open,
+        sr3Open: matches.sr3Open,
+      })
+      .from(matches)
+      .where(inArray(matches.id, matchIds)),
+    getDb().select().from(refereeGames).where(inArray(refereeGames.matchId, matchIds)),
+  ]);
+
+  const teamApiIds = [
+    ...new Set(matchRows.flatMap((m) => [m.homeTeamApiId, m.guestTeamApiId])),
+  ];
+  const teamRows = teamApiIds.length > 0
+    ? await getDb()
+        .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name })
+        .from(teams)
+        .where(inArray(teams.apiTeamPermanentId, teamApiIds))
+    : [];
+  const teamNames = new Map(teamRows.map((t) => [t.apiTeamPermanentId, t.name]));
+
+  return {
+    refereeNames: new Map(refRows.map((r) => [r.id, `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim()])),
+    roleNames: new Map(roleRows.map((r) => [r.id, r.name])),
+    matches: new Map(
+      matchRows.map((m) => [
+        m.id,
+        {
+          matchNo: m.matchNo,
+          homeTeamName: teamNames.get(m.homeTeamApiId) ?? String(m.homeTeamApiId),
+          guestTeamName: teamNames.get(m.guestTeamApiId) ?? String(m.guestTeamApiId),
+          kickoffDate: m.kickoffDate,
+          kickoffTime: m.kickoffTime,
+          teamIds: [m.homeTeamApiId, m.guestTeamApiId],
+          currentRemoteVersion: m.currentRemoteVersion,
+          slotOpen: { 1: m.sr1Open, 2: m.sr2Open, 3: m.sr3Open },
+        } satisfies RemovalMatchInfo,
+      ]),
+    ),
+    refereeGames: new Map(
+      gameRows.filter((g) => g.matchId !== null).map((g) => [g.matchId!, g]),
+    ),
+  };
+}
+
+/**
+ * Put the vacated slot back on offer. Only fires when the federation itself now
+ * flags the slot open and it is one of our club's slots, and reuses the
+ * refereeGames entity id so it coalesces with the referee-games sync's own
+ * `referee.slots.needed` for the same game instead of double-notifying.
+ */
+async function advertiseReopenedSlot(
+  matchId: number,
+  slotNumber: number,
+  context: RemovalContext,
+  syncRunId?: number | null,
+): Promise<void> {
+  if (slotNumber !== 1 && slotNumber !== 2) return;
+
+  const match = context.matches.get(matchId);
+  const game = context.refereeGames.get(matchId);
+  if (!match || !game) return;
+  if (!match.slotOpen[slotNumber]) return;
+
+  const ourClub = slotNumber === 1 ? game.sr1OurClub : game.sr2OurClub;
+  if (!ourClub) return;
+
+  try {
+    await publishDomainEvent({
+      type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+      source: "sync",
+      entityType: "referee",
+      entityId: game.id,
+      entityName: `${game.homeTeamName} vs ${game.guestTeamName}`,
+      deepLinkPath: "/admin/referee-games",
+      syncRunId: syncRunId ?? null,
+      payload: {
+        matchId,
+        matchNo: game.matchNo,
+        homeTeam: game.homeTeamName,
+        guestTeam: game.guestTeamName,
+        leagueId: null,
+        leagueName: game.leagueName ?? "",
+        kickoffDate: game.kickoffDate,
+        kickoffTime: game.kickoffTime,
+        venueId: null,
+        venueName: game.venueName,
+        sr1Open: game.sr1OurClub && match.slotOpen[1] === true,
+        sr2Open: game.sr2OurClub && match.slotOpen[2] === true,
+        sr1Assigned: game.sr1Status === "assigned" ? game.sr1Name : null,
+        sr2Assigned: game.sr2Status === "assigned" ? game.sr2Name : null,
+        deepLink: `/referee/matches?take=${matchId}`,
+      },
+    });
+  } catch (error) {
+    log.warn({ err: error, matchId, slotNumber }, "Failed to re-advertise reopened referee slot");
+  }
+}
+
 export async function confirmIntentsFromSync(): Promise<number> {
   const now = new Date();
 
@@ -443,6 +788,7 @@ export async function confirmIntentsFromSync(): Promise<number> {
         WHERE mr.match_id = ${refereeAssignmentIntents}.match_id
           AND mr.referee_id = ${refereeAssignmentIntents}.referee_id
           AND mr.slot_number = ${refereeAssignmentIntents}.slot_number
+          AND mr.removed_at IS NULL
       )
   `);
 

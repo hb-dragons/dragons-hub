@@ -56,6 +56,7 @@ vi.mock("drizzle-orm", () => ({
     return result;
   }), { raw: vi.fn((...args: unknown[]) => ({ sql: args })) }),
   inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
+  isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
 }));
 
 import {

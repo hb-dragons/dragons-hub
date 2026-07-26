@@ -49,6 +49,10 @@ export const refereeGames = pgTable(
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // Tombstone. Set when a future game disappears from a verifiably complete
+    // offenespiele feed (issue #105). Soft, not hard, so referee history and
+    // anything attached to the game survive the withdrawal.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
   },
   (table) => [
     index("referee_games_match_id_idx").on(table.matchId),

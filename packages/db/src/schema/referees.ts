@@ -8,7 +8,9 @@ import {
   timestamp,
   index,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { matches } from "./matches";
 
 export const referees = pgTable("referees", {
@@ -50,14 +52,19 @@ export const matchReferees = pgTable(
       .references(() => refereeRoles.id),
     slotNumber: smallint("slot_number").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    // Tombstone. Set when the federation stops reporting a referee on this slot
+    // (issue #105). Rows are never hard-deleted so the assignment history — and
+    // the evidence behind a referee.unassigned notification — survives.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
   },
   (table) => ({
     matchIdIdx: index("match_referees_match_id_idx").on(table.matchId),
     refereeIdIdx: index("match_referees_referee_id_idx").on(table.refereeId),
-    matchSlotUnique: unique("match_referees_slot_unique").on(
-      table.matchId,
-      table.slotNumber,
-    ),
+    // Partial: only one *live* assignment per slot. Tombstoned rows drop out so
+    // a slot can be filled, vacated and refilled without colliding.
+    matchSlotUnique: uniqueIndex("match_referees_slot_unique")
+      .on(table.matchId, table.slotNumber)
+      .where(sql`${table.removedAt} is null`),
   }),
 );
 

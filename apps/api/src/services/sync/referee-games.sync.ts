@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
 import { getDb } from "../../config/database";
 import { refereeGames, matches, leagues, teams } from "@dragons/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 import { logger } from "../../config/logger";
 import { createRefereeSdkClient } from "./referee-sdk-client";
 import { getClubConfig } from "../admin/settings.service";
 import { publishDomainEvent } from "../events/event-publisher";
 import { scheduleReminderJobs, cancelReminderJobs } from "../referee/referee-reminders.service";
+import { evaluatePageCompleteness, evaluateRemovalBlastRadius } from "./removal-guard";
 import { EVENT_TYPES } from "@dragons/shared";
 import type { RefereeSlotsPayload } from "@dragons/shared";
 import type { SdkOffeneSpielResult, SdkSpielleitung } from "@dragons/sdk";
@@ -46,6 +47,21 @@ export function computeRefereeGameHash(row: {
     row.isForfeited,
   ];
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
+}
+
+/**
+ * The Berlin calendar day an instant falls on, as `YYYY-MM-DD`. Explicitly
+ * timezone-pinned: the API container runs UTC, kickoff dates are stored as
+ * Berlin local dates, and reading "today" off the host clock would shift the
+ * removal cutoff by a day around midnight.
+ */
+export function berlinDateString(instant: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
 }
 
 function epochMsToBerlin(epochMs: number): { date: string; time: string } {
@@ -157,19 +173,161 @@ function buildPayload(row: ReturnType<typeof mapApiResultToRow> & { matchId?: nu
   };
 }
 
+// --- Removal (issue #105) ---
+
+export interface RefereeGameRemovalResult {
+  removed: number;
+  skipped: boolean;
+  reason: string | null;
+}
+
+/**
+ * Tombstone referee games that have vanished from the offenespiele feed.
+ *
+ * Same removal semantics as referee assignments (see `removal-guard.ts`), with
+ * the completeness check matched to how this feed is fetched: it is paginated
+ * and declares a `total`, so anything short of that total means a page went
+ * missing and no removal may happen.
+ *
+ * Two extra safeguards specific to this feed:
+ *  - Only games at or after today (Berlin) are candidates. Past games roll off
+ *    the federation's search naturally, and tombstoning them would silently
+ *    erase referee history.
+ *  - The removal set still has to clear the mass-removal circuit breaker.
+ */
+export async function removeWithdrawnRefereeGames(
+  pagination: { total: number; received: number },
+  feedApiMatchIds: number[],
+  syncLogger?: SyncLogger,
+  syncRunId?: number | null,
+  now: Date = new Date(),
+): Promise<RefereeGameRemovalResult> {
+  const pageGate = evaluatePageCompleteness(pagination.total, pagination.received);
+  if (!pageGate.allowed) {
+    log.warn({ ...pagination, reason: pageGate.reason }, "Skipping referee game removal — feed is not verifiably complete");
+    await syncLogger?.log({
+      entityType: "refereeGame",
+      entityId: "removal",
+      action: "skipped",
+      message: `Referee game removal skipped: ${pageGate.reason}`,
+      metadata: { ...pagination },
+    });
+    return { removed: 0, skipped: true, reason: pageGate.reason };
+  }
+
+  const cutoff = berlinDateString(now);
+
+  const liveFuture = await getDb()
+    .select()
+    .from(refereeGames)
+    .where(and(isNull(refereeGames.removedAt), gte(refereeGames.kickoffDate, cutoff)));
+
+  if (liveFuture.length === 0) {
+    return { removed: 0, skipped: false, reason: null };
+  }
+
+  const feedIds = new Set(feedApiMatchIds);
+  const candidates = liveFuture.filter((row) => !feedIds.has(row.apiMatchId));
+  if (candidates.length === 0) {
+    return { removed: 0, skipped: false, reason: null };
+  }
+
+  const blastGate = evaluateRemovalBlastRadius(candidates.length, liveFuture.length);
+  if (!blastGate.allowed) {
+    log.error(
+      { candidates: candidates.length, live: liveFuture.length, reason: blastGate.reason },
+      "Refusing referee game removal — blast radius too large",
+    );
+    await syncLogger?.log({
+      entityType: "refereeGame",
+      entityId: "removal",
+      action: "skipped",
+      message: `Referee game removal skipped: ${blastGate.reason}`,
+      metadata: { candidates: candidates.length, live: liveFuture.length },
+    });
+    return { removed: 0, skipped: true, reason: blastGate.reason };
+  }
+
+  const removedAt = new Date();
+  let removed = 0;
+
+  for (const row of candidates) {
+    try {
+      const updated = await getDb()
+        .update(refereeGames)
+        .set({ removedAt, updatedAt: removedAt })
+        .where(and(eq(refereeGames.id, row.id), isNull(refereeGames.removedAt)))
+        .returning({ id: refereeGames.id });
+      if (updated.length === 0) continue;
+      removed++;
+
+      try {
+        await cancelReminderJobs(row.apiMatchId);
+      } catch (err) {
+        log.warn({ err, apiMatchId: row.apiMatchId }, "Failed to cancel reminder jobs for removed game");
+      }
+
+      try {
+        await publishDomainEvent({
+          type: EVENT_TYPES.MATCH_REMOVED,
+          source: "sync",
+          syncRunId,
+          entityType: "match",
+          entityId: row.matchId ?? row.id,
+          entityName: `${row.homeTeamName} vs ${row.guestTeamName}`,
+          deepLinkPath: "/admin/referee-games",
+          payload: {
+            matchNo: row.matchNo,
+            homeTeam: row.homeTeamName,
+            guestTeam: row.guestTeamName,
+            leagueName: row.leagueName ?? "",
+            leagueId: null,
+            teamIds: [row.homeTeamId, row.guestTeamId].filter((id): id is number => id !== null),
+            reason: "withdrawn from federation schedule",
+          },
+        });
+      } catch (err) {
+        log.warn({ err, apiMatchId: row.apiMatchId }, "Failed to emit match.removed event");
+      }
+
+      await syncLogger?.log({
+        entityType: "refereeGame",
+        entityId: String(row.apiMatchId),
+        entityName: `${row.homeTeamName} vs ${row.guestTeamName}`,
+        action: "updated",
+        message: "Game withdrawn from federation schedule",
+      });
+    } catch (err) {
+      log.error({ err, apiMatchId: row.apiMatchId }, "Failed to remove referee game");
+      await syncLogger?.log({
+        entityType: "refereeGame",
+        entityId: String(row.apiMatchId),
+        action: "failed",
+        message: `Failed to remove referee game: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  log.info({ removed, candidates: candidates.length }, "Removed withdrawn referee games");
+  return { removed, skipped: false, reason: null };
+}
+
 // --- Main sync ---
 
 export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: number | null): Promise<{
   created: number;
   updated: number;
   unchanged: number;
+  removed: number;
 }> {
   const client = createRefereeSdkClient();
   const response = await client.fetchOffeneSpiele();
 
   if (response.results.length === 0) {
+    // An empty feed is never treated as "everything was withdrawn" — see the
+    // pagination guard in removeWithdrawnRefereeGames (issue #105).
     log.info("No referee games returned from API");
-    return { created: 0, updated: 0, unchanged: 0 };
+    return { created: 0, updated: 0, unchanged: 0, removed: 0 };
   }
 
   log.info({ count: response.results.length }, "Processing referee games from API");
@@ -428,7 +586,18 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
     }
   }
 
-  log.info({ created, updated, unchanged }, "Referee games sync completed");
+  // Tombstone games that dropped out of the feed (issue #105).
+  const removal = await removeWithdrawnRefereeGames(
+    { total: response.total, received: response.results.length },
+    apiMatchIds,
+    syncLogger,
+    syncRunId,
+  );
+
+  log.info(
+    { created, updated, unchanged, removed: removal.removed },
+    "Referee games sync completed",
+  );
 
   // Emit SYNC_COMPLETED domain event (mirrors full sync behavior)
   if (syncRunId) {
@@ -455,5 +624,5 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
     }
   }
 
-  return { created, updated, unchanged };
+  return { created, updated, unchanged, removed: removal.removed };
 }
