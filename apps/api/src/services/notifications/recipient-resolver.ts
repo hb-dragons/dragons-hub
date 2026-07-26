@@ -1,6 +1,7 @@
 import { eq, isNotNull } from "drizzle-orm";
 import { getDb } from "../../config/database";
 import { user } from "@dragons/db/schema";
+import { satisfiesRole } from "@dragons/shared";
 
 /**
  * Translate a pipeline recipientId (e.g., "referee:42", "audience:admin",
@@ -20,11 +21,16 @@ export async function resolveRecipientUserIds(
   }
 
   if (recipientId === "audience:admin") {
+    // user.role is better-auth's comma-separated role string (e.g.
+    // "admin,refereeAdmin"), so it can't be matched with equality — filter in
+    // application code via the shared RBAC helper. satisfiesRole(user,
+    // "admin") also admits superadmin, which is a documented superset of
+    // admin and must receive every admin-audience push.
     const rows = await getDb()
-      .select({ id: user.id })
+      .select({ id: user.id, role: user.role })
       .from(user)
-      .where(eq(user.role, "admin"));
-    return rows.map((r) => r.id);
+      .where(isNotNull(user.role));
+    return rows.filter((r) => satisfiesRole(r, "admin")).map((r) => r.id);
   }
 
   if (recipientId === "audience:referee") {
