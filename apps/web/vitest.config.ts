@@ -48,11 +48,15 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
       thresholds: {
-        // Phase 2 measured floor (2026-06-10) — ratchet up over time.
-        branches: 9,
-        functions: 10,
-        lines: 12,
-        statements: 12,
+        // Measured floor 2026-07-26 (issue #109), raised from 9/10/12/12.
+        // Actual at the time: 29.95 branches / 32.34 functions / 37.14 lines /
+        // 36.62 statements. The old numbers had drifted ~25 points below
+        // actual, which left enough slack to delete a quarter of the suite with
+        // CI still green. Ratchet up over time; never lower.
+        branches: 29,
+        functions: 32,
+        lines: 37,
+        statements: 36,
       },
     },
   },
