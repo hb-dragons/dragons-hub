@@ -21,7 +21,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "bg-card rounded-lg p-4 space-y-2",
+        "bg-card rounded-md p-4 space-y-2",
         className,
       )}
     >

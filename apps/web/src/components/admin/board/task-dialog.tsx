@@ -129,7 +129,7 @@ export function TaskDialog({
           className="flex flex-col gap-0 overflow-hidden p-0 max-h-[90vh]"
           style={{ maxWidth: "40rem", width: "calc(100% - 2rem)" }}
         >
-          <div className="relative shrink-0 border-b px-6 py-3">
+          <div className="relative shrink-0 px-6 py-3">
             <DialogTitle className="sr-only">
               {detail?.title ?? t("board.title")}
             </DialogTitle>
@@ -161,7 +161,7 @@ export function TaskDialog({
                   </>
                 )}
                 {!saving && showSaved && (
-                  <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <span className="text-primary flex items-center gap-1">
                     <Check className="h-3 w-3" />
                     {t("common.saved")}
                   </span>
@@ -275,7 +275,7 @@ export function TaskDialog({
             )}
           </div>
 
-          <div className="flex shrink-0 items-center justify-between gap-2 border-t bg-muted/30 px-6 py-3">
+          <div className="bg-surface-low flex shrink-0 items-center justify-between gap-2 px-6 py-3">
             <Button
               variant="ghost"
               size="sm"
@@ -338,7 +338,7 @@ function TaskDialogSkeleton() {
         <Skeleton className="h-3 w-24" />
         <Skeleton className="h-12 w-full" />
       </div>
-      <div className="grid grid-cols-2 gap-3 border-t pt-4">
+      <div className="grid grid-cols-2 gap-3 pt-4">
         <div className="space-y-1.5">
           <Skeleton className="h-3 w-16" />
           <Skeleton className="h-8 w-full" />

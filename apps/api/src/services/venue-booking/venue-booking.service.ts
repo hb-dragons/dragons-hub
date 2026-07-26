@@ -126,7 +126,12 @@ async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, Re
   if (matchIds.length === 0) return new Map();
 
   const homeTeam = getDb()
-    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name, customName: teams.customName })
+    .select({
+      apiTeamPermanentId: teams.apiTeamPermanentId,
+      name: teams.name,
+      customName: teams.customName,
+      badgeColor: teams.badgeColor,
+    })
     .from(teams)
     .as("home_team");
   const guestTeam = getDb()
@@ -142,6 +147,7 @@ async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, Re
       isCancelled: matches.isCancelled,
       homeTeam: homeTeam.name,
       homeTeamCustomName: homeTeam.customName,
+      homeBadgeColor: homeTeam.badgeColor,
       guestTeam: guestTeam.name,
     })
     .from(matches)
@@ -155,6 +161,7 @@ async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, Re
       id: r.id,
       homeTeam: r.homeTeam,
       homeTeamCustomName: r.homeTeamCustomName,
+      homeBadgeColor: r.homeBadgeColor,
       guestTeam: r.guestTeam,
       kickoffTime: r.kickoffTime,
       isForfeited: r.isForfeited ?? false,

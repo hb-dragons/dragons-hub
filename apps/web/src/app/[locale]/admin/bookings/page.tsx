@@ -8,6 +8,7 @@ import { SWRConfig } from "swr";
 import { makeQueries } from "@/lib/swr-queries";
 import { BookingListTable } from "@/components/admin/bookings/booking-list-table";
 import type { BookingListItem } from "@/components/admin/bookings/types";
+import { PageError } from "@/components/admin/shared/page-error";
 
 export default async function BookingsPage() {
   const session = await getServerSession();
@@ -32,9 +33,7 @@ export default async function BookingsPage() {
       <PageHeader title={t("bookings.title")} subtitle={t("bookings.description")} />
 
       {error ? (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
+        <PageError message={error} />
       ) : (
         <SWRConfig value={{ fallback: { [bookingsQ.key]: data } }}>
           <BookingListTable />

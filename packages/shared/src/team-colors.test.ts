@@ -47,4 +47,22 @@ describe("team-colors", () => {
       expect(preset.dot).toBeTruthy();
     }
   });
+
+  it("exposes both modes in one literal className per preset", () => {
+    // Consumers must never choose light or dark themselves — that is how the
+    // admin match table ended up showing dark fills to a light-mode user. The
+    // dark: variants also have to be literal here: Tailwind only emits rules
+    // for class names it can see verbatim in source.
+    for (const key of COLOR_PRESET_KEYS) {
+      const preset = COLOR_PRESETS[key]!;
+      expect(preset.className.split(" ")).toEqual([
+        preset.light.bg,
+        preset.light.border,
+        preset.light.text,
+        `dark:${preset.dark.bg}`,
+        `dark:${preset.dark.border}`,
+        `dark:${preset.dark.text}`,
+      ]);
+    }
+  });
 });

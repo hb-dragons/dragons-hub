@@ -8,6 +8,7 @@ import { SWRConfig } from "swr";
 import { makeQueries } from "@/lib/swr-queries";
 import { ChannelConfigsList } from "@/components/admin/notifications/channel-configs-list";
 import type { ChannelConfigListResult } from "@/components/admin/notifications/types";
+import { PageError } from "@/components/admin/shared/page-error";
 
 export default async function ChannelConfigsPage() {
   const session = await getServerSession();
@@ -32,9 +33,7 @@ export default async function ChannelConfigsPage() {
       <PageHeader title={t("channelConfigs.title")} subtitle={t("channelConfigs.description")} />
 
       {error ? (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
+        <PageError message={error} />
       ) : (
         <SWRConfig
           value={{ fallback: { [channelConfigsQ.key]: data } }}

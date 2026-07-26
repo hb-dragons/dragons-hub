@@ -26,7 +26,7 @@ export function MatchDivergenceTable({ diffs }: MatchDivergenceTableProps) {
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{t("title")}</CardTitle>
           {diverged.length > 0 && (
-            <Badge variant="outline" className="border-amber-500 text-amber-600">
+            <Badge variant="outline" className="border-heat/50 text-heat">
               {t("count", { count: diverged.length })}
             </Badge>
           )}
@@ -35,7 +35,7 @@ export function MatchDivergenceTable({ diffs }: MatchDivergenceTableProps) {
       <CardContent>
         {diverged.length === 0 ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <CheckCircle2 className="text-primary h-4 w-4" />
             {t("allSynced")}
           </div>
         ) : (

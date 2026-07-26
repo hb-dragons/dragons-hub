@@ -27,6 +27,7 @@ import type {
   MatchDetailResponse,
   MatchChangeHistoryResponse,
 } from "./types";
+import { PageHeader } from "@/components/admin/shared/page-header";
 
 interface MatchDetailPageProps {
   matchId: number;
@@ -76,41 +77,36 @@ export function MatchDetailPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <PageHeader
+        title={`${match.homeTeamName} vs ${match.guestTeamName}`}
+        subtitle={
+          t("matchDetail.matchday", { day: String(match.matchDay) }) +
+          (match.leagueName ? ` \u00B7 ${match.leagueName}` : "")
+        }
+      >
         <Link href="/admin/matches">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-1 h-4 w-4" />
             {t("common.back")}
           </Button>
         </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">
-            {match.homeTeamName} vs {match.guestTeamName}
-          </h1>
-          <p className="text-muted-foreground">
-            {t("matchDetail.matchday", { day: String(match.matchDay) })}
-            {match.leagueName ? ` \u00B7 ${match.leagueName}` : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {overrideCount > 0 && (
-            <Badge variant="outline" className="border-amber-500 text-amber-600">
-              {t("matchDetail.overrideCount", { count: overrideCount })}
-            </Badge>
-          )}
-          <Can resource="match" action="update">
-            {assistantEnabled && (
-              <Button variant="outline" size="sm" onClick={() => setRescheduleOpen(true)}>
-                {t("matchDetail.reschedule.trigger")}
-              </Button>
-            )}
-            <Button size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              {t("matchDetail.edit")}
+        {overrideCount > 0 && (
+          <Badge variant="outline" className="border-heat/50 text-heat">
+            {t("matchDetail.overrideCount", { count: overrideCount })}
+          </Badge>
+        )}
+        <Can resource="match" action="update">
+          {assistantEnabled && (
+            <Button variant="outline" size="sm" onClick={() => setRescheduleOpen(true)}>
+              {t("matchDetail.reschedule.trigger")}
             </Button>
-          </Can>
-        </div>
-      </div>
+          )}
+          <Button size="sm" onClick={() => setEditOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            {t("matchDetail.edit")}
+          </Button>
+        </Can>
+      </PageHeader>
 
       {/* Match Info */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -275,7 +271,7 @@ export function MatchDetailPage({
                 {t(`bookings.status.${match.booking.status}`)}
               </Badge>
               {match.booking.needsReconfirmation && (
-                <Badge variant="outline" className="border-amber-500 text-amber-600">
+                <Badge variant="outline" className="border-heat/50 text-heat">
                   {t("matchDetail.booking.needsReconfirmation")}
                 </Badge>
               )}

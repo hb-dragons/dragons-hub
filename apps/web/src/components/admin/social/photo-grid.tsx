@@ -159,7 +159,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
               <button
                 type="button"
                 aria-label={t("deleteItemAria", { name: item.originalName })}
-                className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-red-400 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-black/90 hover:text-red-300"
+                className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-foreground/70 text-destructive opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-foreground/90"
                 onClick={() => setDeleteTarget(item)}
               >
                 <X className="h-3.5 w-3.5" />

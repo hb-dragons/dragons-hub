@@ -45,7 +45,7 @@ export function MatchCard({ match, translations }: MatchCardProps) {
         <div className="flex items-center gap-3">
           <div className="flex flex-1 items-center justify-end gap-2">
             <p
-              className={`text-sm font-semibold leading-tight ${isOwnHome ? "text-mint-shade" : ""}`}
+              className={`text-sm font-semibold leading-tight ${isOwnHome ? "text-primary" : ""}`}
             >
               {getTeamName(match, "home")}
             </p>
@@ -65,7 +65,7 @@ export function MatchCard({ match, translations }: MatchCardProps) {
           <div className="flex flex-1 items-center gap-2">
             <ClubLogo clubId={match.guestClubId} size={24} />
             <p
-              className={`text-sm font-semibold leading-tight ${isOwnGuest ? "text-mint-shade" : ""}`}
+              className={`text-sm font-semibold leading-tight ${isOwnGuest ? "text-primary" : ""}`}
             >
               {getTeamName(match, "guest")}
             </p>

@@ -25,7 +25,7 @@ export default async function AdminLayout({
         }}
       />
       <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-6">
+        <header className="bg-surface-low flex h-14 shrink-0 items-center gap-2 px-6">
           <SidebarTrigger />
           <AdminBreadcrumb />
         </header>

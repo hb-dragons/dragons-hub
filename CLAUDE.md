@@ -33,6 +33,7 @@ pnpm typecheck                    # tsc --noEmit across all packages
 pnpm test                         # Run all tests
 pnpm coverage                     # Run tests with per-package coverage enforcement
 pnpm check:coverage-scripts       # Fail if a package with tests lacks a coverage script
+pnpm check:design-tokens          # Fail on a Tailwind colour utility whose token does not exist
 
 # Package-specific
 pnpm --filter @dragons/api dev    # API only

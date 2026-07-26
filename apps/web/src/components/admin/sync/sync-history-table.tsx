@@ -73,15 +73,15 @@ function formatRecords(run: SyncRun): React.ReactNode {
   const f = run.recordsFailed || 0;
   return (
     <span className="tabular-nums">
-      <span className="text-green-600">{c}</span>
+      <span className="text-primary">{c}</span>
       <span className="text-muted-foreground/50"> / </span>
-      <span className="text-blue-600">{u}</span>
+      <span className="text-foreground">{u}</span>
       <span className="text-muted-foreground/50"> / </span>
       <span className="text-muted-foreground">{s}</span>
       {f > 0 && (
         <>
           <span className="text-muted-foreground/50"> / </span>
-          <span className="text-red-600">{f}</span>
+          <span className="text-destructive">{f}</span>
         </>
       )}
     </span>

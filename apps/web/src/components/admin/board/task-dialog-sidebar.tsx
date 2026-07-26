@@ -44,7 +44,7 @@ export function TaskDialogSidebar({
 }: TaskDialogSidebarProps) {
   const t = useTranslations("board");
   return (
-    <aside className="space-y-4 border-t pt-4">
+    <aside className="space-y-4 pt-4">
       <div className="grid grid-cols-2 gap-3">
         <Field label={t("task.priority")}>
           <Select
@@ -88,7 +88,7 @@ export function TaskDialogSidebar({
         </div>
       </Field>
 
-      <dl className="flex justify-between gap-4 border-t pt-3 text-xs text-muted-foreground">
+      <dl className="text-muted-foreground flex justify-between gap-4 pt-3 text-xs">
         <div>
           <dt className="text-[10px] uppercase tracking-wide">
             {t("task.createdAt")}

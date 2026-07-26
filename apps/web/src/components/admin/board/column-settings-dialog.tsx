@@ -138,7 +138,7 @@ export function ColumnSettingsDialog({
               />
               {color && (
                 <span
-                  className="inline-block h-6 w-6 rounded-full border"
+                  className="border-border/20 inline-block h-6 w-6 rounded-full border"
                   style={{ backgroundColor: color }}
                 />
               )}

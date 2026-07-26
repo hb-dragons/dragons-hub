@@ -69,14 +69,14 @@ export function SyncStatusCards() {
           <Activity
             className={cn(
               "h-4 w-4 text-muted-foreground",
-              isRunning && "animate-pulse text-blue-500",
+              isRunning && "animate-pulse text-heat",
             )}
           />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
             {isRunning ? (
-              <span className="text-blue-500">{t("sync.status.running")}</span>
+              <span className="text-heat">{t("sync.status.running")}</span>
             ) : (
               t("sync.status.idle")
             )}
@@ -102,9 +102,9 @@ export function SyncStatusCards() {
                 className={cn(
                   "text-2xl font-bold",
                   lastSync.status === "completed"
-                    ? "text-green-600"
+                    ? "text-primary"
                     : lastSync.status === "failed"
-                      ? "text-red-600"
+                      ? "text-destructive"
                       : "",
                 )}
               >
@@ -160,7 +160,7 @@ export function SyncStatusCards() {
           <div
             className={cn(
               "text-2xl font-bold",
-              schedule?.enabled ? "text-green-600" : "text-muted-foreground",
+              schedule?.enabled ? "text-primary" : "text-muted-foreground",
             )}
           >
             {schedule?.enabled ? t("sync.status.enabled") : t("sync.status.disabled")}

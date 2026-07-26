@@ -19,8 +19,10 @@ export function OpenSlotsTab() {
     label: l.name,
   }));
 
+  // Stacks below lg: the three-pane layout needs ~700px and was unusable on a
+  // phone, which is where this hub gets opened on a match day.
   return (
-    <div className="grid grid-cols-[200px_320px_1fr] gap-px bg-border/15 rounded-md overflow-hidden min-h-[600px]">
+    <div className="bg-border/15 grid min-h-[600px] grid-cols-1 gap-px overflow-hidden rounded-md lg:grid-cols-[200px_320px_1fr]">
       <SlotsFilterSidebar
         filters={state.filters}
         onChange={(patch) => update({ filters: { ...state.filters, ...patch } })}

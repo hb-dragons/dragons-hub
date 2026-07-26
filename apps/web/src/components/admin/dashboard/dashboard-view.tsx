@@ -141,7 +141,7 @@ export function DashboardView({ user }: DashboardViewProps) {
       {(canViewMatches || canViewSync) && (
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Urgent Tasks */}
-          <div className="bg-card rounded-lg p-5 space-y-4">
+          <div className="bg-card rounded-md p-5 space-y-4">
             <h2 className="font-display text-lg font-bold uppercase tracking-tight">
               {t("urgentTasks.title")}
             </h2>
@@ -187,7 +187,7 @@ export function DashboardView({ user }: DashboardViewProps) {
 
           {/* Today's Schedule */}
           {canViewMatches && (
-            <div className="bg-card rounded-lg p-5 space-y-4">
+            <div className="bg-card rounded-md p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-lg font-bold uppercase tracking-tight">
                   {t("todaySchedule.title")}
@@ -225,7 +225,7 @@ export function DashboardView({ user }: DashboardViewProps) {
                           {match.guestTeamName}
                         </p>
                         <p className="text-muted-foreground truncate text-xs">
-                          {match.venueName ?? match.venueNameOverride ?? "—"} •{" "}
+                          {match.venueNameOverride ?? match.venueName ?? "—"} •{" "}
                           {match.leagueName ?? "—"}
                         </p>
                       </div>
@@ -248,7 +248,7 @@ export function DashboardView({ user }: DashboardViewProps) {
         {canViewTeams && (
           <Link
             href="/admin/teams"
-            className="bg-card group flex items-center gap-4 rounded-lg p-4 transition-colors hover:bg-surface-low"
+            className="bg-card group flex items-center gap-4 rounded-md p-4 transition-colors hover:bg-surface-low"
           >
             <Shield className="text-primary size-5" />
             <div>
@@ -262,7 +262,7 @@ export function DashboardView({ user }: DashboardViewProps) {
         {canViewBookings && (
           <Link
             href="/admin/bookings"
-            className="bg-card group flex items-center gap-4 rounded-lg p-4 transition-colors hover:bg-surface-low"
+            className="bg-card group flex items-center gap-4 rounded-md p-4 transition-colors hover:bg-surface-low"
           >
             <CalendarDays className="text-primary size-5" />
             <div>
@@ -273,7 +273,7 @@ export function DashboardView({ user }: DashboardViewProps) {
         {canViewSync && (
           <Link
             href="/admin/sync"
-            className="bg-card group flex items-center gap-4 rounded-lg p-4 transition-colors hover:bg-surface-low"
+            className="bg-card group flex items-center gap-4 rounded-md p-4 transition-colors hover:bg-surface-low"
           >
             <div
               data-testid="sync-indicator"

@@ -11,6 +11,7 @@ import type {
   WatchRuleListResult,
   ChannelConfigListResult,
 } from "@/components/admin/notifications/types";
+import { PageError } from "@/components/admin/shared/page-error";
 
 export default async function WatchRulesPage() {
   const session = await getServerSession();
@@ -40,9 +41,7 @@ export default async function WatchRulesPage() {
       <PageHeader title={t("watchRules.title")} subtitle={t("watchRules.description")} />
 
       {error ? (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
+        <PageError message={error} />
       ) : (
         <SWRConfig
           value={{

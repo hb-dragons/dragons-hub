@@ -8,6 +8,7 @@ import { SWRConfig } from "swr";
 import { makeQueries } from "@/lib/swr-queries";
 import { VenueListTable } from "@/components/admin/venues/venue-list-table"
 import type { VenueListItem } from "@/components/admin/venues/types"
+import { PageError } from "@/components/admin/shared/page-error";
 
 export default async function VenuesPage() {
   const session = await getServerSession();
@@ -32,9 +33,7 @@ export default async function VenuesPage() {
       <PageHeader title={t("venues.title")} />
 
       {error ? (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
+        <PageError message={error} />
       ) : (
         <SWRConfig value={{ fallback: { [venuesQ.key]: data } }}>
           <VenueListTable />

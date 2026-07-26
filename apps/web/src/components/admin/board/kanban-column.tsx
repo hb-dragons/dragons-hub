@@ -64,11 +64,11 @@ export function KanbanColumn({
     <div
       ref={setSortableRef}
       style={style}
-      className={`flex w-72 shrink-0 flex-col rounded-lg border bg-muted/50 ${
+      className={`flex w-72 shrink-0 flex-col rounded-md bg-surface-low ${
         overLimit ? "ring-2 ring-destructive" : ""
       }`}
     >
-      <div className="flex items-center justify-between border-b px-3 py-2">
+      <div className="flex items-center justify-between px-3 py-2">
         <button
           {...attributes}
           {...listeners}

@@ -30,10 +30,9 @@ import {
 import { Skeleton } from "@dragons/ui/components/skeleton";
 import { AlertTriangle, Loader2, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@dragons/ui/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
-import { getTeamColor } from "../matches/utils";
+import { TeamBadge } from "@/components/admin/shared/team-badge";
 import type { BookingDetail } from "./types";
 
 const STATUSES = ["pending", "requested", "confirmed", "cancelled"] as const;
@@ -246,7 +245,7 @@ export function BookingDetailSheet({
                   {t(`bookings.status.${booking.status}`)}
                 </Badge>
                 {booking.needsReconfirmation && (
-                  <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                  <span className="text-heat inline-flex items-center gap-1 text-xs">
                     <AlertTriangle className="h-3 w-3" />
                   </span>
                 )}
@@ -287,7 +286,7 @@ export function BookingDetailSheet({
                 </div>
 
               {booking.needsReconfirmation && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                <div className="bg-heat/10 text-heat rounded-md p-3 text-sm">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
                     {t("bookings.needsReconfirmation")}
@@ -360,24 +359,14 @@ export function BookingDetailSheet({
                   <div className="space-y-2">
                     {booking.matches.map((m) => {
                       const teamName = m.homeTeamCustomName ?? m.homeTeam;
-                      const color = getTeamColor(teamName);
                       return (
                         <div
                           key={m.id}
-                          className="rounded-md border px-3 py-2"
+                          className="bg-surface-low rounded-md px-3 py-2"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span
-                                className={cn(
-                                  "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold",
-                                  color.bg,
-                                  color.border,
-                                  color.text,
-                                )}
-                              >
-                                {teamName}
-                              </span>
+                              <TeamBadge name={teamName} badgeColor={m.homeBadgeColor} />
                               <span className="text-sm">vs {m.guestTeam}</span>
                             </div>
                             <span className="tabular-nums text-sm text-muted-foreground">
@@ -415,7 +404,7 @@ export function BookingDetailSheet({
             </div>
 
             {/* Sticky footer */}
-            <div className="border-t bg-background px-4 py-4">
+            <div className="bg-surface-low px-4 py-4">
               <div className="flex gap-2">
                 <Button
                   variant="ghost"

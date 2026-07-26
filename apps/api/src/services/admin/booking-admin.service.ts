@@ -132,7 +132,12 @@ export async function getBookingDetail(
 
   // Fetch linked matches
   const homeTeam = getDb()
-    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name, customName: teams.customName })
+    .select({
+      apiTeamPermanentId: teams.apiTeamPermanentId,
+      name: teams.name,
+      customName: teams.customName,
+      badgeColor: teams.badgeColor,
+    })
     .from(teams)
     .as("home_team");
   const guestTeam = getDb()
@@ -148,6 +153,7 @@ export async function getBookingDetail(
       kickoffTime: matches.kickoffTime,
       homeTeam: homeTeam.name,
       homeTeamCustomName: homeTeam.customName,
+      homeBadgeColor: homeTeam.badgeColor,
       guestTeam: guestTeam.name,
       leagueName: leagues.name,
     })

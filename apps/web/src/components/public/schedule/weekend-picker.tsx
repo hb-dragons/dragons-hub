@@ -43,7 +43,7 @@ export function WeekendPicker({
 
   return (
     <div
-      className="flex items-center justify-between rounded-lg bg-muted/50 px-2 py-2"
+      className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-2"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >

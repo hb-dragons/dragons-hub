@@ -45,7 +45,7 @@ function ActionCard({
       disabled={disabled}
       onClick={onClick}
       className={[
-        "flex-1 rounded-lg border p-4 text-left transition-colors",
+        "flex-1 rounded-md border p-4 text-left transition-colors",
         disabled
           ? "cursor-not-allowed border-border bg-muted/50 opacity-50"
           : "cursor-pointer border-border bg-card hover:border-primary hover:bg-accent/5",
@@ -128,7 +128,7 @@ export function PostTypeStep({
         </div>
 
         {showPicker && (
-          <div className="flex items-center justify-between rounded-lg bg-muted/50 px-2 py-2">
+          <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-2">
             <Button
               variant="ghost"
               size="icon"

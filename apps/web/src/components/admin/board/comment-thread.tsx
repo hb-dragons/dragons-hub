@@ -45,7 +45,7 @@ export function CommentThread({ comments, onAdd }: CommentThreadProps) {
           {comments.map((c) => (
             <li
               key={c.id}
-              className="rounded-md border bg-muted/30 p-2 text-sm"
+              className="rounded-md bg-muted/30 p-2 text-sm"
             >
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">
