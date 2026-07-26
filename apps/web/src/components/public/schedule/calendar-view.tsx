@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useMemo, type ButtonHTMLAttributes } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+  type ButtonHTMLAttributes,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import { useFormatter } from "next-intl";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
@@ -10,6 +17,7 @@ import { getColorPreset } from "@dragons/shared";
 import { Calendar } from "@dragons/ui/components/calendar";
 import { Button } from "@dragons/ui/components/button";
 import { cn } from "@dragons/ui/lib/utils";
+import { ErrorState } from "@/components/ui/error-state";
 import { MatchCard } from "./match-card";
 import type { PublicTeam } from "./types";
 import { getMonthStart, getMonthEnd, toDateString } from "@/lib/weekend-utils";
@@ -131,6 +139,7 @@ export function CalendarView({
   const [matches, setMatches] = useState(initialMatches);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const teamDotMap = useMemo(() => buildTeamDotMap(teams), [teams]);
 
@@ -166,25 +175,45 @@ export function CalendarView({
     [matchesByDate, teamDotMap],
   );
 
+  // Rapid month paging fires overlapping requests. `requestSeq` is the sequence
+  // guard — only the newest request may write state — and the AbortController
+  // stops the superseded one from occupying a connection at all.
+  const requestSeq = useRef(0);
+  const inFlight = useRef<AbortController | null>(null);
+
   const fetchMatches = useCallback(
     async (monthDate: Date) => {
       const start = getMonthStart(monthDate);
       const end = getMonthEnd(monthDate);
+      const seq = ++requestSeq.current;
+      inFlight.current?.abort();
+      const controller = new AbortController();
+      inFlight.current = controller;
       setLoading(true);
       try {
-        const data = await api.public.getMatches({
-          dateFrom: toDateString(start),
-          dateTo: toDateString(end),
-        });
+        const data = await api.public.getMatches(
+          {
+            dateFrom: toDateString(start),
+            dateTo: toDateString(end),
+          },
+          { signal: controller.signal },
+        );
+        if (seq !== requestSeq.current) return;
         setMatches(data.items ?? []);
+        setFailed(false);
       } catch {
-        setMatches([]);
+        // A stale rejection (including our own abort) must not touch state.
+        if (seq !== requestSeq.current) return;
+        setFailed(true);
       } finally {
-        setLoading(false);
+        if (seq === requestSeq.current) setLoading(false);
       }
     },
     [],
   );
+
+  // Drop the last in-flight request when the view goes away.
+  useEffect(() => () => inFlight.current?.abort(), []);
 
   const handleMonthChange = useCallback(
     (newMonth: Date) => {
@@ -270,6 +299,11 @@ export function CalendarView({
         </Button>
       </div>
 
+      {failed ? (
+        // A server outage is not a month without games — say so, and offer a
+        // way back.
+        <ErrorState onRetry={() => { void fetchMatches(month); }} />
+      ) : (
       <div
         className={cn(
           "flex justify-center",
@@ -305,8 +339,9 @@ export function CalendarView({
           }}
         />
       </div>
+      )}
 
-      {selectedDate && (
+      {!failed && selectedDate && (
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-muted-foreground">{selectedDateLabel}</h3>
           {selectedDateMatches.length === 0 ? (

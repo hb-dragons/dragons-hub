@@ -59,7 +59,8 @@
       "sync": "Sync Status",
       "syncHealthy": "Healthy",
       "syncFailed": "Needs Attention",
-      "syncIdle": "Idle"
+      "syncIdle": "Idle",
+      "syncUnknown": "Status unknown"
     }
   },
   "refereeGames": {

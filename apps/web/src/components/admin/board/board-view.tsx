@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
 import { useBoard, useBoardTasks } from "@/hooks/use-board";
 import { useBoardFilters } from "@/hooks/use-board-filters";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
 import { BoardToolbar } from "./board-toolbar";
 import { KanbanBoard } from "./kanban-board";
 import { CreateTaskDialog } from "./create-task-dialog";
@@ -18,7 +20,8 @@ export interface BoardViewProps {
 export function BoardView({ boardId }: BoardViewProps) {
   const t = useTranslations("board");
   const { filters } = useBoardFilters();
-  const { data: board } = useBoard(boardId);
+  const { data: board, error: boardError, isLoading: boardLoading, mutate: reloadBoard } =
+    useBoard(boardId);
   const { data: allTasks } = useBoardTasks(boardId, filters);
 
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -61,6 +64,16 @@ export function BoardView({ boardId }: BoardViewProps) {
 
   function openTask(task: TaskCardData) {
     setOpenTaskId(task.id);
+  }
+
+  // "No board found. Create one to get started." is advice the user cannot act
+  // on when the request simply failed — separate the two outcomes.
+  if (boardError) {
+    return <ErrorState onRetry={() => { void reloadBoard(); }} />;
+  }
+
+  if (boardLoading && !board) {
+    return <LoadingState rows={4} />;
   }
 
   if (!board) {
