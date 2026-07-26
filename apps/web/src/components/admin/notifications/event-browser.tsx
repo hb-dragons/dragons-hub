@@ -120,6 +120,15 @@ const EMPTY_FILTERS: Filters = {
 
 const PAGE_SIZES = [25, 50, 100];
 
+// Radix rejects an empty-string SelectItem value, so "no filter" needs a
+// sentinel. It must never reach the query: the API treats an unknown
+// entityType/source as a literal to match and returns zero rows, which left
+// the browser permanently empty with no way to clear the filter.
+const ALL = "__all__";
+
+const fromSelect = (value: string) => (value === ALL ? "" : value);
+const toSelect = (value: string) => (value === "" ? ALL : value);
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -373,14 +382,14 @@ export function EventBrowser() {
               {t("columns.entity")}
             </Label>
             <Select
-              value={filters.entityType}
-              onValueChange={(v) => updateFilter("entityType", v)}
+              value={toSelect(filters.entityType)}
+              onValueChange={(v) => updateFilter("entityType", fromSelect(v))}
             >
               <SelectTrigger className="h-8 w-32">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value={ALL}>All</SelectItem>
                 <SelectItem value="match">match</SelectItem>
                 <SelectItem value="booking">booking</SelectItem>
                 <SelectItem value="referee">referee</SelectItem>
@@ -392,14 +401,14 @@ export function EventBrowser() {
               {t("columns.source")}
             </Label>
             <Select
-              value={filters.source}
-              onValueChange={(v) => updateFilter("source", v)}
+              value={toSelect(filters.source)}
+              onValueChange={(v) => updateFilter("source", fromSelect(v))}
             >
               <SelectTrigger className="h-8 w-36">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value={ALL}>All</SelectItem>
                 <SelectItem value="sync">{t("sourceLabels.sync")}</SelectItem>
                 <SelectItem value="manual">
                   {t("sourceLabels.manual")}

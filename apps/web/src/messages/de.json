@@ -269,7 +269,10 @@
       "title": "Terminverschiebungs-Assistent",
       "description": "Beschreibe deine Einschränkungen; ich schlage gültige Termine und Hallen vor.",
       "placeholder": "z. B. nächste 3 Wochen, lieber Samstagabend, gleiche Halle",
-      "send": "Senden"
+      "stop": "Stopp",
+        "retry": "Erneut versuchen",
+        "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+        "send": "Senden"
     }
   },
   "matchDetail": {
@@ -735,6 +738,7 @@
     "boardName": "Board-Name",
     "boardDescription": "Beschreibung (optional)",
     "dnd": {
+      "handle": "{title} verschieben",
       "pickUp": "{title} aufgenommen. Jetzt in {column}, Position {position} von {total}. Pfeiltasten zum Verschieben, Leertaste oder Enter zum Ablegen, Escape zum Abbrechen.",
       "move": "Jetzt in {column}, Position {position} von {total}.",
       "drop": "In {column} an Position {position} abgelegt.",
@@ -1362,6 +1366,9 @@
       "history": {
         "total": "{n} Spiele",
         "exportCsv": "CSV-Export",
+        "exporting": "Export läuft…",
+        "exportFailed": "CSV-Export fehlgeschlagen",
+        "exportTruncated": "Export auf 1000 Zeilen begrenzt ({n} Spiele passen zu diesen Filtern)",
         "loadMore": "Mehr laden",
         "empty": "Keine Spielhistorie im gewählten Zeitraum",
         "statusPlayed": "Gespielt",

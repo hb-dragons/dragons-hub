@@ -45,6 +45,12 @@ export function MatchDetailPage({
   const [editOpen, setEditOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
 
+  // Mirrors the API's ASSISTANT_ENABLED. Without it the copilot endpoint is not
+  // mounted server-side and the sheet can only fail silently, so hide the entry
+  // point entirely. Next inlines NEXT_PUBLIC_* at build time — the deploy
+  // workflow feeds this from the same GitHub variable as TF_VAR_assistant_enabled.
+  const assistantEnabled = process.env.NEXT_PUBLIC_ASSISTANT_ENABLED === "true";
+
   const matchDetailQ = queries.matchDetail(matchId);
   const { data: detailData, mutate: mutateDetail } = useSWR(
     matchDetailQ.key,
@@ -92,9 +98,11 @@ export function MatchDetailPage({
             </Badge>
           )}
           <Can resource="match" action="update">
-            <Button variant="outline" size="sm" onClick={() => setRescheduleOpen(true)}>
-              {t("matchDetail.reschedule.trigger")}
-            </Button>
+            {assistantEnabled && (
+              <Button variant="outline" size="sm" onClick={() => setRescheduleOpen(true)}>
+                {t("matchDetail.reschedule.trigger")}
+              </Button>
+            )}
             <Button size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="mr-2 h-4 w-4" />
               {t("matchDetail.edit")}
@@ -292,11 +300,13 @@ export function MatchDetailPage({
       </Sheet>
 
       {/* Reschedule Chat Sheet */}
-      <RescheduleChatSheet
-        matchId={matchId}
-        open={rescheduleOpen}
-        onOpenChange={setRescheduleOpen}
-      />
+      {assistantEnabled && (
+        <RescheduleChatSheet
+          matchId={matchId}
+          open={rescheduleOpen}
+          onOpenChange={setRescheduleOpen}
+        />
+      )}
     </div>
   );
 }

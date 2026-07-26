@@ -99,13 +99,19 @@ export function BoardView({ boardId }: BoardViewProps) {
         onEditColumn={openColumnSettings}
       />
 
-      <CreateTaskDialog
-        open={createTaskOpen}
-        onOpenChange={setCreateTaskOpen}
-        boardId={boardId}
-        columns={board.columns}
-        defaultColumnId={createTaskColumnId}
-      />
+      {/* Mounted only while open. The dialog seeds its column select from
+          `defaultColumnId` in a useState initialiser, which runs once per
+          mount — rendered unconditionally it would latch the null it saw on
+          first render and every "+" would file into the first column. */}
+      {createTaskOpen && (
+        <CreateTaskDialog
+          open
+          onOpenChange={setCreateTaskOpen}
+          boardId={boardId}
+          columns={board.columns}
+          defaultColumnId={createTaskColumnId}
+        />
+      )}
 
       <ColumnSettingsDialog
         open={columnSettingsOpen}

@@ -5,6 +5,16 @@ export interface AuthStrategy {
   getHeaders(): Record<string, string> | Promise<Record<string, string>>;
 }
 
+/**
+ * A downloaded file plus its response headers. File endpoints carry their
+ * metadata out-of-band (row counts, truncation flags, `Content-Disposition`),
+ * so callers need the headers alongside the bytes.
+ */
+export interface BlobResponse {
+  blob: Blob;
+  headers: Headers;
+}
+
 export interface ApiClientOptions {
   baseUrl: string;
   auth?: AuthStrategy;
@@ -72,6 +82,21 @@ export class ApiClient {
     });
   }
 
+  /**
+   * GET a file download (CSV, PDF, image). Resolves the body as a `Blob`
+   * together with the response headers — the API exposes row counts and
+   * truncation flags there, and CORS `exposeHeaders` makes them readable from
+   * the browser. Non-ok responses still throw an `APIError`.
+   */
+  async getBlob(
+    path: string,
+    params?: Record<string, string | number | boolean | undefined>,
+  ): Promise<BlobResponse> {
+    return this.request<BlobResponse>("GET", path, params, undefined, {
+      responseType: "blobWithHeaders",
+    });
+  }
+
   async put<T>(path: string, body?: unknown): Promise<T> {
     return this.request<T>("PUT", path, undefined, body);
   }
@@ -89,7 +114,11 @@ export class ApiClient {
     path: string,
     params?: Record<string, string | number | boolean | undefined>,
     body?: unknown,
-    opts?: { signal?: AbortSignal; isForm?: boolean; responseType?: "blob" },
+    opts?: {
+      signal?: AbortSignal;
+      isForm?: boolean;
+      responseType?: "blob" | "blobWithHeaders";
+    },
   ): Promise<T> {
     const qs = params ? buildQueryString(params) : "";
     const url = `${this.baseUrl}${path}${qs}`;
@@ -97,7 +126,7 @@ export class ApiClient {
     const isForm = opts?.isForm ?? false;
     const headers: Record<string, string> = {
       // Binary responses accept anything; JSON requests stay strict.
-      Accept: opts?.responseType === "blob" ? "*/*" : "application/json",
+      Accept: opts?.responseType ? "*/*" : "application/json",
     };
     // For multipart uploads the runtime must set the boundary itself, so we
     // omit Content-Type entirely.
@@ -149,6 +178,13 @@ export class ApiClient {
 
     if (opts?.responseType === "blob") {
       return (await response.blob()) as T;
+    }
+
+    if (opts?.responseType === "blobWithHeaders") {
+      return {
+        blob: await response.blob(),
+        headers: response.headers,
+      } as T;
     }
 
     return (await response.json()) as T;

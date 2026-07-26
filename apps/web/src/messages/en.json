@@ -269,7 +269,10 @@
       "title": "Reschedule assistant",
       "description": "Describe your constraints; I'll suggest valid dates and venues.",
       "placeholder": "e.g. next 3 weeks, prefer Saturday evenings, keep our gym",
-      "send": "Send"
+      "stop": "Stop",
+        "retry": "Retry",
+        "error": "Something went wrong. Please try again.",
+        "send": "Send"
     }
   },
   "matchDetail": {
@@ -735,6 +738,7 @@
     "boardName": "Board name",
     "boardDescription": "Description (optional)",
     "dnd": {
+      "handle": "Drag {title}",
       "pickUp": "Picked up {title}. Now in {column}, position {position} of {total}. Use arrow keys to move, Space or Enter to drop, Escape to cancel.",
       "move": "Now in {column}, position {position} of {total}.",
       "drop": "Dropped in {column} at position {position}.",
@@ -1362,6 +1366,9 @@
       "history": {
         "total": "{n} games",
         "exportCsv": "Export CSV",
+        "exporting": "Exporting…",
+        "exportFailed": "CSV export failed",
+        "exportTruncated": "Export capped at 1000 rows ({n} games match these filters)",
         "loadMore": "Load more",
         "empty": "No history in selected range",
         "statusPlayed": "Played",

@@ -377,3 +377,61 @@ describe("ApiClient.postBlob (binary response)", () => {
     });
   });
 });
+
+describe("ApiClient.getBlob (file download)", () => {
+  const baseUrl = "https://api.example.com";
+
+  function mockDownloadFetch(
+    status: number,
+    blob: Blob,
+    headers: Record<string, string> = {},
+  ) {
+    return vi.fn<typeof fetch>().mockResolvedValue({
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: status === 200 ? "OK" : "Error",
+      headers: new Headers(headers),
+      blob: () => Promise.resolve(blob),
+      json: () => Promise.resolve({}),
+    } as Response);
+  }
+
+  it("GETs the path and resolves the body as a Blob plus the response headers", async () => {
+    const csv = new Blob(["a,b\n1,2\n"], { type: "text/csv" });
+    const fetchFn = mockDownloadFetch(200, csv, {
+      "X-Total-Count": "2500",
+      "X-Result-Truncated": "true",
+    });
+    const client = new ApiClient({ baseUrl, fetchFn });
+
+    const result = await client.getBlob("/admin/referee/history/games.csv", {
+      refereeApiId: 100,
+    });
+
+    expect(result.blob).toBe(csv);
+    expect(result.headers.get("X-Total-Count")).toBe("2500");
+    expect(result.headers.get("X-Result-Truncated")).toBe("true");
+    expect(fetchFn).toHaveBeenCalledWith(
+      "https://api.example.com/admin/referee/history/games.csv?refereeApiId=100",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("sends credentials so the session cookie reaches the cross-origin API", async () => {
+    const fetchFn = mockDownloadFetch(200, new Blob(["x"]));
+    const client = new ApiClient({ baseUrl, fetchFn, credentials: "include" });
+
+    await client.getBlob("/admin/referee/history/games.csv");
+
+    const init = fetchFn.mock.calls[0]![1]!;
+    expect(init.credentials).toBe("include");
+  });
+
+  it("throws APIError (parsing the JSON error envelope) on a non-ok response", async () => {
+    const fetchFn = mockFetch(403, { error: "Forbidden", code: "FORBIDDEN" });
+    const client = new ApiClient({ baseUrl, fetchFn });
+    await expect(
+      client.getBlob("/admin/referee/history/games.csv"),
+    ).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+  });
+});
