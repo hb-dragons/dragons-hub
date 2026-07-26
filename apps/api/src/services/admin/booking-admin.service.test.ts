@@ -1,19 +1,28 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from "vitest";
 
 // --- Mock setup ---
+//
+// drizzle-orm and @dragons/db/schema are deliberately NOT mocked. The previous
+// version of this file stubbed `eq`/`and`/`gte`/`lte`/`sql`/`count` with
+// identity functions and asserted `expect(mockSelect).toHaveBeenCalled()` for
+// the filter tests — so swapping `gte(date, dateFrom)` for `lte`, or joining
+// the match-count subquery on the wrong column, left every test green.
+// Everything below runs the real SQL (joins, the match-count subquery, the
+// date-range filters) against an in-process PGlite Postgres.
+//
+// Only the event publisher and the logger are stubbed: publishing touches
+// BullMQ/Redis, and the service treats a publish failure as non-fatal.
 
-const mockSelect = vi.fn();
-const mockUpdate = vi.fn();
-const mockInsert = vi.fn();
-const mockDelete = vi.fn();
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockSelect(...args),
-    update: (...args: unknown[]) => mockUpdate(...args),
-    insert: (...args: unknown[]) => mockInsert(...args),
-    delete: (...args: unknown[]) => mockDelete(...args),
-  }),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
 vi.mock("../events/event-publisher", () => ({
@@ -22,12 +31,7 @@ vi.mock("../events/event-publisher", () => ({
 
 vi.mock("../../config/logger", () => ({
   logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
+    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -35,27 +39,7 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
-vi.mock("@dragons/db/schema", () => ({
-  venueBookings: { id: "vb.id", venueId: "vb.venueId", date: "vb.date", calculatedStartTime: "vb.cst", calculatedEndTime: "vb.cet", overrideStartTime: "vb.ost", overrideEndTime: "vb.oet", overrideReason: "vb.or", status: "vb.status", needsReconfirmation: "vb.nr", notes: "vb.notes", confirmedBy: "vb.cb", confirmedAt: "vb.ca", createdAt: "vb.createdAt", updatedAt: "vb.updatedAt" },
-  venues: { id: "v.id", name: "v.name" },
-  venueBookingMatches: { venueBookingId: "vbm.vbId", matchId: "vbm.matchId" },
-  matches: { id: "m.id", matchNo: "m.matchNo", kickoffDate: "m.kd", kickoffTime: "m.kt", homeTeamApiId: "m.htId", guestTeamApiId: "m.gtId", leagueId: "m.leagueId" },
-  teams: { apiTeamPermanentId: "t.aptId", name: "t.name", customName: "t.customName" },
-  leagues: { id: "l.id", name: "l.name" },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  gte: vi.fn((...args: unknown[]) => ({ gte: args })),
-  lte: vi.fn((...args: unknown[]) => ({ lte: args })),
-  sql: Object.assign(
-    vi.fn((...args: unknown[]) => ({ sql: args, as: vi.fn().mockReturnValue("sql_aliased") })),
-    { raw: vi.fn((s: string) => ({ raw: s })) },
-  ),
-  count: vi.fn(() => ({ as: vi.fn().mockReturnValue("count_aliased") })),
-  asc: vi.fn((...args: unknown[]) => ({ asc: args })),
-}));
+// --- Imports (after mocks) ---
 
 import {
   listBookings,
@@ -67,264 +51,389 @@ import {
 } from "./booking-admin.service";
 import { publishDomainEvent } from "../events/event-publisher";
 import { EVENT_TYPES } from "@dragons/shared";
+import {
+  leagues,
+  matches,
+  teams,
+  venueBookingMatches,
+  venueBookings,
+  venues,
+} from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
-beforeEach(() => {
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
   vi.clearAllMocks();
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
 
-/**
- * Build a mock chain object that handles any combination of Drizzle calls.
- * Each method returns the chain itself (to allow arbitrary chaining),
- * except terminal methods that resolve to rows.
- */
-function makeChain(rows: unknown[]) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: any = {};
-  const _terminal = vi.fn().mockResolvedValue(rows);
-  const methods = ["from", "innerJoin", "leftJoin", "where", "orderBy", "limit", "groupBy"];
-  for (const m of methods) {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  }
-  // as() returns a subquery ref (not a promise), with arbitrary property access
-  chain.as = vi.fn().mockReturnValue(
-    new Proxy({}, {
-      get: () => "subquery_field",
-    }),
-  );
-  // Override limit and orderBy and where to also work as terminal (return promise)
-  chain.limit = vi.fn().mockResolvedValue(rows);
-  chain.orderBy = vi.fn().mockResolvedValue(rows);
-  // where() sometimes terminates (detail match query), sometimes chains
-  chain.where = vi.fn().mockImplementation(() => {
-    return Object.assign(Promise.resolve(rows), {
-      limit: vi.fn().mockResolvedValue(rows),
-      orderBy: vi.fn().mockResolvedValue(rows),
-    });
-  });
-  // Make chain itself thenable so `await db.select(...).from(...).innerJoin(...)...where(...)` works
-  chain.then = (resolve: (v: unknown) => void) => resolve(rows);
-  return chain;
+let seq = 0;
+
+async function seedVenue(name = "Main Hall"): Promise<number> {
+  const [row] = await ctx.db
+    .insert(venues)
+    .values({ apiId: 8000 + ++seq, name })
+    .returning({ id: venues.id });
+  return row!.id;
 }
 
-function mockUpdateChain(rows: unknown[]) {
-  return {
-    set: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue(rows),
-      }),
-    }),
-  };
+async function seedBooking(opts: {
+  venueId: number;
+  date: string;
+  calculatedStartTime?: string;
+  calculatedEndTime?: string;
+  overrideStartTime?: string | null;
+  overrideEndTime?: string | null;
+  overrideReason?: string | null;
+  status?: string;
+  notes?: string | null;
+  needsReconfirmation?: boolean;
+  confirmedBy?: string | null;
+  confirmedAt?: Date | null;
+}): Promise<number> {
+  const [row] = await ctx.db
+    .insert(venueBookings)
+    .values({
+      venueId: opts.venueId,
+      date: opts.date,
+      calculatedStartTime: opts.calculatedStartTime ?? "14:00:00",
+      calculatedEndTime: opts.calculatedEndTime ?? "17:00:00",
+      overrideStartTime: opts.overrideStartTime ?? null,
+      overrideEndTime: opts.overrideEndTime ?? null,
+      overrideReason: opts.overrideReason ?? null,
+      status: (opts.status ?? "pending") as "pending",
+      needsReconfirmation: opts.needsReconfirmation ?? false,
+      notes: opts.notes ?? null,
+      confirmedBy: opts.confirmedBy ?? null,
+      confirmedAt: opts.confirmedAt ?? null,
+    })
+    .returning({ id: venueBookings.id });
+  return row!.id;
 }
+
+async function seedTeamPair(): Promise<{ homeApi: number; guestApi: number }> {
+  const rows = await ctx.db.select({ api: teams.apiTeamPermanentId }).from(teams).limit(2);
+  if (rows.length === 2) return { homeApi: rows[0]!.api, guestApi: rows[1]!.api };
+
+  const [home] = await ctx.db
+    .insert(teams)
+    .values({
+      apiTeamPermanentId: 100 + ++seq,
+      seasonTeamId: 200 + seq,
+      teamCompetitionId: 300 + seq,
+      name: "Dragons",
+      customName: "Dragons Custom",
+      clubId: 1,
+      isOwnClub: true,
+    })
+    .returning({ api: teams.apiTeamPermanentId });
+  const [guest] = await ctx.db
+    .insert(teams)
+    .values({
+      apiTeamPermanentId: 100 + ++seq,
+      seasonTeamId: 200 + seq,
+      teamCompetitionId: 300 + seq,
+      name: "Eagles",
+      clubId: 2,
+    })
+    .returning({ api: teams.apiTeamPermanentId });
+  return { homeApi: home!.api, guestApi: guest!.api };
+}
+
+async function seedMatch(opts: { kickoffTime: string; matchNo?: number }): Promise<number> {
+  const { homeApi, guestApi } = await seedTeamPair();
+  const [league] = await ctx.db
+    .insert(leagues)
+    .values({
+      apiLigaId: 400 + ++seq,
+      ligaNr: 4102,
+      name: "Regionalliga",
+      seasonId: 2025,
+      seasonName: "2025/26",
+    })
+    .returning({ id: leagues.id });
+  const [row] = await ctx.db
+    .insert(matches)
+    .values({
+      apiMatchId: 9000 + ++seq,
+      matchNo: opts.matchNo ?? seq,
+      matchDay: 1,
+      kickoffDate: "2025-03-15",
+      kickoffTime: opts.kickoffTime,
+      homeTeamApiId: homeApi,
+      guestTeamApiId: guestApi,
+      leagueId: league!.id,
+    })
+    .returning({ id: matches.id });
+  return row!.id;
+}
+
+async function link(bookingId: number, matchId: number): Promise<void> {
+  await ctx.db.insert(venueBookingMatches).values({ venueBookingId: bookingId, matchId });
+}
+
+// --- Tests ---
 
 describe("listBookings", () => {
-  it("returns bookings with venue name and match count", async () => {
-    const rows = [
-      {
-        id: 1, venueId: 10, venueName: "Main Hall", date: "2025-03-15",
-        calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-        overrideStartTime: null, overrideEndTime: null,
-        status: "pending", needsReconfirmation: false, notes: null,
-        matchCount: 2,
-      },
-    ];
-    mockSelect.mockReturnValue(makeChain(rows));
+  it("joins the venue name and counts the linked matches", async () => {
+    const venueId = await seedVenue("Main Hall");
+    const bookingId = await seedBooking({ venueId, date: "2025-03-15" });
+    await link(bookingId, await seedMatch({ kickoffTime: "15:00:00" }));
+    await link(bookingId, await seedMatch({ kickoffTime: "17:00:00" }));
 
     const result = await listBookings();
 
     expect(result).toHaveLength(1);
-    expect(result[0]!.venueName).toBe("Main Hall");
-    expect(result[0]!.effectiveStartTime).toBe("14:00:00");
-    expect(result[0]!.effectiveEndTime).toBe("17:00:00");
-    expect(result[0]!.matchCount).toBe(2);
+    expect(result[0]).toMatchObject({
+      id: bookingId,
+      venueId,
+      venueName: "Main Hall",
+      date: "2025-03-15",
+      effectiveStartTime: "14:00:00",
+      effectiveEndTime: "17:00:00",
+      matchCount: 2,
+    });
   });
 
-  it("uses override times for effective times", async () => {
-    const rows = [
-      {
-        id: 1, venueId: 10, venueName: "Main Hall", date: "2025-03-15",
-        calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-        overrideStartTime: "13:00:00", overrideEndTime: "18:00:00",
-        status: "confirmed", needsReconfirmation: false, notes: null,
-        matchCount: 1,
-      },
-    ];
-    mockSelect.mockReturnValue(makeChain(rows));
+  it("reports 0 matches for a booking with no links", async () => {
+    const venueId = await seedVenue();
+    await seedBooking({ venueId, date: "2025-03-15" });
 
-    const result = await listBookings();
-
-    expect(result[0]!.effectiveStartTime).toBe("13:00:00");
-    expect(result[0]!.effectiveEndTime).toBe("18:00:00");
+    expect((await listBookings())[0]!.matchCount).toBe(0);
   });
 
-  it("returns empty array when no bookings exist", async () => {
-    mockSelect.mockReturnValue(makeChain([]));
+  it("does not attribute another booking's matches", async () => {
+    const venueId = await seedVenue();
+    const a = await seedBooking({ venueId, date: "2025-03-15" });
+    const b = await seedBooking({ venueId, date: "2025-03-16" });
+    await link(a, await seedMatch({ kickoffTime: "15:00:00" }));
+    await link(a, await seedMatch({ kickoffTime: "16:00:00" }));
+    await link(b, await seedMatch({ kickoffTime: "17:00:00" }));
 
-    const result = await listBookings();
+    const byId = new Map((await listBookings()).map((r) => [r.id, r.matchCount]));
 
-    expect(result).toEqual([]);
+    expect(byId.get(a)).toBe(2);
+    expect(byId.get(b)).toBe(1);
   });
 
-  it("passes status filter", async () => {
-    mockSelect.mockReturnValue(makeChain([]));
+  it("prefers the override times as effective times", async () => {
+    const venueId = await seedVenue();
+    await seedBooking({
+      venueId,
+      date: "2025-03-15",
+      overrideStartTime: "13:00:00",
+      overrideEndTime: "18:00:00",
+      status: "confirmed",
+    });
 
-    await listBookings({ status: "confirmed" });
+    const [row] = await listBookings();
 
-    expect(mockSelect).toHaveBeenCalled();
+    expect(row!.effectiveStartTime).toBe("13:00:00");
+    expect(row!.effectiveEndTime).toBe("18:00:00");
   });
 
-  it("passes date range filters", async () => {
-    mockSelect.mockReturnValue(makeChain([]));
+  it("returns an empty array when no bookings exist", async () => {
+    expect(await listBookings()).toEqual([]);
+  });
 
-    await listBookings({ dateFrom: "2025-01-01", dateTo: "2025-12-31" });
+  it("filters by status", async () => {
+    const venueId = await seedVenue();
+    const pending = await seedBooking({ venueId, date: "2025-03-15", status: "pending" });
+    const confirmed = await seedBooking({ venueId, date: "2025-03-16", status: "confirmed" });
 
-    expect(mockSelect).toHaveBeenCalled();
+    const result = await listBookings({ status: "confirmed" });
+
+    expect(result.map((r) => r.id)).toEqual([confirmed]);
+    expect(result.map((r) => r.id)).not.toContain(pending);
+  });
+
+  it("keeps only bookings on or after dateFrom", async () => {
+    const venueId = await seedVenue();
+    await seedBooking({ venueId, date: "2025-01-01" });
+    const mid = await seedBooking({ venueId, date: "2025-06-01" });
+    const late = await seedBooking({ venueId, date: "2025-12-01" });
+
+    const result = await listBookings({ dateFrom: "2025-06-01" });
+
+    expect(result.map((r) => r.id)).toEqual([mid, late]);
+  });
+
+  it("keeps only bookings on or before dateTo", async () => {
+    const venueId = await seedVenue();
+    const early = await seedBooking({ venueId, date: "2025-01-01" });
+    const mid = await seedBooking({ venueId, date: "2025-06-01" });
+    await seedBooking({ venueId, date: "2025-12-01" });
+
+    const result = await listBookings({ dateTo: "2025-06-01" });
+
+    expect(result.map((r) => r.id)).toEqual([early, mid]);
+  });
+
+  it("intersects dateFrom and dateTo into a closed range", async () => {
+    const venueId = await seedVenue();
+    await seedBooking({ venueId, date: "2025-01-01" });
+    const mid = await seedBooking({ venueId, date: "2025-06-01" });
+    await seedBooking({ venueId, date: "2025-12-01" });
+
+    const result = await listBookings({ dateFrom: "2025-05-01", dateTo: "2025-07-01" });
+
+    expect(result.map((r) => r.id)).toEqual([mid]);
+  });
+
+  it("orders by date then calculated start time", async () => {
+    const venueA = await seedVenue("A");
+    const venueB = await seedVenue("B");
+    const later = await seedBooking({ venueId: venueA, date: "2025-03-16" });
+    const earlySlot = await seedBooking({
+      venueId: venueA,
+      date: "2025-03-15",
+      calculatedStartTime: "09:00:00",
+    });
+    const lateSlot = await seedBooking({
+      venueId: venueB,
+      date: "2025-03-15",
+      calculatedStartTime: "18:00:00",
+    });
+
+    expect((await listBookings()).map((r) => r.id)).toEqual([earlySlot, lateSlot, later]);
   });
 });
 
 describe("getBookingDetail", () => {
-  it("returns full booking detail with matches", async () => {
-    const bookingRow = {
-      id: 1, venueId: 10, venueName: "Main Hall", date: "2025-03-15",
-      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-      overrideStartTime: null, overrideEndTime: null, overrideReason: null,
-      status: "pending", needsReconfirmation: false, notes: "Test note",
-      confirmedBy: null, confirmedAt: null,
-      createdAt: new Date("2025-01-01"), updatedAt: new Date("2025-01-01"),
-    };
-
-    const matchRows = [
-      { id: 100, matchNo: 42, kickoffDate: "2025-03-15", kickoffTime: "15:00:00", homeTeam: "Dragons", guestTeam: "Eagles" },
-    ];
-
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      if (idx === 0) return makeChain([bookingRow]);  // booking
-      if (idx === 1) return makeChain([]);             // homeTeam subquery
-      if (idx === 2) return makeChain([]);             // guestTeam subquery
-      return makeChain(matchRows);                     // linked matches
+  it("returns the booking with its linked matches, ordered by kickoff time", async () => {
+    const venueId = await seedVenue("Main Hall");
+    const bookingId = await seedBooking({
+      venueId,
+      date: "2025-03-15",
+      notes: "Test note",
     });
+    const late = await seedMatch({ kickoffTime: "18:00:00", matchNo: 2 });
+    const early = await seedMatch({ kickoffTime: "15:00:00", matchNo: 1 });
+    await link(bookingId, late);
+    await link(bookingId, early);
 
-    const result = await getBookingDetail(1);
+    const result = await getBookingDetail(bookingId);
 
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe(1);
-    expect(result!.venueName).toBe("Main Hall");
-    expect(result!.effectiveStartTime).toBe("14:00:00");
-    expect(result!.notes).toBe("Test note");
+    expect(result).toMatchObject({
+      id: bookingId,
+      venueName: "Main Hall",
+      date: "2025-03-15",
+      effectiveStartTime: "14:00:00",
+      effectiveEndTime: "17:00:00",
+      notes: "Test note",
+    });
+    expect(result!.matches.map((m) => m.id)).toEqual([early, late]);
+    expect(result!.matches[0]).toMatchObject({
+      homeTeam: "Dragons",
+      homeTeamCustomName: "Dragons Custom",
+      guestTeam: "Eagles",
+      leagueName: "Regionalliga",
+    });
   });
 
-  it("returns null when booking not found", async () => {
-    mockSelect.mockReturnValue(makeChain([]));
+  it("does not include another booking's matches", async () => {
+    const venueId = await seedVenue();
+    const target = await seedBooking({ venueId, date: "2025-03-15" });
+    const other = await seedBooking({ venueId, date: "2025-03-16" });
+    await link(target, await seedMatch({ kickoffTime: "15:00:00" }));
+    await link(other, await seedMatch({ kickoffTime: "16:00:00" }));
 
-    const result = await getBookingDetail(999);
-
-    expect(result).toBeNull();
+    expect((await getBookingDetail(target))!.matches).toHaveLength(1);
   });
 
-  it("uses override times for effective times", async () => {
-    const bookingRow = {
-      id: 1, venueId: 10, venueName: "Hall", date: "2025-03-15",
-      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-      overrideStartTime: "13:00:00", overrideEndTime: null,
-      overrideReason: "Early start", status: "confirmed",
-      needsReconfirmation: false, notes: null,
-      confirmedBy: "admin", confirmedAt: new Date("2025-01-01"),
-      createdAt: new Date("2025-01-01"), updatedAt: new Date("2025-01-01"),
-    };
+  it("returns null when the booking does not exist", async () => {
+    const venueId = await seedVenue();
+    await seedBooking({ venueId, date: "2025-03-15" });
 
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      if (idx === 0) return makeChain([bookingRow]);
-      return makeChain([]);
+    expect(await getBookingDetail(999)).toBeNull();
+  });
+
+  it("falls back per-field when only one override time is set", async () => {
+    const venueId = await seedVenue("Hall");
+    const bookingId = await seedBooking({
+      venueId,
+      date: "2025-03-15",
+      overrideStartTime: "13:00:00",
+      overrideEndTime: null,
+      overrideReason: "Early start",
+      status: "confirmed",
+      confirmedBy: "admin",
+      confirmedAt: new Date("2025-01-01T10:00:00.000Z"),
     });
 
-    const result = await getBookingDetail(1);
+    const result = await getBookingDetail(bookingId);
 
-    expect(result).not.toBeNull();
     expect(result!.effectiveStartTime).toBe("13:00:00");
     expect(result!.effectiveEndTime).toBe("17:00:00");
+    expect(result!.overrideReason).toBe("Early start");
+    expect(result!.confirmedBy).toBe("admin");
+    expect(result!.confirmedAt).toBe("2025-01-01T10:00:00.000Z");
   });
 });
 
 describe("updateBooking", () => {
-  it("updates booking and returns result with venue info", async () => {
-    const updatedRow = {
-      id: 1, venueId: 10, date: "2025-03-15",
-      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-      overrideStartTime: "13:00:00", overrideEndTime: null,
-      status: "pending", needsReconfirmation: false, notes: "Updated",
-    };
+  it("persists the change on the addressed booking only", async () => {
+    const venueId = await seedVenue("Main Hall");
+    const target = await seedBooking({ venueId, date: "2025-03-15" });
+    const bystander = await seedBooking({ venueId, date: "2025-03-16", notes: "keep me" });
+    await link(target, await seedMatch({ kickoffTime: "15:00:00" }));
+    await link(target, await seedMatch({ kickoffTime: "16:00:00" }));
 
-    mockUpdate.mockReturnValue(mockUpdateChain([updatedRow]));
-
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      if (idx === 0)
-        return makeChain([
-          {
-            overrideStartTime: null,
-            overrideEndTime: null,
-            calculatedStartTime: "14:00:00",
-            calculatedEndTime: "17:00:00",
-          },
-        ]); // pre-update row
-      if (idx === 1) return makeChain([{ name: "Main Hall" }]);   // venue
-      return makeChain([{ count: 2 }]);                           // matchCount
-    });
-
-    const result = await updateBooking(1, {
+    const result = await updateBooking(target, {
       overrideStartTime: "13:00:00",
       notes: "Updated",
     });
 
-    expect(result).not.toBeNull();
-    expect(result!.venueName).toBe("Main Hall");
-    expect(result!.effectiveStartTime).toBe("13:00:00");
-    expect(result!.notes).toBe("Updated");
-    expect(result!.matchCount).toBe(2);
-  });
-
-  it("returns null when booking not found", async () => {
-    mockSelect.mockReturnValue(makeChain([])); // pre-update row missing
-    mockUpdate.mockReturnValue(mockUpdateChain([]));
-
-    const result = await updateBooking(999, { notes: "Test" });
-
-    expect(result).toBeNull();
-  });
-
-  it("handles null override values", async () => {
-    const updatedRow = {
-      id: 1, venueId: 10, date: "2025-03-15",
-      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-      overrideStartTime: null, overrideEndTime: null,
-      status: "pending", needsReconfirmation: false, notes: null,
-    };
-
-    mockUpdate.mockReturnValue(mockUpdateChain([updatedRow]));
-
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      if (idx === 0)
-        return makeChain([
-          {
-            overrideStartTime: "13:00:00",
-            overrideEndTime: "16:00:00",
-            calculatedStartTime: "14:00:00",
-            calculatedEndTime: "17:00:00",
-          },
-        ]); // pre-update row
-      if (idx === 1) return makeChain([{ name: "Hall" }]);
-      return makeChain([{ count: 0 }]);
+    expect(result).toMatchObject({
+      id: target,
+      venueName: "Main Hall",
+      effectiveStartTime: "13:00:00",
+      notes: "Updated",
+      matchCount: 2,
     });
 
-    const result = await updateBooking(1, {
+    const [untouched] = await ctx.db
+      .select()
+      .from(venueBookings)
+      .where(eq(venueBookings.id, bystander));
+    expect(untouched!.notes).toBe("keep me");
+  });
+
+  it("returns null when the booking does not exist", async () => {
+    const venueId = await seedVenue();
+    await seedBooking({ venueId, date: "2025-03-15" });
+
+    expect(await updateBooking(999, { notes: "Test" })).toBeNull();
+  });
+
+  it("clears the override times when they are explicitly set to null", async () => {
+    const venueId = await seedVenue("Hall");
+    const id = await seedBooking({
+      venueId,
+      date: "2025-03-15",
+      overrideStartTime: "13:00:00",
+      overrideEndTime: "16:00:00",
+    });
+
+    const result = await updateBooking(id, {
       overrideStartTime: null,
       overrideEndTime: null,
       overrideReason: null,
@@ -332,46 +441,27 @@ describe("updateBooking", () => {
       notes: null,
     });
 
-    expect(result).not.toBeNull();
     expect(result!.effectiveStartTime).toBe("14:00:00");
+    expect(result!.effectiveEndTime).toBe("17:00:00");
   });
 
   it("emits booking.status.changed with the real pre-update times on a reschedule", async () => {
-    const updatedRow = {
-      id: 1, venueId: 10, date: "2025-03-15",
-      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-      overrideStartTime: "13:00:00", overrideEndTime: "16:00:00",
-      status: "pending", needsReconfirmation: false, notes: null,
-    };
-
-    mockUpdate.mockReturnValue(mockUpdateChain([updatedRow]));
-
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      // pre-update row carries the OLD override times
-      if (idx === 0)
-        return makeChain([
-          {
-            overrideStartTime: "12:00:00",
-            overrideEndTime: "15:00:00",
-            calculatedStartTime: "14:00:00",
-            calculatedEndTime: "17:00:00",
-          },
-        ]);
-      if (idx === 1) return makeChain([{ name: "Main Hall" }]); // venue
-      return makeChain([{ count: 1 }]); // matchCount
+    const venueId = await seedVenue("Main Hall");
+    const id = await seedBooking({
+      venueId,
+      date: "2025-03-15",
+      overrideStartTime: "12:00:00",
+      overrideEndTime: "15:00:00",
     });
 
-    await updateBooking(1, {
-      overrideStartTime: "13:00:00",
-      overrideEndTime: "16:00:00",
-    });
+    await updateBooking(id, { overrideStartTime: "13:00:00", overrideEndTime: "16:00:00" });
 
     expect(publishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        entityId: id,
         payload: expect.objectContaining({
+          venueName: "Main Hall",
           oldStartTime: "12:00:00",
           oldEndTime: "15:00:00",
           newStartTime: "13:00:00",
@@ -381,240 +471,216 @@ describe("updateBooking", () => {
     );
   });
 
-  it("does not emit booking.status.changed when the effective times are unchanged", async () => {
-    const updatedRow = {
-      id: 1, venueId: 10, date: "2025-03-15",
-      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-      overrideStartTime: "13:00:00", overrideEndTime: "16:00:00",
-      status: "pending", needsReconfirmation: false, notes: "note only",
-    };
-
-    mockUpdate.mockReturnValue(mockUpdateChain([updatedRow]));
-
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      // pre-update row already has the same override times
-      if (idx === 0)
-        return makeChain([
-          {
-            overrideStartTime: "13:00:00",
-            overrideEndTime: "16:00:00",
-            calculatedStartTime: "14:00:00",
-            calculatedEndTime: "17:00:00",
-          },
-        ]);
-      if (idx === 1) return makeChain([{ name: "Main Hall" }]);
-      return makeChain([{ count: 1 }]);
-    });
-
-    await updateBooking(1, {
+  it("does not emit when the effective times are unchanged", async () => {
+    const venueId = await seedVenue();
+    const id = await seedBooking({
+      venueId,
+      date: "2025-03-15",
       overrideStartTime: "13:00:00",
       overrideEndTime: "16:00:00",
     });
+
+    await updateBooking(id, {
+      overrideStartTime: "13:00:00",
+      overrideEndTime: "16:00:00",
+      notes: "note only",
+    });
+
+    expect(publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not emit when no time field is touched at all", async () => {
+    const venueId = await seedVenue();
+    const id = await seedBooking({ venueId, date: "2025-03-15" });
+
+    await updateBooking(id, { notes: "note only" });
 
     expect(publishDomainEvent).not.toHaveBeenCalled();
   });
 });
 
 describe("updateBookingStatus", () => {
-  it("confirms booking and sets confirmedAt", async () => {
-    const updatedRow = {
-      id: 1, venueId: 10, date: "2025-03-15",
-      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-      overrideStartTime: null, overrideEndTime: null,
-      status: "confirmed", needsReconfirmation: false, notes: null,
-    };
+  it("confirms the booking, stamps confirmedAt and clears the reconfirm flag", async () => {
+    const venueId = await seedVenue("Main Hall");
+    const id = await seedBooking({ venueId, date: "2025-03-15", needsReconfirmation: true });
 
-    mockUpdate.mockReturnValue(mockUpdateChain([updatedRow]));
+    const result = await updateBookingStatus(id, "confirmed");
 
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      if (idx === 0) return makeChain([{ name: "Main Hall" }]);
-      return makeChain([{ count: 1 }]);
-    });
-
-    const result = await updateBookingStatus(1, "confirmed");
-
-    expect(result).not.toBeNull();
-    expect(result!.status).toBe("confirmed");
-    expect(mockUpdate).toHaveBeenCalled();
+    expect(result).toMatchObject({ status: "confirmed", needsReconfirmation: false });
+    const [stored] = await ctx.db
+      .select()
+      .from(venueBookings)
+      .where(eq(venueBookings.id, id));
+    expect(stored!.confirmedAt).toBeInstanceOf(Date);
   });
 
-  it("clears confirmedAt when moving away from confirmed", async () => {
-    const updatedRow = {
-      id: 1, venueId: 10, date: "2025-03-15",
-      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
-      overrideStartTime: null, overrideEndTime: null,
-      status: "pending", needsReconfirmation: false, notes: null,
-    };
-
-    mockUpdate.mockReturnValue(mockUpdateChain([updatedRow]));
-
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      if (idx === 0) return makeChain([{ name: "Hall" }]);
-      return makeChain([{ count: 0 }]);
+  it("clears confirmedAt/confirmedBy when moving away from confirmed", async () => {
+    const venueId = await seedVenue("Hall");
+    const id = await seedBooking({
+      venueId,
+      date: "2025-03-15",
+      status: "confirmed",
+      confirmedBy: "admin",
+      confirmedAt: new Date("2025-01-01T00:00:00.000Z"),
     });
 
-    const result = await updateBookingStatus(1, "pending");
+    const result = await updateBookingStatus(id, "pending");
 
-    expect(result).not.toBeNull();
     expect(result!.status).toBe("pending");
+    const [stored] = await ctx.db
+      .select()
+      .from(venueBookings)
+      .where(eq(venueBookings.id, id));
+    expect(stored!.confirmedAt).toBeNull();
+    expect(stored!.confirmedBy).toBeNull();
   });
 
-  it("returns null when booking not found", async () => {
-    mockUpdate.mockReturnValue(mockUpdateChain([]));
+  it("emits booking.status.changed when cancelling", async () => {
+    const venueId = await seedVenue("Main Hall");
+    const id = await seedBooking({ venueId, date: "2025-03-15" });
 
-    const result = await updateBookingStatus(999, "confirmed");
+    await updateBookingStatus(id, "cancelled");
 
-    expect(result).toBeNull();
+    expect(publishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        entityId: id,
+        payload: expect.objectContaining({ reason: "Status changed to cancelled" }),
+      }),
+    );
+  });
+
+  it("does not emit for a non-cancel status change", async () => {
+    const venueId = await seedVenue();
+    const id = await seedBooking({ venueId, date: "2025-03-15" });
+
+    await updateBookingStatus(id, "confirmed");
+
+    expect(publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns null when the booking does not exist", async () => {
+    expect(await updateBookingStatus(999, "confirmed")).toBeNull();
   });
 });
 
-function mockInsertChain(rows: unknown[]) {
-  return {
-    values: vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue(rows),
-    }),
-  };
-}
-
-function mockDeleteChain(rows: unknown[]) {
-  return {
-    where: vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue(rows),
-    }),
-  };
-}
-
 describe("createBooking", () => {
-  it("creates a booking and returns detail", async () => {
-    // select calls: venue check, duplicate check, then getBookingDetail calls
-    const detailBookingRow = {
-      id: 1, venueId: 10, venueName: "Main Hall", date: "2025-03-15",
-      calculatedStartTime: null, calculatedEndTime: null,
-      overrideStartTime: "14:00:00", overrideEndTime: "17:00:00",
-      overrideReason: null, status: "pending", needsReconfirmation: false,
-      notes: null, confirmedBy: null, confirmedAt: null,
-      createdAt: new Date("2025-01-01"), updatedAt: new Date("2025-01-01"),
-    };
-
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      if (idx === 0) return makeChain([{ id: 10 }]);           // venue exists
-      if (idx === 1) return makeChain([]);                      // no duplicate
-      if (idx === 2) return makeChain([{ name: "Main Hall" }]); // getVenueName for event
-      if (idx === 3) return makeChain([detailBookingRow]);      // getBookingDetail booking
-      if (idx === 4) return makeChain([]);                      // homeTeam subquery
-      if (idx === 5) return makeChain([]);                      // guestTeam subquery
-      return makeChain([]);                                     // linked matches
-    });
-
-    mockInsert.mockReturnValue(mockInsertChain([{ id: 1 }]));
+  it("creates the booking and returns its detail", async () => {
+    const venueId = await seedVenue("Main Hall");
 
     const result = await createBooking({
-      venueId: 10,
+      venueId,
       date: "2025-03-15",
       overrideStartTime: "14:00:00",
       overrideEndTime: "17:00:00",
     });
 
-    expect(result).not.toBeNull();
-    expect(result!.id).toBe(1);
-    expect(mockInsert).toHaveBeenCalled();
+    expect(result).toMatchObject({
+      venueId,
+      venueName: "Main Hall",
+      date: "2025-03-15",
+      status: "pending",
+      needsReconfirmation: false,
+      effectiveStartTime: "14:00:00",
+      effectiveEndTime: "17:00:00",
+      matches: [],
+    });
+    // calculated* seed from the supplied override times.
+    expect(result!.calculatedStartTime).toBe("14:00:00");
+    expect(result!.calculatedEndTime).toBe("17:00:00");
+    expect(publishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: EVENT_TYPES.BOOKING_CREATED,
+        payload: expect.objectContaining({ venueName: "Main Hall", matchCount: 0 }),
+      }),
+    );
   });
 
-  it("creates a booking with matchIds", async () => {
-    const detailBookingRow = {
-      id: 1, venueId: 10, venueName: "Main Hall", date: "2025-03-15",
-      calculatedStartTime: null, calculatedEndTime: null,
-      overrideStartTime: "14:00:00", overrideEndTime: "17:00:00",
-      overrideReason: null, status: "pending", needsReconfirmation: false,
-      notes: null, confirmedBy: null, confirmedAt: null,
-      createdAt: new Date("2025-01-01"), updatedAt: new Date("2025-01-01"),
-    };
-
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      if (idx === 0) return makeChain([{ id: 10 }]);
-      if (idx === 1) return makeChain([]);
-      if (idx === 2) return makeChain([{ name: "Main Hall" }]); // getVenueName for event
-      if (idx === 3) return makeChain([detailBookingRow]);
-      if (idx === 4) return makeChain([]);
-      if (idx === 5) return makeChain([]);
-      return makeChain([]);
-    });
-
-    // First insert call is for the booking, subsequent ones for match links
-    mockInsert
-      .mockReturnValueOnce(mockInsertChain([{ id: 1 }]))
-      .mockReturnValueOnce(mockInsertChain([]))
-      .mockReturnValueOnce(mockInsertChain([]));
+  it("links the supplied matches", async () => {
+    const venueId = await seedVenue("Main Hall");
+    const m1 = await seedMatch({ kickoffTime: "15:00:00" });
+    const m2 = await seedMatch({ kickoffTime: "16:00:00" });
 
     const result = await createBooking({
-      venueId: 10,
+      venueId,
       date: "2025-03-15",
       overrideStartTime: "14:00:00",
       overrideEndTime: "17:00:00",
-      matchIds: [100, 200],
+      matchIds: [m2, m1],
     });
 
-    expect(result).not.toBeNull();
-    expect(mockInsert).toHaveBeenCalledTimes(3);
+    expect(result!.matches.map((m) => m.id)).toEqual([m1, m2]);
+    expect(publishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ matchCount: 2 }) }),
+    );
   });
 
-  it("returns null for non-existent venue", async () => {
-    mockSelect.mockReturnValue(makeChain([]));
+  it("returns null for a venue that does not exist", async () => {
+    expect(
+      await createBooking({
+        venueId: 999,
+        date: "2025-03-15",
+        overrideStartTime: "14:00:00",
+        overrideEndTime: "17:00:00",
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null on a duplicate venue+date and writes nothing", async () => {
+    const venueId = await seedVenue();
+    await seedBooking({ venueId, date: "2025-03-15" });
 
     const result = await createBooking({
-      venueId: 999,
+      venueId,
       date: "2025-03-15",
       overrideStartTime: "14:00:00",
       overrideEndTime: "17:00:00",
     });
 
     expect(result).toBeNull();
+    expect(await ctx.db.select().from(venueBookings)).toHaveLength(1);
   });
 
-  it("returns null for duplicate venue+date", async () => {
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const idx = selectCallIndex++;
-      if (idx === 0) return makeChain([{ id: 10 }]);           // venue exists
-      return makeChain([{ id: 99 }]);                           // duplicate exists
-    });
+  it("allows the same date at a different venue", async () => {
+    const first = await seedVenue("Hall A");
+    const second = await seedVenue("Hall B");
+    await seedBooking({ venueId: first, date: "2025-03-15" });
 
     const result = await createBooking({
-      venueId: 10,
+      venueId: second,
       date: "2025-03-15",
       overrideStartTime: "14:00:00",
       overrideEndTime: "17:00:00",
     });
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.venueName).toBe("Hall B");
   });
 });
 
 describe("deleteBooking", () => {
-  it("deletes existing booking and returns true", async () => {
-    mockDelete.mockReturnValue(mockDeleteChain([{ id: 1 }]));
+  it("removes the booking and its links, leaving other bookings intact", async () => {
+    const venueId = await seedVenue("Main Hall");
+    const target = await seedBooking({ venueId, date: "2025-03-15" });
+    const bystander = await seedBooking({ venueId, date: "2025-03-16" });
+    await link(target, await seedMatch({ kickoffTime: "15:00:00" }));
 
-    const result = await deleteBooking(1);
+    expect(await deleteBooking(target)).toBe(true);
 
-    expect(result).toBe(true);
-    expect(mockDelete).toHaveBeenCalledTimes(2); // junction + booking
+    expect(await getBookingDetail(target)).toBeNull();
+    expect(await getBookingDetail(bystander)).not.toBeNull();
+    expect(await ctx.db.select().from(venueBookingMatches)).toHaveLength(0);
+    expect(publishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        entityId: target,
+        payload: expect.objectContaining({ reason: "Booking deleted" }),
+      }),
+    );
   });
 
-  it("returns false for non-existent booking", async () => {
-    mockDelete.mockReturnValue(mockDeleteChain([]));
-
-    const result = await deleteBooking(999);
-
-    expect(result).toBe(false);
+  it("returns false and emits nothing for a booking that does not exist", async () => {
+    expect(await deleteBooking(999)).toBe(false);
+    expect(publishDomainEvent).not.toHaveBeenCalled();
   });
 });
