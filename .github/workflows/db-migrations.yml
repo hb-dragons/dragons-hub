@@ -10,7 +10,6 @@ on:
         type: choice
         options:
           - migrate
-          - push
           - check
 
 concurrency:
@@ -70,11 +69,9 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.creds.outputs.DATABASE_URL }}
 
-      - name: Push Schema
-        if: github.event.inputs.action == 'push'
-        run: pnpm --filter @dragons/db db:push
-        env:
-          DATABASE_URL: ${{ steps.creds.outputs.DATABASE_URL }}
+      # NOTE: there is deliberately no "push" action. `drizzle-kit push` drops
+      # indexes it cannot see in the TS schema, three of which exist only in
+      # hand-written migrations. See packages/db/drizzle/README.md.
 
       - name: Check Schema
         if: github.event.inputs.action == 'check'

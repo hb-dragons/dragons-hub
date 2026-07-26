@@ -119,6 +119,44 @@ describe("InAppChannelAdapter", () => {
     expect(rows[0]!.title).toBe("First");
   });
 
+  it("never silently duplicates when notification_log_dedup_idx is absent", async () => {
+    // Simulates the index having been dropped (e.g. by `drizzle-kit push`, which
+    // cannot see the COALESCE-based index). The insert carries an explicit
+    // conflict target, so Postgres must refuse the statement rather than quietly
+    // writing a second copy of an already-delivered notification.
+    await ctx.client.exec(`DROP INDEX "notification_log_dedup_idx"`);
+    try {
+      const adapter = new InAppChannelAdapter();
+      const params = {
+        eventId: "evt-001",
+        watchRuleId: null,
+        channelConfigId: 1,
+        recipientId: "user-1",
+        title: "First",
+        body: "First body",
+        locale: "de",
+      };
+
+      const first = await adapter.send(params);
+      const second = await adapter.send({ ...params, title: "Retry" });
+
+      // The retried event must not produce a second in-app notification.
+      const rows = await getNotificationLogs();
+      expect(rows).toHaveLength(first.success ? 1 : 0);
+
+      // ...and the failure must be loud, not a silent `duplicate: false`.
+      expect(second.success).toBe(false);
+      expect(second.error).toMatch(/on conflict/i);
+    } finally {
+      // Clear first: if the assertions above failed, duplicate rows are present
+      // and the unique index could not be rebuilt.
+      await ctx.client.exec(`DELETE FROM notification_log`);
+      await ctx.client.exec(
+        `CREATE UNIQUE INDEX "notification_log_dedup_idx" ON "notification_log" ("event_id", "channel_config_id", COALESCE("recipient_id", '__group__'))`,
+      );
+    }
+  });
+
   it("returns error result on database failure", async () => {
     // Create a new adapter that will fail by using an invalid event_id (FK violation)
     const adapter = new InAppChannelAdapter();
@@ -141,12 +179,9 @@ describe("InAppChannelAdapter", () => {
     const realRef = dbHolder.ref;
     dbHolder.ref = {
       insert: () => ({
-        values: () => ({
-          onConflictDoNothing: () => ({
-            returning: () => Promise.reject("raw string rejection"),
-          }),
-        }),
+        values: () => ({ getSQL: () => ({}) }),
       }),
+      execute: () => Promise.reject("raw string rejection"),
     };
 
     const adapter = new InAppChannelAdapter();

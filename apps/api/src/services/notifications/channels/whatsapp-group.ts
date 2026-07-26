@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../config/database";
 import { notificationLog } from "@dragons/db/schema";
+import { insertNotificationLogDeduped } from "../notification-log-dedup";
 import type { ChannelSendParams, DeliveryResult } from "./types";
 import { env } from "../../../config/env";
 import { logger } from "../../../config/logger";
@@ -15,20 +16,16 @@ export class WhatsAppGroupAdapter {
     // is the delivery audit trail this channel previously lacked.
     let claimId: number;
     try {
-      const rows = await getDb()
-        .insert(notificationLog)
-        .values({
-          eventId: params.eventId,
-          watchRuleId: params.watchRuleId,
-          channelConfigId: params.channelConfigId,
-          recipientId: params.recipientId,
-          title: params.title,
-          body: params.body,
-          locale: params.locale,
-          status: "pending",
-        })
-        .onConflictDoNothing()
-        .returning({ id: notificationLog.id });
+      const rows = await insertNotificationLogDeduped(getDb(), {
+        eventId: params.eventId,
+        watchRuleId: params.watchRuleId,
+        channelConfigId: params.channelConfigId,
+        recipientId: params.recipientId,
+        title: params.title,
+        body: params.body,
+        locale: params.locale,
+        status: "pending",
+      });
 
       if (rows.length === 0) {
         // Already delivered for this event/channel/recipient — skip the send.

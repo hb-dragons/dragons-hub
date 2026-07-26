@@ -1,11 +1,12 @@
 import { Worker, type Job } from "bullmq";
 import { eq, inArray } from "drizzle-orm";
-import { digestBuffer, domainEvents, channelConfigs, notificationLog } from "@dragons/db/schema";
+import { digestBuffer, domainEvents, channelConfigs } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { getDb } from "../config/database";
 import { readLocale } from "../services/notifications/channel-config-parsers";
 import { renderDigestMessage, type DigestItem } from "../services/notifications/templates/digest";
+import { insertNotificationLogDeduped } from "../services/notifications/notification-log-dedup";
 
 interface DigestJobData {
   channelConfigId: number;
@@ -81,23 +82,20 @@ export const digestWorker = new Worker<DigestJobData>(
       if (config.type === "in_app") {
         const anchorEventId = bufferedRows[0]!.eventId;
 
-        // Insert notification_log entry (dedup via unique index)
-        const rows = await tx
-          .insert(notificationLog)
-          .values({
-            eventId: anchorEventId,
-            watchRuleId: null,
-            channelConfigId: config.id,
-            recipientId: `digest:${config.id}`,
-            title: message.title,
-            body: message.body,
-            locale,
-            status: "sent",
-            sentAt: new Date(),
-            digestRunId,
-          })
-          .onConflictDoNothing()
-          .returning({ id: notificationLog.id });
+        // Insert notification_log entry (dedup via notification_log_dedup_idx,
+        // named explicitly so a missing index fails loudly instead of duplicating)
+        const rows = await insertNotificationLogDeduped(tx, {
+          eventId: anchorEventId,
+          watchRuleId: null,
+          channelConfigId: config.id,
+          recipientId: `digest:${config.id}`,
+          title: message.title,
+          body: message.body,
+          locale,
+          status: "sent",
+          sentAt: new Date(),
+          digestRunId,
+        });
 
         if (rows.length === 0) {
           log.info("Digest already sent (duplicate), clearing stale buffer entries");

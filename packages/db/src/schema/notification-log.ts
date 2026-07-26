@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -14,6 +15,25 @@ import { channelConfigs } from "./channel-configs";
 // expressed in Drizzle schema. If regenerating migrations, manually re-add:
 // CREATE UNIQUE INDEX "notification_log_dedup_idx" ON "notification_log"
 //   ("event_id", "channel_config_id", COALESCE("recipient_id", '__group__'));
+// `db:push` is disabled precisely because drizzle-kit cannot see this index —
+// see packages/db/drizzle/README.md.
+
+/**
+ * Conflict target matching `notification_log_dedup_idx` (migration 0018).
+ *
+ * Postgres infers the arbiter index from the target expression, so this must stay
+ * equivalent to the index definition. A mismatch raises 42P10 ("no unique or
+ * exclusion constraint matching the ON CONFLICT specification") — loud — instead
+ * of silently degrading. `COALESCE(recipient_id, '__group__')` is what makes
+ * group notifications (NULL recipient) dedup at all: a plain unique index treats
+ * every NULL as distinct.
+ *
+ * Every `notification_log` insert that wants dedup must name this target
+ * explicitly. A bare `onConflictDoNothing()` depends on the index existing and,
+ * if it ever stops existing, degrades into unbounded duplicate notifications with
+ * no error.
+ */
+export const notificationLogDedupTarget = sql`event_id, channel_config_id, coalesce(recipient_id, '__group__')`;
 export const notificationLog = pgTable(
   "notification_log",
   {
