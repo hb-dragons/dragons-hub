@@ -111,6 +111,26 @@ jobs:
       - name: Build
         run: pnpm build
 
+  pi:
+    name: Pi Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install -r apps/pi/requirements-dev.txt
+
+      - name: Test
+        working-directory: apps/pi
+        run: pytest
+
   ai-slop:
     name: AI Slop Check
     runs-on: ubuntu-latest

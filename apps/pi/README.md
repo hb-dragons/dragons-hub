@@ -16,7 +16,7 @@ Stramatel basketball console. Captures serial frames and POSTs raw hex to
 ```bash
 sudo apt install -y python3-pip
 sudo mkdir -p /home/pi/Panel2Net
-sudo cp Panel2Net.py /home/pi/Panel2Net/
+sudo cp Panel2Net.py panel_pipeline.py /home/pi/Panel2Net/
 sudo cp panel2net.service /etc/systemd/system/
 sudo cp Panel2Net.id.example /home/pi/Panel2Net/Panel2Net.id  # then edit
 sudo install -m 0600 scoreboard.key.example /home/pi/Panel2Net/scoreboard.key  # then paste real key
@@ -24,6 +24,25 @@ sudo pip3 install -r requirements.txt
 sudo systemctl daemon-reload
 sudo systemctl enable --now panel2net.service
 ```
+
+## Layout
+
+- `Panel2Net.py` — the service: serial port, retry/baudrate walk, HTTP POST.
+- `panel_pipeline.py` — the pure transformation from serial bytes to POST body
+  and headers. No I/O, so it is testable; `Panel2Net.py` calls it per read.
+- `scripts/replay-pipeline.py` — prints the bodies a capture would produce.
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest                     # from apps/pi
+```
+
+`apps/api/src/services/scoreboard/pi-pipeline.test.ts` runs the same
+`panel_pipeline.replay` over a committed capture and feeds the result to the
+API's decoder, so a change here that corrupts frames fails the API suite too.
+It needs `python3` on PATH.
 
 ## Key rotation
 
