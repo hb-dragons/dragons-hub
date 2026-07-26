@@ -25,7 +25,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.{ts,tsx}"],
     setupFiles: ["./src/test-setup.ts"],
     server: {
       deps: {
@@ -44,6 +44,7 @@ export default defineConfig({
         "src/**/*.d.ts",
         "src/messages/**",
         "src/i18n/**",
+        "scripts/**",
       ],
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
