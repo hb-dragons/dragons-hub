@@ -1,8 +1,16 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, configure, fireEvent, render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+
+// `club-assistant.tsx` code-splits the panel behind `next/dynamic`, so every
+// `findBy*` here waits on a real dynamic import that pulls in streamdown. Under
+// full-suite CPU contention that import has been measured at ~1.8s, well past
+// Testing Library's 1000ms default — which showed up as a flaky failure on
+// `findByText("Hi!")` rather than as a timeout anyone could read. The assertions
+// are unchanged: if the panel never mounts, these still fail.
+configure({ asyncUtilTimeout: 15_000 });
 
 const sendMessage = vi.fn();
 const stop = vi.fn();
