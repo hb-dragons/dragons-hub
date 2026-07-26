@@ -77,6 +77,14 @@ jobs:
       TF_VAR_assistant_enabled: ${{ vars.ASSISTANT_ENABLED || 'false' }}
       TF_VAR_google_generative_ai_api_key: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
       TF_VAR_mcp_token: ${{ secrets.MCP_TOKEN }}
+      # WhatsApp group delivery. The WAHA endpoint is not a credential, so it is a
+      # repo variable and lands in Cloud Run env_vars. Unset renders "", which TF
+      # reads as "leave WhatsApp disabled" rather than passing an invalid URL on.
+      TF_VAR_waha_base_url: ${{ vars.WAHA_BASE_URL }}
+      TF_VAR_waha_session: ${{ vars.WAHA_SESSION || 'default' }}
+      # Expo Push authenticated send tier. A credential, so a repo secret; unset
+      # renders "" and leaves push on the unauthenticated tier.
+      TF_VAR_expo_access_token: ${{ secrets.EXPO_ACCESS_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
