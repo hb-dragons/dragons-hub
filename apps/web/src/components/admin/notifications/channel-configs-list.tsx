@@ -230,6 +230,7 @@ export function ChannelConfigsList() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label={t("edit")}
                     onClick={() => openEdit(channel)}
                   >
                     <Pencil className="h-4 w-4" />
@@ -290,11 +291,15 @@ export function ChannelConfigsList() {
               />
             </div>
 
-            {/* Type */}
+            {/* Type — immutable after creation. The update contract carries no
+                `type` field (changing it would invalidate watch rules and
+                notification_log rows), so an editable control here would write
+                a config shaped for a type the server never persists. */}
             <div className="space-y-2">
-              <Label>{t("type")}</Label>
+              <Label htmlFor="channel-type">{t("type")}</Label>
               <Select
                 value={form.type}
+                disabled={editingChannel !== null}
                 onValueChange={(v) =>
                   setForm((prev) => ({
                     ...emptyForm(),
@@ -306,7 +311,7 @@ export function ChannelConfigsList() {
                   }))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="channel-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -317,6 +322,11 @@ export function ChannelConfigsList() {
                   ))}
                 </SelectContent>
               </Select>
+              {editingChannel && (
+                <p className="text-xs text-muted-foreground">
+                  {t("typeImmutable" as never)}
+                </p>
+              )}
             </div>
 
             {/* Digest Mode */}

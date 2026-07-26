@@ -1226,7 +1226,8 @@
       "in_app": "In-App",
       "whatsapp_group": "WhatsApp Group",
       "email": "Email"
-    }
+    },
+    "typeImmutable": "Type cannot be changed after a channel is created."
   },
   "domainEvents": {
     "title": "Domain Events",

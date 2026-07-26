@@ -17,6 +17,18 @@ export interface ColumnUpdateInput {
   position?: number;
 }
 
+/**
+ * `useBoardTasks` mounts filtered variants of the tasks key
+ * (`…/tasks?priority=…`), so a bare-key invalidation misses every board that
+ * currently has a filter applied. Match by prefix, as the task/assignee/
+ * checklist mutation hooks do.
+ */
+function matchBoardTasks(boardId: number) {
+  return (key: unknown): boolean =>
+    typeof key === "string" &&
+    key.startsWith(`/admin/boards/${boardId}/tasks`);
+}
+
 export function useColumnMutations(boardId: number) {
   const { mutate } = useSWRConfig();
 
@@ -49,7 +61,12 @@ export function useColumnMutations(boardId: number) {
   async function deleteColumn(colId: number): Promise<void> {
     try {
       await api.boards.deleteColumn(boardId, colId);
-      await mutate(SWR_KEYS.boardDetail(boardId));
+      // Deleting a column removes a bucket tasks were rendered into, so the
+      // task lists must be refetched alongside the board itself.
+      await Promise.all([
+        mutate(SWR_KEYS.boardDetail(boardId)),
+        mutate(matchBoardTasks(boardId)),
+      ]);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to delete column",
