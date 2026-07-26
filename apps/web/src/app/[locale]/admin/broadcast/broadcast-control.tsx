@@ -16,6 +16,7 @@ import { Field, FieldLabel } from "@dragons/ui/components/field";
 import { Badge } from "@dragons/ui/components/badge";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import type { BroadcastConfig, BroadcastMatch } from "@dragons/shared";
+import type { BroadcastUpsertBody } from "@dragons/api-client";
 import { MatchPicker } from "./match-picker";
 
 interface Props {
@@ -46,7 +47,12 @@ export function BroadcastControl({ deviceId, initial }: Props) {
     setMatch(next.match);
   }
 
-  async function save(partial: Partial<BroadcastConfig>) {
+  // `Partial<BroadcastUpsertBody>`, not `Partial<BroadcastConfig>`: the response
+  // shape also carries isLive/startedAt/endedAt/updatedAt, which the request
+  // contract does not accept. Excess-property checking does not apply through a
+  // spread, so typing this against the response type would let a future
+  // `save({ isLive: true })` compile and then 400 at runtime.
+  async function save(partial: Partial<BroadcastUpsertBody>) {
     setError(null);
     await api.broadcast.upsertConfig({ deviceId, ...partial });
     await reload();

@@ -6,7 +6,6 @@ import {
   createWatchRuleSchema,
   updateWatchRuleSchema,
 } from "./watch-rule";
-import { CHANNEL_TYPES } from "@dragons/shared";
 
 describe("watchRuleIdParamSchema", () => {
   it("coerces string id to positive integer", () => {

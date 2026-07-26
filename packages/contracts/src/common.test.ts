@@ -32,7 +32,10 @@ describe("every :id path param comes from the shared schema", () => {
       : undefined;
   };
 
+  // Path-param schemas only. A body schema may legitimately carry an unrelated
+  // `id` — `qaChatBodySchema.id` is the AI SDK's chat id, a string.
   const schemasWithId = Object.entries(contracts)
+    .filter(([name]) => /Params?Schema$/.test(name))
     .map(([name, value]) => [name, shapeOf(value)] as const)
     .filter(
       (entry): entry is [string, Record<string, unknown>] =>

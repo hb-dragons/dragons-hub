@@ -500,7 +500,7 @@ export async function getOwnClubMatches(params: MatchListParams) {
     );
   }
   if (excludeInactive) {
-    // The columns are NOT NULL (migration 0041), so a plain `= false` covers
+    // The columns are NOT NULL (migration 0042), so a plain `= false` covers
     // every row; the old `OR is_forfeited IS NULL` existed only because NULL
     // rows would otherwise have been dropped by the equality test.
     conditions.push(eq(matches.isForfeited, false));

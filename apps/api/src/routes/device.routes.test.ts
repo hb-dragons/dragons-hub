@@ -149,12 +149,22 @@ describe("POST /register — persisted row", () => {
     ]);
   });
 
-  it("binds the row to the session user, never to a body-supplied id", async () => {
-    await register({
+  it("rejects a body-supplied userId rather than quietly ignoring it", async () => {
+    // `deviceRegisterBodySchema` is strict, so a field the server owns is a 400.
+    // Either way the caller cannot bind a device to someone else's account;
+    // rejecting is the louder of the two.
+    const res = await register({
       token: "ExponentPushToken[spoof]",
       platform: "ios",
       userId: OTHER,
     });
+
+    expect(res.status).toBe(400);
+    expect(await devices()).toEqual([]);
+  });
+
+  it("binds the row to the session user", async () => {
+    await register({ token: "ExponentPushToken[bound]", platform: "ios" });
 
     expect((await devices()).map((d) => d.user_id)).toEqual([USER]);
   });

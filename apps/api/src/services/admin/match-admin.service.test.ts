@@ -692,7 +692,7 @@ describe("updateMatchLocal", () => {
 
   it("clearing isCancelled with no remote snapshot restores false, not NULL", async () => {
     await seedBasicData();
-    // `matches.is_cancelled` is NOT NULL (migration 0041). Clearing the override
+    // `matches.is_cancelled` is NOT NULL (migration 0042). Clearing the override
     // restores the remote value, and with no remote snapshot that lookup yields
     // undefined — which has to land on `false`, not `null`.
     const matchId = await insertMatch({ is_cancelled: true });

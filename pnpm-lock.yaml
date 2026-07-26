@@ -537,6 +537,9 @@ importers:
 
   packages/sdk:
     devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^4.1.6
+        version: 4.1.6(vitest@4.1.6)
       basketball-bund-sdk:
         specifier: github:dirkdrutschmann/basketball-bund-sdk
         version: https://codeload.github.com/dirkdrutschmann/basketball-bund-sdk/tar.gz/c72789068d9ec5910440f9e2b94f99b6e56d4800
@@ -549,6 +552,9 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      vitest:
+        specifier: ^4.1.6
+        version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.8.0)(@vitest/coverage-v8@4.1.6)(happy-dom@20.9.0)(vite@8.0.13(@types/node@25.8.0)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.1)(tsx@4.22.0)(yaml@2.9.0))
 
   packages/shared:
     dependencies:

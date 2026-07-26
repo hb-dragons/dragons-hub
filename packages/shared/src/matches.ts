@@ -84,7 +84,7 @@ export interface MatchListItem {
   venuePostalCode: string | null;
   venueCity: string | null;
   venueNameOverride: string | null;
-  // NOT NULL in `matches` (migration 0041) — no `?? false` needed downstream.
+  // NOT NULL in `matches` (migration 0042) — no `?? false` needed downstream.
   isConfirmed: boolean;
   isForfeited: boolean;
   isCancelled: boolean;

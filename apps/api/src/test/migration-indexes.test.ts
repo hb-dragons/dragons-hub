@@ -55,7 +55,7 @@ describe("migration-created indexes", () => {
 });
 
 /**
- * Indexes added by migration 0041. Each backs a lookup or a referential-integrity
+ * Indexes added by migration 0042. Each backs a lookup or a referential-integrity
  * check that previously had to seq-scan.
  */
 describe("single-column lookup indexes", () => {
@@ -85,7 +85,7 @@ describe("single-column lookup indexes", () => {
   });
 });
 
-/** Match-deletion behaviour, defined by migration 0041. */
+/** Match-deletion behaviour, defined by migration 0042. */
 describe("foreign keys to matches.id", () => {
   /** pg encodes: a = NO ACTION, c = CASCADE, n = SET NULL, r = RESTRICT. */
   async function deleteRule(table: string, constraint: string): Promise<string | undefined> {

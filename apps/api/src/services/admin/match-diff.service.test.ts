@@ -350,7 +350,7 @@ describe("computeDiffs", () => {
 
   describe("false effective value handling", () => {
     it("renders a false effective value against a true remote as diverged", () => {
-      // `isForfeited` is NOT NULL (migration 0041), so "not forfeited" is false,
+      // `isForfeited` is NOT NULL (migration 0042), so "not forfeited" is false,
       // never null — the diff must still read as diverged from a true remote.
       const row = makeDiffInput({ isForfeited: false });
       const remote = { isForfeited: true };

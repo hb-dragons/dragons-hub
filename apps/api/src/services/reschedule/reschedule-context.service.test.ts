@@ -42,7 +42,7 @@ describe("reschedule-context", () => {
 
   it("getMatchForReschedule reports isCancelled/isForfeited as false when unset", async () => {
     await seedOwnTeam(100, "Dragons"); await seedOwnTeam(200, "Lions"); await seedVenue(1); await seedLeague(1);
-    // The columns are NOT NULL DEFAULT false (migration 0041), so an insert that
+    // The columns are NOT NULL DEFAULT false (migration 0042), so an insert that
     // omits them lands on false — there is no third state to fall back from.
     await ctx.db.insert(matches).values({
       id: 2, apiMatchId: 22, matchNo: 2, matchDay: 7,

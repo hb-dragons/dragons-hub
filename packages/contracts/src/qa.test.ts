@@ -51,6 +51,31 @@ describe("qaChatBodySchema", () => {
     ).toBe(false);
   });
 
+  // The AI SDK's DefaultChatTransport appends these to the caller's body. Both
+  // the web widget and the native screen use it unmodified, so a strict schema
+  // that omits them makes every chat request a 400.
+  // `apps/api/src/routes/qa-chat-transport.contract.test.ts` drives the real
+  // transport; these cases pin the fields at the unit level.
+  it("accepts the AI SDK transport envelope", () => {
+    const result = qaChatBodySchema.safeParse({
+      messages: [message()],
+      locale: "de",
+      id: "chat-1",
+      trigger: "submit-message",
+      messageId: "m1",
+    });
+    expect(result.error?.issues ?? []).toEqual([]);
+  });
+
+  it("bounds the envelope fields", () => {
+    expect(
+      qaChatBodySchema.safeParse({ messages: [message()], id: "x".repeat(201) }).success,
+    ).toBe(false);
+    expect(
+      qaChatBodySchema.safeParse({ messages: [message()], trigger: "x".repeat(51) }).success,
+    ).toBe(false);
+  });
+
   it("rejects an empty messages array", () => {
     expect(qaChatBodySchema.safeParse({ messages: [] }).success).toBe(false);
   });

@@ -29,9 +29,28 @@ const uiMessageSchema = z.looseObject({
   parts: z.array(uiMessagePartSchema).max(MAX_PARTS_PER_MESSAGE),
 });
 
+/**
+ * The body is strict, so the AI SDK's own transport envelope has to be declared
+ * here: `DefaultChatTransport.sendMessages` appends `id`, `trigger` and (on
+ * `regenerate()`) `messageId` to whatever `body` the caller configured. Both the
+ * web widget and the native screen use it unmodified, so leaving these out makes
+ * every single chat request a 400.
+ *
+ * `qa-chat-transport.contract.test.ts` drives the real transport and asserts the
+ * body it produces parses against this schema, so an AI-SDK upgrade that changes
+ * the envelope fails the build instead of the chat.
+ */
 export const qaChatBodySchema = z.strictObject({
   messages: z.array(uiMessageSchema).min(1).max(MAX_MESSAGES),
   locale: z.string().min(2).max(15).optional(),
+
+  // ── AI SDK transport envelope ─────────────────────────────────────────────
+  /** Chat id. Not read by the route; the event id is minted server-side. */
+  id: z.string().max(200).optional(),
+  /** "submit-message" | "regenerate-message" | "resume-stream" as of ai@6. */
+  trigger: z.string().max(50).optional(),
+  /** Set only when regenerating a specific assistant message. */
+  messageId: z.string().max(200).optional(),
 });
 
 export type QaChatBody = z.infer<typeof qaChatBodySchema>;

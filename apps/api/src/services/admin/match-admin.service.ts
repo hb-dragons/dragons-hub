@@ -11,7 +11,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
 
 /**
- * Overridable columns that are NOT NULL in `matches` (migration 0041). Clearing
+ * Overridable columns that are NOT NULL in `matches` (migration 0042). Clearing
  * an override on one of these restores `false` when there is nothing to restore
  * from remote — `null` would violate the constraint.
  */
