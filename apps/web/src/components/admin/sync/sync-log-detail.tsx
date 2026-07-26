@@ -48,23 +48,21 @@ interface SyncLogDetailProps {
 
 const ENTITY_CONFIG: Record<
   EntityType,
-  { icon: React.ElementType; labelKey: "league" | "match" | "team" | "standing" | "venue" | "referee" | "refereeRole" | "refereeGame"; color: string }
+  { icon: React.ElementType; labelKey: "league" | "match" | "team" | "standing" | "venue" | "referee" | "refereeRole" | "refereeGame" }
 > = {
-  league: { icon: Trophy, labelKey: "league", color: "text-muted-foreground" },
-  match: { icon: Gamepad2, labelKey: "match", color: "text-muted-foreground" },
-  team: { icon: Users, labelKey: "team", color: "text-muted-foreground" },
-  standing: { icon: BarChart, labelKey: "standing", color: "text-muted-foreground" },
-  venue: { icon: MapPin, labelKey: "venue", color: "text-muted-foreground" },
-  referee: { icon: Shield, labelKey: "referee", color: "text-muted-foreground" },
+  league: { icon: Trophy, labelKey: "league" },
+  match: { icon: Gamepad2, labelKey: "match" },
+  team: { icon: Users, labelKey: "team" },
+  standing: { icon: BarChart, labelKey: "standing" },
+  venue: { icon: MapPin, labelKey: "venue" },
+  referee: { icon: Shield, labelKey: "referee" },
   refereeRole: {
     icon: ClipboardList,
     labelKey: "refereeRole",
-    color: "text-muted-foreground",
   },
   refereeGame: {
     icon: ClipboardList,
     labelKey: "refereeGame",
-    color: "text-muted-foreground",
   },
 };
 
@@ -294,7 +292,6 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
               const entityCfg = ENTITY_CONFIG[entry.entityType] ?? {
                 icon: ClipboardList,
                 labelKey: entry.entityType,
-                color: "text-muted-foreground",
               };
               const actionCfg = ACTION_CONFIG[entry.action] ?? ACTION_CONFIG.skipped;
               const EntityIcon = entityCfg.icon;
@@ -311,16 +308,14 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
                   >
                     {isExpandable ? (
                       isExpanded ? (
-                        <ChevronDown className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
+                        <ChevronDown className="h-4 w-4 shrink-0" />
                       ) : (
-                        <ChevronRight className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
+                        <ChevronRight className="h-4 w-4 shrink-0" />
                       )
                     ) : (
-                      <EntityIcon className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
+                      <EntityIcon className="h-4 w-4 shrink-0" />
                     )}
-                    <span className="w-24 shrink-0 text-muted-foreground">
-                      {tEntity(entityCfg.labelKey)}
-                    </span>
+                    <span className="w-24 shrink-0">{tEntity(entityCfg.labelKey)}</span>
                     <div className="min-w-0 flex-1">
                       <span className="block truncate font-medium">
                         {entry.entityName || entry.entityId}

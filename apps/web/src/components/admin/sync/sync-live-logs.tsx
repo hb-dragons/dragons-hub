@@ -213,10 +213,11 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
                     <span className="w-20 shrink-0 text-xs text-muted-foreground">
                       {format.dateTime(new Date(entry.timestamp), "timeOnly")}
                     </span>
-                    <EntityIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="w-20 shrink-0 text-xs text-muted-foreground">
-                      {entry.entityType}
-                    </span>
+                    {/* Entity carries full foreground weight so it outranks the
+                        timestamp when scanning; the glyph and the literal type
+                        name identify it, not a hue. */}
+                    <EntityIcon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="w-20 shrink-0 text-xs">{entry.entityType}</span>
                     <ActionIcon className={`h-3.5 w-3.5 shrink-0 ${actionColor}`} />
                     <span className="min-w-0 flex-1 truncate text-xs">
                       {entry.entityName || entry.entityId}
