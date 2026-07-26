@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
@@ -20,6 +20,12 @@ import { Switch } from "@dragons/ui/components/switch";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 
+function formatLigaNrs(
+  data: { leagues: { ligaNr: number }[] } | null | undefined,
+): string {
+  return data ? data.leagues.map((l) => l.ligaNr).join(", ") : "";
+}
+
 export function TrackedLeagues() {
   const t = useTranslations();
   const settingsClubQ = queries.settingsClub();
@@ -36,10 +42,23 @@ export function TrackedLeagues() {
     ownClubRefs: l.ownClubRefs ?? false,
   })) ?? [];
 
-  const initialValue = trackedLeagues.map((l) => l.ligaNr).join(", ");
-  const [input, setInput] = useState(initialValue);
+  const [input, setInput] = useState(() => formatLigaNrs(leaguesData));
   const [saving, setSaving] = useState(false);
   const [lastNotFound, setLastNotFound] = useState<number[]>([]);
+  // The server prefetch on /admin/settings can fail into `null`, in which case
+  // the league list only arrives via client revalidation. Without this sync the
+  // input stays empty while the table below fills in, and Save posts an empty
+  // list — untracking every league. Same shape as `booking-config.tsx`.
+  const [initialized, setInitialized] = useState(() => leaguesData != null);
+
+  useEffect(() => {
+    if (leaguesData && !initialized) {
+      setInput(formatLigaNrs(leaguesData));
+      setInitialized(true);
+    }
+  }, [leaguesData, initialized]);
+
+  const canEdit = !!clubConfig && initialized;
 
   function parseInput(value: string): number[] {
     return value
@@ -60,6 +79,10 @@ export function TrackedLeagues() {
   }
 
   async function handleSave() {
+    // Refuse to write a list that was never read — an empty `input` here would
+    // mean "untrack everything" purely because the fetch hadn't landed.
+    if (!canEdit) return;
+
     const leagueNumbers = parseInput(input);
 
     try {
@@ -107,12 +130,12 @@ export function TrackedLeagues() {
               placeholder={t("settings.leagues.numbersPlaceholder")}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              disabled={!clubConfig}
+              disabled={!canEdit}
             />
           </div>
           <Button
             onClick={() => { void handleSave(); }}
-            disabled={!clubConfig || saving}
+            disabled={!canEdit || saving}
             className="w-fit"
           >
             {saving ? (

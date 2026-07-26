@@ -1226,7 +1226,8 @@
       "in_app": "In-App",
       "whatsapp_group": "WhatsApp-Gruppe",
       "email": "E-Mail"
-    }
+    },
+    "typeImmutable": "Der Typ kann nach dem Anlegen nicht mehr geändert werden."
   },
   "domainEvents": {
     "title": "Domain Events",

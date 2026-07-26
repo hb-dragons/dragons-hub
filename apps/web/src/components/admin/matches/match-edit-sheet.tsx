@@ -56,6 +56,7 @@ import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
 import type { OwnClubTeam } from "@dragons/shared";
 import { api } from "@/lib/api";
+import { resolveVenueId, type SelectedVenue } from "@/lib/venue-selection";
 import {
   formatMatchTime,
   formatPeriodScores,
@@ -218,7 +219,9 @@ export function MatchEditSheet({
   const [diffs, setDiffs] = useState<FieldDiff[]>([]);
   const [saving, setSaving] = useState(false);
   const [ownClubTeams, setOwnClubTeams] = useState<OwnClubTeam[]>([]);
-  const selectedVenueIdRef = useRef<number | null>(null);
+  // Remembers both the id and the label it was picked under, so the id can be
+  // reconciled against the text actually in the field at save time.
+  const selectedVenueRef = useRef<SelectedVenue | null>(null);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [setAllOpen, setSetAllOpen] = useState(false);
 
@@ -270,7 +273,7 @@ export function MatchEditSheet({
         if (cancelled) return;
         setMatch(result.match);
         setDiffs(result.diffs);
-        selectedVenueIdRef.current = null;
+        selectedVenueRef.current = null;
         form.reset(getDefaultValues(result.match));
       })
       .catch(() => {
@@ -327,9 +330,15 @@ export function MatchEditSheet({
 
       const updateData: MatchUpdateBody = { ...dirtyValues };
 
-      // Include venueId when a venue was selected from the combobox
-      if (currentDirtyFields.venueNameOverride && selectedVenueIdRef.current != null) {
-        updateData.venueId = selectedVenueIdRef.current;
+      // Include venueId only when the text in the field still names the venue
+      // that was picked from the combobox — a free-text edit since then means
+      // the remembered id belongs to a different venue.
+      if (currentDirtyFields.venueNameOverride) {
+        const venueId = resolveVenueId(
+          selectedVenueRef.current,
+          data.venueNameOverride,
+        );
+        if (venueId != null) updateData.venueId = venueId;
       }
 
       if (Object.keys(updateData).length === 0) return;
@@ -339,7 +348,7 @@ export function MatchEditSheet({
         const result = await api.matches.update(match.id, updateData);
         setMatch(result.match);
         setDiffs(result.diffs);
-        selectedVenueIdRef.current = null;
+        selectedVenueRef.current = null;
         form.reset(getDefaultValues(result.match));
         toast.success(t("matchDetail.toast.updated"));
         router.refresh();
@@ -361,7 +370,7 @@ export function MatchEditSheet({
         const result = await api.matches.releaseOverride(match.id, fieldName);
         setMatch(result.match);
         setDiffs(result.diffs);
-        selectedVenueIdRef.current = null;
+        selectedVenueRef.current = null;
         form.reset(getDefaultValues(result.match));
         toast.success(t("matchDetail.toast.overrideReleased"));
         router.refresh();
@@ -764,7 +773,10 @@ export function MatchEditSheet({
                           }}
                           onSelect={(option) => {
                             field.onChange(option.label);
-                            selectedVenueIdRef.current = Number(option.value);
+                            selectedVenueRef.current = {
+                              id: Number(option.value),
+                              label: option.label,
+                            };
                           }}
                           placeholder={t("matchDetail.overrides.venuePlaceholder")}
                           className="h-9"
