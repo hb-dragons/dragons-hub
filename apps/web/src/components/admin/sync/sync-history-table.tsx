@@ -199,9 +199,18 @@ function SyncHistoryTableInner({
                           run.status === "failed" &&
                           "border-l-2 border-l-destructive bg-destructive/5",
                         )}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
                         onClick={() =>
                           setExpandedId(isExpanded ? null : run.id)
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setExpandedId(isExpanded ? null : run.id);
+                          }
+                        }}
                       >
                         <TableCell>
                           <Badge variant={statusCfg.variant}>
