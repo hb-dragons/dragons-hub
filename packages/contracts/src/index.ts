@@ -1,3 +1,5 @@
+export { idParamSchema, type IdParam } from "./common";
+
 export {
   boardIdParamSchema,
   boardCreateBodySchema,
@@ -47,7 +49,9 @@ export {
   type ChannelConfigIdParam,
   type ChannelConfigListQuery,
   type ChannelConfigCreateBody,
+  type ChannelConfigCreateBodyParsed,
   type ChannelConfigUpdateBody,
+  type ChannelConfigUpdateBodyParsed,
 } from "./channel-config";
 
 export {

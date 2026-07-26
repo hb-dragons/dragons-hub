@@ -90,6 +90,122 @@ export interface SdkGameDetails {
   // Team data
   heimMannschaftLiga: SdkMannschaftLiga;
   gastMannschaftLiga: SdkMannschaftLiga;
+
+  // ── Status flags ──────────────────────────────────────────────────────────
+  // These are returned by getGameDetails and were previously absent from this
+  // type, which forced matches.sync.ts to source them from the *spielplan*
+  // response instead. `game-details-shape.test.ts` pins the full key set
+  // against the recorded live sample.
+  /** Result signed off by both teams. */
+  ergebnisbestaetigt: boolean;
+  /** Forfeit ("Verzicht"). */
+  verzicht: boolean;
+  /** Cancelled. */
+  abgesagt: boolean;
+
+  // ── Provenance / edit trail ───────────────────────────────────────────────
+  /** Who entered the result, e.g. "SR" or a club short name. */
+  ergebnisVon: string;
+  dssUseraccountId: number | null;
+  /** Venue changed after publication. */
+  spielortGeandert: boolean;
+  /** Kickoff time changed after publication. */
+  spielzeitGeandert: boolean;
+
+  // ── League ────────────────────────────────────────────────────────────────
+  liga: SdkGameLiga | null;
+
+  // ── Referee data ──────────────────────────────────────────────────────────
+  /**
+   * Assigned officials. The referee *assignment* endpoints return these
+   * populated; the public game-details call sends `null`.
+   */
+  spielleitungList: SdkSpielleitung[] | null;
+  /** Club delegated to provide SR1 / SR2 ("Vereinsdelegation"). */
+  sr1Verein: SdkVerein | null;
+  sr2Verein: SdkVerein | null;
+  sr1VereinInformiert: boolean | null;
+  sr2VereinInformiert: boolean | null;
+  /**
+   * "Ansetzungstool" state. Only ever observed as `null` or an opaque object;
+   * nothing in this repo reads into it.
+   */
+  ats: unknown | null;
+}
+
+/**
+ * The `liga` object embedded in a game-details response. Wider than
+ * `SdkOffeneSpieleLiga` — it carries the full referee-assignment rule set.
+ *
+ * Fields are those recorded in `src/samples/getGameDetails.shape.json`. The
+ * sub-objects the federation only ever sent as `null` in the recording
+ * (`spielklasse`, `bezirk`, `kreis`, `verband`, …) are typed `unknown | null`
+ * rather than guessed at, so nothing here claims more than was observed.
+ */
+export interface SdkGameLiga {
+  ligaId: number;
+  liganr: number;
+  liganame: string;
+  ligaKurzname: string | null;
+  srKurzname: string | null;
+  srKurznameOrLiganame: string;
+  parentLigaId: number | null;
+  geschlechtId: number;
+  geschlecht: string;
+  altersklasse: unknown | null;
+  spielklasse: unknown | null;
+  bezirk: unknown | null;
+  kreis: unknown | null;
+  verband: unknown | null;
+  ausschreibung: string | null;
+  spieltyp: string;
+  vorabLiga: boolean;
+
+  // Visibility
+  notPublic: boolean;
+  srNotPublic: boolean;
+  srNotVisible: boolean;
+  tabelleNotVisible: boolean;
+  statistikNotVisible: boolean;
+
+  // Scoring / statistics
+  fibaLiveScores: boolean;
+  fibaDss: boolean;
+  fibaCompetitionName: string | null;
+  scouting: boolean;
+  ergViertel: boolean;
+  spielerOhneTna: boolean;
+  nationalitaetSpielerstats: boolean;
+  localPlayerShowInfoEnabled: boolean;
+
+  // Editability
+  mannschaftdataEditable: boolean;
+  spielplanEditable: boolean;
+  mannschaftschluesselnrEditable: boolean;
+
+  // Referee assignment rules
+  srKosten: boolean;
+  srKostenKmPauschal: number;
+  srKoppelbar: boolean;
+  srMindestabstandTage: number;
+  srKmBegrenzungWochenende: number;
+  srKmBegrenzung: number;
+  sr1modus: string | null;
+  sr2modus: string | null;
+  sr3modus: string | null;
+  srModusKom: boolean;
+  srRueckgabefrist: number;
+  srSpieleboerseAktiv: boolean;
+  srSpieleDirektOnline: boolean;
+  srOffeneSpieleSichtbarTage: number;
+  srSofortUebernahmeErlaubt: boolean;
+  srOeffentlAnbietenErlaubt: boolean;
+  srZgSpieleAutoAnbieten: boolean;
+  srEigeneAnsetzungAnbieten: boolean;
+  srAnzahlSrHm: number;
+  srAnzahlSrNichtHm: number;
+  srGebiet: unknown | null;
+  srQualifikation: unknown | null;
 }
 
 export interface SdkGetGameResponse {

@@ -16,9 +16,13 @@ export const digestBuffer = pgTable(
     eventId: text("event_id")
       .notNull()
       .references(() => domainEvents.id),
+    // Transient pending work, not an audit record: if a channel config is ever
+    // hard-deleted its unsent digest entries have no meaning and go with it.
+    // (Routine retirement is a soft delete — see `channelConfigs.deletedAt` —
+    // which purges these explicitly.)
     channelConfigId: integer("channel_config_id")
       .notNull()
-      .references(() => channelConfigs.id),
+      .references(() => channelConfigs.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

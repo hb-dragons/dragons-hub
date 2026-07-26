@@ -16,9 +16,11 @@ export const venueBookingMatches = pgTable(
     venueBookingId: integer("venue_booking_id")
       .notNull()
       .references(() => venueBookings.id, { onDelete: "cascade" }),
+    // A booking↔match link has no meaning without the match, and the column is
+    // NOT NULL so detaching is not an option: the link goes with the match.
     matchId: integer("match_id")
       .notNull()
-      .references(() => matches.id),
+      .references(() => matches.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

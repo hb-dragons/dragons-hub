@@ -72,6 +72,12 @@ export const notificationLog = pgTable(
     digestRunIdx: index("notification_log_digest_run_idx").on(
       table.digestRunId,
     ),
+    // Backs the referential-integrity check Postgres runs on every
+    // `channel_configs` update/delete, plus the per-channel lookups in
+    // notification-admin.service.ts. Without it both seq-scan this table.
+    channelConfigIdx: index("notification_log_channel_config_idx").on(
+      table.channelConfigId,
+    ),
   }),
 );
 

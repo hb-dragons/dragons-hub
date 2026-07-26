@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const userRefereeLinkBodySchema = z.object({
+export const userRefereeLinkBodySchema = z.strictObject({
   refereeId: z.number().int().positive().nullable(),
 });
 

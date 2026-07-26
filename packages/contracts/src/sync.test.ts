@@ -187,9 +187,13 @@ describe("syncUpdateScheduleBodySchema", () => {
     expect(syncUpdateScheduleBodySchema.parse(input)).toEqual(input);
   });
 
-  it("strips a client-supplied updatedBy (audit actor is set server-side)", () => {
-    const result = syncUpdateScheduleBodySchema.parse({ enabled: true, updatedBy: "attacker" });
-    expect(result).not.toHaveProperty("updatedBy");
+  it("rejects a client-supplied updatedBy (audit actor is set server-side)", () => {
+    // Strict schema: a field the server owns is a 400, not a silent strip.
+    const result = syncUpdateScheduleBodySchema.safeParse({
+      enabled: true,
+      updatedBy: "attacker",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("allows empty object", () => {

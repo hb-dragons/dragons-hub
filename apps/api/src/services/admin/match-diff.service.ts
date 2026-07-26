@@ -12,6 +12,9 @@ export const OVERRIDABLE_FIELDS = [
   "guestHalftimeScore",
   "homeQ1", "guestQ1", "homeQ2", "guestQ2",
   "homeQ3", "guestQ3", "homeQ4", "guestQ4",
+  // Periods 5-8 apply to the "achtel" format.
+  "homeQ5", "guestQ5", "homeQ6", "guestQ6",
+  "homeQ7", "guestQ7", "homeQ8", "guestQ8",
   "homeOt1", "guestOt1", "homeOt2", "guestOt2",
 ] as const;
 
@@ -36,8 +39,8 @@ export interface DiffInput {
   kickoffTime: string;
   venueNameOverride: string | null;
   venueName: string | null;
-  isForfeited: boolean | null;
-  isCancelled: boolean | null;
+  isForfeited: boolean;
+  isCancelled: boolean;
   anschreiber: string | null;
   zeitnehmer: string | null;
   shotclock: string | null;

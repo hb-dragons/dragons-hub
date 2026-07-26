@@ -572,7 +572,7 @@ describe("PUT /sync/schedule", () => {
     );
   });
 
-  it("ignores a client-supplied updatedBy and uses the session user id", async () => {
+  it("rejects a client-supplied updatedBy instead of silently dropping it", async () => {
     mocks.upsertSchedule.mockResolvedValue({ id: 1, enabled: true });
 
     const res = await app.request("/sync/schedule", {
@@ -581,11 +581,24 @@ describe("PUT /sync/schedule", () => {
       body: JSON.stringify({ enabled: true, updatedBy: "attacker-spoof" }),
     });
 
+    // The schema is strict, so a field the server owns is a 400. Either way the
+    // spoofed actor never reaches the service.
+    expect(res.status).toBe(400);
+    expect(mocks.upsertSchedule).not.toHaveBeenCalled();
+  });
+
+  it("uses the session user id as the audit actor", async () => {
+    mocks.upsertSchedule.mockResolvedValue({ id: 1, enabled: true });
+
+    const res = await app.request("/sync/schedule", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: true }),
+    });
+
     expect(res.status).toBe(200);
-    // The spoofed audit field must never reach the service; the actor is
-    // derived server-side from the session.
     expect(mocks.upsertSchedule).toHaveBeenCalledWith(
-      expect.not.objectContaining({ updatedBy: "attacker-spoof" }),
+      expect.not.objectContaining({ updatedBy: expect.anything() }),
       "test-user-123",
     );
   });

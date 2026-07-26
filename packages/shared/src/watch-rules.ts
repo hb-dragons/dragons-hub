@@ -34,24 +34,6 @@ export interface WatchRuleListResult {
   total: number;
 }
 
-// ── Request body types ───────────────────────────────────────────────────────
-
-export interface CreateWatchRuleBody {
-  name: string;
-  enabled?: boolean;
-  eventTypes: string[];
-  filters?: FilterCondition[];
-  channels: ChannelTarget[];
-  urgencyOverride?: string | null;
-  templateOverride?: string | null;
-}
-
-export interface UpdateWatchRuleBody {
-  name?: string;
-  enabled?: boolean;
-  eventTypes?: string[];
-  filters?: FilterCondition[];
-  channels?: ChannelTarget[];
-  urgencyOverride?: string | null;
-  templateOverride?: string | null;
-}
+// Request body types live in `@dragons/contracts` (watch-rule.ts) as
+// `WatchRuleCreateBody` / `WatchRuleUpdateBody`, inferred from the zod schemas
+// the routes validate with.

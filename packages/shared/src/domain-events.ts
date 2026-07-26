@@ -1,7 +1,14 @@
 // ── Event metadata types ─────────────────────────────────────────────────────
 
 export type EventSource = "sync" | "manual" | "reconciliation";
-export type EventUrgency = "immediate" | "routine";
+/**
+ * Delivery urgency. Single source of truth — both the manual-trigger contract
+ * and the watch-rule `urgencyOverride` derive their enum from this array rather
+ * than restating the literals (watch-rule used to take a bare string, so a
+ * typo'd urgency saved cleanly and did nothing).
+ */
+export const EVENT_URGENCIES = ["immediate", "routine"] as const;
+export type EventUrgency = (typeof EVENT_URGENCIES)[number];
 /**
  * Every entity a domain event can be raised against. Single source of truth —
  * the manual-trigger request contract derives its `entityType` enum from this
@@ -62,6 +69,13 @@ export const EVENT_TYPES = {
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
+
+/**
+ * Every event type as a flat array. Watch rules validate their `eventTypes`
+ * against this, so a typo'd type is rejected at the boundary instead of being
+ * saved into a rule that then never fires.
+ */
+export const EVENT_TYPE_VALUES = Object.values(EVENT_TYPES) as readonly EventType[];
 
 // ── Payload interfaces ───────────────────────────────────────────────────────
 

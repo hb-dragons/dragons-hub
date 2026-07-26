@@ -23,6 +23,7 @@ export type {
   SdkSpielleitung,
   SdkRefereeSlot,
   SdkGameDetails,
+  SdkGameLiga,
   SdkGetGameResponse,
   SdkOpenGamesSearchParams,
   SdkOffeneSpieleLiga,
@@ -45,4 +46,9 @@ export type {
 
 // Helpers
 export { parseResult } from "./helpers/parse-result";
-export { isSdkLiga, isSdkSpielplanMatch, isSdkTabelleEntry } from "./helpers/type-guards";
+export {
+  isSdkLiga,
+  isSdkSpielplanMatch,
+  isSdkTabelleEntry,
+  isSdkTeamRef,
+} from "./helpers/type-guards";

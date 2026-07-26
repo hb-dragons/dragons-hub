@@ -87,28 +87,34 @@ async function storedCreatedBy(): Promise<Array<string | null>> {
 }
 
 describe("POST /boards — audit actor cannot be spoofed", () => {
-  it("stores the session user as createdBy when the body claims another user", async () => {
+  // `boardCreateBodySchema` is strict, so a body naming an actor the server
+  // owns is rejected outright rather than silently stripped. Either way the
+  // attacker cannot write someone else's id into `created_by`; rejecting is the
+  // louder of the two, so the caller is not left believing it was honoured.
+  it("rejects a body claiming another user as createdBy, and writes nothing", async () => {
     const res = await app.request("/boards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "Spoofed", createdBy: VICTIM }),
     });
 
-    expect(res.status).toBe(201);
-    expect(await storedCreatedBy()).toEqual([ATTACKER]);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(await storedCreatedBy()).toEqual([]);
   });
 
-  it("does not echo the client-supplied createdBy in the response", async () => {
+  it("rejects a null createdBy rather than erasing the audit actor", async () => {
     const res = await app.request("/boards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Spoofed", createdBy: VICTIM }),
+      body: JSON.stringify({ name: "Anonymous", createdBy: null }),
     });
 
-    expect(await res.json()).toMatchObject({ createdBy: ATTACKER });
+    expect(res.status).toBe(400);
+    expect(await storedCreatedBy()).toEqual([]);
   });
 
-  it("stores the session user as createdBy when the body omits it", async () => {
+  it("stores the session user as createdBy for an honest body", async () => {
     const res = await app.request("/boards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -117,16 +123,6 @@ describe("POST /boards — audit actor cannot be spoofed", () => {
 
     expect(res.status).toBe(201);
     expect(await storedCreatedBy()).toEqual([ATTACKER]);
-  });
-
-  it("does not let a null createdBy in the body erase the audit actor", async () => {
-    const res = await app.request("/boards", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Anonymous", createdBy: null }),
-    });
-
-    expect(res.status).toBe(201);
-    expect(await storedCreatedBy()).toEqual([ATTACKER]);
+    expect(await res.json()).toMatchObject({ createdBy: ATTACKER });
   });
 });

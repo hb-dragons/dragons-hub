@@ -32,7 +32,12 @@ export const standings = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
-    leagueIdIdx: index("standings_league_id_idx").on(table.leagueId),
+    // `standings_league_id_idx` is gone: it was a strict prefix of
+    // `standings_league_team_unique`, which serves every league-only lookup
+    // equally well, so it paid write cost for nothing.
+    // The composite cannot serve a team-only lookup, though, and two services
+    // filter on `team_api_id` alone — hence this one.
+    teamApiIdIdx: index("standings_team_api_id_idx").on(table.teamApiId),
     leagueTeamUnique: unique("standings_league_team_unique").on(table.leagueId, table.teamApiId),
   }),
 );

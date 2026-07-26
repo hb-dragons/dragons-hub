@@ -4,10 +4,12 @@ import { sql, asc, desc, ilike, and, or, eq, inArray, isNull } from "drizzle-orm
 import type {
   RefereeListItem,
   PaginatedResponse,
-  UpdateRefereeVisibilityBody,
-  UpdateRefereeRulesBody,
   RefereeCountsResponse,
 } from "@dragons/shared";
+import type {
+  RefereeVisibilityBody,
+  UpdateRefereeRulesBodyParsed,
+} from "@dragons/contracts";
 
 export class RefereeSettingsError extends Error {
   constructor(
@@ -155,7 +157,7 @@ export async function getRefereeCounts(): Promise<RefereeCountsResponse> {
 
 export async function updateRefereeVisibility(
   refereeId: number,
-  body: UpdateRefereeVisibilityBody,
+  body: RefereeVisibilityBody,
 ) {
   const [updated] = await getDb()
     .update(referees)
@@ -182,7 +184,7 @@ export async function updateRefereeVisibility(
 
 export async function updateRefereeRules(
   refereeId: number,
-  body: UpdateRefereeRulesBody,
+  body: UpdateRefereeRulesBodyParsed,
 ) {
   return getDb().transaction(async (tx) => {
     const [ref] = await tx

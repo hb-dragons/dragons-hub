@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, boolean, timestamp, integer, index } from "drizzle-orm/pg-core";
 import { referees } from "./referees";
 
 export const user = pgTable("user", {
@@ -20,19 +20,27 @@ export const user = pgTable("user", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const session = pgTable("session", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  token: text("token").notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  impersonatedBy: text("impersonated_by"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    impersonatedBy: text("impersonated_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // Every session lookup by user, and the cascade Postgres runs when a user
+    // is deleted, seq-scanned this table without it.
+    userIdIdx: index("session_user_id_idx").on(table.userId),
+  }),
+);
 
 export const account = pgTable("account", {
   id: text("id").primaryKey(),

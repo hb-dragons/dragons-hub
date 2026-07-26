@@ -124,6 +124,36 @@ describe("createChannelConfigSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // `channel_configs.config` is a jsonb column typed `$type<ChannelConfig>()`.
+  // If unknown keys survive parsing, that type is a lie at read time.
+  it("strips keys the channel's config shape does not declare", () => {
+    const result = createChannelConfigSchema.parse({
+      ...base,
+      type: "in_app",
+      config: { audienceRole: "admin", locale: "de", injected: "payload" },
+    });
+    expect(result.config).toEqual({ audienceRole: "admin", locale: "de" });
+  });
+
+  it.each(CHANNEL_TYPES)("strips unknown config keys for %s", (type) => {
+    const result = createChannelConfigSchema.parse({
+      ...base,
+      type,
+      config: { ...VALID_CONFIG_BY_CHANNEL_TYPE[type], injected: "payload" },
+    });
+    expect(result.config).not.toHaveProperty("injected");
+  });
+
+  it("rejects a body carrying a key the schema does not declare", () => {
+    const result = createChannelConfigSchema.safeParse({
+      ...base,
+      type: "in_app",
+      config: VALID_CONFIG_BY_CHANNEL_TYPE.in_app,
+      digstMode: "none", // typo'd key — silently ignored before `.strict()`
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("channelConfigIdParamSchema", () => {
@@ -211,6 +241,11 @@ describe("updateChannelConfigSchema", () => {
     expect(updateChannelConfigSchema.parse({ digestTimezone: "Europe/Berlin" })).toEqual({
       digestTimezone: "Europe/Berlin",
     });
+  });
+
+  it("rejects a body carrying a key the schema does not declare", () => {
+    // A mistyped key used to return 200 having changed nothing.
+    expect(() => updateChannelConfigSchema.parse({ enable: false })).toThrow();
   });
 });
 

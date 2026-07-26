@@ -42,6 +42,10 @@ export interface SyncRun {
   durationMs: number | null;
   errorMessage: string | null;
   errorStack: string | null;
+  /** Which orchestrator step failed — added for incident triage. */
+  failedStep: string | null;
+  /** Which instance owned the run — added for incident triage. */
+  ownerInstanceId: string | null;
   summary: SyncRunSummary | null;
   createdAt: string;
 }

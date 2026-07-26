@@ -160,6 +160,21 @@ function makeGameDetails(
       spieltag: 1,
       spieldatum: Date.now(),
       spielfeldId: 50,
+      // Status/provenance fields the live API returns (SdkGameDetails).
+      ergebnisbestaetigt: false,
+      verzicht: false,
+      abgesagt: false,
+      ergebnisVon: "SR",
+      dssUseraccountId: null,
+      spielortGeandert: false,
+      spielzeitGeandert: false,
+      liga: null,
+      spielleitungList: null,
+      sr1Verein: null,
+      sr2Verein: null,
+      sr1VereinInformiert: null,
+      sr2VereinInformiert: null,
+      ats: null,
       heimEndstand: 80,
       gastEndstand: 70,
       heimHalbzeitstand: 40,
@@ -465,6 +480,25 @@ describe("syncMatchesFromData — create path", () => {
     const row = await matchRow();
     expect(row.homeScore).toBe(63);
     expect(row.guestScore).toBe(61);
+  });
+
+  it("keeps a forfeit result of \"0:20\" as 0, not NULL", async () => {
+    // `parseResult` used `parseInt(...) || null`, so the 0 of a forfeit became
+    // null and the match persisted as {home: null, guest: 20}.
+    await syncMatchesFromData(
+      [
+        makeLeagueData({
+          spielplan: [makeBasicMatch({ result: "0:20", verzicht: true })],
+          gameDetails: new Map(),
+        }),
+      ],
+      VENUE_LOOKUP,
+      null,
+    );
+
+    const row = await matchRow();
+    expect(row.homeScore).toBe(0);
+    expect(row.guestScore).toBe(20);
   });
 
   it("stores negative SDK scores as NULL", async () => {

@@ -28,7 +28,7 @@ export type RefereeGamesQuery = z.infer<typeof refereeGamesQuerySchema>;
  * The referee may only assign themselves; the ownership check happens in the
  * route handler after parsing.
  */
-export const refereeAssignBodySchema = z.object({
+export const refereeAssignBodySchema = z.strictObject({
   slotNumber: z.union([z.literal(1), z.literal(2)]),
   refereeApiId: z.number().int().positive(),
 });
@@ -40,7 +40,7 @@ export type RefereeAssignBody = z.infer<typeof refereeAssignBodySchema>;
  * The entire body is optional — an empty body is a valid claim request.
  */
 export const refereeClaimBodySchema = z
-  .object({
+  .strictObject({
     slotNumber: z.union([z.literal(1), z.literal(2)]).optional(),
   })
   .optional();

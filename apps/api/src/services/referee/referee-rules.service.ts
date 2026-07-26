@@ -1,7 +1,8 @@
 import { getDb } from "../../config/database";
 import { refereeAssignmentRules, teams } from "@dragons/db/schema";
 import { eq, and } from "drizzle-orm";
-import type { RefereeRulesResponse, UpdateRefereeRulesBody } from "@dragons/shared";
+import type { RefereeRulesResponse } from "@dragons/shared";
+import type { UpdateRefereeRulesBodyParsed } from "@dragons/contracts";
 
 export async function getRulesForReferee(refereeId: number): Promise<RefereeRulesResponse> {
   const rows = await getDb()
@@ -22,7 +23,7 @@ export async function getRulesForReferee(refereeId: number): Promise<RefereeRule
 
 export async function updateRulesForReferee(
   refereeId: number,
-  body: UpdateRefereeRulesBody,
+  body: UpdateRefereeRulesBodyParsed,
 ): Promise<RefereeRulesResponse> {
   await getDb().transaction(async (tx) => {
     await tx

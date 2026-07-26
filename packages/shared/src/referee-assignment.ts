@@ -1,9 +1,7 @@
 import type { SdkRefCandidate } from "@dragons/sdk";
 
-export interface AssignRefereeBody {
-  slotNumber: 1 | 2;
-  refereeApiId: number;
-}
+// The request body type lives in `@dragons/contracts` as `RefereeAssignBody`
+// (referee-self.ts), inferred from the zod schema the route validates with.
 
 export interface AssignRefereeResponse {
   success: true;

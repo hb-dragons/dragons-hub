@@ -1,10 +1,9 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
-export const boardIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const boardIdParamSchema = idParamSchema;
 
-export const boardCreateBodySchema = z.object({
+export const boardCreateBodySchema = z.strictObject({
   name: z.string().min(1).max(100),
   description: z.string().max(500).nullable().optional(),
   // No createdBy: the audit actor is set server-side from the session, never
@@ -12,17 +11,16 @@ export const boardCreateBodySchema = z.object({
   // unknown keys, so a body that supplies it is silently ignored.
 });
 
-export const boardUpdateBodySchema = z.object({
+export const boardUpdateBodySchema = z.strictObject({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).nullable().optional(),
 });
 
-export const columnIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
+export const columnIdParamSchema = idParamSchema.extend({
   colId: z.coerce.number().int().positive(),
 });
 
-export const columnCreateBodySchema = z.object({
+export const columnCreateBodySchema = z.strictObject({
   name: z.string().min(1).max(100),
   color: z
     .string()
@@ -32,7 +30,7 @@ export const columnCreateBodySchema = z.object({
   isDoneColumn: z.boolean().optional(),
 });
 
-export const columnUpdateBodySchema = z.object({
+export const columnUpdateBodySchema = z.strictObject({
   name: z.string().min(1).max(100).optional(),
   position: z.number().int().min(0).optional(),
   color: z
@@ -43,7 +41,7 @@ export const columnUpdateBodySchema = z.object({
   isDoneColumn: z.boolean().optional(),
 });
 
-export const columnReorderBodySchema = z.object({
+export const columnReorderBodySchema = z.strictObject({
   columns: z
     .array(
       z.object({

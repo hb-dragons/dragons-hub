@@ -458,6 +458,30 @@ describe("PATCH /channel-configs/:id (typed config validation)", () => {
     });
   });
 
+  it("persists the validated config, not the raw body", async () => {
+    mocks.getChannelConfig.mockResolvedValue({ ...sampleConfig, type: "in_app" });
+    // What the per-type schema returns: the same object with unknown keys gone.
+    mocks.validateConfigForType.mockReturnValue({ audienceRole: "admin", locale: "de" });
+    mocks.updateChannelConfig.mockResolvedValue(sampleConfig);
+
+    const res = await app.request("/channel-configs/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Renamed",
+        config: { audienceRole: "admin", locale: "de", injected: "payload" },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    // The raw body — carrying `injected` — must never reach the jsonb column,
+    // which is typed `$type<ChannelConfig>()`.
+    expect(mocks.updateChannelConfig).toHaveBeenCalledWith(1, {
+      name: "Renamed",
+      config: { audienceRole: "admin", locale: "de" },
+    });
+  });
+
   it("returns 400 VALIDATION_ERROR when config does not match existing type", async () => {
     mocks.getChannelConfig.mockResolvedValue({ ...sampleConfig, type: "in_app" });
     mocks.validateConfigForType.mockReturnValue(null);
