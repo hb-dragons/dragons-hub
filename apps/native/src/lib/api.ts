@@ -1,5 +1,3 @@
-import { router } from "expo-router";
-import { mutate as globalMutate } from "swr";
 import {
   ApiClient,
   publicEndpoints,
@@ -9,20 +7,16 @@ import {
 } from "@dragons/api-client";
 import { authClient, resolveApiUrl } from "./auth-client";
 import { createOnceGuard } from "./auth/once-guard";
+import { performSignOut } from "./auth/sign-out";
 
 const baseUrl = resolveApiUrl();
 
 // De-duplicate the 401 recovery flow so a burst of concurrent authed requests
-// can't trigger N sign-outs / navigations.
-const handleUnauthorized = createOnceGuard(async () => {
-  await authClient.signOut().catch(() => {});
-  // Clear every SWR cache entry without revalidating so post-signOut
-  // screens don't briefly show the previous user's data.
-  await globalMutate(() => true, undefined, { revalidate: false });
-  // `router` is a stable singleton from expo-router; safe to call outside
-  // the React tree. `replace("/")` is a no-op if already on home.
-  router.replace("/");
-});
+// can't trigger N sign-outs / navigations. Runs the same sign-out routine as
+// the manual "Sign Out" action (deregister push, clear session, wipe the SWR
+// cache, navigate home) so a silently-expired session can't keep receiving
+// push or leak its cached data to the next user on this device.
+const handleUnauthorized = createOnceGuard(performSignOut);
 
 export const apiClient = new ApiClient({
   baseUrl,
