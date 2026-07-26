@@ -9,6 +9,13 @@ import {
 } from "@dragons/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
+
+/**
+ * Overridable columns that are NOT NULL in `matches` (migration 0041). Clearing
+ * an override on one of these restores `false` when there is nothing to restore
+ * from remote — `null` would violate the constraint.
+ */
+const NOT_NULL_STATUS_FIELDS = new Set<string>(["isForfeited", "isCancelled"]);
 import type { MatchDetailResponse, EventType } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import type { MatchUpdateData, TransactionClient } from "./match-query.service";
@@ -104,7 +111,11 @@ export async function updateMatchLocal(
       if (rawVal === null && isOverridable) {
         clearedOverrides.add(field);
         const restored = remoteSnapshot?.[field];
-        newVal = (restored ?? null) as typeof rawVal;
+        // Status flags are NOT NULL in the schema, and there may be no remote
+        // snapshot to restore from (never synced, or a purely local match).
+        // Their cleared value is `false` — writing null violates the constraint.
+        const cleared = NOT_NULL_STATUS_FIELDS.has(field) ? false : null;
+        newVal = (restored ?? cleared) as typeof rawVal;
       }
 
       const oldVal = locked[field as keyof typeof locked];

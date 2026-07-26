@@ -7,8 +7,8 @@ function makeDiffInput(overrides: Partial<DiffInput> = {}): DiffInput {
     kickoffTime: "19:30",
     venueNameOverride: null,
     venueName: null,
-    isForfeited: null,
-    isCancelled: null,
+    isForfeited: false,
+    isCancelled: false,
     anschreiber: null,
     zeitnehmer: null,
     shotclock: null,
@@ -347,14 +347,16 @@ describe("computeDiffs", () => {
     });
   });
 
-  describe("null effective value handling", () => {
-    it("converts null effective value to null localValue", () => {
-      const row = makeDiffInput({ isForfeited: null });
+  describe("false effective value handling", () => {
+    it("renders a false effective value against a true remote as diverged", () => {
+      // `isForfeited` is NOT NULL (migration 0041), so "not forfeited" is false,
+      // never null — the diff must still read as diverged from a true remote.
+      const row = makeDiffInput({ isForfeited: false });
       const remote = { isForfeited: true };
       const result = computeDiffs(row, ["isForfeited"], remote);
 
       const diff = result.find((d) => d.field === "isForfeited");
-      expect(diff?.localValue).toBeNull();
+      expect(diff?.localValue).toBe("false");
       expect(diff?.remoteValue).toBe("true");
       expect(diff?.status).toBe("diverged");
     });

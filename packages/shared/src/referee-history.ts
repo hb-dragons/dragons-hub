@@ -1,4 +1,5 @@
-export type HistoryStatusValue = "played" | "cancelled" | "forfeited";
+// `HistoryStatusValue` is declared once, in `@dragons/contracts`
+// (referee-history.ts), where the zod enum it comes from lives.
 
 /**
  * @deprecated Use `HistoryStatusValue[]` instead. Kept for legacy URL parsing

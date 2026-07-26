@@ -17,7 +17,10 @@ export const refereeGames = pgTable(
   {
     id: serial("id").primaryKey(),
     apiMatchId: integer("api_match_id").notNull().unique(),
-    matchId: integer("match_id").references(() => matches.id),
+    // referee_games is synced independently and keyed by `api_match_id`; the
+    // link to a local match is enrichment, not ownership. Deleting the match
+    // unlinks the referee game rather than destroying the officiating record.
+    matchId: integer("match_id").references(() => matches.id, { onDelete: "set null" }),
     matchNo: integer("match_no").notNull(),
     kickoffDate: date("kickoff_date").notNull(),
     kickoffTime: time("kickoff_time").notNull(),

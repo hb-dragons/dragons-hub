@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
-import { eq, like, desc } from "drizzle-orm";
+import { and, eq, isNull, like, desc } from "drizzle-orm";
 import { ulid } from "ulid";
 import { getDb } from "../../config/database";
 import {
@@ -79,7 +79,8 @@ notificationTestRoutes.post(
     const pushChannels = await getDb()
       .select()
       .from(channelConfigs)
-      .where(eq(channelConfigs.type, "push"));
+      // Retired configs stay in the table to keep notification_log's FK valid.
+      .where(and(eq(channelConfigs.type, "push"), isNull(channelConfigs.deletedAt)));
     const pushChannel = pushChannels[0];
     if (!pushChannel) {
       log.error("push channel_config row missing");

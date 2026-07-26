@@ -292,8 +292,42 @@ describe("updateChannelConfig", () => {
   });
 });
 
+/**
+ * Deletion is a soft delete. A hard `DELETE` raised Postgres 23503 for any
+ * config that had ever delivered a notification — `notification_log`'s
+ * `channel_config_id` is NOT NULL and references this table — and surfaced as an
+ * unhandled 500 on `DELETE /admin/channel-configs/:id`. `ON DELETE SET NULL` is
+ * not available on a NOT NULL column, and cascading would delete users' in-app
+ * notifications (notification_log *is* the inbox) to retire a delivery route.
+ *
+ * These cases run the real migrations, so the FK is real: a regression to a hard
+ * delete fails here rather than in production.
+ */
 describe("deleteChannelConfig", () => {
-  it("removes only the addressed row and reports true", async () => {
+  async function seedDeliveredNotification(channelConfigId: number): Promise<void> {
+    await ctx.client.exec(`
+      INSERT INTO domain_events
+        (id, type, source, urgency, occurred_at, entity_type, entity_id, entity_name, deep_link_path, payload)
+      VALUES
+        ('evt-001', 'match.cancelled', 'sync', 'immediate', NOW(), 'match', 1, 'Test Match', '/matches/1', '{}');
+    `);
+    await ctx.client.exec(`
+      INSERT INTO notification_log
+        (event_id, channel_config_id, recipient_id, title, body, status, sent_at)
+      VALUES
+        ('evt-001', ${channelConfigId}, 'user:alice', 'Match cancelled', 'body', 'sent', NOW());
+    `);
+    await ctx.client.exec(`
+      INSERT INTO digest_buffer (event_id, channel_config_id) VALUES ('evt-001', ${channelConfigId});
+    `);
+  }
+
+  async function rows(sql: string): Promise<Record<string, unknown>[]> {
+    const result = await ctx.client.query(sql);
+    return result.rows as Record<string, unknown>[];
+  }
+
+  it("removes only the addressed row from view and reports true", async () => {
     const target = await seedConfig({ name: "target" });
     const bystander = await seedConfig({ name: "bystander" });
 
@@ -307,5 +341,60 @@ describe("deleteChannelConfig", () => {
 
     expect(await deleteChannelConfig(999)).toBe(false);
     expect((await listChannelConfigs({})).total).toBe(1);
+  });
+
+  it("succeeds for a config that has already delivered a notification", async () => {
+    const id = await seedConfig();
+    await seedDeliveredNotification(id);
+
+    await expect(deleteChannelConfig(id)).resolves.toBe(true);
+  });
+
+  it("keeps the delivered notification_log rows", async () => {
+    const id = await seedConfig();
+    await seedDeliveredNotification(id);
+
+    await deleteChannelConfig(id);
+
+    const logs = await rows("SELECT * FROM notification_log");
+    expect(logs).toHaveLength(1);
+    expect(logs[0]!["channel_config_id"]).toBe(id);
+  });
+
+  it("drops the pending digest_buffer rows, which are work for a retired route", async () => {
+    const id = await seedConfig();
+    await seedDeliveredNotification(id);
+
+    await deleteChannelConfig(id);
+
+    expect(await rows("SELECT * FROM digest_buffer")).toHaveLength(0);
+  });
+
+  it("marks the row deleted and disables it, and hides it from the list", async () => {
+    const id = await seedConfig();
+    await seedDeliveredNotification(id);
+
+    await deleteChannelConfig(id);
+
+    expect(await listChannelConfigs({})).toEqual({ configs: [], total: 0 });
+    const stored = await rows(`SELECT enabled, deleted_at FROM channel_configs WHERE id = ${id}`);
+    expect(stored[0]!["enabled"]).toBe(false);
+    expect(stored[0]!["deleted_at"]).not.toBeNull();
+  });
+
+  it("returns false for a config that was already retired", async () => {
+    const id = await seedConfig();
+
+    expect(await deleteChannelConfig(id)).toBe(true);
+    expect(await deleteChannelConfig(id)).toBe(false);
+  });
+
+  it("cannot be resurrected by an update", async () => {
+    const id = await seedConfig();
+    await deleteChannelConfig(id);
+
+    expect(await updateChannelConfig(id, { enabled: true })).toBeNull();
+    const stored = await rows(`SELECT enabled FROM channel_configs WHERE id = ${id}`);
+    expect(stored[0]!["enabled"]).toBe(false);
   });
 });

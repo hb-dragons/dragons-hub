@@ -47,6 +47,8 @@ export interface MatchListParams {
 export interface MatchUpdateData {
   kickoffDate?: string | null;
   kickoffTime?: string | null;
+  // null = "clear the override"; the service resolves that to false, since the
+  // columns themselves are NOT NULL.
   isForfeited?: boolean | null;
   isCancelled?: boolean | null;
   homeScore?: number | null;
@@ -490,12 +492,11 @@ export async function getOwnClubMatches(params: MatchListParams) {
     );
   }
   if (excludeInactive) {
-    conditions.push(
-      or(isNull(matches.isForfeited), eq(matches.isForfeited, false))!,
-    );
-    conditions.push(
-      or(isNull(matches.isCancelled), eq(matches.isCancelled, false))!,
-    );
+    // The columns are NOT NULL (migration 0041), so a plain `= false` covers
+    // every row; the old `OR is_forfeited IS NULL` existed only because NULL
+    // rows would otherwise have been dropped by the equality test.
+    conditions.push(eq(matches.isForfeited, false));
+    conditions.push(eq(matches.isCancelled, false));
   }
 
   const whereClause = conditions.length === 1 ? conditions[0]! : and(...conditions)!;

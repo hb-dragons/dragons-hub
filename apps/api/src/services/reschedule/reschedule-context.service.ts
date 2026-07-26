@@ -41,8 +41,8 @@ export async function getMatchForReschedule(matchId: number): Promise<Reschedule
     guestTeamName: row.guestTeamName,
     venueId: row.venueId,
     venueName: row.venueName,
-    isCancelled: row.isCancelled ?? false,
-    isForfeited: row.isForfeited ?? false,
+    isCancelled: row.isCancelled,
+    isForfeited: row.isForfeited,
   };
 }
 

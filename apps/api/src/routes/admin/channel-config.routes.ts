@@ -17,12 +17,9 @@ import {
   updateChannelConfigSchema,
   validateConfigForType,
 } from "@dragons/contracts";
+import type { ChannelConfigUpdateBodyParsed } from "@dragons/contracts";
 import { CHANNEL_TYPES } from "@dragons/shared";
-import type {
-  CreateChannelConfigBody,
-  ProviderAvailability,
-  UpdateChannelConfigBody,
-} from "@dragons/shared";
+import type { ProviderAvailability } from "@dragons/shared";
 import { env } from "../../config/env";
 
 const channelConfigRoutes = new Hono<AppEnv>();
@@ -133,7 +130,9 @@ channelConfigRoutes.post(
       );
     }
 
-    const config = await createChannelConfig(body as unknown as CreateChannelConfigBody);
+    // `body.config` is already the parsed, key-stripped ChannelConfig — the
+    // create schema transforms it, so no cast is needed here any more.
+    const config = await createChannelConfig(body);
     return c.json(config, 201);
   },
 );
@@ -154,9 +153,10 @@ channelConfigRoutes.patch(
   }),
   async (c) => {
     const { id } = c.req.valid("param");
-    const body = c.req.valid("json");
+    const { config: rawConfig, ...rest } = c.req.valid("json");
+    const updates: ChannelConfigUpdateBodyParsed = rest;
 
-    if (body.config) {
+    if (rawConfig) {
       const existing = await getChannelConfig(id);
       if (!existing) {
         return c.json(
@@ -165,7 +165,7 @@ channelConfigRoutes.patch(
         );
       }
 
-      const validated = validateConfigForType(existing.type, body.config);
+      const validated = validateConfigForType(existing.type, rawConfig);
       if (!validated) {
         return c.json(
           {
@@ -175,9 +175,13 @@ channelConfigRoutes.patch(
           400,
         );
       }
+      // Persist the *validated* value. Writing `body.config` back would put the
+      // raw record — unknown keys and all — into a jsonb column typed
+      // `$type<ChannelConfig>()`.
+      updates.config = validated;
     }
 
-    const config = await updateChannelConfig(id, body as UpdateChannelConfigBody);
+    const config = await updateChannelConfig(id, updates);
 
     if (!config) {
       return c.json(

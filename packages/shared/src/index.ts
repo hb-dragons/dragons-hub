@@ -135,8 +135,6 @@ export type {
   RefereeRule,
   RefereeRulesResponse,
   RefereeCountsResponse,
-  UpdateRefereeRulesBody,
-  UpdateRefereeVisibilityBody,
   EligibleOpenGamesResponse,
 } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
@@ -214,7 +212,6 @@ export type {
 
 // Referee assignment
 export type {
-  AssignRefereeBody,
   AssignRefereeResponse,
   UnassignRefereeResponse,
   CandidateSearchResponse,

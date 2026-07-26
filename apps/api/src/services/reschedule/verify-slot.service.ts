@@ -107,7 +107,7 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
       ),
     );
 
-  const activeClash = sameDay.find((mm) => mm.isCancelled !== true && mm.isForfeited !== true);
+  const activeClash = sameDay.find((mm) => !mm.isCancelled && !mm.isForfeited);
   if (activeClash) {
     conflicts.push({
       type: "team-double-book",

@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { notificationLog, domainEvents, channelConfigs, user } from "@dragons/db/schema";
-import { eq, and, desc, count, ne, inArray } from "drizzle-orm";
+import { eq, and, desc, count, ne, inArray, isNull } from "drizzle-orm";
 import { parseRoles } from "@dragons/shared";
 import { dispatchImmediate } from "../notifications/notification-pipeline";
 import { logger } from "../../config/logger";
@@ -219,9 +219,10 @@ export async function retryFailedNotification(
   const [config] = await getDb()
     .select({ id: channelConfigs.id, type: channelConfigs.type, config: channelConfigs.config })
     .from(channelConfigs)
-    .where(eq(channelConfigs.id, entry.channelConfigId))
+    .where(and(eq(channelConfigs.id, entry.channelConfigId), isNull(channelConfigs.deletedAt)))
     .limit(1);
-  /* v8 ignore next 3 -- defensive: notification_log.channel_config_id is a FK, so the config always exists */
+  // The FK guarantees the row is still there, but it may have been retired
+  // (`deleted_at`), and re-dispatching down a retired route is not allowed.
   if (!config) {
     return { success: false, error: "Channel config no longer exists" };
   }

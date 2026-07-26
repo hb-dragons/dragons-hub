@@ -40,15 +40,15 @@ describe("reschedule-context", () => {
     expect(await getMatchForReschedule(999)).toBeNull();
   });
 
-  it("getMatchForReschedule returns isCancelled/isForfeited as false when DB columns are null", async () => {
+  it("getMatchForReschedule reports isCancelled/isForfeited as false when unset", async () => {
     await seedOwnTeam(100, "Dragons"); await seedOwnTeam(200, "Lions"); await seedVenue(1); await seedLeague(1);
-    // Insert a match with explicit null for both nullable boolean columns
+    // The columns are NOT NULL DEFAULT false (migration 0041), so an insert that
+    // omits them lands on false — there is no third state to fall back from.
     await ctx.db.insert(matches).values({
       id: 2, apiMatchId: 22, matchNo: 2, matchDay: 7,
       kickoffDate: "2026-03-01", kickoffTime: "16:00:00",
       homeTeamApiId: 100, guestTeamApiId: 200,
       venueId: 1, leagueId: 1,
-      isCancelled: null, isForfeited: null,
     });
     const m = await getMatchForReschedule(2);
     expect(m).not.toBeNull();

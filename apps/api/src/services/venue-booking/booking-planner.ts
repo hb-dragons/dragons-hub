@@ -81,7 +81,7 @@ export interface ReconcilePlan {
 }
 
 function isActive(m: PlannerMatch): boolean {
-  return m.isForfeited !== true && m.isCancelled !== true;
+  return !m.isForfeited && !m.isCancelled;
 }
 
 /**

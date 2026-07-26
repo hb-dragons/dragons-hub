@@ -690,6 +690,24 @@ describe("updateMatchLocal", () => {
     expect(overrides.rows).toHaveLength(0);
   });
 
+  it("clearing isCancelled with no remote snapshot restores false, not NULL", async () => {
+    await seedBasicData();
+    // `matches.is_cancelled` is NOT NULL (migration 0041). Clearing the override
+    // restores the remote value, and with no remote snapshot that lookup yields
+    // undefined — which has to land on `false`, not `null`.
+    const matchId = await insertMatch({ is_cancelled: true });
+    await insertOverride(matchId, "isCancelled");
+
+    const result = await updateMatchLocal(matchId, { isCancelled: null }, "admin@test.com");
+
+    expect(result!.match.isCancelled).toBe(false);
+    const rows = await ctx.client.query(
+      "SELECT is_cancelled FROM matches WHERE id = $1",
+      [matchId],
+    );
+    expect((rows.rows[0] as Record<string, unknown>).is_cancelled).toBe(false);
+  });
+
   it("updates field from null to non-null value", async () => {
     await seedBasicData();
     const matchId = await insertMatch({ anschreiber: null });

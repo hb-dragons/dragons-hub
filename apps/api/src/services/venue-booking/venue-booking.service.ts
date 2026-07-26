@@ -164,8 +164,8 @@ async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, Re
       homeBadgeColor: r.homeBadgeColor,
       guestTeam: r.guestTeam,
       kickoffTime: r.kickoffTime,
-      isForfeited: r.isForfeited ?? false,
-      isCancelled: r.isCancelled ?? false,
+      isForfeited: r.isForfeited,
+      isCancelled: r.isCancelled,
     });
   }
   return map;

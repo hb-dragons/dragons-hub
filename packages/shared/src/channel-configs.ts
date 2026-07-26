@@ -69,23 +69,6 @@ export interface ProviderStatus {
 
 export type ProviderAvailability = Record<ChannelType, ProviderStatus>;
 
-// ── Request body types ───────────────────────────────────────────────────────
-
-export interface CreateChannelConfigBody {
-  name: string;
-  type: ChannelType;
-  enabled?: boolean;
-  config: ChannelConfig;
-  digestMode?: DigestMode;
-  digestCron?: string | null;
-  digestTimezone?: string;
-}
-
-export interface UpdateChannelConfigBody {
-  name?: string;
-  enabled?: boolean;
-  config?: ChannelConfig;
-  digestMode?: DigestMode;
-  digestCron?: string | null;
-  digestTimezone?: string;
-}
+// Request body types live in `@dragons/contracts` (channel-config.ts) — the zod
+// schema is the single source of truth, and restating them here let the two
+// drift apart.

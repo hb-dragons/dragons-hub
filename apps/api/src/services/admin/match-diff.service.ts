@@ -36,8 +36,8 @@ export interface DiffInput {
   kickoffTime: string;
   venueNameOverride: string | null;
   venueName: string | null;
-  isForfeited: boolean | null;
-  isCancelled: boolean | null;
+  isForfeited: boolean;
+  isCancelled: boolean;
   anschreiber: string | null;
   zeitnehmer: string | null;
   shotclock: string | null;

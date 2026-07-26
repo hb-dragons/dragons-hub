@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CHANNEL_TYPES } from "@dragons/shared";
-import type { ChannelType } from "@dragons/shared";
+import type { ChannelConfig, ChannelType } from "@dragons/shared";
 
 export const channelConfigIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -52,8 +52,15 @@ const configSchemaByType: Record<ChannelType, z.ZodType> = {
 
 const channelTypeSchema = z.enum(CHANNEL_TYPES);
 
+/**
+ * `config` is parsed *and replaced* by the per-type shape, so the value that
+ * reaches the `jsonb` column (typed `$type<ChannelConfig>()`) carries only the
+ * keys that type declares. A `superRefine` could reject a bad config but had no
+ * way to hand back the stripped one, so the raw body was persisted instead and
+ * arbitrary keys accumulated in the column.
+ */
 export const createChannelConfigSchema = z
-  .object({
+  .strictObject({
     name: z.string().min(1),
     type: channelTypeSchema,
     enabled: z.boolean().optional(),
@@ -62,9 +69,8 @@ export const createChannelConfigSchema = z
     digestCron: z.string().nullable().optional(),
     digestTimezone: z.string().optional(),
   })
-  .superRefine((data, ctx) => {
-    const schema = configSchemaByType[data.type];
-    const result = schema.safeParse(data.config);
+  .transform((data, ctx) => {
+    const result = configSchemaByType[data.type].safeParse(data.config);
     if (!result.success) {
       for (const issue of result.error.issues) {
         ctx.addIssue({
@@ -72,16 +78,29 @@ export const createChannelConfigSchema = z
           path: ["config", ...issue.path],
         });
       }
+      return z.NEVER;
     }
+    return { ...data, config: result.data as ChannelConfig };
   });
 
-export type ChannelConfigCreateBody = z.infer<
+/**
+ * Request (input) type — `config` is a transform whose input is a plain record,
+ * so callers build bodies with `z.input`, not the parsed output.
+ */
+export type ChannelConfigCreateBody = z.input<typeof createChannelConfigSchema>;
+/** What the route receives from `c.req.valid("json")`: `config` already narrowed. */
+export type ChannelConfigCreateBodyParsed = z.infer<
   typeof createChannelConfigSchema
 >;
 
 // ── Update schema ───────────────────────────────────────────────────────────
 
-export const updateChannelConfigSchema = z.object({
+/**
+ * `config` cannot be narrowed here: which shape applies depends on the stored
+ * `type`, which only the route knows. The route runs `validateConfigForType`
+ * against the persisted type and must write *that* result, not the raw body.
+ */
+export const updateChannelConfigSchema = z.strictObject({
   name: z.string().min(1).optional(),
   // type is immutable after creation — changing it would invalidate
   // existing watch rules and notification_log entries referencing this config.
@@ -95,16 +114,30 @@ export const updateChannelConfigSchema = z.object({
 export type ChannelConfigUpdateBody = z.infer<
   typeof updateChannelConfigSchema
 >;
+/**
+ * What the update route hands to the service: `config` already run through
+ * `validateConfigForType` against the persisted channel type, so it is a
+ * `ChannelConfig` and not an arbitrary record.
+ */
+export type ChannelConfigUpdateBodyParsed = Omit<
+  ChannelConfigUpdateBody,
+  "config"
+> & { config?: ChannelConfig };
 
 // ── Config validation helper (for update route) ─────────────────────────────
 
+/**
+ * Parses `config` against the shape for `type`, returning the *stripped* value
+ * (unknown keys removed) or null if it does not match. Callers must persist the
+ * returned object rather than what they passed in.
+ */
 export function validateConfigForType(
   type: string,
   config: Record<string, unknown>,
-): Record<string, unknown> | null {
+): ChannelConfig | null {
   const schema = configSchemaByType[type as keyof typeof configSchemaByType];
   if (!schema) return null;
   const result = schema.safeParse(config);
-  return result.success ? (result.data as Record<string, unknown>) : null;
+  return result.success ? (result.data as ChannelConfig) : null;
 }
 

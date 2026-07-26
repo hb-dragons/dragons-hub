@@ -84,9 +84,10 @@ export interface MatchListItem {
   venuePostalCode: string | null;
   venueCity: string | null;
   venueNameOverride: string | null;
-  isConfirmed: boolean | null;
-  isForfeited: boolean | null;
-  isCancelled: boolean | null;
+  // NOT NULL in `matches` (migration 0041) — no `?? false` needed downstream.
+  isConfirmed: boolean;
+  isForfeited: boolean;
+  isCancelled: boolean;
   anschreiber: string | null;
   zeitnehmer: string | null;
   shotclock: string | null;
