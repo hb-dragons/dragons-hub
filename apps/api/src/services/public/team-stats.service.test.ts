@@ -1,132 +1,146 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
 // --- Mocks (hoisted before imports) ---
+//
+// Deliberately NOT mocking drizzle-orm or @dragons/db/schema. The form query is
+// `WHERE (home = team OR guest = team) AND home_score IS NOT NULL AND
+// guest_score IS NOT NULL ORDER BY kickoff_date DESC LIMIT 5`; under the old
+// identity stubs the chain simply returned whatever array the test had queued,
+// so swapping that `or` for an `and` (which empties the form for every team)
+// left all six tests green, and the ordering and the LIMIT 5 were never
+// exercised at all.
 
-const mocks = vi.hoisted(() => ({
-  // Chainable query builder returned by db.select()
-  select: vi.fn(),
-  from: vi.fn(),
-  where: vi.fn(),
-  limit: vi.fn(),
-  innerJoin: vi.fn(),
-  orderBy: vi.fn(),
-}));
-
-// db.select() → { from() → { where() → { limit() } } }
-// The actual query chains vary per query in the service, so we make each
-// intermediate step return the same mock object to keep it simple.
-const chainable = {
-  from: mocks.from,
-  where: mocks.where,
-  limit: mocks.limit,
-  innerJoin: mocks.innerJoin,
-  orderBy: mocks.orderBy,
-};
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => {
-      mocks.select(...args);
-      return chainable;
-    },
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  teams: { id: "teams.id", apiTeamPermanentId: "teams.api_team_permanent_id" },
-  standings: {
-    teamApiId: "standings.team_api_id",
-    leagueId: "standings.league_id",
-  },
-  leagues: { id: "leagues.id", name: "leagues.name" },
-  matches: {
-    homeTeamApiId: "matches.home_team_api_id",
-    guestTeamApiId: "matches.guest_team_api_id",
-    homeScore: "matches.home_score",
-    guestScore: "matches.guest_score",
-    kickoffDate: "matches.kickoff_date",
-  },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-  or: vi.fn(),
-  desc: vi.fn(),
-  isNotNull: vi.fn(),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) =>
+          (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
 // --- Imports (after mocks) ---
 
 import { getTeamStats } from "./team-stats.service";
+import { leagues, matches, standings, teams } from "@dragons/db/schema";
 
-// --- Helpers ---
+let ctx: TestDbContext;
 
-function setupTeamQuery(result: { apiTeamPermanentId: number }[] | []) {
-  // 1st select: teams lookup → select().from().where().limit()
-  chainable.from.mockReturnValueOnce(chainable);
-  chainable.where.mockReturnValueOnce(chainable);
-  chainable.limit.mockResolvedValueOnce(result);
-}
-
-function setupStandingQuery(result: unknown[]) {
-  // 2nd select: standings + innerJoin → select().from().innerJoin().where().limit()
-  chainable.from.mockReturnValueOnce(chainable);
-  chainable.innerJoin.mockReturnValueOnce(chainable);
-  chainable.where.mockReturnValueOnce(chainable);
-  chainable.limit.mockResolvedValueOnce(result);
-}
-
-function setupMatchQuery(result: unknown[]) {
-  // 3rd select: matches → select().from().where().orderBy().limit()
-  chainable.from.mockReturnValueOnce(chainable);
-  chainable.where.mockReturnValueOnce(chainable);
-  chainable.orderBy.mockReturnValueOnce(chainable);
-  chainable.limit.mockResolvedValueOnce(result);
-}
-
-// --- Tests ---
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  // Reset all chainable methods to return chainable by default so unexpected
-  // calls don't throw.
-  Object.values(chainable).forEach((fn) => fn.mockReturnValue(chainable));
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
-describe("getTeamStats", () => {
-  it("returns null when team is not found", async () => {
-    setupTeamQuery([]);
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  vi.clearAllMocks();
+});
 
-    const result = await getTeamStats(999);
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
-    expect(result).toBeNull();
+/** Insert a team and return its internal (serial) id. */
+async function seedTeam(apiTeamPermanentId: number, name: string): Promise<number> {
+  const [row] = await ctx.db
+    .insert(teams)
+    .values({
+      apiTeamPermanentId,
+      seasonTeamId: apiTeamPermanentId * 10,
+      teamCompetitionId: apiTeamPermanentId,
+      name,
+      clubId: 1,
+    })
+    .returning({ id: teams.id });
+  return row!.id;
+}
+
+async function seedLeague(apiLigaId: number, name: string): Promise<number> {
+  const [row] = await ctx.db
+    .insert(leagues)
+    .values({
+      apiLigaId,
+      ligaNr: apiLigaId,
+      name,
+      seasonId: 2026,
+      seasonName: "2025/26",
+    })
+    .returning({ id: leagues.id });
+  return row!.id;
+}
+
+interface MatchSpec {
+  apiMatchId: number;
+  home: number;
+  guest: number;
+  kickoffDate: string;
+  homeScore?: number | null;
+  guestScore?: number | null;
+}
+
+async function seedMatch(spec: MatchSpec): Promise<number> {
+  const [row] = await ctx.db
+    .insert(matches)
+    .values({
+      apiMatchId: spec.apiMatchId,
+      matchNo: spec.apiMatchId,
+      matchDay: 1,
+      kickoffDate: spec.kickoffDate,
+      kickoffTime: "18:00:00",
+      homeTeamApiId: spec.home,
+      guestTeamApiId: spec.guest,
+      homeScore: spec.homeScore ?? null,
+      guestScore: spec.guestScore ?? null,
+    })
+    .returning({ id: matches.id });
+  return row!.id;
+}
+
+describe("getTeamStats — team lookup", () => {
+  it("returns null when the team is not found", async () => {
+    expect(await getTeamStats(999)).toBeNull();
   });
 
-  it("returns stats with standing and form when all data present", async () => {
-    setupTeamQuery([{ apiTeamPermanentId: 42 }]);
-    setupStandingQuery([
-      {
-        position: 2,
-        played: 8,
-        won: 6,
-        lost: 2,
-        pointsFor: 700,
-        pointsAgainst: 600,
-        pointsDiff: 100,
-        leagueName: "Kreisliga A",
-      },
-    ]);
-    setupMatchQuery([
-      { id: 10, homeTeamApiId: 42, guestTeamApiId: 99, homeScore: 80, guestScore: 70 },
-      { id: 9, homeTeamApiId: 55, guestTeamApiId: 42, homeScore: 65, guestScore: 72 },
-      { id: 8, homeTeamApiId: 42, guestTeamApiId: 77, homeScore: 60, guestScore: 75 },
-    ]);
+  it("resolves the team by internal id, not by api id", async () => {
+    // internal id 1, api id 42 — a lookup on the wrong column would miss.
+    const teamId = await seedTeam(42, "Dragons");
 
-    const result = await getTeamStats(1);
+    const result = await getTeamStats(teamId);
 
-    expect(result).toEqual({
-      teamId: 1,
+    expect(result).not.toBeNull();
+    expect(result!.teamId).toBe(teamId);
+    expect(await getTeamStats(42)).toBeNull();
+  });
+});
+
+describe("getTeamStats — standing", () => {
+  it("returns the standing joined with its league name", async () => {
+    const teamId = await seedTeam(42, "Dragons");
+    const leagueId = await seedLeague(500, "Kreisliga A");
+    await ctx.db.insert(standings).values({
+      leagueId,
+      teamApiId: 42,
+      position: 2,
+      played: 8,
+      won: 6,
+      lost: 2,
+      pointsFor: 700,
+      pointsAgainst: 600,
+      pointsDiff: 100,
+    });
+
+    expect(await getTeamStats(teamId)).toEqual({
+      teamId,
       leagueName: "Kreisliga A",
       position: 2,
       played: 8,
@@ -135,23 +149,28 @@ describe("getTeamStats", () => {
       pointsFor: 700,
       pointsAgainst: 600,
       pointsDiff: 100,
-      form: [
-        { result: "W", matchId: 10 }, // home, 80 > 70
-        { result: "W", matchId: 9 },  // guest, 72 > 65
-        { result: "L", matchId: 8 },  // home, 60 < 75
-      ],
+      form: [],
     });
   });
 
-  it("returns stats with null position and zero counters when no standing exists", async () => {
-    setupTeamQuery([{ apiTeamPermanentId: 42 }]);
-    setupStandingQuery([]);
-    setupMatchQuery([]);
+  it("does not pick up another team's standing", async () => {
+    const teamId = await seedTeam(42, "Dragons");
+    await seedTeam(99, "Rivals");
+    const leagueId = await seedLeague(500, "Kreisliga A");
+    await ctx.db
+      .insert(standings)
+      .values({ leagueId, teamApiId: 99, position: 1, played: 8, won: 8 });
 
-    const result = await getTeamStats(5);
+    const result = await getTeamStats(teamId);
 
-    expect(result).toEqual({
-      teamId: 5,
+    expect(result).toMatchObject({ leagueName: "", position: null, played: 0, wins: 0 });
+  });
+
+  it("falls back to zeroes and a null position when no standing exists", async () => {
+    const teamId = await seedTeam(42, "Dragons");
+
+    expect(await getTeamStats(teamId)).toEqual({
+      teamId,
       leagueName: "",
       position: null,
       played: 0,
@@ -163,40 +182,127 @@ describe("getTeamStats", () => {
       form: [],
     });
   });
+});
 
-  it("marks guest-side win correctly", async () => {
-    setupTeamQuery([{ apiTeamPermanentId: 7 }]);
-    setupStandingQuery([]);
-    setupMatchQuery([
-      { id: 1, homeTeamApiId: 50, guestTeamApiId: 7, homeScore: 55, guestScore: 80 },
+describe("getTeamStats — form", () => {
+  it("counts both home and away matches", async () => {
+    const teamId = await seedTeam(42, "Dragons");
+    await seedTeam(99, "Rivals");
+    const home = await seedMatch({
+      apiMatchId: 1,
+      home: 42,
+      guest: 99,
+      kickoffDate: "2026-03-01",
+      homeScore: 80,
+      guestScore: 70,
+    });
+    const away = await seedMatch({
+      apiMatchId: 2,
+      home: 99,
+      guest: 42,
+      kickoffDate: "2026-02-01",
+      homeScore: 65,
+      guestScore: 72,
+    });
+
+    const result = await getTeamStats(teamId);
+
+    // An `and` where the service means `or` would demand the team be *both*
+    // sides of the same match, producing an empty form for everyone.
+    expect(result!.form).toEqual([
+      { result: "W", matchId: home },
+      { result: "W", matchId: away },
     ]);
-
-    const result = await getTeamStats(2);
-
-    expect(result?.form).toEqual([{ result: "W", matchId: 1 }]);
   });
 
-  it("marks guest-side loss correctly", async () => {
-    setupTeamQuery([{ apiTeamPermanentId: 7 }]);
-    setupStandingQuery([]);
-    setupMatchQuery([
-      { id: 2, homeTeamApiId: 50, guestTeamApiId: 7, homeScore: 90, guestScore: 70 },
+  it("marks a home loss and an away loss as L", async () => {
+    const teamId = await seedTeam(42, "Dragons");
+    await seedTeam(99, "Rivals");
+    const homeLoss = await seedMatch({
+      apiMatchId: 1,
+      home: 42,
+      guest: 99,
+      kickoffDate: "2026-03-01",
+      homeScore: 60,
+      guestScore: 88,
+    });
+    const awayLoss = await seedMatch({
+      apiMatchId: 2,
+      home: 99,
+      guest: 42,
+      kickoffDate: "2026-02-01",
+      homeScore: 90,
+      guestScore: 70,
+    });
+
+    const result = await getTeamStats(teamId);
+
+    expect(result!.form).toEqual([
+      { result: "L", matchId: homeLoss },
+      { result: "L", matchId: awayLoss },
     ]);
-
-    const result = await getTeamStats(3);
-
-    expect(result?.form).toEqual([{ result: "L", matchId: 2 }]);
   });
 
-  it("marks home-side loss correctly", async () => {
-    setupTeamQuery([{ apiTeamPermanentId: 7 }]);
-    setupStandingQuery([]);
-    setupMatchQuery([
-      { id: 3, homeTeamApiId: 7, guestTeamApiId: 50, homeScore: 60, guestScore: 88 },
-    ]);
+  it("excludes matches belonging to other teams", async () => {
+    const teamId = await seedTeam(42, "Dragons");
+    await seedTeam(99, "Rivals");
+    await seedTeam(77, "Others");
+    await seedMatch({
+      apiMatchId: 1,
+      home: 99,
+      guest: 77,
+      kickoffDate: "2026-03-01",
+      homeScore: 80,
+      guestScore: 70,
+    });
 
-    const result = await getTeamStats(4);
+    expect((await getTeamStats(teamId))!.form).toEqual([]);
+  });
 
-    expect(result?.form).toEqual([{ result: "L", matchId: 3 }]);
+  it("excludes matches that are missing either score", async () => {
+    const teamId = await seedTeam(42, "Dragons");
+    await seedTeam(99, "Rivals");
+    await seedMatch({ apiMatchId: 1, home: 42, guest: 99, kickoffDate: "2026-03-01" });
+    await seedMatch({
+      apiMatchId: 2,
+      home: 42,
+      guest: 99,
+      kickoffDate: "2026-02-01",
+      homeScore: 80,
+    });
+    await seedMatch({
+      apiMatchId: 3,
+      home: 42,
+      guest: 99,
+      kickoffDate: "2026-01-01",
+      guestScore: 70,
+    });
+
+    expect((await getTeamStats(teamId))!.form).toEqual([]);
+  });
+
+  it("returns the five most recent matches, newest first", async () => {
+    const teamId = await seedTeam(42, "Dragons");
+    await seedTeam(99, "Rivals");
+    const ids: number[] = [];
+    for (let i = 1; i <= 7; i++) {
+      ids.push(
+        await seedMatch({
+          apiMatchId: i,
+          home: 42,
+          guest: 99,
+          kickoffDate: `2026-0${i}-01`,
+          homeScore: 80,
+          guestScore: 70,
+        }),
+      );
+    }
+
+    const result = await getTeamStats(teamId);
+
+    // Neither the DESC ordering nor the LIMIT 5 was observable before.
+    expect(result!.form.map((f) => f.matchId)).toEqual(
+      [...ids].reverse().slice(0, 5),
+    );
   });
 });

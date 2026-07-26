@@ -1,335 +1,340 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
-// --- Mock setup (must precede imports) ---
+// --- Mocks (hoisted before imports) ---
+//
+// Deliberately NOT mocking drizzle-orm, drizzle-orm/pg-core's `alias`, or
+// @dragons/db/schema. This service is a two-alias self-join plus a date window
+// and a score filter; the old suite stubbed all of that and then asserted on a
+// JSON snapshot of the fake predicate tree it had just built
+// (`expect(whereArg.and[2]).toEqual({ and: [...] })`), which pins the shape of
+// the mock rather than the behaviour of the query. Dropping the `lte` upper
+// bound was caught only because the tuple got shorter, not because any wrong
+// match came back.
 
-const { mockDb } = vi.hoisted(() => {
-  const mockDb = {
-    select: vi.fn(),
-  };
-  return { mockDb };
-});
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
-vi.mock("../../config/database", () => ({ getDb: () => (mockDb) }));
-vi.mock("@dragons/db/schema", () => ({
-  matches: {
-    id: "id",
-    homeTeamApiId: "homeTeamApiId",
-    guestTeamApiId: "guestTeamApiId",
-    kickoffDate: "kickoffDate",
-    kickoffTime: "kickoffTime",
-    homeScore: "homeScore",
-    guestScore: "guestScore",
-  },
-  teams: {
-    apiTeamPermanentId: "apiTeamPermanentId",
-    customName: "customName",
-    nameShort: "nameShort",
-    name: "name",
-    isOwnClub: "isOwnClub",
-  },
-}));
-
-vi.mock("drizzle-orm/pg-core", () => ({
-  alias: (_table: unknown, _name: string) => ({
-    apiTeamPermanentId: "apiTeamPermanentId",
-    customName: "customName",
-    nameShort: "nameShort",
-    name: "name",
-    isOwnClub: "isOwnClub",
-  }),
-}));
-
-vi.mock("drizzle-orm", () => ({
-  and: (...args: unknown[]) => ({ and: args }),
-  eq: (a: unknown, b: unknown) => ({ eq: [a, b] }),
-  gte: (a: unknown, b: unknown) => ({ gte: [a, b] }),
-  lte: (a: unknown, b: unknown) => ({ lte: [a, b] }),
-  isNotNull: (a: unknown) => ({ isNotNull: a }),
-  isNull: (a: unknown) => ({ isNull: a }),
+vi.mock("../../config/database", () => ({
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) =>
+          (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
 // --- Imports (after mocks) ---
 
 import { getWeekendMatches } from "./match-social.service";
+import { matches, teams } from "@dragons/db/schema";
 
-// --- Helpers ---
+// ISO week 10 of 2026 runs Monday 2026-03-02 .. Sunday 2026-03-08.
+const WEEK = { week: 10, year: 2026 } as const;
+const MONDAY = "2026-03-02";
+const SUNDAY = "2026-03-08";
+const DAY_BEFORE = "2026-03-01";
+const DAY_AFTER = "2026-03-09";
 
-function makeSelectChain(result: unknown[]) {
-  const chain = {
-    from: vi.fn(),
-    innerJoin: vi.fn(),
-    where: vi.fn(),
-    orderBy: vi.fn().mockResolvedValue(result),
-  };
-  chain.from.mockReturnValue(chain);
-  chain.innerJoin.mockReturnValue(chain);
-  chain.where.mockReturnValue(chain);
-  return chain;
-}
+const OWN_HOME = 1;
+const OPPONENT = 2;
+const OWN_GUEST = 3;
+const FOREIGN = 4;
 
-beforeEach(() => {
-  vi.clearAllMocks();
+let ctx: TestDbContext;
+let nextApiMatchId = 1;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
-// --- Test data ---
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  vi.clearAllMocks();
+  nextApiMatchId = 1;
+  await ctx.db.insert(teams).values([
+    {
+      apiTeamPermanentId: OWN_HOME,
+      seasonTeamId: 10,
+      teamCompetitionId: 1,
+      name: "SG Dragons Hannover 1",
+      nameShort: "Dragons H1",
+      customName: "Herren 1",
+      clubId: 1,
+      isOwnClub: true,
+    },
+    {
+      apiTeamPermanentId: OPPONENT,
+      seasonTeamId: 20,
+      teamCompetitionId: 2,
+      name: "TV Bergkrug Osnabrück",
+      nameShort: "TV Bergkrug",
+      clubId: 2,
+      isOwnClub: false,
+    },
+    {
+      apiTeamPermanentId: OWN_GUEST,
+      seasonTeamId: 30,
+      teamCompetitionId: 3,
+      name: "SG Dragons Hannover Damen 1",
+      nameShort: "Dragons D1",
+      customName: "Damen 1",
+      clubId: 1,
+      isOwnClub: true,
+    },
+    {
+      apiTeamPermanentId: FOREIGN,
+      seasonTeamId: 40,
+      teamCompetitionId: 4,
+      name: "Rival Club",
+      nameShort: "Rivals",
+      clubId: 3,
+      isOwnClub: false,
+    },
+  ]);
+});
 
-const ownHomeTeam = {
-  apiTeamPermanentId: 1,
-  customName: "Herren 1",
-  nameShort: "Dragons H1",
-  name: "SG Dragons Hannover 1",
-  isOwnClub: true,
-};
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
-const opponentTeam = {
-  apiTeamPermanentId: 2,
-  customName: null,
-  nameShort: "TV Bergkrug",
-  name: "TV Bergkrug Osnabrück",
-  isOwnClub: false,
-};
+interface MatchSpec {
+  home?: number;
+  guest?: number;
+  date?: string;
+  time?: string;
+  homeScore?: number | null;
+  guestScore?: number | null;
+}
 
-const ownGuestTeam = {
-  apiTeamPermanentId: 3,
-  customName: "Damen 1",
-  nameShort: "Dragons D1",
-  name: "SG Dragons Hannover Damen 1",
-  isOwnClub: true,
-};
+async function seedMatch(spec: MatchSpec = {}): Promise<number> {
+  const apiMatchId = nextApiMatchId++;
+  const [row] = await ctx.db
+    .insert(matches)
+    .values({
+      apiMatchId,
+      matchNo: apiMatchId,
+      matchDay: 1,
+      kickoffDate: spec.date ?? "2026-03-07",
+      kickoffTime: spec.time ?? "18:00:00",
+      homeTeamApiId: spec.home ?? OWN_HOME,
+      guestTeamApiId: spec.guest ?? OPPONENT,
+      homeScore: spec.homeScore ?? null,
+      guestScore: spec.guestScore ?? null,
+    })
+    .returning({ id: matches.id });
+  return row!.id;
+}
 
-const foreignHome = {
-  apiTeamPermanentId: 4,
-  customName: null,
-  nameShort: "Rivals",
-  name: "Rival Club",
-  isOwnClub: false,
-};
+/** A finished own-club home match inside the target week. */
+function seedResult(spec: MatchSpec = {}) {
+  return seedMatch({ homeScore: 96, guestScore: 52, ...spec });
+}
 
-const baseMatch = {
-  id: 1,
-  homeTeamApiId: 1,
-  guestTeamApiId: 2,
-  kickoffDate: "2026-03-07",
-  kickoffTime: "18:00",
-  homeScore: 96,
-  guestScore: 52,
-};
+describe("getWeekendMatches — row mapping", () => {
+  it("maps a home own-club result", async () => {
+    const id = await seedResult({ date: "2026-03-07", time: "18:00:00" });
 
-describe("getWeekendMatches", () => {
-  describe("returns SocialMatchItem[] from query rows", () => {
-    it("maps a home own-club match correctly", async () => {
-      const rows = [
-        { match: baseMatch, homeTeam: ownHomeTeam, guestTeam: opponentTeam },
-      ];
-      const chain = makeSelectChain(rows);
-      mockDb.select.mockReturnValue(chain);
+    const result = await getWeekendMatches({ type: "results", ...WEEK });
 
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
+    expect(result).toEqual([
+      {
+        id,
+        teamLabel: "Herren 1",
+        opponent: "TV Bergkrug",
+        isHome: true,
+        kickoffDate: "2026-03-07",
+        kickoffTime: "18:00:00",
+        homeScore: 96,
+        guestScore: 52,
+      },
+    ]);
+  });
 
-      expect(result).toHaveLength(1);
-      const item = result[0]!;
-      expect(item.id).toBe(1);
-      expect(item.isHome).toBe(true);
-      expect(item.teamLabel).toBe("Herren 1");
-      expect(item.opponent).toBe("TV Bergkrug");
-      expect(item.kickoffDate).toBe("2026-03-07");
-      expect(item.kickoffTime).toBe("18:00");
-      expect(item.homeScore).toBe(96);
-      expect(item.guestScore).toBe(52);
-    });
+  it("maps an away own-club result from the guest perspective", async () => {
+    await seedResult({ home: FOREIGN, guest: OWN_GUEST });
 
-    it("maps an away own-club match correctly", async () => {
-      const awayMatch = { ...baseMatch, homeTeamApiId: 4, guestTeamApiId: 3 };
-      const rows = [
-        { match: awayMatch, homeTeam: foreignHome, guestTeam: ownGuestTeam },
-      ];
-      const chain = makeSelectChain(rows);
-      mockDb.select.mockReturnValue(chain);
+    const [item] = await getWeekendMatches({ type: "results", ...WEEK });
 
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-
-      expect(result).toHaveLength(1);
-      const item = result[0]!;
-      expect(item.isHome).toBe(false);
-      expect(item.teamLabel).toBe("Damen 1");
-      expect(item.opponent).toBe("Rivals");
+    expect(item).toMatchObject({
+      isHome: false,
+      teamLabel: "Damen 1",
+      opponent: "Rivals",
     });
   });
 
-  describe("resolveTeamLabel fallback chain", () => {
-    it("uses customName when available", async () => {
-      const rows = [
-        { match: baseMatch, homeTeam: ownHomeTeam, guestTeam: opponentTeam },
-      ];
-      mockDb.select.mockReturnValue(makeSelectChain(rows));
+  it("orders by kickoff date then time", async () => {
+    const late = await seedResult({ date: "2026-03-07", time: "20:00:00" });
+    const early = await seedResult({ date: "2026-03-07", time: "14:00:00" });
+    const saturday = await seedResult({ date: "2026-03-06", time: "23:00:00" });
 
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-      expect(result[0]!.teamLabel).toBe("Herren 1");
-    });
+    const result = await getWeekendMatches({ type: "results", ...WEEK });
 
-    it("falls back to nameShort when customName is null", async () => {
-      const teamNoCustom = { ...ownHomeTeam, customName: null };
-      const rows = [
-        { match: baseMatch, homeTeam: teamNoCustom, guestTeam: opponentTeam },
-      ];
-      mockDb.select.mockReturnValue(makeSelectChain(rows));
+    expect(result.map((m) => m.id)).toEqual([saturday, early, late]);
+  });
+});
 
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-      expect(result[0]!.teamLabel).toBe("Dragons H1");
-    });
-
-    it("falls back to name when both customName and nameShort are null", async () => {
-      const teamNameOnly = { ...ownHomeTeam, customName: null, nameShort: null };
-      const rows = [
-        { match: baseMatch, homeTeam: teamNameOnly, guestTeam: opponentTeam },
-      ];
-      mockDb.select.mockReturnValue(makeSelectChain(rows));
-
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-      expect(result[0]!.teamLabel).toBe("SG Dragons Hannover 1");
-    });
-
-    it("applies fallback chain to opponent label too", async () => {
-      // opponent has no customName, has nameShort
-      const rows = [
-        { match: baseMatch, homeTeam: ownHomeTeam, guestTeam: opponentTeam },
-      ];
-      mockDb.select.mockReturnValue(makeSelectChain(rows));
-
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-      expect(result[0]!.opponent).toBe("TV Bergkrug");
-    });
+describe("getWeekendMatches — team label fallback chain", () => {
+  it("prefers customName", async () => {
+    await seedResult();
+    const [item] = await getWeekendMatches({ type: "results", ...WEEK });
+    expect(item!.teamLabel).toBe("Herren 1");
   });
 
-  describe("filtering", () => {
-    it("filters out rows where neither team is own club", async () => {
-      const noOwnClub = {
-        match: baseMatch,
-        homeTeam: { ...opponentTeam, isOwnClub: false },
-        guestTeam: { ...foreignHome, isOwnClub: false },
-      };
-      mockDb.select.mockReturnValue(makeSelectChain([noOwnClub]));
+  it("falls back to nameShort when customName is null", async () => {
+    await ctx.client.query(
+      "UPDATE teams SET custom_name = NULL WHERE api_team_permanent_id = $1",
+      [OWN_HOME],
+    );
+    await seedResult();
 
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-      expect(result).toHaveLength(0);
-    });
+    const [item] = await getWeekendMatches({ type: "results", ...WEEK });
 
-    it("includes row where only guest team is own club", async () => {
-      const rows = [
-        { match: baseMatch, homeTeam: foreignHome, guestTeam: ownGuestTeam },
-      ];
-      mockDb.select.mockReturnValue(makeSelectChain(rows));
-
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-      expect(result).toHaveLength(1);
-      expect(result[0]!.isHome).toBe(false);
-    });
-
-    it("includes row where only home team is own club", async () => {
-      const rows = [
-        { match: baseMatch, homeTeam: ownHomeTeam, guestTeam: opponentTeam },
-      ];
-      mockDb.select.mockReturnValue(makeSelectChain(rows));
-
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-      expect(result).toHaveLength(1);
-      expect(result[0]!.isHome).toBe(true);
-    });
-
-    it("returns empty array when query returns no rows", async () => {
-      mockDb.select.mockReturnValue(makeSelectChain([]));
-
-      const result = await getWeekendMatches({ type: "preview", week: 10, year: 2026 });
-      expect(result).toEqual([]);
-    });
+    expect(item!.teamLabel).toBe("Dragons H1");
   });
 
-  describe("score fields", () => {
-    it("returns null scores for preview matches", async () => {
-      const previewMatch = { ...baseMatch, homeScore: null, guestScore: null };
-      const rows = [
-        { match: previewMatch, homeTeam: ownHomeTeam, guestTeam: opponentTeam },
-      ];
-      mockDb.select.mockReturnValue(makeSelectChain(rows));
+  it("falls back to name when customName and nameShort are both null", async () => {
+    await ctx.client.query(
+      "UPDATE teams SET custom_name = NULL, name_short = NULL WHERE api_team_permanent_id = $1",
+      [OWN_HOME],
+    );
+    await seedResult();
 
-      const result = await getWeekendMatches({ type: "preview", week: 10, year: 2026 });
-      expect(result[0]!.homeScore).toBeNull();
-      expect(result[0]!.guestScore).toBeNull();
-    });
+    const [item] = await getWeekendMatches({ type: "results", ...WEEK });
 
-    it("returns scores for result matches", async () => {
-      const rows = [
-        { match: baseMatch, homeTeam: ownHomeTeam, guestTeam: opponentTeam },
-      ];
-      mockDb.select.mockReturnValue(makeSelectChain(rows));
-
-      const result = await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-      expect(result[0]!.homeScore).toBe(96);
-      expect(result[0]!.guestScore).toBe(52);
-    });
+    expect(item!.teamLabel).toBe("SG Dragons Hannover 1");
   });
 
-  describe("weekend window + score filter (#82)", () => {
-    it("requires BOTH scores present for results, not just homeScore", async () => {
-      const chain = makeSelectChain([]);
-      mockDb.select.mockReturnValue(chain);
+  it("applies the same chain to the opponent label", async () => {
+    await seedResult();
+    const [item] = await getWeekendMatches({ type: "results", ...WEEK });
+    // Opponent has no customName, so nameShort wins.
+    expect(item!.opponent).toBe("TV Bergkrug");
+  });
+});
 
-      await getWeekendMatches({ type: "results", week: 10, year: 2026 });
+describe("getWeekendMatches — own-club filter", () => {
+  it("drops matches where neither side is own club", async () => {
+    await seedResult({ home: OPPONENT, guest: FOREIGN });
 
-      const whereArg = chain.where.mock.calls[0]![0] as { and: unknown[] };
-      expect(whereArg.and[2]).toEqual({
-        and: [{ isNotNull: "homeScore" }, { isNotNull: "guestScore" }],
-      });
-    });
-
-    it("requires BOTH scores absent for previews", async () => {
-      const chain = makeSelectChain([]);
-      mockDb.select.mockReturnValue(chain);
-
-      await getWeekendMatches({ type: "preview", week: 10, year: 2026 });
-
-      const whereArg = chain.where.mock.calls[0]![0] as { and: unknown[] };
-      expect(whereArg.and[2]).toEqual({
-        and: [{ isNull: "homeScore" }, { isNull: "guestScore" }],
-      });
-    });
-
-    it("computes the ISO-week window in local time, not shifted UTC", async () => {
-      const prevTz = process.env.TZ;
-      process.env.TZ = "Europe/Berlin";
-      try {
-        const chain = makeSelectChain([]);
-        mockDb.select.mockReturnValue(chain);
-
-        await getWeekendMatches({ type: "results", week: 10, year: 2026 });
-
-        const whereArg = chain.where.mock.calls[0]![0] as {
-          and: Array<{ gte?: [unknown, string]; lte?: [unknown, string] }>;
-        };
-        const gteStr = whereArg.and[0]!.gte![1];
-        const lteStr = whereArg.and[1]!.lte![1];
-        // ISO week runs Monday..Sunday. A UTC toISOString() in a positive-offset
-        // zone (Berlin, CET in week 10) shifts these back to Sunday..Saturday.
-        expect(new Date(`${gteStr}T12:00:00Z`).getUTCDay()).toBe(1); // Monday
-        expect(new Date(`${lteStr}T12:00:00Z`).getUTCDay()).toBe(0); // Sunday
-      } finally {
-        process.env.TZ = prevTz;
-      }
-    });
+    expect(await getWeekendMatches({ type: "results", ...WEEK })).toEqual([]);
   });
 
-  describe("query construction", () => {
-    it("calls db.select and chains from/innerJoin/where/orderBy", async () => {
-      const chain = makeSelectChain([]);
-      mockDb.select.mockReturnValue(chain);
+  it("keeps a match where only the guest is own club", async () => {
+    await seedResult({ home: FOREIGN, guest: OWN_GUEST });
 
-      await getWeekendMatches({ type: "results", week: 10, year: 2026 });
+    const result = await getWeekendMatches({ type: "results", ...WEEK });
 
-      expect(mockDb.select).toHaveBeenCalledOnce();
-      expect(chain.from).toHaveBeenCalledOnce();
-      expect(chain.innerJoin).toHaveBeenCalledTimes(2);
-      expect(chain.where).toHaveBeenCalledOnce();
-      expect(chain.orderBy).toHaveBeenCalledOnce();
-    });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.isHome).toBe(false);
+  });
+
+  it("keeps a match where only the home side is own club", async () => {
+    await seedResult();
+
+    const result = await getWeekendMatches({ type: "results", ...WEEK });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.isHome).toBe(true);
+  });
+
+  it("returns an empty list when nothing is scheduled", async () => {
+    expect(await getWeekendMatches({ type: "preview", ...WEEK })).toEqual([]);
+  });
+});
+
+describe("getWeekendMatches — score filter (#82)", () => {
+  it("requires BOTH scores present for results, not just homeScore", async () => {
+    const finished = await seedResult();
+    await seedMatch({ homeScore: 96, guestScore: null });
+    await seedMatch({ homeScore: null, guestScore: 52 });
+
+    const result = await getWeekendMatches({ type: "results", ...WEEK });
+
+    // A one-sided score is a data glitch, not a played game.
+    expect(result.map((m) => m.id)).toEqual([finished]);
+  });
+
+  it("requires BOTH scores absent for previews", async () => {
+    const upcoming = await seedMatch();
+    await seedMatch({ homeScore: 96, guestScore: null });
+    await seedMatch({ homeScore: null, guestScore: 52 });
+    await seedMatch({ homeScore: 96, guestScore: 52 });
+
+    const result = await getWeekendMatches({ type: "preview", ...WEEK });
+
+    expect(result.map((m) => m.id)).toEqual([upcoming]);
+  });
+
+  it("returns null scores for preview matches", async () => {
+    await seedMatch();
+
+    const [item] = await getWeekendMatches({ type: "preview", ...WEEK });
+
+    expect(item).toMatchObject({ homeScore: null, guestScore: null });
+  });
+});
+
+describe("getWeekendMatches — ISO week window", () => {
+  // The window must be formatted in local time. `toISOString()` in a
+  // positive-offset zone rolls local-midnight Monday back to Sunday and shifts
+  // the whole window by a day, so every zone below has to agree.
+  const zones = ["UTC", "America/New_York", "Europe/Berlin"] as const;
+
+  let previousTz: string | undefined;
+
+  beforeEach(() => {
+    previousTz = process.env.TZ;
+  });
+
+  afterEach(() => {
+    process.env.TZ = previousTz;
+  });
+
+  it.each(zones)("spans Monday..Sunday inclusive in %s", async (tz) => {
+    process.env.TZ = tz;
+    const before = await seedResult({ date: DAY_BEFORE });
+    const monday = await seedResult({ date: MONDAY });
+    const sunday = await seedResult({ date: SUNDAY });
+    const after = await seedResult({ date: DAY_AFTER });
+
+    const ids = (await getWeekendMatches({ type: "results", ...WEEK })).map((m) => m.id);
+
+    expect(ids).toEqual([monday, sunday]);
+    expect(ids).not.toContain(before);
+    expect(ids).not.toContain(after);
+  });
+
+  it("excludes a match one day past the window's end", async () => {
+    await seedResult({ date: DAY_AFTER });
+
+    expect(await getWeekendMatches({ type: "results", ...WEEK })).toEqual([]);
+  });
+
+  it("resolves week 1 into the previous calendar year when ISO week 1 starts there", async () => {
+    // ISO week 1 of 2026 runs 2025-12-29 .. 2026-01-04.
+    const inWeek = await seedResult({ date: "2025-12-29" });
+    await seedResult({ date: "2025-12-28" });
+
+    const result = await getWeekendMatches({ type: "results", week: 1, year: 2026 });
+
+    expect(result.map((m) => m.id)).toEqual([inWeek]);
+  });
+
+  it("resolves week 53 into the following calendar year", async () => {
+    // ISO week 53 of 2026 runs 2026-12-28 .. 2027-01-03.
+    const inWeek = await seedResult({ date: "2027-01-03" });
+    await seedResult({ date: "2027-01-04" });
+
+    const result = await getWeekendMatches({ type: "results", week: 53, year: 2026 });
+
+    expect(result.map((m) => m.id)).toEqual([inWeek]);
   });
 });
