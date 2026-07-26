@@ -30,7 +30,15 @@ vi.mock("../../services/admin/board.service", () => ({
 
 vi.mock("../../middleware/rbac", () => ({
   requirePermission: vi.fn(() =>
-    async (_c: unknown, next: () => Promise<void>) => next(),
+    async (
+      c: { set: (k: string, v: unknown) => void },
+      next: () => Promise<void>,
+    ) => {
+      // Mirrors the real middleware: the authenticated user lands on context,
+      // which is where the route reads the audit actor from.
+      c.set("user", { id: "session-user-1" });
+      return next();
+    },
   ),
 }));
 
@@ -95,10 +103,10 @@ describe("POST /boards", () => {
 
     expect(res.status).toBe(201);
     expect(await json(res)).toEqual(board);
-    expect(mocks.createBoard).toHaveBeenCalledWith("Sprint", undefined, undefined);
+    expect(mocks.createBoard).toHaveBeenCalledWith("Sprint", undefined, "session-user-1");
   });
 
-  it("passes description and createdBy to service", async () => {
+  it("passes description and the session user as createdBy to service", async () => {
     mocks.createBoard.mockResolvedValue({ id: 1, name: "Board" });
 
     await app.request("/boards", {
@@ -107,7 +115,8 @@ describe("POST /boards", () => {
       body: JSON.stringify({ name: "Board", description: "Desc", createdBy: "admin" }),
     });
 
-    expect(mocks.createBoard).toHaveBeenCalledWith("Board", "Desc", "admin");
+    // "admin" from the body is discarded — the audit actor comes from the session.
+    expect(mocks.createBoard).toHaveBeenCalledWith("Board", "Desc", "session-user-1");
   });
 
   it("returns 400 for missing name", async () => {

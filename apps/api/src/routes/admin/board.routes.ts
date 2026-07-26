@@ -56,7 +56,10 @@ boardRoutes.post(
   }),
   async (c) => {
     const body = c.req.valid("json");
-    const result = await createBoard(body.name, body.description, body.createdBy);
+    // Audit actor comes from the session, never from the body — boards.createdBy
+    // is bare text with no FK, so a client-supplied value would poison the trail.
+    const createdBy = c.get("user")?.id ?? null;
+    const result = await createBoard(body.name, body.description, createdBy);
     return c.json(result, 201);
   },
 );

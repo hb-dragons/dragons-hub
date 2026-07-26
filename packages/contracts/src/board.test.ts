@@ -46,16 +46,16 @@ describe("boardCreateBodySchema", () => {
     ).toEqual({ name: "Board", description: null });
   });
 
-  it("accepts createdBy", () => {
+  it("strips a client-supplied createdBy", () => {
     expect(
       boardCreateBodySchema.parse({ name: "Board", createdBy: "admin" }),
-    ).toEqual({ name: "Board", createdBy: "admin" });
+    ).toEqual({ name: "Board" });
   });
 
-  it("accepts null createdBy", () => {
+  it("strips a null createdBy", () => {
     expect(
       boardCreateBodySchema.parse({ name: "Board", createdBy: null }),
-    ).toEqual({ name: "Board", createdBy: null });
+    ).toEqual({ name: "Board" });
   });
 
   it("rejects empty name", () => {
@@ -83,10 +83,12 @@ describe("boardCreateBodySchema", () => {
     expect(() => boardCreateBodySchema.parse({})).toThrow();
   });
 
-  it("rejects createdBy exceeding 100 characters", () => {
-    expect(() =>
+  it("strips an over-long createdBy rather than validating it", () => {
+    // createdBy is no longer part of the contract at all: the audit actor is
+    // read from the session, so any body value is dropped, not length-checked.
+    expect(
       boardCreateBodySchema.parse({ name: "Board", createdBy: "x".repeat(101) }),
-    ).toThrow();
+    ).toEqual({ name: "Board" });
   });
 });
 
