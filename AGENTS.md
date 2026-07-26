@@ -57,6 +57,9 @@ RefereeRole (1) ──── (N) MatchReferee
 MatchReferee unique constraint: (matchId, slotNumber)
   — one referee per slot, not one row per (referee, role). Two referees cannot
     occupy the same slot on the same match.
+  — Partial: `WHERE removed_at IS NULL` (issue #105). Tombstoned rows drop out
+    of the index, so a slot can be filled, vacated and refilled without
+    colliding with its own history.
 
 Board (1) ──── (N) BoardColumn
      (1) ──── (N) Task (via boardId)
@@ -113,10 +116,10 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `standings` | `packages/db/src/schema/standings.ts` | leagueId FK + teamApiId (unique), position, won, lost, points |
 | `referees` | `packages/db/src/schema/referees.ts` | apiId (unique), firstName, lastName, licenseNumber, allowAllHomeGames, allowAwayGames, isOwnClub, dataHash |
 | `refereeRoles` | `packages/db/src/schema/referees.ts` | apiId (unique), name, shortName |
-| `matchReferees` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, roleId FK, slotNumber — unique(matchId, slotNumber) |
+| `matchReferees` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, roleId FK, slotNumber, removedAt (tombstone) — partial unique(matchId, slotNumber) WHERE removed_at IS NULL |
 | `refereeAssignmentIntents` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, slotNumber, clickedAt, confirmedBySyncAt |
 | `refereeAssignmentRules` | `packages/db/src/schema/referee-assignment-rules.ts` | refereeId FK (cascade), teamId FK (cascade), deny, allowSr1, allowSr2 — unique(refereeId, teamId) |
-| `refereeGames` | `packages/db/src/schema/referee-games.ts` | apiMatchId (unique), matchId FK, homeTeamId FK, guestTeamId FK, homeClubId, guestClubId, isHomeGame, sr1/sr2OurClub, sr1/sr2Status, sr1/sr2Name, leagueName, kickoffDate/Time, dataHash |
+| `refereeGames` | `packages/db/src/schema/referee-games.ts` | apiMatchId (unique), matchId FK, homeTeamId FK, guestTeamId FK, homeClubId, guestClubId, isHomeGame, sr1/sr2OurClub, sr1/sr2Status, sr1/sr2Name, leagueName, kickoffDate/Time, dataHash, removedAt (tombstone) |
 | `matchRemoteVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, snapshot JSONB, dataHash |
 | `matchLocalVersions` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), versionNumber, changedBy, snapshot JSONB |
 | `matchChanges` | `packages/db/src/schema/versions.ts` | matchId FK (cascade), track (remote/local), fieldName, oldValue, newValue |
@@ -170,6 +173,25 @@ Matches track both remote (SDK) and local (admin) changes independently:
 - `matchChanges` tracks individual field-level diffs with `track` column (remote/local)
 - `remoteDataHash` is compared during sync to detect changes
 
+### Soft deletes (tombstones)
+
+Two tables carry a `removedAt` tombstone instead of being hard-deleted:
+`matchReferees` and `refereeGames` (issue #105). Both are written only by the
+sync removal pass. The reason is evidential, not sentimental: a
+`referee.unassigned` or `match.removed` notification has to stay explainable
+after the fact, and referee history must not lose games the federation later
+withdrew.
+
+Consequences for anything reading those tables:
+
+- A live-rows query must say `isNull(table.removedAt)`. Forgetting it resurrects
+  withdrawn assignments in lists, counts and eligibility checks.
+- The `matchReferees` slot uniqueness is a *partial* index
+  (`WHERE removed_at IS NULL`, migration `0041`), so a tombstoned row does not
+  block refilling the slot. Unlike the three indexes listed in
+  `packages/db/drizzle/README.md`, this one **is** declared in the Drizzle
+  schema, so drizzle-kit can see it.
+
 ## Sync Pipeline
 
 ### Execution Flow
@@ -179,11 +201,21 @@ entry point is `fullSync(triggeredBy, jobLogger?, syncRunId?)` exported from
 `apps/api/src/services/sync/index.ts`, which calls the per-entity
 `services/sync/*.sync.ts` modules in order.
 
+Every stage named below is checked against that file by
+`apps/api/src/test/docs-drift.test.ts`: the set of functions `fullSync` imports
+from inside `services/` and calls must all appear here, **in call order**. Add a
+stage to the pipeline and this block fails until it is documented.
+
 ```
 BullMQ Job (cron 04:00 Europe/Berlin or manual trigger)
   └─> sync.worker processes job
        └─> fullSync(triggeredBy, jobLogger, syncRunId?)
              from apps/api/src/services/sync/index.ts
+
+Step 0: Open the run
+  - Reuse the eagerly-created syncRuns row (syncRunId) or insert one
+  - Stamp status "running", startedAt, ownerInstanceId = INSTANCE_ID
+  - createSyncLogger(syncRunId) for per-item logging
 
 Step 1: syncLeagues()
   - DB: query leagues WHERE isTracked = true
@@ -207,14 +239,28 @@ Step 3: Parallel upserts (Promise.all)
     running it concurrently with the teams upsert dropped the whole batch on a
     league's first sync (issue #47). Keep it sequential.
 
-Step 4: syncMatchesFromData(leagueData, venueIdLookup, syncRunId)
-  - Needs venue FK lookup (apiId -> dbId) from buildVenueIdLookup()
+Step 4: buildVenueIdLookup() -> syncMatchesFromData(leagueData, venueIdLookup, syncRunId)
+  - buildVenueIdLookup gives the venue FK lookup (apiId -> dbId) first
   - Hash compare -> skip or upsert
   - Version snapshot + field-level changes in transaction
 
-Step 5: syncRefereeAssignmentsFromData()
-  - Needs match + referee + role FK lookups
+Step 5: extractRefereeAssignments() + buildMatchIdLookup()
+        -> syncRefereeAssignmentsFromData()
+  - The two lookups are built first; the sync needs match + referee + role FKs
   - Upsert matchReferees entries
+
+Step 5.1: removeStaleRefereeAssignments()   (issue #105)
+  - Tombstones matchReferees rows the federation has stopped reporting by
+    setting removed_at, rather than deleting them, so the assignment history
+    and the evidence behind a referee.unassigned notification survive
+  - Guarded by services/sync/removal-guard.ts. Absence from a feed only counts
+    as removal when the fetch that produced it is verifiably complete, so three
+    independent gates must pass: per-entity evidence (isUsableGameDetail), run
+    coverage (evaluateFetchCoverage, MIN_FETCH_COVERAGE) and blast radius
+    (evaluateRemovalBlastRadius, MASS_REMOVAL_FLOOR / MASS_REMOVAL_RATIO).
+    A degraded run is skipped with a reason, never read as "everything was
+    removed"
+  - Reuses the same matchIdLookup and refereeAssignments as step 5
 
 Step 5.25: confirmIntentsFromSync()
   - Check pending refereeAssignmentIntents (confirmedBySyncAt IS NULL)
@@ -274,7 +320,7 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 - `match.forfeited` — Match forfeited
 - `match.score.changed` — Match score updated
 - `match.confirmed` — Match finalized
-- `match.removed` — Match deleted from remote API
+- `match.removed` — A future game disappeared from a verifiably complete federation feed. Emitted by `services/sync/referee-games.sync.ts` when it tombstones a `refereeGames` row (issue #105), gated by `removal-guard.ts` so a degraded fetch never reads as a removal
 - `match.result_entered` — Result initially recorded
 - `match.result_changed` — Result score corrected
 
@@ -826,6 +872,29 @@ Every web data call goes through the shared typed client built from `@dragons/ap
 Types come from one place each: request body/query types from `@dragons/contracts`, response types from `@dragons/shared`, and the single `APIError` from `@dragons/api-client`.
 
 To add an endpoint: add an `xEndpoints` factory plus a `.contract.test.ts` in `@dragons/api-client`, register the factory in `create-api.ts`, then consume it as `api.<group>`. The contract test parses the client's request body/query against the `@dragons/contracts` schema so client/server drift fails the build.
+
+### Dates and times (web)
+
+`apps/web/src/lib/tz.ts` is the only place the web app converts between Berlin
+calendar days / wall-clock times and `Date` instants (issue #114). The API
+stores and returns Berlin-local `YYYY-MM-DD` and `HH:MM:SS` strings, and
+`i18n/request.ts` pins every `useFormatter()` output to `Europe/Berlin`, so a
+`Date` built without an explicit zone is read in the *runtime's* zone — UTC in
+the SSR container, the admin's own zone in the browser — and the same value
+renders differently in the two places.
+
+Two rules, both of which `tz.ts` exists to enforce:
+
+- Never `toISOString().slice(0, 10)` a `Date` to get a day. Use
+  `toBerlinDateString()` for an instant, `calendarDayString()` for a day the
+  user picked in a date widget. Also available: `todayInBerlin()`,
+  `plusDaysInBerlin()`.
+- Never `new Date(day + "T00:00:00")` or `new Date("1970-01-01T" + time)`. Use
+  `berlinDayAnchor()` / `berlinTimeAnchor()`. `lib/format-kickoff.ts` calls
+  `berlinDayAnchor` rather than anchoring itself.
+
+Anything testing this must force a non-Berlin `TZ` — a developer machine set to
+`Europe/Berlin` makes every one of these bugs invisible.
 
 Raw `fetch` is lint-banned in web components (`no-restricted-globals` in `apps/web/eslint.config.mjs`, scoped to `src/**` outside `src/lib/**` and tests). The only exceptions are non-JSON requests — blob downloads and multipart uploads — which carry an inline `eslint-disable-next-line no-restricted-globals` with a reason (the social post generator's preview download and photo upload).
 
