@@ -39,6 +39,34 @@ vi.mock("../services/notifications/expo-push.client", () => ({
   },
 }));
 
+// `push-receipt.worker.ts` imports `Worker` from bullmq at module scope, and
+// bullmq builds its own ioredis client from the connection URL rather than
+// going through `config/redis`. Left unmocked, importing this module opens a
+// real connection to 6379: harmless on a dev box with docker infra up, but on
+// CI — which runs no Redis service — the socket rejection escapes as an
+// unhandled rejection and fails the whole run with every test passing. Only
+// the retry backoff makes it timing-dependent, so it surfaces in a long run
+// and not when this file is run alone. Every sibling worker test mocks bullmq
+// for the same reason.
+vi.mock("bullmq", () => ({
+  Worker: class MockWorker {
+    on() {
+      return this;
+    }
+    close() {
+      return Promise.resolve();
+    }
+  },
+  Queue: class MockQueue {
+    add() {
+      return Promise.resolve({ id: "1" });
+    }
+    close() {
+      return Promise.resolve();
+    }
+  },
+}));
+
 // --- Imports (after mocks) ---
 
 import { reconcilePushReceipts } from "./push-receipt.worker";

@@ -21,7 +21,25 @@ const REQUEST_MAX_RETRIES_PER_REQUEST = 2;
  * long-lived for the same reason. Never use this on the request path.
  */
 export function createRedisClient(): Redis {
-  return new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
+  return attachErrorLogging(
+    new Redis(env.REDIS_URL, { maxRetriesPerRequest: null }),
+    "blocking",
+  );
+}
+
+/**
+ * ioredis surfaces connection failures as `error` events. An ioredis client
+ * with no `error` listener lets the underlying socket rejection escape as an
+ * unhandled rejection, which fails the whole vitest run even when every test
+ * passes — and in production would be an unhandled rejection on a Redis blip
+ * rather than the reconnect ioredis is already doing for us. Every client this
+ * module hands out gets a listener; callers may add their own on top.
+ */
+function attachErrorLogging(client: Redis, kind: string): Redis {
+  client.on("error", (err) => {
+    logger.error({ err, kind }, "Redis connection error");
+  });
+  return client;
 }
 
 /**
