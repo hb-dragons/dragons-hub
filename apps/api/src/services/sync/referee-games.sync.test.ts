@@ -1,75 +1,48 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
 import type { SdkOffeneSpielResult, SdkSpielleitung } from "@dragons/sdk";
 
-// --- Mock setup ---
+// Real Postgres (pglite) with real migrations, the real drizzle operators and the
+// real `EVENT_TYPES` from @dragons/shared.
+//
+// The previous mocked-ORM version stubbed `eq`/`and`/`gte`/`isNull`/`inArray` to
+// identity functions and hand-choreographed `select()` return values by call
+// index, so nothing this file's queries express was executed — the clubId→team
+// preference, the `inArray(refereeGames.apiMatchId, ...)` batch load and the
+// `where(eq(refereeGames.id, existing.id))` update target were all inert. It also
+// mocked `@dragons/shared` down to a single EVENT_TYPES key, so
+// `EVENT_TYPES.MATCH_REMOVED` and `EVENT_TYPES.SYNC_COMPLETED` resolved to
+// `undefined` inside the code under test and no assertion noticed.
+//
+// `removeWithdrawnRefereeGames` has its own pglite suite in
+// referee-games.removal.integration.test.ts; here the feed always contains every
+// synced game, so the removal pass is a no-op.
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+
+vi.mock("../../config/database", () => ({
+  getDb: () =>
+    new Proxy(
+      {},
+      { get: (_t, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop] },
+    ),
+}));
 
 vi.mock("../../config/logger", () => ({
   logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
+    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
   },
 }));
 
-const mockInsert = vi.fn();
-const mockSelect = vi.fn();
-const mockUpdate = vi.fn();
-vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    insert: (...args: unknown[]) => mockInsert(...args),
-    select: (...args: unknown[]) => mockSelect(...args),
-    update: (...args: unknown[]) => mockUpdate(...args),
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  refereeGames: {
-    apiMatchId: "apiMatchId",
-    id: "id",
-    dataHash: "dataHash",
-  },
-  matches: {
-    apiMatchId: "apiMatchId",
-    id: "id",
-  },
-  leagues: {
-    apiLigaId: "apiLigaId",
-    ownClubRefs: "ownClubRefs",
-  },
-  teams: {
-    id: "id",
-    clubId: "clubId",
-    isOwnClub: "isOwnClub",
-  },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  gte: vi.fn((...args: unknown[]) => ({ gte: args })),
-  isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
-  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
-}));
-
-const mockPublishDomainEvent = vi.fn().mockResolvedValue(undefined);
+const mockPublishDomainEvent = vi.fn();
 vi.mock("../events/event-publisher", () => ({
   publishDomainEvent: (...args: unknown[]) => mockPublishDomainEvent(...args),
 }));
 
-const mockScheduleReminderJobs = vi.fn().mockResolvedValue(undefined);
-const mockCancelReminderJobs = vi.fn().mockResolvedValue(undefined);
+const mockScheduleReminderJobs = vi.fn();
+const mockCancelReminderJobs = vi.fn();
 vi.mock("../referee/referee-reminders.service", () => ({
   scheduleReminderJobs: (...args: unknown[]) => mockScheduleReminderJobs(...args),
   cancelReminderJobs: (...args: unknown[]) => mockCancelReminderJobs(...args),
-}));
-
-vi.mock("@dragons/shared", () => ({
-  EVENT_TYPES: {
-    REFEREE_SLOTS_NEEDED: "referee.slots.needed",
-  },
 }));
 
 const mockFetchOffeneSpiele = vi.fn();
@@ -79,7 +52,7 @@ vi.mock("./referee-sdk-client", () => ({
   }),
 }));
 
-const mockGetClubConfig = vi.fn().mockResolvedValue({ clubId: 300, clubName: "SC Dragons" });
+const mockGetClubConfig = vi.fn();
 vi.mock("../admin/settings.service", () => ({
   getClubConfig: () => mockGetClubConfig(),
 }));
@@ -90,12 +63,36 @@ import {
   mapApiResultToRow,
   syncRefereeGames,
 } from "./referee-games.sync";
+import { refereeGames, leagues, teams, matches } from "@dragons/db/schema";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
-beforeEach(() => {
-  vi.clearAllMocks();
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
-// --- Helpers ---
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  dbHolder.ref = ctx.db;
+  vi.clearAllMocks();
+  mockPublishDomainEvent.mockResolvedValue(undefined);
+  mockScheduleReminderJobs.mockResolvedValue(undefined);
+  mockCancelReminderJobs.mockResolvedValue(undefined);
+  mockGetClubConfig.mockResolvedValue({ clubId: 300, clubName: "SC Dragons" });
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
+
+// --- SDK fixtures ---
 
 function makeSr(overrides: Partial<SdkSpielleitung> = {}): SdkSpielleitung {
   return {
@@ -239,8 +236,6 @@ function makeApiResult(overrides: Partial<SdkOffeneSpielResult> = {}): SdkOffene
   };
 }
 
-// --- Tests ---
-
 describe("deriveSrStatus", () => {
   it("returns 'assigned' when sr is not null", () => {
     expect(deriveSrStatus(makeSr(), false)).toBe("assigned");
@@ -359,165 +354,241 @@ describe("mapApiResultToRow", () => {
   });
 });
 
-describe("syncRefereeGames", () => {
-  /**
-   * Helper: sets up mockSelect to handle the league lookup (first call),
-   * team lookup (second call), then per-game referee_games + matches lookups.
-   * `perGameFn` receives the per-game select call index (0-based) and returns the resolved rows.
-   * `teamRows` provides the result for the teams batch lookup (default: empty).
-   */
-  function setupSelectMock(
-    perGameFn: (callIndex: number) => Promise<unknown[]>,
-    teamRows: Array<{ id: number; clubId: number; isOwnClub: boolean }> = [],
-  ) {
-    let selectCallIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const currentCall = selectCallIndex++;
-      if (currentCall === 0) {
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([]),
-          }),
-        };
-      }
-      if (currentCall === 1) {
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(teamRows),
-          }),
-        };
-      }
-      // Batch lookups: refereeGames (call 2) then matches (call 3)
-      const batchIndex = currentCall - 2;
-      if (batchIndex > 1) {
-        // Anything after the two batch lookups is the removal pass's live-rows
-        // query (issue #105). Removal has its own pglite suite; here it is a
-        // no-op so these upsert assertions stay about upserts.
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue([]),
-          }),
-        };
-      }
-      return {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockImplementation(() => perGameFn(batchIndex)),
-        }),
-      };
-    });
-  }
 
-  it("returns zeros when API returns empty results", async () => {
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 0, results: [] });
+// --- DB helpers ---
+
+/** Insert teams with a given clubId, returning their generated ids in order. */
+async function seedTeams(rows: Array<{ clubId: number; isOwnClub?: boolean; name?: string }>) {
+  const inserted = await ctx.db
+    .insert(teams)
+    .values(
+      rows.map((r, i) => ({
+        apiTeamPermanentId: 9000 + i,
+        seasonTeamId: 9000 + i,
+        teamCompetitionId: 1,
+        name: r.name ?? `Team ${i}`,
+        clubId: r.clubId,
+        isOwnClub: r.isOwnClub ?? false,
+      })),
+    )
+    .returning({ id: teams.id });
+  return inserted.map((r) => r.id);
+}
+
+async function seedLeague(apiLigaId: number, ownClubRefs: boolean) {
+  await ctx.db.insert(leagues).values({
+    apiLigaId,
+    ligaNr: apiLigaId,
+    name: "Kreisliga Nord",
+    seasonId: 2026,
+    seasonName: "2025/26",
+    ownClubRefs,
+  });
+}
+
+async function gameRows() {
+  return ctx.db.select().from(refereeGames).orderBy(refereeGames.apiMatchId);
+}
+
+async function gameRow(apiMatchId = 1001) {
+  const [row] = await ctx.db
+    .select()
+    .from(refereeGames)
+    .where(eq(refereeGames.apiMatchId, apiMatchId));
+  if (!row) throw new Error(`referee game ${apiMatchId} not found`);
+  return row;
+}
+
+/** Feed helper: total always matches the payload so the removal page gate passes. */
+function feed(...results: SdkOffeneSpielResult[]) {
+  return { total: results.length, results };
+}
+
+/** Swap getDb() for a proxy overriding one method and delegating the rest. */
+function overrideDbMethod(name: string, impl: unknown) {
+  const real = ctx.db as unknown as Record<string | symbol, unknown>;
+  dbHolder.ref = new Proxy({}, { get: (_t, prop) => (prop === name ? impl : real[prop]) });
+}
+
+describe("syncRefereeGames", () => {
+  it("returns zeros when the API returns no results", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed());
+
     const counts = await syncRefereeGames();
+
     expect(counts).toEqual({ created: 0, updated: 0, unchanged: 0, removed: 0 });
+    expect(await gameRows()).toEqual([]);
   });
 
-  it("inserts new game and emits event when open our-club slot exists", async () => {
-    // sr1 is open and our club
-    const result = makeApiResult({
-      sr1: null,
-      sr1MeinVerein: true,
-      sr1OffenAngeboten: false,
-    });
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
-
-    // No existing row, no matches row
-    setupSelectMock(async () => []);
-
-    // Insert returns the new row
-    const mockValues = vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
-      }),
-    });
-    mockInsert.mockReturnValue({ values: mockValues });
+  it("inserts a new game with every mapped column and emits the open-slot event", async () => {
+    const result = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    mockFetchOffeneSpiele.mockResolvedValue(feed(result));
 
     const counts = await syncRefereeGames();
 
     expect(counts.created).toBe(1);
-    expect(mockInsert).toHaveBeenCalled();
+
+    const row = await gameRow();
+    expect(row.matchNo).toBe(42);
+    expect(row.leagueApiId).toBe(10);
+    expect(row.kickoffDate).toBe("2026-04-25");
+    expect(row.kickoffTime).toBe("14:00:00");
+    expect(row.homeTeamName).toBe("Dragons 1");
+    expect(row.guestTeamName).toBe("Titans 1");
+    expect(row.leagueName).toBe("Kreisliga Nord");
+    expect(row.leagueShort).toBe("SR-KLN");
+    expect(row.venueName).toBe("Sporthalle West");
+    expect(row.venueCity).toBe("Berlin");
+    expect(row.sr1OurClub).toBe(true);
+    expect(row.sr2OurClub).toBe(false);
+    expect(row.sr1Status).toBe("open");
+    expect(row.sr2Status).toBe("offered");
+    expect(row.dataHash).toBe(computeRefereeGameHash(mapApiResultToRow(result)));
+    expect(row.lastSyncedAt).not.toBeNull();
+    expect(row.removedAt).toBeNull();
+
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "referee.slots.needed",
+        entityId: row.id,
+        entityName: "Dragons 1 vs Titans 1",
+        payload: expect.objectContaining({
+          matchNo: 42,
+          sr1Open: true,
+          sr2Open: false,
+          deepLink: "/referee/games?apiMatchId=1001",
+        }),
       }),
     );
-    expect(mockScheduleReminderJobs).toHaveBeenCalledWith(
-      1001, 1, "2026-04-25", "14:00",
+    expect(mockScheduleReminderJobs).toHaveBeenCalledWith(1001, row.id, "2026-04-25", "14:00");
+  });
+
+  it("links the referee game to an existing match row", async () => {
+    await ctx.db.insert(teams).values([
+      { apiTeamPermanentId: 1, seasonTeamId: 1, teamCompetitionId: 1, name: "H", clubId: 300 },
+      { apiTeamPermanentId: 2, seasonTeamId: 2, teamCompetitionId: 2, name: "G", clubId: 301 },
+    ]);
+    const [match] = await ctx.db
+      .insert(matches)
+      .values({
+        apiMatchId: 1001,
+        matchNo: 42,
+        matchDay: 1,
+        kickoffDate: "2026-04-25",
+        kickoffTime: "14:00:00",
+        homeTeamApiId: 1,
+        guestTeamApiId: 2,
+      })
+      .returning();
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
     );
+
+    await syncRefereeGames();
+
+    expect((await gameRow()).matchId).toBe(match!.id);
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          matchId: match!.id,
+          deepLink: `/referee/matches?take=${match!.id}`,
+        }),
+      }),
+    );
+  });
+
+  it("does not emit or schedule for a game with no open our-club slot", async () => {
+    // sr1 assigned, sr2 offered but not our club → nothing open for us.
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr() })));
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.created).toBe(1);
+    expect(mockPublishDomainEvent).not.toHaveBeenCalled();
+    expect(mockScheduleReminderJobs).not.toHaveBeenCalled();
+  });
+
+  it("does not emit for a cancelled game even when a slot is open", async () => {
+    const result = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    result.sp.abgesagt = true;
+    mockFetchOffeneSpiele.mockResolvedValue(feed(result));
+
+    await syncRefereeGames();
+
+    expect((await gameRow()).isCancelled).toBe(true);
+    expect(mockPublishDomainEvent).not.toHaveBeenCalled();
   });
 
   it("upserts on apiMatchId conflict so a concurrent run can't drop the insert (#69)", async () => {
     const result = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
-
-    // No existing row in this run's snapshot → INSERT branch.
-    setupSelectMock(async () => []);
-
-    const returning = vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]);
-    const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
-    // values() exposes BOTH so the current (returning-only) chain still runs;
-    // only the new code reaches onConflictDoUpdate.
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({ onConflictDoUpdate, returning }),
+    mockFetchOffeneSpiele.mockResolvedValue(feed(result));
+    // A row already exists for this apiMatchId with stale data, but it is hidden
+    // from the batch pre-load (as it would be for a run that raced us), so the
+    // sync takes the INSERT branch and must resolve the conflict by updating.
+    await ctx.db.insert(refereeGames).values({
+      apiMatchId: 1001,
+      matchNo: 1,
+      kickoffDate: "2020-01-01",
+      kickoffTime: "09:00:00",
+      homeTeamName: "stale home",
+      guestTeamName: "stale guest",
+      sr1OurClub: false,
+      sr2OurClub: false,
+      dataHash: "stale",
     });
-
-    await syncRefereeGames();
-
-    const upsertArg = onConflictDoUpdate.mock.calls[0]![0];
-    expect(upsertArg.target).toBe("apiMatchId");
-    // The conflict set must mirror the UPDATE branch's columns, so the upsert
-    // can't silently rot into a partial set that drops fields on conflict.
-    expect(Object.keys(upsertArg.set)).toEqual(
-      expect.arrayContaining([
-        "matchId",
-        "homeTeamId",
-        "guestTeamId",
-        "ownClubRefs",
-        "isHomeGame",
-        "isGuestGame",
-        "dataHash",
-        "lastSyncedAt",
-        "updatedAt",
-      ]),
+    const real = ctx.db as unknown as Record<string | symbol, unknown>;
+    let selectCall = 0;
+    dbHolder.ref = new Proxy(
+      {},
+      {
+        get: (_t, prop) =>
+          prop === "select"
+            ? (...args: unknown[]) => {
+                selectCall++;
+                // 3rd select is the refereeGames batch pre-load.
+                if (selectCall === 3) {
+                  return { from: () => ({ where: async () => [] }) };
+                }
+                return (real.select as (...a: unknown[]) => unknown)(...args);
+              }
+            : real[prop],
+      },
     );
-    expect(upsertArg.set.dataHash).toBeDefined();
-  });
-
-  it("skips unchanged games", async () => {
-    const sr1 = makeSr();
-    const result = makeApiResult({ sr1 });
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
-
-    // Compute the actual hash to match
-    const mapped = mapApiResultToRow(result);
-    const hash = computeRefereeGameHash(mapped);
-
-    // Per-game: first call returns existing with matching hash, second returns match
-    let perGameCall = 0;
-    setupSelectMock(async () => {
-      perGameCall++;
-      if (perGameCall === 1) {
-        return [{
-          id: 1,
-          apiMatchId: 1001,
-          dataHash: hash,
-          sr1Status: "assigned",
-          sr2Status: "offered",
-        }];
-      }
-      return [{ id: 50 }];
-    });
 
     const counts = await syncRefereeGames();
 
-    expect(counts.unchanged).toBe(1);
-    expect(mockInsert).not.toHaveBeenCalled();
-    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(counts.created).toBe(1);
+    const rows = await gameRows();
+    expect(rows).toHaveLength(1); // no duplicate row
+    expect(rows[0]!.matchNo).toBe(42);
+    expect(rows[0]!.homeTeamName).toBe("Dragons 1");
+    expect(rows[0]!.kickoffDate).toBe("2026-04-25");
+    expect(rows[0]!.dataHash).toBe(computeRefereeGameHash(mapApiResultToRow(result)));
   });
 
-  it("updates game and cancels reminders when both slots filled", async () => {
-    const sr1 = makeSr();
+  it("skips an unchanged game on re-sync", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr() })));
+    await syncRefereeGames();
+    const before = await gameRow();
+    vi.clearAllMocks();
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr() })));
+
+    const counts = await syncRefereeGames();
+
+    expect(counts).toMatchObject({ created: 0, updated: 0, unchanged: 1 });
+    const after = await gameRow();
+    expect(after.updatedAt.getTime()).toBe(before.updatedAt.getTime());
+    expect(after.lastSyncedAt!.getTime()).toBe(before.lastSyncedAt!.getTime());
+  });
+
+  it("updates the row and cancels reminders when both slots fill", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
+    await syncRefereeGames();
+    const before = await gameRow();
+    vi.clearAllMocks();
+
     const sr2 = makeSr({
       schiedsrichter: {
         schiedsrichterId: 99,
@@ -535,192 +606,72 @@ describe("syncRefereeGames", () => {
         lizenznummer: 99999,
       },
     });
-    const result = makeApiResult({ sr1, sr2 });
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
-
-    let perGameCall = 0;
-    setupSelectMock(async () => {
-      perGameCall++;
-      if (perGameCall === 1) {
-        return [{
-          id: 1,
-          apiMatchId: 1001,
-          dataHash: "old-hash",
-          sr1Status: "open",
-          sr2Status: "open",
-          sr1OurClub: true,
-          sr2OurClub: false,
-        }];
-      }
-      return [{ id: 50 }];
-    });
-
-    // Update returns
-    const mockSet = vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    });
-    mockUpdate.mockReturnValue({ set: mockSet });
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr(), sr2 })));
 
     const counts = await syncRefereeGames();
 
     expect(counts.updated).toBe(1);
-    expect(mockUpdate).toHaveBeenCalled();
+    const after = await gameRow();
+    expect(after.id).toBe(before.id); // updated in place
+    expect(after.sr1Status).toBe("assigned");
+    expect(after.sr2Status).toBe("assigned");
+    expect(after.sr1Name).toBe("Hans Müller");
+    expect(after.sr2Name).toBe("Eva Schmidt");
+    expect(after.dataHash).not.toBe(before.dataHash);
     expect(mockCancelReminderJobs).toHaveBeenCalledWith(1001);
   });
 
-  it("continues processing when a single game's insert throws", async () => {
-    const result1 = makeApiResult();
-    const result2 = makeApiResult();
-    result2.sp.spielplanId = 2002;
-    result2.sp.spielnr = 99;
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 2, results: [result1, result2] });
+  it("reschedules reminders when the kickoff moves", async () => {
+    const early = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    early.sp.spieldatum = 1776686400000; // 2026-04-20 14:00 CEST
+    mockFetchOffeneSpiele.mockResolvedValue(feed(early));
+    await syncRefereeGames();
+    expect((await gameRow()).kickoffDate).toBe("2026-04-20");
+    vi.clearAllMocks();
 
-    setupSelectMock(async () => []);
-
-    let insertCall = 0;
-    mockInsert.mockImplementation(() => ({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockImplementation(() => {
-            insertCall++;
-            if (insertCall === 1) {
-              return Promise.reject(new Error("DB connection lost"));
-            }
-            return Promise.resolve([{ id: 2, apiMatchId: 2002 }]);
-          }),
-        }),
-      }),
-    }));
-
-    const counts = await syncRefereeGames();
-
-    expect(counts.created).toBe(1);
-  });
-
-  it("updates game and reschedules reminders when kickoff changes", async () => {
-    const result = makeApiResult({
-      sr1: null,
-      sr1MeinVerein: true,
-      sr1OffenAngeboten: false,
-    });
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
-
-    let perGameCall = 0;
-    setupSelectMock(async () => {
-      perGameCall++;
-      if (perGameCall === 1) {
-        return [{
-          id: 1,
-          apiMatchId: 1001,
-          dataHash: "old-hash",
-          sr1Status: "open",
-          sr2Status: "offered",
-          sr1OurClub: true,
-          sr2OurClub: false,
-          kickoffDate: "2026-04-20",
-          kickoffTime: "14:00",
-          isCancelled: false,
-          isForfeited: false,
-        }];
-      }
-      return [{ id: 50 }];
-    });
-
-    const mockSet = vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    });
-    mockUpdate.mockReturnValue({ set: mockSet });
-
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
     const counts = await syncRefereeGames();
 
     expect(counts.updated).toBe(1);
-    // Kickoff changed: cancel old reminders, schedule new ones
+    const row = await gameRow();
+    expect(row.kickoffDate).toBe("2026-04-25");
     expect(mockCancelReminderJobs).toHaveBeenCalledWith(1001);
-    expect(mockScheduleReminderJobs).toHaveBeenCalledWith(1001, 1, "2026-04-25", "14:00");
+    expect(mockScheduleReminderJobs).toHaveBeenCalledWith(1001, row.id, "2026-04-25", "14:00");
   });
 
-  it("emits event when a slot opens on update", async () => {
-    // sr1 was assigned, now it's open — slot opened
-    const result = makeApiResult({
-      sr1: null,
-      sr1MeinVerein: true,
-      sr1OffenAngeboten: false,
-    });
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+  it("emits referee.slots.needed when an assigned our-club slot opens up", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr() })));
+    await syncRefereeGames();
+    expect((await gameRow()).sr1Status).toBe("assigned");
+    vi.clearAllMocks();
 
-    let perGameCall = 0;
-    setupSelectMock(async () => {
-      perGameCall++;
-      if (perGameCall === 1) {
-        return [{
-          id: 1,
-          apiMatchId: 1001,
-          dataHash: "old-hash",
-          sr1Status: "assigned",
-          sr2Status: "offered",
-          sr1OurClub: true,
-          sr2OurClub: false,
-          kickoffDate: "2026-04-25",
-          kickoffTime: "14:00",
-          isCancelled: false,
-          isForfeited: false,
-        }];
-      }
-      return [{ id: 50 }];
-    });
-
-    const mockSet = vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    });
-    mockUpdate.mockReturnValue({ set: mockSet });
-
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
     const counts = await syncRefereeGames();
 
     expect(counts.updated).toBe(1);
+    expect((await gameRow()).sr1Status).toBe("open");
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "referee.slots.needed",
-      }),
+      expect.objectContaining({ type: "referee.slots.needed" }),
     );
   });
 
   it("uses the current (mapped) ourClub flag for slot-opened detection, not the stale row (#82)", async () => {
-    // sr1 assigned -> open. The stored row's sr1OurClub is stale (false), but
-    // this sync marks the slot as our club's (sr1MeinVerein true). Gating on the
-    // stale flag would suppress the event; gating on the mapped flag emits it.
-    const result = makeApiResult({
-      sr1: null,
-      sr1MeinVerein: true,
-      sr1OffenAngeboten: false,
-    });
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+    // Stored row says the slot is not ours; this sync says it is. Gating on the
+    // stale flag would suppress the event.
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: makeSr(), sr1MeinVerein: false })),
+    );
+    await syncRefereeGames();
+    expect((await gameRow()).sr1OurClub).toBe(false);
+    vi.clearAllMocks();
 
-    let perGameCall = 0;
-    setupSelectMock(async () => {
-      perGameCall++;
-      if (perGameCall === 1) {
-        return [{
-          id: 1,
-          apiMatchId: 1001,
-          dataHash: "old-hash",
-          sr1Status: "assigned",
-          sr2Status: "offered",
-          sr1OurClub: false, // STALE: previously not flagged as our club
-          sr2OurClub: false,
-          kickoffDate: "2026-04-25",
-          kickoffTime: "14:00",
-          isCancelled: false,
-          isForfeited: false,
-        }];
-      }
-      return [{ id: 50 }];
-    });
-
-    const mockSet = vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    });
-    mockUpdate.mockReturnValue({ set: mockSet });
-
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
     const counts = await syncRefereeGames();
 
     expect(counts.updated).toBe(1);
@@ -729,207 +680,352 @@ describe("syncRefereeGames", () => {
     );
   });
 
-  it("cancels reminders when game is cancelled on update", async () => {
-    const result = makeApiResult();
-    result.sp.abgesagt = true;
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+  it("cancels reminders when a game is cancelled on update", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
+    await syncRefereeGames();
+    vi.clearAllMocks();
 
-    let perGameCall = 0;
-    setupSelectMock(async () => {
-      perGameCall++;
-      if (perGameCall === 1) {
-        return [{
-          id: 1,
-          apiMatchId: 1001,
-          dataHash: "old-hash",
-          sr1Status: "open",
-          sr2Status: "offered",
-          sr1OurClub: true,
-          sr2OurClub: false,
-          kickoffDate: "2026-04-23",
-          kickoffTime: "12:00",
-          isCancelled: false,
-          isForfeited: false,
-        }];
-      }
-      return [{ id: 50 }];
-    });
-
-    const mockSet = vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    });
-    mockUpdate.mockReturnValue({ set: mockSet });
+    const cancelled = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    cancelled.sp.abgesagt = true;
+    mockFetchOffeneSpiele.mockResolvedValue(feed(cancelled));
 
     const counts = await syncRefereeGames();
 
     expect(counts.updated).toBe(1);
+    expect((await gameRow()).isCancelled).toBe(true);
     expect(mockCancelReminderJobs).toHaveBeenCalledWith(1001);
+    expect(mockPublishDomainEvent).not.toHaveBeenCalled();
   });
 
-  it("sets isHomeGame when homeClubId matches club config", async () => {
-    const result = makeApiResult();
-    // homeClubId = 300 (from makeApiResult)
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+  it("continues processing when one game's write fails", async () => {
+    const first = makeApiResult();
+    const second = makeApiResult();
+    second.sp.spielplanId = 2002;
+    second.sp.spielnr = 99;
+    mockFetchOffeneSpiele.mockResolvedValue(feed(first, second));
 
-    // No existing row, no matches row
-    setupSelectMock(async () => []);
-
-    const mockValues = vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
-      }),
-    });
-    mockInsert.mockReturnValue({ values: mockValues });
-
-    await syncRefereeGames();
-
-    // Verify insert was called with isHomeGame/isGuestGame
-    const insertedValues = mockValues.mock.calls[0]![0];
-    expect(insertedValues).toHaveProperty("isHomeGame", true);
-    expect(insertedValues).toHaveProperty("isGuestGame", false);
-  });
-
-  it("resolves homeTeamId and guestTeamId from teams table when club IDs match", async () => {
-    const result = makeApiResult();
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
-
-    // No existing row, no matches row
-    setupSelectMock(async () => [], [
-      { id: 10, clubId: 300, isOwnClub: true },
-      { id: 20, clubId: 301, isOwnClub: false },
-    ]);
-
-    const mockValues = vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
-      }),
-    });
-    mockInsert.mockReturnValue({ values: mockValues });
-
-    await syncRefereeGames();
-
-    const insertedValues = mockValues.mock.calls[0]![0];
-    expect(insertedValues).toHaveProperty("homeTeamId", 10);
-    expect(insertedValues).toHaveProperty("guestTeamId", 20);
-  });
-
-  it("sets homeTeamId/guestTeamId to null when no matching team exists", async () => {
-    const result = makeApiResult();
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
-
-    // No teams in DB, no existing row, no matches row
-    setupSelectMock(async () => [], []);
-
-    const mockValues = vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
-      }),
-    });
-    mockInsert.mockReturnValue({ values: mockValues });
-
-    await syncRefereeGames();
-
-    const insertedValues = mockValues.mock.calls[0]![0];
-    expect(insertedValues).toHaveProperty("homeTeamId", null);
-    expect(insertedValues).toHaveProperty("guestTeamId", null);
-  });
-
-  it("prefers isOwnClub=true team when multiple teams share a clubId", async () => {
-    const result = makeApiResult();
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
-
-    // Two teams for clubId 300: non-own first, then own-club
-    setupSelectMock(async () => [], [
-      { id: 10, clubId: 300, isOwnClub: false },
-      { id: 11, clubId: 300, isOwnClub: true },
-      { id: 20, clubId: 301, isOwnClub: false },
-    ]);
-
-    const mockValues = vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
-      }),
-    });
-    mockInsert.mockReturnValue({ values: mockValues });
-
-    await syncRefereeGames();
-
-    const insertedValues = mockValues.mock.calls[0]![0];
-    // Should pick id=11 (isOwnClub=true) over id=10
-    expect(insertedValues).toHaveProperty("homeTeamId", 11);
-    expect(insertedValues).toHaveProperty("guestTeamId", 20);
-  });
-
-  it("passes homeTeamId/guestTeamId in update when data hash changes", async () => {
-    const result = makeApiResult({ sr1: makeSr() });
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
-
-    let perGameCall = 0;
-    setupSelectMock(
-      async () => {
-        perGameCall++;
-        if (perGameCall === 1) {
-          return [{
-            id: 1,
-            apiMatchId: 1001,
-            dataHash: "old-hash",
-            sr1Status: "open",
-            sr2Status: "offered",
-            sr1OurClub: true,
-            sr2OurClub: false,
-            kickoffDate: "2026-04-25",
-            kickoffTime: "14:00",
-            isCancelled: false,
-            isForfeited: false,
-          }];
-        }
-        return [{ id: 50 }];
+    const real = ctx.db as unknown as Record<string | symbol, unknown>;
+    let insertCall = 0;
+    dbHolder.ref = new Proxy(
+      {},
+      {
+        get: (_t, prop) =>
+          prop === "insert"
+            ? (...args: unknown[]) => {
+                insertCall++;
+                if (insertCall === 1) {
+                  return {
+                    values: () => ({
+                      onConflictDoUpdate: () => ({
+                        returning: () => Promise.reject(new Error("DB connection lost")),
+                      }),
+                    }),
+                  };
+                }
+                return (real.insert as (...a: unknown[]) => unknown)(...args);
+              }
+            : real[prop],
       },
-      [
-        { id: 10, clubId: 300, isOwnClub: true },
-        { id: 20, clubId: 301, isOwnClub: false },
-      ],
     );
 
-    const mockSet = vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    });
-    mockUpdate.mockReturnValue({ set: mockSet });
+    const counts = await syncRefereeGames();
+
+    expect(counts.created).toBe(1);
+    const rows = await gameRows();
+    expect(rows.map((r) => r.apiMatchId)).toEqual([2002]);
+  });
+
+  it("sets isHomeGame/isGuestGame from the configured club id", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
 
     await syncRefereeGames();
 
-    const updatedValues = mockSet.mock.calls[0]![0];
-    expect(updatedValues).toHaveProperty("homeTeamId", 10);
-    expect(updatedValues).toHaveProperty("guestTeamId", 20);
+    const row = await gameRow();
+    expect(row.isHomeGame).toBe(true); // homeClubId 300 === configured clubId
+    expect(row.isGuestGame).toBe(false);
+    expect(row.homeClubId).toBe(300);
+    expect(row.guestClubId).toBe(301);
   });
 
-  it("should log entries when SyncLogger is provided", async () => {
-    const mockLogger = {
-      log: vi.fn().mockResolvedValue(undefined),
-    };
+  it("marks neither side when no club is configured", async () => {
+    mockGetClubConfig.mockResolvedValue(null);
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
 
-    // Use one result that will be inserted (new game)
-    const result = makeApiResult({
-      sr1: null,
-      sr1MeinVerein: true,
-      sr1OffenAngeboten: false,
-    });
-    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+    await syncRefereeGames();
 
-    // No existing row, no matches row
-    setupSelectMock(async () => []);
+    const row = await gameRow();
+    expect(row.isHomeGame).toBe(false);
+    expect(row.isGuestGame).toBe(false);
+  });
 
-    const mockValues = vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
-      }),
-    });
-    mockInsert.mockReturnValue({ values: mockValues });
+  it("resolves homeTeamId/guestTeamId from the teams table", async () => {
+    const [homeId, guestId] = await seedTeams([
+      { clubId: 300, isOwnClub: true },
+      { clubId: 301 },
+    ]);
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+
+    await syncRefereeGames();
+
+    const row = await gameRow();
+    expect(row.homeTeamId).toBe(homeId);
+    expect(row.guestTeamId).toBe(guestId);
+  });
+
+  it("leaves homeTeamId/guestTeamId null when no team matches the club id", async () => {
+    await seedTeams([{ clubId: 999 }]);
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+
+    await syncRefereeGames();
+
+    const row = await gameRow();
+    expect(row.homeTeamId).toBeNull();
+    expect(row.guestTeamId).toBeNull();
+  });
+
+  it("prefers the isOwnClub team when several teams share a club id", async () => {
+    const ids = await seedTeams([
+      { clubId: 300, isOwnClub: false },
+      { clubId: 300, isOwnClub: true },
+      { clubId: 301 },
+    ]);
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+
+    await syncRefereeGames();
+
+    const row = await gameRow();
+    expect(row.homeTeamId).toBe(ids[1]);
+    expect(row.guestTeamId).toBe(ids[2]);
+  });
+
+  it("carries the team ids through on the update path too", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+    await syncRefereeGames();
+    expect((await gameRow()).homeTeamId).toBeNull();
+
+    const [homeId, guestId] = await seedTeams([
+      { clubId: 300, isOwnClub: true },
+      { clubId: 301 },
+    ]);
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr() })));
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.updated).toBe(1);
+    const row = await gameRow();
+    expect(row.homeTeamId).toBe(homeId);
+    expect(row.guestTeamId).toBe(guestId);
+  });
+
+  it("carries ownClubRefs from the league row", async () => {
+    await seedLeague(10, true);
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+
+    await syncRefereeGames();
+
+    expect((await gameRow()).ownClubRefs).toBe(true);
+  });
+
+  it("defaults ownClubRefs to false when the league is unknown", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+
+    await syncRefereeGames();
+
+    expect((await gameRow()).ownClubRefs).toBe(false);
+  });
+
+  it("logs created, skipped and failed entries to the sync logger", async () => {
+    const mockLogger = { log: vi.fn().mockResolvedValue(undefined) };
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
 
     await syncRefereeGames(mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: "refereeGame" }),
+      expect.objectContaining({
+        entityType: "refereeGame",
+        entityId: "1001",
+        entityName: "Dragons 1 vs Titans 1",
+        action: "created",
+        message: "New game with open our-club slot",
+      }),
     );
+
+    mockLogger.log.mockClear();
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
+    await syncRefereeGames(mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "refereeGame", action: "skipped" }),
+    );
+  });
+
+  it("logs a failed entry when a game cannot be written", async () => {
+    const mockLogger = { log: vi.fn().mockResolvedValue(undefined) };
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+    overrideDbMethod("insert", () => ({
+      values: () => ({
+        onConflictDoUpdate: () => ({ returning: () => Promise.reject(new Error("nope")) }),
+      }),
+    }));
+
+    await syncRefereeGames(mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: "refereeGame",
+        action: "failed",
+        message: "nope",
+      }),
+    );
+  });
+
+  it("emits sync.completed with the real EVENT_TYPES constant when a syncRunId is given", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+
+    await syncRefereeGames(undefined, 77);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "sync.completed",
+        syncRunId: 77,
+        deepLinkPath: "/admin/sync/logs/77",
+        payload: expect.objectContaining({
+          syncRunId: 77,
+          syncType: "referee-games",
+          recordsProcessed: 1,
+          recordsCreated: 1,
+          recordsUpdated: 0,
+          recordsFailed: 0,
+        }),
+      }),
+    );
+  });
+
+  it("does not emit sync.completed without a syncRunId", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+
+    await syncRefereeGames();
+
+    const types = mockPublishDomainEvent.mock.calls.map(
+      (c: unknown[]) => (c[0] as Record<string, unknown>).type,
+    );
+    expect(types).not.toContain("sync.completed");
+  });
+
+  it("still returns counts when publishing sync.completed fails", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
+    mockPublishDomainEvent.mockRejectedValue(new Error("outbox down"));
+
+    const counts = await syncRefereeGames(undefined, 77);
+
+    expect(counts.created).toBe(1);
+    expect(await gameRows()).toHaveLength(1);
+  });
+
+  it("survives a reminder-scheduling failure on insert", async () => {
+    mockScheduleReminderJobs.mockRejectedValue(new Error("queue down"));
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.created).toBe(1);
+    expect(await gameRows()).toHaveLength(1);
+  });
+
+  it("survives an event-publishing failure on insert", async () => {
+    mockPublishDomainEvent.mockRejectedValue(new Error("outbox down"));
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.created).toBe(1);
+    expect(mockScheduleReminderJobs).toHaveBeenCalled();
+  });
+
+  it("survives a reminder-cancellation failure when both slots fill", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
+    await syncRefereeGames();
+    mockCancelReminderJobs.mockRejectedValue(new Error("queue down"));
+    const sr2 = makeSr({
+      schiedsrichter: {
+        schiedsrichterId: 99,
+        vereinVO: null,
+        personVO: {
+          personId: 200,
+          nachname: "Schmidt",
+          vorname: "Eva",
+          email: "eva@example.com",
+          geburtsdatum: null,
+          geschlecht: "W",
+        },
+        srgebietId: 1,
+        schiristatusId: 1,
+        lizenznummer: 99999,
+      },
+    });
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr(), sr2 })));
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.updated).toBe(1);
+    expect((await gameRow()).sr2Status).toBe("assigned");
+  });
+
+  it("survives a reminder-cancellation failure on cancellation", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
+    await syncRefereeGames();
+    mockCancelReminderJobs.mockRejectedValue(new Error("queue down"));
+    const cancelled = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    cancelled.sp.abgesagt = true;
+    mockFetchOffeneSpiele.mockResolvedValue(feed(cancelled));
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.updated).toBe(1);
+    expect((await gameRow()).isCancelled).toBe(true);
+  });
+
+  it("survives a reschedule failure when the kickoff moves", async () => {
+    const early = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    early.sp.spieldatum = 1776686400000;
+    mockFetchOffeneSpiele.mockResolvedValue(feed(early));
+    await syncRefereeGames();
+    mockCancelReminderJobs.mockRejectedValue(new Error("queue down"));
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.updated).toBe(1);
+    expect((await gameRow()).kickoffDate).toBe("2026-04-25");
+  });
+
+  it("survives an event-publishing failure when a slot opens", async () => {
+    mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr() })));
+    await syncRefereeGames();
+    mockPublishDomainEvent.mockRejectedValue(new Error("outbox down"));
+    mockFetchOffeneSpiele.mockResolvedValue(
+      feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
+    );
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.updated).toBe(1);
+    expect((await gameRow()).sr1Status).toBe("open");
   });
 });
