@@ -26,7 +26,7 @@ export function PublicBottomTabs() {
               key={tab.href}
               href={tab.href}
               className={cn(
-                "flex flex-col items-center gap-1 rounded-lg px-4 py-2 text-xs font-medium transition-colors min-w-[64px]",
+                "flex flex-col items-center gap-1 rounded-md px-4 py-2 text-xs font-medium transition-colors min-w-[64px]",
                 isActive
                   ? "text-foreground"
                   : "text-muted-foreground",

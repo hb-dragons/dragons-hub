@@ -170,7 +170,7 @@ function getTeamDisplayName(team: OwnClubTeam): string {
 function SheetSkeleton() {
   return (
     <div className="flex flex-col gap-6 px-4 pb-4">
-      <div className="rounded-lg bg-muted/30 p-4">
+      <div className="rounded-md bg-muted/30 p-4">
         <Skeleton className="mb-3 h-4 w-24" />
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -451,7 +451,7 @@ export function MatchEditSheet({
           >
             <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4">
               {/* #1 — Read-only match info in card-like container */}
-              <section className="rounded-lg bg-muted/30 p-4">
+              <section className="rounded-md bg-muted/30 p-4">
                 <h3 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
                   {t("matchDetail.info.title")}
                 </h3>

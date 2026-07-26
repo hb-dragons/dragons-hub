@@ -13,6 +13,7 @@ import { getServerApi } from "@/lib/api.server";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { BoardView } from "@/components/admin/board/board-view";
 import { makeQueries } from "@/lib/swr-queries";
+import { PageError } from "@/components/admin/shared/page-error";
 
 export default async function BoardDetailPage({
   params,
@@ -74,9 +75,7 @@ export default async function BoardDetailPage({
     return (
       <div className="space-y-6">
         <PageHeader title={t("board.title")} />
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error ?? "Board not found"}
-        </div>
+        <PageError message={error ?? "Board not found"} />
       </div>
     );
   }

@@ -26,6 +26,7 @@ import type {
   SyncRun,
   SyncScheduleData,
 } from "@/components/admin/sync/types";
+import { PageError } from "@/components/admin/shared/page-error";
 
 export default async function SyncPage() {
   const session = await getServerSession();
@@ -58,9 +59,7 @@ export default async function SyncPage() {
     return (
       <div className="space-y-6">
         <PageHeader title={t("sync.title")} subtitle={t("sync.description")} />
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
+        <PageError message={error} />
       </div>
     );
   }

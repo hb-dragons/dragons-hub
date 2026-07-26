@@ -340,7 +340,7 @@ export function KanbanBoard({
         {activeTask && <TaskCard task={activeTask} onOpen={() => {}} />}
         {activeColumn && (
           <div
-            className="flex shrink-0 flex-col rounded-lg border bg-muted/50 shadow-lg"
+            className="flex shrink-0 flex-col rounded-md border bg-muted/50 shadow-lg"
             style={{
               width: activeSize?.width,
               height: activeSize?.height,

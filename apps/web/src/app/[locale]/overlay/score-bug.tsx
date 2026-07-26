@@ -59,7 +59,7 @@ export function ScoreBug({ match, scoreboard, stale }: Props) {
       style={{ zoom: 2 }}
     >
       <div className="flex items-stretch justify-center font-display">
-        <div className="flex h-20 items-stretch overflow-hidden rounded-lg bg-surface-low">
+        <div className="flex h-20 items-stretch overflow-hidden rounded-md bg-surface-low">
           <LogoCap team={match.home} />
           <TeamPanel
             abbr={match.home.abbr}

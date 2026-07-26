@@ -64,7 +64,7 @@ export function KanbanColumn({
     <div
       ref={setSortableRef}
       style={style}
-      className={`flex w-72 shrink-0 flex-col rounded-lg border bg-muted/50 ${
+      className={`flex w-72 shrink-0 flex-col rounded-md border bg-muted/50 ${
         overLimit ? "ring-2 ring-destructive" : ""
       }`}
     >

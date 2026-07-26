@@ -8,6 +8,7 @@ import { SWRConfig } from "swr";
 import { makeQueries } from "@/lib/swr-queries";
 import { EventBrowser } from "@/components/admin/notifications/event-browser";
 import type { DomainEventListResult } from "@/components/admin/notifications/types";
+import { PageError } from "@/components/admin/shared/page-error";
 
 /**
  * The query `EventBrowser` issues on first paint. Both the query object and the
@@ -42,9 +43,7 @@ export default async function EventsPage() {
       <PageHeader title={t("title")} subtitle={t("description")} />
 
       {error ? (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
+        <PageError message={error} />
       ) : (
         <SWRConfig value={{ fallback: { [eventsQ.key]: data } }}>
           <EventBrowser />

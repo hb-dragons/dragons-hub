@@ -8,6 +8,7 @@ import { SWRConfig } from "swr";
 import { makeQueries } from "@/lib/swr-queries";
 import { MatchListTable } from "@/components/admin/matches/match-list-table"
 import type { PaginatedResponse, MatchListItem } from "@/components/admin/matches/types"
+import { PageError } from "@/components/admin/shared/page-error";
 
 export default async function MatchesPage() {
   const session = await getServerSession();
@@ -32,9 +33,7 @@ export default async function MatchesPage() {
       <PageHeader title={t("matches.title")} />
 
       {error ? (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
+        <PageError message={error} />
       ) : (
         <SWRConfig value={{ fallback: { [matchesQ.key]: data } }}>
           <MatchListTable />
