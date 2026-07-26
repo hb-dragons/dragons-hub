@@ -32,7 +32,7 @@ export function PublicBottomTabs() {
                   : "text-muted-foreground",
               )}
             >
-              <Icon className={cn("h-5 w-5", isActive && "text-mint-shade")} />
+              <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
               <span>{t(tab.labelKey)}</span>
             </Link>
           );
