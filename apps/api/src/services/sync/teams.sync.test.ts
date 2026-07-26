@@ -1,7 +1,25 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
+import { eq } from "drizzle-orm";
 import type { SdkTeamRef } from "@dragons/sdk";
 
-// --- Mock setup ---
+// Real Postgres (pglite) with real migrations, the real `sql`/`and`/`eq`/`ne`/`inArray`
+// operators and the real `computeEntityHash`. The previous mocked-ORM version stubbed
+// every operator to an identity function and hand-choreographed four `select()` return
+// values in call order, so the corrective pass's predicates
+// (`and(eq(clubId, ownClubId), eq(isOwnClub, false))` / `and(ne(clubId, ownClubId),
+// eq(isOwnClub, true))`) never ran. Swapping `and` for `or` left all 19 tests green.
+//
+// displayOrder mechanics have their own pglite suite in teams.sync.display-order.test.ts;
+// this file covers counting, column mapping, the isOwnClub corrective pass and errors.
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+
+vi.mock("../../config/database", () => ({
+  getDb: () =>
+    new Proxy(
+      {},
+      { get: (_t, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop] },
+    ),
+}));
 
 const mockLogInfo = vi.fn();
 vi.mock("../../config/logger", () => ({
@@ -20,90 +38,42 @@ vi.mock("../admin/settings.service", () => ({
   getClubConfig: (...args: unknown[]) => mockGetClubConfig(...args),
 }));
 
-const mockInsert = vi.fn();
-const mockSelect = vi.fn();
-const mockUpdate = vi.fn();
-const mockTransaction = vi.fn((fn: (tx: unknown) => unknown) =>
-  // The corrective pass batches its updates inside a transaction; route
-  // tx.update back to the same mockUpdate so per-call setups still apply.
-  fn({ update: (...args: unknown[]) => mockUpdate(...args) }),
-);
-vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    insert: (...args: unknown[]) => mockInsert(...args),
-    select: (...args: unknown[]) => mockSelect(...args),
-    update: (...args: unknown[]) => mockUpdate(...args),
-    transaction: (...args: [(tx: unknown) => unknown]) => mockTransaction(...args),
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  teams: {
-    apiTeamPermanentId: "apiTeamPermanentId",
-    id: "id",
-    dataHash: "dataHash",
-    createdAt: "createdAt",
-    clubId: "clubId",
-    isOwnClub: "isOwnClub",
-    displayOrder: "displayOrder",
-  },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  sql: (...args: unknown[]) => args,
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  ne: vi.fn((...args: unknown[]) => ({ ne: args })),
-  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
-}));
-
-vi.mock("./hash", () => ({
-  computeEntityHash: vi.fn(() => "hash-123"),
-}));
-
 import { syncTeamsFromData, buildTeamIdLookup } from "./teams.sync";
+import { computeEntityHash } from "./hash";
+import { teams } from "@dragons/db/schema";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
-const FROZEN_TIME = new Date("2025-06-01T00:00:00Z");
+let ctx: TestDbContext;
 
-beforeEach(() => {
+const OWN_CLUB_ID = 4121;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  dbHolder.ref = ctx.db;
   vi.clearAllMocks();
-  vi.useFakeTimers();
-  vi.setSystemTime(FROZEN_TIME);
-  mockGetClubConfig.mockResolvedValue({ clubId: 4121, clubName: "Dragons" });
+  mockGetClubConfig.mockResolvedValue({ clubId: OWN_CLUB_ID, clubName: "Dragons" });
+  // Only Date is faked: pglite's WASM I/O needs real timers.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2025-06-01T00:00:00.000Z"));
 });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-// --- Helpers ---
-
-/**
- * Returns a mock chain for db.select(...).from(...).where(...) → resolves to `rows`.
- * Used because the new sync calls db.select multiple times (existingIds, getMaxOwnDisplayOrder,
- * toMarkOwn, flippedViaUpsert).
- */
-function mockSelectChain(rows: unknown[] = []) {
-  const where = vi.fn().mockResolvedValue(rows);
-  const from = vi.fn().mockReturnValue({ where });
-  return { from };
-}
-
-/** Default select mock: no existing rows, maxOrder = -1 (no own teams yet). */
-function setupDefaultSelectMock() {
-  mockSelect
-    // existingIds lookup → no existing rows
-    .mockReturnValueOnce(mockSelectChain([]))
-    // getMaxOwnDisplayOrder → -1
-    .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }]))
-    // toMarkOwn → no rows
-    .mockReturnValueOnce(mockSelectChain([]))
-    // getMaxOwnDisplayOrder (corrective pass) → -1
-    .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }]));
-  // flippedViaUpsert is only called when flippingToOwnIds.size > 0 → not needed in default
-  // After all .mockReturnValueOnce exhausted, falls back to default (unconfigured) — tests
-  // that need more calls must set up their own chain.
-}
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
 function makeTeamRef(overrides: Partial<SdkTeamRef> = {}): SdkTeamRef {
   return {
@@ -112,203 +82,236 @@ function makeTeamRef(overrides: Partial<SdkTeamRef> = {}): SdkTeamRef {
     teamCompetitionId: 100,
     teamname: "Test Team",
     teamnameSmall: "TT",
-    clubId: 4121,
+    clubId: OWN_CLUB_ID,
     verzicht: false,
     ...overrides,
   };
 }
 
-function mockInsertChain(returningRows: unknown[] = []) {
-  return {
-    values: vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue(returningRows),
-      }),
-    }),
-  };
+function teamMap(...refs: SdkTeamRef[]) {
+  return new Map(refs.map((r) => [r.teamPermanentId, r]));
 }
 
-function mockUpdateReturningChain(returningRows: unknown[] = []) {
-  return {
-    set: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue(returningRows),
-      }),
-    }),
-  };
+async function teamRows() {
+  return ctx.db.select().from(teams).orderBy(teams.apiTeamPermanentId);
+}
+
+async function teamRow(apiTeamPermanentId: number) {
+  const [row] = await ctx.db
+    .select()
+    .from(teams)
+    .where(eq(teams.apiTeamPermanentId, apiTeamPermanentId));
+  if (!row) throw new Error(`team ${apiTeamPermanentId} not found`);
+  return row;
+}
+
+/** Point getDb() at a db whose upsert rejects, while keeping the reads real. */
+async function withFailingUpsert<T>(reason: unknown, fn: () => Promise<T>): Promise<T> {
+  const real = ctx.db as unknown as Record<string | symbol, unknown>;
+  dbHolder.ref = new Proxy(
+    {},
+    {
+      get: (_t, prop) =>
+        prop === "insert"
+          ? () => ({
+              values: () => ({
+                onConflictDoUpdate: () => ({ returning: () => Promise.reject(reason) }),
+              }),
+            })
+          : real[prop],
+    },
+  );
+  try {
+    return await fn();
+  } finally {
+    dbHolder.ref = ctx.db;
+  }
 }
 
 describe("syncTeamsFromData", () => {
-  it("returns early for empty map", async () => {
+  it("returns early for an empty map without touching the database", async () => {
     const result = await syncTeamsFromData(new Map());
 
     expect(result.total).toBe(0);
     expect(result.created).toBe(0);
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(await teamRows()).toEqual([]);
   });
 
-  it("creates new teams", async () => {
-    setupDefaultSelectMock();
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue(mockInsertChain([{ id: 1, createdAt: FROZEN_TIME }]));
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
+  it("creates new teams with every column mapped", async () => {
+    const ref = makeTeamRef();
 
-    const result = await syncTeamsFromData(teamsMap);
+    const result = await syncTeamsFromData(teamMap(ref));
 
     expect(result.total).toBe(1);
     expect(result.created).toBe(1);
     expect(result.updated).toBe(0);
+
+    const row = await teamRow(1);
+    expect(row.seasonTeamId).toBe(10);
+    expect(row.teamCompetitionId).toBe(100);
+    expect(row.name).toBe("Test Team");
+    expect(row.nameShort).toBe("TT");
+    expect(row.clubId).toBe(OWN_CLUB_ID);
+    expect(row.verzicht).toBe(false);
+    expect(row.dataHash).toBe(
+      computeEntityHash({
+        teamPermanentId: 1,
+        seasonTeamId: 10,
+        teamCompetitionId: 100,
+        teamname: "Test Team",
+        teamnameSmall: "TT",
+        clubId: OWN_CLUB_ID,
+        verzicht: false,
+      }),
+    );
   });
 
-  it("detects updated teams by createdAt mismatch", async () => {
-    setupDefaultSelectMock();
-    const oldDate = new Date("2024-01-01T00:00:00Z");
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue(mockInsertChain([{ id: 1, createdAt: oldDate }]));
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
+  it("counts an existing team with changed data as updated and rewrites its columns", async () => {
+    await syncTeamsFromData(teamMap(makeTeamRef()));
+    const afterCreate = await teamRow(1);
 
-    const result = await syncTeamsFromData(teamsMap);
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    const result = await syncTeamsFromData(
+      teamMap(makeTeamRef({ teamname: "Renamed", seasonTeamId: 11, verzicht: true })),
+    );
 
     expect(result.updated).toBe(1);
     expect(result.created).toBe(0);
+    expect(result.skipped).toBe(0);
+
+    const row = await teamRow(1);
+    expect(row.id).toBe(afterCreate.id);
+    expect(row.name).toBe("Renamed");
+    expect(row.seasonTeamId).toBe(11);
+    expect(row.verzicht).toBe(true);
+    expect(row.dataHash).not.toBe(afterCreate.dataHash);
   });
 
-  it("calculates skipped count correctly", async () => {
-    setupDefaultSelectMock();
-    const oldDate = new Date("2024-01-01T00:00:00Z");
-    const teamsMap = new Map([
-      [1, makeTeamRef({ teamPermanentId: 1 })],
-      [2, makeTeamRef({ teamPermanentId: 2 })],
-      [3, makeTeamRef({ teamPermanentId: 3 })],
-    ]);
-    // Only 1 returned = 2 skipped
-    mockInsert.mockReturnValue(mockInsertChain([{ id: 1, createdAt: oldDate }]));
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
+  it("skips an unchanged team on re-sync (dataHash change detection)", async () => {
+    await syncTeamsFromData(teamMap(makeTeamRef()));
+    const afterCreate = await teamRow(1);
 
-    const result = await syncTeamsFromData(teamsMap);
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    const result = await syncTeamsFromData(teamMap(makeTeamRef()));
+
+    expect(result.skipped).toBe(1);
+    expect(result.created).toBe(0);
+    expect(result.updated).toBe(0);
+    expect((await teamRow(1)).updatedAt.getTime()).toBe(afterCreate.updatedAt.getTime());
+  });
+
+  it("calculates created/updated/skipped across a mixed batch", async () => {
+    await syncTeamsFromData(
+      teamMap(
+        makeTeamRef({ teamPermanentId: 1 }),
+        makeTeamRef({ teamPermanentId: 2, teamname: "Two" }),
+      ),
+    );
+
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    const result = await syncTeamsFromData(
+      teamMap(
+        makeTeamRef({ teamPermanentId: 1 }), // unchanged → skipped
+        makeTeamRef({ teamPermanentId: 2, teamname: "Two renamed" }), // changed → updated
+        makeTeamRef({ teamPermanentId: 3, teamname: "Three" }), // new → created
+      ),
+    );
 
     expect(result.total).toBe(3);
-    expect(result.skipped).toBe(2);
+    expect(result.created).toBe(1);
+    expect(result.updated).toBe(1);
+    expect(result.skipped).toBe(1);
+    expect((await teamRows()).map((t) => t.name)).toEqual([
+      "Test Team",
+      "Two renamed",
+      "Three",
+    ]);
   });
 
-  it("handles batch error", async () => {
-    setupDefaultSelectMock();
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockRejectedValue(new Error("Batch failed")),
-        }),
-      }),
-    });
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
-
-    const result = await syncTeamsFromData(teamsMap);
+  it("handles a batch error and leaves the table untouched", async () => {
+    const result = await withFailingUpsert(new Error("Batch failed"), () =>
+      syncTeamsFromData(teamMap(makeTeamRef())),
+    );
 
     expect(result.failed).toBe(1);
     expect(result.errors[0]).toContain("Batch team sync failed");
+    expect(await teamRows()).toEqual([]);
   });
 
-  it("handles non-Error batch failure", async () => {
-    setupDefaultSelectMock();
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockRejectedValue("string error"),
-        }),
-      }),
-    });
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
-
-    const result = await syncTeamsFromData(teamsMap);
+  it("handles a non-Error batch failure", async () => {
+    const result = await withFailingUpsert("string error", () =>
+      syncTeamsFromData(teamMap(makeTeamRef())),
+    );
 
     expect(result.errors[0]).toContain("Unknown error");
   });
 
-  it("logs batch result to logger with 'updated' action when changes exist", async () => {
-    setupDefaultSelectMock();
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue(mockInsertChain([{ id: 1, createdAt: FROZEN_TIME }]));
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
+  it("logs the batch result with the 'updated' action when changes exist", async () => {
     const mockLogger = { log: vi.fn() };
 
-    await syncTeamsFromData(teamsMap, mockLogger as never);
+    await syncTeamsFromData(teamMap(makeTeamRef()), mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: "team", entityId: "batch", action: "updated" }),
-    );
-  });
-
-  it("logs batch result with 'skipped' action when all entries are skipped", async () => {
-    setupDefaultSelectMock();
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue(mockInsertChain([]));
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
-    const mockLogger = { log: vi.fn() };
-
-    await syncTeamsFromData(teamsMap, mockLogger as never);
-
-    expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: "team", entityId: "batch", action: "skipped" }),
-    );
-  });
-
-  it("logs failure to logger", async () => {
-    setupDefaultSelectMock();
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockRejectedValue(new Error("fail")),
-        }),
+      expect.objectContaining({
+        entityType: "team",
+        entityId: "batch",
+        action: "updated",
+        metadata: { created: 1, updated: 0, skipped: 0 },
       }),
-    });
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
+    );
+  });
+
+  it("logs the batch result with the 'skipped' action when all entries are skipped", async () => {
+    await syncTeamsFromData(teamMap(makeTeamRef()));
     const mockLogger = { log: vi.fn() };
 
-    await syncTeamsFromData(teamsMap, mockLogger as never);
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    await syncTeamsFromData(teamMap(makeTeamRef()), mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: "team",
+        entityId: "batch",
+        action: "skipped",
+        metadata: { created: 0, updated: 0, skipped: 1 },
+      }),
+    );
+  });
+
+  it("logs failure to the sync logger", async () => {
+    const mockLogger = { log: vi.fn() };
+
+    await withFailingUpsert(new Error("fail"), () =>
+      syncTeamsFromData(teamMap(makeTeamRef()), mockLogger as never),
+    );
 
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({ action: "failed" }),
     );
   });
 
-  it("sets isOwnClub based on club config", async () => {
-    setupDefaultSelectMock();
-    const teamsMap = new Map([
-      [1, makeTeamRef({ clubId: 4121 })],
-      [2, makeTeamRef({ teamPermanentId: 2, clubId: 9999 })],
-    ]);
-    const chain = mockInsertChain([]);
-    mockInsert.mockReturnValue(chain);
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
+  it("persists isOwnClub based on the club config", async () => {
+    await syncTeamsFromData(
+      teamMap(
+        makeTeamRef({ teamPermanentId: 1, clubId: OWN_CLUB_ID }),
+        makeTeamRef({ teamPermanentId: 2, clubId: 9999, teamname: "Other" }),
+      ),
+    );
 
-    await syncTeamsFromData(teamsMap);
-
-    const records = chain.values.mock.calls[0]![0];
-    const ownTeam = records.find((r: { apiTeamPermanentId: number }) => r.apiTeamPermanentId === 1);
-    const otherTeam = records.find((r: { apiTeamPermanentId: number }) => r.apiTeamPermanentId === 2);
-    expect(ownTeam.isOwnClub).toBe(true);
-    expect(otherTeam.isOwnClub).toBe(false);
+    expect((await teamRow(1)).isOwnClub).toBe(true);
+    expect((await teamRow(2)).isOwnClub).toBe(false);
   });
 
-  it("defaults ownClubId to 0 when no club config", async () => {
+  it("treats every team as non-own and skips the corrective pass when no club config exists", async () => {
     mockGetClubConfig.mockResolvedValue(null);
-    // No corrective pass when ownClubId=0, but existingIds + getMaxOwnDisplayOrder still called
-    mockSelect
-      .mockReturnValueOnce(mockSelectChain([]))  // existingIds
-      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder
-    const teamsMap = new Map([[1, makeTeamRef({ clubId: 4121 })]]);
-    const chain = mockInsertChain([]);
-    mockInsert.mockReturnValue(chain);
 
-    await syncTeamsFromData(teamsMap);
+    await syncTeamsFromData(teamMap(makeTeamRef({ clubId: OWN_CLUB_ID })));
 
-    const records = chain.values.mock.calls[0]![0];
-    expect(records[0].isOwnClub).toBe(false);
-    // Should not call update when ownClubId is 0
-    expect(mockUpdate).not.toHaveBeenCalled();
+    expect((await teamRow(1)).isOwnClub).toBe(false);
+    // Corrective pass is gated on ownClubId > 0 — nothing was logged.
+    expect(
+      mockLogInfo.mock.calls.filter((c: unknown[]) => c[1] === "Corrected isOwnClub"),
+    ).toHaveLength(0);
   });
 
   it("includes durationMs", async () => {
@@ -317,131 +320,132 @@ describe("syncTeamsFromData", () => {
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("handles empty teamnameSmall", async () => {
-    setupDefaultSelectMock();
-    const teamsMap = new Map([[1, makeTeamRef({ teamnameSmall: "" })]]);
-    const chain = mockInsertChain([]);
-    mockInsert.mockReturnValue(chain);
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
+  it("stores NULL for an empty teamnameSmall", async () => {
+    await syncTeamsFromData(teamMap(makeTeamRef({ teamnameSmall: "" })));
 
-    await syncTeamsFromData(teamsMap);
-
-    const records = chain.values.mock.calls[0]![0];
-    expect(records[0].nameShort).toBeNull();
+    expect((await teamRow(1)).nameShort).toBeNull();
   });
 
-  it("corrective pass marks own-club teams", async () => {
-    // toMarkOwn returns 1 row (hash-skipped flip-to-true), unmarkOwn returns 0
-    mockSelect
-      .mockReturnValueOnce(mockSelectChain([]))               // existingIds
-      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])) // getMaxOwnDisplayOrder (pre-upsert)
-      .mockReturnValueOnce(mockSelectChain([{ id: 5 }]))      // toMarkOwn → 1 row
-      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder (corrective)
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue(mockInsertChain([]));
-    // per-row update for toMarkOwn[0], then bulk unmarkOwn
-    mockUpdate
-      .mockReturnValueOnce({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([]) }) }) // per-row update
-      .mockReturnValueOnce(mockUpdateReturningChain([])); // unmarkOwn
+  it("corrective pass marks an own-club row that the federation batch never touched", async () => {
+    // Row is ours by clubId but flagged non-own, and is absent from the incoming
+    // batch — only the table-wide corrective SELECT can reach it.
+    await ctx.db.insert(teams).values({
+      apiTeamPermanentId: 42,
+      seasonTeamId: 420,
+      teamCompetitionId: 4200,
+      name: "Forgotten own team",
+      clubId: OWN_CLUB_ID,
+      isOwnClub: false,
+      displayOrder: 0,
+    });
 
-    mockLogInfo.mockClear();
-    await syncTeamsFromData(teamsMap);
+    await syncTeamsFromData(teamMap(makeTeamRef({ teamPermanentId: 1 })));
 
+    expect((await teamRow(42)).isOwnClub).toBe(true);
     expect(mockLogInfo).toHaveBeenCalledWith(
       expect.objectContaining({ marked: 1, unmarked: 0 }),
       "Corrected isOwnClub",
     );
   });
 
-  it("batches mark-own corrections in one transaction with sequential displayOrder", async () => {
-    // toMarkOwn returns 2 rows → both flipped inside a single transaction,
-    // each assigned the next displayOrder (maxOrder null → starts at 0).
-    mockSelect
-      .mockReturnValueOnce(mockSelectChain([]))                    // existingIds
-      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }]))  // getMaxOwnDisplayOrder (pre-upsert)
-      .mockReturnValueOnce(mockSelectChain([{ id: 5 }, { id: 6 }])) // toMarkOwn → 2 rows
-      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder (corrective)
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue(mockInsertChain([]));
+  it("corrective pass marks an own-club team whose hash did not change", async () => {
+    // Row already in the DB with the exact hash the sync will compute, but flagged
+    // non-own — the upsert skips it, so only the corrective pass can fix it.
+    const ref = makeTeamRef();
+    await ctx.db.insert(teams).values({
+      apiTeamPermanentId: ref.teamPermanentId,
+      seasonTeamId: ref.seasonTeamId,
+      teamCompetitionId: ref.teamCompetitionId,
+      name: ref.teamname,
+      nameShort: ref.teamnameSmall,
+      clubId: ref.clubId,
+      isOwnClub: false,
+      verzicht: ref.verzicht,
+      dataHash: computeEntityHash({
+        teamPermanentId: ref.teamPermanentId,
+        seasonTeamId: ref.seasonTeamId,
+        teamCompetitionId: ref.teamCompetitionId,
+        teamname: ref.teamname,
+        teamnameSmall: ref.teamnameSmall,
+        clubId: ref.clubId,
+        verzicht: ref.verzicht,
+      }),
+    });
 
-    const setCalls: Record<string, unknown>[] = [];
-    mockUpdate.mockImplementation(() => ({
-      set: (payload: Record<string, unknown>) => {
-        setCalls.push(payload);
-        // markOwn awaits .where() directly; unmarkOwn calls .where().returning().
-        return { where: () => ({ returning: () => Promise.resolve([]) }) };
-      },
-    }));
+    const result = await syncTeamsFromData(teamMap(ref));
 
-    await syncTeamsFromData(teamsMap);
-
-    expect(mockTransaction).toHaveBeenCalledTimes(1);
-    const markOwnSets = setCalls.filter((s) => s.isOwnClub === true);
-    expect(markOwnSets).toHaveLength(2);
-    expect(markOwnSets.map((s) => s.displayOrder)).toEqual([0, 1]);
+    expect(result.skipped).toBe(1); // upsert really did skip it
+    expect((await teamRow(1)).isOwnClub).toBe(true);
+    // The row is counted once by toMarkOwn and once by flippedViaUpsert, so the
+    // log's `marked` is 2 for a single corrected row. Only the UPDATE is deduped.
+    expect(mockLogInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ marked: 2, unmarked: 0 }),
+      "Corrected isOwnClub",
+    );
   });
 
-  it("corrective pass unmarks non-own-club teams", async () => {
-    // toMarkOwn returns 0, unmarkOwn returns 2
-    mockSelect
-      .mockReturnValueOnce(mockSelectChain([]))               // existingIds
-      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])) // getMaxOwnDisplayOrder (pre-upsert)
-      .mockReturnValueOnce(mockSelectChain([]))               // toMarkOwn → 0 rows
-      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder (corrective)
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue(mockInsertChain([]));
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([{ id: 3 }, { id: 7 }])); // unmarkOwn
+  it("corrective pass unmarks teams whose clubId is no longer ours", async () => {
+    await ctx.db.insert(teams).values([
+      {
+        apiTeamPermanentId: 3,
+        seasonTeamId: 30,
+        teamCompetitionId: 300,
+        name: "Stale own A",
+        clubId: 9999,
+        isOwnClub: true,
+        displayOrder: 4,
+      },
+      {
+        apiTeamPermanentId: 7,
+        seasonTeamId: 70,
+        teamCompetitionId: 700,
+        name: "Stale own B",
+        clubId: 8888,
+        isOwnClub: true,
+        displayOrder: 5,
+      },
+    ]);
 
-    mockLogInfo.mockClear();
-    await syncTeamsFromData(teamsMap);
+    await syncTeamsFromData(teamMap(makeTeamRef()));
 
+    expect((await teamRow(3)).isOwnClub).toBe(false);
+    expect((await teamRow(3)).displayOrder).toBe(0);
+    expect((await teamRow(7)).isOwnClub).toBe(false);
+    // The freshly synced own-club team is untouched by the unmark pass.
+    expect((await teamRow(1)).isOwnClub).toBe(true);
     expect(mockLogInfo).toHaveBeenCalledWith(
       expect.objectContaining({ marked: 0, unmarked: 2 }),
       "Corrected isOwnClub",
     );
   });
 
-  it("corrective pass skips logging when no corrections needed", async () => {
-    setupDefaultSelectMock();
-    const teamsMap = new Map([[1, makeTeamRef()]]);
-    mockInsert.mockReturnValue(mockInsertChain([]));
-    mockUpdate.mockReturnValue(mockUpdateReturningChain([]));
+  it("corrective pass skips logging when nothing needs correcting", async () => {
+    await syncTeamsFromData(teamMap(makeTeamRef({ clubId: 9999 })));
 
-    mockLogInfo.mockClear();
-    await syncTeamsFromData(teamsMap);
-
-    const correctionLogs = mockLogInfo.mock.calls.filter(
-      (call: unknown[]) => call[1] === "Corrected isOwnClub",
-    );
-    expect(correctionLogs).toHaveLength(0);
-  });
-
-  it("skips corrective pass when no club config", async () => {
-    mockGetClubConfig.mockResolvedValue(null);
-    mockSelect
-      .mockReturnValueOnce(mockSelectChain([]))              // existingIds
-      .mockReturnValueOnce(mockSelectChain([{ maxOrder: null }])); // getMaxOwnDisplayOrder
-    const teamsMap = new Map([[1, makeTeamRef({ clubId: 4121 })]]);
-    mockInsert.mockReturnValue(mockInsertChain([]));
-
-    await syncTeamsFromData(teamsMap);
-
-    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(
+      mockLogInfo.mock.calls.filter((c: unknown[]) => c[1] === "Corrected isOwnClub"),
+    ).toHaveLength(0);
   });
 });
 
 describe("buildTeamIdLookup", () => {
-  it("returns a map from apiTeamPermanentId to id", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockResolvedValue([
-        { id: 1, apiTeamPermanentId: 100 },
-        { id: 2, apiTeamPermanentId: 200 },
-      ]),
-    });
+  it("returns a map from apiTeamPermanentId to the generated row id", async () => {
+    await syncTeamsFromData(
+      teamMap(
+        makeTeamRef({ teamPermanentId: 100 }),
+        makeTeamRef({ teamPermanentId: 200, teamname: "Other" }),
+      ),
+    );
+    const rows = await teamRows();
 
     const lookup = await buildTeamIdLookup();
 
-    expect(lookup.get(100)).toBe(1);
-    expect(lookup.get(200)).toBe(2);
+    expect(lookup.size).toBe(2);
+    expect(lookup.get(100)).toBe(rows.find((r) => r.apiTeamPermanentId === 100)!.id);
+    expect(lookup.get(200)).toBe(rows.find((r) => r.apiTeamPermanentId === 200)!.id);
+  });
+
+  it("returns an empty map when there are no teams", async () => {
+    expect((await buildTeamIdLookup()).size).toBe(0);
   });
 });
