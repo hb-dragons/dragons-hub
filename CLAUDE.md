@@ -9,6 +9,8 @@ Basketball club management monorepo for the Dragons. Syncs data from the German 
 ```
 apps/web          @dragons/web      Next.js 16 frontend (port 3000)
 apps/api          @dragons/api      Hono REST API (port 3001)
+apps/native       @dragons/native   Expo / React Native app (ships via EAS)
+apps/pi           —                 Python payload for the Raspberry Pi scoreboard tap (not a pnpm workspace package; pytest + a CI job)
 packages/ui       @dragons/ui       Shared shadcn/Radix UI components
 packages/sdk      @dragons/sdk      Basketball-Bund SDK type definitions
 packages/db       @dragons/db       Drizzle ORM schema & database client
@@ -37,6 +39,7 @@ pnpm --filter @dragons/api dev    # API only
 pnpm --filter @dragons/web dev    # Web only
 pnpm --filter @dragons/api test   # API tests only
 pnpm --filter @dragons/native test  # Native (Expo) tests only
+(cd apps/pi && pytest)            # Raspberry Pi payload tests (Python, not pnpm)
 
 # Database (generate + migrate only — `drizzle-kit push` is disabled, see below)
 pnpm --filter @dragons/db db:generate   # Generate Drizzle migrations
@@ -99,15 +102,16 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 - After schema changes: run `db:generate` then `db:migrate`
 - **`drizzle-kit push` is disabled.** It diffs the TS schema against the live DB and drops whatever the schema does not declare — including three indexes that exist only in hand-written SQL migrations and are invisible to drizzle-kit. The `db:push` script and `drizzle.config.ts` both refuse to run it. Migrations are the only schema-sync path. Details and the list of invisible indexes: `packages/db/drizzle/README.md`.
 - Use `dataHash` columns for change detection during sync
-- All tables use `serial` primary keys with separate `apiId`/`apiMatchId` etc. for external IDs
+- New tables use `serial` primary keys with separate `apiId`/`apiMatchId` etc. for external IDs. The exceptions are inherited: the four better-auth tables use text ids, `domainEvents` uses a text ULID, `broadcastConfigs` is keyed by `deviceId`, `taskAssignees` has a composite PK
 - Unique constraints on external IDs to prevent duplicates
+- Table inventory lives in `AGENTS.md` and is enforced against the schema exports by `apps/api/src/test/docs-drift.test.ts` — add the row in the same commit as the table
 
 ### Frontend (Next.js)
 - App Router with server components by default
 - Client components marked with `"use client"` directive
 - UI components imported from `@dragons/ui`
 - API calls via `apps/web/src/lib/api.ts`
-- Admin pages under `app/admin/`
+- Every route sits under a `[locale]` segment (next-intl); admin pages live in `app/[locale]/admin/`
 - **Design System:** Read `packages/ui/DESIGN-SYSTEM.md` before building any UI
 
 ### SDK Types
@@ -127,7 +131,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 ## Git & CI
 
 - **Never add `Co-Authored-By`, `Signed-off-by`, or any other trailer that credits Claude/AI as a contributor.** Commits are authored solely by the human developer.
-- CI runs on all PRs and pushes to main: lint, typecheck, test, coverage, build, AI slop check, dependency audit, secret scan
+- CI runs on all PRs and pushes to main: lint + i18n check + typecheck + knip, test + coverage, build, `apps/pi` pytest, AI slop check, lockfile integrity, dependency review, dependency audit, secret scan. Full job list: `AGENTS.md` CI/CD table
 - CD builds artifacts on pushes to main and creates releases on version tags
 - Do not commit `.env` files, secrets, or credentials
 - Do not commit `node_modules/`, `dist/`, `.next/`, `coverage/`
@@ -149,24 +153,53 @@ Optional with defaults:
 ```
 PORT=3001
 NODE_ENV=development
+RUN_MODE=both                     # api | worker | both — which halves of the process boot
 TRUSTED_ORIGINS=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:3001
-NEXT_PUBLIC_SCOREBOARD_DEVICE_ID=<must match SCOREBOARD_DEVICE_ID; baked into the web bundle at build time>
 BETTER_AUTH_URL=http://localhost:3001
 LOG_LEVEL=info                    # Pino log level (fatal/error/warn/info/debug/trace)
-REFEREE_SDK_USERNAME=<separate federation account for referee assignment>
-REFEREE_SDK_PASSWORD=<separate federation account for referee assignment>
-EXPO_ACCESS_TOKEN=<optional — enables authenticated Expo Push send tier, higher rate limits + better receipt SLA>
-EXPO_PROJECT_ID=<optional — validates EAS project ID match between server and native; surfaces mismatch early>
+SERVICE_NAME=api                  # log label; also the Cloud Run service name
+WAHA_SESSION=default              # WAHA session name for whatsapp_group delivery
+SYNC_RUN_RETENTION_DAYS=90        # sync_runs rows older than this are pruned
+DOMAIN_EVENT_RETENTION_DAYS=365   # domain_events rows older than this are pruned
+VERBOSE_ERRORS=false              # true returns error detail in API responses; keep false in production
 ASSISTANT_ENABLED=false           # set true to enable the game rescheduling AI copilot
 ASSISTANT_MODEL=gemini-2.5-flash  # Gemini model ID used by the assistant
-NEXT_PUBLIC_ASSISTANT_ENABLED=false # web: show the reschedule copilot entry point on match detail; baked into the web bundle at build time
-GOOGLE_GENERATIVE_AI_API_KEY=<google ai studio key; required when ASSISTANT_ENABLED=true>
-MCP_TOKEN=<random string min 32 chars; bearer token for the /mcp endpoint>
 CHATBOT_ENABLED=false             # set true to enable the members-only club Q&A assistant; requires GOOGLE_GENERATIVE_AI_API_KEY
 CHATBOT_MODEL=gemini-2.5-flash    # AI SDK model ID for the club Q&A assistant
-NEXT_PUBLIC_CHATBOT_ENABLED=false # web: mount the club assistant widget on public pages; baked into the web bundle at build time
-EXPO_PUBLIC_CHATBOT_ENABLED=false # native: show the club assistant entry point; baked into the native bundle at build time
+```
+
+Optional with no default — the dependent feature stays off when unset:
+```
+GCS_BUCKET_NAME=<bucket for social post assets; the social routes need it>
+GCS_PROJECT_ID=<GCP project owning that bucket>
+SERVICE_VERSION=<falls back to K_REVISION, which Cloud Run sets, then "unknown">
+GCP_PROJECT_ID=<required for Cloud Logging → Cloud Trace correlation>
+WAHA_BASE_URL=<WhatsApp HTTP API base URL; whatsapp_group delivery is inert without it>
+SMTP_HOST=<SMTP relay host>
+SMTP_PORT=<SMTP relay port>
+SMTP_USER=<SMTP username>
+SMTP_PASSWORD=<SMTP password>
+SMTP_FROM=<From header, e.g. "Dragons <noreply@example.de>">
+REFEREE_SDK_USERNAME=<separate federation account for referee assignment>
+REFEREE_SDK_PASSWORD=<separate federation account for referee assignment>
+EXPO_ACCESS_TOKEN=<enables the authenticated Expo Push send tier: higher rate limits + better receipt SLA>
+EXPO_PROJECT_ID=<EAS project id; validated as a non-empty string at boot and not read anywhere else>
+GOOGLE_GENERATIVE_AI_API_KEY=<google ai studio key; required when ASSISTANT_ENABLED or CHATBOT_ENABLED is true>
+MCP_TOKEN=<random string min 32 chars; bearer token for the /mcp endpoint>
+```
+
+The `SMTP_*` vars are declared and validated but currently unused: the `email`
+channel type has no adapter (`notification-pipeline.ts` skips it). Setting them
+does not make email notifications deliver.
+
+Build-time client variables. These never reach `config/env.ts` — Next.js and
+Expo inline them into their bundles, so changing one needs a rebuild:
+```
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_SCOREBOARD_DEVICE_ID=<must match SCOREBOARD_DEVICE_ID>
+NEXT_PUBLIC_ASSISTANT_ENABLED=false # web: show the reschedule copilot entry point on match detail
+NEXT_PUBLIC_CHATBOT_ENABLED=false # web: mount the club assistant widget on public pages
+EXPO_PUBLIC_CHATBOT_ENABLED=false # native: show the club assistant entry point
 ```
 
 ### Production deployment plumbing
@@ -186,9 +219,9 @@ Note: Club and league tracking configuration is managed via the admin UI (`/admi
 
 ## When Changing Things
 
-1. **New API endpoint**: Add route in `routes/`, add tests, update `AGENTS.md` endpoint list
-2. **New DB table**: Add schema in `packages/db/src/schema/`, export from index, run `db:generate`, update `AGENTS.md` data model
-3. **New sync entity**: Add `*.sync.ts` in `services/sync/`, wire into `SyncOrchestrator`, add tests, update `AGENTS.md`
+1. **New API endpoint**: Add route in `routes/`, add tests, add the row to `AGENTS.md`'s endpoint tables — `apps/api/src/test/docs-drift.test.ts` compares them against the Hono route tree in both directions and fails the build otherwise
+2. **New DB table**: Add schema in `packages/db/src/schema/`, export from index, run `db:generate`, add the row to `AGENTS.md`'s data model table (enforced by `docs-drift.test.ts`)
+3. **New sync entity**: Add `*.sync.ts` in `services/sync/`, then call it from `fullSync()` in `apps/api/src/services/sync/index.ts` (there is no orchestrator class — the pipeline is a module of free functions), add tests, update `AGENTS.md`
 4. **New UI component**: Add to `packages/ui/src/components/`, export from index
-5. **New env var**: Add to Zod schema in `config/env.ts`, add to `.env.example`, document here
+5. **New env var**: Add to Zod schema in `config/env.ts`, add to `.env.example`, document here. All three must agree — `docs-drift.test.ts` checks the schema against both files in both directions, so a var added to the schema alone, or left in a file after removal from the schema, fails the build
 6. **Any change**: Write/update tests to maintain coverage above thresholds

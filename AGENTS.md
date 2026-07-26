@@ -6,14 +6,28 @@ Detailed technical reference for AI agents working in this codebase. For guideli
 
 ```
 @dragons/web        ──> @dragons/ui, @dragons/shared, @dragons/api-client
+@dragons/native     ──> @dragons/shared, @dragons/api-client
 @dragons/api        ──> @dragons/sdk, @dragons/db, @dragons/shared, @dragons/contracts
-@dragons/api-client ──> @dragons/contracts (infers request types from the shared schemas)
-@dragons/contracts  ──> @dragons/shared (zod-only request schemas; single source of truth for API request contracts)
-@dragons/db   ──> (standalone - drizzle-orm + pg)
-@dragons/sdk  ──> (standalone - basketball-bund-sdk)
-@dragons/shared ──> (standalone - zod for validation schemas)
-@dragons/ui   ──> (standalone - radix-ui + tailwind)
+@dragons/api-client ──> @dragons/contracts, @dragons/shared
+@dragons/contracts  ──> @dragons/shared
+@dragons/db         ──> @dragons/shared (+ drizzle-orm, pg, @opentelemetry/api)
+@dragons/shared     ──> @dragons/sdk (+ zod, better-auth; peer: react)
+@dragons/sdk        ──> (leaf — types only, no runtime deps)
+@dragons/ui         ──> (leaf — radix-ui + tailwind; peer: react, react-dom)
 ```
+
+`apps/pi` is not a workspace package: it is a Python payload for the Raspberry
+Pi scoreboard tap and depends on nothing here. It talks to the API over HTTP
+(`POST /api/scoreboard/ingest`).
+
+Two dependency edges are easy to get wrong and matter:
+
+- **`@dragons/shared` is not a leaf.** It depends on `@dragons/sdk` (types) and
+  **value**-exports from `better-auth` (`ac`, `roles` in `rbac.ts` are built with
+  better-auth's access-control builder). Anything importing `@dragons/shared`
+  pulls better-auth into its bundle, including the Metro/native bundle.
+- **`@dragons/db` is not a leaf.** It depends on `@dragons/shared` and re-exports
+  `SyncRunSummary` from it, so a schema-only import still crosses that edge.
 
 **Request contracts:** `@dragons/contracts` (`packages/contracts/src/<group>.ts`) is the sole declaration of each API endpoint's request schema. The API validates via `hono-openapi`'s `validator(..., validationHook)` (which also registers the schema into `/openapi.json`); `@dragons/api-client` infers `z.infer` request types from the same schemas; `*.contract.test.ts` files guard against client/server drift. A handful of endpoints with optional/empty bodies or custom JSON-parse handling (referee self/admin assign + claim, notification test-push) deliberately keep a manual `schema.parse()` but still source the schema from `@dragons/contracts`.
 
@@ -40,7 +54,9 @@ Match (1) ──── (N) MatchReferee
 Referee (1) ──── (N) MatchReferee
 RefereeRole (1) ──── (N) MatchReferee
 
-MatchReferee unique constraint: (matchId, refereeId, roleId)
+MatchReferee unique constraint: (matchId, slotNumber)
+  — one referee per slot, not one row per (referee, role). Two referees cannot
+    occupy the same slot on the same match.
 
 Board (1) ──── (N) BoardColumn
      (1) ──── (N) Task (via boardId)
@@ -49,19 +65,43 @@ BoardColumn (1) ──── (N) Task (via columnId)
 
 Task (1) ──── (N) TaskChecklistItem
      (1) ──── (N) TaskComment
+     (N) ──── (N) User (via TaskAssignee, PK (taskId, userId))
 
 User (1) ──── (0..1) Referee (via refereeId FK)
+User (1) ──── (N) PushDevice (by userId, token unique)
 
 RefereeAssignmentIntent (N) ──── (1) Match
 RefereeAssignmentIntent (N) ──── (1) Referee
   unique: (matchId, refereeId, slotNumber)
 
 SyncRun (1) ──── (N) SyncRunEntry
+        (1) ──── (N) DomainEvent
+
+Notification outbox and fan-out:
+
+DomainEvent (1) ──── (N) NotificationLog
+ChannelConfig (1) ──── (N) NotificationLog
+WatchRule (0..1) ──── (N) NotificationLog (set null on rule delete)
+DomainEvent + ChannelConfig ──── DigestBuffer (unique: (eventId, channelConfigId))
+
+WatchRule and ChannelConfig have no FK to each other: a rule stores its targets
+as `channels` JSONB of `{ channel, targetId }`, where targetId is a stringified
+channel config id.
+
+Match (0..1) ──── (N) BroadcastConfig (PK deviceId — one row per scoreboard device)
 ```
 
 ### Database Tables
 
-All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLigaId`, `apiMatchId`, `apiTeamPermanentId` columns with unique constraints.
+44 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
+verified against those exports by `apps/api/src/test/docs-drift.test.ts` in both
+directions — adding a `pgTable` without a row here fails the build.
+
+Most tables use `serial` primary keys. The exceptions: the four better-auth
+tables (`user`, `session`, `account`, `verification`) use text ids,
+`domainEvents` uses a text ULID, `broadcastConfigs` is keyed by `deviceId`, and
+`taskAssignees` has a composite PK. External API IDs are stored in `apiId`,
+`apiLigaId`, `apiMatchId`, `apiTeamPermanentId` columns with unique constraints.
 
 | Table | File | Key Columns |
 |-------|------|-------------|
@@ -73,7 +113,7 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `standings` | `packages/db/src/schema/standings.ts` | leagueId FK + teamApiId (unique), position, won, lost, points |
 | `referees` | `packages/db/src/schema/referees.ts` | apiId (unique), firstName, lastName, licenseNumber, allowAllHomeGames, allowAwayGames, isOwnClub, dataHash |
 | `refereeRoles` | `packages/db/src/schema/referees.ts` | apiId (unique), name, shortName |
-| `matchReferees` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, roleId FK |
+| `matchReferees` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, roleId FK, slotNumber — unique(matchId, slotNumber) |
 | `refereeAssignmentIntents` | `packages/db/src/schema/referees.ts` | matchId FK (cascade), refereeId FK, slotNumber, clickedAt, confirmedBySyncAt |
 | `refereeAssignmentRules` | `packages/db/src/schema/referee-assignment-rules.ts` | refereeId FK (cascade), teamId FK (cascade), deny, allowSr1, allowSr2 — unique(refereeId, teamId) |
 | `refereeGames` | `packages/db/src/schema/referee-games.ts` | apiMatchId (unique), matchId FK, homeTeamId FK, guestTeamId FK, homeClubId, guestClubId, isHomeGame, sr1/sr2OurClub, sr1/sr2Status, sr1/sr2Name, leagueName, kickoffDate/Time, dataHash |
@@ -94,15 +134,21 @@ All tables use `serial` primary keys. External API IDs stored in `apiId`, `apiLi
 | `syncRuns` | `packages/db/src/schema/sync-runs.ts` | syncType, status (`pending`/`running`/`completed`/`failed`/`partial`), triggeredBy, failedStep, ownerInstanceId, records*, durationMs, summary JSONB |
 | `syncRunEntries` | `packages/db/src/schema/sync-runs.ts` | syncRunId FK (cascade), entityType, action, metadata JSONB |
 | `syncSchedule` | `packages/db/src/schema/sync-runs.ts` | enabled, cronExpression, timezone |
-| `live_scoreboards` | `packages/db/src/schema/scoreboard.ts` | One row per Pi; latest decoded scoreboard state. |
-| `scoreboard_snapshots` | `packages/db/src/schema/scoreboard.ts` | Append-only history of dedupe'd state changes. |
+| `liveScoreboards` | `packages/db/src/schema/scoreboard.ts` | deviceId; one row per Pi with the latest decoded scoreboard state |
+| `scoreboardSnapshots` | `packages/db/src/schema/scoreboard.ts` | Append-only history of dedupe'd state changes |
+| `broadcastConfigs` | `packages/db/src/schema/broadcast-configs.ts` | deviceId (text PK), matchId FK, isLive, home/guestAbbr, home/guestColorOverride, startedAt, endedAt |
+| `domainEvents` | `packages/db/src/schema/domain-events.ts` | id (text ULID PK), type, source, urgency, occurredAt, syncRunId FK, entityType, entityId, deepLinkPath, enqueuedAt (lease), processedAt, payload JSONB — the outbox |
+| `watchRules` | `packages/db/src/schema/watch-rules.ts` | name, enabled, eventTypes (text[]), filters JSONB, channels JSONB (`{ channel, targetId }[]`), urgencyOverride, templateOverride |
+| `channelConfigs` | `packages/db/src/schema/channel-configs.ts` | name, type (ChannelType), enabled, config JSONB, digestMode, digestCron, digestTimezone |
+| `notificationLog` | `packages/db/src/schema/notification-log.ts` | eventId FK, watchRuleId FK (set null), channelConfigId FK, recipientId, title, body, locale, status, sentAt, readAt, retryCount, providerTicketId, recipientToken — dedup via a COALESCE unique index (migration 0018), not expressible in Drizzle |
+| `digestBuffer` | `packages/db/src/schema/digest-buffer.ts` | eventId FK, channelConfigId FK — unique(eventId, channelConfigId) |
+| `pushDevices` | `packages/db/src/schema/push-devices.ts` | userId, token (unique), platform, locale, lastSeenAt |
+| `playerPhotos` | `packages/db/src/schema/player-photos.ts` | filename, originalName, width, height — uploaded player photos for social posts |
+| `socialBackgrounds` | `packages/db/src/schema/social-backgrounds.ts` | filename, originalName, width, height, isDefault — background images for social posts |
 | `user` | `packages/db/src/schema/auth.ts` | id (text PK), email (unique), name, role, refereeId FK, banned, banReason, banExpires |
 | `session` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), token (unique), expiresAt, ipAddress, userAgent, impersonatedBy |
 | `account` | `packages/db/src/schema/auth.ts` | id (text PK), userId FK (cascade), providerId, accountId, password |
 | `verification` | `packages/db/src/schema/auth.ts` | id (text PK), identifier, value, expiresAt |
-
-| `playerPhotos` | `packages/db/src/schema/player-photos.ts` | filename, originalName, width, height — uploaded player photos for social posts |
-| `socialBackgrounds` | `packages/db/src/schema/social-backgrounds.ts` | filename, originalName, width, height, isDefault — background images for social posts |
 
 Schema index: `packages/db/src/schema/index.ts` re-exports all tables.
 
@@ -128,10 +174,16 @@ Matches track both remote (SDK) and local (admin) changes independently:
 
 ### Execution Flow
 
+There is no orchestrator class. The pipeline is a module of free functions; the
+entry point is `fullSync(triggeredBy, jobLogger?, syncRunId?)` exported from
+`apps/api/src/services/sync/index.ts`, which calls the per-entity
+`services/sync/*.sync.ts` modules in order.
+
 ```
 BullMQ Job (cron 04:00 Europe/Berlin or manual trigger)
-  └─> syncWorker processes job
-       └─> SyncOrchestrator.fullSync(triggeredBy, jobLogger)
+  └─> sync.worker processes job
+       └─> fullSync(triggeredBy, jobLogger, syncRunId?)
+             from apps/api/src/services/sync/index.ts
 
 Step 1: syncLeagues()
   - DB: query leagues WHERE isTracked = true
@@ -149,10 +201,14 @@ Step 3: Parallel upserts (Promise.all)
   - syncVenuesFromData(venuesMap)
   - syncRefereesFromData(refereesMap)
   - syncRefereeRolesFromData(rolesMap)
+  then, awaited AFTER that Promise.all (not inside it):
   - syncStandingsFromData(leagueData)
+    standings.teamApiId has a non-deferrable FK on teams.apiTeamPermanentId, so
+    running it concurrently with the teams upsert dropped the whole batch on a
+    league's first sync (issue #47). Keep it sequential.
 
-Step 4: syncMatchesFromData(leagueData, venueIdLookup)
-  - Needs venue FK lookup (apiId -> dbId)
+Step 4: syncMatchesFromData(leagueData, venueIdLookup, syncRunId)
+  - Needs venue FK lookup (apiId -> dbId) from buildVenueIdLookup()
   - Hash compare -> skip or upsert
   - Version snapshot + field-level changes in transaction
 
@@ -164,9 +220,17 @@ Step 5.25: confirmIntentsFromSync()
   - Check pending refereeAssignmentIntents (confirmedBySyncAt IS NULL)
   - If referee now assigned in matchReferees, set confirmedBySyncAt
 
+Step 5.5: reconcileAfterSync()
+  - services/venue-booking/venue-booking.service.ts
+  - Recomputes venue bookings from the freshly synced matches
+  - Wrapped in its own try/catch: a failure is collected into the error list,
+    it does not fail the run
+
 Step 6: Finalize
-  - Close SyncLogger (flush remaining entries)
-  - Update syncRuns record with results
+  - Close SyncLogger (flush remaining entries; dropped entries become errors)
+  - Update syncRuns record with counts, summary JSONB and status
+  - publishDomainEvent(sync.completed) — best-effort, a throw here is logged
+    and swallowed so a delivered sync is not reported as failed
 ```
 
 If a fatal error hits after at least one step has already committed, the run is
@@ -241,23 +305,42 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 - `task.comment.added` — Comment posted on task (recipients = current assignees minus author)
 - `task.due.reminder` — Emitted 24h before and on the morning of task due date by task reminder worker; skipped for tasks whose column is flagged `isDoneColumn`
 
+### Sync Events
+
+- `sync.completed` — Published at the end of `fullSync()` with the run's counts. Uses `entityType: "match"`, `entityId: 0` because the event envelope has no sync entity type; the deep link points at `/admin/sync/logs/<syncRunId>`.
+
+### Entity types
+
+`EVENT_ENTITY_TYPES` in the same file is the closed set of entities an event can
+be raised against: `match`, `booking`, `referee`, `task`. The manual-trigger
+request contract derives its enum from that array — do not restate the literals.
+
 ## API Endpoints
 
-### Public
+Every table below is checked against the Hono route tree by
+`apps/api/src/test/docs-drift.test.ts`, in both directions. Query strings are
+documented in the description column, not in the path.
+
+### Service & docs
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/` | Service metadata |
-| GET | `/health` | Health check: `{ status: "ok" }` |
-| GET | `/openapi.json` | OpenAPI 3.1 spec (auto-generated from route annotations) |
-| GET | `/docs` | Interactive API docs (Scalar UI) |
+| GET | `/health` | Liveness: API, database, Redis |
+| GET | `/health/deep` | Deep probe: DB, Redis, queue counts, outbox lag, sync freshness |
+| GET | `/openapi.json` | OpenAPI 3.1 spec (auto-generated from route annotations). **Not public in production** — `requireAuth + requireAnyRole("admin")`; open only when `NODE_ENV !== "production"` |
+| GET | `/docs` | Interactive API docs (Scalar UI). Same production gate as `/openapi.json` |
 
 ### Authentication (Better Auth)
+
+better-auth mounts its own handler behind a single
+`app.on(["POST", "GET"], "/api/auth/*")`, so these paths do not appear in the
+Hono route table and are documented by hand.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/auth/sign-up/email` | Register with email + password |
-| POST | `/api/auth/sign-in/email` | Sign in with email + password |
+| POST | `/api/auth/sign-in/email` | Sign in with email + password (rate-limited by `signInLockout`) |
 | POST | `/api/auth/sign-out` | Sign out (invalidate session) |
 | GET | `/api/auth/get-session` | Get current session + user |
 
@@ -267,7 +350,7 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/admin/sync/trigger` | Queue manual sync job |
+| POST | `/admin/sync/trigger` | Queue manual sync job (non-blocking) |
 | GET | `/admin/sync/status` | Last sync + running status |
 | GET | `/admin/sync/status/:jobId` | Specific job status + progress |
 
@@ -275,17 +358,18 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/sync/jobs?statuses=` | List jobs by status (active,waiting,delayed,completed,failed) |
+| GET | `/admin/sync/jobs` | List jobs by status. Query: `statuses=active,waiting,delayed,completed,failed` |
 | POST | `/admin/sync/jobs/:jobId/retry` | Retry failed job |
-| DELETE | `/admin/sync/jobs/:jobId` | Remove job |
+| DELETE | `/admin/sync/jobs/:jobId` | Remove job from the queue |
 | GET | `/admin/sync/jobs/:jobId/logs` | BullMQ job logs |
 
 ### Admin - Sync History
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/sync/logs?limit=&offset=&status=` | Paginated sync run history |
-| GET | `/admin/sync/logs/:id/entries?limit=&offset=&entityType=&action=` | Per-item log entries with summary |
+| GET | `/admin/sync/logs` | Paginated sync run history. Query: `limit`, `offset`, `status` |
+| GET | `/admin/sync/logs/:id/entries` | Per-item log entries with summary. Query: `limit`, `offset`, `entityType`, `action` |
+| GET | `/admin/sync/logs/:id/match-changes/:apiMatchId` | Field-level changes recorded for one match in that run |
 | GET | `/admin/sync/logs/:id/stream` | SSE real-time log stream |
 
 ### Admin - Schedule
@@ -297,27 +381,31 @@ Event types are defined in `packages/shared/src/domain-events.ts`. Events are pu
 
 ### Admin - Settings
 
+League tracking lives under `/admin/settings/leagues`. There is no
+`/admin/leagues` route group.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/settings/club` | Get current club config (clubId, clubName) or null |
 | PUT | `/admin/settings/club` | Set club config `{ clubId, clubName }` |
-
-### Admin - League Management
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/admin/leagues/discover` | Discover leagues for configured club |
-| GET | `/admin/leagues` | All leagues grouped by season with tracking status |
-| PUT | `/admin/leagues/:id/tracking` | Toggle `{ isTracked: boolean }` |
+| GET | `/admin/settings/booking` | Get booking configuration |
+| PUT | `/admin/settings/booking` | Set booking configuration |
+| GET | `/admin/settings/referee-reminders` | Get referee reminder day offsets |
+| PUT | `/admin/settings/referee-reminders` | Set referee reminder day offsets |
+| GET | `/admin/settings/leagues` | Tracked leagues, grouped by season, with tracking status |
+| PUT | `/admin/settings/leagues` | Set tracked leagues by league number |
+| PATCH | `/admin/settings/leagues/:id/own-club-refs` | Set whether a league uses own-club referees |
+| POST | `/admin/settings/referee-games-sync` | Trigger a manual referee games sync |
 
 ### Admin - Matches
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/matches` | List own club matches (with booking info) |
-| GET | `/admin/matches/:id` | Match detail (includes booking info) |
+| GET | `/admin/matches/:id` | Match detail with remote/local diffs (includes booking info) |
+| GET | `/admin/matches/:id/history` | Match change history (remote + local track) |
 | PATCH | `/admin/matches/:id` | Update match local fields |
-| DELETE | `/admin/matches/:id/overrides/:field` | Release a local override |
+| DELETE | `/admin/matches/:id/overrides/:fieldName` | Release a local override |
 
 Match list and detail responses include associated venue booking data when available.
 
@@ -358,31 +446,39 @@ The same provider-neutral tool registry that backs the in-app chat is served her
 |--------|------|-------------|
 | GET | `/admin/bookings` | List all bookings |
 | GET | `/admin/bookings/:id` | Booking detail |
+| POST | `/admin/bookings` | Create a booking manually |
 | PATCH | `/admin/bookings/:id` | Update booking |
 | PATCH | `/admin/bookings/:id/status` | Quick status change |
-| POST | `/admin/bookings` | Create a booking manually |
 | DELETE | `/admin/bookings/:id` | Delete a booking |
+| GET | `/admin/bookings/reconcile/preview` | Preview the booking changes a reconcile would make |
+| POST | `/admin/bookings/reconcile` | Apply booking reconciliation from matches |
 
 ### Admin - Boards
+
+Columns are nested under their board (`/admin/boards/:id/columns/...`), not
+addressed globally.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/boards` | List all boards |
-| POST | `/admin/boards` | Create a board |
-| GET | `/admin/boards/:id` | Get board with columns and tasks |
+| POST | `/admin/boards` | Create a board with default columns |
+| GET | `/admin/boards/:id` | Get board with columns |
 | PATCH | `/admin/boards/:id` | Update board |
 | DELETE | `/admin/boards/:id` | Delete board |
 | POST | `/admin/boards/:id/columns` | Add column to board |
-| PATCH | `/admin/boards/columns/:id` | Update column |
-| PATCH | `/admin/boards/columns/:id/position` | Reorder column |
-| DELETE | `/admin/boards/columns/:id` | Delete column |
+| PATCH | `/admin/boards/:id/columns/reorder` | Reorder the board's columns |
+| PATCH | `/admin/boards/:id/columns/:colId` | Update column |
+| DELETE | `/admin/boards/:id/columns/:colId` | Delete column |
 
 ### Admin - Tasks
 
+Task creation and listing are board-scoped. Checklist items and comments are
+nested under their task.
+
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/tasks` | List tasks (filterable by board, column, assignee) |
-| POST | `/admin/tasks` | Create a task |
+| GET | `/admin/boards/:boardId/tasks` | List tasks for a board (filterable by column, assignee) |
+| POST | `/admin/boards/:boardId/tasks` | Create a task on a board |
 | GET | `/admin/tasks/:id` | Task detail with checklist + comments |
 | PATCH | `/admin/tasks/:id` | Update task fields |
 | PATCH | `/admin/tasks/:id/move` | Move task to another column/position |
@@ -390,59 +486,92 @@ The same provider-neutral tool registry that backs the in-app chat is served her
 | PUT | `/admin/tasks/:id/assignees/:userId` | Assign a user to a task (idempotent) |
 | DELETE | `/admin/tasks/:id/assignees/:userId` | Remove a user from a task |
 | POST | `/admin/tasks/:id/checklist` | Add checklist item |
-| PATCH | `/admin/tasks/checklist/:id` | Toggle/update checklist item |
-| DELETE | `/admin/tasks/checklist/:id` | Delete checklist item |
+| PATCH | `/admin/tasks/:id/checklist/:itemId` | Toggle/update checklist item |
+| DELETE | `/admin/tasks/:id/checklist/:itemId` | Delete checklist item |
 | POST | `/admin/tasks/:id/comments` | Add comment |
-| PATCH | `/admin/tasks/comments/:id` | Update comment |
-| DELETE | `/admin/tasks/comments/:id` | Delete comment |
+| PATCH | `/admin/tasks/:id/comments/:commentId` | Edit comment |
+| DELETE | `/admin/tasks/:id/comments/:commentId` | Delete comment |
 
 ### Admin - Teams
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/teams` | List teams |
+| GET | `/admin/teams` | List own club teams |
 | PATCH | `/admin/teams/:id` | Update team (e.g. isOwnClub) |
+| PUT | `/admin/teams/order` | Reorder own club teams (display order) |
 
 ### Admin - Venues
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/venues` | List venues |
-| GET | `/admin/venues/:id` | Venue detail |
+| GET | `/admin/venues/search` | Search venues by name. Query: `q` |
+
+### Admin - Users
+
+| Method | Path | Description |
+|--------|------|-------------|
+| PATCH | `/admin/users/:id/referee-link` | Link or unlink a referee record from a user account |
+
+User listing, role assignment and banning are served by better-auth's admin
+plugin under `/api/auth/*`, not by this route group.
 
 ### Admin - Referees
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/referees` | List referees. Query: `ownClub` (boolean, default true) filters to own-club referees. Includes allowAllHomeGames, allowAwayGames, isOwnClub flags |
-| PATCH | `/admin/referees/:id/visibility` | Update referee visibility flags. Body: `{ allowAllHomeGames: boolean, allowAwayGames: boolean, isOwnClub: boolean }` |
-| GET | `/admin/referees/:id/eligible-open-games` | List open games the referee is eligible to take (used by the admin assign UI). |
-| GET | `/admin/referees/:id/rules` | Get assignment rules for a referee. Requires `isOwnClub=true` (returns 400 NOT_OWN_CLUB otherwise) |
-| PUT | `/admin/referees/:id/rules` | Replace assignment rules. Requires `isOwnClub=true`. Body: `{ rules: [{ teamId, deny, allowSr1, allowSr2 }] }` |
+| GET | `/admin/referees` | List referees with pagination, search and sort. Query: `ownClub` (boolean, default true). Includes allowAllHomeGames, allowAwayGames, isOwnClub flags |
+| GET | `/admin/referees/counts` | Own-club and total referee counts |
+| GET | `/admin/referees/:id` | Single referee by id |
+| PATCH | `/admin/referees/:id/visibility` | Update referee visibility flags. Body: `{ allowAllHomeGames, allowAwayGames, isOwnClub }` |
+| GET | `/admin/referees/:id/eligible-open-games` | Open games the referee is eligible to take (used by the admin assign UI) |
+| GET | `/admin/referees/:id/rules` | Get assignment rules for a referee. Requires `isOwnClub=true` (400 NOT_OWN_CLUB otherwise) |
+| PATCH | `/admin/referees/:id/rules` | Replace assignment rules. Requires `isOwnClub=true`. Body: `{ rules: [{ teamId, deny, allowSr1, allowSr2 }] }` |
 
 ### Admin - Standings
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/standings` | Get standings for tracked leagues |
+| GET | `/admin/standings` | Standings grouped by tracked league |
 
 ### Admin - Notifications
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/notifications` | List notifications |
+| GET | `/admin/notifications` | List notifications for the caller from the notification log |
+| GET | `/admin/notifications/unread-count` | Unread notification count for the caller |
+| PATCH | `/admin/notifications/:id/read` | Mark one notification as read |
+| PATCH | `/admin/notifications/read-all` | Mark all of the caller's notifications as read |
+| POST | `/admin/notifications/:id/retry` | Retry a failed notification delivery |
 | GET | `/admin/notifications/preferences` | Get the calling user's own notification preferences. Returns `{ mutedEventTypes: string[], locale: "de" \| "en" }`. Any authenticated user may call this. |
 | PATCH | `/admin/notifications/preferences` | Update the calling user's own notification preferences. Body: `{ mutedEventTypes?: string[], locale?: "de" \| "en" }`. Rejects event types not in the shared `USER_TOGGLEABLE_EVENTS` catalog. |
-| PATCH | `/admin/notifications/:id/read` | Mark notification as read |
-| POST | `/admin/notifications/test-push` | Send a test push to the caller's own registered devices. Body: `{ message?: string }`. Returns device count + per-ticket status. |
-| GET | `/admin/notifications/test-push/recent` | Last 10 test push results for the caller (for admin test UI). |
+| POST | `/admin/notifications/test-push` | Send a test push to the caller's own registered devices. Body: `{ message? }`. Returns device count + per-ticket status. |
+| GET | `/admin/notifications/test-push/recent` | Last 10 test push results for the caller (for the admin test UI) |
+
+### Admin - Domain Events
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/events` | List domain events with filtering and pagination |
+| GET | `/admin/events/failed` | List failed notification deliveries with their event context |
+| POST | `/admin/events/trigger` | Manually publish a domain event into the notification pipeline. `entityType` is constrained to `EVENT_ENTITY_TYPES` |
+
+### Admin - Watch Rules
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/watch-rules` | List watch rules with pagination |
+| GET | `/admin/watch-rules/:id` | Get a single watch rule |
+| POST | `/admin/watch-rules` | Create a watch rule |
+| PATCH | `/admin/watch-rules/:id` | Update a watch rule |
+| DELETE | `/admin/watch-rules/:id` | Delete a watch rule |
 
 ### Admin - Channel Configs
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/channel-configs` | List channel configurations |
-| GET | `/admin/channel-configs/providers` | Check which providers are configured |
+| GET | `/admin/channel-configs` | List channel configurations with pagination |
+| GET | `/admin/channel-configs/providers` | Which channel types have a configured provider |
 | GET | `/admin/channel-configs/:id` | Get a single channel config |
 | POST | `/admin/channel-configs` | Create channel config (provider must be configured) |
 | PATCH | `/admin/channel-configs/:id` | Update channel config (validates config against type) |
@@ -450,17 +579,31 @@ The same provider-neutral tool registry that backs the in-app chat is served her
 
 ### Admin - Bull Board
 
+| Method | Path | Description |
+|--------|------|-------------|
 | GET | `/admin/queues/*` | Bull Board web UI for queue monitoring. Requires the `superadmin` role (`requireAnyRole("superadmin")`), not plain `admin`. |
 
-### Scoreboard ingest
+### Scoreboard
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/scoreboard/ingest` | Stramatel raw-hex ingest (Bearer key) |
-| GET | `/public/scoreboard/latest` | Current snapshot for a device (no auth) |
+| POST | `/api/scoreboard/ingest` | Stramatel raw-hex ingest from the Raspberry Pi (Bearer `SCOREBOARD_INGEST_KEY` + matching device id header) |
+| GET | `/public/scoreboard/latest` | Latest decoded snapshot for a device (no auth) |
 | GET | `/public/scoreboard/stream` | SSE stream of decoded snapshots (no auth) |
 | GET | `/admin/scoreboard/snapshots` | Paginated snapshot history (admin) |
 | GET | `/admin/scoreboard/health` | Ingest health (admin) |
+
+### Broadcast overlay
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/public/broadcast/state` | Current broadcast state for a device (no auth) |
+| GET | `/public/broadcast/stream` | SSE stream of broadcast state changes (no auth) |
+| GET | `/admin/broadcast/config` | Get the broadcast config for a device |
+| PUT | `/admin/broadcast/config` | Upsert the broadcast config for a device (bound match, abbreviations, colour overrides) |
+| GET | `/admin/broadcast/matches` | Own-club matches available for broadcast binding |
+| POST | `/admin/broadcast/start` | Set `isLive = true` |
+| POST | `/admin/broadcast/stop` | Set `isLive = false` |
 
 ### Public
 
@@ -469,39 +612,44 @@ The same provider-neutral tool registry that backs the in-app chat is served her
 | GET | `/public/matches` | List own club matches, supports `opponentApiId` filter (no auth) |
 | GET | `/public/matches/:id` | Single match with quarter scores (no auth) |
 | GET | `/public/matches/:id/context` | H2H record and form for both teams (no auth) |
+| GET | `/public/schedule.ics` | ICS calendar subscription feed for own-club matches. Default window: 30 days back to 180 days forward (no auth) |
 | GET | `/public/standings` | League standings (no auth) |
 | GET | `/public/teams` | List teams (no auth) |
 | GET | `/public/teams/:id/stats` | Season stats and recent form for a team (no auth) |
-| GET | `/public/home/dashboard` | Aggregated home screen data (no auth) |
+| GET | `/public/home/dashboard` | Aggregated home screen data: next game, recent results, upcoming games, club stats (no auth) |
+| GET | `/public/assets/clubs/:id` | Club logo as webp, proxied by club id. The route constrains `:id` to `[0-9]+\.webp` |
 
-### Device
+### Device (push registration)
+
+Mounted at `/api/devices` — note the `/api` prefix.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/devices/register` | Register push notification device token. Body: `{ token, platform: "ios"\|"android", locale? }`. Upserts by token and bumps `lastSeenAt`. |
-| DELETE | `/devices/:token` | Unregister device token (caller must own the token). |
+| POST | `/api/devices/register` | Register push notification device token. Body: `{ token, platform: "ios"\|"android", locale? }`. Upserts by token and bumps `lastSeenAt`. |
+| DELETE | `/api/devices/:token` | Unregister device token (caller must own the token). |
 
-### Referee
+### Referee self-service (role: referee | admin | refereeAdmin)
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/referee/matches` | referee/admin | List matches with open referee slots |
-| POST | `/referee/matches/:id/take` | referee/admin | Record take-intent, returns deep-link URL |
-
-### Referee Games & Assignment (role: referee | admin)
+`admin`/`refereeAdmin` get cross-referee visibility; a plain referee is scoped to
+their own games via `c.get("refereeId")`. The native app depends on `/referee/games`,
+`/referee/games/:id` and `/referee/matches/:matchId`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/referee/games` | referee/admin | List games. Admin sees all; referee sees only games matching their visibility rules (allowAllHomeGames, allowAwayGames, per-team allowlist). Requires `isOwnClub=true` on referee record. Query: `?search=&league=&status=active&dateFrom=&dateTo=&limit=100&offset=0` |
-| GET | `/referee/games/by-api-match/:apiMatchId` | referee/admin | Fetch a single game by its Basketball-Bund `apiMatchId` (used for deep-link landing from take-intent URLs). |
-| POST | `/referee/games/:spielplanId/assign` | referee/admin | Assign self to a game slot. Requires `isOwnClub=true`. Body: `{ slotNumber: 1\|2, refereeApiId: number }`. Returns: `{ success, slot, status, refereeName }` |
+| GET | `/referee/games` | referee/admin | List games the caller may see. Query: `search`, `league`, `status`, `dateFrom`, `dateTo`, `limit`, `offset` |
+| GET | `/referee/games/:id` | referee/admin | Single game by `refereeGames.id` |
+| GET | `/referee/games/by-api-match/:apiMatchId` | referee/admin | Single game by Basketball-Bund `apiMatchId` (deep-link landing from take-intent URLs) |
+| GET | `/referee/matches/:matchId` | referee/admin | Single game by local `matches.id` |
+| POST | `/referee/games/:spielplanId/assign` | referee (self) | Assign self to a game slot in the federation. Requires `isOwnClub=true` and `refereeApiId` matching the caller. Body: `{ slotNumber: 1\|2, refereeApiId }` |
+| POST | `/referee/games/:id/claim` | referee (self) | Record a local claim (take-intent) on a game. Optional body: `{ slotNumber?: 1\|2 }` |
+| DELETE | `/referee/games/:id/claim` | referee (self) | Release the caller's claim on a game |
 
 ### Admin Referee Assignment (role: admin)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/admin/referee/games/:spielplanId/candidates` | admin | Search qualified candidates. Query: `?search=&pageFrom=0&pageSize=15` |
-| POST | `/admin/referee/games/:spielplanId/assign` | admin | Assign referee to slot. Body: `{ slotNumber: 1\|2, refereeApiId: number }` |
+| GET | `/admin/referee/games/:spielplanId/candidates` | admin | Search qualified candidates. Query: `search`, `pageFrom`, `pageSize` |
+| POST | `/admin/referee/games/:spielplanId/assign` | admin | Assign referee to slot. Body: `{ slotNumber: 1\|2, refereeApiId }` |
 | DELETE | `/admin/referee/games/:spielplanId/assignment/:slotNumber` | admin | Remove referee from slot |
 
 ### Admin Referee History (role: admin, refereeAdmin)
@@ -517,7 +665,7 @@ The same provider-neutral tool registry that backs the in-app chat is served her
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/social/matches?type=&week=&year=` | Weekend matches filtered by type (preview/results) |
+| GET | `/admin/social/matches` | Weekend matches filtered by type. Query: `type` (preview/results), `week`, `year` |
 | GET | `/admin/social/player-photos` | List player photos |
 | GET | `/admin/social/player-photos/:id/image` | Proxy player photo image from GCS |
 | POST | `/admin/social/player-photos` | Upload player photo (multipart) |
@@ -529,9 +677,9 @@ The same provider-neutral tool registry that backs the in-app chat is served her
 | PATCH | `/admin/social/backgrounds/:id/default` | Set default background |
 | POST | `/admin/social/generate` | Generate social post PNG (Satori + Sharp compositing) |
 
-Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`, `apps/api/src/routes/device.routes.ts`
-Validation schemas: `apps/api/src/routes/admin/*.schemas.ts`
-Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
+Route files: `apps/api/src/routes/health.routes.ts`, `apps/api/src/routes/mcp.routes.ts`, `apps/api/src/routes/qa.routes.ts`, `apps/api/src/routes/device.routes.ts`, `apps/api/src/routes/admin/*.routes.ts`, `apps/api/src/routes/api/*.routes.ts`, `apps/api/src/routes/public/*.routes.ts`, `apps/api/src/routes/referee/*.routes.ts`. Mount table: `apps/api/src/routes/index.ts`; app-level routes: `apps/api/src/app.ts`.
+Request schemas: `packages/contracts/src/<group>.ts` (never redeclared in the route).
+Service layer: `apps/api/src/services/admin/*.service.ts`, `apps/api/src/services/referee/`, `apps/api/src/services/venue-booking/`, `apps/api/src/services/notifications/`, `apps/api/src/services/social/`
 
 ## Access Control (RBAC)
 
@@ -569,12 +717,16 @@ All resources, actions, and role → permission mappings live in `packages/share
 |---|---|
 | `superadmin` | Superset of `admin`. Additionally gates the Bull Board queue UI (`/admin/queues/*`) via `requireAnyRole("superadmin")`. **Operational note:** existing `admin` users do NOT inherit this — each must be explicitly granted `superadmin` to keep Bull Board access. `superadmin` is also listed in better-auth's `adminRoles`. |
 | `admin` | Full access to every resource and action (except Bull Board, which now requires `superadmin`). |
-| `refereeAdmin` | Manage referees, assignments; view matches; trigger referee sync. |
-| `venueManager` | Manage venues and bookings; view matches. |
-| `teamManager` | Manage teams; view matches, standings, referees. |
+| `refereeAdmin` | Full referee + assignment CRUD; view matches and teams; board view/create/update. |
+| `venueManager` | Full venue + booking CRUD; view matches; board view/create/update. |
+| `teamManager` | `team:view,manage`; view matches, standings, referees; board view/create/update. |
+| `coach` | Read-only: view teams, matches, standings and boards. |
 | *(no role, refereeId set)* | Referee self-service (own assignments via `isReferee`). |
 
-A user may have multiple roles. Roles are stored in the `user.role` column as a comma-separated string (better-auth native format).
+Six named roles — `ROLE_NAMES` in `packages/shared/src/rbac.ts` is the closed set
+and `parseRoles()` discards anything outside it. A user may have multiple roles.
+Roles are stored in the `user.role` column as a comma-separated string
+(better-auth native format).
 
 ### Adding a role or resource
 
@@ -589,28 +741,48 @@ A user may have multiple roles. Roles are stored in the `user.role` column as a 
 
 ### Page Structure
 
+Every route is nested under a `[locale]` dynamic segment (next-intl). Only the
+root `layout.tsx` sits outside it. 32 pages as of writing.
+
 ```
 app/
-├── page.tsx                          Home page
-├── layout.tsx                        Root layout (fonts, metadata, Providers + Toaster)
-├── providers.tsx                     Client component wrapping AuthUIProvider
-├── auth/
-│   └── [path]/page.tsx              better-auth-ui AuthView (sign-in, sign-up, forgot-password, etc.)
-├── referee/
-│   ├── layout.tsx                    Referee shell (simplified header)
-│   └── matches/
-│       └── page.tsx                  Referee match list with open slots
-└── admin/
-    ├── layout.tsx                    Admin shell (header nav + UserButton)
-    ├── page.tsx                      Redirects to /admin/sync
-    ├── settings/
-    │   └── page.tsx                  Server component: club config + league discovery + league list
-    ├── social/
-    │   └── create/
-    │       └── page.tsx              Social post wizard (4-step: type/week → matches → assets → preview/download)
-    └── sync/
-        └── page.tsx                  Server component: fetches initial data, renders SyncDashboard
+├── layout.tsx                        Root layout (fonts, metadata)
+└── [locale]/
+    ├── layout.tsx                    Locale layout (next-intl provider, Toaster)
+    ├── providers.tsx                 Client component wrapping AuthUIProvider
+    ├── not-found.tsx
+    ├── auth/[path]/page.tsx          better-auth-ui AuthView (sign-in, sign-up, forgot-password, …)
+    ├── live/                         Public live scoreboard view (own layout, no chrome)
+    ├── overlay/                      Broadcast overlay for OBS (own layout, transparent)
+    ├── (public)/                     Route group — public site, shared public layout
+    │   ├── page.tsx                  Home
+    │   ├── schedule/page.tsx
+    │   ├── standings/page.tsx
+    │   ├── teams/page.tsx
+    │   ├── team/[id]/page.tsx
+    │   ├── game/[id]/page.tsx
+    │   └── h2h/[teamApiId]/page.tsx
+    └── admin/
+        ├── layout.tsx                Admin shell (sidebar + breadcrumb + UserButton)
+        ├── page.tsx                  Admin landing
+        ├── sync/page.tsx             Sync dashboard (server component seeds the client tree)
+        ├── matches/page.tsx, matches/[id]/page.tsx (+ not-found.tsx)
+        ├── bookings/page.tsx
+        ├── boards/page.tsx, boards/[boardId]/page.tsx (board/ redirects to boards/)
+        ├── referees/page.tsx
+        ├── teams/page.tsx
+        ├── venues/page.tsx
+        ├── standings/page.tsx
+        ├── users/page.tsx
+        ├── scoreboard/page.tsx
+        ├── broadcast/page.tsx
+        ├── notifications/page.tsx (+ channels/, events/, rules/)
+        ├── settings/page.tsx (+ notifications/)
+        └── social/create/page.tsx    Social post wizard
 ```
+
+`/admin/referees` renders `RefereeHubPage` from
+`components/admin/referee-hub/`; there is no separate referee page tree.
 
 ### Auth
 
@@ -626,18 +798,22 @@ app/
 
 ### Client Components
 
-All in `apps/web/src/components/admin/sync/`:
+`apps/web/src/components/` is organised by surface, one directory per feature —
+not a single sync directory:
 
-| Component | File | Purpose |
-|-----------|------|---------|
-| `SyncDashboard` | `sync-dashboard.tsx` | Main client component, 5s polling, tab layout |
-| `SyncStatusCards` | `sync-status-cards.tsx` | Status display cards |
-| `SyncHistoryTable` | `sync-history-table.tsx` | Paginated sync run history |
-| `SyncLiveLogs` | `sync-live-logs.tsx` | SSE log streaming |
-| `SyncScheduleConfig` | `sync-schedule-config.tsx` | Cron schedule form |
-| `SyncLogDetail` | `sync-log-detail.tsx` | Detailed log entry viewer |
+- `admin/` — the admin app. One subdirectory per feature area: `board`,
+  `bookings`, `dashboard`, `matches`, `notifications`, `referee-hub`,
+  `settings`, `social`, `standings`, `sync`, `users`, `venues`, plus `shared`
+  for cross-feature pieces and `app-sidebar.tsx` / `admin-breadcrumb.tsx` for
+  the shell.
+- `public/` — the public site (home, schedule, standings, team and game pages,
+  the club assistant widget).
+- `rbac/` — the `<Can>` gate.
+- `brand/`, `ui/`, `locale-switcher.tsx`, `theme-toggle.tsx` — chrome.
 
-Types: `apps/web/src/components/admin/sync/types.ts`
+Each feature directory owns its own types file where it needs one (e.g.
+`admin/sync/types.ts`). Prefer adding to the matching directory over creating a
+new top-level one.
 
 ### Web data layer
 
@@ -655,9 +831,20 @@ Raw `fetch` is lint-banned in web components (`no-restricted-globals` in `apps/w
 
 ## UI Component Library
 
-`packages/ui/src/components/` exports:
+Two import paths, both valid:
 
-Button, Combobox, Tabs/TabsList/TabsTrigger/TabsContent, Card/CardHeader/CardTitle/CardDescription/CardContent, Label, Switch, Badge, Table/TableHeader/TableHead/TableBody/TableRow/TableCell, Separator, Select/SelectTrigger/SelectValue/SelectContent/SelectItem, Input, Popover/PopoverTrigger/PopoverContent/PopoverAnchor
+- `@dragons/ui` — the curated barrel, `packages/ui/src/index.ts`. Everything
+  re-exported there is composed or wrapped (Button, Combobox, Calendar,
+  DatePicker, TimePicker, Popover, Dialog, Sheet, Tooltip, `cn`).
+- `@dragons/ui/components/<name>` — direct subpath import of any file in
+  `packages/ui/src/components/` (alert-dialog, badge, breadcrumb, card,
+  checkbox, collapsible, command, dropdown-menu, field, input, label, select,
+  separator, sidebar, skeleton, switch, table, tabs, textarea, …). This is how
+  most shadcn primitives are consumed; the barrel deliberately does not
+  re-export them.
+
+`ls packages/ui/src/components/` is the authoritative list. Read
+`packages/ui/DESIGN-SYSTEM.md` before building UI.
 
 Utility: `cn()` from `packages/ui/src/lib/utils.ts` (clsx + tailwind-merge)
 
@@ -672,29 +859,38 @@ All types in `packages/sdk/src/types/`:
 | `common.ts` | `SdkMatchDayInfo`, `SdkTeamRef`, `SdkSpielfeld`, `SdkVerein`, `SdkMannschaft`, `SdkMannschaftLiga` | Shared structures |
 | `match.ts` | `SdkSpielplanMatch`, `SdkSpielplanResponse` | Match schedule |
 | `standings.ts` | `SdkTabelleEntry`, `SdkTabelle`, `SdkTabelleResponse` | League standings |
-| `game-details.ts` | `SdkSchirirolle`, `SdkPersonVO`, `SdkSchiedsrichter`, `SdkSpielleitung`, `SdkRefereeSlot`, `SdkGameDetails`, `SdkGetGameResponse`, `SdkOpenGame`, `SdkOpenGamesResponse`, `SdkUserContext`, `SdkUserContextResponse` | Game details + referees |
+| `game-details.ts` | `SdkSchirirolle`, `SdkPersonVO`, `SdkSchiedsrichter`, `SdkSpielleitung`, `SdkRefereeSlot`, `SdkGameDetails`, `SdkGetGameResponse`, `SdkOpenGamesSearchParams`, `SdkOffeneSpieleLiga`, `SdkOffeneSpieleSp`, `SdkOffeneSpielResult`, `SdkOffeneSpieleResponse`, `SdkUserContext`, `SdkUserContextResponse` | Game details + open games |
+| `referee-assignment.ts` | `SdkRefCandidateMeta`, `SdkRefCandidate`, `SdkGetRefsPayload`, `SdkGetRefsResponse`, `SdkAufheben`, `SdkSubmitSlotPayload`, `SdkSubmitPayload`, `SdkSubmitResponse` | Referee candidate search + slot submit |
 
 Helpers: `parseResult()`, `isSdkLiga()`, `isSdkSpielplanMatch()`, `isSdkTabelleEntry()`
 
-Sample API responses: `/Users/jn/git/dragons-mono/apps/api/sdk-type-samples/` (getLigaList.json, getSpielplan.json, getTabelle.json, getGameDetails.json)
+Sample API responses: `packages/sdk/src/samples/` — `getLigaList.json`, `getSpielplan.json`, `getTabelle.json`, `getGameDetails.json`, each with a `.shape.json` sibling summarising its structure.
 
 ## Infrastructure
 
 ### BullMQ Queue
 
-- Queue name: `sync`
-- Default: 3 attempts, exponential backoff (5s base)
-- Keeps last 100 completed, 500 failed jobs
-- Worker concurrency: 1
-- Config: `apps/api/src/workers/queues.ts`
+- Seven queues, all declared in `apps/api/src/workers/queues.ts`: `sync`,
+  `domain-events`, `digest`, `referee-reminders`, `push-receipt`,
+  `task-reminders`, `outbox-poll`.
+- `sync` default: 3 attempts, exponential backoff (5s base); keeps last 100
+  completed and 500 failed jobs; worker concurrency 1.
 
 ### Notification Channels
 
 Channel adapters live in `apps/api/src/services/notifications/channels/` and are dispatched by the notification pipeline per user preference + channel config.
 
+`CHANNEL_TYPES` in `packages/shared/src/channel-configs.ts` is the single source
+of truth for the four channel types. Three have adapters:
+
 - **in_app** — Writes to `notification_log` for in-app inbox rendering. Adapter: `channels/in-app.ts`.
 - **whatsapp_group** — Posts to a WhatsApp group via configured provider. Adapter: `channels/whatsapp-group.ts`.
 - **push** — Native push notifications via Expo Push Service. Delivers `PUSH_ELIGIBLE_EVENTS` (referee assignments, slot requests/reminders, urgent match changes) to devices registered via `POST /api/devices/register`. Adapter: `channels/push.ts`. HTTP wrapper: `expo-push.client.ts`. Device tokens live in `push_devices`; delivery receipts reconciled via the `push-receipt` worker.
+- **email** — Declared in `CHANNEL_TYPES` and accepted by the channel-config API
+  (`EmailConfig` exists, `SMTP_*` env vars exist), but **there is no adapter**.
+  `dispatchImmediate` in `notification-pipeline.ts` falls through to its
+  "Unknown channel type, skipping dispatch" branch, logs a warning and returns
+  false. An email channel config can be created and will never deliver.
 
 ### Workers
 
@@ -795,7 +991,14 @@ Two operational constraints the code relies on but doesn't state inline:
 
 | Workflow | File | Triggers | Jobs |
 |----------|------|----------|------|
-| CI | `.github/workflows/ci.yml` | PR, push main | quality (lint+typecheck+test+coverage+build), ai-slop, dependency-review, dependency-audit, secret-scan |
-| CD | `.github/workflows/cd.yml` | push main, version tags | deliver (build+pack artifacts), release (GitHub release) |
-| CodeQL | `.github/workflows/codeql.yml` | PR, push main, weekly | JavaScript/TypeScript analysis |
+| CI | `.github/workflows/ci.yml` | PR, push main/master, dispatch | `lint` (eslint + `check:i18n` + tsc + knip), `test` (test + `check:coverage-scripts` + coverage), `build`, `pi` (pytest over `apps/pi`), `ai-slop`, `lockfile-check`, `dependency-review`, `dependency-audit`, `secret-scan` |
+| Deploy | `.github/workflows/deploy.yml` | `workflow_run` after a green CI on main, dispatch | `check-ci`, `determine-changes` (path filters live in `.github/scripts/change-patterns.sh`), `run-migrations`, `build-web`, `build-api`, `summary` |
+| CD | `.github/workflows/cd.yml` | push main, `v*.*.*` tags, dispatch | `deliver` (build + pack artifacts), `release` (GitHub release) |
+| DB migrations | `.github/workflows/db-migrations.yml` | dispatch only | `migrate`. Actions: `migrate` or `check`. There is deliberately no `push` action — `drizzle-kit push` drops hand-written SQL indexes |
+| OpenTofu | `.github/workflows/opentofu.yml` | push/PR touching `infra/**`, dispatch | `validate`, `plan`, `apply` |
+| CodeQL | `.github/workflows/codeql.yml` | PR, push main/master, weekly | `analyze` (JavaScript/TypeScript) |
+| Scorecard | `.github/workflows/scorecard.yml` | push main, weekly | `analysis` (OSSF Scorecard) |
+| Semgrep | `.github/workflows/semgrep.yml` | push main, PR, weekly | `semgrep` (OSS scan) |
 | Dependabot | `.github/dependabot.yml` | weekly | npm + GitHub Actions updates |
+
+The web image is built with `NEXT_PUBLIC_*` build args (`deploy.yml` → `apps/web/Dockerfile`), because Next.js inlines them at build time. Changing one of those values requires a rebuild, not a restart.
