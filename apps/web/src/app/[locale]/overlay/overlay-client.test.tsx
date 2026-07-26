@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { OverlayClient } from "./overlay-client";
 
 vi.mock("./pregame-card", () => ({
@@ -66,7 +66,14 @@ function liveState(clockRunning: boolean) {
 describe("OverlayClient", () => {
   // Guard against a mid-test failure leaking fake timers / the performance.now
   // spy into sibling tests.
+  //
+  // `cleanup()` is load-bearing, not tidiness: OverlayClient runs a 100ms
+  // setInterval to advance the interpolated clock, cleared only by its effect
+  // teardown on unmount. Without this the interval outlives the test file and
+  // fires after the environment is gone, throwing "window is not defined" —
+  // which failed whole runs intermittently while every test passed.
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
