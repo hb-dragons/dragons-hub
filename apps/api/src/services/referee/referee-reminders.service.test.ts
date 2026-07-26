@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   selectResult: vi.fn(),
@@ -99,6 +99,55 @@ describe("computeReminderDelays", () => {
     const reminderDays = [7, 3, 1];
 
     const delays = computeReminderDelays(kickoffDate, kickoffTime, reminderDays, now);
+
+    expect(delays).toHaveLength(0);
+  });
+});
+
+describe("computeReminderDelays - timezone correctness (issue #96)", () => {
+  const originalTZ = process.env.TZ;
+
+  afterEach(() => {
+    process.env.TZ = originalTZ;
+  });
+
+  it("resolves the exact UTC instant for a CEST (summer) Berlin kickoff under a non-Berlin process TZ", () => {
+    process.env.TZ = "UTC";
+    // 19:30 Berlin time in July is CEST (UTC+2) -> 17:30Z
+    const now = new Date("2026-07-01T00:00:00Z");
+    const delays = computeReminderDelays("2026-07-15", "19:30", [0], now);
+
+    expect(delays).toHaveLength(1);
+    const expectedKickoffUtc = new Date("2026-07-15T17:30:00Z");
+    expect(delays[0]!.delayMs).toBe(expectedKickoffUtc.getTime() - now.getTime());
+  });
+
+  it("resolves the exact UTC instant for a CET (winter) Berlin kickoff under a non-Berlin process TZ", () => {
+    process.env.TZ = "UTC";
+    // 19:30 Berlin time in January is CET (UTC+1) -> 18:30Z
+    const now = new Date("2026-01-01T00:00:00Z");
+    const delays = computeReminderDelays("2026-01-15", "19:30", [0], now);
+
+    expect(delays).toHaveLength(1);
+    const expectedKickoffUtc = new Date("2026-01-15T18:30:00Z");
+    expect(delays[0]!.delayMs).toBe(expectedKickoffUtc.getTime() - now.getTime());
+  });
+
+  it("resolves the same correct UTC instant under America/New_York process TZ", () => {
+    process.env.TZ = "America/New_York";
+    const now = new Date("2026-07-01T00:00:00Z");
+    const delays = computeReminderDelays("2026-07-15", "19:30", [0], now);
+
+    expect(delays).toHaveLength(1);
+    const expectedKickoffUtc = new Date("2026-07-15T17:30:00Z");
+    expect(delays[0]!.delayMs).toBe(expectedKickoffUtc.getTime() - now.getTime());
+  });
+
+  it("still excludes an already-passed kickoff under a non-Berlin process TZ", () => {
+    process.env.TZ = "UTC";
+    // "now" is after the CEST kickoff instant (17:30Z), so the 0-day reminder must be excluded
+    const now = new Date("2026-07-15T18:00:00Z");
+    const delays = computeReminderDelays("2026-07-15", "19:30", [0], now);
 
     expect(delays).toHaveLength(0);
   });
