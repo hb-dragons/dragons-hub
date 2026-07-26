@@ -129,4 +129,51 @@ describe("<DashboardView>", () => {
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText("7")).toBeInTheDocument();
   });
+
+  /** Today's schedule row for one match, with whatever venue fields are given. */
+  function renderTodayMatch(venue: {
+    venueName: string | null;
+    venueNameOverride: string | null;
+  }) {
+    mockSwr((key) =>
+      key.startsWith("/admin/matches?dateFrom=")
+        ? {
+            data: {
+              total: 1,
+              items: [
+                {
+                  id: 1,
+                  kickoffTime: "19:30",
+                  homeTeamName: "Dragons",
+                  guestTeamName: "Rivals",
+                  leagueName: "Oberliga",
+                  anschreiber: null,
+                  ...venue,
+                },
+              ],
+            },
+          }
+        : { data: undefined },
+    );
+    render(<DashboardView user={ADMIN} />);
+  }
+
+  it("shows the admin's venue override rather than the federation venue", () => {
+    // An override exists precisely because the federation value is wrong, so
+    // every surface must prefer it. Reading `venueName ?? venueNameOverride`
+    // pins the dashboard to the stale federation value forever.
+    renderTodayMatch({
+      venueName: "Federation Hall",
+      venueNameOverride: "Corrected Gym",
+    });
+
+    expect(screen.getByText(/Corrected Gym/)).toBeInTheDocument();
+    expect(screen.queryByText(/Federation Hall/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the federation venue when no override is set", () => {
+    renderTodayMatch({ venueName: "Federation Hall", venueNameOverride: null });
+
+    expect(screen.getByText(/Federation Hall/)).toBeInTheDocument();
+  });
 });

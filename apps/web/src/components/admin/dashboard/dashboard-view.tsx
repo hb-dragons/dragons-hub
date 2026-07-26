@@ -225,7 +225,7 @@ export function DashboardView({ user }: DashboardViewProps) {
                           {match.guestTeamName}
                         </p>
                         <p className="text-muted-foreground truncate text-xs">
-                          {match.venueName ?? match.venueNameOverride ?? "—"} •{" "}
+                          {match.venueNameOverride ?? match.venueName ?? "—"} •{" "}
                           {match.leagueName ?? "—"}
                         </p>
                       </div>
