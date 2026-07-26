@@ -488,7 +488,8 @@ describe("removeStaleRefereeAssignments — removal semantics (issue #105)", () 
     expect(result.errors).toEqual([]);
     const [row] = await liveAssignments(matchId);
     expect(row!.removedAt).toBeInstanceOf(Date);
-    publishMock.mockResolvedValue(undefined);
+    // beforeEach's clearAllMocks does not clear a rejection set here.
+    publishMock.mockReset();
   });
 
   it("leaves an already tombstoned row alone and emits nothing twice", async () => {
