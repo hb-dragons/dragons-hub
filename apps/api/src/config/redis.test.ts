@@ -14,8 +14,13 @@ const mockOn = vi.fn().mockImplementation(function (this: unknown, event: string
   return this;
 });
 
+const constructed: { url: string; options: Record<string, unknown> }[] = [];
+
 vi.mock("ioredis", () => ({
   default: class MockRedis {
+    constructor(url: string, options: Record<string, unknown>) {
+      constructed.push({ url, options });
+    }
     on = mockOn;
     ping = vi.fn().mockResolvedValue("PONG");
     quit = vi.fn().mockResolvedValue("OK");
@@ -26,6 +31,7 @@ describe("redis config", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    constructed.length = 0;
   });
 
   it("creates redis lazily on first call", async () => {
@@ -82,5 +88,43 @@ describe("redis config", () => {
   it("closeRedis is a no-op when no client exists", async () => {
     const { closeRedis } = await import("./redis");
     await expect(closeRedis()).resolves.toBeUndefined();
+  });
+
+  // `maxRetriesPerRequest: null` makes a command issued while Redis is down sit
+  // in the offline queue forever — it never resolves and never rejects. On the
+  // request path that turns every "fail open" catch into dead code and hangs
+  // the request, so the request-path client must use a finite value.
+  it("gives the request-path client a finite maxRetriesPerRequest", async () => {
+    const { getRedis } = await import("./redis");
+
+    getRedis();
+
+    expect(constructed).toHaveLength(1);
+    const { options } = constructed[0]!;
+    expect(typeof options.maxRetriesPerRequest).toBe("number");
+    expect(options.maxRetriesPerRequest).toBeGreaterThan(0);
+  });
+
+  // BullMQ mandates `null` on connections it owns (a blocking read must survive
+  // reconnects), so that option keeps its own factory.
+  it("keeps maxRetriesPerRequest null on blocking/BullMQ-style clients", async () => {
+    const { createRedisClient } = await import("./redis");
+
+    createRedisClient();
+
+    expect(constructed).toHaveLength(1);
+    expect(constructed[0]!.options.maxRetriesPerRequest).toBeNull();
+  });
+
+  it("builds request-path and blocking clients as separate instances", async () => {
+    const { getRedis, createRedisClient } = await import("./redis");
+
+    const request = getRedis();
+    const blocking = createRedisClient();
+
+    expect(request).not.toBe(blocking);
+    expect(constructed).toHaveLength(2);
+    expect(constructed[0]!.options.maxRetriesPerRequest).not.toBeNull();
+    expect(constructed[1]!.options.maxRetriesPerRequest).toBeNull();
   });
 });
