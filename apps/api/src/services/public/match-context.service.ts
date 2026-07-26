@@ -47,7 +47,15 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
     .where(eq(teams.apiTeamPermanentId, guestTeamApiId))
     .limit(1);
 
-  const ourTeamApiId = homeTeamRow?.isOwnClub ? homeTeamApiId : guestTeamApiId;
+  // The match-detail route only surfaces context for a match with exactly one
+  // own-club side. With zero own-club teams the "our team" perspective (W/L,
+  // points) is meaningless, and with two it's ambiguous — and either way the
+  // route hides the match, so don't compute or expose H2H/form.
+  const homeOwn = homeTeamRow?.isOwnClub ?? false;
+  const guestOwn = guestTeamRow?.isOwnClub ?? false;
+  if (homeOwn === guestOwn) return null;
+
+  const ourTeamApiId = homeOwn ? homeTeamApiId : guestTeamApiId;
 
   let wins = 0, losses = 0, pointsFor = 0, pointsAgainst = 0;
   const previousMeetings: PreviousMeeting[] = [];

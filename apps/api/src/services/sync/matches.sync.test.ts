@@ -695,14 +695,16 @@ describe("syncMatchesFromData", () => {
       spielplan: [makeBasicMatch({ kickoffTime: "18:00" })],
     });
     setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
-    const { txInsert } = makeTxMock(makeLockedRow({
+    const { txInsert, txUpdateSet } = makeTxMock(makeLockedRow({
       kickoffTime: "18:00:00", // DB returns with seconds
     }));
 
     await syncMatchesFromData([data], new Map(), 1);
 
-    // Only matchRemoteVersions insert, NO matchChanges insert
-    expect(txInsert).toHaveBeenCalledTimes(1);
+    // No effective change → no version snapshot and no matchChanges, and the
+    // remote version is not bumped (issue #49).
+    expect(txInsert).toHaveBeenCalledTimes(0);
+    expect(txUpdateSet.mock.calls[0]![0].currentRemoteVersion).toBe(1);
   });
 
   it("preserves existing fields when game details are unavailable", async () => {
@@ -1451,14 +1453,15 @@ describe("computeEffectiveChanges kickoffTime normalization in update", () => {
     });
     setupBatchSelect([{ apiMatchId: 1000, id: 1, remoteDataHash: "old-hash" }]);
     // Locked row has "10:30:00" (DB format) and everything else matches
-    const { txInsert } = makeTxMock(makeLockedRow({ kickoffTime: "10:30:00" }));
+    const { txInsert, txUpdateSet } = makeTxMock(makeLockedRow({ kickoffTime: "10:30:00" }));
 
     const result = await syncMatchesFromData([data], new Map(), 1);
 
     // Should be skipped since kickoffTime "10:30:00" == "10:30" after normalization
     // and no other fields changed
     expect(result.skipped).toBe(1);
-    // Only matchRemoteVersions insert, NO matchChanges
-    expect(txInsert).toHaveBeenCalledTimes(1);
+    // No effective change → no version snapshot, no matchChanges, no version bump (issue #49)
+    expect(txInsert).toHaveBeenCalledTimes(0);
+    expect(txUpdateSet.mock.calls[0]![0].currentRemoteVersion).toBe(1);
   });
 });

@@ -7,6 +7,10 @@ import { uploadToGcs, downloadFromGcs, deleteFromGcs } from "./gcs-storage.servi
 
 const UPLOAD_PREFIX = "player-photos";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+// Player photos are composited onto a 1080² canvas, so storing anything larger
+// is wasted bytes and lets a later scale-up force a huge sharp surface. Bound
+// the longest edge on upload; never enlarge smaller images.
+const MAX_STORED_DIMENSION = 1080;
 const EXT_BY_CONTENT_TYPE: Record<string, string> = {
   "image/png": ".png",
   "image/jpeg": ".jpg",
@@ -30,11 +34,18 @@ export async function uploadPlayerPhoto(buffer: Buffer, originalName: string, co
   const metadata = await sharp(buffer).metadata();
   if (!metadata.width || !metadata.height) throw new Error("Could not read image dimensions");
 
+  // Normalize to a bounded dimension so a large photo scaled up at composite
+  // time can't blow up memory. `fit: inside` preserves aspect ratio and
+  // `withoutEnlargement` leaves already-small images untouched.
+  const { data: normalized, info } = await sharp(buffer)
+    .resize(MAX_STORED_DIMENSION, MAX_STORED_DIMENSION, { fit: "inside", withoutEnlargement: true })
+    .toBuffer({ resolveWithObject: true });
+
   const ext = EXT_BY_CONTENT_TYPE[contentType] ?? ".png";
   const filename = `${randomUUID()}${ext}`;
-  await uploadToGcs(`${UPLOAD_PREFIX}/${filename}`, buffer, contentType);
+  await uploadToGcs(`${UPLOAD_PREFIX}/${filename}`, normalized, contentType);
 
-  const [record] = await getDb().insert(playerPhotos).values({ filename, originalName, width: metadata.width, height: metadata.height }).returning();
+  const [record] = await getDb().insert(playerPhotos).values({ filename, originalName, width: info.width, height: info.height }).returning();
   return record;
 }
 

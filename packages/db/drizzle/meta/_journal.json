@@ -285,8 +285,15 @@
     {
       "idx": 40,
       "version": "7",
-      "when": 1782304282065,
-      "tag": "0040_flashy_squadron_supreme",
+      "when": 1781694285752,
+      "tag": "0040_brainy_photon",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1785080912161,
+      "tag": "0041_productive_firebrand",
       "breakpoints": true
     }
   ]

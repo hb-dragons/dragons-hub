@@ -201,6 +201,23 @@ describe("generatePostImage", () => {
       // Default: width=500, height=750, scale=0.8 → 400 x 600
       expect(mocks.sharpChain.resize).toHaveBeenCalledWith(400, 600);
     });
+
+    it("clamps an oversized player surface so the sharp resize stays bounded", async () => {
+      // A legacy full-resolution photo at max scale would force a ~2.4GB surface.
+      mocks.sharpChain.metadata.mockResolvedValue({ width: 4000, height: 6000 });
+      await generatePostImage({ type: "preview", ...baseParams, playerPosition: { x: 0, y: 0, scale: 5 } });
+      // 4000*5 x 6000*5 = 20000 x 30000 → clamp longest edge to SIZE*5 (5400),
+      // preserving aspect ratio → 3600 x 5400.
+      expect(mocks.sharpChain.resize).toHaveBeenCalledWith(3600, 5400);
+    });
+
+    it("clamps against the width when it is the longest edge (landscape)", async () => {
+      mocks.sharpChain.metadata.mockResolvedValue({ width: 6000, height: 4000 });
+      await generatePostImage({ type: "preview", ...baseParams, playerPosition: { x: 0, y: 0, scale: 5 } });
+      // 6000*5 x 4000*5 = 30000 x 20000 → clamp longest edge (width) to 5400,
+      // preserving aspect ratio → 5400 x 3600.
+      expect(mocks.sharpChain.resize).toHaveBeenCalledWith(5400, 3600);
+    });
   });
 
   describe("Resvg rendering", () => {
@@ -211,6 +228,24 @@ describe("generatePostImage", () => {
       });
       expect(mocks.render).toHaveBeenCalled();
       expect(mocks.asPng).toHaveBeenCalled();
+    });
+  });
+
+  describe("font cache poisoning regression", () => {
+    it("retries font load after a transient GCS failure instead of caching the rejection", async () => {
+      // Fresh module so fontPromise starts unset (other tests already loaded it).
+      vi.resetModules();
+      const { generatePostImage: gen } = await import("./social-image.service");
+
+      // First font download rejects → loadFonts() rejects, generation fails.
+      mocks.downloadFromGcs.mockRejectedValueOnce(new Error("transient GCS error"));
+      await expect(gen({ type: "preview", ...baseParams })).rejects.toThrow();
+
+      // GCS recovers. A second call must retry the font load, not replay the
+      // cached rejection.
+      mocks.downloadFromGcs.mockImplementation((_path: string) => Promise.resolve(Buffer.from("data")));
+      const result = await gen({ type: "preview", ...baseParams });
+      expect(result).toBeInstanceOf(Buffer);
     });
   });
 

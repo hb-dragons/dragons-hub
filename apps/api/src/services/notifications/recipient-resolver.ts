@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, isNotNull } from "drizzle-orm";
 import { getDb } from "../../config/database";
 import { user } from "@dragons/db/schema";
 
@@ -24,6 +24,16 @@ export async function resolveRecipientUserIds(
       .select({ id: user.id })
       .from(user)
       .where(eq(user.role, "admin"));
+    return rows.map((r) => r.id);
+  }
+
+  if (recipientId === "audience:referee") {
+    // Every user linked to a referee identity. Referees carry no role value
+    // post-RBAC-cleanup, so this is keyed off the referee link, not a role.
+    const rows = await getDb()
+      .select({ id: user.id })
+      .from(user)
+      .where(isNotNull(user.refereeId));
     return rows.map((r) => r.id);
   }
 

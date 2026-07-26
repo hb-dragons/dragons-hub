@@ -43,6 +43,14 @@ export const eventWorker = new Worker<EventJobData>(
     // Run through notification pipeline (returns configs for reuse)
     const result = await processEvent(event);
 
+    // Mark delivered. Until this is set the outbox poller treats the event as
+    // unprocessed and will reclaim it after the lease expires, so a pipeline
+    // throw above (which skips this) leaves the event retriable instead of lost.
+    await getDb()
+      .update(domainEvents)
+      .set({ processedAt: new Date() })
+      .where(eq(domainEvents.id, event.id));
+
     // Trigger per_sync digests when a sync completes — reuse configs from pipeline
     if (event.type === EVENT_TYPES.SYNC_COMPLETED) {
       await triggerPerSyncDigests(result.configs, log);

@@ -65,6 +65,8 @@ import {
   createBooking,
   deleteBooking,
 } from "./booking-admin.service";
+import { publishDomainEvent } from "../events/event-publisher";
+import { EVENT_TYPES } from "@dragons/shared";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -262,7 +264,16 @@ describe("updateBooking", () => {
     let selectCallIndex = 0;
     mockSelect.mockImplementation(() => {
       const idx = selectCallIndex++;
-      if (idx === 0) return makeChain([{ name: "Main Hall" }]);   // venue
+      if (idx === 0)
+        return makeChain([
+          {
+            overrideStartTime: null,
+            overrideEndTime: null,
+            calculatedStartTime: "14:00:00",
+            calculatedEndTime: "17:00:00",
+          },
+        ]); // pre-update row
+      if (idx === 1) return makeChain([{ name: "Main Hall" }]);   // venue
       return makeChain([{ count: 2 }]);                           // matchCount
     });
 
@@ -279,6 +290,7 @@ describe("updateBooking", () => {
   });
 
   it("returns null when booking not found", async () => {
+    mockSelect.mockReturnValue(makeChain([])); // pre-update row missing
     mockUpdate.mockReturnValue(mockUpdateChain([]));
 
     const result = await updateBooking(999, { notes: "Test" });
@@ -299,7 +311,16 @@ describe("updateBooking", () => {
     let selectCallIndex = 0;
     mockSelect.mockImplementation(() => {
       const idx = selectCallIndex++;
-      if (idx === 0) return makeChain([{ name: "Hall" }]);
+      if (idx === 0)
+        return makeChain([
+          {
+            overrideStartTime: "13:00:00",
+            overrideEndTime: "16:00:00",
+            calculatedStartTime: "14:00:00",
+            calculatedEndTime: "17:00:00",
+          },
+        ]); // pre-update row
+      if (idx === 1) return makeChain([{ name: "Hall" }]);
       return makeChain([{ count: 0 }]);
     });
 
@@ -313,6 +334,86 @@ describe("updateBooking", () => {
 
     expect(result).not.toBeNull();
     expect(result!.effectiveStartTime).toBe("14:00:00");
+  });
+
+  it("emits booking.status.changed with the real pre-update times on a reschedule", async () => {
+    const updatedRow = {
+      id: 1, venueId: 10, date: "2025-03-15",
+      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
+      overrideStartTime: "13:00:00", overrideEndTime: "16:00:00",
+      status: "pending", needsReconfirmation: false, notes: null,
+    };
+
+    mockUpdate.mockReturnValue(mockUpdateChain([updatedRow]));
+
+    let selectCallIndex = 0;
+    mockSelect.mockImplementation(() => {
+      const idx = selectCallIndex++;
+      // pre-update row carries the OLD override times
+      if (idx === 0)
+        return makeChain([
+          {
+            overrideStartTime: "12:00:00",
+            overrideEndTime: "15:00:00",
+            calculatedStartTime: "14:00:00",
+            calculatedEndTime: "17:00:00",
+          },
+        ]);
+      if (idx === 1) return makeChain([{ name: "Main Hall" }]); // venue
+      return makeChain([{ count: 1 }]); // matchCount
+    });
+
+    await updateBooking(1, {
+      overrideStartTime: "13:00:00",
+      overrideEndTime: "16:00:00",
+    });
+
+    expect(publishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: EVENT_TYPES.BOOKING_STATUS_CHANGED,
+        payload: expect.objectContaining({
+          oldStartTime: "12:00:00",
+          oldEndTime: "15:00:00",
+          newStartTime: "13:00:00",
+          newEndTime: "16:00:00",
+        }),
+      }),
+    );
+  });
+
+  it("does not emit booking.status.changed when the effective times are unchanged", async () => {
+    const updatedRow = {
+      id: 1, venueId: 10, date: "2025-03-15",
+      calculatedStartTime: "14:00:00", calculatedEndTime: "17:00:00",
+      overrideStartTime: "13:00:00", overrideEndTime: "16:00:00",
+      status: "pending", needsReconfirmation: false, notes: "note only",
+    };
+
+    mockUpdate.mockReturnValue(mockUpdateChain([updatedRow]));
+
+    let selectCallIndex = 0;
+    mockSelect.mockImplementation(() => {
+      const idx = selectCallIndex++;
+      // pre-update row already has the same override times
+      if (idx === 0)
+        return makeChain([
+          {
+            overrideStartTime: "13:00:00",
+            overrideEndTime: "16:00:00",
+            calculatedStartTime: "14:00:00",
+            calculatedEndTime: "17:00:00",
+          },
+        ]);
+      if (idx === 1) return makeChain([{ name: "Main Hall" }]);
+      return makeChain([{ count: 1 }]);
+    });
+
+    await updateBooking(1, {
+      overrideStartTime: "13:00:00",
+      overrideEndTime: "16:00:00",
+    });
+
+    expect(publishDomainEvent).not.toHaveBeenCalled();
   });
 });
 

@@ -442,6 +442,7 @@ export async function confirmIntentsFromSync(): Promise<number> {
         SELECT 1 FROM ${matchReferees} mr
         WHERE mr.match_id = ${refereeAssignmentIntents}.match_id
           AND mr.referee_id = ${refereeAssignmentIntents}.referee_id
+          AND mr.slot_number = ${refereeAssignmentIntents}.slot_number
       )
   `);
 

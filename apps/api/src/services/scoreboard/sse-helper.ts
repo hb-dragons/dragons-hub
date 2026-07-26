@@ -22,6 +22,19 @@ export function createSseResponse({
   let cancelled = false;
   let released = false;
 
+  // Centralized cleanup. Runs on every terminal state — a client-initiated
+  // cancel() AND a failed start() — so the connection-cap slot (onClose) is
+  // released exactly once. Per the Streams spec a rejected start() does not
+  // call cancel(), so without this the slot would leak on any init failure.
+  const release = async () => {
+    if (heartbeat) clearInterval(heartbeat);
+    if (unsubscribe) await unsubscribe();
+    if (!released && onClose) {
+      released = true;
+      onClose();
+    }
+  };
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const enqueue: SafeEnqueue = (text) => {
@@ -32,24 +45,27 @@ export function createSseResponse({
         }
       };
 
-      enqueue("retry: 2000\n\n");
+      try {
+        enqueue("retry: 2000\n\n");
 
-      const sub = await onStart(enqueue, () => cancelled);
-      if (cancelled) {
-        if (sub) await sub();
-        return;
+        const sub = await onStart(enqueue, () => cancelled);
+        if (cancelled) {
+          if (sub) await sub();
+          return;
+        }
+        unsubscribe = sub;
+        heartbeat = setInterval(() => enqueue(": ping\n\n"), heartbeatMs);
+      } catch (err) {
+        cancelled = true;
+        await release();
+        // controller.error() is a no-op once the stream has left the "readable"
+        // state (e.g. an earlier cancel()), so it is safe on every catch path.
+        controller.error(err);
       }
-      unsubscribe = sub;
-      heartbeat = setInterval(() => enqueue(": ping\n\n"), heartbeatMs);
     },
     async cancel() {
       cancelled = true;
-      if (heartbeat) clearInterval(heartbeat);
-      if (unsubscribe) await unsubscribe();
-      if (!released && onClose) {
-        released = true;
-        onClose();
-      }
+      await release();
     },
   });
 

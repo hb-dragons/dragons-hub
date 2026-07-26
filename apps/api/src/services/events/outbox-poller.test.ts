@@ -1,112 +1,170 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
 
-vi.mock("../../config/logger", () => ({
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-}));
-
-const mockExecute = vi.fn();
-const mockTransaction = vi.fn();
+// Real Postgres (pglite) so the claim/lease SQL is actually exercised.
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    execute: (...args: unknown[]) => mockExecute(...args),
-    transaction: (fn: (tx: unknown) => Promise<unknown>) => mockTransaction(fn),
-  }),
+  getDb: () =>
+    new Proxy(
+      {},
+      { get: (_t, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop] },
+    ),
 }));
 
-vi.mock("@dragons/db/schema", () => ({
-  domainEvents: { id: "id" },
+vi.mock("../../config/logger", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("drizzle-orm", () => ({
-  sql: Object.assign(
-    vi.fn((...args: unknown[]) => ({ sql: args })),
-    { raw: vi.fn((s: string) => ({ raw: s })) },
-  ),
-}));
-
-const mockQueueAdd = vi.fn().mockResolvedValue({ id: "job-1" });
+const mockQueueAdd = vi.fn();
 vi.mock("../../workers/queues", () => ({
-  domainEventsQueue: {
-    add: (...args: unknown[]) => mockQueueAdd(...args),
-  },
+  domainEventsQueue: { add: (...args: unknown[]) => mockQueueAdd(...args) },
 }));
 
 import { pollOutbox } from "./outbox-poller";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
-beforeEach(() => {
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
   vi.clearAllMocks();
   mockQueueAdd.mockResolvedValue({ id: "job-1" });
 });
 
-function setClaimedRows(rows: unknown[]) {
-  mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-    const tx = {
-      execute: vi.fn().mockResolvedValue({ rows }),
-    };
-    return fn(tx);
-  });
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
+
+const MINUTE = 60_000;
+
+async function seedEvent(opts: {
+  id: string;
+  createdAt: Date;
+  enqueuedAt?: Date | null;
+  processedAt?: Date | null;
+  type?: string;
+  urgency?: string;
+}): Promise<void> {
+  const {
+    id,
+    createdAt,
+    enqueuedAt = null,
+    processedAt = null,
+    type = "match.created",
+    urgency = "routine",
+  } = opts;
+  await ctx.client.query(
+    `INSERT INTO domain_events
+       (id, type, source, urgency, occurred_at, entity_type, entity_id,
+        entity_name, deep_link_path, payload, created_at, enqueued_at, processed_at)
+     VALUES ($1, $2, 'sync', $3, now(), 'match', 1,
+             'Dragons vs Tigers', '/matches/1', '{}'::jsonb, $4, $5, $6)`,
+    [
+      id,
+      type,
+      urgency,
+      createdAt.toISOString(),
+      enqueuedAt ? enqueuedAt.toISOString() : null,
+      processedAt ? processedAt.toISOString() : null,
+    ],
+  );
+}
+
+async function getRow(id: string): Promise<{ enqueued_at: string | null; processed_at: string | null }> {
+  const r = await ctx.client.query<{ enqueued_at: string | null; processed_at: string | null }>(
+    `SELECT enqueued_at, processed_at FROM domain_events WHERE id = $1`,
+    [id],
+  );
+  return r.rows[0]!;
 }
 
 describe("pollOutbox", () => {
-  it("returns 0 when no pending events", async () => {
-    setClaimedRows([]);
+  it("returns 0 and enqueues nothing when there are no pending events", async () => {
     expect(await pollOutbox()).toBe(0);
     expect(mockQueueAdd).not.toHaveBeenCalled();
   });
 
-  it("enqueues claimed events and returns count", async () => {
-    setClaimedRows([
-      { id: "evt-1", type: "match.created", urgency: "routine", entity_type: "match", entity_id: 1 },
-      { id: "evt-2", type: "match.cancelled", urgency: "immediate", entity_type: "match", entity_id: 2 },
-    ]);
-
-    expect(await pollOutbox()).toBe(2);
-    expect(mockQueueAdd).toHaveBeenCalledTimes(2);
-    expect(mockQueueAdd).toHaveBeenCalledWith(
-      "match.created",
-      expect.objectContaining({ eventId: "evt-1" }),
-    );
-    expect(mockQueueAdd).toHaveBeenCalledWith(
-      "match.cancelled",
-      expect.objectContaining({ eventId: "evt-2" }),
-    );
-  });
-
-  it("releases claim and logs on enqueue failure", async () => {
-    setClaimedRows([
-      { id: "evt-1", type: "match.created", urgency: "routine", entity_type: "match", entity_id: 1 },
-      { id: "evt-2", type: "match.cancelled", urgency: "immediate", entity_type: "match", entity_id: 2 },
-    ]);
-
-    mockQueueAdd
-      .mockRejectedValueOnce(new Error("Redis down"))
-      .mockResolvedValueOnce({ id: "job-2" });
-
-    mockExecute.mockResolvedValue({ rows: [] });
+  it("claims a never-enqueued, never-processed event and enqueues it", async () => {
+    await seedEvent({ id: "evt-pending", createdAt: new Date(Date.now() - MINUTE) });
 
     expect(await pollOutbox()).toBe(1);
-    expect(mockExecute).toHaveBeenCalled();
-    const { logger } = await import("../../config/logger");
-    expect(logger.error).toHaveBeenCalled();
+    expect(mockQueueAdd).toHaveBeenCalledTimes(1);
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "match.created",
+      expect.objectContaining({ eventId: "evt-pending" }),
+    );
+    const row = await getRow("evt-pending");
+    expect(row.enqueued_at).not.toBeNull(); // lease stamped
   });
 
-  it("uses FOR UPDATE SKIP LOCKED in claim sql", async () => {
-    let captured: unknown = null;
-    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
-      const tx = {
-        execute: vi.fn().mockImplementation((sqlQuery: unknown) => {
-          captured = sqlQuery;
-          return Promise.resolve({ rows: [] });
-        }),
-      };
-      return fn(tx);
+  it("does not re-claim an already-processed event", async () => {
+    await seedEvent({
+      id: "evt-done",
+      createdAt: new Date(Date.now() - 10 * MINUTE),
+      enqueuedAt: new Date(Date.now() - 10 * MINUTE),
+      processedAt: new Date(Date.now() - 9 * MINUTE),
     });
-    await pollOutbox();
-    expect(captured).toBeDefined();
+
+    expect(await pollOutbox()).toBe(0);
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+  });
+
+  it("does not re-claim a freshly-leased event still being processed", async () => {
+    // enqueued 10s ago, not yet processed → within lease, leave it alone
+    await seedEvent({
+      id: "evt-inflight",
+      createdAt: new Date(Date.now() - 5 * MINUTE),
+      enqueuedAt: new Date(Date.now() - 10_000),
+      processedAt: null,
+    });
+
+    expect(await pollOutbox()).toBe(0);
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+  });
+
+  it("reclaims a stranded event whose lease has expired and is still unprocessed", async () => {
+    // enqueued 10 min ago but never processed → the prior delivery failed; reclaim it
+    await seedEvent({
+      id: "evt-stranded",
+      createdAt: new Date(Date.now() - 30 * MINUTE),
+      enqueuedAt: new Date(Date.now() - 10 * MINUTE),
+      processedAt: null,
+    });
+
+    expect(await pollOutbox()).toBe(1);
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "match.created",
+      expect.objectContaining({ eventId: "evt-stranded" }),
+    );
+  });
+
+  it("does not claim events created within the last second (insert race guard)", async () => {
+    await seedEvent({ id: "evt-fresh", createdAt: new Date() });
+
+    expect(await pollOutbox()).toBe(0);
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+  });
+
+  it("resets the lease (enqueued_at) and logs when the queue add fails", async () => {
+    await seedEvent({ id: "evt-1", createdAt: new Date(Date.now() - MINUTE) });
+    await seedEvent({ id: "evt-2", createdAt: new Date(Date.now() - MINUTE), type: "match.cancelled" });
+    mockQueueAdd.mockRejectedValueOnce(new Error("Redis down")).mockResolvedValueOnce({ id: "job-2" });
+
+    // one succeeds, one fails
+    expect(await pollOutbox()).toBe(1);
+
+    const { logger } = await import("../../config/logger");
+    expect(logger.error).toHaveBeenCalled();
+
+    // the failed event must be released so it is retried next poll
+    const rows = await ctx.client.query<{ id: string; enqueued_at: string | null }>(
+      `SELECT id, enqueued_at FROM domain_events WHERE enqueued_at IS NULL`,
+    );
+    expect(rows.rows.length).toBe(1); // exactly the failed one is back to NULL
   });
 });

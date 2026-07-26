@@ -414,7 +414,9 @@ describe("syncRefereeGames", () => {
 
     // Insert returns the new row
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -430,6 +432,43 @@ describe("syncRefereeGames", () => {
     expect(mockScheduleReminderJobs).toHaveBeenCalledWith(
       1001, 1, "2026-04-25", "14:00",
     );
+  });
+
+  it("upserts on apiMatchId conflict so a concurrent run can't drop the insert (#69)", async () => {
+    const result = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    // No existing row in this run's snapshot → INSERT branch.
+    setupSelectMock(async () => []);
+
+    const returning = vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]);
+    const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+    // values() exposes BOTH so the current (returning-only) chain still runs;
+    // only the new code reaches onConflictDoUpdate.
+    mockInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({ onConflictDoUpdate, returning }),
+    });
+
+    await syncRefereeGames();
+
+    const upsertArg = onConflictDoUpdate.mock.calls[0]![0];
+    expect(upsertArg.target).toBe("apiMatchId");
+    // The conflict set must mirror the UPDATE branch's columns, so the upsert
+    // can't silently rot into a partial set that drops fields on conflict.
+    expect(Object.keys(upsertArg.set)).toEqual(
+      expect.arrayContaining([
+        "matchId",
+        "homeTeamId",
+        "guestTeamId",
+        "ownClubRefs",
+        "isHomeGame",
+        "isGuestGame",
+        "dataHash",
+        "lastSyncedAt",
+        "updatedAt",
+      ]),
+    );
+    expect(upsertArg.set.dataHash).toBeDefined();
   });
 
   it("skips unchanged games", async () => {
@@ -528,12 +567,14 @@ describe("syncRefereeGames", () => {
     let insertCall = 0;
     mockInsert.mockImplementation(() => ({
       values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockImplementation(() => {
-          insertCall++;
-          if (insertCall === 1) {
-            return Promise.reject(new Error("DB connection lost"));
-          }
-          return Promise.resolve([{ id: 2, apiMatchId: 2002 }]);
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockImplementation(() => {
+            insertCall++;
+            if (insertCall === 1) {
+              return Promise.reject(new Error("DB connection lost"));
+            }
+            return Promise.resolve([{ id: 2, apiMatchId: 2002 }]);
+          }),
         }),
       }),
     }));
@@ -630,6 +671,51 @@ describe("syncRefereeGames", () => {
     );
   });
 
+  it("uses the current (mapped) ourClub flag for slot-opened detection, not the stale row (#82)", async () => {
+    // sr1 assigned -> open. The stored row's sr1OurClub is stale (false), but
+    // this sync marks the slot as our club's (sr1MeinVerein true). Gating on the
+    // stale flag would suppress the event; gating on the mapped flag emits it.
+    const result = makeApiResult({
+      sr1: null,
+      sr1MeinVerein: true,
+      sr1OffenAngeboten: false,
+    });
+    mockFetchOffeneSpiele.mockResolvedValue({ total: 1, results: [result] });
+
+    let perGameCall = 0;
+    setupSelectMock(async () => {
+      perGameCall++;
+      if (perGameCall === 1) {
+        return [{
+          id: 1,
+          apiMatchId: 1001,
+          dataHash: "old-hash",
+          sr1Status: "assigned",
+          sr2Status: "offered",
+          sr1OurClub: false, // STALE: previously not flagged as our club
+          sr2OurClub: false,
+          kickoffDate: "2026-04-25",
+          kickoffTime: "14:00",
+          isCancelled: false,
+          isForfeited: false,
+        }];
+      }
+      return [{ id: 50 }];
+    });
+
+    const mockSet = vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(undefined),
+    });
+    mockUpdate.mockReturnValue({ set: mockSet });
+
+    const counts = await syncRefereeGames();
+
+    expect(counts.updated).toBe(1);
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "referee.slots.needed" }),
+    );
+  });
+
   it("cancels reminders when game is cancelled on update", async () => {
     const result = makeApiResult();
     result.sp.abgesagt = true;
@@ -676,7 +762,9 @@ describe("syncRefereeGames", () => {
     setupSelectMock(async () => []);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -699,7 +787,9 @@ describe("syncRefereeGames", () => {
     ]);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -718,7 +808,9 @@ describe("syncRefereeGames", () => {
     setupSelectMock(async () => [], []);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -741,7 +833,9 @@ describe("syncRefereeGames", () => {
     ]);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 
@@ -813,7 +907,9 @@ describe("syncRefereeGames", () => {
     setupSelectMock(async () => []);
 
     const mockValues = vi.fn().mockReturnValue({
-      returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1, apiMatchId: 1001 }]),
+      }),
     });
     mockInsert.mockReturnValue({ values: mockValues });
 

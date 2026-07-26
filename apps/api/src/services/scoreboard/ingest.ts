@@ -36,12 +36,13 @@ const DEDUPE_KEYS = [
   "clockRunning",
   "shotClock",
   "shotClockText",
+  "shotClockRunning",
   "timeoutActive",
 ] as const satisfies ReadonlyArray<keyof StramatelSnapshot>;
 
 type DedupeKey = (typeof DEDUPE_KEYS)[number];
 
-function snapshotsDiffer(
+export function snapshotsDiffer(
   prev: Pick<typeof liveScoreboards.$inferSelect, DedupeKey> | null,
   next: Pick<StramatelSnapshot, DedupeKey>,
 ): boolean {

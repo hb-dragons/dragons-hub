@@ -370,7 +370,7 @@ describe("getSchedule", () => {
 
 describe("upsertSchedule", () => {
   it("inserts a new schedule with defaults", async () => {
-    const result = await upsertSchedule({});
+    const result = await upsertSchedule({}, null);
 
     expect(result).toBeDefined();
     expect(result!.syncType).toBe("full");
@@ -388,8 +388,7 @@ describe("upsertSchedule", () => {
       enabled: false,
       cronExpression: "*/30 * * * *",
       timezone: "UTC",
-      updatedBy: "admin",
-    });
+    }, "admin");
 
     expect(result!.enabled).toBe(false);
     expect(result!.cronExpression).toBe("*/30 * * * *");
@@ -399,11 +398,11 @@ describe("upsertSchedule", () => {
 
   it("updates an existing schedule", async () => {
     // First insert
-    await upsertSchedule({ enabled: true, cronExpression: "0 4 * * *" });
+    await upsertSchedule({ enabled: true, cronExpression: "0 4 * * *" }, null);
     vi.clearAllMocks();
 
     // Then update
-    const result = await upsertSchedule({ cronExpression: "0 6 * * *", updatedBy: "someone" });
+    const result = await upsertSchedule({ cronExpression: "0 6 * * *" }, "someone");
 
     expect(result!.cronExpression).toBe("0 6 * * *");
     expect(result!.enabled).toBe(true); // Preserved from original
@@ -412,10 +411,10 @@ describe("upsertSchedule", () => {
   });
 
   it("preserves unmodified fields on update", async () => {
-    await upsertSchedule({ enabled: false, cronExpression: "*/5 * * * *", timezone: "UTC" });
+    await upsertSchedule({ enabled: false, cronExpression: "*/5 * * * *", timezone: "UTC" }, null);
     vi.clearAllMocks();
 
-    const result = await upsertSchedule({ timezone: "America/New_York" });
+    const result = await upsertSchedule({ timezone: "America/New_York" }, null);
 
     expect(result!.enabled).toBe(false);
     expect(result!.cronExpression).toBe("*/5 * * * *");
@@ -427,7 +426,7 @@ describe("upsertSchedule", () => {
       syncType: "referee-games",
       enabled: true,
       intervalMinutes: 15,
-    });
+    }, null);
 
     expect(result!.syncType).toBe("referee-games");
     expect(result!.intervalMinutes).toBe(15);
@@ -437,10 +436,10 @@ describe("upsertSchedule", () => {
   });
 
   it("updates referee-games schedule", async () => {
-    await upsertSchedule({ syncType: "referee-games", intervalMinutes: 30 });
+    await upsertSchedule({ syncType: "referee-games", intervalMinutes: 30 }, null);
     vi.clearAllMocks();
 
-    const result = await upsertSchedule({ syncType: "referee-games", intervalMinutes: 15 });
+    const result = await upsertSchedule({ syncType: "referee-games", intervalMinutes: 15 }, null);
 
     expect(result!.intervalMinutes).toBe(15);
     expect(updateRefereeSyncSchedule).toHaveBeenCalledWith(true, 15);

@@ -405,7 +405,8 @@ syncRoutes.put(
   }),
   async (c) => {
     const body = c.req.valid("json");
-    const schedule = await upsertSchedule(body);
+    // Audit actor comes from the authenticated session, never the request body.
+    const schedule = await upsertSchedule(body, c.get("user")?.id ?? null);
     return c.json(schedule);
   },
 );

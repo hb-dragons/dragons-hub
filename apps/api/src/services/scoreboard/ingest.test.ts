@@ -36,7 +36,7 @@ vi.mock("../broadcast/publisher", () => ({
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { processIngest } from "./ingest";
+import { processIngest, snapshotsDiffer } from "./ingest";
 import { setupTestDb, resetTestDb, closeTestDb } from "../../test/setup-test-db";
 import type { TestDbContext } from "../../test/setup-test-db";
 import { broadcastConfigs, liveScoreboards, scoreboardSnapshots } from "@dragons/db/schema";
@@ -323,5 +323,35 @@ describe("processIngest broadcast publish", () => {
       hex: frameWith({ ss: "04", scoreHome: "  5" }),
     });
     expect(mocks.publishSnapshot.mock.calls.length).toBe(2);
+  });
+});
+
+describe("snapshotsDiffer", () => {
+  const base = {
+    scoreHome: 0,
+    scoreGuest: 0,
+    foulsHome: 0,
+    foulsGuest: 0,
+    timeoutsHome: 0,
+    timeoutsGuest: 0,
+    period: 1,
+    clockSeconds: 600,
+    clockRunning: false,
+    shotClock: 24,
+    shotClockText: "24",
+    shotClockRunning: false,
+    timeoutActive: false,
+  };
+
+  it("treats a shot-clock running-state change as a real change (#82)", () => {
+    // Same value/text, only the running flag flipped — must still count as a
+    // change so the transition is persisted and broadcast.
+    expect(
+      snapshotsDiffer(base as never, { ...base, shotClockRunning: true } as never),
+    ).toBe(true);
+  });
+
+  it("treats an identical snapshot as unchanged", () => {
+    expect(snapshotsDiffer(base as never, { ...base } as never)).toBe(false);
   });
 });

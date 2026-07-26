@@ -38,6 +38,8 @@ const { mockDb, mockGcs, mockSharp } = vi.hoisted(() => {
 
   const mockSharpInstance = {
     metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+    resize: vi.fn().mockReturnThis(),
+    toBuffer: vi.fn().mockResolvedValue({ data: Buffer.from("normalized"), info: { width: 800, height: 600 } }),
   };
 
   const mockSharp = vi.fn().mockReturnValue(mockSharpInstance);
@@ -104,7 +106,11 @@ beforeEach(() => {
   mockGcs.uploadToGcs.mockResolvedValue(undefined);
   mockGcs.downloadFromGcs.mockResolvedValue(Buffer.from("image-bytes"));
   mockGcs.deleteFromGcs.mockResolvedValue(undefined);
-  mockSharp.mockReturnValue({ metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }) });
+  mockSharp.mockReturnValue({
+    metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+    resize: vi.fn().mockReturnThis(),
+    toBuffer: vi.fn().mockResolvedValue({ data: Buffer.from("normalized"), info: { width: 800, height: 600 } }),
+  });
 });
 
 describe("listPlayerPhotos", () => {
@@ -252,6 +258,30 @@ describe("uploadPlayerPhoto", () => {
     mockDb.setResult([samplePhoto]);
 
     await expect(uploadPlayerPhoto(validBuffer, "photo.webp", "image/webp")).resolves.toBeDefined();
+  });
+
+  it("normalizes a large upload to a bounded dimension before storing", async () => {
+    mockDb.setResult([samplePhoto]);
+    const normalizedBuffer = Buffer.from("normalized-bytes");
+    const toBuffer = vi.fn().mockResolvedValue({ data: normalizedBuffer, info: { width: 720, height: 1080 } });
+    const resize = vi.fn().mockReturnThis();
+    mockSharp.mockReturnValue({
+      metadata: vi.fn().mockResolvedValue({ width: 4000, height: 6000 }),
+      resize,
+      toBuffer,
+    });
+
+    await uploadPlayerPhoto(validBuffer, validName, validType);
+
+    // Downscale the longest edge to a bounded box without enlarging smaller images.
+    expect(resize).toHaveBeenCalledWith(1080, 1080, { fit: "inside", withoutEnlargement: true });
+    // The normalized buffer (not the full-resolution source) is what gets stored.
+    const [, storedBuffer] = mockGcs.uploadToGcs.mock.calls[0]!;
+    expect(storedBuffer).toBe(normalizedBuffer);
+    // DB records the post-normalization dimensions.
+    expect(mockDb.chain.values).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 720, height: 1080 }),
+    );
   });
 });
 

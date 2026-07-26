@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import {
   watchRules,
   channelConfigs,
@@ -49,13 +49,23 @@ export async function loadMutedEventTypes(
   const userRecipients = recipientIds.filter((r) => r.startsWith("user:"));
   if (refereeRecipients.length === 0 && userRecipients.length === 0) return result;
 
+  // The stored user_id is the literal "referee:<id>" for referee prefs but the
+  // bare id for user prefs (the recipient strips the "user:" prefix below), so
+  // build the lookup set to match both keyings — and constrain the query to it
+  // instead of scanning the whole preferences table on every event.
+  const lookupIds = [
+    ...refereeRecipients,
+    ...userRecipients.map((r) => r.slice("user:".length)),
+  ];
+
   try {
     const prefs = await getDb()
       .select({
         userId: userNotificationPreferences.userId,
         mutedEventTypes: userNotificationPreferences.mutedEventTypes,
       })
-      .from(userNotificationPreferences);
+      .from(userNotificationPreferences)
+      .where(inArray(userNotificationPreferences.userId, lookupIds));
 
     const userMutedMap = new Map<string, Set<string>>();
     for (const pref of prefs) {
@@ -160,6 +170,27 @@ function evaluateWatchRules(
 }
 
 /**
+ * Derive the recipient key a watch-rule match addresses, from its channel
+ * config. `in_app` configs carry an audienceRole ("admin" | "referee") which
+ * maps to `audience:<role>` — an inbox-addressable, push-resolvable key.
+ * Channels without an audience (whatsapp_group, email) deliver to a fixed
+ * target, not a user inbox, so they get a non-resolvable label that never
+ * masquerades as a user or audience. Never the bare channel-config id, which
+ * matches no inbox key and resolves to zero push recipients.
+ */
+function watchRuleRecipientId(config: { id: number; config: unknown }): string {
+  const cfg = config.config;
+  const audienceRole =
+    cfg && typeof cfg === "object"
+      ? (cfg as Record<string, unknown>).audienceRole
+      : undefined;
+  if (audienceRole === "admin" || audienceRole === "referee") {
+    return `audience:${audienceRole}`;
+  }
+  return `channel:${config.id}`;
+}
+
+/**
  * Step 3: Evaluate role-based defaults.
  */
 function evaluateDefaults(
@@ -240,8 +271,12 @@ async function resolveLocaleForRecipient(
 
 /**
  * Step 5: Dispatch an immediate notification via channel adapter.
+ *
+ * Exported so the admin "retry failed notification" path can re-run delivery for
+ * a single (event, channel, recipient) through the same adapters instead of
+ * faking a "sent" status.
  */
-async function dispatchImmediate(params: {
+export async function dispatchImmediate(params: {
   event: DomainEventRow;
   config: { id: number; type: string; config: unknown };
   watchRuleId: number | null;
@@ -255,7 +290,7 @@ async function dispatchImmediate(params: {
   const message = renderEventMessage(event.type, payload, event.entityName, locale);
 
   if (channelType === "in_app") {
-    await inAppAdapter.send({
+    const sendResult = await inAppAdapter.send({
       eventId: event.id,
       watchRuleId,
       channelConfigId: config.id,
@@ -264,7 +299,7 @@ async function dispatchImmediate(params: {
       body: message.body,
       locale,
     });
-    return true;
+    return sendResult.success;
   }
 
   if (channelType === "whatsapp_group") {
@@ -353,7 +388,10 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
   // Step 5: Check coalescing — atomically claim the dispatch slot via Redis SET NX.
   // Returns "OK" if this process is the first caller within the window (dispatch proceeds),
   // or null if another process already claimed the slot (skip immediate dispatch).
-  const coalesceKey = `coalesce:${event.entityType}:${event.entityId}`;
+  // Key on the event type too — without it, two distinct events on the same
+  // entity within the window (e.g. schedule + venue change from one admin edit)
+  // collide and the second is dropped (a push-only default never reaches digest).
+  const coalesceKey = `coalesce:${event.type}:${event.entityType}:${event.entityId}`;
   const claim = await getRedis().set(coalesceKey, "1", "EX", COALESCE_WINDOW_SEC, "NX");
   const coalesced = claim !== "OK";
 
@@ -377,7 +415,7 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
           event,
           config: match.config,
           watchRuleId: match.watchRuleId,
-          recipientId: match.channelTarget.targetId,
+          recipientId: watchRuleRecipientId(match.config),
           channelType: match.channelTarget.channel,
         });
         if (sent) result.dispatched++;

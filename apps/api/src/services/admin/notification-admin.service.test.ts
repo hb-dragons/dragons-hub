@@ -22,6 +22,15 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
+// retryFailedNotification routes through the pipeline's dispatchImmediate; mock
+// it so the admin unit test asserts delegation + the stale-row deletion without
+// loading the real dispatch adapters (network/env). Adapter behaviour itself is
+// covered by notification-pipeline.test.ts and the channel adapter suites.
+const mockDispatchImmediate = vi.fn();
+vi.mock("../notifications/notification-pipeline", () => ({
+  dispatchImmediate: (...args: unknown[]) => mockDispatchImmediate(...args),
+}));
+
 // --- Imports (after mocks) ---
 
 import {
@@ -30,6 +39,7 @@ import {
   markAllRead,
   getUnreadCount,
   retryFailedNotification,
+  recipientKeysForUserId,
 } from "./notification-admin.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
@@ -68,13 +78,21 @@ async function ensureChannelConfig(id: number = 1): Promise<void> {
 
 async function seedUser(
   id: string,
-  opts: { role?: string | null } = {},
+  opts: { role?: string | null; refereeId?: number } = {},
 ): Promise<void> {
   await ctx.client.query(
-    `INSERT INTO "user" (id, name, email, email_verified, role, created_at, updated_at)
-     VALUES ($1, $2, $3, false, $4, now(), now())`,
-    [id, id, `${id}@test.de`, opts.role ?? null],
+    `INSERT INTO "user" (id, name, email, email_verified, role, referee_id, created_at, updated_at)
+     VALUES ($1, $2, $3, false, $4, $5, now(), now())`,
+    [id, id, `${id}@test.de`, opts.role ?? null, opts.refereeId ?? null],
   );
+}
+
+async function seedReferee(apiId: number): Promise<number> {
+  const r = await ctx.client.query<{ id: number }>(
+    `INSERT INTO referees (api_id, first_name) VALUES ($1, 'Ref') RETURNING id`,
+    [apiId],
+  );
+  return r.rows[0]!.id;
 }
 
 async function insertEvent(overrides: Record<string, unknown> = {}): Promise<string> {
@@ -132,6 +150,28 @@ async function insertNotification(overrides: Record<string, unknown> = {}) {
 }
 
 // --- Tests ---
+
+describe("recipientKeysForUserId", () => {
+  it("addresses a referee-linked user via referee:<id> and audience:referee", async () => {
+    const refId = await seedReferee(901);
+    await seedUser("ref-user", { refereeId: refId });
+
+    const keys = await recipientKeysForUserId("ref-user");
+
+    expect(keys).toEqual(
+      expect.arrayContaining(["user:ref-user", `referee:${refId}`, "audience:referee"]),
+    );
+  });
+
+  it("does not grant audience:referee to a non-referee user", async () => {
+    await seedUser("admin-user", { role: "admin" });
+
+    const keys = await recipientKeysForUserId("admin-user");
+
+    expect(keys).toContain("audience:admin");
+    expect(keys).not.toContain("audience:referee");
+  });
+});
 
 describe("listNotifications", () => {
   it("returns empty list when no notifications exist", async () => {
@@ -359,25 +399,99 @@ describe("getUnreadCount", () => {
 });
 
 describe("retryFailedNotification", () => {
-  it("retries a failed notification and updates status to sent", async () => {
+  it("re-dispatches a failed notification through the pipeline and clears the stale row (#57)", async () => {
+    const eventId = await insertEvent({ type: "match.cancelled" });
     const id = await insertNotification({
+      event_id: eventId,
       status: "failed",
       error_message: "Connection refused",
       retry_count: 1,
+      recipient_id: "user:user-1",
+    });
+    mockDispatchImmediate.mockResolvedValue(true);
+
+    const result = await retryFailedNotification(id);
+
+    expect(result.success).toBe(true);
+    // Must actually route through dispatch (not just flip the row to "sent").
+    expect(mockDispatchImmediate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientId: "user:user-1",
+        channelType: "in_app",
+        config: expect.objectContaining({ id: 1, type: "in_app" }),
+        event: expect.objectContaining({ id: eventId, type: "match.cancelled" }),
+      }),
+    );
+    // The stale failed row must be removed so the adapter's deduped insert writes fresh.
+    const rows = await ctx.client.query("SELECT id FROM notification_log WHERE id = $1", [id]);
+    expect(rows.rows).toHaveLength(0);
+  });
+
+  it("re-prefixes a push row's bare userId so dispatch can resolve it (#57)", async () => {
+    // Push rows are keyed by the BARE userId (the push adapter resolved the
+    // prefixed recipient to userIds and stored each row by userId).
+    await ctx.client.query(
+      "INSERT INTO channel_configs (id, name, type, config) VALUES ($1, $2, $3, $4)",
+      [7, "push-channel", "push", JSON.stringify({})],
+    );
+    const eventId = await insertEvent({ type: "referee.assigned" });
+    const id = await insertNotification({
+      event_id: eventId,
+      channel_config_id: 7,
+      status: "failed",
+      recipient_id: "user-99",
+    });
+    mockDispatchImmediate.mockResolvedValue(true);
+
+    const result = await retryFailedNotification(id);
+
+    expect(result.success).toBe(true);
+    // dispatchImmediate's push branch resolves via resolveRecipientUserIds, which
+    // only matches the prefixed "user:<id>" form — the bare row id must be restored.
+    expect(mockDispatchImmediate).toHaveBeenCalledWith(
+      expect.objectContaining({ channelType: "push", recipientId: "user:user-99" }),
+    );
+  });
+
+  it("carries the prior retry_count forward (+1) onto the freshly dispatched row (#87)", async () => {
+    const eventId = await insertEvent({ type: "match.cancelled" });
+    const id = await insertNotification({
+      event_id: eventId,
+      status: "failed",
+      retry_count: 2,
+      recipient_id: "user:user-1",
+    });
+    // Simulate the channel adapter inserting a fresh row (default retry_count 0)
+    // on a successful re-dispatch.
+    mockDispatchImmediate.mockImplementation(async () => {
+      await ctx.client.query(
+        "INSERT INTO notification_log (event_id, channel_config_id, recipient_id, title, body, locale, status, sent_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+        [eventId, 1, "user:user-1", "T", "B", "de", "sent", new Date().toISOString()],
+      );
+      return true;
     });
 
     const result = await retryFailedNotification(id);
 
     expect(result.success).toBe(true);
-
-    const row = await ctx.client.query(
-      "SELECT status, retry_count, error_message FROM notification_log WHERE id = $1",
-      [id],
+    const rows = await ctx.client.query(
+      "SELECT retry_count FROM notification_log WHERE event_id = $1 AND channel_config_id = 1 AND recipient_id = $2",
+      [eventId, "user:user-1"],
     );
-    const updated = row.rows[0] as { status: string; retry_count: number; error_message: string | null };
-    expect(updated.status).toBe("sent");
-    expect(updated.retry_count).toBe(2);
-    expect(updated.error_message).toBeNull();
+    expect(rows.rows).toHaveLength(1);
+    expect((rows.rows[0] as { retry_count: number }).retry_count).toBe(3);
+  });
+
+  it("reports failure and does not resurrect the stale row when dispatch does not deliver (#57)", async () => {
+    const id = await insertNotification({ status: "failed", recipient_id: "user:user-1" });
+    mockDispatchImmediate.mockResolvedValue(false);
+
+    const result = await retryFailedNotification(id);
+
+    expect(result.success).toBe(false);
+    // Released for the channel's own retry semantics — not left as a stale "sent".
+    const rows = await ctx.client.query("SELECT id FROM notification_log WHERE id = $1", [id]);
+    expect(rows.rows).toHaveLength(0);
   });
 
   it("returns error for non-existent notification", async () => {
@@ -394,5 +508,15 @@ describe("retryFailedNotification", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("Cannot retry");
+  });
+
+  it("returns error and does not dispatch when the row has no recipient", async () => {
+    const id = await insertNotification({ status: "failed", recipient_id: null });
+
+    const result = await retryFailedNotification(id);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("no recipient");
+    expect(mockDispatchImmediate).not.toHaveBeenCalled();
   });
 });

@@ -44,7 +44,7 @@ vi.mock("./templates/index", () => ({
   renderEventMessage: (...args: unknown[]) => mockRenderEventMessage(...args),
 }));
 
-const mockInAppSend = vi.fn().mockResolvedValue(undefined);
+const mockInAppSend = vi.fn().mockResolvedValue({ success: true });
 vi.mock("./channels/in-app", () => ({
   InAppChannelAdapter: class {
     send(...args: unknown[]) {
@@ -120,6 +120,7 @@ vi.mock("../../config/redis", () => ({
 // --- Import after mocks ---
 
 import { processEvent } from "./notification-pipeline";
+import { inArray } from "drizzle-orm";
 
 // --- Helpers ---
 
@@ -258,9 +259,9 @@ describe("processEvent", () => {
   });
 
   describe("rule matching with immediate dispatch", () => {
-    it("dispatches via in-app adapter and buffers for digest", async () => {
+    it("dispatches via in-app adapter using the config's audience as recipientId, not the config id", async () => {
       const rule = makeRule();
-      const config = makeChannelConfig();
+      const config = makeChannelConfig({ config: { audienceRole: "admin", locale: "de" } });
       setupDbMocks({ rules: [rule], configs: [config] });
       mockEvaluateRule.mockReturnValue({
         matched: true,
@@ -276,7 +277,8 @@ describe("processEvent", () => {
           eventId: "evt-1",
           watchRuleId: 1,
           channelConfigId: 10,
-          recipientId: "10",
+          // must be an inbox-addressable recipient, NOT the bare config id "10"
+          recipientId: "audience:admin",
           title: "Match Cancelled",
           body: "The match has been cancelled.",
           locale: "de",
@@ -284,6 +286,23 @@ describe("processEvent", () => {
       );
       expect(mockDbInsert).toHaveBeenCalled();
       expect(result).toMatchObject({ dispatched: 1, buffered: 1, coalesced: 0, muted: 0 });
+    });
+
+    it("routes a referee-audience in_app config to audience:referee", async () => {
+      const rule = makeRule();
+      const config = makeChannelConfig({ config: { audienceRole: "referee", locale: "de" } });
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "in_app", targetId: "10" }],
+        urgencyOverride: null,
+      });
+
+      await processEvent(makeEvent());
+
+      expect(mockInAppSend).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: "audience:referee" }),
+      );
     });
 
     it("uses urgencyOverride from rule when present", async () => {
@@ -613,7 +632,31 @@ describe("processEvent", () => {
 
       await processEvent(makeEvent({ entityType: "match", entityId: 42 }));
 
-      expect(mockRedisSet).toHaveBeenCalledWith("coalesce:match:42", "1", "EX", 60, "NX");
+      expect(mockRedisSet).toHaveBeenCalledWith("coalesce:match.cancelled:match:42", "1", "EX", 60, "NX");
+    });
+
+    it("embeds event.type in the coalesce key so different event types on one entity don't collide (#61)", async () => {
+      const rule = makeRule();
+      const config = makeChannelConfig();
+      mockRedisSet.mockResolvedValue("OK");
+      setupDbMocks({ rules: [rule], configs: [config] });
+      mockEvaluateRule.mockReturnValue({
+        matched: true,
+        channels: [{ channel: "in_app", targetId: "10" }],
+        urgencyOverride: null,
+      });
+
+      await processEvent(makeEvent({ type: "match.venue.changed", entityType: "match", entityId: 42 }));
+
+      // Key must include the event type — otherwise a second, distinct event on
+      // the same entity within the window collides and is dropped.
+      expect(mockRedisSet).toHaveBeenCalledWith(
+        "coalesce:match.venue.changed:match:42",
+        "1",
+        "EX",
+        60,
+        "NX",
+      );
     });
 
     it("releases the coalesce key when claim was OK but nothing was dispatched", async () => {
@@ -639,7 +682,7 @@ describe("processEvent", () => {
       const result = await processEvent(makeEvent({ entityType: "match", entityId: 42 }));
 
       expect(result.dispatched).toBe(0);
-      expect(mockRedisDel).toHaveBeenCalledWith("coalesce:match:42");
+      expect(mockRedisDel).toHaveBeenCalledWith("coalesce:match.cancelled:match:42");
     });
 
     it("does not release the coalesce key when at least one dispatch succeeded", async () => {
@@ -777,6 +820,23 @@ describe("processEvent", () => {
       expect(mockInAppSend).toHaveBeenCalledTimes(1);
       expect(result.muted).toBe(0);
     });
+
+    it("constrains the preferences query to the known recipient ids, not a full scan (#72)", async () => {
+      const config = makeChannelConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
+      setupDbMocks({
+        rules: [],
+        configs: [config],
+        prefs: [{ userId: "referee:77", mutedEventTypes: ["match.created"] }],
+      });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "referee", channel: "in_app", refereeId: 77 },
+      ]);
+
+      await processEvent(makeEvent());
+
+      // The prefs load must be filtered by the resolved recipient ids.
+      expect(inArray).toHaveBeenCalledWith("userId", ["referee:77"]);
+    });
   });
 
   describe("loadMutedEventTypes error handling", () => {
@@ -800,12 +860,15 @@ describe("processEvent", () => {
             }),
           };
         }
-        // Prefs query — throw
+        // Prefs query — throw. loadMutedEventTypes now filters with .where(),
+        // so the rejecting thenable must hang off .where() (not just .from()).
         const rejected = Promise.reject(new Error("DB error"));
         return {
           from: vi.fn().mockReturnValue({
-            then: rejected.then.bind(rejected),
-            catch: rejected.catch.bind(rejected),
+            where: vi.fn().mockReturnValue({
+              then: rejected.then.bind(rejected),
+              catch: rejected.catch.bind(rejected),
+            }),
           }),
         };
       });
@@ -885,6 +948,9 @@ describe("processEvent", () => {
         expect.objectContaining({
           eventId: "evt-1",
           channelConfigId: 10,
+          // group-delivered channels (no audienceRole) get a non-user label,
+          // never the bare config id
+          recipientId: "channel:10",
         }),
         "120363@g.us",
       );

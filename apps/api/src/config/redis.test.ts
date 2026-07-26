@@ -18,6 +18,7 @@ vi.mock("ioredis", () => ({
   default: class MockRedis {
     on = mockOn;
     ping = vi.fn().mockResolvedValue("PONG");
+    quit = vi.fn().mockResolvedValue("OK");
   },
 }));
 
@@ -66,5 +67,20 @@ describe("redis config", () => {
     expect(errorHandler).toBeDefined();
     errorHandler!(err);
     expect(logger.error).toHaveBeenCalledWith({ err }, "Redis connection error");
+  });
+
+  it("closeRedis quits the client and clears the singleton", async () => {
+    const { getRedis, closeRedis } = await import("./redis");
+    const client = getRedis();
+
+    await closeRedis();
+
+    expect(client.quit).toHaveBeenCalled();
+    expect(getRedis()).not.toBe(client);
+  });
+
+  it("closeRedis is a no-op when no client exists", async () => {
+    const { closeRedis } = await import("./redis");
+    await expect(closeRedis()).resolves.toBeUndefined();
   });
 });

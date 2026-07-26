@@ -8,9 +8,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { syncRuns } from "./sync-runs";
 
-// NOTE: A partial outbox index exists in migration 0019 but cannot be expressed in Drizzle schema.
+// NOTE: A partial outbox index exists (migration 0040) but cannot be expressed in Drizzle schema.
 // If regenerating migrations, manually re-add:
-// CREATE INDEX "domain_events_outbox_idx" ON "domain_events" ("enqueued_at") WHERE "enqueued_at" IS NULL;
+// CREATE INDEX "domain_events_outbox_idx" ON "domain_events" ("created_at") WHERE "processed_at" IS NULL;
 export const domainEvents = pgTable(
   "domain_events",
   {
@@ -25,7 +25,12 @@ export const domainEvents = pgTable(
     entityId: integer("entity_id").notNull(),
     entityName: text("entity_name").notNull(),
     deepLinkPath: text("deep_link_path").notNull(),
+    // Lease timestamp: set when the outbox poller hands the event to the queue.
+    // The poller reclaims rows whose lease has expired and are still unprocessed.
     enqueuedAt: timestamp("enqueued_at", { withTimezone: true }),
+    // Set by the event worker once the notification pipeline has run successfully.
+    // NULL means "not yet delivered" — the source of truth for at-least-once delivery.
+    processedAt: timestamp("processed_at", { withTimezone: true }),
     payload: jsonb("payload").notNull().$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

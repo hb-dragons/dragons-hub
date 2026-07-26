@@ -113,6 +113,30 @@ describe("getMatchContext", () => {
     expect(result).toBeNull();
   });
 
+  it("returns null when neither team is own club (#82)", async () => {
+    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
+    setupH2HQuery([]);
+    setupTeamRow([{ isOwnClub: false, name: "Foreign A" }]);
+    setupTeamRow([{ isOwnClub: false, name: "Foreign B" }]);
+
+    const result = await getMatchContext(1);
+
+    // No own-club side → "our team" W/L is meaningless and the detail route
+    // hides the match, so context must not be exposed.
+    expect(result).toBeNull();
+  });
+
+  it("returns null when both teams are own club (#82)", async () => {
+    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
+    setupH2HQuery([]);
+    setupTeamRow([{ isOwnClub: true, name: "Dragons A" }]);
+    setupTeamRow([{ isOwnClub: true, name: "Dragons B" }]);
+
+    const result = await getMatchContext(1);
+
+    expect(result).toBeNull();
+  });
+
   it("returns full context with H2H and form", async () => {
     // Query 1: match lookup
     setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);

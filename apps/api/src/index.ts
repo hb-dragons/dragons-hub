@@ -46,17 +46,21 @@ if (mode === "worker" || mode === "both") {
   }
 }
 
-async function shutdown() {
-  logger.info("Shutting down...");
-  if (shutdownWorkersFn) await shutdownWorkersFn();
-  httpServer?.close();
-  const { closeDb } = await import("./config/database");
-  await closeDb();
-  await flushLogger();
-  process.exit(0);
-}
+const { closeDb } = await import("./config/database");
+const { closeRedis } = await import("./config/redis");
+const { createShutdown, registerProcessHandlers } = await import("./shutdown");
+
+const shutdown = createShutdown({
+  httpServer,
+  shutdownWorkers: shutdownWorkersFn,
+  closeDb,
+  closeRedis,
+  flushLogger,
+  exit: (code) => process.exit(code),
+});
 
 process.on("SIGTERM", () => void shutdown());
 process.on("SIGINT", () => void shutdown());
+registerProcessHandlers(shutdown);
 
 export { mode, port };

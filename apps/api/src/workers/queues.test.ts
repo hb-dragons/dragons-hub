@@ -25,6 +25,12 @@ vi.mock("../config/database", () => ({
   }),
 }));
 
+const mockSet = vi.fn();
+const mockDel = vi.fn();
+vi.mock("../config/redis", () => ({
+  getRedis: () => ({ set: mockSet, del: mockDel }),
+}));
+
 vi.mock("@dragons/db/schema", () => ({
   syncSchedule: Symbol("syncSchedule"),
   syncRuns: Symbol("syncRuns"),
@@ -104,6 +110,9 @@ import { runWithLogContext } from "../config/log-context";
 beforeEach(() => {
   vi.clearAllMocks();
   mockLimit.mockResolvedValue([]);
+  // Lock acquired by default; individual tests override to simulate contention.
+  mockSet.mockResolvedValue("OK");
+  mockDel.mockResolvedValue(1);
   mockInsert.mockReturnValue({
     values: vi.fn().mockReturnValue({
       returning: vi.fn().mockResolvedValue([{ id: 42 }]),
@@ -343,6 +352,31 @@ describe("triggerManualSync", () => {
 
     expect(result).toEqual(expect.objectContaining({ code: "SYNC_ALREADY_QUEUED" }));
   });
+
+  it("does not write an orphan pending run when the lock is held (#71)", async () => {
+    mockGetJob.mockResolvedValue(null);
+    mockGetJobs.mockResolvedValue([]); // queue guards would pass
+    mockSet.mockResolvedValue(null); // but a concurrent trigger holds the lock
+
+    const result = await triggerManualSync("user-1");
+
+    expect(result).toEqual({
+      error: "Sync already in progress or queued",
+      code: "SYNC_ALREADY_QUEUED",
+    });
+    expect(mockSet).toHaveBeenCalledWith("lock:sync:full", expect.anything(), "EX", expect.any(Number), "NX");
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockAdd).not.toHaveBeenCalled();
+  });
+
+  it("releases the sync lock after a successful manual enqueue (#71)", async () => {
+    mockGetJob.mockResolvedValue(null);
+    mockGetJobs.mockResolvedValue([]);
+
+    await triggerManualSync("user-1");
+
+    expect(mockDel).toHaveBeenCalledWith("lock:sync:full");
+  });
 });
 
 describe("getJobStatus", () => {
@@ -464,6 +498,24 @@ describe("triggerRefereeGamesSync", () => {
     const result = await triggerRefereeGamesSync();
 
     expect(result).toBeNull();
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockAdd).not.toHaveBeenCalled();
+  });
+
+  it("serializes concurrent triggers via a Redis NX lock (#71)", async () => {
+    mockGetJobs.mockResolvedValue([]); // queue guard would pass
+    mockSet.mockResolvedValue(null); // lock already held by a concurrent trigger
+
+    const result = await triggerRefereeGamesSync();
+
+    expect(result).toBeNull();
+    expect(mockSet).toHaveBeenCalledWith(
+      "lock:sync:referee-games",
+      expect.anything(),
+      "EX",
+      expect.any(Number),
+      "NX",
+    );
     expect(mockInsert).not.toHaveBeenCalled();
     expect(mockAdd).not.toHaveBeenCalled();
   });

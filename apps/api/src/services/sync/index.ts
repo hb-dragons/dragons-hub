@@ -117,13 +117,19 @@ export async function fullSync(
     // Step 3: Parallel entity upserts (independent tables)
     await logStep("Step 3/6: Syncing entities in parallel...");
     currentStep = "entities";
-    const [teamsRes, venuesRes, refereesRes, rolesRes, standingsRes] = await Promise.all([
+    const [teamsRes, venuesRes, refereesRes, rolesRes] = await Promise.all([
       syncTeamsFromData(syncData.teams, syncLogger),
       syncVenuesFromData(syncData.venues, syncLogger),
       syncRefereesFromData(syncData.referees, syncLogger),
       syncRefereeRolesFromData(syncData.refereeRoles, syncLogger),
-      syncStandingsFromData(syncData.leagueData, syncLogger),
     ]);
+
+    // standings.teamApiId has a non-deferrable FK on teams.apiTeamPermanentId. Running
+    // standings inside the Promise.all above raced the teams upsert (standings does only
+    // in-memory work before its INSERT, teams awaits several DB round-trips first), so on
+    // a league's first sync the FK check failed and the whole standings batch was dropped.
+    // Await teams before standings so every referenced team is committed. (issue #47)
+    const standingsRes = await syncStandingsFromData(syncData.leagueData, syncLogger);
     committedAny = true;
 
     allErrors.push(...teamsRes.errors);

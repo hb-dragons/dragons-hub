@@ -271,7 +271,26 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
           lastSyncedAt: now,
           createdAt: now,
           updatedAt: now,
-        }).returning({ id: refereeGames.id, apiMatchId: refereeGames.apiMatchId });
+        })
+          // apiMatchId is unique; a concurrent run (e.g. the post-sync trigger
+          // racing the scheduled job) could insert the same row first. Upsert
+          // instead of throwing a unique violation that would drop this update.
+          .onConflictDoUpdate({
+            target: refereeGames.apiMatchId,
+            set: {
+              ...mapped,
+              matchId,
+              homeTeamId,
+              guestTeamId,
+              ownClubRefs,
+              isHomeGame,
+              isGuestGame,
+              dataHash: hash,
+              lastSyncedAt: now,
+              updatedAt: now,
+            },
+          })
+          .returning({ id: refereeGames.id, apiMatchId: refereeGames.apiMatchId });
 
         created++;
         await syncLogger?.log({
@@ -354,8 +373,8 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
         } else {
           // Check if a slot opened (was assigned, now not)
           const slotOpened =
-            (existing.sr1OurClub && existing.sr1Status === "assigned" && mapped.sr1Status !== "assigned") ||
-            (existing.sr2OurClub && existing.sr2Status === "assigned" && mapped.sr2Status !== "assigned");
+            (mapped.sr1OurClub && existing.sr1Status === "assigned" && mapped.sr1Status !== "assigned") ||
+            (mapped.sr2OurClub && existing.sr2Status === "assigned" && mapped.sr2Status !== "assigned");
 
           if (slotOpened && !nowCancelledOrForfeited) {
             try {

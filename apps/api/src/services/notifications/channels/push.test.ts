@@ -277,6 +277,86 @@ describe("PushChannelAdapter", () => {
     expect(rows[0]!.status).toBe("sent_ticket");
   });
 
+  it("releases only fully-undelivered users' claims and keeps delivered ones (#62)", async () => {
+    await seedDevice("user_a", "ExponentPushToken[a]");
+    await seedDevice("user_b", "ExponentPushToken[b]");
+    // user_a delivered; user_b's send-chunk never reached Expo (undelivered).
+    sendBatch.mockResolvedValueOnce([
+      { status: "ok", id: "tkt_a" },
+      { status: "error", details: { error: "ChunkUndelivered" } },
+    ]);
+
+    const adapter = new PushChannelAdapter(mockClient);
+    const result = await adapter.send(baseParams(["user_a", "user_b"]));
+
+    const rows = await getLogs();
+    const byUser = new Map(rows.map((r) => [r.recipient_id, r]));
+    // Delivered user keeps a sent_ticket row (must NOT be re-sent on reprocess).
+    expect(byUser.get("user_a")?.status).toBe("sent_ticket");
+    // Undelivered user's claim is released so only they retry.
+    expect(byUser.has("user_b")).toBe(false);
+    expect(result.success).toBe(false);
+
+    // Reprocess: user_a is deduped (row exists), only user_b is re-sent.
+    sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_b" }]);
+    await adapter.send(baseParams(["user_a", "user_b"]));
+
+    const sentSecond = sendBatch.mock.calls[1]![0] as Array<{ to: string }>;
+    expect(sentSecond.map((m) => m.to)).toEqual(["ExponentPushToken[b]"]);
+    const after = await getLogs();
+    expect(new Set(after.map((r) => r.recipient_id))).toEqual(new Set(["user_a", "user_b"]));
+  });
+
+  it("keeps a user's claim when one device delivered and another was undelivered (#62)", async () => {
+    await seedDevice("user_a", "ExponentPushToken[a1]");
+    await seedDevice("user_a", "ExponentPushToken[a2]");
+    // First device delivered, second device's chunk undelivered.
+    sendBatch.mockResolvedValueOnce([
+      { status: "ok", id: "tkt_a1" },
+      { status: "error", details: { error: "ChunkUndelivered" } },
+    ]);
+
+    const adapter = new PushChannelAdapter(mockClient);
+    await adapter.send(baseParams(["user_a"]));
+
+    // The user reached Expo on one device → keep the row, do not release/retry.
+    const rows = await getLogs();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.status).toBe("sent_ticket");
+  });
+
+  it("releases the claim when a user's devices straddle a terminal error and an undelivered chunk (#88)", async () => {
+    await seedDevice("user_a", "ExponentPushToken[term]");
+    await seedDevice("user_a", "ExponentPushToken[undel]");
+    // One device got a terminal Expo error (DeviceNotRegistered — reached Expo,
+    // not retryable); the other's chunk never reached Expo (undelivered).
+    sendBatch.mockResolvedValueOnce([
+      { status: "error", message: "DeviceNotRegistered", details: { error: "DeviceNotRegistered" } },
+      { status: "error", details: { error: "ChunkUndelivered" } },
+    ]);
+
+    const adapter = new PushChannelAdapter(mockClient);
+    const result = await adapter.send(baseParams(["user_a"]));
+
+    // No delivered device AND at least one undelivered → release so the
+    // transient device retries (the terminal device just errors again, harmless).
+    const rows = await getLogs();
+    expect(rows.some((r) => r.recipient_id === "user_a")).toBe(false);
+    expect(result.success).toBe(false);
+
+    // Reprocess re-sends both of the user's devices.
+    sendBatch.mockResolvedValueOnce([
+      { status: "error", message: "DeviceNotRegistered", details: { error: "DeviceNotRegistered" } },
+      { status: "ok", id: "tkt_undel" },
+    ]);
+    await adapter.send(baseParams(["user_a"]));
+    const sentSecond = sendBatch.mock.calls[1]![0] as Array<{ to: string }>;
+    expect(sentSecond.map((m) => m.to).sort()).toEqual([
+      "ExponentPushToken[term]",
+      "ExponentPushToken[undel]",
+    ]);
+  });
+
   it("prefers the user preference locale over the device locale", async () => {
     await seedDevice("user_a", "ExponentPushToken[a]", "de-DE");
     await seedPref("user_a", { locale: "en" });

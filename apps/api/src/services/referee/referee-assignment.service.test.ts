@@ -4,7 +4,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   selectCalls: [] as unknown[][],
-  updateWhere: vi.fn().mockResolvedValue(undefined),
+  // .where() returns a thenable-ish object exposing .returning(); assignReferee
+  // now reads the affected-row count, unassignReferee just awaits and ignores it.
+  updateReturning: vi.fn().mockResolvedValue([{ id: 1 }]),
+  updateWhere: vi.fn(() => ({ returning: mocks.updateReturning })),
   insertOnConflict: vi.fn().mockResolvedValue(undefined),
   deleteWhere: vi.fn().mockResolvedValue(undefined),
   searchRefereesForGame: vi.fn(),
@@ -59,7 +62,15 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@dragons/db/schema", () => ({
-  refereeGames: { apiMatchId: "rg.apiMatchId", matchId: "rg.matchId" },
+  refereeGames: {
+    apiMatchId: "rg.apiMatchId",
+    matchId: "rg.matchId",
+    id: "rg.id",
+    sr1Status: "rg.sr1Status",
+    sr2Status: "rg.sr2Status",
+    sr1RefereeApiId: "rg.sr1RefereeApiId",
+    sr2RefereeApiId: "rg.sr2RefereeApiId",
+  },
   referees: { apiId: "r.apiId", id: "r.id" },
   matches: { id: "m.id", homeTeamApiId: "m.homeTeamApiId", guestTeamApiId: "m.guestTeamApiId" },
   teams: { id: "t.id", apiTeamPermanentId: "t.apiTeamPermanentId" },
@@ -98,6 +109,17 @@ const SUCCESS_RESPONSE = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // clearAllMocks keeps queued mockResolvedValueOnce values + implementations;
+  // reset the SDK mocks so per-test setup is fully isolated (each test below
+  // configures its own search/submit behaviour).
+  mocks.searchRefereesForGame.mockReset();
+  mocks.submitRefereeAssignment.mockReset();
+  mocks.submitRefereeUnassignment.mockReset();
+  // clearAllMocks does not reset mockResolvedValue, so a test that sets the
+  // guarded UPDATE to 0 rows would otherwise leak that into later tests. Restore
+  // the default "claim succeeded" so test order doesn't matter.
+  mocks.updateReturning.mockReset();
+  mocks.updateReturning.mockResolvedValue([{ id: 1 }]);
   selectCallIndex = 0;
   mocks.selectCalls = [];
 });
@@ -161,6 +183,14 @@ describe("assignReferee", () => {
     // Event role should be SR2
     const eventCall = mocks.publishDomainEvent.mock.calls[0]![0];
     expect(eventCall.payload.role).toBe("SR2");
+
+    // Slot-2 path must gate on sr2_status (not sr1) being open.
+    expect(mocks.updateWhere).toHaveBeenCalledWith({
+      and: [
+        { eq: ["rg.apiMatchId", 12345] },
+        { eq: ["rg.sr2Status", "open"] },
+      ],
+    });
   });
 
   it("GAME_NOT_FOUND: throws AssignmentError when game not in refereeGames", async () => {
@@ -248,9 +278,42 @@ describe("assignReferee", () => {
       name: "AssignmentError",
     });
 
-    // No db update or event on federation failure
-    expect(mocks.updateWhere).not.toHaveBeenCalled();
+    // #84: we now win the atomic local claim BEFORE submitting to the
+    // federation, so on a federation rejection we must roll the slot back to
+    // open (claim UPDATE + rollback UPDATE = 2 calls). The rollback is a
+    // compare-and-set guarded on THIS caller still holding the slot, so it can't
+    // clobber a referee a concurrent caller validly assigned in the meantime.
+    expect(mocks.updateWhere).toHaveBeenCalledTimes(2);
+    expect(mocks.updateWhere).toHaveBeenLastCalledWith({
+      and: [
+        { eq: ["rg.apiMatchId", 12345] },
+        { eq: ["rg.sr1RefereeApiId", 9001] },
+        { eq: ["rg.sr1Status", "assigned"] },
+      ],
+    });
+    expect(mocks.insertOnConflict).not.toHaveBeenCalled();
     expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("race loser never writes the federation: 0-row claim short-circuits before submit (#84)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+      // re-read: a rival referee already holds the slot
+      [{ ...GAME_ROW, sr1Status: "assigned", sr1RefereeApiId: 5555 }],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    mocks.updateReturning.mockResolvedValue([]); // lost the atomic guard
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "SLOT_TAKEN",
+    });
+    // The federation has no compare-and-set; the loser must not submit there.
+    expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
   });
 
   it("skips deny check when matchId is null", async () => {
@@ -271,6 +334,138 @@ describe("assignReferee", () => {
 
     // No intent upsert since matchId is null
     expect(mocks.insertOnConflict).not.toHaveBeenCalled();
+  });
+
+  it("pages past the first result window to find a distance-ranked referee (#68)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+    ];
+    const OTHER = { ...CANDIDATE, srId: 1234 };
+    // Target referee (srId 9001) is NOT on the first page; total signals more.
+    mocks.searchRefereesForGame
+      .mockResolvedValueOnce({ results: [OTHER], total: 2 })
+      .mockResolvedValueOnce({ results: [CANDIDATE], total: 2 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+
+    const result = await assignReferee(12345, 1, 9001);
+
+    expect(result.success).toBe(true);
+    expect(mocks.searchRefereesForGame).toHaveBeenCalledTimes(2);
+    expect(mocks.searchRefereesForGame.mock.calls[0]![1]).toMatchObject({ pageFrom: 0, pageSize: 200 });
+    expect(mocks.searchRefereesForGame.mock.calls[1]![1]).toMatchObject({ pageFrom: 1, pageSize: 200 });
+    // The candidate found on page 2 is the one submitted to the federation.
+    expect(mocks.submitRefereeAssignment).toHaveBeenCalledWith(12345, 1, CANDIDATE);
+  });
+
+  it("stops paging and throws NOT_QUALIFIED once total is exhausted (#68)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+    ];
+    const OTHER = { ...CANDIDATE, srId: 1234 };
+    // Two pages, neither contains srId 9001 → exhaust total, then NOT_QUALIFIED.
+    mocks.searchRefereesForGame
+      .mockResolvedValueOnce({ results: [OTHER], total: 2 })
+      .mockResolvedValueOnce({ results: [{ ...CANDIDATE, srId: 5678 }], total: 2 });
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "NOT_QUALIFIED",
+      name: "AssignmentError",
+    });
+    expect(mocks.searchRefereesForGame).toHaveBeenCalledTimes(2);
+    expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
+  });
+
+  it("SLOT_TAKEN: throws when the conditional slot update affects 0 rows (#67)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    // The guarded UPDATE ... WHERE sr1_status='open' matched no row → slot taken.
+    mocks.updateReturning.mockResolvedValue([]);
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "SLOT_TAKEN",
+      name: "AssignmentError",
+    });
+
+    // The atomic guard must gate the write on the slot still being open — this
+    // locks the WHERE clause so the fix can't silently regress to an
+    // unconditional update.
+    expect(mocks.updateWhere).toHaveBeenCalledWith({
+      and: [
+        { eq: ["rg.apiMatchId", 12345] },
+        { eq: ["rg.sr1Status", "open"] },
+      ],
+    });
+    // The race loser must not write an intent or publish an assignment event.
+    expect(mocks.insertOnConflict).not.toHaveBeenCalled();
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("idempotent self-reclaim: 0-row update but slot already held by the SAME referee returns success (#86)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+      // 6th select: re-read after the 0-row guard shows the slot is already
+      // held by this same referee (a re-submit / double-click), not a rival.
+      [{ ...GAME_ROW, sr1Status: "assigned", sr1RefereeApiId: 9001, sr1Name: "Max Muster" }],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    mocks.updateReturning.mockResolvedValue([]); // guard matched 0 rows
+
+    const result = await assignReferee(12345, 1, 9001);
+
+    expect(result).toMatchObject({
+      success: true,
+      slot: "sr1",
+      status: "assigned",
+      refereeName: "Max Muster",
+    });
+    // The federation already holds this referee, so we don't re-submit.
+    expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
+    // We still (idempotently) upsert the intent, so an original call that died
+    // after the federation submit but before persisting the intent is recovered.
+    expect(mocks.insertOnConflict).toHaveBeenCalledOnce();
+    // But we do NOT re-publish REFEREE_ASSIGNED — replaying it on a re-claim
+    // would spam a stale "just assigned" notification.
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("SLOT_TAKEN: 0-row update with the slot held by a DIFFERENT referee still throws (#86)", async () => {
+    mocks.selectCalls = [
+      [GAME_ROW],
+      [REFEREE_ROW],
+      [{ homeTeamApiId: 201, guestTeamApiId: 202 }],
+      [{ id: 10 }, { id: 11 }],
+      [],
+      // re-read shows a rival referee won the slot
+      [{ ...GAME_ROW, sr1Status: "assigned", sr1RefereeApiId: 5555, sr1Name: "Other Ref" }],
+    ];
+    mocks.searchRefereesForGame.mockResolvedValue({ results: [CANDIDATE], total: 1 });
+    mocks.submitRefereeAssignment.mockResolvedValue(SUCCESS_RESPONSE);
+    mocks.updateReturning.mockResolvedValue([]);
+
+    await expect(assignReferee(12345, 1, 9001)).rejects.toMatchObject({
+      code: "SLOT_TAKEN",
+    });
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
   });
 });
 

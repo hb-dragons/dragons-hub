@@ -281,6 +281,33 @@ describe("runTaskReminderSweep", () => {
     }
   });
 
+  it("runs the day-of gate in Europe/Berlin, not UTC (#82)", async () => {
+    // 07:00 UTC in summer = 09:00 Europe/Berlin (CEST). Past the 08:00 LOCAL
+    // threshold, so the day-of branch must run even though UTC hour is < 08:00.
+    const today = new Date("2026-07-15T07:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(today);
+
+    try {
+      const { taskId, userId } = await setup({ dueDate: today });
+
+      const result = await runTaskReminderSweep();
+
+      expect(result.dayOf).toBe(1);
+      const events = await (ctx.db as Database)
+        .select()
+        .from(domainEvents)
+        .where(eq(domainEvents.entityId, taskId));
+      const dayOf = events.find(
+        (e) => (e.payload as Record<string, unknown>).reminderKind === "day_of",
+      );
+      expect(dayOf).toBeDefined();
+      expect((dayOf!.payload as Record<string, unknown>).assigneeUserIds).toEqual([userId]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("logs a warning and continues when lead emitAndMark throws — catch branch", async () => {
     const dueIn20h = new Date(Date.now() + 20 * 60 * 60 * 1000);
     const { taskId } = await setup({ dueDate: dueIn20h });

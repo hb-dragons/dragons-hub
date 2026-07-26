@@ -51,10 +51,28 @@ async function loadLeadCandidates(): Promise<TaskReminderRow[]> {
     );
 }
 
+// "Due today" and the 08:00 send gate are club-local (Europe/Berlin), not UTC —
+// otherwise a task due today wouldn't surface until 08:00 UTC (09:00/10:00
+// local), and near midnight the date itself would be off by one.
+function berlinNow(now: Date): { hour: number; dateStr: string } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)!.value;
+  return {
+    hour: Number(get("hour")) % 24, // some ICU builds emit "24" at midnight
+    dateStr: `${get("year")}-${get("month")}-${get("day")}`,
+  };
+}
+
 async function loadDayOfCandidates(): Promise<TaskReminderRow[]> {
-  const now = new Date();
-  if (now.getUTCHours() < 8) return [];
-  const todayStr = now.toISOString().slice(0, 10);
+  const { hour, dateStr: todayStr } = berlinNow(new Date());
+  if (hour < 8) return [];
   return await getDb()
     .select({
       id: tasks.id,
