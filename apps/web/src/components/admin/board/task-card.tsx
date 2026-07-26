@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Badge } from "@dragons/ui/components/badge";
 import {
   Calendar,
@@ -10,6 +10,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
+import { berlinDayAnchor } from "@/lib/tz";
 import { AssigneeStack } from "./assignee-stack";
 import { LabelsBar } from "./labels-bar.stub";
 
@@ -36,6 +37,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onOpen, dragHandle }: TaskCardProps) {
   const t = useTranslations("board");
+  const format = useFormatter();
   const variant = priorityVariant[task.priority];
   const hasChecklist = task.checklistTotal > 0;
 
@@ -95,7 +97,11 @@ export function TaskCard({ task, onOpen, dragHandle }: TaskCardProps) {
           {task.dueDate && (
             <span className="inline-flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {task.dueDate}
+              {/* dueDate is a bare Berlin calendar day; anchoring it in Berlin
+                  keeps the rendered day right on a UTC server and for an admin
+                  in any zone. Rendering the raw string also skipped locale
+                  formatting that every other date in the board goes through. */}
+              {format.dateTime(berlinDayAnchor(task.dueDate), "short")}
             </span>
           )}
           {hasChecklist && (

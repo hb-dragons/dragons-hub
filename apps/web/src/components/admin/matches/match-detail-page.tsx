@@ -6,6 +6,7 @@ import { useRouter } from "@/lib/navigation";
 import { Link } from "@/lib/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import { queries } from "@/lib/swr-queries";
+import { berlinDayAnchor } from "@/lib/tz";
 import {
   Card,
   CardContent,
@@ -134,7 +135,7 @@ export function MatchDetailPage({
               <div>
                 <dt className="text-muted-foreground">{t("matchDetail.info.date")}</dt>
                 <dd className="font-medium">
-                  {format.dateTime(new Date(match.kickoffDate + "T00:00:00"), "matchDate")}
+                  {format.dateTime(berlinDayAnchor(match.kickoffDate), "matchDate")}
                 </dd>
               </div>
               <div>

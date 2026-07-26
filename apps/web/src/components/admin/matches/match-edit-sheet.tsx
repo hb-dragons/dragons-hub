@@ -53,6 +53,7 @@ import {
 import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
+import { berlinDayAnchor } from "@/lib/tz";
 import { can } from "@dragons/shared";
 import type { OwnClubTeam } from "@dragons/shared";
 import { api } from "@/lib/api";
@@ -590,7 +591,7 @@ export function MatchEditSheet({
                         label={t("matchDetail.overrides.date")}
                         remoteDisplay={
                           remoteKickoffDate
-                            ? format.dateTime(new Date(remoteKickoffDate + "T00:00:00"), "matchDate")
+                            ? format.dateTime(berlinDayAnchor(remoteKickoffDate), "matchDate")
                             : undefined
                         }
                         isOverridden={match.overriddenFields.includes("kickoffDate")}

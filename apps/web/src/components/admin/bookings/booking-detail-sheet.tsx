@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { api } from "@/lib/api";
+import { berlinDayAnchor, berlinTimeAnchor } from "@/lib/tz";
 import {
   SheetContent,
   SheetHeader,
@@ -256,10 +257,7 @@ export function BookingDetailSheet({
             <Skeleton className="h-4 w-32" />
           ) : (
             <SheetDescription>
-              {format.dateTime(
-                new Date(booking.date + "T00:00:00"),
-                "matchDate",
-              )}
+              {format.dateTime(berlinDayAnchor(booking.date), "matchDate")}
             </SheetDescription>
           )}
         </SheetHeader>
@@ -316,7 +314,7 @@ export function BookingDetailSheet({
                     />
                     {booking.calculatedStartTime && startTime !== booking.calculatedStartTime && (
                       <p className="text-xs text-muted-foreground">
-                        {t("bookings.detail.calculated")}: {format.dateTime(new Date(`1970-01-01T${booking.calculatedStartTime}`), "matchTime")}
+                        {t("bookings.detail.calculated")}: {format.dateTime(berlinTimeAnchor(booking.calculatedStartTime, booking.date), "matchTime")}
                       </p>
                     )}
                   </Field>
@@ -330,7 +328,7 @@ export function BookingDetailSheet({
                     />
                     {booking.calculatedEndTime && endTime !== booking.calculatedEndTime && (
                       <p className="text-xs text-muted-foreground">
-                        {t("bookings.detail.calculated")}: {format.dateTime(new Date(`1970-01-01T${booking.calculatedEndTime}`), "matchTime")}
+                        {t("bookings.detail.calculated")}: {format.dateTime(berlinTimeAnchor(booking.calculatedEndTime, booking.date), "matchTime")}
                       </p>
                     )}
                   </Field>

@@ -283,3 +283,53 @@ describe("MatchEditSheet venue override", () => {
     expect(body).not.toHaveProperty("venueId");
   });
 });
+
+/**
+ * The "official" hint re-renders the federation's kickoff date. It must name
+ * the federation's Berlin calendar day whatever zone the process runs in — the
+ * app pins every formatter to Europe/Berlin, but SSR runs UTC and admins
+ * travel. Asserting under Europe/Berlin would prove nothing.
+ */
+function wrapInBerlin(ui: React.ReactNode) {
+  return (
+    <NextIntlClientProvider
+      locale="de"
+      timeZone="Europe/Berlin"
+      messages={messages}
+      formats={formats}
+    >
+      <Sheet open onOpenChange={() => {}}>
+        {ui}
+      </Sheet>
+    </NextIntlClientProvider>
+  );
+}
+
+describe("MatchEditSheet official kickoff date hint", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    const match = { ...makeMatch(), overriddenFields: ["kickoffDate"] };
+    mocks.getMatch.mockResolvedValue({ match, diffs: [] });
+    mocks.listTeams.mockResolvedValue([]);
+    mocks.searchVenues.mockResolvedValue({ venues: [] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    cleanup();
+  });
+
+  it.each(["UTC", "America/New_York", "Pacific/Kiritimati", "Pacific/Honolulu"])(
+    "names the federation's own day (TZ=%s)",
+    async (tz) => {
+      vi.stubEnv("TZ", tz);
+      render(wrapInBerlin(<MatchEditSheet matchId={7} open onOpenChange={() => {}} />));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      // makeMatch().kickoffDate is 2026-08-01.
+      expect(screen.getByText(/Official: .*01\.08\.26/)).toBeInTheDocument();
+    },
+  );
+});

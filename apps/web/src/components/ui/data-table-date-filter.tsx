@@ -12,6 +12,7 @@ import {
 } from "@dragons/ui/components/popover"
 import { cn } from "@dragons/ui/lib/utils"
 import type { DateRange } from "@dragons/ui/components/calendar"
+import { berlinDayAnchor, calendarDayString } from "@/lib/tz"
 
 interface DataTableDateFilterProps<TData, TValue> {
   column: Column<TData, TValue>
@@ -28,6 +29,13 @@ export function DataTableDateFilter<TData, TValue>({
   const dateRange = column.getFilterValue() as DateRange | undefined
   const hasValue = dateRange?.from || dateRange?.to
 
+  // The formatter renders in Europe/Berlin, but the calendar hands back local
+  // midnight of the clicked day. Re-anchoring the picked day in Berlin keeps
+  // the label naming the day the user actually clicked — and keeps it equal to
+  // what the column's range filter matches — in every runtime timezone.
+  const label = (picked: Date) =>
+    format.dateTime(berlinDayAnchor(calendarDayString(picked)), "short")
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -39,8 +47,8 @@ export function DataTableDateFilter<TData, TValue>({
           <CalendarIcon />
           {hasValue ? (
             <span>
-              {dateRange?.from ? format.dateTime(dateRange.from, "short") : ""}{" "}
-              {dateRange?.to ? `– ${format.dateTime(dateRange.to, "short")}` : ""}
+              {dateRange?.from ? label(dateRange.from) : ""}{" "}
+              {dateRange?.to ? `– ${label(dateRange.to)}` : ""}
             </span>
           ) : (
             <span>{title}</span>

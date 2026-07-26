@@ -19,6 +19,7 @@ import { Ban, Calendar, CircleOff, SearchIcon, SquareActivity } from "lucide-rea
 import { Input } from "@dragons/ui/components/input"
 import type { DateRange } from "@dragons/ui/components/calendar"
 
+import { berlinDayAnchor, calendarDayString } from "@/lib/tz"
 import { DataTable } from "@/components/ui/data-table"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
@@ -67,18 +68,21 @@ function TeamBadge({ name, badgeColor }: { name: string; badgeColor?: string | n
   )
 }
 
-const dateRangeFilterFn: FilterFn<MatchListItem> = (row, columnId, value) => {
+/**
+ * Range filter over the `YYYY-MM-DD` kickoff day.
+ *
+ * The picked `Date`s are local midnight of the days the user clicked, so their
+ * calendar components are read directly (`calendarDayString`). Converting them
+ * to UTC instead — `toISOString().slice(0, 10)` — dropped the end day and
+ * admitted the day before the start for every admin east of Greenwich, and
+ * disagreed with the trigger label, which renders the same days via next-intl.
+ */
+export const dateRangeFilterFn: FilterFn<MatchListItem> = (row, columnId, value) => {
   const dateRange = value as DateRange | undefined
   if (!dateRange) return true
   const cellValue = row.getValue(columnId) as string
-  if (dateRange.from) {
-    const fromStr = dateRange.from.toISOString().slice(0, 10)
-    if (cellValue < fromStr) return false
-  }
-  if (dateRange.to) {
-    const toStr = dateRange.to.toISOString().slice(0, 10)
-    if (cellValue > toStr) return false
-  }
+  if (dateRange.from && cellValue < calendarDayString(dateRange.from)) return false
+  if (dateRange.to && cellValue > calendarDayString(dateRange.to)) return false
   return true
 }
 
@@ -91,7 +95,7 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
       ),
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-sm">
-          {format.dateTime(new Date(row.original.kickoffDate + "T00:00:00"), "matchDate")}
+          {format.dateTime(berlinDayAnchor(row.original.kickoffDate), "matchDate")}
           <OverrideDot match={row.original} field="kickoffDate" />
         </span>
       ),
