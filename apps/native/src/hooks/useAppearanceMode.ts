@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Appearance, useColorScheme } from "react-native";
-import * as SecureStore from "expo-secure-store";
+import { localStorage } from "@/lib/local-storage";
 
 export type Mode = "system" | "light" | "dark";
 
@@ -30,7 +30,7 @@ export function useAppearanceMode(): AppearanceMode {
   }
 
   useEffect(() => {
-    void SecureStore.getItemAsync(THEME_MODE_KEY).then((stored) => {
+    void localStorage.getItem(THEME_MODE_KEY).then((stored) => {
       const resolved: Mode = isValidMode(stored) ? stored : "system";
       if (resolved !== "system") {
         Appearance.setColorScheme(resolved);
@@ -47,7 +47,7 @@ export function useAppearanceMode(): AppearanceMode {
       Appearance.setColorScheme(next);
     }
     setModeState(next);
-    void SecureStore.setItemAsync(THEME_MODE_KEY, next);
+    void localStorage.setItem(THEME_MODE_KEY, next);
   }, []);
 
   const resolvedSystem: "light" | "dark" =

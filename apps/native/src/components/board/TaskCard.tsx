@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
-import type { TaskCardData, TaskAssignee, TaskPriority } from "@dragons/shared";
+import type {
+  TaskCardData,
+  TaskAssignee,
+  TaskPriority,
+  TaskContentRect,
+} from "@dragons/shared";
 import { dueDateBucket, type DueDateBucket } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
@@ -23,14 +28,6 @@ export interface TaskCardLayout {
   y: number;
   width: number;
   height: number;
-}
-
-export interface TaskContentRect {
-  contentX: number;
-  contentY: number;
-  width: number;
-  height: number;
-  columnId: number;
 }
 
 export interface TaskDragCallbacks {

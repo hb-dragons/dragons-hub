@@ -76,7 +76,6 @@ export default function TeamDetailScreen() {
     }
 
     return {
-      pastMatches: past,
       lastGame: past.length > 0 ? past[past.length - 1]! : null,
       nextGame: future.length > 0 ? future[0]! : null,
     };

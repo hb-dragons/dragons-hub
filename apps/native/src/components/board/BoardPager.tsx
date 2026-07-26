@@ -6,26 +6,11 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import type { BoardColumnData, TaskCardData } from "@dragons/shared";
+import type { BoardColumnData, TaskCardData, TaskContentRect, PagerLayout } from "@dragons/shared";
 import { BoardColumn, type BoardColumnHandle, type TaskDragCallbacks } from "./BoardColumn";
-import type { TaskContentRect } from "./TaskCard";
 
 export interface BoardPagerHandle {
   scrollToIndex: (i: number, animated?: boolean) => void;
-  getScrollRef: () => ScrollView | null;
-  /** Returns the current horizontal scroll offset of the pager (JS-side, safe to read synchronously). */
-  getScrollX: () => number;
-}
-
-export interface PagerLayout {
-  /** Screen x of the pager's left edge. */
-  pageX: number;
-  /** Screen y of the pager's top edge. */
-  pageY: number;
-  /** Total rendered width of the pager (== window width). */
-  width: number;
-  /** Visible height of the pager. */
-  height: number;
 }
 
 interface BoardPagerProps {
@@ -107,8 +92,6 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
         scrollToIndex: (i: number, animated = true) => {
           scrollRef.current?.scrollTo({ x: i * columnWidth, y: 0, animated });
         },
-        getScrollRef: () => scrollRef.current,
-        getScrollX: () => scrollXRef.current,
       }),
       [columnWidth],
     );

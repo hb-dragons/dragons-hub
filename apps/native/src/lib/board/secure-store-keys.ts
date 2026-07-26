@@ -1,19 +1,14 @@
 /**
- * Builders for the expo-secure-store keys used by board filter persistence.
+ * Builders for the storage keys used by board filter persistence
+ * (`@/lib/local-storage`, backed by AsyncStorage).
  *
- * expo-secure-store rejects any key that is empty or contains a character
- * outside `[A-Za-z0-9._-]`. An earlier scheme used colon separators
- * (`board:<id>:filters`), which threw "Invalid key provided to SecureStore"
- * at runtime on iOS. Keys here use dot separators so they stay valid.
+ * These were originally expo-secure-store keys, which reject any key that is
+ * empty or contains a character outside `[A-Za-z0-9._-]`. An earlier scheme
+ * used colon separators (`board:<id>:filters`), which threw "Invalid key
+ * provided to SecureStore" at runtime on iOS. Keys here still use dot
+ * separators — AsyncStorage doesn't require it, but there's no reason to
+ * reintroduce colons now that the constraint is gone.
  */
-
-/** Characters expo-secure-store accepts in a key. */
-export const SECURE_STORE_KEY_PATTERN = /^[A-Za-z0-9._-]+$/;
-
-/** True when a key is non-empty and uses only SecureStore-legal characters. */
-export function isValidSecureStoreKey(key: string): boolean {
-  return key.length > 0 && SECURE_STORE_KEY_PATTERN.test(key);
-}
 
 /**
  * True when a board id is safe to build storage keys from. Guards against
