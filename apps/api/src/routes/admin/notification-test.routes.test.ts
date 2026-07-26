@@ -1,14 +1,44 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { Hono } from "hono";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 import type { AppEnv } from "../../types";
 import type * as ExpoPushClientModule from "../../services/notifications/expo-push.client";
 
+// --- Mocks (hoisted before imports) ---
+//
+// Deliberately NOT mocking drizzle-orm, @dragons/db/schema or the rbac
+// middleware. Every DB touch in this route is a scoping decision — devices are
+// `WHERE user_id = caller`, the channel lookup is `WHERE type = 'push'`, and
+// /recent is a LIKE over an `admin_test:<caller>:` prefix. Under the identity
+// stubs the prefix could be widened to `admin_test:%` (every admin's test
+// pushes, tokens included, leaking to any admin) with all 15 tests still green.
+// The transactional domain_events + notification_log write also only proves
+// anything against real foreign keys.
+//
+// Redis (cooldown) and the Expo HTTP client stay stubbed: neither is DB state.
+
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
-  dbSelect: vi.fn(),
-  dbInsert: vi.fn(),
-  dbTransaction: vi.fn(),
+  getSession: vi.fn(),
+  userHasPermission: vi.fn(),
   sendBatch: vi.fn(),
   redisStore: new Map<string, string>(),
+}));
+
+vi.mock("../../config/database", () => ({
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) =>
+          (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
 vi.mock("../../config/redis", () => ({
@@ -21,52 +51,25 @@ vi.mock("../../config/redis", () => ({
     async ttl(_key: string) {
       return 9;
     },
-    async del(...keys: string[]) {
-      for (const k of keys) mocks.redisStore.delete(k);
-      return 0;
+  }),
+}));
+
+vi.mock("../../config/auth", () => ({
+  auth: {
+    api: {
+      getSession: (...args: unknown[]) => mocks.getSession(...args),
+      userHasPermission: (...args: unknown[]) => mocks.userHasPermission(...args),
     },
-  }),
-}));
-
-vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mocks.dbSelect(...args),
-    insert: (...args: unknown[]) => mocks.dbInsert(...args),
-    transaction: (fn: (tx: unknown) => Promise<unknown>) => mocks.dbTransaction(fn),
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  pushDevices: {
-    userId: "user_id",
-    token: "token",
-    platform: "platform",
-    locale: "locale",
   },
-  notificationLog: {
-    id: "id",
-    eventId: "event_id",
-    createdAt: "created_at",
-  },
-  channelConfigs: { id: "id", type: "type" },
-  domainEvents: { id: "id", type: "type" },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...a: unknown[]) => ({ eq: a })),
-  and: vi.fn((...a: unknown[]) => ({ and: a })),
-  like: vi.fn((...a: unknown[]) => ({ like: a })),
-  desc: vi.fn((a: unknown) => ({ desc: a })),
 }));
 
 vi.mock("../../config/logger", () => ({
   logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
   },
 }));
 
@@ -82,431 +85,448 @@ vi.mock("../../services/notifications/expo-push.client", async (importOriginal) 
   };
 });
 
-// RBAC middleware pass-through for tests -- we simulate the user via c.set("user", ...)
-vi.mock("../../middleware/rbac", () => ({
-  requirePermission:
-    () =>
-    async (
-      c: { get: (k: string) => unknown },
-      next: () => Promise<void>,
-    ) => {
-      const user = c.get("user");
-      if (!user)
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-        });
-      if ((user as { role?: string }).role !== "admin") {
-        return new Response(JSON.stringify({ error: "Forbidden" }), {
-          status: 403,
-        });
-      }
-      await next();
-    },
-}));
+// --- Imports (after mocks) ---
 
 import { notificationTestRoutes } from "./notification-test.routes";
+import { errorHandler } from "../../middleware/error";
+import {
+  channelConfigs,
+  domainEvents,
+  notificationLog,
+  pushDevices,
+} from "@dragons/db/schema";
 
-function makeApp(user: { id: string; role: string } | null) {
-  const app = new Hono<AppEnv>();
-  app.use("*", async (c, next) => {
-    if (user) c.set("user", user as unknown as AppEnv["Variables"]["user"]);
-    await next();
-  });
-  app.route("/", notificationTestRoutes);
-  return app;
-}
+const app = new Hono<AppEnv>();
+app.onError(errorHandler);
+app.route("/", notificationTestRoutes);
 
-function mockSelectSimple(rows: unknown[]) {
-  mocks.dbSelect.mockReturnValueOnce({
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(rows),
-    }),
-  });
-}
+const ADMIN = "u_admin";
+const OTHER_ADMIN = "u_other_admin";
 
-function mockInsertCapture() {
-  const domainEventsValues = vi.fn();
-  const logValues = vi.fn();
-  let call = 0;
-  mocks.dbInsert.mockImplementation(() => ({
-    values: vi.fn().mockImplementation((v) => {
-      // First insert in the transaction is domain_events, second is notification_log
-      if (call === 0) domainEventsValues(v);
-      else logValues(v);
-      call++;
-      return Promise.resolve(undefined);
-    }),
-  }));
-  return { domainEventsValues, logValues };
-}
+let ctx: TestDbContext;
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.dbSelect.mockReset();
-  mocks.dbInsert.mockReset();
-  mocks.dbTransaction.mockReset();
-  mocks.sendBatch.mockReset();
-  mocks.redisStore.clear();
-
-  // Default: transaction simulator that delegates tx.insert -> mocks.dbInsert
-  mocks.dbTransaction.mockImplementation(
-    async (fn: (tx: unknown) => Promise<unknown>) => {
-      const tx = {
-        insert: (...a: unknown[]) => mocks.dbInsert(...a),
-      };
-      return fn(tx);
-    },
-  );
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
-describe("POST /notifications/test-push", () => {
-  it("returns 401 when no session", async () => {
-    const app = makeApp(null);
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(res.status).toBe(401);
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  vi.clearAllMocks();
+  mocks.redisStore.clear();
+  mocks.getSession.mockResolvedValue({
+    user: { id: ADMIN, role: "admin" },
+    session: { id: "sess-admin" },
+  });
+  mocks.userHasPermission.mockResolvedValue({ success: true });
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
+
+function asUser(id: string, role = "admin"): void {
+  mocks.getSession.mockResolvedValue({ user: { id, role }, session: { id: `sess-${id}` } });
+}
+
+async function seedPushChannel(): Promise<number> {
+  const [row] = await ctx.db
+    .insert(channelConfigs)
+    .values({ name: "Push", type: "push", config: {} as never })
+    .returning({ id: channelConfigs.id });
+  return row!.id;
+}
+
+async function seedDevice(
+  userId: string,
+  token: string,
+  platform = "ios",
+  locale: string | null = "de-DE",
+): Promise<void> {
+  await ctx.db.insert(pushDevices).values({ userId, token, platform, locale });
+}
+
+/** A previously-logged test push for `owner`, so /recent has something to scope. */
+async function seedLoggedTestPush(
+  owner: string,
+  opts: { suffix?: string; token?: string; sentAt?: Date | null; status?: string } = {},
+): Promise<void> {
+  const channelId = await seedPushChannel();
+  const eventId = `admin_test:${owner}:${opts.suffix ?? "01"}`;
+  await ctx.db.insert(domainEvents).values({
+    id: eventId,
+    type: "admin.test_push",
+    source: "manual",
+    urgency: "immediate",
+    occurredAt: new Date(),
+    actor: owner,
+    entityType: "user",
+    entityId: 0,
+    entityName: "admin test",
+    deepLinkPath: "/",
+    payload: {},
+  });
+  await ctx.db.insert(notificationLog).values({
+    eventId,
+    channelConfigId: channelId,
+    recipientId: owner,
+    recipientToken: opts.token ?? `ExponentPushToken[${owner}]`,
+    title: "Dragons — Test",
+    body: "hi",
+    locale: "de",
+    status: opts.status ?? "sent_ticket",
+    sentAt: opts.sentAt === undefined ? new Date() : opts.sentAt,
+  });
+}
+
+function post(body: unknown = {}) {
+  return app.request("/notifications/test-push", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+async function logRows(): Promise<
+  Array<{ event_id: string; recipient_id: string | null; recipient_token: string | null; status: string; provider_ticket_id: string | null }>
+> {
+  const rows = await ctx.client.query<{
+    event_id: string;
+    recipient_id: string | null;
+    recipient_token: string | null;
+    status: string;
+    provider_ticket_id: string | null;
+  }>(
+    "SELECT event_id, recipient_id, recipient_token, status, provider_ticket_id FROM notification_log ORDER BY id",
+  );
+  return rows.rows;
+}
+
+describe("POST /notifications/test-push — authorization", () => {
+  it("returns 401 when there is no session", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    expect((await post()).status).toBe(401);
   });
 
-  it("returns 403 when user is not admin", async () => {
-    const app = makeApp({ id: "u_regular", role: "user" });
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(res.status).toBe(403);
+  it("returns 403 when the caller lacks settings:update", async () => {
+    mocks.userHasPermission.mockResolvedValue({ success: false });
+    expect((await post()).status).toBe(403);
   });
+});
 
-  it("returns 400 when admin has no devices", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([]); // devices query: empty
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
+describe("POST /notifications/test-push — device scoping", () => {
+  it("returns 400 when the admin has no devices", async () => {
+    await seedPushChannel();
+
+    const res = await post();
+
     expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toBe("no_devices");
+    expect(await res.json()).toMatchObject({ error: "no_devices" });
   });
 
-  it("sends a test push and logs rows", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      {
-        id: 1,
-        userId: "u_admin",
-        token: "ExponentPushToken[x1]",
-        platform: "ios",
-        locale: "de-DE",
-      },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]); // push channel lookup
+  it("returns 400 when only another user has devices", async () => {
+    await seedPushChannel();
+    await seedDevice(OTHER_ADMIN, "ExponentPushToken[not-mine]");
+
+    const res = await post();
+
+    // An unscoped device SELECT would happily push to somebody else's phone.
+    expect(res.status).toBe(400);
+    expect(mocks.sendBatch).not.toHaveBeenCalled();
+  });
+
+  it("sends only to the caller's own devices", async () => {
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[mine]");
+    await seedDevice(OTHER_ADMIN, "ExponentPushToken[theirs]");
     mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_1" }]);
-    const { domainEventsValues, logValues } = mockInsertCapture();
 
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "hello" }),
-    });
+    const res = await post();
 
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.deviceCount).toBe(1);
-    expect(body.tickets).toHaveLength(1);
-    expect(body.tickets[0].status).toBe("sent_ticket");
-
-    // Synthetic domain_events row inserted first
-    expect(domainEventsValues).toHaveBeenCalled();
-    const eventRow = domainEventsValues.mock.calls[0]![0] as Record<
-      string,
-      unknown
-    >;
-    expect(eventRow.id).toMatch(/^admin_test:u_admin:/);
-    expect(eventRow.type).toBe("admin.test_push");
-
-    // notification_log rows referencing that event
-    expect(logValues).toHaveBeenCalled();
-    const rows = logValues.mock.calls[0]![0] as Array<Record<string, unknown>>;
-    expect(rows[0]!.eventId).toMatch(/^admin_test:u_admin:/);
-    expect(rows[0]!.providerTicketId).toBe("tkt_1");
-    expect(rows[0]!.status).toBe("sent_ticket");
-  });
-
-  it("records per-ticket failure when Expo rejects", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      {
-        id: 1,
-        userId: "u_admin",
-        token: "ExponentPushToken[bad]",
-        platform: "ios",
-        locale: "de-DE",
-      },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    mocks.sendBatch.mockResolvedValueOnce([
-      { status: "error", message: "oops", details: { error: "SomeError" } },
-    ]);
-    mockInsertCapture();
-
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.tickets[0].status).toBe("failed");
-    // message wins over details.error (unified message-first precedence via mapTicketError)
-    expect(body.tickets[0].error).toBe("oops");
-  });
-
-  it("handles Expo network error -- returns 200 with all-failed tickets", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      {
-        id: 1,
-        userId: "u_admin",
-        token: "ExponentPushToken[a]",
-        platform: "ios",
-      },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    mocks.sendBatch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
-    mockInsertCapture();
-
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.tickets[0].status).toBe("failed");
-    expect(body.tickets[0].error).toMatch(/ECONNREFUSED|unknown/);
-  });
-
-  it("rate-limits rapid consecutive test pushes from the same user", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-
-    // First call succeeds — queue up all its mocks
-    mockSelectSimple([
-      {
-        id: 1,
-        userId: "u_admin",
-        token: "ExponentPushToken[a]",
-        platform: "ios",
-        locale: "de-DE",
-      },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_1" }]);
-    mockInsertCapture();
-
-    const first = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(first.status).toBe(200);
-
-    // Second call within the 10s window should be rejected before any DB work.
-    // No additional mocks queued on purpose — if the handler reaches the DB we'll fail loud.
-    const second = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(second.status).toBe(429);
-    const body = await second.json();
-    expect(body.error).toBe("rate_limited");
-    expect(typeof body.retryAfter).toBe("number");
-    expect(second.headers.get("Retry-After")).toBeTruthy();
+    expect(await res.json()).toMatchObject({ deviceCount: 1 });
+    const sent = mocks.sendBatch.mock.calls[0]![0] as Array<{ to: string }>;
+    expect(sent.map((m) => m.to)).toEqual(["ExponentPushToken[mine]"]);
   });
 
   it("returns 500 when no push channel config exists", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      { id: 1, userId: "u_admin", token: "ExponentPushToken[x]", platform: "ios" },
-    ]); // devices found
-    mockSelectSimple([]); // no push channel config row
+    await seedDevice(ADMIN, "ExponentPushToken[x]");
 
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
+    const res = await post();
+
     expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.error).toBe("push_channel_missing");
+    expect(await res.json()).toMatchObject({ error: "push_channel_missing" });
   });
 
-  it("handles ok ticket with no ticketId (id is undefined)", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      { id: 1, userId: "u_admin", token: "ExponentPushToken[x]", platform: "ios" },
+  it("ignores channel configs of other types", async () => {
+    await seedDevice(ADMIN, "ExponentPushToken[x]");
+    await ctx.db
+      .insert(channelConfigs)
+      .values({ name: "WhatsApp", type: "whatsapp_group", config: {} as never });
+
+    const res = await post();
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ error: "push_channel_missing" });
+  });
+});
+
+describe("POST /notifications/test-push — persisted audit trail", () => {
+  it("writes a domain_events row and a notification_log row for the device", async () => {
+    const channelId = await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[x1]");
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_1" }]);
+
+    const res = await post({ message: "hello" });
+
+    expect(res.status).toBe(200);
+    const events = await ctx.db.select().from(domainEvents);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ type: "admin.test_push", actor: ADMIN });
+    expect(events[0]!.id).toMatch(/^admin_test:u_admin:/);
+
+    const rows = await logRows();
+    expect(rows).toEqual([
+      {
+        event_id: events[0]!.id,
+        recipient_id: ADMIN,
+        recipient_token: "ExponentPushToken[x1]",
+        status: "sent_ticket",
+        provider_ticket_id: "tkt_1",
+      },
     ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    // Ticket with status=ok but no id field
+    const logged = await ctx.db.select().from(notificationLog);
+    expect(logged[0]!.channelConfigId).toBe(channelId);
+    expect(logged[0]!.body).toBe("hello");
+  });
+
+  it("currently fails with 500 for an admin with two devices (known defect)", async () => {
+    // DEFECT, not desired behaviour. The route writes one notification_log row
+    // per device, but every row of one send shares (event_id, channel_config_id,
+    // recipient_id) — which is exactly the tuple `notification_log_dedup_idx`
+    // (migration 0018) declares UNIQUE. The second row violates it, the wrapping
+    // transaction aborts, and the admin gets a 500 with nothing written. The
+    // previous suite stubbed the insert, so it never saw the constraint at all.
+    // Asserted here so the eventual fix has to come past a failing test.
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[x1]");
+    await seedDevice(ADMIN, "ExponentPushToken[x2]", "android", null);
+    mocks.sendBatch.mockResolvedValueOnce([
+      { status: "ok", id: "tkt_1" },
+      { status: "ok", id: "tkt_2" },
+    ]);
+
+    const res = await post({ message: "hello" });
+
+    expect(res.status).toBe(500);
+    expect(await logRows()).toEqual([]);
+    expect(await ctx.db.select().from(domainEvents)).toEqual([]);
+  });
+
+  it("falls back to the default body when no message is supplied", async () => {
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[x1]");
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_1" }]);
+
+    await post();
+
+    const rows = await ctx.db.select().from(notificationLog);
+    expect(rows[0]!.body).toBe("Test push from Dragons admin");
+  });
+
+  it("records a per-ticket failure when Expo rejects the message", async () => {
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[bad]");
+    mocks.sendBatch.mockResolvedValueOnce([
+      { status: "error", message: "oops", details: { error: "SomeError" } },
+    ]);
+
+    const res = await post();
+    const body = (await res.json()) as { tickets: Array<{ status: string; error: string }> };
+
+    expect(res.status).toBe(200);
+    expect(body.tickets[0]).toMatchObject({ status: "failed", error: "oops" });
+    const rows = await ctx.db.select().from(notificationLog);
+    expect(rows[0]).toMatchObject({
+      status: "failed",
+      sentAt: null,
+      providerTicketId: null,
+      errorMessage: "oops",
+    });
+  });
+
+  it("returns 200 with all-failed tickets when the Expo call throws", async () => {
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[a]");
+    mocks.sendBatch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+
+    const res = await post();
+    const body = (await res.json()) as { tickets: Array<{ status: string; error: string }> };
+
+    expect(res.status).toBe(200);
+    expect(body.tickets[0]!.status).toBe("failed");
+    expect(body.tickets[0]!.error).toMatch(/ECONNREFUSED|unknown/);
+    expect((await logRows())[0]!.status).toBe("failed");
+  });
+
+  it("handles an ok ticket that carries no ticket id", async () => {
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[x]");
     mocks.sendBatch.mockResolvedValueOnce([{ status: "ok" }]);
-    mockInsertCapture();
 
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.tickets[0].ticketId).toBeNull();
-    expect(body.tickets[0].status).toBe("sent_ticket");
+    const res = await post();
+    const body = (await res.json()) as {
+      tickets: Array<{ status: string; ticketId: string | null }>;
+    };
+
+    expect(body.tickets[0]).toMatchObject({ status: "sent_ticket", ticketId: null });
   });
 
-  it("uses 'unknown' as errorMessage when ticket has no message or details", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      { id: 1, userId: "u_admin", token: "ExponentPushToken[x]", platform: "ios" },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    // Ticket with status=error but no message or details fields
+  it("uses 'unknown' as errorMessage when the ticket carries no detail", async () => {
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[x]");
     mocks.sendBatch.mockResolvedValueOnce([{ status: "error" }]);
-    mockInsertCapture();
 
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.tickets[0].error).toBe("unknown");
+    const res = await post();
+    const body = (await res.json()) as { tickets: Array<{ error: string }> };
+
+    expect(body.tickets[0]!.error).toBe("unknown");
+  });
+
+  it("rate-limits a second test push inside the cooldown window", async () => {
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[a]");
+    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_1" }]);
+
+    expect((await post()).status).toBe(200);
+
+    const second = await post();
+    const body = (await second.json()) as { error: string; retryAfter: number };
+
+    expect(second.status).toBe(429);
+    expect(body.error).toBe("rate_limited");
+    expect(typeof body.retryAfter).toBe("number");
+    expect(second.headers.get("Retry-After")).toBeTruthy();
+    // The rejected call must not have written a second batch of log rows.
+    expect(await logRows()).toHaveLength(1);
   });
 });
 
 describe("GET /notifications/test-push/recent", () => {
-  it("returns 401 without session", async () => {
-    const app = makeApp(null);
-    const res = await app.request("/notifications/test-push/recent");
-    expect(res.status).toBe(401);
+  it("returns 401 without a session", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    expect((await app.request("/notifications/test-push/recent")).status).toBe(401);
   });
 
-  it("returns caller's test rows with masked token", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mocks.dbSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 1,
-                sentAt: new Date("2026-04-23T10:00:00Z"),
-                createdAt: new Date("2026-04-23T10:00:00Z"),
-                recipientToken: "ExponentPushToken[abcdef123456]",
-                status: "delivered",
-                providerTicketId: "tkt_1",
-                errorMessage: null,
-              },
-            ]),
-          }),
-        }),
-      }),
-    });
+  it("returns the caller's own test pushes", async () => {
+    await seedLoggedTestPush(ADMIN, { token: "ExponentPushToken[abcdef123456]" });
 
     const res = await app.request("/notifications/test-push/recent");
+    const body = (await res.json()) as {
+      results: Array<{ recipientToken: string; status: string }>;
+    };
+
     expect(res.status).toBe(200);
-    const body = await res.json();
     expect(body.results).toHaveLength(1);
-    const tok = body.results[0].recipientToken as string;
-    expect(tok.startsWith("...")).toBe(true);
-    expect(tok.length).toBeLessThanOrEqual(9); // "..." + 6
+    expect(body.results[0]!.recipientToken).toBe("...23456]");
+    expect(body.results[0]!.status).toBe("sent_ticket");
   });
 
-  it("returns sentAt from createdAt when sentAt is null", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    const createdAt = new Date("2026-04-23T09:00:00Z");
-    mocks.dbSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 2,
-                sentAt: null,
-                createdAt,
-                recipientToken: "ExponentPushToken[xyz789]",
-                status: "failed",
-                providerTicketId: null,
-                errorMessage: "ECONNREFUSED",
-              },
-            ]),
-          }),
-        }),
-      }),
+  it("does not return another admin's test pushes", async () => {
+    await seedLoggedTestPush(OTHER_ADMIN, { token: "ExponentPushToken[theirs]" });
+
+    const res = await app.request("/notifications/test-push/recent");
+    const body = (await res.json()) as { results: unknown[] };
+
+    // Widening the LIKE prefix to `admin_test:%` would leak every admin's
+    // (masked, but still) tokens and delivery state here.
+    expect(body.results).toEqual([]);
+  });
+
+  it("does not return non-test notification log rows", async () => {
+    const channelId = await seedPushChannel();
+    await ctx.db.insert(domainEvents).values({
+      id: "match_update_01",
+      type: "match.updated",
+      source: "sync",
+      urgency: "routine",
+      occurredAt: new Date(),
+      entityType: "match",
+      entityId: 1,
+      entityName: "Match",
+      deepLinkPath: "/",
+      payload: {},
+    });
+    await ctx.db.insert(notificationLog).values({
+      eventId: "match_update_01",
+      channelConfigId: channelId,
+      recipientId: ADMIN,
+      recipientToken: "ExponentPushToken[real]",
+      title: "t",
+      body: "b",
+      status: "sent_ticket",
     });
 
     const res = await app.request("/notifications/test-push/recent");
-    const body = await res.json();
-    expect(body.results[0].sentAt).toBe(createdAt.toISOString());
+    const body = (await res.json()) as { results: unknown[] };
+
+    expect(body.results).toEqual([]);
   });
 
-  it("maskToken returns null for null token", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mocks.dbSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 3,
-                sentAt: new Date(),
-                createdAt: new Date(),
-                recipientToken: null,
-                status: "failed",
-                providerTicketId: null,
-                errorMessage: null,
-              },
-            ]),
-          }),
-        }),
-      }),
-    });
+  it("treats a caller id containing LIKE wildcards literally", async () => {
+    // `escapeLikePattern` is why `a%` cannot match `ab`'s rows.
+    await seedLoggedTestPush("ab", { token: "ExponentPushToken[victim]" });
+    asUser("a%");
 
     const res = await app.request("/notifications/test-push/recent");
-    const body = await res.json();
-    expect(body.results[0].recipientToken).toBeNull();
+    const body = (await res.json()) as { results: unknown[] };
+
+    expect(body.results).toEqual([]);
   });
 
-  it("maskToken always masks short tokens (no plaintext leak)", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mocks.dbSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 4,
-                sentAt: new Date(),
-                createdAt: new Date(),
-                recipientToken: "abc",
-                status: "sent_ticket",
-                providerTicketId: "t1",
-                errorMessage: null,
-              },
-            ]),
-          }),
-        }),
-      }),
-    });
+  it("falls back to createdAt when sentAt is null", async () => {
+    await seedLoggedTestPush(ADMIN, { sentAt: null, status: "failed" });
 
     const res = await app.request("/notifications/test-push/recent");
-    const body = await res.json();
-    expect(body.results[0].recipientToken).toMatch(/^\.\.\./);
-    expect(body.results[0].recipientToken).not.toBe("abc");
+    const body = (await res.json()) as { results: Array<{ sentAt: string }> };
+    const [stored] = await ctx.db.select().from(notificationLog);
+
+    expect(body.results[0]!.sentAt).toBe(stored!.createdAt.toISOString());
+  });
+
+  it("masks a null token as null", async () => {
+    await seedLoggedTestPush(ADMIN);
+    await ctx.client.query("UPDATE notification_log SET recipient_token = NULL");
+
+    const res = await app.request("/notifications/test-push/recent");
+    const body = (await res.json()) as { results: Array<{ recipientToken: string | null }> };
+
+    expect(body.results[0]!.recipientToken).toBeNull();
+  });
+
+  it("masks a short token rather than echoing it", async () => {
+    await seedLoggedTestPush(ADMIN, { token: "abc" });
+
+    const res = await app.request("/notifications/test-push/recent");
+    const body = (await res.json()) as { results: Array<{ recipientToken: string }> };
+
+    expect(body.results[0]!.recipientToken).toBe("...bc");
+    expect(body.results[0]!.recipientToken).not.toBe("abc");
+  });
+
+  it("returns the newest rows first, capped at 10", async () => {
+    for (let i = 0; i < 12; i++) {
+      await seedLoggedTestPush(ADMIN, {
+        suffix: String(i).padStart(2, "0"),
+        token: `ExponentPushToken[dev${String(i).padStart(2, "0")}]`,
+      });
+    }
+
+    const res = await app.request("/notifications/test-push/recent");
+    const body = (await res.json()) as { results: Array<{ id: number }> };
+
+    expect(body.results).toHaveLength(10);
+    const ids = body.results.map((r) => r.id);
+    expect([...ids].sort((a, b) => b - a)).toEqual(ids);
   });
 });
