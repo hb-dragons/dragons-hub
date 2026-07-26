@@ -49,6 +49,11 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
+          # WEB_PATTERN / API_PATTERN live in change-patterns.sh (single
+          # source of truth, also exercised by change-patterns.test.sh) so
+          # the workflow and its regression test can never drift apart.
+          source .github/scripts/change-patterns.sh
+
           CHANGED=$(git diff --name-only HEAD~1 HEAD)
           echo "Changed files:"
           echo "$CHANGED"
@@ -57,10 +62,10 @@ jobs:
           api=false
           db=false
 
-          if echo "$CHANGED" | grep -qE '^(apps/web/|packages/ui/|packages/shared/)'; then
+          if echo "$CHANGED" | grep -qE "$WEB_PATTERN"; then
             web=true
           fi
-          if echo "$CHANGED" | grep -qE '^(apps/api/|packages/db/|packages/sdk/|packages/shared/)'; then
+          if echo "$CHANGED" | grep -qE "$API_PATTERN"; then
             api=true
           fi
           if echo "$CHANGED" | grep -qE '^(packages/db/src/schema/|packages/db/drizzle/)'; then
