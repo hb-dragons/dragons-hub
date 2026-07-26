@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EVENT_ENTITY_TYPES } from "@dragons/shared";
 
 export const eventListQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
@@ -14,7 +15,7 @@ export const eventListQuerySchema = z.object({
 
 export const triggerEventSchema = z.object({
   type: z.string().min(1).max(100),
-  entityType: z.enum(["match", "booking", "referee"]),
+  entityType: z.enum(EVENT_ENTITY_TYPES),
   entityId: z.number().int().positive(),
   entityName: z.string().min(1).max(300),
   deepLinkPath: z.string().min(1).max(500),

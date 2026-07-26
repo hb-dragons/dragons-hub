@@ -6,9 +6,48 @@ import {
   updateChannelConfigSchema,
   validateConfigForType,
 } from "./channel-config";
+import { CHANNEL_TYPES } from "@dragons/shared";
+import type { ChannelType } from "@dragons/shared";
+
+/**
+ * A minimal valid `config` payload per channel type. Typed as an exhaustive
+ * record so adding a channel type to CHANNEL_TYPES is a compile error here
+ * until the new type is given a config shape.
+ */
+const VALID_CONFIG_BY_CHANNEL_TYPE: Record<
+  ChannelType,
+  Record<string, unknown>
+> = {
+  in_app: { audienceRole: "admin", locale: "de" },
+  whatsapp_group: { groupId: "4915100000000@g.us", locale: "de" },
+  push: { provider: "expo" },
+  email: { locale: "de" },
+};
 
 describe("createChannelConfigSchema", () => {
   const base = { name: "Test Channel" };
+
+  // Structural guard: the channel type enum must be derived from CHANNEL_TYPES,
+  // not restated. Adding a value to CHANNEL_TYPES without it reaching the
+  // schema (or its per-type config schema) fails here.
+  it.each(CHANNEL_TYPES)("accepts the shared channel type %s", (type) => {
+    const result = createChannelConfigSchema.safeParse({
+      ...base,
+      type,
+      config: VALID_CONFIG_BY_CHANNEL_TYPE[type],
+    });
+    expect(result.error?.issues ?? []).toEqual([]);
+    expect(result.success).toBe(true);
+  });
+
+  it.each(CHANNEL_TYPES)(
+    "validateConfigForType resolves a schema for the shared channel type %s",
+    (type) => {
+      expect(
+        validateConfigForType(type, VALID_CONFIG_BY_CHANNEL_TYPE[type]),
+      ).not.toBeNull();
+    },
+  );
 
   it("accepts in_app with audienceRole admin and locale de", () => {
     const result = createChannelConfigSchema.safeParse({

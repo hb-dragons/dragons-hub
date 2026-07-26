@@ -33,14 +33,14 @@ import {
 import { Switch } from "@dragons/ui/components/switch";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { CHANNEL_TYPES } from "./types";
 import type {
   ChannelConfigItem,
+  ChannelType,
 } from "./types";
 
-type ChannelType = ChannelConfigItem["type"];
 type DigestMode = ChannelConfigItem["digestMode"];
 
-const CHANNEL_TYPES: ChannelType[] = ["in_app", "whatsapp_group", "email"];
 const DIGEST_MODES: DigestMode[] = ["per_sync", "scheduled", "none"];
 
 interface ChannelFormState {
@@ -87,6 +87,8 @@ function buildConfig(form: ChannelFormState): Record<string, unknown> {
       return { audienceRole: form.audienceRole, locale: form.locale };
     case "whatsapp_group":
       return { groupId: form.groupId, locale: form.locale };
+    case "push":
+      return { provider: "expo", locale: form.locale };
     case "email":
       return { locale: form.locale };
   }
@@ -107,6 +109,7 @@ function channelTypeLabel(type: string, t: TranslateFunc): string {
   switch (type) {
     case "in_app": return t("typeLabels.in_app" as never);
     case "whatsapp_group": return t("typeLabels.whatsapp_group" as never);
+    case "push": return t("typeLabels.push" as never);
     case "email": return t("typeLabels.email" as never);
     default: return type;
   }

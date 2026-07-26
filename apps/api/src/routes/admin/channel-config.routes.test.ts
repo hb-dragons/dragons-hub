@@ -52,6 +52,7 @@ vi.mock("../../config/logger", () => ({
 
 import { channelConfigRoutes } from "./channel-config.routes";
 import { errorHandler } from "../../middleware/error";
+import { CHANNEL_TYPES } from "@dragons/shared";
 
 const app = new Hono<AppEnv>();
 app.onError(errorHandler);
@@ -310,14 +311,18 @@ describe("DELETE /channel-configs/:id", () => {
 });
 
 describe("GET /channel-configs/providers", () => {
-  it("returns all three types with configured status", async () => {
+  it("returns every shared channel type with configured status", async () => {
     const res = await app.request("/channel-configs/providers");
 
     expect(res.status).toBe(200);
     const body = await json(res);
+    // Structural guard: the response must cover CHANNEL_TYPES exactly, so a
+    // channel type added to the shared array cannot go unreported.
+    expect(Object.keys(body).sort()).toEqual([...CHANNEL_TYPES].sort());
     expect(body).toEqual({
       in_app: { configured: true },
       whatsapp_group: { configured: true },
+      push: { configured: true },
       email: { configured: false },
     });
   });
@@ -350,6 +355,30 @@ describe("POST /channel-configs (provider gate)", () => {
 
     expect(res.status).toBe(201);
     expect(mocks.createChannelConfig).toHaveBeenCalled();
+  });
+
+  it("creates a push channel config", async () => {
+    mocks.createChannelConfig.mockResolvedValue({
+      ...sampleConfig,
+      name: "Expo Push",
+      type: "push",
+      config: { provider: "expo" },
+    });
+
+    const res = await app.request("/channel-configs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Expo Push",
+        type: "push",
+        config: { provider: "expo" },
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(mocks.createChannelConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "push", config: { provider: "expo" } }),
+    );
   });
 
   it("returns 400 PROVIDER_NOT_CONFIGURED when email SMTP is not set", async () => {

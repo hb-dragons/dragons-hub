@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { EVENT_TYPES } from "@dragons/shared";
+import { EVENT_TYPES, TASK_PRIORITIES } from "@dragons/shared";
 import type { Database } from "@dragons/db";
 
 // --- Mock setup ---
@@ -67,6 +67,37 @@ beforeEach(() => {
 });
 
 describe("buildDomainEvent", () => {
+  // Structural guard: every TASK_PRIORITIES value must survive task.assigned
+  // payload validation, so an urgent task assignment is published clean rather
+  // than with a "failed schema validation" warning.
+  it.each(TASK_PRIORITIES)(
+    "builds a task.assigned event with priority %s without a validation warning",
+    async (priority) => {
+      const { logger } = await import("../../config/logger");
+
+      buildDomainEvent({
+        type: EVENT_TYPES.TASK_ASSIGNED,
+        source: "manual",
+        entityType: "task",
+        entityId: 7,
+        entityName: "Book the hall",
+        deepLinkPath: "/admin/boards/1?task=7",
+        payload: {
+          taskId: 7,
+          boardId: 1,
+          boardName: "Ops",
+          title: "Book the hall",
+          assigneeUserIds: ["u1"],
+          assignedBy: "Alice",
+          dueDate: null,
+          priority,
+        },
+      });
+
+      expect(logger.warn).not.toHaveBeenCalled();
+    },
+  );
+
   it("produces an event with ULID id", () => {
     const event = buildDomainEvent({
       type: EVENT_TYPES.MATCH_CREATED,

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TASK_PRIORITIES } from "./constants";
 import { EVENT_TYPES } from "./domain-events";
 import type { EventType } from "./domain-events";
 
@@ -243,7 +244,7 @@ const taskAssignedSchema = z.object({
   assigneeUserIds: z.array(z.string()),
   assignedBy: z.string(),
   dueDate: z.string().nullable(),
-  priority: z.enum(["low", "normal", "high"]),
+  priority: z.enum(TASK_PRIORITIES),
 });
 
 const taskUnassignedSchema = z.object({

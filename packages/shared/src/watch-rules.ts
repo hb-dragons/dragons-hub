@@ -1,3 +1,5 @@
+import type { ChannelType } from "./channel-configs";
+
 // ── Filter & channel types ───────────────────────────────────────────────────
 
 export interface FilterCondition {
@@ -7,7 +9,7 @@ export interface FilterCondition {
 }
 
 export interface ChannelTarget {
-  channel: "in_app" | "whatsapp_group" | "push" | "email";
+  channel: ChannelType;
   targetId: string;
 }
 

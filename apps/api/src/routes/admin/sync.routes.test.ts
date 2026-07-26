@@ -60,6 +60,7 @@ vi.mock("../../services/sync/sync-log-stream", () => ({
 
 import { syncRoutes } from "./sync.routes";
 import { errorHandler } from "../../middleware/error";
+import { SYNC_STATUSES } from "@dragons/shared";
 
 // Test app without auth middleware — inject a fake user for routes that need it
 const app = new Hono<AppEnv>();
@@ -327,6 +328,29 @@ describe("GET /sync/logs", () => {
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
+
+  // Structural guard: every SYNC_STATUSES value must be a filterable status.
+  it.each(SYNC_STATUSES)(
+    "filters by the shared sync status %s",
+    async (status) => {
+      mocks.getSyncLogs.mockResolvedValue({
+        items: [],
+        total: 0,
+        limit: 20,
+        offset: 0,
+        hasMore: false,
+      });
+
+      const res = await app.request(`/sync/logs?status=${status}`);
+
+      expect(res.status).toBe(200);
+      expect(mocks.getSyncLogs).toHaveBeenCalledWith({
+        limit: 20,
+        offset: 0,
+        status,
+      });
+    },
+  );
 });
 
 describe("GET /sync/logs/:id/entries", () => {

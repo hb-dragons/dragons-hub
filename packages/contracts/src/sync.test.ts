@@ -9,6 +9,7 @@ import {
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
 } from "./sync";
+import { SYNC_STATUSES } from "@dragons/shared";
 
 describe("syncPaginationSchema", () => {
   it("applies defaults when empty", () => {
@@ -33,10 +34,11 @@ describe("syncPaginationSchema", () => {
 });
 
 describe("syncLogsQuerySchema", () => {
-  it("accepts valid status values", () => {
-    for (const status of ["running", "completed", "failed"]) {
-      expect(syncLogsQuerySchema.parse({ status }).status).toBe(status);
-    }
+  // Structural guard: the status enum must be derived from SYNC_STATUSES, not
+  // restated. Adding a value to SYNC_STATUSES without it reaching the schema
+  // fails here.
+  it.each(SYNC_STATUSES)("accepts the shared sync status %s", (status) => {
+    expect(syncLogsQuerySchema.parse({ status }).status).toBe(status);
   });
 
   it("rejects invalid status", () => {
