@@ -44,7 +44,7 @@ export default async function BoardsPage() {
             <li key={b.id}>
               <a
                 href={`/admin/boards/${b.id}`}
-                className="block rounded-md border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+                className="bg-card hover:bg-surface-high block rounded-md p-4 transition-colors"
               >
                 <h3 className="font-semibold">{b.name}</h3>
                 {b.description && (

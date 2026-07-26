@@ -63,7 +63,7 @@ export function TaskCard({ task, onOpen, dragHandle }: TaskCardProps) {
       }}
       role="button"
       tabIndex={0}
-      className="cursor-pointer rounded-md border bg-card p-3 shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="bg-card hover:bg-surface-high focus-visible:ring-ring cursor-pointer rounded-md p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
       <LabelsBar labels={task.labels} />
 

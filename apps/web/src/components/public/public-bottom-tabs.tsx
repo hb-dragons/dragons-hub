@@ -16,7 +16,7 @@ export function PublicBottomTabs() {
   const t = useTranslations();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden pb-[var(--safe-area-bottom)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-low/95 backdrop-blur supports-[backdrop-filter]:bg-surface-low/60 md:hidden pb-[var(--safe-area-bottom)]">
       <div className="mx-auto flex h-16 max-w-2xl items-center justify-around px-4">
         {tabs.map((tab) => {
           const isActive = pathname === tab.href || pathname.startsWith(tab.href + "/");

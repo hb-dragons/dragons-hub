@@ -30,7 +30,6 @@ import {
 import { Skeleton } from "@dragons/ui/components/skeleton";
 import { AlertTriangle, Loader2, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@dragons/ui/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { can } from "@dragons/shared";
 import { TeamBadge } from "@/components/admin/shared/team-badge";
@@ -361,7 +360,7 @@ export function BookingDetailSheet({
                       return (
                         <div
                           key={m.id}
-                          className="rounded-md border px-3 py-2"
+                          className="bg-surface-low rounded-md px-3 py-2"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -403,7 +402,7 @@ export function BookingDetailSheet({
             </div>
 
             {/* Sticky footer */}
-            <div className="border-t bg-background px-4 py-4">
+            <div className="bg-surface-low px-4 py-4">
               <div className="flex gap-2">
                 <Button
                   variant="ghost"

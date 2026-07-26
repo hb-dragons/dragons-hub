@@ -73,7 +73,7 @@ export function AssigneePicker({
         )}
       </PopoverTrigger>
       <PopoverContent className="w-72 p-0" align="start">
-        <div className="border-b p-2">
+        <div className="bg-surface-low p-2">
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}

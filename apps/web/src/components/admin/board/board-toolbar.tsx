@@ -34,9 +34,9 @@ export function BoardToolbar({ boardId, onAddColumn }: BoardToolbarProps) {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 rounded-md border bg-card p-2">
+      <div className="bg-card flex flex-wrap items-center gap-2 rounded-md p-2">
         <BoardSwitcher currentBoardId={boardId} />
-        <div className="ml-2 h-6 border-l" />
+        <div className="bg-border/15 ml-2 h-6 w-px" />
         <TaskFilters />
         <span className="flex-1" />
         <Button variant="outline" size="sm" className="h-8" onClick={onAddColumn}>

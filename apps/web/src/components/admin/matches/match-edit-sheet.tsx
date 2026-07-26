@@ -510,10 +510,10 @@ export function MatchEditSheet({
                 </dl>
 
                 {/* Score table — quarters, halftime, final in one view */}
-                <div className="mt-4 overflow-x-auto rounded-md border">
+                <div className="bg-card mt-4 overflow-x-auto rounded-md">
                   <table className="w-full border-collapse text-sm">
                     <thead>
-                      <tr className="border-b">
+                      <tr className="bg-surface-low">
                         <th className="px-2 py-1.5 text-left text-xs font-medium text-muted-foreground" />
                         {periodScores.map((p) => (
                           <th
@@ -524,11 +524,11 @@ export function MatchEditSheet({
                           </th>
                         ))}
                         {periodScores.length > 0 && (
-                          <th className="border-l px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">
+                          <th className="text-muted-foreground px-2 py-1.5 text-center text-xs font-medium">
                             {t("matchDetail.score.halftime")}
                           </th>
                         )}
-                        <th className={`px-2 py-1.5 text-center text-xs font-semibold${periodScores.length > 0 ? "" : " border-l"}`}>
+                        <th className="px-2 py-1.5 text-center text-xs font-semibold">
                           {t("matchDetail.score.final")}
                         </th>
                       </tr>
@@ -542,11 +542,11 @@ export function MatchEditSheet({
                           </td>
                         ))}
                         {periodScores.length > 0 && (
-                          <td className="border-l px-2 py-1.5 text-center tabular-nums">
+                          <td className="px-2 py-1.5 text-center tabular-nums">
                             {match.homeHalftimeScore ?? "\u2014"}
                           </td>
                         )}
-                        <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
+                        <td className="px-2 py-1.5 text-center font-bold tabular-nums">
                           {match.homeScore ?? "\u2014"}
                         </td>
                       </tr>
@@ -558,11 +558,11 @@ export function MatchEditSheet({
                           </td>
                         ))}
                         {periodScores.length > 0 && (
-                          <td className="border-l px-2 py-1.5 text-center tabular-nums">
+                          <td className="px-2 py-1.5 text-center tabular-nums">
                             {match.guestHalftimeScore ?? "\u2014"}
                           </td>
                         )}
-                        <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
+                        <td className="px-2 py-1.5 text-center font-bold tabular-nums">
                           {match.guestScore ?? "\u2014"}
                         </td>
                       </tr>
@@ -970,7 +970,7 @@ export function MatchEditSheet({
             </div>
 
             {/* #4 — Footer: Cancel + Save — sticky at bottom */}
-            <div className="flex gap-2 border-t bg-background px-4 py-4">
+            <div className="bg-surface-low flex gap-2 px-4 py-4">
               {canEdit ? (
                 <>
                   <Button
