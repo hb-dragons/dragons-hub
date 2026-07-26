@@ -1,3 +1,5 @@
+import { EVENT_TYPES, type EventType } from "@dragons/shared";
+
 // ── Types ───────────────────────────────────────────────────────────────────
 
 export type Channel = "in_app" | "push";
@@ -20,9 +22,9 @@ const ADMIN_EVENT_PREFIXES = [
 
 // ── Referee assignment event types ──────────────────────────────────────────
 
-const REFEREE_SELF_EVENTS = new Set([
-  "referee.assigned",
-  "referee.unassigned",
+const REFEREE_SELF_EVENTS: ReadonlySet<string> = new Set<EventType>([
+  EVENT_TYPES.REFEREE_ASSIGNED,
+  EVENT_TYPES.REFEREE_UNASSIGNED,
 ]);
 
 // ── Push-eligible event types ───────────────────────────────────────────────
@@ -31,28 +33,33 @@ const REFEREE_SELF_EVENTS = new Set([
  * Events where users should receive a native push notification in addition
  * to the in-app entry. Limited to personal + high-urgency events to avoid
  * notification noise.
+ *
+ * Members are `EVENT_TYPES` constants, never restated string literals: the
+ * list previously carried "match.rescheduled", an event nobody emits, so real
+ * schedule changes were silently never push-eligible. Typing the Set as
+ * `Set<EventType>` turns any such name into a compile error.
  */
-const PUSH_ELIGIBLE_EVENTS = new Set([
-  "referee.assigned",
-  "referee.unassigned",
-  "referee.reassigned",
-  "referee.slots.needed",
-  "referee.slots.reminder",
-  "match.cancelled",
-  "match.rescheduled",
-  "task.assigned",
-  "task.unassigned",
-  "task.comment.added",
-  "task.due.reminder",
+const PUSH_ELIGIBLE_EVENTS: ReadonlySet<string> = new Set<EventType>([
+  EVENT_TYPES.REFEREE_ASSIGNED,
+  EVENT_TYPES.REFEREE_UNASSIGNED,
+  EVENT_TYPES.REFEREE_REASSIGNED,
+  EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+  EVENT_TYPES.REFEREE_SLOTS_REMINDER,
+  EVENT_TYPES.MATCH_CANCELLED,
+  EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
+  EVENT_TYPES.TASK_ASSIGNED,
+  EVENT_TYPES.TASK_UNASSIGNED,
+  EVENT_TYPES.TASK_COMMENT_ADDED,
+  EVENT_TYPES.TASK_DUE_REMINDER,
 ]);
 
 // ── Task event recipient field map ───────────────────────────────────────────
 
-const TASK_RECIPIENT_FIELDS: Record<string, string> = {
-  "task.assigned": "assigneeUserIds",
-  "task.unassigned": "unassignedUserIds",
-  "task.comment.added": "recipientUserIds",
-  "task.due.reminder": "assigneeUserIds",
+const TASK_RECIPIENT_FIELDS: Partial<Record<EventType, string>> = {
+  [EVENT_TYPES.TASK_ASSIGNED]: "assigneeUserIds",
+  [EVENT_TYPES.TASK_UNASSIGNED]: "unassignedUserIds",
+  [EVENT_TYPES.TASK_COMMENT_ADDED]: "recipientUserIds",
+  [EVENT_TYPES.TASK_DUE_REMINDER]: "assigneeUserIds",
 };
 
 // ── getDefaultNotificationsForEvent ─────────────────────────────────────────
@@ -95,7 +102,7 @@ export function getDefaultNotificationsForEvent(
     }
   }
 
-  if (eventType === "referee.reassigned") {
+  if (eventType === EVENT_TYPES.REFEREE_REASSIGNED) {
     const oldRefereeId = toNumber(payload["oldRefereeId"]);
     const newRefereeId = toNumber(payload["newRefereeId"]);
 
@@ -107,7 +114,7 @@ export function getDefaultNotificationsForEvent(
     }
   }
 
-  const taskField = TASK_RECIPIENT_FIELDS[eventType];
+  const taskField = (TASK_RECIPIENT_FIELDS as Record<string, string | undefined>)[eventType];
   if (taskField) {
     const raw = payload[taskField];
     const userIds = Array.isArray(raw) ? raw.filter((x) => typeof x === "string") as string[] : [];

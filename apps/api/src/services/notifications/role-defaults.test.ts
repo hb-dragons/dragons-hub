@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { EVENT_TYPES } from "@dragons/shared";
 import { getDefaultNotificationsForEvent } from "./role-defaults";
 
 describe("getDefaultNotificationsForEvent", () => {
@@ -227,13 +228,39 @@ describe("getDefaultNotificationsForEvent", () => {
         {},
         "test",
       );
-      const rescheduled = getDefaultNotificationsForEvent(
-        "match.rescheduled",
+      const scheduleChanged = getDefaultNotificationsForEvent(
+        EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
         {},
         "test",
       );
       expect(cancelled.some((n) => n.channel === "push")).toBe(true);
-      expect(rescheduled.some((n) => n.channel === "push")).toBe(true);
+      expect(scheduleChanged.some((n) => n.channel === "push")).toBe(true);
+    });
+
+    // The push eligibility list used to key on the string "match.rescheduled",
+    // which is not a member of EVENT_TYPES — so real schedule changes never
+    // became push-eligible and the list matched an event nobody emits.
+    it("makes the real schedule-change event push-eligible for admins", () => {
+      const out = getDefaultNotificationsForEvent(
+        EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
+        {
+          matchNo: 42,
+          homeTeam: "Dragons",
+          guestTeam: "Tigers",
+          leagueName: "BL",
+          teamIds: [],
+          changes: [
+            { field: "kickoffDate", oldValue: "2026-06-08", newValue: "2026-06-10" },
+          ],
+        },
+        "sync",
+      );
+      expect(out).toContainEqual({ audience: "admin", channel: "push" });
+    });
+
+    it("does not treat the non-existent 'match.rescheduled' name as push-eligible", () => {
+      const out = getDefaultNotificationsForEvent("match.rescheduled", {}, "sync");
+      expect(out.filter((n) => n.channel === "push")).toEqual([]);
     });
   });
 
@@ -321,7 +348,7 @@ describe("getDefaultNotificationsForEvent", () => {
       { type: "referee.slots.needed", payload: {} },
       { type: "referee.slots.reminder", payload: {} },
       { type: "match.cancelled", payload: {} },
-      { type: "match.rescheduled", payload: {} },
+      { type: EVENT_TYPES.MATCH_SCHEDULE_CHANGED, payload: {} },
     ];
 
     it.each(eligibleEvents)(
