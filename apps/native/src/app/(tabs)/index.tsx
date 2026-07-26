@@ -1,6 +1,8 @@
+import { useCallback } from "react";
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
+import type { MatchListItem } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { StatStrip } from "@/components/StatStrip";
@@ -39,6 +41,15 @@ export default function HomeScreen() {
   } = useSWR("home:dashboard", () => publicApi.getHomeDashboard());
 
   const state = resolveFetchState({ isLoading, error, data: dashboard });
+
+  // Stable handler: MatchCard* are memo-wrapped, and an inline arrow per call
+  // site made that memo a no-op.
+  const openMatch = useCallback(
+    (match: MatchListItem) => {
+      router.push(`/game/${String(match.id)}`);
+    },
+    [router],
+  );
 
   if (state === "loading") {
     return (
@@ -172,10 +183,7 @@ export default function HomeScreen() {
         </View>
 
         {nextGame ? (
-          <MatchCardFull
-            match={nextGame}
-            onPress={() => router.push(`/game/${String(nextGame.id)}`)}
-          />
+          <MatchCardFull match={nextGame} onPress={openMatch} />
         ) : (
           <View
             style={{
@@ -254,11 +262,7 @@ export default function HomeScreen() {
           </Text>
           <View style={{ gap: spacing.sm }}>
             {upcomingGames.slice(0, 3).map((match) => (
-              <MatchCardCompact
-                key={match.id}
-                match={match}
-                onPress={() => router.push(`/game/${String(match.id)}`)}
-              />
+              <MatchCardCompact key={match.id} match={match} onPress={openMatch} />
             ))}
           </View>
         </View>

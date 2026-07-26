@@ -134,6 +134,15 @@ export default function TeamDetailScreen() {
   // Last completed match id for highlighting in "All Games"
   const lastCompletedId = lastGame?.id ?? null;
 
+  // Stable handler: MatchCard* are memo-wrapped, and an inline arrow per call
+  // site made that memo a no-op.
+  const openMatch = useCallback(
+    (match: MatchListItem) => {
+      router.push(`/game/${String(match.id)}`);
+    },
+    [router],
+  );
+
   // Memoized renderers for the "All Games" FlatList
   const renderMatchItem = useCallback<ListRenderItem<MatchListItem>>(
     ({ item: match }) => (
@@ -141,11 +150,11 @@ export default function TeamDetailScreen() {
         <MatchCardCompact
           match={match}
           highlighted={match.id === lastCompletedId}
-          onPress={() => router.push(`/game/${String(match.id)}`)}
+          onPress={openMatch}
         />
       </View>
     ),
-    [lastCompletedId, router, spacing.sm],
+    [lastCompletedId, openMatch, spacing.sm],
   );
   const keyExtractMatch = useCallback((match: MatchListItem) => String(match.id), []);
 
@@ -326,10 +335,7 @@ export default function TeamDetailScreen() {
             >
               {i18n.t("teamDetail.lastGame")}
             </Text>
-            <MatchCardFull
-              match={lastGame}
-              onPress={() => router.push(`/game/${String(lastGame.id)}`)}
-            />
+            <MatchCardFull match={lastGame} onPress={openMatch} />
           </View>
         ) : null}
 
@@ -348,10 +354,7 @@ export default function TeamDetailScreen() {
             >
               {i18n.t("teamDetail.nextGame")}
             </Text>
-            <MatchCardFull
-              match={nextGame}
-              onPress={() => router.push(`/game/${String(nextGame.id)}`)}
-            />
+            <MatchCardFull match={nextGame} onPress={openMatch} />
           </View>
         ) : null}
 

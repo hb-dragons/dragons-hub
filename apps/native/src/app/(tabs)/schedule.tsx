@@ -61,6 +61,15 @@ function MatchList({
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
 
+  // Stable handler: MatchCard* are memo-wrapped, and an inline arrow per call
+  // site made that memo a no-op.
+  const openMatch = useCallback(
+    (match: MatchListItem) => {
+      router.push(`/game/${String(match.id)}`);
+    },
+    [router],
+  );
+
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xl }}>
@@ -104,10 +113,7 @@ function MatchList({
       )}
       renderItem={({ item }) => (
         <View style={{ marginBottom: spacing.sm }}>
-          <MatchCardFull
-            match={item}
-            onPress={() => router.push(`/game/${String(item.id)}`)}
-          />
+          <MatchCardFull match={item} onPress={openMatch} />
         </View>
       )}
       refreshControl={refreshControl}

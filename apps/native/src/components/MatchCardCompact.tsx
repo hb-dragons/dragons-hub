@@ -10,7 +10,7 @@ import { ClubLogo } from "./brand/ClubLogo";
 
 interface MatchCardCompactProps {
   match: MatchListItem;
-  onPress?: () => void;
+  onPress?: (match: MatchListItem) => void;
   highlighted?: boolean;
 }
 
@@ -208,7 +208,7 @@ function MatchCardCompactImpl({ match, onPress, highlighted }: MatchCardCompactP
   if (onPress) {
     return (
       <Pressable
-        onPress={onPress}
+        onPress={() => onPress(match)}
         style={({ pressed }) => (pressed ? { opacity: 0.85 } : undefined)}
       >
         {content}

@@ -1,6 +1,5 @@
 import {
   createContext,
-  Fragment,
   useCallback,
   useContext,
   useEffect,
@@ -41,27 +40,33 @@ const LocaleContext = createContext<LocaleContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [pref, setPrefState] = useState<LocalePref>("system");
+  const [locale, setLocaleState] = useState<ResolvedLocale>(() => resolve("system"));
   const [loaded, setLoaded] = useState(false);
+
+  // `i18n` is a module singleton, so it has to be pushed at the moment the
+  // preference changes rather than during render: assigning to it while
+  // rendering is a side effect React is free to run twice or discard.
+  const apply = useCallback((next: LocalePref) => {
+    const resolved = resolve(next);
+    i18n.locale = resolved;
+    setPrefState(next);
+    setLocaleState(resolved);
+  }, []);
 
   useEffect(() => {
     void SecureStore.getItemAsync(LOCALE_KEY).then((stored) => {
-      if (isValidPref(stored)) {
-        setPrefState(stored);
-      }
+      apply(isValidPref(stored) ? stored : "system");
       setLoaded(true);
     });
-  }, []);
+  }, [apply]);
 
-  const locale = useMemo(() => resolve(pref), [pref]);
-
-  // Keep the shared i18n instance in sync synchronously so children
-  // reading `i18n.t(...)` during render see the current locale.
-  i18n.locale = locale;
-
-  const setPref = useCallback((next: LocalePref) => {
-    setPrefState(next);
-    void SecureStore.setItemAsync(LOCALE_KEY, next);
-  }, []);
+  const setPref = useCallback(
+    (next: LocalePref) => {
+      apply(next);
+      void SecureStore.setItemAsync(LOCALE_KEY, next);
+    },
+    [apply],
+  );
 
   const value = useMemo<LocaleContextValue>(
     () => ({ pref, locale, setPref }),
@@ -70,13 +75,14 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   if (!loaded) return null;
 
-  // Remount the subtree when locale flips so components re-read
-  // `i18n.t(...)` against the new translations.
-  return createElement(
-    LocaleContext.Provider,
-    { value },
-    createElement(Fragment, { key: locale }, children),
-  );
+  // NOTE: children are deliberately NOT wrapped in `key={locale}`. That
+  // remounted the entire navigation tree on every locale switch — resetting the
+  // back stack, scroll positions and any open sheet — just to make components
+  // re-read `i18n.t(...)`. Re-reading only needs a re-render, and React
+  // propagates a context change into subtrees that would otherwise bail out, so
+  // consumers of this context re-render in place. `useTheme()` subscribes on
+  // every themed component's behalf; see the note there.
+  return createElement(LocaleContext.Provider, { value }, children);
 }
 
 export function useLocale(): LocaleContextValue {
@@ -85,4 +91,13 @@ export function useLocale(): LocaleContextValue {
     throw new Error("useLocale must be used within a LocaleProvider");
   }
   return ctx;
+}
+
+/**
+ * Subscribes the calling component to locale changes without requiring a
+ * provider — for components that render translated text but do not otherwise
+ * care about the locale value. Returns null outside a `LocaleProvider`.
+ */
+export function useLocaleSubscription(): ResolvedLocale | null {
+  return useContext(LocaleContext)?.locale ?? null;
 }

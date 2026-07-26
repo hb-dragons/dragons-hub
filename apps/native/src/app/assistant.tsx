@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
@@ -103,14 +103,33 @@ export default function AssistantScreen() {
   const contentH = useRef(0);
   const lastUserCount = useRef(0);
 
-  const cfg = buildAssistantTransportConfig({ apiUrl: resolveApiUrl(), cookie: authClient.getCookie(), locale: i18n.locale });
+  // Built once. A fresh DefaultChatTransport used to be constructed on every
+  // render — including every streamed token — and the auth cookie was
+  // snapshotted at render time, so a cookie rotated mid-conversation was not
+  // picked up until something else happened to re-render the screen. `headers`
+  // and `body` accept thunks, which the transport resolves per request.
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: buildAssistantTransportConfig({ apiUrl: resolveApiUrl(), cookie: null }).api,
+        headers: () =>
+          buildAssistantTransportConfig({
+            apiUrl: resolveApiUrl(),
+            cookie: authClient.getCookie() ?? null,
+          }).headers,
+        body: () =>
+          buildAssistantTransportConfig({
+            apiUrl: resolveApiUrl(),
+            cookie: null,
+            locale: i18n.locale,
+          }).body,
+        fetch: expoFetch as unknown as typeof globalThis.fetch,
+      }),
+    [],
+  );
+
   const { messages, sendMessage, status, error, stop, regenerate } = useChat({
-    transport: new DefaultChatTransport({
-      api: cfg.api,
-      headers: cfg.headers,
-      body: cfg.body,
-      fetch: expoFetch as unknown as typeof globalThis.fetch,
-    }),
+    transport,
   });
 
   const scrollToBottom = (animated: boolean) => {
