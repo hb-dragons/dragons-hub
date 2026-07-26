@@ -9,6 +9,7 @@ import { logger } from "../../../config/logger";
 import type { ExpoPushClient, ExpoPushMessage } from "../expo-push.client";
 import { mapTicketError, isUndeliveredTicket } from "../expo-push.client";
 import { renderPushTemplate, type Locale } from "../templates/push";
+import { insertNotificationLogDeduped } from "../notification-log-dedup";
 
 const log = logger.child({ service: "push-adapter" });
 
@@ -123,11 +124,7 @@ export class PushChannelAdapter {
       status: "pending",
     }));
 
-    const claimedRows = await getDb()
-      .insert(notificationLog)
-      .values(claimValues)
-      .onConflictDoNothing()
-      .returning({ id: notificationLog.id, recipientId: notificationLog.recipientId });
+    const claimedRows = await insertNotificationLogDeduped(getDb(), claimValues);
 
     const claimIdByUser = new Map<string, number>();
     for (const row of claimedRows) {

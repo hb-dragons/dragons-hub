@@ -38,10 +38,9 @@ pnpm --filter @dragons/web dev    # Web only
 pnpm --filter @dragons/api test   # API tests only
 pnpm --filter @dragons/native test  # Native (Expo) tests only
 
-# Database
+# Database (generate + migrate only — `drizzle-kit push` is disabled, see below)
 pnpm --filter @dragons/db db:generate   # Generate Drizzle migrations
 pnpm --filter @dragons/db db:migrate    # Run migrations
-pnpm --filter @dragons/db db:push       # Push schema to DB
 pnpm --filter @dragons/db db:studio     # Open Drizzle Studio
 
 # Infrastructure
@@ -98,6 +97,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 ### Database (Drizzle)
 - Schema files in `packages/db/src/schema/`
 - After schema changes: run `db:generate` then `db:migrate`
+- **`drizzle-kit push` is disabled.** It diffs the TS schema against the live DB and drops whatever the schema does not declare — including three indexes that exist only in hand-written SQL migrations and are invisible to drizzle-kit. The `db:push` script and `drizzle.config.ts` both refuse to run it. Migrations are the only schema-sync path. Details and the list of invisible indexes: `packages/db/drizzle/README.md`.
 - Use `dataHash` columns for change detection during sync
 - All tables use `serial` primary keys with separate `apiId`/`apiMatchId` etc. for external IDs
 - Unique constraints on external IDs to prevent duplicates

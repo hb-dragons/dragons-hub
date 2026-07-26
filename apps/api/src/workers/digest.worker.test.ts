@@ -1,4 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import type * as DbSchema from "@dragons/db/schema";
+import type * as DrizzleOrm from "drizzle-orm";
 
 // --- Hoisted mocks ---
 
@@ -50,7 +52,10 @@ vi.mock("../config/database", () => ({
   }),
 }));
 
-vi.mock("@dragons/db/schema", () => ({
+vi.mock("@dragons/db/schema", async (importOriginal) => ({
+  // The dedup conflict target is real SQL, not a stub — it has to render.
+  notificationLogDedupTarget: (await importOriginal<typeof DbSchema>())
+    .notificationLogDedupTarget,
   digestBuffer: { id: "id", eventId: "eventId", channelConfigId: "channelConfigId" },
   domainEvents: {
     id: "id",
@@ -71,7 +76,10 @@ vi.mock("@dragons/db/schema", () => ({
   },
 }));
 
-vi.mock("drizzle-orm", () => ({
+vi.mock("drizzle-orm", async (importOriginal) => ({
+  // `sql` must stay real: the notification_log dedup insert builds its explicit
+  // conflict target with it.
+  ...(await importOriginal<typeof DrizzleOrm>()),
   eq: vi.fn((...args: unknown[]) => ({ _eq: args })),
   and: vi.fn((...args: unknown[]) => ({ _and: args })),
   inArray: vi.fn((...args: unknown[]) => ({ _inArray: args })),
@@ -222,17 +230,14 @@ describe("digest worker processor", () => {
       // Transaction mock: execute the callback with a mock tx
       mockDbTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
         const mockInsert = vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([{ id: 1 }]),
-            }),
-          }),
+          values: vi.fn().mockReturnValue({ getSQL: vi.fn().mockReturnValue({}) }),
         });
+        const mockExecute = vi.fn().mockResolvedValue({ rows: [{ id: 1, recipient_id: "digest:5" }] });
         const mockDelete = vi.fn().mockReturnValue({
           where: vi.fn().mockResolvedValue(undefined),
         });
 
-        return fn({ insert: mockInsert, delete: mockDelete });
+        return fn({ insert: mockInsert, execute: mockExecute, delete: mockDelete });
       });
     }
 
@@ -295,17 +300,14 @@ describe("digest worker processor", () => {
       // Transaction mock: insert returns empty array (duplicate detected)
       mockDbTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
         const mockInsert = vi.fn().mockReturnValue({
-          values: vi.fn().mockReturnValue({
-            onConflictDoNothing: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([]),  // empty = duplicate
-            }),
-          }),
+          values: vi.fn().mockReturnValue({ getSQL: vi.fn().mockReturnValue({}) }),
         });
+        const mockExecute = vi.fn().mockResolvedValue({ rows: [] }); // empty = duplicate
         const mockDelete = vi.fn().mockReturnValue({
           where: vi.fn().mockResolvedValue(undefined),
         });
 
-        return fn({ insert: mockInsert, delete: mockDelete });
+        return fn({ insert: mockInsert, execute: mockExecute, delete: mockDelete });
       });
 
       const result = await capturedProcessor!(makeJob({ channelConfigId: 5, digestRunId: 200 }));
