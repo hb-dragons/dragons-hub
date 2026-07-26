@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo } from "react-native";
 import { useSharedValue, type SharedValue } from "react-native-reanimated";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
@@ -283,11 +283,17 @@ export function useBoardDrag({
     }
   }, [callFindDropTarget, moveTask]);
 
-  const onTaskDrag = {
-    start: handleDragStart,
-    move: handleDragMove,
-    end: handleDragEnd,
-  };
+  // Must be memoised: this object is forwarded through BoardPager and
+  // BoardColumn down to every TaskCard, so a fresh literal per render made
+  // memoising the cards pointless and rebuilt each card's pan gesture.
+  const onTaskDrag = useMemo(
+    () => ({
+      start: handleDragStart,
+      move: handleDragMove,
+      end: handleDragEnd,
+    }),
+    [handleDragStart, handleDragMove, handleDragEnd],
+  );
 
   // ---------------------------------------------------------------------------
   // Autoscroll interval

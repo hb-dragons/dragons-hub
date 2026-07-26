@@ -235,7 +235,10 @@
     "apply": "Anwenden",
     "loading": "Laden…",
     "vs": "vs",
-    "at": "@"
+    "at": "@",
+    "loadFailed": "Seite konnte nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "notFound": "Nicht gefunden"
   },
   "admin": {
     "boards": {

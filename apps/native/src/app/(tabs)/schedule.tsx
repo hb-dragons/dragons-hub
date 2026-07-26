@@ -20,26 +20,12 @@ import { FilterPill } from "@/components/FilterPill";
 import { MatchCardFull } from "@/components/MatchCardFull";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
+import { kickoffLong, kickoffToday } from "@/lib/format/kickoff";
 import { fontFamilies } from "@/theme/typography";
 import { Segmented } from "@/components/ui/Segmented";
 
 type Segment = "upcoming" | "results";
 type LocationFilter = "all" | "home" | "away";
-
-function getToday(): string {
-  // ISO string always has a T separator, so index 0 is always defined
-  return new Date().toISOString().split("T")[0]!;
-}
-
-function formatSectionDate(dateStr: string): string {
-  const locale = i18n.locale === "de" ? "de-DE" : "en-US";
-  const d = new Date(dateStr + "T00:00:00");
-  const weekday = d.toLocaleDateString(locale, { weekday: "long" });
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const year = d.getFullYear();
-  return `${weekday}, ${day}.${month}.${year}`;
-}
 
 interface Section {
   title: string;
@@ -57,7 +43,7 @@ function groupByDate(matches: MatchListItem[]): Section[] {
   }
   return Array.from(grouped.entries()).map(([date, items]): Section => ({
     title: date,
-    formattedTitle: formatSectionDate(date),
+    formattedTitle: kickoffLong(date),
     data: items,
   }));
 }
@@ -140,13 +126,18 @@ export default function ScheduleScreen() {
   const [segment, setSegment] = useState<Segment>("upcoming");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
 
+  // Only the visible segment fetches. Both queries pull up to 1000 matches, and
+  // issuing them unconditionally doubled the payload on mount for a list the
+  // user cannot see. SWR keeps the other segment's response cached, so
+  // switching back renders from cache and merely revalidates.
+
   // Upcoming: from today, ascending
   const {
     data: upcomingData,
     isLoading: upcomingLoading,
     mutate: mutateUpcoming,
-  } = useSWR("schedule:upcoming", () =>
-    publicApi.getMatches({ limit: 1000, sort: "asc", dateFrom: getToday() }),
+  } = useSWR(segment === "upcoming" ? "schedule:upcoming" : null, () =>
+    publicApi.getMatches({ limit: 1000, sort: "asc", dateFrom: kickoffToday() }),
   );
 
   // Results: up to today, descending (most recent first)
@@ -154,8 +145,8 @@ export default function ScheduleScreen() {
     data: resultsData,
     isLoading: resultsLoading,
     mutate: mutateResults,
-  } = useSWR("schedule:results", () =>
-    publicApi.getMatches({ limit: 1000, sort: "desc", dateTo: getToday(), hasScore: true }),
+  } = useSWR(segment === "results" ? "schedule:results" : null, () =>
+    publicApi.getMatches({ limit: 1000, sort: "desc", dateTo: kickoffToday(), hasScore: true }),
   );
 
   const upcomingRefresh = useRefresh(() => mutateUpcoming());

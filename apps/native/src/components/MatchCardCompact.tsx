@@ -4,6 +4,7 @@ import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
+import { kickoffCompact } from "../lib/format/kickoff";
 import { fontFamilies } from "../theme/typography";
 import { ClubLogo } from "./brand/ClubLogo";
 
@@ -11,19 +12,6 @@ interface MatchCardCompactProps {
   match: MatchListItem;
   onPress?: () => void;
   highlighted?: boolean;
-}
-
-function getDateLocale(): string {
-  return i18n.locale === "de" ? "de-DE" : "en-US";
-}
-
-function formatCompactDate(kickoffDate: string, kickoffTime: string): string {
-  const d = new Date(kickoffDate + "T00:00:00");
-  const weekday = d.toLocaleDateString(getDateLocale(), { weekday: "short" });
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const time = kickoffTime.slice(0, 5);
-  return `${weekday} ${day}.${month}. ${time}`;
 }
 
 function resolveName(
@@ -104,7 +92,7 @@ function MatchCardCompactImpl({ match, onPress, highlighted }: MatchCardCompactP
           marginBottom: spacing.xs,
         }}
       >
-        {formatCompactDate(match.kickoffDate, match.kickoffTime)}
+        {kickoffCompact(match.kickoffDate, match.kickoffTime)}
       </Text>
 
       {/* Main row: teams + score + badge */}

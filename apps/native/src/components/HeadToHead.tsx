@@ -2,6 +2,7 @@ import { View, Text, Pressable } from "react-native";
 import type { HeadToHead as HeadToHeadData } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
+import { kickoffShortNumeric } from "../lib/format/kickoff";
 import { fontFamilies } from "../theme/typography";
 import { ClubLogo } from "./brand/ClubLogo";
 
@@ -12,14 +13,6 @@ interface HeadToHeadProps {
   ownLabel: string;
   ownColor: string;
   onMatchPress?: (matchId: number) => void;
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const year = d.getFullYear().toString().slice(2);
-  return `${day}.${month}.${year}`;
 }
 
 export function HeadToHead({
@@ -167,7 +160,7 @@ export function HeadToHead({
                     width: 58,
                   }}
                 >
-                  {formatDate(meeting.date)}
+                  {kickoffShortNumeric(meeting.date)}
                 </Text>
 
                 {/* Home team */}

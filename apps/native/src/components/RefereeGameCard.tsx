@@ -2,6 +2,7 @@ import { View, Text, Pressable } from "react-native";
 import type { RefereeGameListItem } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
+import { kickoffCompact } from "../lib/format/kickoff";
 import { fontFamilies } from "../theme/typography";
 
 interface RefereeGameCardProps {
@@ -10,16 +11,6 @@ interface RefereeGameCardProps {
   isAdmin?: boolean;
   onAdminAssign?: (slotNumber: 1 | 2) => void;
   onAdminUnassign?: (slotNumber: 1 | 2, refereeName: string) => void;
-}
-
-function formatCompactDate(kickoffDate: string, kickoffTime: string): string {
-  const locale = i18n.locale === "de" ? "de-DE" : "en-US";
-  const d = new Date(kickoffDate + "T00:00:00");
-  const weekday = d.toLocaleDateString(locale, { weekday: "short" });
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const time = kickoffTime.slice(0, 5);
-  return `${weekday} ${day}.${month}. ${time}`;
 }
 
 interface SlotRowProps {
@@ -231,7 +222,7 @@ export function RefereeGameCard({
             color: colors.mutedForeground,
           }}
         >
-          {formatCompactDate(game.kickoffDate, game.kickoffTime)}
+          {kickoffCompact(game.kickoffDate, game.kickoffTime)}
         </Text>
         {game.leagueShort ? (
           <Text

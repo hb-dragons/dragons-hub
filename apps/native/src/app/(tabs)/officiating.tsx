@@ -22,20 +22,11 @@ import { AssignRefereeModal } from "@/components/AssignRefereeModal";
 import { authClient } from "@/lib/auth-client";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
+import { kickoffLong, kickoffToday } from "@/lib/format/kickoff";
 import { haptics } from "@/lib/haptics";
 import { fontFamilies } from "@/theme/typography";
 
 type Segment = "mine" | "open" | "past";
-
-function formatSectionDate(dateStr: string): string {
-  const locale = i18n.locale === "de" ? "de-DE" : "en-US";
-  const d = new Date(dateStr + "T00:00:00");
-  const weekday = d.toLocaleDateString(locale, { weekday: "long" });
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const year = d.getFullYear();
-  return `${weekday}, ${day}.${month}.${year}`;
-}
 
 interface Section {
   title: string;
@@ -59,17 +50,9 @@ function groupByDate(
   );
   return entries.map(([date, items]): Section => ({
     title: date,
-    formattedTitle: formatSectionDate(date),
+    formattedTitle: kickoffLong(date),
     data: items,
   }));
-}
-
-function todayIsoDate(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = (now.getMonth() + 1).toString().padStart(2, "0");
-  const d = now.getDate().toString().padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 function hasAvailableSlot(g: RefereeGameListItem): boolean {
@@ -211,7 +194,7 @@ export default function OfficiatingScreen() {
         pastCount: 0,
       };
     }
-    const { mine, open, past } = partitionGames(data.items, todayIsoDate());
+    const { mine, open, past } = partitionGames(data.items, kickoffToday());
     return {
       mineSections: groupByDate(mine, "asc"),
       openSections: groupByDate(open, "asc"),

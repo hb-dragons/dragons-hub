@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
@@ -322,7 +322,7 @@ function AvatarStack({
 // TaskCard
 // ---------------------------------------------------------------------------
 
-export function TaskCard({
+function TaskCardImpl({
   task,
   onPress,
   onLongPress,
@@ -352,6 +352,42 @@ export function TaskCard({
   }));
 
   const cardRef = useAnimatedRef<Animated.View>();
+
+  // Built once per (onDrag, task) rather than on every render: `Gesture.Pan()`
+  // constructs a new gesture object and, when its identity changes,
+  // GestureDetector tears down and re-attaches the native recogniser — which
+  // during a drag happens on every animation frame.
+  const dragGesture = useMemo(() => {
+    if (!onDrag) return null;
+    const { start: safeStart, move: safeMove, end: safeEnd } = onDrag;
+    return Gesture.Pan()
+      .activateAfterLongPress(300)
+      .onStart(() => {
+        "worklet";
+        const m = measure(cardRef);
+        if (!m) return;
+        runOnJS(safeStart)(task, {
+          x: m.pageX,
+          y: m.pageY,
+          width: m.width,
+          height: m.height,
+        });
+      })
+      .onUpdate((e) => {
+        "worklet";
+        runOnJS(safeMove)(e.absoluteX, e.absoluteY);
+      })
+      .onEnd(() => {
+        "worklet";
+        runOnJS(safeEnd)();
+      })
+      .onFinalize((_e, success) => {
+        "worklet";
+        if (!success) {
+          runOnJS(safeEnd)();
+        }
+      });
+  }, [onDrag, task, cardRef]);
 
   const handleLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -580,39 +616,9 @@ export function TaskCard({
     cardContent
   );
 
-  if (!onDrag) {
+  if (!dragGesture) {
     return swipeWrapped;
   }
-
-  const { start: safeStart, move: safeMove, end: safeEnd } = onDrag;
-
-  const dragGesture = Gesture.Pan()
-    .activateAfterLongPress(300)
-    .onStart(() => {
-      "worklet";
-      const m = measure(cardRef);
-      if (!m) return;
-      runOnJS(safeStart)(task, {
-        x: m.pageX,
-        y: m.pageY,
-        width: m.width,
-        height: m.height,
-      });
-    })
-    .onUpdate((e) => {
-      "worklet";
-      runOnJS(safeMove)(e.absoluteX, e.absoluteY);
-    })
-    .onEnd(() => {
-      "worklet";
-      runOnJS(safeEnd)();
-    })
-    .onFinalize((_e, success) => {
-      "worklet";
-      if (!success) {
-        runOnJS(safeEnd)();
-      }
-    });
 
   return (
     <GestureDetector gesture={dragGesture}>
@@ -622,3 +628,11 @@ export function TaskCard({
     </GestureDetector>
   );
 }
+
+/**
+ * Memoised: a board column renders one of these per task, and the parent
+ * re-renders on every search keystroke and on every drag-move that changes the
+ * highlighted column. All props except `task` are now referentially stable, so
+ * only the cards that actually changed re-render.
+ */
+export const TaskCard = memo(TaskCardImpl);

@@ -1,12 +1,14 @@
 import { useCallback, useMemo } from "react";
-import { View, Text, ActivityIndicator, FlatList } from "react-native";
+import { View, Text, ActivityIndicator, FlatList, RefreshControl } from "react-native";
 import type { ListRenderItem } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
+import { useRefresh } from "@/hooks/useRefresh";
 import { Screen } from "@/components/Screen";
+import { ErrorState } from "@/components/ErrorState";
 import { MatchCardFull } from "@/components/MatchCardFull";
 import { MatchCardCompact } from "@/components/MatchCardCompact";
 import { FormStrip } from "@/components/FormStrip";
@@ -14,6 +16,7 @@ import { StandingsTable } from "@/components/StandingsTable";
 import { ClubLogo } from "@/components/brand/ClubLogo";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
+import { resolveFetchState } from "@/lib/ui/fetch-state";
 import { fontFamilies } from "@/theme/typography";
 
 export default function TeamDetailScreen() {
@@ -25,6 +28,7 @@ export default function TeamDetailScreen() {
 
   const {
     data: teams,
+    error: teamsError,
     isLoading: teamsLoading,
     mutate: mutateTeams,
   } = useSWR("teams:all", () => publicApi.getTeams());
@@ -114,7 +118,15 @@ export default function TeamDetailScreen() {
     return map;
   }, [teams]);
 
-  const isLoading = teamsLoading || matchesLoading || statsLoading;
+  // The team list is what decides whether this route exists at all: a deep
+  // link to an unknown id used to sit on a spinner forever, because `team` is
+  // derived from `teams` and stays null once the list has loaded without it.
+  const teamsState = resolveFetchState({
+    isLoading: teamsLoading,
+    error: teamsError,
+    data: teams,
+  });
+  const isLoading = teamsState === "loading" || matchesLoading || statsLoading;
   const teamName = team
     ? team.customName || team.nameShort || team.name
     : "";
@@ -137,6 +149,31 @@ export default function TeamDetailScreen() {
   );
   const keyExtractMatch = useCallback((match: MatchListItem) => String(match.id), []);
 
+  const { refreshing, onRefresh } = useRefresh([
+    () => mutateTeams(),
+    () => mutateStats(),
+    () => mutateMatches(),
+    () => mutateStandings(),
+  ]);
+
+  const listRefreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={() => {
+          void onRefresh();
+        }}
+        tintColor={colors.primary}
+      />
+    ),
+    [refreshing, onRefresh, colors.primary],
+  );
+
+  const listContentStyle = useMemo(
+    () => ({ paddingBottom: spacing.xl }),
+    [spacing.xl],
+  );
+
   // Resolve opponent team API ID from standings team name
   const handleOpponentPress = (teamName: string) => {
     if (!teams) return;
@@ -153,7 +190,7 @@ export default function TeamDetailScreen() {
 
   // --- Loading state ---
 
-  if (isLoading || !team) {
+  if (isLoading) {
     return (
       <Screen headerOffset={44}>
         <View
@@ -170,25 +207,39 @@ export default function TeamDetailScreen() {
     );
   }
 
+  // --- Error / not-found state ---
+  // Reachable by deep link: the id may simply not be in the teams list.
+  if (teamsState === "error" || !team) {
+    return (
+      <Screen headerOffset={44}>
+        <ErrorState
+          message={
+            teamsState === "error"
+              ? i18n.t("common.loadFailed")
+              : i18n.t("common.notFound")
+          }
+          retryLabel={i18n.t("common.retry")}
+          onRetry={() => {
+            void mutateTeams();
+          }}
+        />
+      </Screen>
+    );
+  }
+
   // --- Season stats values ---
   const played = teamStats?.played ?? 0;
   const wins = teamStats?.wins ?? 0;
   const losses = teamStats?.losses ?? 0;
   const diff = teamStats?.pointsDiff ?? 0;
 
-  return (
+  // Everything above "All Games" is the list header. It used to sit alongside a
+  // FlatList inside the Screen's ScrollView, which nested one VirtualizedList
+  // inside another: RN warns, and the inner list renders every row eagerly
+  // because it never sees a viewport.
+  const listHeader = (
     <>
-      <Stack.Screen options={{ headerTitle: team.name }} />
-      <Screen
-        headerOffset={44}
-        onRefresh={[
-          () => mutateTeams(),
-          () => mutateStats(),
-          () => mutateMatches(),
-          () => mutateStandings(),
-        ]}
-      >
-        {/* 1. Team Header */}
+      {/* 1. Team Header */}
         <View
           style={{
             marginBottom: spacing.lg,
@@ -373,41 +424,47 @@ export default function TeamDetailScreen() {
           </View>
         ) : null}
 
-        {/* 7. All Games */}
-        {allMatches.length > 0 ? (
-          <View style={{ marginBottom: spacing.lg }}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontFamily: fontFamilies.displayMedium,
-                color: colors.mutedForeground,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-                marginBottom: spacing.sm,
-              }}
-            >
-              {i18n.t("teamDetail.allGames")}
-            </Text>
-            <FlatList
-              data={allMatches}
-              renderItem={renderMatchItem}
-              keyExtractor={keyExtractMatch}
-              scrollEnabled={false}
-              removeClippedSubviews={false}
-              initialNumToRender={10}
-              windowSize={5}
-              maxToRenderPerBatch={10}
-            />
-          </View>
-        ) : (
-          <View style={{ paddingTop: spacing.xl, alignItems: "center" }}>
-            <Text
-              style={[textStyles.body, { color: colors.mutedForeground }]}
-            >
-              {i18n.t("teamDetail.noMatches")}
-            </Text>
-          </View>
-        )}
+      {/* 7. All Games — the heading only; the rows are the list itself. */}
+      {allMatches.length > 0 ? (
+        <Text
+          style={{
+            fontSize: 11,
+            fontFamily: fontFamilies.displayMedium,
+            color: colors.mutedForeground,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            marginBottom: spacing.sm,
+          }}
+        >
+          {i18n.t("teamDetail.allGames")}
+        </Text>
+      ) : null}
+    </>
+  );
+
+  return (
+    <>
+      <Stack.Screen options={{ headerTitle: team.name }} />
+      <Screen headerOffset={44} scroll={false}>
+        <FlatList
+          data={allMatches}
+          renderItem={renderMatchItem}
+          keyExtractor={keyExtractMatch}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            <View style={{ paddingTop: spacing.xl, alignItems: "center" }}>
+              <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
+                {i18n.t("teamDetail.noMatches")}
+              </Text>
+            </View>
+          }
+          refreshControl={listRefreshControl}
+          contentContainerStyle={listContentStyle}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={10}
+          windowSize={5}
+          maxToRenderPerBatch={10}
+        />
       </Screen>
     </>
   );
