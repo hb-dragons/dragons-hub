@@ -1,60 +1,25 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
 
 // --- Mock setup ---
+//
+// drizzle-orm and @dragons/db/schema are deliberately NOT mocked (issue #110).
+// This file used to stub `eq`/`and`/`or` with identity functions and assert on a
+// JSON.stringify of the resulting fake predicate tree. That form of assertion
+// cannot see whether a predicate is *correct*: inverting the home/away filter
+// from `eq(isHomeGame, true)` to `eq(isHomeGame, false)` left all 29 tests green.
+// Everything below runs the real query against a real (in-process PGlite)
+// Postgres and asserts which rows actually come back.
 
-const mockSelect = vi.fn();
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockSelect(...args),
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  refereeGames: {
-    id: "rg.id",
-    apiMatchId: "rg.apiMatchId",
-    matchId: "rg.matchId",
-    matchNo: "rg.matchNo",
-    kickoffDate: "rg.kickoffDate",
-    kickoffTime: "rg.kickoffTime",
-    homeTeamName: "rg.homeTeamName",
-    guestTeamName: "rg.guestTeamName",
-    leagueName: "rg.leagueName",
-    leagueShort: "rg.leagueShort",
-    leagueApiId: "rg.leagueApiId",
-    venueName: "rg.venueName",
-    venueCity: "rg.venueCity",
-    sr1OurClub: "rg.sr1OurClub",
-    sr2OurClub: "rg.sr2OurClub",
-    sr1Name: "rg.sr1Name",
-    sr2Name: "rg.sr2Name",
-    sr1RefereeApiId: "rg.sr1RefereeApiId",
-    sr2RefereeApiId: "rg.sr2RefereeApiId",
-    sr1Status: "rg.sr1Status",
-    sr2Status: "rg.sr2Status",
-    isCancelled: "rg.isCancelled",
-    isForfeited: "rg.isForfeited",
-    lastSyncedAt: "rg.lastSyncedAt",
-    isHomeGame: "rg.isHomeGame",
-    isGuestGame: "rg.isGuestGame",
-  },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  or: vi.fn((...args: unknown[]) => ({ or: args })),
-  gte: vi.fn((...args: unknown[]) => ({ gte: args })),
-  lte: vi.fn((...args: unknown[]) => ({ lte: args })),
-  ilike: vi.fn((...args: unknown[]) => ({ ilike: args })),
-  asc: vi.fn((...args: unknown[]) => ({ asc: args })),
-  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
-  isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
-  sql: Object.assign(
-    vi.fn((...args: unknown[]) => ({ sql: args, as: vi.fn().mockReturnValue("sql_aliased") })),
-    { raw: vi.fn((s: string) => ({ raw: s })) },
-  ),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
 // --- Imports (after mocks) ---
@@ -64,64 +29,95 @@ import {
   getRefereeGameById,
   computeMySlot,
 } from "./referee-games.service";
+import { refereeGames, matches, teams } from "@dragons/db/schema";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
+
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
 // --- Helpers ---
 
-function buildChain(result: unknown) {
-  const chain: Record<string, unknown> = {};
-  const methods = ["from", "where", "orderBy", "limit", "offset"];
-  for (const m of methods) {
-    chain[m] = vi.fn().mockReturnValue(chain);
+type GameSeed = Partial<typeof refereeGames.$inferInsert> & { apiMatchId: number };
+
+async function seedGame(seed: GameSeed): Promise<number> {
+  const [row] = await ctx.db
+    .insert(refereeGames)
+    .values({
+      matchNo: seed.apiMatchId,
+      kickoffDate: "2026-04-25",
+      kickoffTime: "14:00:00",
+      homeTeamName: "Dragons 1",
+      guestTeamName: "Titans 1",
+      leagueName: "Kreisliga Nord",
+      leagueShort: "KLN",
+      venueName: "Sporthalle West",
+      venueCity: "Berlin",
+      sr1OurClub: true,
+      sr2OurClub: false,
+      sr1Status: "open",
+      sr2Status: "offered",
+      isHomeGame: true,
+      isGuestGame: false,
+      ...seed,
+    })
+    .returning({ id: refereeGames.id });
+  return row!.id;
+}
+
+/** Seed a real `matches` row (plus its FK dependencies) and return its id. */
+async function seedMatch(apiMatchId: number): Promise<number> {
+  for (const apiTeamPermanentId of [7001, 7002]) {
+    await ctx.db.insert(teams).values({
+      apiTeamPermanentId,
+      seasonTeamId: apiTeamPermanentId,
+      teamCompetitionId: apiTeamPermanentId,
+      name: `Team ${apiTeamPermanentId}`,
+      clubId: 1,
+    });
   }
-  // Thenable so Promise.all resolves it
-  chain.then = (resolve: (v: unknown) => void) => {
-    resolve(result);
-    return chain;
-  };
-  return chain;
+  const [row] = await ctx.db
+    .insert(matches)
+    .values({
+      apiMatchId,
+      matchNo: apiMatchId,
+      matchDay: 1,
+      kickoffDate: "2026-04-25",
+      kickoffTime: "14:00:00",
+      homeTeamApiId: 7001,
+      guestTeamApiId: 7002,
+    })
+    .returning({ id: matches.id });
+  return row!.id;
 }
 
-function makeGameRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 1,
-    apiMatchId: 1001,
-    matchId: 50,
-    matchNo: 42,
-    kickoffDate: "2026-04-25",
-    kickoffTime: "14:00",
-    homeTeamName: "Dragons 1",
-    guestTeamName: "Titans 1",
-    leagueName: "Kreisliga Nord",
-    leagueShort: "KLN",
-    venueName: "Sporthalle West",
-    venueCity: "Berlin",
-    sr1OurClub: true,
-    sr2OurClub: false,
-    sr1Name: null,
-    sr2Name: null,
-    sr1RefereeApiId: null,
-    sr2RefereeApiId: null,
-    sr1Status: "open",
-    sr2Status: "offered",
-    isCancelled: false,
-    isForfeited: false,
-    isHomeGame: true,
-    isGuestGame: false,
-    lastSyncedAt: new Date("2026-04-14T10:00:00Z"),
-    ...overrides,
-  };
+/** Federation match ids of the returned page, in result order. */
+function apiIds(result: { items: Array<{ apiMatchId: number }> }): number[] {
+  return result.items.map((i) => i.apiMatchId);
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+const PAGE = { limit: 50, offset: 0 } as const;
+
+// --- Tests ---
 
 describe("getRefereeGames", () => {
-  it("returns empty result when no data", async () => {
-    mockSelect
-      .mockReturnValueOnce(buildChain([]))
-      .mockReturnValueOnce(buildChain([{ count: 0 }]));
-
+  it("returns an empty page when the table is empty", async () => {
     const result = await getRefereeGames({ limit: 20, offset: 0 });
 
     expect(result).toEqual({
@@ -133,258 +129,373 @@ describe("getRefereeGames", () => {
     });
   });
 
-  it("returns paginated results", async () => {
-    const row = makeGameRow();
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 5 }]));
+  it("paginates: limit caps the page, total counts the whole filtered set", async () => {
+    for (const id of [1, 2, 3, 4, 5]) {
+      await seedGame({ apiMatchId: id, kickoffTime: `1${id}:00:00` });
+    }
 
-    const result = await getRefereeGames({ limit: 1, offset: 0 });
+    const first = await getRefereeGames({ limit: 2, offset: 0 });
+    expect(apiIds(first)).toEqual([1, 2]);
+    expect(first.total).toBe(5);
+    expect(first.hasMore).toBe(true);
 
-    expect(result.items).toHaveLength(1);
-    expect(result.total).toBe(5);
-    expect(result.hasMore).toBe(true);
-    expect(result.limit).toBe(1);
-    expect(result.offset).toBe(0);
+    const last = await getRefereeGames({ limit: 2, offset: 4 });
+    expect(apiIds(last)).toEqual([5]);
+    expect(last.total).toBe(5);
+    expect(last.hasMore).toBe(false);
   });
 
-  it("filters by status 'active' (excludes cancelled/forfeited)", async () => {
-    const row = makeGameRow({ isCancelled: false, isForfeited: false });
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+  it("orders by kickoff date then kickoff time", async () => {
+    await seedGame({ apiMatchId: 1, kickoffDate: "2026-05-02", kickoffTime: "09:00:00" });
+    await seedGame({ apiMatchId: 2, kickoffDate: "2026-05-01", kickoffTime: "20:00:00" });
+    await seedGame({ apiMatchId: 3, kickoffDate: "2026-05-01", kickoffTime: "09:00:00" });
 
-    const result = await getRefereeGames({ limit: 20, offset: 0, status: "active" });
+    const result = await getRefereeGames(PAGE);
 
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.isCancelled).toBe(false);
-    expect(result.items[0]?.isForfeited).toBe(false);
+    expect(apiIds(result)).toEqual([3, 2, 1]);
   });
 
-  it("filters by status 'cancelled'", async () => {
-    const row = makeGameRow({ isCancelled: true });
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+  it("never returns tombstoned (withdrawn) games (#105)", async () => {
+    await seedGame({ apiMatchId: 1 });
+    await seedGame({ apiMatchId: 2, removedAt: new Date("2026-04-01T00:00:00Z") });
 
-    const result = await getRefereeGames({ limit: 20, offset: 0, status: "cancelled" });
+    const result = await getRefereeGames({ ...PAGE, status: "all" });
 
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.isCancelled).toBe(true);
+    expect(apiIds(result)).toEqual([1]);
+    expect(result.total).toBe(1);
+  });
+});
+
+describe("getRefereeGames — status filter", () => {
+  beforeEach(async () => {
+    await seedGame({ apiMatchId: 1 });
+    await seedGame({ apiMatchId: 2, isCancelled: true });
+    await seedGame({ apiMatchId: 3, isForfeited: true });
   });
 
-  it("filters by league (single)", async () => {
-    const row = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
-
-    const result = await getRefereeGames({ limit: 20, offset: 0, league: ["101"] });
-
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.leagueShort).toBe("BL");
+  it("defaults to active: excludes cancelled AND forfeited", async () => {
+    const result = await getRefereeGames(PAGE);
+    expect(apiIds(result)).toEqual([1]);
   });
 
-  it("filters by league (multiple, uses inArray)", async () => {
-    const { inArray: mockInArray } = await import("drizzle-orm");
-    const row1 = makeGameRow({ leagueShort: "BL", leagueApiId: 101 });
-    const row2 = makeGameRow({ id: 2, leagueShort: "OL", leagueApiId: 202 });
-    mockSelect
-      .mockReturnValueOnce(buildChain([row1, row2]))
-      .mockReturnValueOnce(buildChain([{ count: 2 }]));
-
-    const result = await getRefereeGames({ limit: 20, offset: 0, league: ["101", "202"] });
-
-    expect(result.items).toHaveLength(2);
-    expect(mockInArray).toHaveBeenCalled();
+  it("status 'active' excludes cancelled AND forfeited", async () => {
+    const result = await getRefereeGames({ ...PAGE, status: "active" });
+    expect(apiIds(result)).toEqual([1]);
   });
 
-  it("search matches team names", async () => {
-    const row = makeGameRow({ homeTeamName: "Dragons 1", guestTeamName: "Titans 1" });
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
-
-    const result = await getRefereeGames({ limit: 20, offset: 0, search: "Dragons" });
-
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.homeTeamName).toBe("Dragons 1");
+  it("status 'cancelled' returns only cancelled games", async () => {
+    const result = await getRefereeGames({ ...PAGE, status: "cancelled" });
+    expect(apiIds(result)).toEqual([2]);
   });
 
-  it("derives isTrackedLeague true when matchId present", async () => {
-    const row = { ...makeGameRow({ matchId: 50 }), is_tracked_league: true };
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
-
-    const result = await getRefereeGames({ limit: 20, offset: 0 });
-
-    // The service passes isTrackedLeague as a sql expression; the DB resolves it.
-    // We just verify the item is returned and the field passes through.
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.matchId).toBe(50);
+  it("status 'forfeited' returns only forfeited games", async () => {
+    const result = await getRefereeGames({ ...PAGE, status: "forfeited" });
+    expect(apiIds(result)).toEqual([3]);
   });
 
-  it("derives isTrackedLeague false when matchId is null", async () => {
-    const row = { ...makeGameRow({ matchId: null }), is_tracked_league: false };
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+  it("status 'all' returns every game", async () => {
+    const result = await getRefereeGames({ ...PAGE, status: "all" });
+    expect(apiIds(result).sort()).toEqual([1, 2, 3]);
+  });
+});
 
-    const result = await getRefereeGames({ limit: 20, offset: 0 });
-
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.matchId).toBeNull();
+describe("getRefereeGames — league filter", () => {
+  beforeEach(async () => {
+    await seedGame({ apiMatchId: 1, leagueApiId: 101 });
+    await seedGame({ apiMatchId: 2, leagueApiId: 202 });
+    await seedGame({ apiMatchId: 3, leagueApiId: 303 });
   });
 
-  it("returns hasMore=false when all results fit in one page", async () => {
-    const rows = [makeGameRow(), makeGameRow({ id: 2 })];
-    mockSelect
-      .mockReturnValueOnce(buildChain(rows))
-      .mockReturnValueOnce(buildChain([{ count: 2 }]));
-
-    const result = await getRefereeGames({ limit: 20, offset: 0 });
-
-    expect(result.hasMore).toBe(false);
+  it("a single league id matches only that league", async () => {
+    const result = await getRefereeGames({ ...PAGE, league: ["101"] });
+    expect(apiIds(result)).toEqual([1]);
   });
 
-  it("defaults total to 0 when count result is empty", async () => {
-    mockSelect
-      .mockReturnValueOnce(buildChain([]))
-      .mockReturnValueOnce(buildChain([]));
-
-    const result = await getRefereeGames({ limit: 20, offset: 0 });
-
-    expect(result.total).toBe(0);
+  it("multiple league ids match exactly that set (inArray)", async () => {
+    const result = await getRefereeGames({ ...PAGE, league: ["101", "202"] });
+    expect(apiIds(result).sort()).toEqual([1, 2]);
   });
 
-  it("filters by status 'forfeited'", async () => {
-    const row = makeGameRow({ isForfeited: true });
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
-
-    const result = await getRefereeGames({ limit: 20, offset: 0, status: "forfeited" });
-
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.isForfeited).toBe(true);
+  it("drops non-numeric league ids and applies the remaining one", async () => {
+    const result = await getRefereeGames({ ...PAGE, league: ["101", "not-a-number"] });
+    expect(apiIds(result)).toEqual([1]);
   });
 
-  it("returns all games when status is 'all'", async () => {
-    const rows = [
-      makeGameRow(),
-      makeGameRow({ id: 2, isCancelled: true }),
-    ];
-    mockSelect
-      .mockReturnValueOnce(buildChain(rows))
-      .mockReturnValueOnce(buildChain([{ count: 2 }]));
-
-    const result = await getRefereeGames({ limit: 20, offset: 0, status: "all" });
-
-    expect(result.items).toHaveLength(2);
+  it("an all-non-numeric league list applies no league filter", async () => {
+    const result = await getRefereeGames({ ...PAGE, league: ["abc"] });
+    expect(apiIds(result).sort()).toEqual([1, 2, 3]);
   });
 
-  it("filters by dateFrom", async () => {
-    const row = makeGameRow({ kickoffDate: "2026-05-01" });
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+  it("an empty league list applies no league filter", async () => {
+    const result = await getRefereeGames({ ...PAGE, league: [] });
+    expect(apiIds(result).sort()).toEqual([1, 2, 3]);
+  });
+});
 
-    const result = await getRefereeGames({ limit: 20, offset: 0, dateFrom: "2026-04-01" });
-
-    expect(result.items).toHaveLength(1);
+describe("getRefereeGames — gameType filter", () => {
+  beforeEach(async () => {
+    await seedGame({ apiMatchId: 1, isHomeGame: true, isGuestGame: false });
+    await seedGame({ apiMatchId: 2, isHomeGame: false, isGuestGame: true });
+    await seedGame({ apiMatchId: 3, isHomeGame: false, isGuestGame: false });
   });
 
-  it("filters by dateTo", async () => {
-    const row = makeGameRow({ kickoffDate: "2026-04-15" });
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+  // Issue #110's proof case: inverting `eq(refereeGames.isHomeGame, true)` to
+  // `false` is a user-visible bug that the previous JSON.stringify assertion
+  // could not see. This test fails on that mutation.
+  it("gameType 'home' returns home games and excludes away/neutral ones", async () => {
+    const result = await getRefereeGames({ ...PAGE, gameType: "home" });
 
-    const result = await getRefereeGames({ limit: 20, offset: 0, dateTo: "2026-05-01" });
-
-    expect(result.items).toHaveLength(1);
+    expect(apiIds(result)).toEqual([1]);
+    expect(result.total).toBe(1);
+    expect(result.items[0]?.isHomeGame).toBe(true);
   });
 
-  it("combines dateFrom and dateTo with status filter", async () => {
-    const row = makeGameRow();
-    mockSelect
-      .mockReturnValueOnce(buildChain([row]))
-      .mockReturnValueOnce(buildChain([{ count: 1 }]));
+  it("gameType 'away' returns guest games and excludes home/neutral ones", async () => {
+    const result = await getRefereeGames({ ...PAGE, gameType: "away" });
 
+    expect(apiIds(result)).toEqual([2]);
+    expect(result.items[0]?.isGuestGame).toBe(true);
+  });
+
+  it("gameType 'both' applies no home/away filter", async () => {
+    const result = await getRefereeGames({ ...PAGE, gameType: "both" });
+    expect(apiIds(result).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("no gameType applies no home/away filter", async () => {
+    const result = await getRefereeGames(PAGE);
+    expect(apiIds(result).sort()).toEqual([1, 2, 3]);
+  });
+});
+
+describe("getRefereeGames — date range filter", () => {
+  beforeEach(async () => {
+    await seedGame({ apiMatchId: 1, kickoffDate: "2026-03-31" });
+    await seedGame({ apiMatchId: 2, kickoffDate: "2026-04-01" });
+    await seedGame({ apiMatchId: 3, kickoffDate: "2026-05-01" });
+    await seedGame({ apiMatchId: 4, kickoffDate: "2026-05-02" });
+  });
+
+  it("dateFrom is inclusive and excludes earlier games", async () => {
+    const result = await getRefereeGames({ ...PAGE, dateFrom: "2026-04-01" });
+    expect(apiIds(result)).toEqual([2, 3, 4]);
+  });
+
+  it("dateTo is inclusive and excludes later games", async () => {
+    const result = await getRefereeGames({ ...PAGE, dateTo: "2026-05-01" });
+    expect(apiIds(result)).toEqual([1, 2, 3]);
+  });
+
+  it("dateFrom and dateTo combine as a closed range", async () => {
     const result = await getRefereeGames({
-      limit: 20,
-      offset: 0,
-      status: "active",
+      ...PAGE,
       dateFrom: "2026-04-01",
       dateTo: "2026-05-01",
     });
+    expect(apiIds(result)).toEqual([2, 3]);
+  });
+});
+
+describe("getRefereeGames — search filter", () => {
+  beforeEach(async () => {
+    await seedGame({
+      apiMatchId: 1,
+      homeTeamName: "Dragons U16",
+      guestTeamName: "Titans 1",
+      leagueName: "Kreisliga Nord",
+    });
+    await seedGame({
+      apiMatchId: 2,
+      homeTeamName: "Falcons 2",
+      guestTeamName: "Dragons U18",
+      leagueName: "Bezirksliga",
+    });
+    await seedGame({
+      apiMatchId: 3,
+      homeTeamName: "Falcons 3",
+      guestTeamName: "Titans 2",
+      leagueName: "Dragons Cup",
+    });
+    await seedGame({
+      apiMatchId: 4,
+      homeTeamName: "Falcons 4",
+      guestTeamName: "Titans 3",
+      leagueName: "Bezirksliga",
+    });
+  });
+
+  it("matches home team, guest team or league name", async () => {
+    const result = await getRefereeGames({ ...PAGE, search: "Dragons" });
+    expect(apiIds(result).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("is case-insensitive (ilike, not like)", async () => {
+    const result = await getRefereeGames({ ...PAGE, search: "dRaGoNs" });
+    expect(apiIds(result).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("matches on a substring, not just a prefix", async () => {
+    const result = await getRefereeGames({ ...PAGE, search: "ragon" });
+    expect(apiIds(result).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("requires every word of a multi-word search to match (AND across words)", async () => {
+    // "Dragons" matches 1, 2 and 3; "Kreisliga" only matches 1.
+    const result = await getRefereeGames({ ...PAGE, search: "Dragons Kreisliga" });
+    expect(apiIds(result)).toEqual([1]);
+  });
+
+  it("returns nothing when a word matches no column", async () => {
+    const result = await getRefereeGames({ ...PAGE, search: "Dragons Handball" });
+    expect(apiIds(result)).toEqual([]);
+    expect(result.total).toBe(0);
+  });
+
+  it("ignores repeated whitespace between words", async () => {
+    const result = await getRefereeGames({ ...PAGE, search: "  Dragons   Kreisliga  " });
+    expect(apiIds(result)).toEqual([1]);
+  });
+});
+
+describe("getRefereeGames — assignedRefereeApiId filter", () => {
+  beforeEach(async () => {
+    await seedGame({ apiMatchId: 1, sr1RefereeApiId: 9001, sr1Status: "assigned" });
+    await seedGame({ apiMatchId: 2, sr2RefereeApiId: 9001, sr2Status: "assigned" });
+    await seedGame({ apiMatchId: 3, sr1RefereeApiId: 5555, sr2RefereeApiId: 6666 });
+    await seedGame({ apiMatchId: 4 });
+  });
+
+  it("matches the referee on either slot and excludes everyone else", async () => {
+    const result = await getRefereeGames({ ...PAGE, assignedRefereeApiId: 9001 });
+    expect(apiIds(result).sort()).toEqual([1, 2]);
+  });
+
+  it("returns nothing for a referee assigned to no game", async () => {
+    const result = await getRefereeGames({ ...PAGE, assignedRefereeApiId: 4242 });
+    expect(apiIds(result)).toEqual([]);
+  });
+});
+
+describe("getRefereeGames — slotStatus filter", () => {
+  beforeEach(async () => {
+    await seedGame({ apiMatchId: 1, sr1Status: "open", sr2Status: "assigned" });
+    await seedGame({ apiMatchId: 2, sr1Status: "assigned", sr2Status: "open" });
+    await seedGame({ apiMatchId: 3, sr1Status: "offered", sr2Status: "assigned" });
+    await seedGame({ apiMatchId: 4, sr1Status: "assigned", sr2Status: "offered" });
+    await seedGame({ apiMatchId: 5, sr1Status: "assigned", sr2Status: "assigned" });
+  });
+
+  it("slotStatus 'open' keeps games with an open slot on either side", async () => {
+    const result = await getRefereeGames({ ...PAGE, slotStatus: "open" });
+    expect(apiIds(result).sort()).toEqual([1, 2]);
+  });
+
+  it("slotStatus 'offered' keeps open OR offered slots on either side", async () => {
+    const result = await getRefereeGames({ ...PAGE, slotStatus: "offered" });
+    expect(apiIds(result).sort()).toEqual([1, 2, 3, 4]);
+  });
+
+  it("slotStatus 'any' applies no slot filter", async () => {
+    const result = await getRefereeGames({ ...PAGE, slotStatus: "any" });
+    expect(apiIds(result).sort()).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("no slotStatus applies no slot filter", async () => {
+    const result = await getRefereeGames(PAGE);
+    expect(apiIds(result).sort()).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("getRefereeGames — filters combine with AND", () => {
+  it("a row satisfying only one of two filters is excluded", async () => {
+    // Home + Kreisliga
+    await seedGame({ apiMatchId: 1, isHomeGame: true, leagueApiId: 101 });
+    // Home but wrong league
+    await seedGame({ apiMatchId: 2, isHomeGame: true, leagueApiId: 202 });
+    // Right league but away
+    await seedGame({
+      apiMatchId: 3,
+      isHomeGame: false,
+      isGuestGame: true,
+      leagueApiId: 101,
+    });
+
+    const result = await getRefereeGames({
+      ...PAGE,
+      gameType: "home",
+      league: ["101"],
+    });
+
+    // Swapping the top-level and(...) for or(...) would return all three.
+    expect(apiIds(result)).toEqual([1]);
+    expect(result.total).toBe(1);
+  });
+
+  it("the count query applies the same filters as the item query", async () => {
+    for (const id of [1, 2, 3]) {
+      await seedGame({ apiMatchId: id, isHomeGame: true, isGuestGame: false });
+    }
+    for (const id of [4, 5]) {
+      await seedGame({ apiMatchId: id, isHomeGame: false, isGuestGame: true });
+    }
+
+    const result = await getRefereeGames({ limit: 1, offset: 0, gameType: "home" });
 
     expect(result.items).toHaveLength(1);
+    expect(result.total).toBe(3);
+    expect(result.hasMore).toBe(true);
+  });
+});
+
+describe("getRefereeGames — projected row shape", () => {
+  it("derives isTrackedLeague from whether a match is linked", async () => {
+    const matchId = await seedMatch(555);
+    await seedGame({ apiMatchId: 1, matchId });
+    await seedGame({ apiMatchId: 2, matchId: null });
+
+    const result = await getRefereeGames(PAGE);
+    const byApiId = new Map(result.items.map((i) => [i.apiMatchId, i]));
+
+    expect(byApiId.get(1)?.isTrackedLeague).toBe(true);
+    expect(byApiId.get(1)?.matchId).toBe(matchId);
+    expect(byApiId.get(2)?.isTrackedLeague).toBe(false);
+    expect(byApiId.get(2)?.matchId).toBeNull();
   });
 
-  it("slotStatus=open adds an or() clause covering sr1Status and sr2Status", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
+  it("returns every RefereeGameListItem field, decorated with mySlot/claimableSlots", async () => {
+    await seedGame({
+      apiMatchId: 4711,
+      matchNo: 42,
+      lastSyncedAt: new Date("2026-04-14T10:00:00Z"),
+    });
 
-    await getRefereeGames({ limit: 50, offset: 0, slotStatus: "open" });
+    const result = await getRefereeGames(PAGE);
+    const item = result.items[0]!;
 
-    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    const serialized = JSON.stringify(whereArg);
-    expect(serialized).toMatch(/sr1Status/i);
-    expect(serialized).toMatch(/sr2Status/i);
-    // The or() clause must reference "open" for both slots
-    expect(serialized).toMatch(/"open"/);
-  });
-
-  it("slotStatus=offered adds an or() clause covering open and offered for both slots", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    await getRefereeGames({ limit: 50, offset: 0, slotStatus: "offered" });
-
-    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    const serialized = JSON.stringify(whereArg);
-    expect(serialized).toMatch(/sr1Status/i);
-    expect(serialized).toMatch(/sr2Status/i);
-    expect(serialized).toMatch(/"open"/);
-    expect(serialized).toMatch(/"offered"/);
-  });
-
-  it("slotStatus=any does not add an sr1Status/sr2Status clause", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    await getRefereeGames({ limit: 50, offset: 0, slotStatus: "any" });
-
-    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    const serialized = JSON.stringify(whereArg);
-    expect(serialized).not.toMatch(/sr1Status/i);
-    expect(serialized).not.toMatch(/sr2Status/i);
-  });
-
-  it("no slotStatus does not add an sr1Status/sr2Status clause", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    await getRefereeGames({ limit: 50, offset: 0 });
-
-    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    const serialized = JSON.stringify(whereArg);
-    expect(serialized).not.toMatch(/sr1Status/i);
-    expect(serialized).not.toMatch(/sr2Status/i);
+    expect(item).toMatchObject({
+      apiMatchId: 4711,
+      matchNo: 42,
+      kickoffDate: "2026-04-25",
+      kickoffTime: "14:00:00",
+      homeTeamName: "Dragons 1",
+      guestTeamName: "Titans 1",
+      leagueName: "Kreisliga Nord",
+      leagueShort: "KLN",
+      venueName: "Sporthalle West",
+      venueCity: "Berlin",
+      sr1OurClub: true,
+      sr2OurClub: false,
+      sr1Status: "open",
+      sr2Status: "offered",
+      isCancelled: false,
+      isForfeited: false,
+      isTrackedLeague: false,
+      isHomeGame: true,
+      isGuestGame: false,
+      mySlot: null,
+      claimableSlots: [],
+    });
+    expect(item.lastSyncedAt).toEqual(new Date("2026-04-14T10:00:00Z"));
   });
 });
 
@@ -414,76 +525,41 @@ describe("computeMySlot", () => {
   });
 });
 
-describe("getRefereeGames new filters", () => {
-  it("filters by gameType=home", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    await getRefereeGames({ limit: 50, offset: 0, gameType: "home" });
-
-    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    expect(JSON.stringify(whereArg)).toMatch(/isHomeGame|is_home_game/i);
-  });
-
-  it("filters by gameType=away", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    await getRefereeGames({ limit: 50, offset: 0, gameType: "away" });
-
-    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    expect(JSON.stringify(whereArg)).toMatch(/isGuestGame|is_guest_game/i);
-  });
-
-  it("filters by assignedRefereeApiId across both slots", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
-
-    await getRefereeGames({ limit: 50, offset: 0, assignedRefereeApiId: 12345 });
-
-    const whereArg = (dataChain.where as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
-    expect(JSON.stringify(whereArg)).toMatch(/sr1RefereeApiId|sr2RefereeApiId/i);
-  });
-});
-
 describe("getRefereeGameById", () => {
-  function buildSingleRowChain(result: unknown) {
-    const chain: Record<string, unknown> = {};
-    const methods = ["from", "where", "limit"];
-    for (const m of methods) {
-      chain[m] = vi.fn().mockReturnValue(chain);
-    }
-    chain.then = (resolve: (v: unknown) => void) => {
-      resolve(result);
-      return chain;
-    };
-    return chain;
-  }
-
   it("returns the row when found", async () => {
-    const row = makeGameRow({ id: 7 });
-    mockSelect.mockReturnValueOnce(buildSingleRowChain([row]));
+    const id = await seedGame({ apiMatchId: 4711 });
 
-    const result = await getRefereeGameById(7);
+    const result = await getRefereeGameById(id);
 
     expect(result).not.toBeNull();
-    expect(result?.id).toBe(7);
+    expect(result?.id).toBe(id);
+    expect(result?.apiMatchId).toBe(4711);
+    expect(result?.mySlot).toBeNull();
+    expect(result?.claimableSlots).toEqual([]);
+  });
+
+  it("selects by id, not simply the first row", async () => {
+    await seedGame({ apiMatchId: 1 });
+    const wanted = await seedGame({ apiMatchId: 2 });
+    await seedGame({ apiMatchId: 3 });
+
+    const result = await getRefereeGameById(wanted);
+
+    expect(result?.apiMatchId).toBe(2);
   });
 
   it("returns null when no row matches", async () => {
-    mockSelect.mockReturnValueOnce(buildSingleRowChain([]));
+    await seedGame({ apiMatchId: 1 });
 
-    const result = await getRefereeGameById(999);
+    expect(await getRefereeGameById(9999)).toBeNull();
+  });
 
-    expect(result).toBeNull();
+  it("returns null for a tombstoned game (#105)", async () => {
+    const id = await seedGame({
+      apiMatchId: 1,
+      removedAt: new Date("2026-04-01T00:00:00Z"),
+    });
+
+    expect(await getRefereeGameById(id)).toBeNull();
   });
 });

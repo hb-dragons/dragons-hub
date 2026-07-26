@@ -1,180 +1,329 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
 
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockDelete = vi.fn();
-const mockTransaction = vi.fn();
+// --- Mock setup ---
+//
+// drizzle-orm and @dragons/db/schema are deliberately NOT mocked (issue #110).
+// Every function here is a predicate: "rules for THIS referee", "the rule for
+// this referee AND this team", "replace this referee's rules". With `eq`/`and`
+// stubbed to identity functions and the chain handing back a canned array, a
+// query scoped to the wrong referee — or an `and` collapsed to `or` — passed
+// just as happily. These run against a real (in-process PGlite) Postgres,
+// including the real transaction in updateRulesForReferee.
+
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockSelect(...args),
-    insert: (...args: unknown[]) => mockInsert(...args),
-    delete: (...args: unknown[]) => mockDelete(...args),
-    transaction: (fn: (tx: unknown) => Promise<unknown>) => mockTransaction(fn),
-  }),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
-vi.mock("@dragons/db/schema", () => ({
-  refereeAssignmentRules: {
-    id: "rar.id",
-    refereeId: "rar.refereeId",
-    teamId: "rar.teamId",
-    deny: "rar.deny",
-    allowSr1: "rar.allowSr1",
-    allowSr2: "rar.allowSr2",
-  },
-  teams: {
-    id: "t.id",
-    name: "t.name",
-    isOwnClub: "t.isOwnClub",
-  },
-  referees: {
-    id: "r.id",
-  },
-}));
+// --- Imports (after mocks) ---
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
-}));
+import {
+  getRulesForReferee,
+  updateRulesForReferee,
+  hasAnyRules,
+  getRuleForRefereeAndTeam,
+  getAllowedTeamIdsForReferee,
+} from "./referee-rules.service";
+import { referees, teams, refereeAssignmentRules } from "@dragons/db/schema";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
-import { getRulesForReferee, updateRulesForReferee, hasAnyRules, getRuleForRefereeAndTeam, getAllowedTeamIdsForReferee } from "./referee-rules.service";
+let ctx: TestDbContext;
 
-beforeEach(() => {
-  vi.clearAllMocks();
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
 });
 
-describe("getRulesForReferee", () => {
-  it("returns rules with team names", async () => {
-    const mockRules = [
-      { id: 1, teamId: 42, teamName: "Dragons 1", allowSr1: true, allowSr2: false },
-    ];
-    mockSelect.mockReturnValue({ from: () => ({ innerJoin: () => ({ where: () => mockRules }) }) });
+beforeEach(async () => {
+  await resetTestDb(ctx);
+});
 
-    const result = await getRulesForReferee(1);
-    expect(result).toEqual({ rules: mockRules });
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
+
+// --- Helpers ---
+
+async function seedReferee(apiId: number): Promise<number> {
+  const [row] = await ctx.db
+    .insert(referees)
+    .values({ apiId, firstName: "Ref", lastName: String(apiId) })
+    .returning({ id: referees.id });
+  return row!.id;
+}
+
+async function seedTeam(apiTeamPermanentId: number, name: string): Promise<number> {
+  const [row] = await ctx.db
+    .insert(teams)
+    .values({
+      apiTeamPermanentId,
+      seasonTeamId: apiTeamPermanentId,
+      teamCompetitionId: apiTeamPermanentId,
+      name,
+      clubId: 1,
+    })
+    .returning({ id: teams.id });
+  return row!.id;
+}
+
+async function seedRule(
+  refereeId: number,
+  teamId: number,
+  rule: { deny?: boolean; allowSr1?: boolean; allowSr2?: boolean } = {},
+): Promise<void> {
+  await ctx.db.insert(refereeAssignmentRules).values({
+    refereeId,
+    teamId,
+    deny: rule.deny ?? false,
+    allowSr1: rule.allowSr1 ?? false,
+    allowSr2: rule.allowSr2 ?? false,
+  });
+}
+
+async function storedRules(): Promise<
+  Array<{ referee_id: number; team_id: number; allow_sr1: boolean; allow_sr2: boolean; deny: boolean }>
+> {
+  const res = await ctx.client.query<{
+    referee_id: number;
+    team_id: number;
+    allow_sr1: boolean;
+    allow_sr2: boolean;
+    deny: boolean;
+  }>(
+    `SELECT referee_id, team_id, allow_sr1, allow_sr2, deny
+     FROM referee_assignment_rules ORDER BY referee_id, team_id`,
+  );
+  return res.rows;
+}
+
+// --- Tests ---
+
+describe("getRulesForReferee", () => {
+  it("returns each rule joined to its team name", async () => {
+    const refId = await seedReferee(9001);
+    const teamId = await seedTeam(101, "Dragons 1");
+    await seedRule(refId, teamId, { allowSr1: true, allowSr2: false });
+
+    const result = await getRulesForReferee(refId);
+
+    expect(result.rules).toEqual([
+      {
+        id: expect.any(Number),
+        teamId,
+        teamName: "Dragons 1",
+        deny: false,
+        allowSr1: true,
+        allowSr2: false,
+      },
+    ]);
   });
 
-  it("returns empty rules array when referee has no rules", async () => {
-    mockSelect.mockReturnValue({ from: () => ({ innerJoin: () => ({ where: () => [] }) }) });
+  it("returns only this referee's rules", async () => {
+    const mine = await seedReferee(9001);
+    const theirs = await seedReferee(9002);
+    const teamA = await seedTeam(101, "Dragons 1");
+    const teamB = await seedTeam(102, "Dragons 2");
+    await seedRule(mine, teamA, { allowSr1: true });
+    await seedRule(theirs, teamB, { allowSr2: true });
 
-    const result = await getRulesForReferee(999);
-    expect(result).toEqual({ rules: [] });
+    const result = await getRulesForReferee(mine);
+
+    expect(result.rules.map((r) => r.teamName)).toEqual(["Dragons 1"]);
+  });
+
+  it("returns an empty list when the referee has no rules", async () => {
+    const refId = await seedReferee(9001);
+
+    expect(await getRulesForReferee(refId)).toEqual({ rules: [] });
   });
 });
 
 describe("updateRulesForReferee", () => {
-  it("deletes existing rules and inserts new ones via transaction", async () => {
-    const mockTxDelete = vi.fn().mockReturnValue({ where: vi.fn() });
-    const mockTxInsert = vi.fn().mockReturnValue({ values: vi.fn() });
-    mockTransaction.mockImplementation(async (fn) => {
-      await fn({ delete: mockTxDelete, insert: mockTxInsert });
-    });
-    const updatedRules = [
-      { id: 2, teamId: 43, teamName: "Dragons 2", allowSr1: false, allowSr2: true },
-    ];
-    mockSelect.mockReturnValue({ from: () => ({ innerJoin: () => ({ where: () => updatedRules }) }) });
+  it("replaces the referee's rules and returns the fresh joined list", async () => {
+    const refId = await seedReferee(9001);
+    const teamA = await seedTeam(101, "Dragons 1");
+    const teamB = await seedTeam(102, "Dragons 2");
+    await seedRule(refId, teamA, { allowSr1: true });
 
-    const result = await updateRulesForReferee(1, {
-      rules: [{ teamId: 43, deny: false, allowSr1: false, allowSr2: true }],
+    const result = await updateRulesForReferee(refId, {
+      rules: [{ teamId: teamB, deny: false, allowSr1: false, allowSr2: true }],
     });
 
-    expect(mockTransaction).toHaveBeenCalled();
-    expect(result).toEqual({ rules: updatedRules });
+    expect(result.rules).toEqual([
+      {
+        id: expect.any(Number),
+        teamId: teamB,
+        teamName: "Dragons 2",
+        deny: false,
+        allowSr1: false,
+        allowSr2: true,
+      },
+    ]);
+    expect(await storedRules()).toEqual([
+      { referee_id: refId, team_id: teamB, allow_sr1: false, allow_sr2: true, deny: false },
+    ]);
   });
 
-  it("clears all rules when given empty array", async () => {
-    const mockTxDelete = vi.fn().mockReturnValue({ where: vi.fn() });
-    mockTransaction.mockImplementation(async (fn) => {
-      await fn({ delete: mockTxDelete, insert: vi.fn() });
+  it("writes every rule in the body, preserving each flag", async () => {
+    const refId = await seedReferee(9001);
+    const teamA = await seedTeam(101, "Dragons 1");
+    const teamB = await seedTeam(102, "Dragons 2");
+
+    await updateRulesForReferee(refId, {
+      rules: [
+        { teamId: teamA, deny: true, allowSr1: false, allowSr2: false },
+        { teamId: teamB, deny: false, allowSr1: true, allowSr2: true },
+      ],
     });
-    mockSelect.mockReturnValue({ from: () => ({ innerJoin: () => ({ where: () => [] }) }) });
 
-    const result = await updateRulesForReferee(1, { rules: [] });
+    expect(await storedRules()).toEqual([
+      { referee_id: refId, team_id: teamA, allow_sr1: false, allow_sr2: false, deny: true },
+      { referee_id: refId, team_id: teamB, allow_sr1: true, allow_sr2: true, deny: false },
+    ]);
+  });
 
-    expect(mockTransaction).toHaveBeenCalled();
+  it("clears the referee's rules when given an empty list", async () => {
+    const refId = await seedReferee(9001);
+    const teamId = await seedTeam(101, "Dragons 1");
+    await seedRule(refId, teamId, { allowSr1: true });
+
+    const result = await updateRulesForReferee(refId, { rules: [] });
+
     expect(result).toEqual({ rules: [] });
+    expect(await storedRules()).toEqual([]);
+  });
+
+  it("does not touch another referee's rules", async () => {
+    const mine = await seedReferee(9001);
+    const theirs = await seedReferee(9002);
+    const teamA = await seedTeam(101, "Dragons 1");
+    const teamB = await seedTeam(102, "Dragons 2");
+    await seedRule(mine, teamA, { allowSr1: true });
+    await seedRule(theirs, teamB, { allowSr2: true });
+
+    await updateRulesForReferee(mine, { rules: [] });
+
+    expect(await storedRules()).toEqual([
+      { referee_id: theirs, team_id: teamB, allow_sr1: false, allow_sr2: true, deny: false },
+    ]);
+  });
+
+  it("rolls the delete back when the insert fails (single transaction)", async () => {
+    const refId = await seedReferee(9001);
+    const teamId = await seedTeam(101, "Dragons 1");
+    await seedRule(refId, teamId, { allowSr1: true });
+
+    // teamId 999999 violates the FK to teams, so the INSERT aborts.
+    await expect(
+      updateRulesForReferee(refId, {
+        rules: [{ teamId: 999_999, deny: false, allowSr1: true, allowSr2: false }],
+      }),
+    ).rejects.toThrow();
+
+    // The pre-existing rule must survive: delete + insert are one unit.
+    expect(await storedRules()).toEqual([
+      { referee_id: refId, team_id: teamId, allow_sr1: true, allow_sr2: false, deny: false },
+    ]);
   });
 });
 
 describe("hasAnyRules", () => {
-  it("returns false when no rules exist", async () => {
-    mockSelect.mockReturnValue({
-      from: () => ({
-        where: () => ({
-          limit: () => [],
-        }),
-      }),
-    });
+  it("returns false when the referee has no rules", async () => {
+    const refId = await seedReferee(9001);
 
-    const result = await hasAnyRules(1);
-    expect(result).toBe(false);
+    expect(await hasAnyRules(refId)).toBe(false);
   });
 
-  it("returns true when rules exist", async () => {
-    mockSelect.mockReturnValue({
-      from: () => ({
-        where: () => ({
-          limit: () => [{ id: 1 }],
-        }),
-      }),
-    });
+  it("returns true when the referee has a rule", async () => {
+    const refId = await seedReferee(9001);
+    const teamId = await seedTeam(101, "Dragons 1");
+    await seedRule(refId, teamId);
 
-    const result = await hasAnyRules(1);
-    expect(result).toBe(true);
+    expect(await hasAnyRules(refId)).toBe(true);
+  });
+
+  it("does not count another referee's rules", async () => {
+    const mine = await seedReferee(9001);
+    const theirs = await seedReferee(9002);
+    const teamId = await seedTeam(101, "Dragons 1");
+    await seedRule(theirs, teamId);
+
+    expect(await hasAnyRules(mine)).toBe(false);
   });
 });
 
 describe("getRuleForRefereeAndTeam", () => {
-  it("returns rule when found", async () => {
-    const rule = { deny: false, allowSr1: true, allowSr2: false };
-    mockSelect.mockReturnValue({
-      from: () => ({
-        where: () => ({
-          limit: () => [rule],
-        }),
-      }),
-    });
+  it("returns the rule flags for the matching referee/team pair", async () => {
+    const refId = await seedReferee(9001);
+    const teamId = await seedTeam(101, "Dragons 1");
+    await seedRule(refId, teamId, { deny: false, allowSr1: true, allowSr2: false });
 
-    const result = await getRuleForRefereeAndTeam(1, 42);
-    expect(result).toEqual(rule);
+    expect(await getRuleForRefereeAndTeam(refId, teamId)).toEqual({
+      deny: false,
+      allowSr1: true,
+      allowSr2: false,
+    });
   });
 
-  it("returns null when no rule exists", async () => {
-    mockSelect.mockReturnValue({
-      from: () => ({
-        where: () => ({
-          limit: () => [],
-        }),
-      }),
-    });
+  it("returns null when the referee has no rule for that team", async () => {
+    const refId = await seedReferee(9001);
+    const teamA = await seedTeam(101, "Dragons 1");
+    const teamB = await seedTeam(102, "Dragons 2");
+    await seedRule(refId, teamA, { allowSr1: true });
 
-    const result = await getRuleForRefereeAndTeam(1, 999);
-    expect(result).toBeNull();
+    // Same referee, different team: the AND must not degrade to an OR.
+    expect(await getRuleForRefereeAndTeam(refId, teamB)).toBeNull();
+  });
+
+  it("returns null for another referee's rule on the same team", async () => {
+    const mine = await seedReferee(9001);
+    const theirs = await seedReferee(9002);
+    const teamId = await seedTeam(101, "Dragons 1");
+    await seedRule(theirs, teamId, { allowSr1: true });
+
+    expect(await getRuleForRefereeAndTeam(mine, teamId)).toBeNull();
   });
 });
 
 describe("getAllowedTeamIdsForReferee", () => {
-  it("returns team IDs for referee", async () => {
-    mockSelect.mockReturnValue({
-      from: () => ({
-        where: () => [{ teamId: 10 }, { teamId: 20 }, { teamId: 30 }],
-      }),
-    });
+  it("returns the team ids the referee has rules for", async () => {
+    const refId = await seedReferee(9001);
+    const teamA = await seedTeam(101, "Dragons 1");
+    const teamB = await seedTeam(102, "Dragons 2");
+    await seedRule(refId, teamA);
+    await seedRule(refId, teamB);
 
-    const result = await getAllowedTeamIdsForReferee(1);
-    expect(result).toEqual([10, 20, 30]);
+    expect((await getAllowedTeamIdsForReferee(refId)).sort()).toEqual(
+      [teamA, teamB].sort(),
+    );
   });
 
-  it("returns empty array when no rules exist", async () => {
-    mockSelect.mockReturnValue({
-      from: () => ({
-        where: () => [],
-      }),
-    });
+  it("excludes team ids belonging to another referee's rules", async () => {
+    const mine = await seedReferee(9001);
+    const theirs = await seedReferee(9002);
+    const teamA = await seedTeam(101, "Dragons 1");
+    const teamB = await seedTeam(102, "Dragons 2");
+    await seedRule(mine, teamA);
+    await seedRule(theirs, teamB);
 
-    const result = await getAllowedTeamIdsForReferee(999);
-    expect(result).toEqual([]);
+    expect(await getAllowedTeamIdsForReferee(mine)).toEqual([teamA]);
+  });
+
+  it("returns an empty array when the referee has no rules", async () => {
+    const refId = await seedReferee(9001);
+
+    expect(await getAllowedTeamIdsForReferee(refId)).toEqual([]);
   });
 });
