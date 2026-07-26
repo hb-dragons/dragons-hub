@@ -46,17 +46,6 @@ const ENTITY_ICONS: Record<EntityType, React.ElementType> = {
   refereeGame: ClipboardList,
 };
 
-const ENTITY_COLORS: Record<EntityType, string> = {
-  league: "text-yellow-600",
-  match: "text-purple-600",
-  team: "text-blue-600",
-  standing: "text-green-600",
-  venue: "text-orange-600",
-  referee: "text-teal-600",
-  refereeRole: "text-indigo-600",
-  refereeGame: "text-cyan-600",
-};
-
 const ACTION_ICONS: Record<EntryAction, React.ElementType> = {
   created: Plus,
   updated: RefreshCw,
@@ -65,10 +54,10 @@ const ACTION_ICONS: Record<EntryAction, React.ElementType> = {
 };
 
 const ACTION_COLORS: Record<EntryAction, string> = {
-  created: "text-green-600",
-  updated: "text-blue-600",
+  created: "text-primary",
+  updated: "text-foreground",
   skipped: "text-muted-foreground",
-  failed: "text-red-600",
+  failed: "text-destructive",
 };
 
 const MAX_ENTRIES = 500;
@@ -148,11 +137,11 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
   }, [entries, scrollToBottom]);
 
   return (
-    <Card className="border-blue-200 dark:border-blue-800">
+    <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Radio className="h-4 w-4 animate-pulse text-blue-500" />
+            <Radio className="h-4 w-4 animate-pulse text-heat" />
             <CardTitle>{t("sync.live.title")}</CardTitle>
           </div>
           <div className="flex items-center gap-2">
@@ -177,11 +166,11 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
         </CardDescription>
         {/* Live Counters */}
         <div className="flex gap-4 pt-2 text-sm">
-          <span className="text-green-600">
+          <span className="text-primary">
             <Plus className="mr-1 inline h-3 w-3" />
             {t("sync.live.created", { count: String(counters.created) })}
           </span>
-          <span className="text-blue-600">
+          <span className="text-foreground">
             <RefreshCw className="mr-1 inline h-3 w-3" />
             {t("sync.live.updated", { count: String(counters.updated) })}
           </span>
@@ -189,7 +178,7 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
             <SkipForward className="mr-1 inline h-3 w-3" />
             {t("sync.live.skipped", { count: String(counters.skipped) })}
           </span>
-          <span className="text-red-600">
+          <span className="text-destructive">
             <XCircle className="mr-1 inline h-3 w-3" />
             {t("sync.live.failed", { count: String(counters.failed) })}
           </span>
@@ -209,8 +198,6 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
               {entries.map((entry) => {
                 const EntityIcon =
                   ENTITY_ICONS[entry.entityType] ?? ClipboardList;
-                const entityColor =
-                  ENTITY_COLORS[entry.entityType] ?? "text-muted-foreground";
                 const ActionIcon = ACTION_ICONS[entry.action] ?? SkipForward;
                 const actionColor =
                   ACTION_COLORS[entry.action] ?? "text-muted-foreground";
@@ -220,13 +207,13 @@ export function SyncLiveLogs({ syncRunId, onComplete }: SyncLiveLogsProps) {
                     key={entry._key}
                     className={cn(
                       "flex items-center gap-2 rounded px-2 py-0.5",
-                      entry.action === "failed" && "bg-red-500/10",
+                      entry.action === "failed" && "bg-destructive/10",
                     )}
                   >
                     <span className="w-20 shrink-0 text-xs text-muted-foreground">
                       {format.dateTime(new Date(entry.timestamp), "timeOnly")}
                     </span>
-                    <EntityIcon className={`h-3.5 w-3.5 shrink-0 ${entityColor}`} />
+                    <EntityIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     <span className="w-20 shrink-0 text-xs text-muted-foreground">
                       {entry.entityType}
                     </span>

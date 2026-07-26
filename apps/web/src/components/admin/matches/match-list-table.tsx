@@ -29,12 +29,12 @@ import { DataTableDateFilter } from "@/components/ui/data-table-date-filter"
 import {
   formatMatchTime,
   formatScore,
-  getTeamColor,
   getOwnTeamLabel,
   getOpponentName,
 } from "./utils"
 import type { MatchListItem } from "./types"
 import { MatchEditSheet } from "./match-edit-sheet"
+import { TeamBadge } from "@/components/admin/shared/team-badge"
 
 function OverrideDot({ match, field }: { match: MatchListItem; field: string }) {
   const t = useTranslations("matchDetail")
@@ -43,28 +43,12 @@ function OverrideDot({ match, field }: { match: MatchListItem; field: string }) 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="ml-1 inline-block h-2 w-2 rounded-full bg-amber-500" />
+        <span className="bg-heat ml-1 inline-block h-2 w-2 rounded-full" />
       </TooltipTrigger>
       <TooltipContent>
         <p className="text-xs">{t("overrideActive")}</p>
       </TooltipContent>
     </Tooltip>
-  )
-}
-
-function TeamBadge({ name, badgeColor }: { name: string; badgeColor?: string | null }) {
-  const color = getTeamColor(name, badgeColor)
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold",
-        color.bg,
-        color.border,
-        color.text,
-      )}
-    >
-      {name}
-    </span>
   )
 }
 

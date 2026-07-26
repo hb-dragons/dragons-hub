@@ -129,7 +129,7 @@ export function BookingListTable() {
                   </Badge>
                   {booking.needsReconfirmation && (
                     <span
-                      className="inline-flex items-center gap-1 text-xs text-amber-600"
+                      className="text-heat inline-flex items-center gap-1 text-xs"
                       title={t("bookings.needsReconfirmation")}
                     >
                       <AlertTriangle className="h-3 w-3" />

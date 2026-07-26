@@ -161,7 +161,7 @@ export function TaskDialog({
                   </>
                 )}
                 {!saving && showSaved && (
-                  <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <span className="text-primary flex items-center gap-1">
                     <Check className="h-3 w-3" />
                     {t("common.saved")}
                   </span>

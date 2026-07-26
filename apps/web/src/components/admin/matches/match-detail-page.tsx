@@ -94,7 +94,7 @@ export function MatchDetailPage({
         </div>
         <div className="flex items-center gap-2">
           {overrideCount > 0 && (
-            <Badge variant="outline" className="border-amber-500 text-amber-600">
+            <Badge variant="outline" className="border-heat/50 text-heat">
               {t("matchDetail.overrideCount", { count: overrideCount })}
             </Badge>
           )}
@@ -275,7 +275,7 @@ export function MatchDetailPage({
                 {t(`bookings.status.${match.booking.status}`)}
               </Badge>
               {match.booking.needsReconfirmation && (
-                <Badge variant="outline" className="border-amber-500 text-amber-600">
+                <Badge variant="outline" className="border-heat/50 text-heat">
                   {t("matchDetail.booking.needsReconfirmation")}
                 </Badge>
               )}

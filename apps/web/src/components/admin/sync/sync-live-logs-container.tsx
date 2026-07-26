@@ -32,10 +32,10 @@ export function SyncLiveLogsContainer() {
 
   if (!runningSyncRunId) {
     return (
-      <Card className="border-blue-200 dark:border-blue-800">
+      <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+            <Loader2 className="h-4 w-4 animate-spin text-heat" />
             <CardTitle>{t("sync.live.title")}</CardTitle>
           </div>
           <CardDescription>{t("sync.live.starting")}</CardDescription>

@@ -170,7 +170,7 @@ export function SyncScheduleConfig() {
                   : t("common.saveChanges")}
           </Button>
           {hasChanges && (
-            <span className="text-sm text-yellow-600">{t("common.unsavedChanges")}</span>
+            <span className="text-sm text-heat">{t("common.unsavedChanges")}</span>
           )}
         </div>
       </CardContent>

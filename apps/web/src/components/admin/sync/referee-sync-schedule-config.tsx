@@ -140,7 +140,7 @@ export function RefereeSyncScheduleConfig() {
                   : t("common.saveChanges")}
           </Button>
           {hasChanges && (
-            <span className="text-sm text-yellow-600">
+            <span className="text-sm text-heat">
               {t("common.unsavedChanges")}
             </span>
           )}

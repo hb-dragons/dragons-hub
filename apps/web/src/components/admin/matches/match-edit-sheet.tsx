@@ -900,7 +900,7 @@ export function MatchEditSheet({
                         {t(`bookings.status.${match.booking.status}`)}
                       </Badge>
                       {match.booking.needsReconfirmation && (
-                        <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                        <span className="text-heat inline-flex items-center gap-1 text-xs">
                           <AlertTriangle className="h-3 w-3" />
                           {t("matchDetail.booking.needsReconfirmation")}
                         </span>

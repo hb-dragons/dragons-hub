@@ -27,7 +27,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { getTeamColor } from "../matches/utils";
+import { TeamBadge } from "@/components/admin/shared/team-badge";
 import type {
   ReconcilePreview,
   ReconcilePreviewMatch,
@@ -40,7 +40,6 @@ function MatchBadge({ match }: { match: ReconcilePreviewMatch }) {
   const t = useTranslations("bookings.reconcile");
   const format = useFormatter();
   const teamName = match.homeTeamCustomName ?? match.homeTeam;
-  const color = getTeamColor(teamName);
   const inactive = match.isForfeited || match.isCancelled;
 
   return (
@@ -50,16 +49,7 @@ function MatchBadge({ match }: { match: ReconcilePreviewMatch }) {
         inactive && "opacity-60",
       )}
     >
-      <span
-        className={cn(
-          "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold",
-          color.bg,
-          color.border,
-          color.text,
-        )}
-      >
-        {teamName}
-      </span>
+      <TeamBadge name={teamName} badgeColor={match.homeBadgeColor} />
       <span>vs {match.guestTeam}</span>
       <span className="tabular-nums text-muted-foreground">
         {format.dateTime(clubTimeAnchor(match.kickoffTime), "matchTime")}
@@ -85,12 +75,12 @@ function CreateSection({ items }: { items: ReconcilePreviewCreate[] }) {
   if (items.length === 0) return null;
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm font-semibold text-green-700 dark:text-green-400">
+      <div className="flex items-center gap-2 text-primary text-sm font-semibold">
         <CirclePlus className="h-4 w-4" />
         {t("toCreate")} ({items.length})
       </div>
       {items.map((item, i) => (
-        <div key={i} className="rounded-md border border-green-200 bg-green-50/50 p-3 dark:border-green-900 dark:bg-green-950/30">
+        <div key={i} className="bg-primary/5 rounded-md p-3">
           <div className="flex items-center justify-between text-sm font-medium">
             <span>{item.venueName}</span>
             <span className="tabular-nums text-muted-foreground">
@@ -118,12 +108,12 @@ function UpdateSection({ items }: { items: ReconcilePreviewUpdate[] }) {
   if (items.length === 0) return null;
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
+      <div className="flex items-center gap-2 text-heat text-sm font-semibold">
         <Pencil className="h-4 w-4" />
         {t("toUpdate")} ({items.length})
       </div>
       {items.map((item) => (
-        <div key={item.bookingId} className="rounded-md border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+        <div key={item.bookingId} className="bg-heat/5 rounded-md p-3">
           <div className="flex items-center justify-between text-sm font-medium">
             <span>{item.venueName}</span>
             <span className="tabular-nums text-muted-foreground">
@@ -144,7 +134,7 @@ function UpdateSection({ items }: { items: ReconcilePreviewUpdate[] }) {
           )}
           {item.matchesAdded.length > 0 && (
             <div className="mt-2">
-              <p className="text-xs font-medium text-green-700 dark:text-green-400">
+              <p className="text-primary text-xs font-medium">
                 + {t("matchesAdded")}
               </p>
               <div className="mt-1 space-y-1">
@@ -156,7 +146,7 @@ function UpdateSection({ items }: { items: ReconcilePreviewUpdate[] }) {
           )}
           {item.matchesRemoved.length > 0 && (
             <div className="mt-2">
-              <p className="text-xs font-medium text-red-700 dark:text-red-400">
+              <p className="text-destructive text-xs font-medium">
                 − {t("matchesRemoved")}
               </p>
               <div className="mt-1 space-y-1">
@@ -179,12 +169,12 @@ function RemoveSection({ items }: { items: ReconcilePreviewRemove[] }) {
   if (items.length === 0) return null;
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-400">
+      <div className="flex items-center gap-2 text-destructive text-sm font-semibold">
         <Trash2 className="h-4 w-4" />
         {t("toRemove")} ({items.length})
       </div>
       {items.map((item) => (
-        <div key={item.bookingId} className="rounded-md border border-red-200 bg-red-50/50 p-3 dark:border-red-900 dark:bg-red-950/30">
+        <div key={item.bookingId} className="bg-destructive/5 rounded-md p-3">
           <div className="flex items-center justify-between text-sm font-medium">
             <span>{item.venueName}</span>
             <span className="tabular-nums text-muted-foreground">
