@@ -6,7 +6,7 @@ import { useRouter } from "@/lib/navigation";
 import { Link } from "@/lib/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import { queries } from "@/lib/swr-queries";
-import { berlinDayAnchor } from "@/lib/tz";
+import { clubDayAnchor } from "@dragons/shared";
 import {
   Card,
   CardContent,
@@ -135,7 +135,7 @@ export function MatchDetailPage({
               <div>
                 <dt className="text-muted-foreground">{t("matchDetail.info.date")}</dt>
                 <dd className="font-medium">
-                  {format.dateTime(berlinDayAnchor(match.kickoffDate), "matchDate")}
+                  {format.dateTime(clubDayAnchor(match.kickoffDate), "matchDate")}
                 </dd>
               </div>
               <div>

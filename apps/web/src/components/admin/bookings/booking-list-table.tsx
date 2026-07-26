@@ -6,8 +6,7 @@ import useSWR, { useSWRConfig } from "swr";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { queries } from "@/lib/swr-queries";
 import { authClient } from "@/lib/auth-client";
-import { berlinDayAnchor, berlinTimeAnchor } from "@/lib/tz";
-import { can } from "@dragons/shared";
+import { can, clubDayAnchor, clubTimeAnchor } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 import { Sheet } from "@dragons/ui/components/sheet";
 import {
@@ -62,8 +61,8 @@ export function BookingListTable() {
 
   function formatTimeWindow(booking: BookingListItem): string {
     if (!booking.effectiveStartTime || !booking.effectiveEndTime) return "\u2014";
-    const start = format.dateTime(berlinTimeAnchor(booking.effectiveStartTime, booking.date), "matchTime");
-    const end = format.dateTime(berlinTimeAnchor(booking.effectiveEndTime, booking.date), "matchTime");
+    const start = format.dateTime(clubTimeAnchor(booking.effectiveStartTime, booking.date), "matchTime");
+    const end = format.dateTime(clubTimeAnchor(booking.effectiveEndTime, booking.date), "matchTime");
     return `${start} \u2013 ${end}`;
   }
 
@@ -114,7 +113,7 @@ export function BookingListTable() {
               onClick={() => setSelectedBookingId(booking.id)}
             >
               <TableCell className="font-medium tabular-nums">
-                {format.dateTime(berlinDayAnchor(booking.date), "matchDate")}
+                {format.dateTime(clubDayAnchor(booking.date), "matchDate")}
               </TableCell>
               <TableCell>{booking.venueName}</TableCell>
               <TableCell className="tabular-nums">
