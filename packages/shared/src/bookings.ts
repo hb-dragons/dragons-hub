@@ -60,7 +60,7 @@ export interface ReconcileResult {
 
 // ── Booking types ───────────────────────────────────────────────────────────
 
-export interface BookingMatch {
+interface BookingMatch {
   id: number;
   matchNo: number;
   kickoffDate: string;

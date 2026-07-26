@@ -7,8 +7,7 @@ import { Button } from "@dragons/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dragons/ui/components/card";
 import { ImagePreview } from "../image-preview";
 import type { WizardState } from "../types";
-// eslint-disable-next-line no-restricted-imports -- postBlob is a binary download not in the typed `api` registry
-import { browserClient } from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface PreviewStepProps {
   state: WizardState;
@@ -22,6 +21,11 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
   const [error, setError] = useState<string | null>(null);
 
   async function handleGenerate() {
+    if (state.selectedPhotoId === null || state.selectedBackgroundId === null) {
+      setError("Bitte Spielerfoto und Hintergrund auswählen.");
+      return;
+    }
+
     setGenerating(true);
     setError(null);
 
@@ -36,7 +40,7 @@ export function PreviewStep({ state, onUpdate, onBack }: PreviewStepProps) {
     };
 
     try {
-      const blob = await browserClient.postBlob("/admin/social/generate", body);
+      const blob = await api.social.generate(body);
       const url = URL.createObjectURL(blob);
 
       const a = document.createElement("a");

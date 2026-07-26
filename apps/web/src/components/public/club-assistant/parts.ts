@@ -1,4 +1,4 @@
-export type ChatToolStatus = "running" | "done" | "error";
+type ChatToolStatus = "running" | "done" | "error";
 
 export interface ChatToolChip {
   /** Bare tool name, e.g. "get_standings". */

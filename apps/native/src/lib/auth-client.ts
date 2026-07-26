@@ -8,7 +8,7 @@ import { resolveApiUrl } from "./api-url";
 // Re-exported so the many `import { resolveApiUrl } from "@/lib/auth-client"`
 // call sites keep working; the implementation lives in `./api-url`, which never
 // throws during module evaluation (see the note there).
-export { resolveApiUrl, getApiUrlConfigError } from "./api-url";
+export { resolveApiUrl } from "./api-url";
 
 const baseURL = resolveApiUrl();
 type AdminPluginOptions = NonNullable<Parameters<typeof adminClient>[0]>;

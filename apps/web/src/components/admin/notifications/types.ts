@@ -33,14 +33,8 @@ export { CHANNEL_TYPES, EVENT_TYPE_VALUES, EVENT_URGENCIES } from "@dragons/shar
 export type { EventType, EventUrgency } from "@dragons/shared";
 export type {
   ChannelType,
-  InAppConfig,
-  WhatsAppGroupConfig,
-  PushConfig,
-  ChannelConfig,
   ChannelConfigItem,
   ChannelConfigListResult,
-  ProviderStatus,
-  ProviderAvailability,
 } from "@dragons/shared";
 
 // Trigger event body is the request contract; re-export from the API client

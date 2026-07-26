@@ -40,7 +40,7 @@ const COALESCE_WINDOW_SEC = 60;
  * to look up preferences. For "audience:admin", muting is not applied
  * (group recipients don't have individual preferences).
  */
-export async function loadMutedEventTypes(
+async function loadMutedEventTypes(
   recipientIds: string[],
 ): Promise<Map<string, Set<string>>> {
   const result = new Map<string, Set<string>>();
@@ -527,4 +527,3 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
   return result;
 }
 
-export { loadRulesAndConfigs };

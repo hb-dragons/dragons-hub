@@ -297,11 +297,4 @@ export async function shutdownWorkers() {
   logger.info("Worker shutdown complete");
 }
 
-export { syncWorker };
-export { eventWorker };
-export { digestWorker };
-export { refereeReminderWorker };
-export { pushReceiptWorker };
-export { taskReminderWorker };
-export { outboxPollWorker };
 export * from "./queues";

@@ -1,1 +1,1 @@
-export type { StandingItem, LeagueStandings } from "@dragons/shared";
+export type { LeagueStandings } from "@dragons/shared";

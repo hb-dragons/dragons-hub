@@ -11,10 +11,6 @@ export const notificationListQuerySchema = z.object({
 
 export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
 
-export const notificationUserIdQuerySchema = z.object({
-  userId: z.string().min(1),
-});
-
 export const notificationPreferencesBodySchema = z.strictObject({
   mutedEventTypes: z.array(z.string()).optional(),
   locale: z.enum(["de", "en"]).optional(),

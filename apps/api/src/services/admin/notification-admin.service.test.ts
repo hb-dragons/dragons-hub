@@ -37,7 +37,6 @@ import {
   listNotifications,
   markRead,
   markAllRead,
-  getUnreadCount,
   retryFailedNotification,
   recipientKeysForUserId,
 } from "./notification-admin.service";
@@ -358,43 +357,6 @@ describe("markAllRead", () => {
       "SELECT status FROM notification_log WHERE recipient_id = 'user:user-2'",
     );
     expect((result.rows[0] as { status: string }).status).toBe("sent");
-  });
-});
-
-describe("getUnreadCount", () => {
-  it("returns count of unread notifications for the user's recipient keys", async () => {
-    await insertNotification({ recipient_id: "user:user-1", status: "sent" });
-    await insertNotification({ recipient_id: "user:user-1", status: "sent" });
-    await insertNotification({ recipient_id: "user:user-1", status: "read" });
-
-    const count = await getUnreadCount("user-1");
-    expect(count).toBe(2);
-  });
-
-  it("returns 0 when all notifications are read", async () => {
-    await insertNotification({ recipient_id: "user:user-1", status: "read" });
-    const count = await getUnreadCount("user-1");
-    expect(count).toBe(0);
-  });
-
-  it("returns 0 when user has no notifications", async () => {
-    const count = await getUnreadCount("user-1");
-    expect(count).toBe(0);
-  });
-
-  it("does not count other users' notifications", async () => {
-    await insertNotification({ recipient_id: "user:user-1", status: "sent" });
-    await insertNotification({ recipient_id: "user:user-2", status: "sent" });
-
-    const count = await getUnreadCount("user-1");
-    expect(count).toBe(1);
-  });
-
-  it("counts pending status as unread", async () => {
-    await insertNotification({ recipient_id: "user:user-1", status: "pending" });
-
-    const count = await getUnreadCount("user-1");
-    expect(count).toBe(1);
   });
 });
 

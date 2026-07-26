@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
   listNotifications: vi.fn(),
   markRead: vi.fn(),
   markAllRead: vi.fn(),
-  getUnreadCount: vi.fn(),
   retryFailedNotification: vi.fn(),
   getUserNotificationPreferences: vi.fn(),
   updateUserNotificationPreferences: vi.fn(),
@@ -18,7 +17,6 @@ vi.mock("../../services/admin/notification-admin.service", () => ({
   listNotifications: mocks.listNotifications,
   markRead: mocks.markRead,
   markAllRead: mocks.markAllRead,
-  getUnreadCount: mocks.getUnreadCount,
   retryFailedNotification: mocks.retryFailedNotification,
 }));
 
@@ -208,34 +206,12 @@ describe("PATCH /notifications/read-all", () => {
 });
 
 describe("GET /notifications/unread-count", () => {
-  it("returns unread count for a user", async () => {
-    mocks.getUnreadCount.mockResolvedValue(5);
+  // Removed in #120: the route had no consumer, and its `userId` query param
+  // was the only unscoped read of another user's notification state.
+  it("is no longer routed", async () => {
+    const res = await app.request("/notifications/unread-count?userId=user-1");
 
-    const res = await app.request(
-      "/notifications/unread-count?userId=user-1",
-    );
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ count: 5 });
-    expect(mocks.getUnreadCount).toHaveBeenCalledWith("user-1");
-  });
-
-  it("returns 0 when no unread notifications", async () => {
-    mocks.getUnreadCount.mockResolvedValue(0);
-
-    const res = await app.request(
-      "/notifications/unread-count?userId=user-1",
-    );
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ count: 0 });
-  });
-
-  it("returns 400 when userId is missing", async () => {
-    const res = await app.request("/notifications/unread-count");
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(res.status).toBe(404);
   });
 });
 

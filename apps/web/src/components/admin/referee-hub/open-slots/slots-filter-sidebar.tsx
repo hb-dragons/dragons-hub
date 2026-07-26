@@ -166,5 +166,3 @@ function applyPreset(preset: "14d" | "30d" | "season" | "custom"): Partial<HubFi
   return { dateFrom: todayInClubZone(), dateTo: todayInClubZone() };
 }
 
-// Re-export pure helpers for testing
-export { matchesPreset, applyPreset };

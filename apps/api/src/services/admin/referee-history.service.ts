@@ -10,7 +10,7 @@ import type {
 } from "@dragons/shared";
 import { escapeLikePattern } from "../utils/sql";
 
-export type HistoryStatusValue = "played" | "cancelled" | "forfeited";
+type HistoryStatusValue = "played" | "cancelled" | "forfeited";
 
 export interface HistoryFilterParams {
   dateFrom?: string;

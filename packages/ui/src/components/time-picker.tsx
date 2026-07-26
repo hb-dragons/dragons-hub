@@ -30,4 +30,3 @@ function TimePicker({ value, onChange, className, disabled, id }: TimePickerProp
 }
 
 export { TimePicker }
-export type { TimePickerProps }

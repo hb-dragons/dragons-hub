@@ -12,7 +12,7 @@ import {
 } from "@dragons/ui/components/popover";
 import { CandidatePicker } from "./candidate-picker";
 
-export type SlotStatus = "open" | "offered" | "assigned";
+type SlotStatus = "open" | "offered" | "assigned";
 
 interface Assignment {
   refereeApiId: number | null;

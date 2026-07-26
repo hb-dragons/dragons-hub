@@ -24,7 +24,7 @@ export type DigestMode = "per_sync" | "scheduled" | "none";
 
 // ── Per-channel config shapes ───────────────────────────────────────────────
 
-export interface InAppConfig {
+interface InAppConfig {
   audienceRole: "admin" | "referee";
   locale: "de" | "en";
 }
@@ -34,7 +34,7 @@ export interface WhatsAppGroupConfig {
   locale: "de" | "en";
 }
 
-export interface PushConfig {
+interface PushConfig {
   provider: "expo";
   locale?: "de" | "en";
 }
@@ -63,7 +63,7 @@ export interface ChannelConfigListResult {
 
 // ── Provider availability ───────────────────────────────────────────────────
 
-export interface ProviderStatus {
+interface ProviderStatus {
   configured: boolean;
 }
 

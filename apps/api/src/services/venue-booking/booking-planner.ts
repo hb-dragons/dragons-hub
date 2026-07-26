@@ -21,7 +21,7 @@ export interface PlannerExistingBooking {
   calculatedEndTime: string;
 }
 
-export type PlanScope = { kind: "all" } | { kind: "matchIds"; matchIds: number[] };
+type PlanScope = { kind: "all" } | { kind: "matchIds"; matchIds: number[] };
 
 export interface PlannerInput {
   groups: ReadonlyMap<string, readonly PlannerMatch[]>;
@@ -33,7 +33,7 @@ export interface PlannerInput {
 
 // ── Plan ─────────────────────────────────────────────────────────────────────
 
-export interface PlanCreate {
+interface PlanCreate {
   venueId: number;
   date: string;
   calculatedStartTime: string;
@@ -41,7 +41,7 @@ export interface PlanCreate {
   matchIds: number[];
 }
 
-export interface PlanUpdate {
+interface PlanUpdate {
   bookingId: number;
   venueId: number;
   date: string;
@@ -56,9 +56,9 @@ export interface PlanUpdate {
   expectedMatchIds: number[];
 }
 
-export type RemovalReason = "all_matches_cancelled" | "no_matches";
+type RemovalReason = "all_matches_cancelled" | "no_matches";
 
-export interface PlanRemoval {
+interface PlanRemoval {
   bookingId: number;
   venueId: number;
   date: string;

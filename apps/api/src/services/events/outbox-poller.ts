@@ -104,4 +104,3 @@ export async function pollOutbox(): Promise<number> {
   return enqueued;
 }
 
-export { domainEvents };

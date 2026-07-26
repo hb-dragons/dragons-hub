@@ -13,7 +13,7 @@ import { ThemeSettings } from "@/components/admin/settings/theme-settings";
 import type {
   ClubConfig as ClubConfigType,
   TrackedLeaguesResponse,
-} from "@/components/admin/settings/settings-provider";
+} from "@dragons/shared";
 
 export default async function SettingsPage() {
   const session = await getServerSession();

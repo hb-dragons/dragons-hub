@@ -20,16 +20,6 @@ import { EVENT_TYPES } from "@dragons/shared";
 
 const log = logger.child({ service: "referees-sync" });
 
-export interface RefereesSyncResult {
-  total: number;
-  created: number;
-  updated: number;
-  skipped: number;
-  failed: number;
-  errors: string[];
-  durationMs: number;
-}
-
 export interface RefereeRolesSyncResult {
   created: number;
   updated: number;

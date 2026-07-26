@@ -14,7 +14,7 @@ export const verifySlotInputSchema = z.object({
 });
 export type VerifySlotInput = z.infer<typeof verifySlotInputSchema>;
 
-export type ConflictType =
+type ConflictType =
   | "venue-busy"
   | "team-double-book"
   | "outside-round-window"

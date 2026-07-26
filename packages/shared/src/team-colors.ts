@@ -1,4 +1,4 @@
-export interface ColorPresetMode {
+interface ColorPresetMode {
   bg: string;
   border: string;
   text: string;

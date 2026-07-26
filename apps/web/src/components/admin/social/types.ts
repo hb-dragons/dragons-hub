@@ -37,7 +37,7 @@ export interface WeekendOption {
   matches: MatchItem[];
 }
 
-export interface PlayerPosition {
+interface PlayerPosition {
   x: number;
   y: number;
   scale: number;

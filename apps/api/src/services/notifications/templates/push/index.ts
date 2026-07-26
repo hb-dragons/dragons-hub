@@ -79,7 +79,3 @@ function renderForType(
 }
 
 export type { PushTemplateOutput, Locale } from "./types";
-export type { RefereeAssignedPayload } from "./referee-assigned";
-export type { RefereeSlotsPushPayload } from "./referee-slots";
-export type { MatchCancelledPayload } from "./match-cancelled";
-export type { MatchScheduleChangedPushPayload } from "./match-schedule-changed";
