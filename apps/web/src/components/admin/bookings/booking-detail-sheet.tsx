@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { api } from "@/lib/api";
-import { berlinDayAnchor, berlinTimeAnchor } from "@/lib/tz";
+import { clubDayAnchor, clubTimeAnchor } from "@dragons/shared";
 import {
   SheetContent,
   SheetHeader,
@@ -257,7 +257,7 @@ export function BookingDetailSheet({
             <Skeleton className="h-4 w-32" />
           ) : (
             <SheetDescription>
-              {format.dateTime(berlinDayAnchor(booking.date), "matchDate")}
+              {format.dateTime(clubDayAnchor(booking.date), "matchDate")}
             </SheetDescription>
           )}
         </SheetHeader>
@@ -314,7 +314,7 @@ export function BookingDetailSheet({
                     />
                     {booking.calculatedStartTime && startTime !== booking.calculatedStartTime && (
                       <p className="text-xs text-muted-foreground">
-                        {t("bookings.detail.calculated")}: {format.dateTime(berlinTimeAnchor(booking.calculatedStartTime, booking.date), "matchTime")}
+                        {t("bookings.detail.calculated")}: {format.dateTime(clubTimeAnchor(booking.calculatedStartTime, booking.date), "matchTime")}
                       </p>
                     )}
                   </Field>
@@ -328,7 +328,7 @@ export function BookingDetailSheet({
                     />
                     {booking.calculatedEndTime && endTime !== booking.calculatedEndTime && (
                       <p className="text-xs text-muted-foreground">
-                        {t("bookings.detail.calculated")}: {format.dateTime(berlinTimeAnchor(booking.calculatedEndTime, booking.date), "matchTime")}
+                        {t("bookings.detail.calculated")}: {format.dateTime(clubTimeAnchor(booking.calculatedEndTime, booking.date), "matchTime")}
                       </p>
                     )}
                   </Field>

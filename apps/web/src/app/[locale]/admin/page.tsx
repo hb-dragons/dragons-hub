@@ -1,15 +1,15 @@
 import { getServerApi } from "@/lib/api.server";
 import { SWRConfig } from "swr";
 import { makeQueries } from "@/lib/swr-queries";
-import { todayInBerlin } from "@/lib/tz";
+import { todayInClubZone } from "@dragons/shared";
 import { getServerSession } from "@/lib/auth-server";
 import { DashboardView } from "@/components/admin/dashboard/dashboard-view";
 
 export default async function AdminDashboardPage() {
   // Club operates in Europe/Berlin; UTC date would show the wrong day's
   // fixtures between Berlin midnight and 01:00/02:00. Must match the client's
-  // todayInBerlin() so the SWR fallback key lines up.
-  const today = todayInBerlin();
+  // todayInClubZone() so the SWR fallback key lines up.
+  const today = todayInClubZone();
 
   // `getServerSession` is React-cached, so this shares the layout's round trip
   // rather than adding one. Handing the user to the client view keeps every

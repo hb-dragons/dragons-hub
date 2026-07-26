@@ -19,7 +19,7 @@ import { Ban, Calendar, CircleOff, SearchIcon, SquareActivity } from "lucide-rea
 import { Input } from "@dragons/ui/components/input"
 import type { DateRange } from "@dragons/ui/components/calendar"
 
-import { berlinDayAnchor, calendarDayString } from "@/lib/tz"
+import { clubDayAnchor, calendarDayString } from "@dragons/shared"
 import { DataTable } from "@/components/ui/data-table"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
@@ -95,7 +95,7 @@ function getColumns(t: ReturnType<typeof useTranslations<"matches">>, tBookings:
       ),
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-sm">
-          {format.dateTime(berlinDayAnchor(row.original.kickoffDate), "matchDate")}
+          {format.dateTime(clubDayAnchor(row.original.kickoffDate), "matchDate")}
           <OverrideDot match={row.original} field="kickoffDate" />
         </span>
       ),

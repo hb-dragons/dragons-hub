@@ -4,8 +4,7 @@ import useSWR from "swr";
 import { useTranslations } from "next-intl";
 import { Link } from "@/lib/navigation";
 import { queries } from "@/lib/swr-queries";
-import { todayInBerlin } from "@/lib/tz";
-import { can, type GateUser } from "@dragons/shared";
+import { can, todayInClubZone, type GateUser } from "@dragons/shared";
 import { StatCard } from "@/components/admin/shared/stat-card";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import { ErrorState } from "@/components/ui/error-state";
@@ -41,7 +40,7 @@ export interface DashboardViewProps {
 
 export function DashboardView({ user }: DashboardViewProps) {
   const t = useTranslations("dashboard");
-  const today = todayInBerlin();
+  const today = todayInClubZone();
   const canViewReferees = can(user, "referee", "view");
   const canViewMatches = can(user, "match", "view");
   const canViewStandings = can(user, "standing", "view");

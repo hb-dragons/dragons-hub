@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { berlinDayAnchor, berlinTimeAnchor } from "@/lib/tz";
+import { clubDayAnchor, clubTimeAnchor } from "@dragons/shared";
 import {
   Dialog,
   DialogContent,
@@ -62,7 +62,7 @@ function MatchBadge({ match }: { match: ReconcilePreviewMatch }) {
       </span>
       <span>vs {match.guestTeam}</span>
       <span className="tabular-nums text-muted-foreground">
-        {format.dateTime(berlinTimeAnchor(match.kickoffTime), "matchTime")}
+        {format.dateTime(clubTimeAnchor(match.kickoffTime), "matchTime")}
       </span>
       {match.isForfeited && (
         <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
@@ -94,11 +94,11 @@ function CreateSection({ items }: { items: ReconcilePreviewCreate[] }) {
           <div className="flex items-center justify-between text-sm font-medium">
             <span>{item.venueName}</span>
             <span className="tabular-nums text-muted-foreground">
-              {format.dateTime(berlinDayAnchor(item.date), "matchDate")}
+              {format.dateTime(clubDayAnchor(item.date), "matchDate")}
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            {t("timeWindow")}: {format.dateTime(berlinTimeAnchor(item.calculatedStartTime, item.date), "matchTime")} – {format.dateTime(berlinTimeAnchor(item.calculatedEndTime, item.date), "matchTime")}
+            {t("timeWindow")}: {format.dateTime(clubTimeAnchor(item.calculatedStartTime, item.date), "matchTime")} – {format.dateTime(clubTimeAnchor(item.calculatedEndTime, item.date), "matchTime")}
           </p>
           <div className="mt-2 space-y-1">
             {item.matches.map((m) => (
@@ -127,18 +127,18 @@ function UpdateSection({ items }: { items: ReconcilePreviewUpdate[] }) {
           <div className="flex items-center justify-between text-sm font-medium">
             <span>{item.venueName}</span>
             <span className="tabular-nums text-muted-foreground">
-              {format.dateTime(berlinDayAnchor(item.date), "matchDate")}
+              {format.dateTime(clubDayAnchor(item.date), "matchDate")}
             </span>
           </div>
           {(item.currentStartTime !== item.newStartTime ||
             item.currentEndTime !== item.newEndTime) && (
             <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
               <span className="tabular-nums">
-                {format.dateTime(berlinTimeAnchor(item.currentStartTime, item.date), "matchTime")} – {format.dateTime(berlinTimeAnchor(item.currentEndTime, item.date), "matchTime")}
+                {format.dateTime(clubTimeAnchor(item.currentStartTime, item.date), "matchTime")} – {format.dateTime(clubTimeAnchor(item.currentEndTime, item.date), "matchTime")}
               </span>
               <ArrowRight className="h-3 w-3" />
               <span className="tabular-nums font-medium text-foreground">
-                {format.dateTime(berlinTimeAnchor(item.newStartTime, item.date), "matchTime")} – {format.dateTime(berlinTimeAnchor(item.newEndTime, item.date), "matchTime")}
+                {format.dateTime(clubTimeAnchor(item.newStartTime, item.date), "matchTime")} – {format.dateTime(clubTimeAnchor(item.newEndTime, item.date), "matchTime")}
               </span>
             </div>
           )}
@@ -188,7 +188,7 @@ function RemoveSection({ items }: { items: ReconcilePreviewRemove[] }) {
           <div className="flex items-center justify-between text-sm font-medium">
             <span>{item.venueName}</span>
             <span className="tabular-nums text-muted-foreground">
-              {format.dateTime(berlinDayAnchor(item.date), "matchDate")}
+              {format.dateTime(clubDayAnchor(item.date), "matchDate")}
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">

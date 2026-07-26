@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { Label } from "@dragons/ui/components/label";
 import { Checkbox } from "@dragons/ui/components/checkbox";
 import { Button } from "@dragons/ui/components/button";
-import { todayInBerlin, plusDaysInBerlin } from "@/lib/tz";
+import { todayInClubZone, plusDaysInClubZone } from "@dragons/shared";
 import type { HubFilters } from "../use-referee-hub-url";
 
 interface LeagueOption {
@@ -140,10 +140,10 @@ export function SlotsFilterSidebar({ filters, onChange, leagueOptions }: Props) 
 
 function matchesPreset(f: HubFilters, preset: "14d" | "30d" | "season" | "custom"): boolean {
   if (preset === "14d") {
-    return f.dateFrom === todayInBerlin() && f.dateTo === plusDaysInBerlin(14);
+    return f.dateFrom === todayInClubZone() && f.dateTo === plusDaysInClubZone(14);
   }
   if (preset === "30d") {
-    return f.dateFrom === todayInBerlin() && f.dateTo === plusDaysInBerlin(30);
+    return f.dateFrom === todayInClubZone() && f.dateTo === plusDaysInClubZone(30);
   }
   if (preset === "season") {
     return f.dateFrom === null && f.dateTo === null;
@@ -154,16 +154,16 @@ function matchesPreset(f: HubFilters, preset: "14d" | "30d" | "season" | "custom
 
 function applyPreset(preset: "14d" | "30d" | "season" | "custom"): Partial<HubFilters> {
   if (preset === "14d") {
-    return { dateFrom: todayInBerlin(), dateTo: plusDaysInBerlin(14) };
+    return { dateFrom: todayInClubZone(), dateTo: plusDaysInClubZone(14) };
   }
   if (preset === "30d") {
-    return { dateFrom: todayInBerlin(), dateTo: plusDaysInBerlin(30) };
+    return { dateFrom: todayInClubZone(), dateTo: plusDaysInClubZone(30) };
   }
   if (preset === "season") {
     return { dateFrom: null, dateTo: null };
   }
   // custom — keep existing dates or initialize to today
-  return { dateFrom: todayInBerlin(), dateTo: todayInBerlin() };
+  return { dateFrom: todayInClubZone(), dateTo: todayInClubZone() };
 }
 
 // Re-export pure helpers for testing

@@ -10,7 +10,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
-import { berlinDayAnchor } from "@/lib/tz";
+import { clubDayAnchor } from "@dragons/shared";
 import { AssigneeStack } from "./assignee-stack";
 import { LabelsBar } from "./labels-bar.stub";
 
@@ -101,7 +101,7 @@ export function TaskCard({ task, onOpen, dragHandle }: TaskCardProps) {
                   keeps the rendered day right on a UTC server and for an admin
                   in any zone. Rendering the raw string also skipped locale
                   formatting that every other date in the board goes through. */}
-              {format.dateTime(berlinDayAnchor(task.dueDate), "short")}
+              {format.dateTime(clubDayAnchor(task.dueDate), "short")}
             </span>
           )}
           {hasChecklist && (
