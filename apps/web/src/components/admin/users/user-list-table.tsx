@@ -19,6 +19,8 @@ import {
 } from "@dragons/ui/components/tooltip"
 
 import { DataTable } from "@/components/ui/data-table"
+import { ErrorState } from "@/components/ui/error-state"
+import { LoadingState } from "@/components/ui/loading-state"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 
@@ -194,20 +196,14 @@ export function UserListTable() {
     [t, format, currentUserId, mutate],
   )
 
+  // The old branch showed the "no users found" copy on failure, which reads as
+  // an empty account list rather than an outage.
   if (error) {
-    return (
-      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-        {t("empty")}
-      </div>
-    )
+    return <ErrorState onRetry={() => { void mutate(); }} />
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12 text-muted-foreground">
-        <p>{tCommon("loading")}</p>
-      </div>
-    )
+    return <LoadingState rows={6} label={tCommon("loading")} />
   }
 
   return (

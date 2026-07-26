@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useFormatter } from "next-intl";
 import type { MatchListItem } from "@dragons/shared";
 import { api } from "@/lib/api";
+import { ErrorState } from "@/components/ui/error-state";
 import { WeekendPicker } from "./weekend-picker";
 import { MatchList } from "./match-list";
 import type { PublicTeam } from "./types";
@@ -63,28 +64,49 @@ export function ScheduleView({
   );
   const [matches, setMatches] = useState(initialMatches);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const sunday = getSunday(saturday);
+
+  // Rapid paging fires overlapping requests. `requestSeq` is the sequence guard
+  // — only the newest request may write state — and the AbortController stops
+  // the superseded one from occupying a connection at all.
+  const requestSeq = useRef(0);
+  const inFlight = useRef<AbortController | null>(null);
 
   const fetchMatches = useCallback(
     async (sat: Date, teamApiId: number | null) => {
       const sun = getSunday(sat);
+      const seq = ++requestSeq.current;
+      inFlight.current?.abort();
+      const controller = new AbortController();
+      inFlight.current = controller;
       setLoading(true);
       try {
-        const data = await api.public.getMatches({
-          dateFrom: toDateString(sat),
-          dateTo: toDateString(sun),
-          ...(teamApiId ? { teamApiId } : {}),
-        });
+        const data = await api.public.getMatches(
+          {
+            dateFrom: toDateString(sat),
+            dateTo: toDateString(sun),
+            ...(teamApiId ? { teamApiId } : {}),
+          },
+          { signal: controller.signal },
+        );
+        if (seq !== requestSeq.current) return;
         setMatches(data.items ?? []);
+        setFailed(false);
       } catch {
-        setMatches([]);
+        // A stale rejection (including our own abort) must not touch state.
+        if (seq !== requestSeq.current) return;
+        setFailed(true);
       } finally {
-        setLoading(false);
+        if (seq === requestSeq.current) setLoading(false);
       }
     },
     [],
   );
+
+  // Drop the last in-flight request when the view goes away.
+  useEffect(() => () => inFlight.current?.abort(), []);
 
   // Re-fetch when the team filter changes at the page level
   const prevTeamRef = useRef(selectedTeamApiId);
@@ -119,13 +141,18 @@ export function ScheduleView({
         hasNext={true}
       />
 
-      <div className={loading ? "opacity-50 transition-opacity" : ""}>
-        <MatchList
-          matches={matches}
-          formatDate={formatDate}
-          translations={translations}
-        />
-      </div>
+      {failed ? (
+        // A server outage is not an empty weekend — say so, and offer a way back.
+        <ErrorState onRetry={() => { void fetchMatches(saturday, selectedTeamApiId); }} />
+      ) : (
+        <div className={loading ? "opacity-50 transition-opacity" : ""}>
+          <MatchList
+            matches={matches}
+            formatDate={formatDate}
+            translations={translations}
+          />
+        </div>
+      )}
     </div>
   );
 }

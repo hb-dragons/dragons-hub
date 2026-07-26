@@ -10,6 +10,8 @@ import { Link } from "@/lib/navigation";
 import { toast } from "sonner";
 import { Badge } from "@dragons/ui/components/badge";
 import { Button } from "@dragons/ui/components/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
 import {
   Card,
   CardContent,
@@ -76,8 +78,18 @@ export function NotificationCenter() {
   const notificationsQ = queries.notifications(PAGE_SIZE, offset);
   const domainEventsFailedQ = queries.domainEventsFailed(failedPage, PAGE_SIZE);
 
-  const { data: inboxData } = useSWR(inboxKey, notificationsQ.fetcher);
-  const { data: failedData } = useSWR(failedKey, domainEventsFailedQ.fetcher);
+  const {
+    data: inboxData,
+    error: inboxError,
+    isLoading: inboxLoading,
+    mutate: reloadInbox,
+  } = useSWR(inboxKey, notificationsQ.fetcher);
+  const {
+    data: failedData,
+    error: failedError,
+    isLoading: failedLoading,
+    mutate: reloadFailed,
+  } = useSWR(failedKey, domainEventsFailedQ.fetcher);
 
   const notifications = inboxData?.notifications ?? [];
   const totalInbox = inboxData?.total ?? 0;
@@ -159,7 +171,12 @@ export function NotificationCenter() {
 
       {/* Inbox Tab */}
       <TabsContent value="inbox" className="mt-4 space-y-3">
-        {notifications.length === 0 ? (
+        {/* An unreachable API is not an empty inbox. */}
+        {inboxError ? (
+          <ErrorState onRetry={() => { void reloadInbox(); }} />
+        ) : inboxLoading && !inboxData ? (
+          <LoadingState rows={4} />
+        ) : notifications.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             {t("empty")}
           </p>
@@ -189,7 +206,11 @@ export function NotificationCenter() {
 
       {/* Failed Tab */}
       <TabsContent value="failed" className="mt-4 space-y-3">
-        {failedNotifications.length === 0 ? (
+        {failedError ? (
+          <ErrorState onRetry={() => { void reloadFailed(); }} />
+        ) : failedLoading && !failedData ? (
+          <LoadingState rows={4} />
+        ) : failedNotifications.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             {t("empty")}
           </p>

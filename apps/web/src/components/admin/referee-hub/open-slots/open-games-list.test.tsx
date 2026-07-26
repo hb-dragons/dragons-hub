@@ -1,9 +1,12 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import useSWR from "swr";
+import { SWR_KEYS } from "@/lib/swr-keys";
+import { normalizeRefereeGamesQuery } from "@/lib/referee-games-query";
+import { OPEN_GAMES_PREFETCH_OPTS } from "./open-games-query";
 import { OpenGamesList } from "./open-games-list";
 
 vi.mock("next-intl", () => ({
@@ -34,6 +37,7 @@ describe("OpenGamesList", () => {
   beforeEach(() => {
     vi.mocked(useSWR).mockReset();
   });
+  afterEach(cleanup);
 
   it("renders rows from server response without client-side status filter", async () => {
     vi.mocked(useSWR).mockReturnValue({
@@ -78,6 +82,37 @@ describe("OpenGamesList", () => {
     />));
     expect(observed).toContain("slotStatus=open");
     expect(observed).not.toMatch(/slotStatus=any/);
+  });
+
+  it("offers a retry affordance when the list fails to load", () => {
+    const mutate = vi.fn();
+    vi.mocked(useSWR).mockReturnValue({
+      data: undefined,
+      error: new Error("down"),
+      isLoading: false,
+      mutate,
+    } as never);
+    render(wrap(<OpenGamesList filters={baseFilters} selectedGameId={null} onSelect={() => {}} />));
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText(/empty|no games/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /tryAgain/i }));
+    expect(mutate).toHaveBeenCalled();
+  });
+
+  it("requests exactly the key the server prefetch primes for default filters", () => {
+    let observed = "";
+    vi.mocked(useSWR).mockImplementation((key: unknown) => {
+      observed = key as string;
+      return { data: { items: [] } } as never;
+    });
+    render(wrap(<OpenGamesList filters={baseFilters} selectedGameId={null} onSelect={() => {}} />));
+    // `admin/referees/page.tsx` primes this exact key. If either side drifts the
+    // SSR payload is silently discarded and the pane shows "Loading…".
+    expect(observed).toBe(
+      SWR_KEYS.refereeGamesFiltered(
+        normalizeRefereeGamesQuery(OPEN_GAMES_PREFETCH_OPTS),
+      ),
+    );
   });
 
   it("maps filters.status=any to no slotStatus param (server returns all)", () => {

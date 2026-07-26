@@ -8,8 +8,11 @@ import { formatKickoff } from "@/lib/format-kickoff";
 import { queries } from "@/lib/swr-queries";
 import { Input } from "@dragons/ui/components/input";
 import { Badge } from "@dragons/ui/components/badge";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
 import { cn } from "@dragons/ui/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
+import { OPEN_GAMES_PAGE_SIZE } from "./open-games-query";
 import type { HubFilters } from "../use-referee-hub-url";
 
 interface Props {
@@ -52,11 +55,11 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
     dateTo: filters.dateTo ?? undefined,
     gameType: filters.gameType,
     search: debouncedSearch.length >= 3 ? debouncedSearch : undefined,
-    limit: 200,
+    limit: OPEN_GAMES_PAGE_SIZE,
     offset: 0,
   });
 
-  const { data, error, isLoading } = useSWR(gamesQ.key, gamesQ.fetcher, {
+  const { data, error, isLoading, mutate } = useSWR(gamesQ.key, gamesQ.fetcher, {
     dedupingInterval: 5000,
   });
 
@@ -99,9 +102,15 @@ export function OpenGamesList({ filters, selectedGameId, onSelect }: Props) {
         />
       </div>
       <div ref={containerRef} className="flex-1 min-h-0">
-        {error && <div className="p-4 text-sm text-destructive">{t("loadError")}</div>}
-        {isLoading && !data && <div className="p-4 text-sm text-muted-foreground">{t("loading")}</div>}
-        {!isLoading && rows.length === 0 && (
+        {error && (
+          <ErrorState
+            className="m-3"
+            description={t("loadError")}
+            onRetry={() => { void mutate(); }}
+          />
+        )}
+        {!error && isLoading && !data && <LoadingState className="p-3" rows={5} />}
+        {!error && !isLoading && rows.length === 0 && (
           <div className="p-4 text-sm text-muted-foreground text-center">{t("empty")}</div>
         )}
         {rows.length > 0 && (

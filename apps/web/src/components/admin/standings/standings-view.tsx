@@ -3,6 +3,8 @@
 import { useTranslations } from "next-intl"
 import useSWR from "swr"
 import { queries } from "@/lib/swr-queries"
+import { ErrorState } from "@/components/ui/error-state"
+import { LoadingState } from "@/components/ui/loading-state"
 import { Trophy } from "lucide-react"
 import {
   Table,
@@ -18,7 +20,19 @@ import { cn } from "@dragons/ui/lib/utils"
 export function StandingsView() {
   const t = useTranslations("standings")
   const standingsQ = queries.standings()
-  const { data: leagues } = useSWR(standingsQ.key, standingsQ.fetcher)
+  const { data: leagues, error, isLoading, mutate } = useSWR(
+    standingsQ.key,
+    standingsQ.fetcher,
+  )
+
+  // A failed request is not "no standings data" — never collapse the two.
+  if (error) {
+    return <ErrorState onRetry={() => { void mutate(); }} />
+  }
+
+  if (isLoading && !leagues) {
+    return <LoadingState rows={5} />
+  }
 
   const leagueList = leagues ?? []
 

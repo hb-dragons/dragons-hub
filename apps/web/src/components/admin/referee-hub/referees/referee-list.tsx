@@ -13,6 +13,8 @@ import { Input } from "@dragons/ui/components/input";
 import { Checkbox } from "@dragons/ui/components/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@dragons/ui/components/select";
 import { Button } from "@dragons/ui/components/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
 import { cn } from "@dragons/ui/lib/utils";
 import type { RefereeListItem } from "@dragons/shared";
 
@@ -42,7 +44,7 @@ export function RefereeList({ selectedId, onSelect }: Props) {
   const listKey = refereesPaginatedQ.key;
   const refereeCountsQ = queries.refereeCounts();
 
-  const { data } = useSWR(listKey, refereesPaginatedQ.fetcher);
+  const { data, error, isLoading, mutate: reloadList } = useSWR(listKey, refereesPaginatedQ.fetcher);
   const { data: counts } = useSWR(SWR_KEYS.refereeCounts, refereeCountsQ.fetcher, { dedupingInterval: 30_000 });
   const items = data?.items ?? [];
 
@@ -111,7 +113,14 @@ export function RefereeList({ selectedId, onSelect }: Props) {
       </div>
 
       <div className="flex-1 overflow-auto bg-surface-low">
-        {items.length === 0 && <div className="p-4 text-sm text-muted-foreground">{t("empty")}</div>}
+        {/* A failed list is not "no referees match your filters". */}
+        {error ? (
+          <ErrorState className="m-3" onRetry={() => { void reloadList(); }} />
+        ) : isLoading && !data ? (
+          <LoadingState className="p-3" rows={5} />
+        ) : (
+          items.length === 0 && <div className="p-4 text-sm text-muted-foreground">{t("empty")}</div>
+        )}
         {items.map((r) => (
           <div
             key={r.id}
