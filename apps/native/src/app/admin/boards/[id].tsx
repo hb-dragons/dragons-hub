@@ -444,7 +444,10 @@ function BoardDetailBody() {
           container: it is positioned in window-absolute coordinates, which
           only line up with the unpadded root. */}
       <View style={{ flex: 1, paddingTop: headerHeight, paddingBottom: contentBottomInset }}>
-        {boardLoading && !board ? (
+        {/* Also gate on persistence.hydrating: without it, the board renders
+            with default (empty) filters for a frame or two before the
+            persisted filters land, which briefly shows the wrong task set. */}
+        {(boardLoading && !board) || persistence.hydrating ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator color={colors.foreground} />
           </View>

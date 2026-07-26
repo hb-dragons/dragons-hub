@@ -9,17 +9,7 @@ import { useColumnMutations } from "@/hooks/board/useColumnMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { singleLineInput } from "@/components/ui/inputStyles";
-
-const COLOR_PRESETS = [
-  null,
-  "#9ca3af",
-  "#34d399",
-  "#60a5fa",
-  "#f59e0b",
-  "#ef4444",
-  "#a78bfa",
-  "#f472b6",
-] as const;
+import { COLUMN_COLOR_PRESETS } from "@/lib/board/column-colors";
 
 interface OpenArgs {
   boardId: number;
@@ -101,7 +91,7 @@ export const AddColumnSheet = forwardRef<AddColumnSheetHandle>(function AddColum
         />
 
         <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" }}>
-          {COLOR_PRESETS.map((c, i) => {
+          {COLUMN_COLOR_PRESETS.map((c, i) => {
             const selected = c === color;
             return (
               <Pressable

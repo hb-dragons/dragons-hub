@@ -12,7 +12,6 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "Use Face ID to unlock the Dragons app",
-        "NSCameraUsageDescription": "Allow Dragons to access your camera for team photos",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -40,9 +39,7 @@
       ],
       "permissions": [
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "notification": {
@@ -60,13 +57,6 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#004b23"
-        }
-      ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow Dragons to access your camera for team photos.",
-          "microphonePermission": false
         }
       ],
       [

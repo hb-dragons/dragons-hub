@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { createElement } from "react";
-import * as SecureStore from "expo-secure-store";
+import { localStorage } from "@/lib/local-storage";
 import { getLocales } from "expo-localization";
 import { i18n } from "@/lib/i18n";
 
@@ -44,7 +44,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    void SecureStore.getItemAsync(LOCALE_KEY).then((stored) => {
+    void localStorage.getItem(LOCALE_KEY).then((stored) => {
       if (isValidPref(stored)) {
         setPrefState(stored);
       }
@@ -60,7 +60,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const setPref = useCallback((next: LocalePref) => {
     setPrefState(next);
-    void SecureStore.setItemAsync(LOCALE_KEY, next);
+    void localStorage.setItem(LOCALE_KEY, next);
   }, []);
 
   const value = useMemo<LocaleContextValue>(

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
-import * as SecureStore from "expo-secure-store";
+import { localStorage } from "@/lib/local-storage";
 import { DEFAULT_RELOCK_GRACE_PERIOD_MS, subscribeBackgroundRelock } from "@/lib/biometric-relock";
 
 const BIOMETRIC_KEY = "biometric_lock_enabled";
@@ -22,7 +22,7 @@ export function useBiometricLock(options?: { relockGracePeriodMs?: number }) {
     async function init() {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      const stored = await SecureStore.getItemAsync(BIOMETRIC_KEY);
+      const stored = await localStorage.getItem(BIOMETRIC_KEY);
       const enabled = stored === "true";
 
       if (cancelled) return;
@@ -69,11 +69,11 @@ export function useBiometricLock(options?: { relockGracePeriodMs?: number }) {
         disableDeviceFallback: false,
       });
       if (!result.success) return;
-      await SecureStore.setItemAsync(BIOMETRIC_KEY, "true");
+      await localStorage.setItem(BIOMETRIC_KEY, "true");
       setIsEnabled(true);
     } else {
       // Disabling
-      await SecureStore.setItemAsync(BIOMETRIC_KEY, "false");
+      await localStorage.setItem(BIOMETRIC_KEY, "false");
       setIsEnabled(false);
       setIsLocked(false);
     }

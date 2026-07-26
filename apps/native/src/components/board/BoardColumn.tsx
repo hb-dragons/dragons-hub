@@ -7,8 +7,8 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import type { TaskCardData, BoardColumnData } from "@dragons/shared";
-import { TaskCard, type TaskContentRect, type TaskDragCallbacks } from "./TaskCard";
+import type { TaskCardData, BoardColumnData, TaskContentRect } from "@dragons/shared";
+import { TaskCard, type TaskDragCallbacks } from "./TaskCard";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 

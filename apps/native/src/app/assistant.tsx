@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
+import { Redirect } from "expo-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { fetch as expoFetch } from "expo/fetch";
@@ -43,6 +44,15 @@ function MessageItem({ message, isStreaming, onRegenerate }: { message: UiMessag
   const full = messageText(message);
   const shown = useThrottledText(full, isStreaming);
   const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear the pending "copied" -> reset timer on unmount so it doesn't fire
+  // setState against a message row that scrolled out and unmounted.
+  useEffect(() => {
+    return () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    };
+  }, []);
 
   if (message.role === "user") {
     return (
@@ -56,7 +66,8 @@ function MessageItem({ message, isStreaming, onRegenerate }: { message: UiMessag
   const copy = () => {
     void Clipboard.setStringAsync(full);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 1500);
   };
 
   return (
@@ -126,6 +137,15 @@ export default function AssistantScreen() {
     }
     lastUserCount.current = userCount;
   }, [messages]);
+
+  // The home-screen entry point only shows when the flag is on, but a deep
+  // link or back-navigation can still land here directly — the backend
+  // returns 503 when the assistant is disabled, so gate the route itself
+  // the same way the entry point is gated. Checked after all hooks so the
+  // hook call order stays fixed across renders.
+  if (process.env.EXPO_PUBLIC_CHATBOT_ENABLED !== "true") {
+    return <Redirect href="/" />;
+  }
 
   const send = (text: string) => {
     const trimmed = text.trim();
