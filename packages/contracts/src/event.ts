@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EVENT_ENTITY_TYPES } from "@dragons/shared";
+import { EVENT_ENTITY_TYPES, EVENT_URGENCIES } from "@dragons/shared";
 
 export const eventListQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
@@ -13,14 +13,14 @@ export const eventListQuerySchema = z.object({
   status: z.enum(["pending", "sent", "failed", "read"]).optional(),
 });
 
-export const triggerEventSchema = z.object({
+export const triggerEventSchema = z.strictObject({
   type: z.string().min(1).max(100),
   entityType: z.enum(EVENT_ENTITY_TYPES),
   entityId: z.number().int().positive(),
   entityName: z.string().min(1).max(300),
   deepLinkPath: z.string().min(1).max(500),
   payload: z.record(z.string(), z.unknown()).default({}),
-  urgencyOverride: z.enum(["immediate", "routine"]).optional(),
+  urgencyOverride: z.enum(EVENT_URGENCIES).optional(),
 });
 
 export type EventListQuery = z.infer<typeof eventListQuerySchema>;

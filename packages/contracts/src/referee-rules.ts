@@ -23,7 +23,7 @@ export const refereeRulesArraySchema = z.array(refereeRuleItemSchema).refine(
   { message: "Duplicate teamId entries are not allowed" },
 );
 
-export const updateRefereeRulesBodySchema = z.object({
+export const updateRefereeRulesBodySchema = z.strictObject({
   rules: refereeRulesArraySchema,
 });
 

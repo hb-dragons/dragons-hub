@@ -33,12 +33,23 @@ export const matchUpdateBodySchema = matchFormSchema.extend({
   guestQ3: z.number().int().nullable().optional(),
   homeQ4: z.number().int().nullable().optional(),
   guestQ4: z.number().int().nullable().optional(),
+  // Periods 5-8 exist for the "achtel" format: the columns are in `matches`,
+  // `MatchDetail` exposes them, and without them here an achtel match with a
+  // wrong period score has no editable path at all.
+  homeQ5: z.number().int().nullable().optional(),
+  guestQ5: z.number().int().nullable().optional(),
+  homeQ6: z.number().int().nullable().optional(),
+  guestQ6: z.number().int().nullable().optional(),
+  homeQ7: z.number().int().nullable().optional(),
+  guestQ7: z.number().int().nullable().optional(),
+  homeQ8: z.number().int().nullable().optional(),
+  guestQ8: z.number().int().nullable().optional(),
   homeOt1: z.number().int().nullable().optional(),
   guestOt1: z.number().int().nullable().optional(),
   homeOt2: z.number().int().nullable().optional(),
   guestOt2: z.number().int().nullable().optional(),
   changeReason: z.string().optional(),
-});
+}).strict();
 
 export const matchHistoryQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),

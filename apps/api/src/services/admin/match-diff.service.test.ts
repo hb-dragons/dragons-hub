@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { matchUpdateBodySchema } from "@dragons/contracts";
 import { computeDiffs, type DiffInput, OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
 
 function makeDiffInput(overrides: Partial<DiffInput> = {}): DiffInput {
@@ -383,7 +384,27 @@ describe("computeDiffs", () => {
       expect(OVERRIDABLE_FIELDS).toContain("guestScore");
       expect(OVERRIDABLE_FIELDS).toContain("isForfeited");
       expect(OVERRIDABLE_FIELDS).toContain("isCancelled");
-      expect(OVERRIDABLE_FIELDS).toHaveLength(20);
+      expect(OVERRIDABLE_FIELDS).toHaveLength(28);
+    });
+
+    // Structural guard: a field the update contract accepts but that neither
+    // list names is silently dropped by updateMatchLocal — which is exactly how
+    // periods 5-8 came to be uneditable. Deriving the check from the schema
+    // means adding a field to the contract fails here until it is wired up.
+    it("covers every field matchUpdateBodySchema accepts", () => {
+      const editable = new Set<string>([
+        ...OVERRIDABLE_FIELDS,
+        ...LOCAL_ONLY_FIELDS,
+        "changeReason", // metadata, not a column
+      ]);
+      const contractFields = Object.keys(matchUpdateBodySchema.shape);
+      expect(contractFields.length).toBeGreaterThan(0);
+      expect(contractFields.filter((f) => !editable.has(f))).toEqual([]);
+    });
+
+    it.each([1, 2, 3, 4, 5, 6, 7, 8])("treats period %s as overridable", (period) => {
+      expect(OVERRIDABLE_FIELDS).toContain(`homeQ${period}`);
+      expect(OVERRIDABLE_FIELDS).toContain(`guestQ${period}`);
     });
 
     it("LOCAL_ONLY_FIELDS contains expected fields", () => {

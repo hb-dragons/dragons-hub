@@ -81,7 +81,7 @@ async function seedRule(
       name: opts.name ?? "Match alerts",
       enabled: opts.enabled ?? true,
       createdBy: opts.createdBy ?? "user-1",
-      eventTypes: opts.eventTypes ?? ["match.scheduled"],
+      eventTypes: opts.eventTypes ?? ["match.schedule.changed"],
       filters: opts.filters ?? DEFAULT_FILTERS,
       channels: opts.channels ?? DEFAULT_CHANNELS,
       urgencyOverride: opts.urgencyOverride ?? null,
@@ -136,7 +136,7 @@ describe("listWatchRules", () => {
       name: "Match alerts",
       enabled: true,
       createdBy: "user-1",
-      eventTypes: ["match.scheduled"],
+      eventTypes: ["match.schedule.changed"],
       filters: [{ field: "teamId", operator: "eq", value: "42" }],
       channels: [{ channel: "in_app", targetId: "1" }],
       urgencyOverride: null,
@@ -168,7 +168,7 @@ describe("createWatchRule", () => {
     const created = await createWatchRule(
       {
         name: "Match alerts",
-        eventTypes: ["match.scheduled"],
+        eventTypes: ["match.schedule.changed"],
         filters: [{ field: "teamId", operator: "eq", value: "42" }],
         channels: [{ channel: "in_app", targetId: "1" }],
         enabled: true,
@@ -207,18 +207,18 @@ describe("updateWatchRule", () => {
   it("changes only the provided fields and leaves the rest intact", async () => {
     const id = await seedRule({
       name: "Original",
-      eventTypes: ["match.scheduled"],
-      urgencyOverride: "high",
+      eventTypes: ["match.schedule.changed"],
+      urgencyOverride: "immediate",
     });
 
     const updated = await updateWatchRule(id, { name: "Renamed", enabled: false });
 
     expect(updated!.name).toBe("Renamed");
     expect(updated!.enabled).toBe(false);
-    expect(updated!.eventTypes).toEqual(["match.scheduled"]);
+    expect(updated!.eventTypes).toEqual(["match.schedule.changed"]);
     expect(updated!.filters).toEqual([{ field: "teamId", operator: "eq", value: "42" }]);
     expect(updated!.channels).toEqual([{ channel: "in_app", targetId: "1" }]);
-    expect(updated!.urgencyOverride).toBe("high");
+    expect(updated!.urgencyOverride).toBe("immediate");
     expect(updated!.createdBy).toBe("user-1");
   });
 
@@ -266,9 +266,9 @@ describe("updateWatchRule", () => {
   it("persists urgencyOverride when provided", async () => {
     const id = await seedRule();
 
-    await updateWatchRule(id, { urgencyOverride: "high" });
+    await updateWatchRule(id, { urgencyOverride: "immediate" });
 
-    expect((await getWatchRule(id))!.urgencyOverride).toBe("high");
+    expect((await getWatchRule(id))!.urgencyOverride).toBe("immediate");
   });
 
   it("persists templateOverride when provided", async () => {

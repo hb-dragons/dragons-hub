@@ -112,11 +112,22 @@ describe("POST /boards", () => {
     await app.request("/boards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Board", description: "Desc", createdBy: "admin" }),
+      body: JSON.stringify({ name: "Board", description: "Desc" }),
     });
 
-    // "admin" from the body is discarded — the audit actor comes from the session.
+    // The audit actor comes from the session, never the body.
     expect(mocks.createBoard).toHaveBeenCalledWith("Board", "Desc", "session-user-1");
+  });
+
+  it("rejects a body that names createdBy at all", async () => {
+    const res = await app.request("/boards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Board", createdBy: "admin" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(mocks.createBoard).not.toHaveBeenCalled();
   });
 
   it("returns 400 for missing name", async () => {

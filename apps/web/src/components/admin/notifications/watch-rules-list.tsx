@@ -46,34 +46,21 @@ import {
 } from "@dragons/ui/components/alert-dialog";
 import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { EVENT_TYPE_VALUES, EVENT_URGENCIES } from "./types";
 import type {
   WatchRuleItem,
   FilterCondition,
   ChannelTarget,
   ChannelConfigItem,
+  EventType,
+  EventUrgency,
 } from "./types";
 
-const ALL_EVENT_TYPES = [
-  "match.created",
-  "match.schedule.changed",
-  "match.venue.changed",
-  "match.cancelled",
-  "match.forfeited",
-  "match.score.changed",
-  "match.removed",
-  "match.result_entered",
-  "match.result_changed",
-  "referee.assigned",
-  "referee.unassigned",
-  "referee.reassigned",
-  "booking.created",
-  "booking.status.changed",
-  "booking.needs_reconfirmation",
-  "override.conflict",
-  "override.applied",
-  "override.reverted",
-  "sync.completed",
-] as const;
+// Derived from the shared EVENT_TYPES registry, which the watch-rule contract
+// also validates against. The list used to be restated here and had drifted:
+// it was missing match.confirmed, referee.slots.* and every task.* event, so
+// those could not be selected at all.
+const ALL_EVENT_TYPES = EVENT_TYPE_VALUES;
 
 const FILTER_FIELDS: FilterCondition["field"][] = [
   "teamId",
@@ -90,10 +77,11 @@ const FILTER_OPERATORS: FilterCondition["operator"][] = [
 
 interface RuleFormState {
   name: string;
-  eventTypes: string[];
+  eventTypes: EventType[];
   filters: FilterCondition[];
   channels: ChannelTarget[];
-  urgencyOverride: string;
+  /** "default" means "no override" — the contract takes null for that. */
+  urgencyOverride: EventUrgency | "default";
 }
 
 function emptyForm(): RuleFormState {
@@ -109,10 +97,16 @@ function emptyForm(): RuleFormState {
 function ruleToForm(rule: WatchRuleItem): RuleFormState {
   return {
     name: rule.name,
-    eventTypes: [...rule.eventTypes],
+    // Stored rules predate the contract's EVENT_TYPES enum, so a row may hold a
+    // type that no longer exists. Such a type can never match an event anyway;
+    // dropping it on edit repairs the rule instead of resubmitting a value the
+    // contract now rejects.
+    eventTypes: rule.eventTypes.filter((et): et is EventType =>
+      (EVENT_TYPE_VALUES as readonly string[]).includes(et),
+    ),
     filters: rule.filters.map((f) => ({ ...f })),
     channels: rule.channels.map((c) => ({ ...c })),
-    urgencyOverride: rule.urgencyOverride ?? "default",
+    urgencyOverride: (rule.urgencyOverride as EventUrgency | null) ?? "default",
   };
 }
 
@@ -199,7 +193,7 @@ export function WatchRulesList() {
   }
 
   // ── Event type toggle ──────────────────────────────────────────────────────
-  function toggleEventType(eventType: string) {
+  function toggleEventType(eventType: EventType) {
     setForm((prev) => ({
       ...prev,
       eventTypes: prev.eventTypes.includes(eventType)
@@ -546,7 +540,10 @@ export function WatchRulesList() {
               <Select
                 value={form.urgencyOverride}
                 onValueChange={(v) =>
-                  setForm((prev) => ({ ...prev, urgencyOverride: v }))
+                  setForm((prev) => ({
+                    ...prev,
+                    urgencyOverride: v as EventUrgency | "default",
+                  }))
                 }
               >
                 <SelectTrigger className="w-[200px]">
@@ -554,8 +551,12 @@ export function WatchRulesList() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="default">{t("noOverride")}</SelectItem>
-                  <SelectItem value="immediate">Immediate</SelectItem>
-                  <SelectItem value="routine">Routine</SelectItem>
+                  {/* Derived from the shared urgency list the contract enum uses. */}
+                  {EVENT_URGENCIES.map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {u === "immediate" ? "Immediate" : "Routine"}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

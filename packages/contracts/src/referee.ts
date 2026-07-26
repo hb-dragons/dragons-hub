@@ -10,7 +10,7 @@ export const refereeListQuerySchema = z.object({
 
 export type RefereeListQuery = z.infer<typeof refereeListQuerySchema>;
 
-export const refereeVisibilityBodySchema = z.object({
+export const refereeVisibilityBodySchema = z.strictObject({
   allowAllHomeGames: z.boolean(),
   allowAwayGames: z.boolean(),
   isOwnClub: z.boolean(),

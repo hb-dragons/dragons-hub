@@ -50,7 +50,7 @@ export const syncJobStatusesQuerySchema = z.object({
     }),
 });
 
-export const syncUpdateScheduleBodySchema = z.object({
+export const syncUpdateScheduleBodySchema = z.strictObject({
   syncType: z.string().optional(),
   enabled: z.boolean().optional(),
   cronExpression: z

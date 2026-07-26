@@ -63,6 +63,14 @@ export interface MatchUpdateData {
   guestQ3?: number | null;
   homeQ4?: number | null;
   guestQ4?: number | null;
+  homeQ5?: number | null;
+  guestQ5?: number | null;
+  homeQ6?: number | null;
+  guestQ6?: number | null;
+  homeQ7?: number | null;
+  guestQ7?: number | null;
+  homeQ8?: number | null;
+  guestQ8?: number | null;
   homeOt1?: number | null;
   guestOt1?: number | null;
   homeOt2?: number | null;

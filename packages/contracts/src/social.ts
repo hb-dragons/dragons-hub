@@ -8,7 +8,7 @@ export const socialMatchesQuerySchema = z.object({
 
 export type SocialMatchesQuery = z.infer<typeof socialMatchesQuerySchema>;
 
-export const socialGenerateBodySchema = z.object({
+export const socialGenerateBodySchema = z.strictObject({
   type: z.enum(["preview", "results"]),
   calendarWeek: z.number().int().min(1).max(53),
   year: z.number().int().min(2020).max(2100),

@@ -153,6 +153,31 @@ describe("matchUpdateBodySchema", () => {
     expect(result).toMatchObject({ homeOt1: 5, guestOt1: 3 });
   });
 
+  // An "achtel" match is played in eight periods; the DB has homeQ5..homeQ8 and
+  // MatchDetail exposes them, but the update body stopped at Q4 — so a wrong
+  // period score on an achtel match could not be corrected through the UI at all.
+  it.each([5, 6, 7, 8])("accepts period %s scores", (period) => {
+    const result = matchUpdateBodySchema.parse({
+      [`homeQ${period}`]: 12,
+      [`guestQ${period}`]: 10,
+    });
+    expect(result).toMatchObject({
+      [`homeQ${period}`]: 12,
+      [`guestQ${period}`]: 10,
+    });
+  });
+
+  it("accepts null period 5-8 scores to clear the override", () => {
+    const result = matchUpdateBodySchema.parse({ homeQ8: null, guestQ8: null });
+    expect(result).toMatchObject({ homeQ8: null, guestQ8: null });
+  });
+
+  it("rejects a key the schema does not declare", () => {
+    // A mistyped field used to be silently dropped, returning 200 unchanged.
+    expect(() => matchUpdateBodySchema.parse({ homeQ9: 5 })).toThrow();
+    expect(() => matchUpdateBodySchema.parse({ kickofDate: "2025-04-01" })).toThrow();
+  });
+
   it("accepts changeReason", () => {
     const result = matchUpdateBodySchema.parse({ changeReason: "Rescheduled" });
     expect(result).toMatchObject({ changeReason: "Rescheduled" });

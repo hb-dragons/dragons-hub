@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-export const leagueNumbersSchema = z.object({
+export const leagueNumbersSchema = z.strictObject({
   leagueNumbers: z.array(z.number().int().positive()),
 });
 
-export const leagueOwnClubRefsSchema = z.object({
+export const leagueOwnClubRefsSchema = z.strictObject({
   ownClubRefs: z.boolean(),
 });
 
