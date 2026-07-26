@@ -2,28 +2,62 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOTS = ["apps", "packages"];
+const SKIP_DIRS = new Set([
+  "node_modules",
+  "dist",
+  ".next",
+  "coverage",
+  ".expo",
+  ".turbo",
+]);
 
-function hasTestFile(dir) {
+/**
+ * Workspace packages that ship TypeScript source but deliberately have no test
+ * suite of their own. Every entry needs a reason that says why testing the
+ * package here would not add signal, and what covers it instead. Delete the
+ * entry the moment the package grows a test — the check below fails on a stale
+ * exemption so this list cannot quietly outlive its justification.
+ *
+ * Recorded 2026-07-26 (issue #109). These are exemptions from the *no tests at
+ * all* check only; none of them is exempt from being tested later, and each has
+ * a follow-up noted in the issue.
+ */
+const UNTESTED_PACKAGE_EXEMPTIONS = {
+  "@dragons/db":
+    "Drizzle table/column declarations with no runtime branching. Exercised end to end by @dragons/api's PGlite integration suite, which builds every table from this schema and runs real SQL against it.",
+  "@dragons/sdk":
+    "Almost entirely `types/*.ts` type declarations (zero runtime output) plus dev-only scripts under src/scripts. The two runtime helpers (helpers/parse-result.ts, helpers/type-guards.ts) are reached through @dragons/api's sync services.",
+  "@dragons/ui":
+    "Vendored shadcn/Radix primitives re-exported unmodified. Behaviour that matters is asserted where the components are composed, in @dragons/web's component tests; testing the wrappers here would assert Radix's behaviour, not ours.",
+};
+
+function walk(dir, visit) {
   for (const entry of readdirSync(dir)) {
-    if (
-      entry === "node_modules" ||
-      entry === "dist" ||
-      entry === ".next" ||
-      entry === "coverage"
-    )
-      continue;
+    if (SKIP_DIRS.has(entry)) continue;
     const full = join(dir, entry);
-    const s = statSync(full);
-    if (s.isDirectory()) {
-      if (hasTestFile(full)) return true;
-    } else if (/\.test\.(ts|tsx)$/.test(entry)) {
-      return true;
+    if (statSync(full).isDirectory()) {
+      walk(full, visit);
+    } else {
+      visit(entry, full);
     }
   }
-  return false;
 }
 
-const offenders = [];
+function scan(dir) {
+  let hasTest = false;
+  let hasSource = false;
+  walk(dir, (name) => {
+    if (/\.test\.(ts|tsx)$/.test(name)) hasTest = true;
+    else if (/\.tsx?$/.test(name) && !/\.d\.ts$/.test(name)) hasSource = true;
+  });
+  return { hasTest, hasSource };
+}
+
+const missingCoverageScript = [];
+const untested = [];
+const staleExemptions = [];
+const seenPackages = new Set();
+
 for (const root of ROOTS) {
   if (!existsSync(root)) continue;
   for (const pkg of readdirSync(root)) {
@@ -31,20 +65,52 @@ for (const root of ROOTS) {
     const pkgJsonPath = join(pkgDir, "package.json");
     const srcDir = join(pkgDir, "src");
     if (!existsSync(pkgJsonPath)) continue;
-    const dirToScan = existsSync(srcDir) ? srcDir : pkgDir;
-    if (!hasTestFile(dirToScan)) continue;
     const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
-    if (!pkgJson.scripts?.coverage) {
-      offenders.push(pkgJson.name ?? pkgDir);
+    const name = pkgJson.name ?? pkgDir;
+    seenPackages.add(name);
+
+    const { hasTest, hasSource } = scan(existsSync(srcDir) ? srcDir : pkgDir);
+    const exemptionReason = UNTESTED_PACKAGE_EXEMPTIONS[name];
+
+    if (hasTest) {
+      if (!pkgJson.scripts?.coverage) missingCoverageScript.push(name);
+      if (exemptionReason) staleExemptions.push(name);
+      continue;
     }
+
+    if (hasSource && !exemptionReason) untested.push(name);
   }
 }
 
-if (offenders.length > 0) {
-  console.error(
+for (const name of Object.keys(UNTESTED_PACKAGE_EXEMPTIONS)) {
+  if (!seenPackages.has(name)) staleExemptions.push(name);
+}
+
+const failures = [];
+if (missingCoverageScript.length > 0) {
+  failures.push(
     "These packages have *.test.* files but no `coverage` script:\n  " +
-      offenders.join("\n  "),
+      missingCoverageScript.join("\n  "),
   );
+}
+if (untested.length > 0) {
+  failures.push(
+    "These packages ship TypeScript source but have no *.test.* files at all.\n" +
+      "Add tests, or add an entry with a recorded reason to UNTESTED_PACKAGE_EXEMPTIONS\n" +
+      "in scripts/check-coverage-scripts.mjs:\n  " +
+      untested.join("\n  "),
+  );
+}
+if (staleExemptions.length > 0) {
+  failures.push(
+    "These packages are listed in UNTESTED_PACKAGE_EXEMPTIONS but no longer qualify\n" +
+      "(they now have tests, or no longer exist). Remove the exemption:\n  " +
+      staleExemptions.join("\n  "),
+  );
+}
+
+if (failures.length > 0) {
+  console.error(failures.join("\n\n"));
   process.exit(1);
 }
 console.log("Coverage-script check passed.");
