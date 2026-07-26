@@ -771,10 +771,15 @@ Two operational constraints the code relies on but doesn't state inline:
     is reclaimed (marked failed) only when its owner's heartbeat is absent, so a
     second worker can no longer kill an in-flight run owned by a live instance.
     Shutdown reclaim is scoped to the shutting-down instance's own runs.
-  - **Notification coalesce is Redis-backed.** The 60s coalesce window uses
-    `redis.set("coalesce:<entityType>:<entityId>", "1", "EX", 60, "NX")` instead
-    of an in-process Map; the claim is released if nothing was dispatched. This
-    coalesces correctly across instances.
+  - **Notification coalesce is Redis-backed and claimed per dispatch target.**
+    The 60s window uses
+    `redis.set("coalesce:<eventType>:<entityType>:<entityId>:<dedupKey>", "1", "EX", 60, "NX")`
+    instead of an in-process Map, so it coalesces correctly across instances.
+    `<dedupKey>` is the same per-(rule|default, channel config, channel,
+    recipient) key used for in-run dedup, and the claim is released in a
+    `finally` whenever that target was not delivered — including when the
+    dispatch throws. A retry inside the window therefore re-delivers exactly the
+    targets that failed, without re-sending the ones that already landed.
 - **Single-tenant ("own club").** The app is deployed once per club. The owning
   club is identified by `teams.isOwnClub` / `referees.isOwnClub` and
   `getClubConfig()`, threaded through routes, services, and sync. There is no

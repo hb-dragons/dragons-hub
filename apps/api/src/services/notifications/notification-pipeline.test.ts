@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // --- Mocks ---
 
@@ -220,6 +220,24 @@ function setupDbMocks(opts: {
       onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
     }),
   });
+}
+
+/**
+ * Back the Redis mock with a real in-memory key store so SET NX / DEL behave
+ * like Redis across several processEvent calls. Without this a test cannot tell
+ * "second attempt at the same event" apart from "second distinct event".
+ */
+function useFakeRedisStore(): Map<string, string> {
+  const store = new Map<string, string>();
+  mockRedisSet.mockImplementation((key: string, value: string) => {
+    if (store.has(key)) return Promise.resolve(null);
+    store.set(key, value);
+    return Promise.resolve("OK");
+  });
+  mockRedisDel.mockImplementation((key: string) =>
+    Promise.resolve(store.delete(key) ? 1 : 0),
+  );
+  return store;
 }
 
 // --- Tests ---
@@ -632,7 +650,15 @@ describe("processEvent", () => {
 
       await processEvent(makeEvent({ entityType: "match", entityId: 42 }));
 
-      expect(mockRedisSet).toHaveBeenCalledWith("coalesce:match.cancelled:match:42", "1", "EX", 60, "NX");
+      // Key carries the dispatch target (rule + channel + config) so one
+      // channel's failure cannot suppress the others' retry (#99).
+      expect(mockRedisSet).toHaveBeenCalledWith(
+        "coalesce:match.cancelled:match:42:rule:1:in_app:10",
+        "1",
+        "EX",
+        60,
+        "NX",
+      );
     });
 
     it("embeds event.type in the coalesce key so different event types on one entity don't collide (#61)", async () => {
@@ -651,7 +677,7 @@ describe("processEvent", () => {
       // Key must include the event type — otherwise a second, distinct event on
       // the same entity within the window collides and is dropped.
       expect(mockRedisSet).toHaveBeenCalledWith(
-        "coalesce:match.venue.changed:match:42",
+        "coalesce:match.venue.changed:match:42:rule:1:in_app:10",
         "1",
         "EX",
         60,
@@ -682,7 +708,9 @@ describe("processEvent", () => {
       const result = await processEvent(makeEvent({ entityType: "match", entityId: 42 }));
 
       expect(result.dispatched).toBe(0);
-      expect(mockRedisDel).toHaveBeenCalledWith("coalesce:match.cancelled:match:42");
+      expect(mockRedisDel).toHaveBeenCalledWith(
+        "coalesce:match.cancelled:match:42:rule:1:whatsapp_group:10",
+      );
     });
 
     it("does not release the coalesce key when at least one dispatch succeeded", async () => {
@@ -730,6 +758,102 @@ describe("processEvent", () => {
       expect(result2.coalesced).toBe(1);
       expect(result2.dispatched).toBe(0);
       expect(result2.buffered).toBe(1);
+    });
+  });
+
+  describe("mid-pipeline throw + retry inside the coalesce window (#99)", () => {
+    afterEach(() => {
+      // These two mocks are overridden with implementations above, and
+      // implementations survive vi.clearAllMocks() — restore the file defaults.
+      mockRedisDel.mockResolvedValue(1);
+      mockResolveRecipientUserIds.mockResolvedValue([]);
+    });
+
+    /** One admin recipient reachable on two channels: in_app (10) and push (20). */
+    function setupTwoChannelDefaults() {
+      const inAppConfig = makeChannelConfig({
+        id: 10,
+        type: "in_app",
+        config: { audienceRole: "admin", locale: "de" },
+      });
+      const pushConfig = makeChannelConfig({
+        id: 20,
+        type: "push",
+        config: { audienceRole: "admin", locale: "de" },
+      });
+      setupDbMocks({ rules: [], configs: [inAppConfig, pushConfig] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "admin", channel: "in_app" },
+        { audience: "admin", channel: "push" },
+      ]);
+      mockResolveRecipientUserIds.mockResolvedValue(["user-abc"]);
+    }
+
+    it("re-delivers the channel whose dispatch threw when the job is retried inside the window", async () => {
+      useFakeRedisStore();
+      setupTwoChannelDefaults();
+      const event = makeEvent();
+
+      // Attempt 1: in-app lands, then the push branch throws (a DB blip).
+      mockPushSend.mockRejectedValueOnce(new Error("db blip"));
+      await expect(processEvent(event)).rejects.toThrow("db blip");
+      expect(mockInAppSend).toHaveBeenCalledTimes(1);
+
+      // Attempt 2: BullMQ retries the same event 5s later — still inside the
+      // 60s window. The push notification must actually go out this time.
+      setupTwoChannelDefaults();
+      const result = await processEvent(event);
+
+      expect(mockPushSend).toHaveBeenCalledTimes(2);
+      expect(result.dispatched).toBe(1);
+      // The in-app that already landed stays claimed and is not sent twice.
+      expect(mockInAppSend).toHaveBeenCalledTimes(1);
+      expect(result.coalesced).toBe(1);
+    });
+
+    it("still coalesces a genuine duplicate event inside the window", async () => {
+      useFakeRedisStore();
+      setupTwoChannelDefaults();
+
+      const first = await processEvent(makeEvent({ id: "evt-1" }));
+      expect(first.dispatched).toBe(2);
+      expect(first.coalesced).toBe(0);
+
+      // A second, distinct domain event for the same type + entity arrives
+      // inside the window: nothing may be delivered again.
+      setupTwoChannelDefaults();
+      const second = await processEvent(makeEvent({ id: "evt-2" }));
+
+      expect(second.dispatched).toBe(0);
+      expect(second.coalesced).toBe(2);
+      expect(second.buffered).toBe(2);
+      expect(mockInAppSend).toHaveBeenCalledTimes(1);
+      expect(mockPushSend).toHaveBeenCalledTimes(1);
+    });
+
+    it("releases the coalesce claim of the target whose dispatch threw", async () => {
+      useFakeRedisStore();
+      setupTwoChannelDefaults();
+      mockPushSend.mockRejectedValueOnce(new Error("db blip"));
+
+      await expect(processEvent(makeEvent())).rejects.toThrow("db blip");
+
+      expect(mockRedisDel).toHaveBeenCalledWith(
+        "coalesce:match.cancelled:match:42:default:20:audience:admin",
+      );
+      // ...while the target that was delivered keeps its claim.
+      expect(mockRedisDel).not.toHaveBeenCalledWith(
+        "coalesce:match.cancelled:match:42:default:10:audience:admin",
+      );
+    });
+
+    it("propagates the dispatch error (so the worker never stamps processed_at) even if releasing the claim fails", async () => {
+      useFakeRedisStore();
+      setupTwoChannelDefaults();
+      mockPushSend.mockRejectedValueOnce(new Error("db blip"));
+      mockRedisDel.mockImplementation(() => Promise.reject(new Error("redis down")));
+
+      await expect(processEvent(makeEvent())).rejects.toThrow("db blip");
     });
   });
 
