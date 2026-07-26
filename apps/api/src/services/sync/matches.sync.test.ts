@@ -467,6 +467,25 @@ describe("syncMatchesFromData — create path", () => {
     expect(row.guestScore).toBe(61);
   });
 
+  it("keeps a forfeit result of \"0:20\" as 0, not NULL", async () => {
+    // `parseResult` used `parseInt(...) || null`, so the 0 of a forfeit became
+    // null and the match persisted as {home: null, guest: 20}.
+    await syncMatchesFromData(
+      [
+        makeLeagueData({
+          spielplan: [makeBasicMatch({ result: "0:20", verzicht: true })],
+          gameDetails: new Map(),
+        }),
+      ],
+      VENUE_LOOKUP,
+      null,
+    );
+
+    const row = await matchRow();
+    expect(row.homeScore).toBe(0);
+    expect(row.guestScore).toBe(20);
+  });
+
   it("stores negative SDK scores as NULL", async () => {
     await syncMatchesFromData(
       [
