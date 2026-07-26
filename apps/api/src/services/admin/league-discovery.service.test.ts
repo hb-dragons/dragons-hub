@@ -1,56 +1,69 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from "vitest";
 
 // --- Mock setup ---
+//
+// Only the federation SDK is stubbed — it is a network boundary. drizzle-orm
+// and @dragons/db/schema are deliberately NOT mocked: the previous version of
+// this file replaced `eq`/`and`/`notInArray` with identity stubs and counted
+// `mockInsert` calls, so the upsert lookup could have matched on the wrong
+// column and the untrack predicate could have been inverted with every test
+// still green. Everything below runs against a real (in-process PGlite)
+// Postgres.
 
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+const mocks = vi.hoisted(() => ({ getAllLigen: vi.fn() }));
+
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockSelect(...args),
-    insert: (...args: unknown[]) => mockInsert(...args),
-    update: (...args: unknown[]) => mockUpdate(...args),
-  }),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
-vi.mock("@dragons/db/schema", () => ({
-  leagues: {
-    id: "id",
-    apiLigaId: "apiLigaId",
-    ligaNr: "ligaNr",
-    name: "name",
-    seasonId: "seasonId",
-    seasonName: "seasonName",
-    skName: "skName",
-    akName: "akName",
-    geschlecht: "geschlecht",
-    isTracked: "isTracked",
-    discoveredAt: "discoveredAt",
-  },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  notInArray: vi.fn((...args: unknown[]) => ({ notInArray: args })),
-}));
-
-const mockGetAllLigen = vi.fn();
 vi.mock("../sync/sdk-client", () => ({
-  sdkClient: {
-    getAllLigen: (...args: unknown[]) => mockGetAllLigen(...args),
-  },
+  sdkClient: { getAllLigen: (...args: unknown[]) => mocks.getAllLigen(...args) },
 }));
 
-import { resolveAndSaveLeagues, getTrackedLeagues } from "./league-discovery.service";
+// --- Imports (after mocks) ---
 
-beforeEach(() => {
+import {
+  resolveAndSaveLeagues,
+  getTrackedLeagues,
+  setLeagueOwnClubRefs,
+} from "./league-discovery.service";
+import { leagues } from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
+import type { SdkLiga } from "@dragons/sdk";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
+
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
   vi.clearAllMocks();
+  mocks.getAllLigen.mockResolvedValue([]);
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
 });
 
 // --- Helpers ---
 
-function makeLiga(overrides: Record<string, unknown> = {}) {
+function makeLiga(overrides: Partial<SdkLiga> = {}): SdkLiga {
   return {
     ligaId: 58001,
     liganr: 4102,
@@ -63,221 +76,239 @@ function makeLiga(overrides: Record<string, unknown> = {}) {
     verbandId: 7,
     verbandName: "DBB",
     ...overrides,
-  };
+  } as SdkLiga;
 }
 
-function mockSelectChain(rows: unknown[]) {
-  return {
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue(rows),
-      }),
-    }),
-  };
+/** Seed a league row directly, bypassing the service. */
+async function seedLeague(opts: {
+  apiLigaId: number;
+  ligaNr: number;
+  name?: string;
+  isTracked?: boolean;
+  ownClubRefs?: boolean;
+}): Promise<number> {
+  const [row] = await ctx.db
+    .insert(leagues)
+    .values({
+      apiLigaId: opts.apiLigaId,
+      ligaNr: opts.ligaNr,
+      name: opts.name ?? `League ${opts.ligaNr}`,
+      seasonId: 2025,
+      seasonName: "2025/26",
+      isTracked: opts.isTracked ?? true,
+      ownClubRefs: opts.ownClubRefs ?? false,
+    })
+    .returning({ id: leagues.id });
+  return row!.id;
 }
 
-function mockSelectTrackedChain(rows: unknown[]) {
-  return {
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(rows),
-    }),
-  };
+async function allLeagues() {
+  return ctx.db.select().from(leagues).orderBy(leagues.apiLigaId);
 }
 
-function mockUpdateChain(returningRows: unknown[] = []) {
-  return {
-    set: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue(returningRows),
-      }),
-    }),
-  };
-}
-
-function mockUpdateSimpleChain() {
-  return {
-    set: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    }),
-  };
-}
-
-function mockInsertChain() {
-  return {
-    values: vi.fn().mockResolvedValue(undefined),
-  };
-}
+// --- Tests ---
 
 describe("resolveAndSaveLeagues", () => {
-  it("resolves matching leagues and creates new DB entries", async () => {
-    mockGetAllLigen.mockResolvedValue([makeLiga()]);
-
-    // First call: select for upsert check (no existing)
-    // Second call: update for untracking
-    let selectCallCount = 0;
-    mockSelect.mockImplementation(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        return mockSelectChain([]);
-      }
-      return mockSelectChain([]);
-    });
-    mockInsert.mockReturnValue(mockInsertChain());
-    mockUpdate.mockReturnValue(mockUpdateChain([]));
+  it("inserts a league that is not yet in the database", async () => {
+    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
 
     const result = await resolveAndSaveLeagues([4102]);
 
-    expect(result.resolved).toHaveLength(1);
-    expect(result.resolved[0]).toMatchObject({
+    expect(result.resolved).toEqual([
+      { ligaNr: 4102, ligaId: 58001, name: "Regionalliga West", seasonName: "2025/26" },
+    ]);
+    expect(result.notFound).toEqual([]);
+    expect(result.tracked).toBe(1);
+
+    const rows = await allLeagues();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      apiLigaId: 58001,
       ligaNr: 4102,
-      ligaId: 58001,
       name: "Regionalliga West",
       seasonName: "2025/26",
+      skName: "RL",
+      akName: "Herren",
+      geschlecht: "m",
+      verbandId: 7,
+      verbandName: "DBB",
+      isTracked: true,
+      isActive: true,
     });
-    expect(result.notFound).toHaveLength(0);
-    expect(result.tracked).toBe(1);
-    expect(mockInsert).toHaveBeenCalledTimes(1);
   });
 
-  it("updates existing leagues instead of inserting", async () => {
-    mockGetAllLigen.mockResolvedValue([makeLiga()]);
-    mockSelect.mockReturnValue(mockSelectChain([{ id: 10, apiLigaId: 58001 }]));
-    mockUpdate
-      .mockReturnValueOnce(mockUpdateSimpleChain()) // upsert update
-      .mockReturnValueOnce(mockUpdateChain([])); // untrack update
+  it("updates the existing row instead of inserting a second one", async () => {
+    // Note the ligaNr differs from apiLigaId, so a lookup on the wrong column
+    // would miss and duplicate-insert (blocked by the unique index) instead.
+    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, name: "Stale name", isTracked: false });
+
+    mocks.getAllLigen.mockResolvedValue([makeLiga({ liganame: "Fresh name" })]);
 
     const result = await resolveAndSaveLeagues([4102]);
 
-    expect(result.resolved).toHaveLength(1);
     expect(result.tracked).toBe(1);
-    expect(mockInsert).not.toHaveBeenCalled();
-    expect(mockUpdate).toHaveBeenCalledTimes(2); // upsert + untrack
+    const rows = await allLeagues();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.name).toBe("Fresh name");
+    expect(rows[0]!.isTracked).toBe(true);
   });
 
-  it("reports not-found league numbers", async () => {
-    mockGetAllLigen.mockResolvedValue([makeLiga()]);
-    mockSelect.mockReturnValue(mockSelectChain([]));
-    mockInsert.mockReturnValue(mockInsertChain());
-    mockUpdate.mockReturnValue(mockUpdateChain([]));
+  it("reports league numbers the federation does not know", async () => {
+    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
 
     const result = await resolveAndSaveLeagues([4102, 9999]);
 
-    expect(result.resolved).toHaveLength(1);
+    expect(result.resolved.map((r) => r.ligaNr)).toEqual([4102]);
     expect(result.notFound).toEqual([9999]);
     expect(result.tracked).toBe(1);
   });
 
-  it("handles all not-found league numbers", async () => {
-    mockGetAllLigen.mockResolvedValue([makeLiga()]);
-    mockUpdate.mockReturnValue(mockUpdateChain([{ id: 5 }]));
+  it("untracks previously tracked leagues that are not in the new set", async () => {
+    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true }); // stays
+    await seedLeague({ apiLigaId: 58002, ligaNr: 4105, isTracked: true }); // dropped
+    await seedLeague({ apiLigaId: 58003, ligaNr: 4003, isTracked: true }); // dropped
 
-    const result = await resolveAndSaveLeagues([9999, 8888]);
-
-    expect(result.resolved).toHaveLength(0);
-    expect(result.notFound).toEqual([9999, 8888]);
-    expect(result.tracked).toBe(0);
-    expect(result.untracked).toBe(1);
-  });
-
-  it("untracks previously tracked leagues not in new set", async () => {
-    mockGetAllLigen.mockResolvedValue([makeLiga()]);
-    mockSelect.mockReturnValue(mockSelectChain([]));
-    mockInsert.mockReturnValue(mockInsertChain());
-    mockUpdate.mockReturnValue(mockUpdateChain([{ id: 3 }, { id: 7 }]));
+    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
 
     const result = await resolveAndSaveLeagues([4102]);
 
     expect(result.untracked).toBe(2);
+    const rows = await allLeagues();
+    expect(rows.map((r) => [r.apiLigaId, r.isTracked])).toEqual([
+      [58001, true],
+      [58002, false],
+      [58003, false],
+    ]);
   });
 
-  it("untracks all when empty array is passed", async () => {
-    mockGetAllLigen.mockResolvedValue([makeLiga()]);
-    mockUpdate.mockReturnValue(mockUpdateChain([{ id: 1 }]));
+  it("does not re-count leagues that were already untracked", async () => {
+    await seedLeague({ apiLigaId: 58002, ligaNr: 4105, isTracked: false });
+
+    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
+
+    const result = await resolveAndSaveLeagues([4102]);
+
+    expect(result.untracked).toBe(0);
+  });
+
+  it("untracks everything when no league number resolves", async () => {
+    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true });
+    await seedLeague({ apiLigaId: 58002, ligaNr: 4105, isTracked: true });
+
+    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
+
+    const result = await resolveAndSaveLeagues([9999, 8888]);
+
+    expect(result.resolved).toEqual([]);
+    expect(result.notFound).toEqual([9999, 8888]);
+    expect(result.tracked).toBe(0);
+    expect(result.untracked).toBe(2);
+    expect((await allLeagues()).every((r) => r.isTracked === false)).toBe(true);
+  });
+
+  it("untracks everything when an empty array is passed", async () => {
+    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true });
+    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
 
     const result = await resolveAndSaveLeagues([]);
 
-    expect(result.resolved).toHaveLength(0);
-    expect(result.tracked).toBe(0);
-    expect(result.untracked).toBe(1);
+    expect(result).toMatchObject({ resolved: [], tracked: 0, untracked: 1 });
+    expect((await allLeagues())[0]!.isTracked).toBe(false);
   });
 
-  it("handles empty SDK response", async () => {
-    mockGetAllLigen.mockResolvedValue([]);
-    mockUpdate.mockReturnValue(mockUpdateChain([]));
+  it("handles an empty SDK response", async () => {
+    mocks.getAllLigen.mockResolvedValue([]);
 
     const result = await resolveAndSaveLeagues([4102]);
 
-    expect(result.resolved).toHaveLength(0);
-    expect(result.notFound).toEqual([4102]);
-    expect(result.tracked).toBe(0);
+    expect(result).toMatchObject({ resolved: [], notFound: [4102], tracked: 0 });
+    expect(await allLeagues()).toEqual([]);
   });
 
-  it("handles null optional fields from SDK", async () => {
-    mockGetAllLigen.mockResolvedValue([
+  it("normalises the SDK's empty/null optional fields on insert", async () => {
+    // `seasonId`/`seasonName` are nullable in SdkLiga; the rest arrive as empty
+    // strings / 0 from the federation and the service maps falsy -> NULL.
+    mocks.getAllLigen.mockResolvedValue([
       makeLiga({
         seasonId: null,
         seasonName: null,
-        skName: null,
-        akName: null,
-        geschlecht: null,
-        verbandId: null,
-        verbandName: null,
+        skName: "",
+        akName: "",
+        geschlecht: "",
+        verbandId: 0,
+        verbandName: "",
       }),
     ]);
-    mockSelect.mockReturnValue(mockSelectChain([]));
-    mockInsert.mockReturnValue(mockInsertChain());
-    mockUpdate.mockReturnValue(mockUpdateChain([]));
 
     const result = await resolveAndSaveLeagues([4102]);
 
-    expect(result.resolved[0]).toMatchObject({
-      ligaNr: 4102,
+    expect(result.resolved[0]).toMatchObject({ ligaNr: 4102, seasonName: "" });
+    const [row] = await allLeagues();
+    expect(row).toMatchObject({
+      seasonId: 0,
       seasonName: "",
+      skName: null,
+      akName: null,
+      geschlecht: null,
+      verbandId: null,
+      verbandName: null,
     });
-    expect(mockInsert).toHaveBeenCalledTimes(1);
   });
 
-  it("resolves multiple leagues from different liganr values", async () => {
-    mockGetAllLigen.mockResolvedValue([
+  it("resolves several league numbers at once", async () => {
+    mocks.getAllLigen.mockResolvedValue([
       makeLiga({ ligaId: 58001, liganr: 4102, liganame: "Liga A" }),
       makeLiga({ ligaId: 58002, liganr: 4105, liganame: "Liga B" }),
       makeLiga({ ligaId: 58003, liganr: 4003, liganame: "Liga C" }),
     ]);
-    mockSelect.mockReturnValue(mockSelectChain([]));
-    mockInsert.mockReturnValue(mockInsertChain());
-    mockUpdate.mockReturnValue(mockUpdateChain([]));
 
     const result = await resolveAndSaveLeagues([4102, 4105]);
 
-    expect(result.resolved).toHaveLength(2);
-    expect(result.notFound).toHaveLength(0);
+    expect(result.resolved.map((r) => r.name)).toEqual(["Liga A", "Liga B"]);
     expect(result.tracked).toBe(2);
-    expect(mockInsert).toHaveBeenCalledTimes(2);
+    expect((await allLeagues()).map((r) => r.apiLigaId)).toEqual([58001, 58002]);
   });
 });
 
 describe("getTrackedLeagues", () => {
-  it("returns tracked leagues with league numbers", async () => {
-    mockSelect.mockReturnValue(
-      mockSelectTrackedChain([
-        { id: 1, ligaNr: 4102, apiLigaId: 58001, name: "Regionalliga West", seasonName: "2025/26" },
-        { id: 2, ligaNr: 4105, apiLigaId: 58002, name: "Oberliga", seasonName: "2025/26" },
-      ]),
-    );
+  it("returns only the tracked leagues", async () => {
+    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, name: "Regionalliga West", isTracked: true });
+    await seedLeague({ apiLigaId: 58002, ligaNr: 4105, name: "Oberliga", isTracked: true });
+    await seedLeague({ apiLigaId: 58003, ligaNr: 4003, name: "Untracked", isTracked: false });
 
     const result = await getTrackedLeagues();
 
-    expect(result.leagueNumbers).toEqual([4102, 4105]);
-    expect(result.leagues).toHaveLength(2);
-    expect(result.leagues[0]).toMatchObject({ id: 1, ligaNr: 4102, name: "Regionalliga West" });
+    expect(result.leagueNumbers.sort()).toEqual([4102, 4105]);
+    expect(result.leagues.map((l) => l.name).sort()).toEqual(["Oberliga", "Regionalliga West"]);
   });
 
-  it("returns empty state when no tracked leagues", async () => {
-    mockSelect.mockReturnValue(mockSelectTrackedChain([]));
+  it("returns an empty state when nothing is tracked", async () => {
+    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: false });
+
+    expect(await getTrackedLeagues()).toEqual({ leagueNumbers: [], leagues: [] });
+  });
+
+  it("defaults ownClubRefs to false when the column is null", async () => {
+    const id = await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true });
+    await ctx.db.update(leagues).set({ ownClubRefs: null }).where(eq(leagues.id, id));
 
     const result = await getTrackedLeagues();
 
-    expect(result.leagueNumbers).toEqual([]);
-    expect(result.leagues).toHaveLength(0);
+    expect(result.leagues[0]!.ownClubRefs).toBe(false);
+  });
+});
+
+describe("setLeagueOwnClubRefs", () => {
+  it("flips the flag on the addressed league only", async () => {
+    const target = await seedLeague({ apiLigaId: 58001, ligaNr: 4102 });
+    await seedLeague({ apiLigaId: 58002, ligaNr: 4105 });
+
+    await setLeagueOwnClubRefs(target, true);
+
+    const rows = await allLeagues();
+    expect(rows.map((r) => [r.apiLigaId, r.ownClubRefs])).toEqual([
+      [58001, true],
+      [58002, false],
+    ]);
   });
 });

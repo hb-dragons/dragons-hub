@@ -1,291 +1,343 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from "vitest";
 
 // --- Mock setup ---
+//
+// drizzle-orm and @dragons/db/schema are deliberately NOT mocked. The previous
+// version of this file asserted `expect(eq).toHaveBeenCalledWith("de.type", …)`
+// against identity stubs, so the filters were only checked for having been
+// *constructed* — swapping `gte` for `lte`, or filtering the failed-notification
+// list on "sent" instead of "failed", left every test green. Everything below
+// runs the real SQL against an in-process PGlite Postgres.
+//
+// Only BullMQ is stubbed (network/Redis boundary); `buildDomainEvent`,
+// `insertDomainEvent` and `enqueueDomainEvent` all run for real, so
+// triggerManualEvent is verified by the row it leaves in `domain_events`.
 
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+const mocks = vi.hoisted(() => ({ queueAdd: vi.fn() }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockSelect(...args),
-    insert: (...args: unknown[]) => mockInsert(...args),
-  }),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
-vi.mock("@dragons/db/schema", () => ({
-  domainEvents: {
-    id: "de.id",
-    type: "de.type",
-    entityType: "de.entityType",
-    source: "de.source",
-    occurredAt: "de.occurredAt",
-    entityName: "de.entityName",
-  },
-  notificationLog: {
-    id: "nl.id",
-    eventId: "nl.eventId",
-    watchRuleId: "nl.watchRuleId",
-    channelConfigId: "nl.channelConfigId",
-    recipientId: "nl.recipientId",
-    title: "nl.title",
-    body: "nl.body",
-    locale: "nl.locale",
-    status: "nl.status",
-    errorMessage: "nl.errorMessage",
-    retryCount: "nl.retryCount",
-    createdAt: "nl.createdAt",
-  },
-  channelConfigs: {},
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  desc: vi.fn((...args: unknown[]) => ({ desc: args })),
-  gte: vi.fn((...args: unknown[]) => ({ gte: args })),
-  lte: vi.fn((...args: unknown[]) => ({ lte: args })),
-  ilike: vi.fn((...args: unknown[]) => ({ ilike: args })),
-  count: vi.fn(() => "count()"),
-}));
-
-const mockBuildDomainEvent = vi.fn();
-const mockInsertDomainEvent = vi.fn();
-const mockEnqueueDomainEvent = vi.fn();
-
-vi.mock("../events/event-publisher", () => ({
-  buildDomainEvent: (...args: unknown[]) => mockBuildDomainEvent(...args),
-  insertDomainEvent: (...args: unknown[]) => mockInsertDomainEvent(...args),
-  enqueueDomainEvent: (...args: unknown[]) => mockEnqueueDomainEvent(...args),
-}));
-
-vi.mock("../notifications/templates/index", () => ({
-  renderEventMessage: vi.fn(),
-}));
-
-vi.mock("../notifications/channels/in-app", () => ({
-  InAppChannelAdapter: vi.fn(),
+vi.mock("../../workers/queues", () => ({
+  domainEventsQueue: { add: (...args: unknown[]) => mocks.queueAdd(...args) },
 }));
 
 vi.mock("../../config/logger", () => ({
-  logger: { child: vi.fn().mockReturnValue({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }) },
+  logger: {
+    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 // --- Imports (after mocks) ---
 
-import { listDomainEvents, triggerManualEvent, listFailedNotifications } from "./event-admin.service";
-import { eq, gte, lte, ilike, and } from "drizzle-orm";
+import {
+  listDomainEvents,
+  triggerManualEvent,
+  listFailedNotifications,
+} from "./event-admin.service";
+import { channelConfigs, domainEvents, notificationLog } from "@dragons/db/schema";
+import type { ChannelConfig } from "@dragons/shared";
+import { eq } from "drizzle-orm";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
+
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  vi.clearAllMocks();
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
 // --- Helpers ---
 
-function makeDate(iso: string) {
-  return { toISOString: () => iso };
+interface EventSeed {
+  id: string;
+  type?: string;
+  source?: string;
+  urgency?: string;
+  occurredAt?: string;
+  entityType?: string;
+  entityName?: string;
+  entityId?: number;
+  actor?: string | null;
+  enqueuedAt?: Date | null;
+  payload?: Record<string, unknown>;
 }
 
-function buildChain(result: unknown) {
-  const chain: Record<string, unknown> = {};
-  const methods = ["from", "where", "orderBy", "limit", "offset"];
-  for (const m of methods) {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  }
-  chain.then = (resolve: (v: unknown) => void) => {
-    resolve(result);
-    return chain;
-  };
-  return chain;
-}
-
-function makeRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "evt-1",
-    type: "match.created",
-    source: "sync",
-    urgency: "info",
-    occurredAt: makeDate("2025-06-01T12:00:00.000Z"),
-    actor: "system",
-    syncRunId: 42,
-    entityType: "match",
-    entityId: 1,
-    entityName: "Team A vs Team B",
+async function seedEvent(seed: EventSeed): Promise<string> {
+  await ctx.db.insert(domainEvents).values({
+    id: seed.id,
+    type: seed.type ?? "match.created",
+    source: seed.source ?? "sync",
+    urgency: seed.urgency ?? "routine",
+    occurredAt: new Date(seed.occurredAt ?? "2025-06-01T12:00:00.000Z"),
+    actor: seed.actor ?? "system",
+    syncRunId: null,
+    entityType: seed.entityType ?? "match",
+    entityId: seed.entityId ?? 1,
+    entityName: seed.entityName ?? "Team A vs Team B",
     deepLinkPath: "/matches/1",
-    enqueuedAt: makeDate("2025-06-01T12:00:01.000Z"),
-    payload: { matchNo: 100 },
-    createdAt: makeDate("2025-06-01T12:00:00.000Z"),
-    ...overrides,
-  };
+    enqueuedAt: seed.enqueuedAt ?? null,
+    payload: seed.payload ?? { matchNo: 100 },
+  });
+  return seed.id;
+}
+
+async function seedChannelConfig(): Promise<number> {
+  const [row] = await ctx.db
+    .insert(channelConfigs)
+    .values({
+      name: "Test channel",
+      type: "in_app",
+      config: { locale: "de" } as ChannelConfig,
+    })
+    .returning({ id: channelConfigs.id });
+  return row!.id;
+}
+
+async function seedNotification(opts: {
+  eventId: string;
+  channelConfigId: number;
+  status: string;
+  title?: string;
+  createdAt?: Date;
+  retryCount?: number;
+  errorMessage?: string | null;
+  recipientId?: string | null;
+}): Promise<number> {
+  const [row] = await ctx.db
+    .insert(notificationLog)
+    .values({
+      eventId: opts.eventId,
+      channelConfigId: opts.channelConfigId,
+      recipientId: opts.recipientId ?? "user:1",
+      title: opts.title ?? "Match cancelled",
+      body: "Your match was cancelled",
+      locale: "de",
+      status: opts.status,
+      errorMessage: opts.errorMessage ?? null,
+      retryCount: opts.retryCount ?? 0,
+      ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
+    })
+    .returning({ id: notificationLog.id });
+  return row!.id;
 }
 
 // --- Tests ---
 
 describe("listDomainEvents", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("returns an empty list when there is nothing stored", async () => {
+    expect(await listDomainEvents({})).toEqual({ events: [], total: 0 });
   });
 
-  it("returns empty list with defaults (no filters)", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
+  it("filters by type", async () => {
+    await seedEvent({ id: "evt-a", type: "match.created" });
+    await seedEvent({ id: "evt-b", type: "match.cancelled" });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const result = await listDomainEvents({ type: "match.created" });
 
-    const result = await listDomainEvents({});
-
-    expect(result).toEqual({ events: [], total: 0 });
-    expect(countChain.where).toHaveBeenCalledWith(undefined);
-    expect(dataChain.where).toHaveBeenCalledWith(undefined);
-    expect(dataChain.limit).toHaveBeenCalledWith(20);
-    expect(dataChain.offset).toHaveBeenCalledWith(0);
+    expect(result.total).toBe(1);
+    expect(result.events.map((e) => e.id)).toEqual(["evt-a"]);
   });
 
-  it("applies type filter", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
+  it("filters by entityType", async () => {
+    await seedEvent({ id: "evt-a", entityType: "match" });
+    await seedEvent({ id: "evt-b", entityType: "booking" });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const result = await listDomainEvents({ entityType: "booking" });
 
-    await listDomainEvents({ type: "match.created" });
-
-    expect(eq).toHaveBeenCalledWith("de.type", "match.created");
-    expect(and).toHaveBeenCalled();
+    expect(result.events.map((e) => e.id)).toEqual(["evt-b"]);
   });
 
-  it("applies entityType filter", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
+  it("filters by source", async () => {
+    await seedEvent({ id: "evt-a", source: "sync" });
+    await seedEvent({ id: "evt-b", source: "manual" });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const result = await listDomainEvents({ source: "manual" });
 
-    await listDomainEvents({ entityType: "match" });
-
-    expect(eq).toHaveBeenCalledWith("de.entityType", "match");
-    expect(and).toHaveBeenCalled();
+    expect(result.events.map((e) => e.id)).toEqual(["evt-b"]);
   });
 
-  it("applies source filter", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
+  it("keeps only events at or after `from`", async () => {
+    await seedEvent({ id: "evt-old", occurredAt: "2025-01-01T00:00:00.000Z" });
+    await seedEvent({ id: "evt-mid", occurredAt: "2025-06-01T00:00:00.000Z" });
+    await seedEvent({ id: "evt-new", occurredAt: "2025-12-01T00:00:00.000Z" });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const result = await listDomainEvents({ from: "2025-06-01T00:00:00Z" });
 
-    await listDomainEvents({ source: "sync" });
-
-    expect(eq).toHaveBeenCalledWith("de.source", "sync");
-    expect(and).toHaveBeenCalled();
+    expect(result.events.map((e) => e.id).sort()).toEqual(["evt-mid", "evt-new"]);
   });
 
-  it("applies from/to date range filters", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
+  it("keeps only events at or before `to`", async () => {
+    await seedEvent({ id: "evt-old", occurredAt: "2025-01-01T00:00:00.000Z" });
+    await seedEvent({ id: "evt-mid", occurredAt: "2025-06-01T00:00:00.000Z" });
+    await seedEvent({ id: "evt-new", occurredAt: "2025-12-01T00:00:00.000Z" });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const result = await listDomainEvents({ to: "2025-06-01T00:00:00Z" });
 
-    await listDomainEvents({
-      from: "2025-01-01T00:00:00Z",
-      to: "2025-12-31T23:59:59Z",
+    expect(result.events.map((e) => e.id).sort()).toEqual(["evt-mid", "evt-old"]);
+  });
+
+  it("intersects `from` and `to` into a closed range", async () => {
+    await seedEvent({ id: "evt-old", occurredAt: "2025-01-01T00:00:00.000Z" });
+    await seedEvent({ id: "evt-mid", occurredAt: "2025-06-01T00:00:00.000Z" });
+    await seedEvent({ id: "evt-new", occurredAt: "2025-12-01T00:00:00.000Z" });
+
+    const result = await listDomainEvents({
+      from: "2025-05-01T00:00:00Z",
+      to: "2025-07-01T00:00:00Z",
     });
 
-    expect(gte).toHaveBeenCalledWith(
-      "de.occurredAt",
-      new Date("2025-01-01T00:00:00Z"),
-    );
-    expect(lte).toHaveBeenCalledWith(
-      "de.occurredAt",
-      new Date("2025-12-31T23:59:59Z"),
-    );
-    expect(and).toHaveBeenCalled();
+    expect(result.events.map((e) => e.id)).toEqual(["evt-mid"]);
   });
 
-  it("applies search filter with LIKE escaping", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
+  it("searches entityName case-insensitively", async () => {
+    await seedEvent({ id: "evt-a", entityName: "Dragons vs Tigers" });
+    await seedEvent({ id: "evt-b", entityName: "Eagles vs Bears" });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const result = await listDomainEvents({ search: "dragons" });
 
-    await listDomainEvents({ search: "100%" });
-
-    expect(ilike).toHaveBeenCalledWith("de.entityName", "%100\\%%");
+    expect(result.events.map((e) => e.id)).toEqual(["evt-a"]);
   });
 
-  it("escapes underscore in search pattern", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
+  it("treats % in the search term as a literal, not a wildcard", async () => {
+    await seedEvent({ id: "evt-literal", entityName: "Halle 100% belegt" });
+    await seedEvent({ id: "evt-other", entityName: "Halle frei" });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const result = await listDomainEvents({ search: "100%" });
 
-    await listDomainEvents({ search: "team_a" });
-
-    expect(ilike).toHaveBeenCalledWith("de.entityName", "%team\\_a%");
+    expect(result.events.map((e) => e.id)).toEqual(["evt-literal"]);
   });
 
-  it("escapes backslash in search pattern", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
+  it("treats _ in the search term as a literal, not a single-char wildcard", async () => {
+    await seedEvent({ id: "evt-literal", entityName: "team_a" });
+    await seedEvent({ id: "evt-decoy", entityName: "teamXa" });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const result = await listDomainEvents({ search: "team_a" });
 
-    await listDomainEvents({ search: "a\\b" });
-
-    expect(ilike).toHaveBeenCalledWith("de.entityName", "%a\\\\b%");
+    expect(result.events.map((e) => e.id)).toEqual(["evt-literal"]);
   });
 
-  it("handles pagination (page, limit, offset)", async () => {
-    const countChain = buildChain([{ count: 50 }]);
-    const dataChain = buildChain([]);
+  it("treats a backslash in the search term as a literal", async () => {
+    await seedEvent({ id: "evt-literal", entityName: "a\\b" });
+    await seedEvent({ id: "evt-decoy", entityName: "ab" });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const result = await listDomainEvents({ search: "a\\b" });
 
-    const result = await listDomainEvents({ page: 3, limit: 10 });
-
-    expect(dataChain.limit).toHaveBeenCalledWith(10);
-    expect(dataChain.offset).toHaveBeenCalledWith(20);
-    expect(result.total).toBe(50);
+    expect(result.events.map((e) => e.id)).toEqual(["evt-literal"]);
   });
 
-  it("maps row dates to ISO strings correctly", async () => {
-    const row = makeRow();
-    const countChain = buildChain([{ count: 1 }]);
-    const dataChain = buildChain([row]);
+  it("orders newest-first and pages with (page - 1) * limit", async () => {
+    for (let i = 1; i <= 5; i++) {
+      await seedEvent({ id: `evt-${i}`, occurredAt: `2025-06-0${i}T00:00:00.000Z` });
+    }
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const page1 = await listDomainEvents({ page: 1, limit: 2 });
+    expect(page1.events.map((e) => e.id)).toEqual(["evt-5", "evt-4"]);
+    expect(page1.total).toBe(5);
 
-    const result = await listDomainEvents({});
+    const page3 = await listDomainEvents({ page: 3, limit: 2 });
+    expect(page3.events.map((e) => e.id)).toEqual(["evt-1"]);
+    expect(page3.total).toBe(5);
+  });
+
+  it("counts all matching rows, not just the page", async () => {
+    for (let i = 1; i <= 5; i++) {
+      await seedEvent({ id: `evt-${i}`, type: i <= 3 ? "match.created" : "match.cancelled" });
+    }
+
+    const result = await listDomainEvents({ type: "match.created", limit: 1 });
 
     expect(result.events).toHaveLength(1);
-    const event = result.events[0]!;
-    expect(event.occurredAt).toBe("2025-06-01T12:00:00.000Z");
-    expect(event.createdAt).toBe("2025-06-01T12:00:00.000Z");
-    expect(event.enqueuedAt).toBe("2025-06-01T12:00:01.000Z");
-    expect(event.id).toBe("evt-1");
-    expect(event.type).toBe("match.created");
-    expect(event.source).toBe("sync");
-    expect(event.urgency).toBe("info");
-    expect(event.actor).toBe("system");
-    expect(event.syncRunId).toBe(42);
-    expect(event.entityType).toBe("match");
-    expect(event.entityId).toBe(1);
-    expect(event.entityName).toBe("Team A vs Team B");
-    expect(event.deepLinkPath).toBe("/matches/1");
-    expect(event.payload).toEqual({ matchNo: 100 });
+    expect(result.total).toBe(3);
   });
 
-  it("handles null enqueuedAt", async () => {
-    const row = makeRow({ enqueuedAt: null });
-    const countChain = buildChain([{ count: 1 }]);
-    const dataChain = buildChain([row]);
+  it("maps a stored row into the API shape", async () => {
+    await seedEvent({
+      id: "evt-1",
+      type: "match.created",
+      source: "sync",
+      urgency: "routine",
+      occurredAt: "2025-06-01T12:00:00.000Z",
+      entityType: "match",
+      entityId: 1,
+      entityName: "Team A vs Team B",
+      enqueuedAt: new Date("2025-06-01T12:00:01.000Z"),
+      payload: { matchNo: 100 },
+    });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const [event] = (await listDomainEvents({})).events;
 
-    const result = await listDomainEvents({});
-
-    expect(result.events[0]!.enqueuedAt).toBeNull();
+    expect(event).toMatchObject({
+      id: "evt-1",
+      type: "match.created",
+      source: "sync",
+      urgency: "routine",
+      occurredAt: "2025-06-01T12:00:00.000Z",
+      actor: "system",
+      syncRunId: null,
+      entityType: "match",
+      entityId: 1,
+      entityName: "Team A vs Team B",
+      deepLinkPath: "/matches/1",
+      enqueuedAt: "2025-06-01T12:00:01.000Z",
+      payload: { matchNo: 100 },
+    });
+    expect(typeof event!.createdAt).toBe("string");
   });
 
-  it("combines multiple filters", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
+  it("reports a null enqueuedAt as null", async () => {
+    await seedEvent({ id: "evt-1", enqueuedAt: null });
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    expect((await listDomainEvents({})).events[0]!.enqueuedAt).toBeNull();
+  });
 
-    await listDomainEvents({
+  it("ANDs all filters together", async () => {
+    await seedEvent({
+      id: "evt-hit",
+      type: "match.created",
+      entityType: "match",
+      source: "sync",
+      entityName: "Dragons vs Tigers",
+      occurredAt: "2025-06-01T00:00:00.000Z",
+    });
+    // Each of these differs from the hit in exactly one filtered dimension.
+    await seedEvent({ id: "evt-type", type: "match.cancelled", entityName: "Dragons vs Tigers" });
+    await seedEvent({ id: "evt-entity", entityType: "booking", entityName: "Dragons vs Tigers" });
+    await seedEvent({ id: "evt-source", source: "manual", entityName: "Dragons vs Tigers" });
+    await seedEvent({ id: "evt-name", entityName: "Eagles vs Bears" });
+    await seedEvent({
+      id: "evt-date",
+      entityName: "Dragons vs Tigers",
+      occurredAt: "2024-01-01T00:00:00.000Z",
+    });
+
+    const result = await listDomainEvents({
       type: "match.created",
       entityType: "match",
       source: "sync",
@@ -294,41 +346,15 @@ describe("listDomainEvents", () => {
       search: "Dragons",
     });
 
-    // All filter functions should have been called
-    expect(eq).toHaveBeenCalledTimes(3); // type, entityType, source
-    expect(gte).toHaveBeenCalledTimes(1);
-    expect(lte).toHaveBeenCalledTimes(1);
-    expect(ilike).toHaveBeenCalledTimes(1);
-
-    // and() should receive all 6 conditions
-    expect(and).toHaveBeenCalledWith(
-      expect.objectContaining({ eq: expect.anything() }),
-      expect.objectContaining({ eq: expect.anything() }),
-      expect.objectContaining({ eq: expect.anything() }),
-      expect.objectContaining({ gte: expect.anything() }),
-      expect.objectContaining({ lte: expect.anything() }),
-      expect.objectContaining({ ilike: expect.anything() }),
-    );
+    expect(result.events.map((e) => e.id)).toEqual(["evt-hit"]);
+    expect(result.total).toBe(1);
   });
 });
 
 describe("triggerManualEvent", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockBuildDomainEvent.mockReturnValue({
-      id: "evt-new",
-      type: "match.created",
-      urgency: "routine",
-      entityType: "match",
-      entityId: 1,
-    });
-    mockInsertDomainEvent.mockResolvedValue(undefined);
-    mockEnqueueDomainEvent.mockResolvedValue(undefined);
-  });
-
-  it("builds, inserts, and enqueues a domain event", async () => {
+  it("persists the event with source=manual and enqueues it", async () => {
     const result = await triggerManualEvent({
-      type: "match.created",
+      type: "match.cancelled",
       entityType: "match",
       entityId: 1,
       entityName: "Dragons vs Tigers",
@@ -337,132 +363,113 @@ describe("triggerManualEvent", () => {
       actor: "admin",
     });
 
-    expect(mockBuildDomainEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "match.created",
-        source: "manual",
-        entityId: 1,
-        actor: "admin",
-      }),
-    );
-    expect(mockInsertDomainEvent).toHaveBeenCalledTimes(1);
-    expect(mockEnqueueDomainEvent).toHaveBeenCalledTimes(1);
-    expect(result.eventId).toBe("evt-new");
-    expect(result.type).toBe("match.created");
-  });
+    const [row] = await ctx.db
+      .select()
+      .from(domainEvents)
+      .where(eq(domainEvents.id, result.eventId));
 
-  it("applies urgency override before persisting", async () => {
-    const builtEvent = {
-      id: "evt-new",
-      type: "match.created",
-      urgency: "routine",
+    expect(row).toMatchObject({
+      type: "match.cancelled",
+      source: "manual",
       entityType: "match",
       entityId: 1,
-    };
-    mockBuildDomainEvent.mockReturnValue(builtEvent);
+      entityName: "Dragons vs Tigers",
+      deepLinkPath: "/matches/1",
+      actor: "admin",
+      payload: { matchNo: 100 },
+    });
+    expect(mocks.queueAdd).toHaveBeenCalledTimes(1);
+  });
 
+  it("stores the overridden urgency, not the classified one", async () => {
     const result = await triggerManualEvent({
-      type: "match.created",
+      type: "match.cancelled",
       entityType: "match",
       entityId: 1,
       entityName: "Test",
       deepLinkPath: "/test",
       payload: {},
-      urgencyOverride: "immediate",
+      urgencyOverride: "routine",
       actor: "admin",
     });
 
-    expect(builtEvent.urgency).toBe("immediate");
-    expect(result.urgency).toBe("immediate");
-  });
+    const [row] = await ctx.db
+      .select({ urgency: domainEvents.urgency })
+      .from(domainEvents)
+      .where(eq(domainEvents.id, result.eventId));
 
-  it("does not override urgency when not specified", async () => {
-    const builtEvent = {
-      id: "evt-new",
-      type: "match.created",
-      urgency: "routine",
-      entityType: "match",
-      entityId: 1,
-    };
-    mockBuildDomainEvent.mockReturnValue(builtEvent);
-
-    const result = await triggerManualEvent({
-      type: "match.created",
-      entityType: "match",
-      entityId: 1,
-      entityName: "Test",
-      deepLinkPath: "/test",
-      payload: {},
-      actor: "admin",
-    });
-
-    expect(builtEvent.urgency).toBe("routine");
     expect(result.urgency).toBe("routine");
+    expect(row!.urgency).toBe("routine");
+  });
+
+  it("keeps the classified urgency when no override is given", async () => {
+    const withOverride = await triggerManualEvent({
+      type: "match.cancelled",
+      entityType: "match",
+      entityId: 1,
+      entityName: "Test",
+      deepLinkPath: "/test",
+      payload: {},
+      urgencyOverride: "routine",
+      actor: "admin",
+    });
+    const withoutOverride = await triggerManualEvent({
+      type: "match.cancelled",
+      entityType: "match",
+      entityId: 2,
+      entityName: "Test",
+      deepLinkPath: "/test",
+      payload: {},
+      actor: "admin",
+    });
+
+    // match.cancelled classifies as immediate; the override forced it down.
+    expect(withoutOverride.urgency).toBe("immediate");
+    expect(withOverride.urgency).toBe("routine");
   });
 });
 
 describe("listFailedNotifications", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("returns an empty list when nothing has failed", async () => {
+    expect(await listFailedNotifications({})).toEqual({ notifications: [], total: 0 });
   });
 
-  function buildNotificationChain(result: unknown) {
-    const chain: Record<string, unknown> = {};
-    const methods = ["from", "innerJoin", "where", "orderBy", "limit", "offset"];
-    for (const m of methods) {
-      chain[m] = vi.fn().mockReturnValue(chain);
-    }
-    chain.then = (resolve: (v: unknown) => void) => {
-      resolve(result);
-      return chain;
-    };
-    return chain;
-  }
-
-  it("returns empty list when no failed notifications", async () => {
-    const countChain = buildNotificationChain([{ count: 0 }]);
-    const dataChain = buildNotificationChain([]);
-
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+  it("returns only failed rows, ignoring sent and pending ones", async () => {
+    const eventId = await seedEvent({ id: "evt-1" });
+    const channelConfigId = await seedChannelConfig();
+    const failed = await seedNotification({ eventId, channelConfigId, status: "failed" });
+    await seedNotification({ eventId, channelConfigId, status: "sent", recipientId: "user:2" });
+    await seedNotification({ eventId, channelConfigId, status: "pending", recipientId: "user:3" });
 
     const result = await listFailedNotifications({});
 
-    expect(result).toEqual({ notifications: [], total: 0 });
+    expect(result.total).toBe(1);
+    expect(result.notifications.map((n) => n.id)).toEqual([failed]);
   });
 
-  it("returns failed notifications with correct mapping", async () => {
-    const row = {
-      id: 1,
-      eventId: "evt-1",
-      watchRuleId: 10,
-      channelConfigId: 5,
-      recipientId: "user:1",
-      title: "Match cancelled",
-      body: "Your match was cancelled",
-      locale: "de",
+  it("joins the originating event for context", async () => {
+    const eventId = await seedEvent({
+      id: "evt-1",
+      type: "match.cancelled",
+      entityName: "Dragons vs Tigers",
+    });
+    const channelConfigId = await seedChannelConfig();
+    const id = await seedNotification({
+      eventId,
+      channelConfigId,
       status: "failed",
       errorMessage: "Connection timeout",
       retryCount: 3,
-      createdAt: { toISOString: () => "2025-06-01T12:00:00.000Z" },
-      eventType: "match.cancelled",
-      entityName: "Dragons vs Tigers",
-      deepLinkPath: "/matches/1",
-    };
-
-    const countChain = buildNotificationChain([{ count: 1 }]);
-    const dataChain = buildNotificationChain([row]);
-
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+      createdAt: new Date("2025-06-01T12:00:00.000Z"),
+    });
 
     const result = await listFailedNotifications({ page: 1, limit: 10 });
 
-    expect(result.total).toBe(1);
-    expect(result.notifications).toHaveLength(1);
     expect(result.notifications[0]).toEqual({
-      id: 1,
+      id,
       eventId: "evt-1",
-      watchRuleId: 10,
-      channelConfigId: 5,
+      watchRuleId: null,
+      channelConfigId,
       recipientId: "user:1",
       title: "Match cancelled",
       body: "Your match was cancelled",
@@ -477,16 +484,28 @@ describe("listFailedNotifications", () => {
     });
   });
 
-  it("applies pagination correctly", async () => {
-    const countChain = buildNotificationChain([{ count: 50 }]);
-    const dataChain = buildNotificationChain([]);
+  it("orders newest-first and pages with (page - 1) * limit", async () => {
+    const eventId = await seedEvent({ id: "evt-1" });
+    const channelConfigId = await seedChannelConfig();
+    const ids: number[] = [];
+    for (let i = 1; i <= 5; i++) {
+      ids.push(
+        await seedNotification({
+          eventId,
+          channelConfigId,
+          status: "failed",
+          recipientId: `user:${i}`,
+          createdAt: new Date(`2025-06-0${i}T00:00:00.000Z`),
+        }),
+      );
+    }
 
-    mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(dataChain);
+    const page1 = await listFailedNotifications({ page: 1, limit: 2 });
+    expect(page1.notifications.map((n) => n.id)).toEqual([ids[4], ids[3]]);
+    expect(page1.total).toBe(5);
 
-    const result = await listFailedNotifications({ page: 3, limit: 10 });
-
-    expect(result.total).toBe(50);
-    expect(dataChain.limit).toHaveBeenCalledWith(10);
-    expect(dataChain.offset).toHaveBeenCalledWith(20);
+    const page3 = await listFailedNotifications({ page: 3, limit: 2 });
+    expect(page3.notifications.map((n) => n.id)).toEqual([ids[0]]);
+    expect(page3.total).toBe(5);
   });
 });

@@ -1,42 +1,24 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import type { FilterCondition, ChannelTarget } from "@dragons/shared";
 
 // --- Mock setup ---
+//
+// drizzle-orm and @dragons/db/schema are deliberately NOT mocked. The previous
+// version of this file asserted on the arguments passed to a fake chain, so
+// `where(eq(watchRules.id, id))` could have addressed any id and the canned
+// row still came back. Everything below runs against a real (in-process
+// PGlite) Postgres, including the jsonb round-trip of `filters`/`channels`.
 
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
-const mockDelete = vi.fn();
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockSelect(...args),
-    insert: (...args: unknown[]) => mockInsert(...args),
-    update: (...args: unknown[]) => mockUpdate(...args),
-    delete: (...args: unknown[]) => mockDelete(...args),
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  watchRules: {
-    id: "wr.id",
-    name: "wr.name",
-    enabled: "wr.enabled",
-    createdBy: "wr.createdBy",
-    eventTypes: "wr.eventTypes",
-    filters: "wr.filters",
-    channels: "wr.channels",
-    urgencyOverride: "wr.urgencyOverride",
-    templateOverride: "wr.templateOverride",
-    createdAt: "wr.createdAt",
-    updatedAt: "wr.updatedAt",
-  },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  desc: vi.fn((...args: unknown[]) => ({ desc: args })),
-  count: vi.fn(() => "count(*)"),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
 // --- Imports (after mocks) ---
@@ -48,74 +30,109 @@ import {
   updateWatchRule,
   deleteWatchRule,
 } from "./watch-rule-admin.service";
+import { watchRules } from "@dragons/db/schema";
+import type { FilterConditionRow, ChannelTargetRow } from "@dragons/db/schema";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
+
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
 // --- Helpers ---
 
-function makeDate(iso: string) {
-  return { toISOString: () => iso } as unknown as Date;
-}
+const DEFAULT_FILTERS: FilterConditionRow[] = [
+  { field: "teamId", operator: "eq", value: "42" },
+];
+const DEFAULT_CHANNELS: ChannelTargetRow[] = [{ channel: "in_app", targetId: "1" }];
 
-function makeRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 1,
-    name: "Match alerts",
-    enabled: true,
-    createdBy: "user-1",
-    eventTypes: ["match.scheduled"],
-    filters: [{ field: "teamId", operator: "eq", value: "42" }],
-    channels: [{ channel: "in_app", targetId: "1" }],
-    urgencyOverride: null,
-    templateOverride: null,
-    createdAt: makeDate("2026-01-01T00:00:00.000Z"),
-    updatedAt: makeDate("2026-01-02T00:00:00.000Z"),
-    ...overrides,
-  };
-}
-
-function buildChain(result: unknown) {
-  const chain: Record<string, unknown> = {};
-  const methods = [
-    "from",
-    "where",
-    "orderBy",
-    "limit",
-    "offset",
-    "values",
-    "set",
-    "returning",
-  ];
-  for (const m of methods) {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  }
-  chain.then = (resolve: (v: unknown) => void) => {
-    resolve(result);
-    return chain;
-  };
-  return chain;
+async function seedRule(
+  opts: {
+    name?: string;
+    enabled?: boolean;
+    createdBy?: string;
+    eventTypes?: string[];
+    filters?: FilterConditionRow[];
+    channels?: ChannelTargetRow[];
+    urgencyOverride?: string | null;
+    templateOverride?: string | null;
+    createdAt?: Date;
+    updatedAt?: Date;
+  } = {},
+): Promise<number> {
+  const [row] = await ctx.db
+    .insert(watchRules)
+    .values({
+      name: opts.name ?? "Match alerts",
+      enabled: opts.enabled ?? true,
+      createdBy: opts.createdBy ?? "user-1",
+      eventTypes: opts.eventTypes ?? ["match.scheduled"],
+      filters: opts.filters ?? DEFAULT_FILTERS,
+      channels: opts.channels ?? DEFAULT_CHANNELS,
+      urgencyOverride: opts.urgencyOverride ?? null,
+      templateOverride: opts.templateOverride ?? null,
+      ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
+      ...(opts.updatedAt ? { updatedAt: opts.updatedAt } : {}),
+    })
+    .returning({ id: watchRules.id });
+  return row!.id;
 }
 
 // --- Tests ---
 
 describe("listWatchRules", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("returns newest-first and pages with (page - 1) * limit", async () => {
+    await seedRule({ name: "oldest", createdAt: new Date("2026-01-01T00:00:00Z") });
+    await seedRule({ name: "middle", createdAt: new Date("2026-01-02T00:00:00Z") });
+    await seedRule({ name: "newest", createdAt: new Date("2026-01-03T00:00:00Z") });
+
+    const page1 = await listWatchRules({ page: 1, limit: 2 });
+    expect(page1.rules.map((r) => r.name)).toEqual(["newest", "middle"]);
+    expect(page1.total).toBe(3);
+
+    const page2 = await listWatchRules({ page: 2, limit: 2 });
+    expect(page2.rules.map((r) => r.name)).toEqual(["oldest"]);
+    expect(page2.total).toBe(3);
   });
 
-  it("returns paginated results with correct total", async () => {
-    const row = makeRow();
-    const countChain = buildChain([{ count: 3 }]);
-    const dataChain = buildChain([row]);
+  it("defaults to page=1, limit=20", async () => {
+    for (let i = 0; i < 21; i++) await seedRule({ name: `rule-${i}` });
 
-    mockSelect
-      .mockReturnValueOnce(countChain)
-      .mockReturnValueOnce(dataChain);
+    const result = await listWatchRules({});
 
-    const result = await listWatchRules({ page: 2, limit: 1 });
+    expect(result.rules).toHaveLength(20);
+    expect(result.total).toBe(21);
+  });
 
-    expect(result.total).toBe(3);
-    expect(result.rules).toHaveLength(1);
-    expect(result.rules[0]).toEqual({
-      id: 1,
+  it("returns an empty page when nothing is stored", async () => {
+    expect(await listWatchRules({})).toEqual({ rules: [], total: 0 });
+  });
+
+  it("maps a stored row into the API shape", async () => {
+    const id = await seedRule({
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+    });
+
+    const [rule] = (await listWatchRules({})).rules;
+
+    expect(rule).toEqual({
+      id,
       name: "Match alerts",
       enabled: true,
       createdBy: "user-1",
@@ -127,79 +144,28 @@ describe("listWatchRules", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-02T00:00:00.000Z",
     });
-
-    // Verify offset was called with (page-1)*limit = 1
-    expect(dataChain.offset).toHaveBeenCalledWith(1);
-    expect(dataChain.limit).toHaveBeenCalledWith(1);
-  });
-
-  it("uses default page=1, limit=20", async () => {
-    const countChain = buildChain([{ count: 0 }]);
-    const dataChain = buildChain([]);
-
-    mockSelect
-      .mockReturnValueOnce(countChain)
-      .mockReturnValueOnce(dataChain);
-
-    const result = await listWatchRules({});
-
-    expect(result).toEqual({ rules: [], total: 0 });
-    expect(dataChain.limit).toHaveBeenCalledWith(20);
-    expect(dataChain.offset).toHaveBeenCalledWith(0);
   });
 });
 
 describe("getWatchRule", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("returns the rule with the requested id, not just any row", async () => {
+    const first = await seedRule({ name: "first" });
+    const second = await seedRule({ name: "second" });
+
+    expect((await getWatchRule(first))!.name).toBe("first");
+    expect((await getWatchRule(second))!.name).toBe("second");
   });
 
-  it("returns item when found", async () => {
-    const row = makeRow({ id: 5 });
-    const chain = buildChain([row]);
+  it("returns null when no row matches", async () => {
+    await seedRule();
 
-    mockSelect.mockReturnValueOnce(chain);
-
-    const result = await getWatchRule(5);
-
-    expect(result).toEqual({
-      id: 5,
-      name: "Match alerts",
-      enabled: true,
-      createdBy: "user-1",
-      eventTypes: ["match.scheduled"],
-      filters: [{ field: "teamId", operator: "eq", value: "42" }],
-      channels: [{ channel: "in_app", targetId: "1" }],
-      urgencyOverride: null,
-      templateOverride: null,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-02T00:00:00.000Z",
-    });
-  });
-
-  it("returns null when not found", async () => {
-    const chain = buildChain([]);
-
-    mockSelect.mockReturnValueOnce(chain);
-
-    const result = await getWatchRule(999);
-
-    expect(result).toBeNull();
+    expect(await getWatchRule(999)).toBeNull();
   });
 });
 
 describe("createWatchRule", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("inserts with correct values including userId as createdBy", async () => {
-    const row = makeRow({ id: 10, createdBy: "admin-42" });
-    const chain = buildChain([row]);
-
-    mockInsert.mockReturnValueOnce(chain);
-
-    const result = await createWatchRule(
+  it("persists the rule with the caller's user id as createdBy", async () => {
+    const created = await createWatchRule(
       {
         name: "Match alerts",
         eventTypes: ["match.scheduled"],
@@ -212,34 +178,13 @@ describe("createWatchRule", () => {
       "admin-42",
     );
 
-    expect(result.id).toBe(10);
-    expect(result.createdBy).toBe("admin-42");
-    expect(mockInsert).toHaveBeenCalledTimes(1);
-    expect(chain.values).toHaveBeenCalledWith({
-      name: "Match alerts",
-      enabled: true,
-      createdBy: "admin-42",
-      eventTypes: ["match.scheduled"],
-      filters: [{ field: "teamId", operator: "eq", value: "42" }],
-      channels: [{ channel: "in_app", targetId: "1" }],
-      urgencyOverride: null,
-      templateOverride: null,
-    });
+    expect(created.createdBy).toBe("admin-42");
+    // Round-trips through jsonb unchanged.
+    expect(await getWatchRule(created.id)).toEqual(created);
   });
 
-  it("uses defaults for optional fields (enabled=true, filters=[], etc.)", async () => {
-    const row = makeRow({
-      id: 11,
-      enabled: true,
-      filters: [],
-      urgencyOverride: null,
-      templateOverride: null,
-    });
-    const chain = buildChain([row]);
-
-    mockInsert.mockReturnValueOnce(chain);
-
-    await createWatchRule(
+  it("applies defaults for the optional fields", async () => {
+    const created = await createWatchRule(
       {
         name: "Minimal rule",
         eventTypes: ["match.cancelled"],
@@ -248,139 +193,117 @@ describe("createWatchRule", () => {
       "user-7",
     );
 
-    expect(chain.values).toHaveBeenCalledWith(
-      expect.objectContaining({
-        enabled: true,
-        filters: [],
-        urgencyOverride: null,
-        templateOverride: null,
-      }),
-    );
+    expect(created).toMatchObject({
+      enabled: true,
+      filters: [],
+      urgencyOverride: null,
+      templateOverride: null,
+    });
+    expect((await getWatchRule(created.id))!.filters).toEqual([]);
   });
 });
 
 describe("updateWatchRule", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("only sets provided fields plus updatedAt", async () => {
-    const row = makeRow({ id: 3, name: "Renamed", enabled: false });
-    const chain = buildChain([row]);
-
-    mockUpdate.mockReturnValueOnce(chain);
-
-    const result = await updateWatchRule(3, {
-      name: "Renamed",
-      enabled: false,
+  it("changes only the provided fields and leaves the rest intact", async () => {
+    const id = await seedRule({
+      name: "Original",
+      eventTypes: ["match.scheduled"],
+      urgencyOverride: "high",
     });
 
-    expect(result).not.toBeNull();
-    expect(result!.name).toBe("Renamed");
-    expect(result!.enabled).toBe(false);
+    const updated = await updateWatchRule(id, { name: "Renamed", enabled: false });
 
-    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
-    expect(setCall.name).toBe("Renamed");
-    expect(setCall.enabled).toBe(false);
-    expect(setCall.updatedAt).toBeInstanceOf(Date);
-    // Should NOT contain keys that were not provided
-    expect(setCall).not.toHaveProperty("eventTypes");
-    expect(setCall).not.toHaveProperty("filters");
-    expect(setCall).not.toHaveProperty("channels");
-    expect(setCall).not.toHaveProperty("urgencyOverride");
-    expect(setCall).not.toHaveProperty("templateOverride");
+    expect(updated!.name).toBe("Renamed");
+    expect(updated!.enabled).toBe(false);
+    expect(updated!.eventTypes).toEqual(["match.scheduled"]);
+    expect(updated!.filters).toEqual([{ field: "teamId", operator: "eq", value: "42" }]);
+    expect(updated!.channels).toEqual([{ channel: "in_app", targetId: "1" }]);
+    expect(updated!.urgencyOverride).toBe("high");
+    expect(updated!.createdBy).toBe("user-1");
   });
 
-  it("returns null when not found", async () => {
-    const chain = buildChain([]);
+  it("updates only the addressed row", async () => {
+    const target = await seedRule({ name: "target" });
+    const bystander = await seedRule({ name: "bystander" });
 
-    mockUpdate.mockReturnValueOnce(chain);
+    await updateWatchRule(target, { name: "renamed" });
 
-    const result = await updateWatchRule(999, { name: "Nope" });
-
-    expect(result).toBeNull();
+    expect((await getWatchRule(bystander))!.name).toBe("bystander");
   });
 
-  it("sets eventTypes when provided", async () => {
-    const row = makeRow({ id: 4, eventTypes: ["match.cancelled"] });
-    const chain = buildChain([row]);
-    mockUpdate.mockReturnValueOnce(chain);
+  it("returns null when the id does not exist", async () => {
+    await seedRule();
 
-    await updateWatchRule(4, { eventTypes: ["match.cancelled"] });
-
-    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
-    expect(setCall.eventTypes).toEqual(["match.cancelled"]);
+    expect(await updateWatchRule(999, { name: "Nope" })).toBeNull();
   });
 
-  it("sets filters when provided", async () => {
-    const row = makeRow({ id: 5 });
-    const chain = buildChain([row]);
-    mockUpdate.mockReturnValueOnce(chain);
+  it("persists eventTypes when provided", async () => {
+    const id = await seedRule();
 
+    await updateWatchRule(id, { eventTypes: ["match.cancelled"] });
+
+    expect((await getWatchRule(id))!.eventTypes).toEqual(["match.cancelled"]);
+  });
+
+  it("persists filters when provided", async () => {
+    const id = await seedRule();
     const filters: FilterCondition[] = [{ field: "teamId", operator: "eq", value: "99" }];
-    await updateWatchRule(5, { filters });
 
-    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
-    expect(setCall.filters).toEqual(filters);
+    await updateWatchRule(id, { filters });
+
+    expect((await getWatchRule(id))!.filters).toEqual(filters);
   });
 
-  it("sets channels when provided", async () => {
-    const row = makeRow({ id: 6 });
-    const chain = buildChain([row]);
-    mockUpdate.mockReturnValueOnce(chain);
-
+  it("persists channels when provided", async () => {
+    const id = await seedRule();
     const channels: ChannelTarget[] = [{ channel: "push", targetId: "ch-1" }];
-    await updateWatchRule(6, { channels });
 
-    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
-    expect(setCall.channels).toEqual(channels);
+    await updateWatchRule(id, { channels });
+
+    expect((await getWatchRule(id))!.channels).toEqual(channels);
   });
 
-  it("sets urgencyOverride when provided", async () => {
-    const row = makeRow({ id: 7, urgencyOverride: "high" });
-    const chain = buildChain([row]);
-    mockUpdate.mockReturnValueOnce(chain);
+  it("persists urgencyOverride when provided", async () => {
+    const id = await seedRule();
 
-    await updateWatchRule(7, { urgencyOverride: "high" });
+    await updateWatchRule(id, { urgencyOverride: "high" });
 
-    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
-    expect(setCall.urgencyOverride).toBe("high");
+    expect((await getWatchRule(id))!.urgencyOverride).toBe("high");
   });
 
-  it("sets templateOverride when provided", async () => {
-    const row = makeRow({ id: 8, templateOverride: "my-tpl" });
-    const chain = buildChain([row]);
-    mockUpdate.mockReturnValueOnce(chain);
+  it("persists templateOverride when provided", async () => {
+    const id = await seedRule();
 
-    await updateWatchRule(8, { templateOverride: "my-tpl" });
+    await updateWatchRule(id, { templateOverride: "my-tpl" });
 
-    const setCall = (chain.set as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
-    expect(setCall.templateOverride).toBe("my-tpl");
+    expect((await getWatchRule(id))!.templateOverride).toBe("my-tpl");
+  });
+
+  it("advances updatedAt", async () => {
+    const id = await seedRule({ updatedAt: new Date("2020-01-01T00:00:00Z") });
+
+    const updated = await updateWatchRule(id, { name: "Renamed" });
+
+    expect(new Date(updated!.updatedAt).getTime()).toBeGreaterThan(
+      new Date("2020-01-01T00:00:00Z").getTime(),
+    );
   });
 });
 
 describe("deleteWatchRule", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it("removes only the addressed row and reports true", async () => {
+    const target = await seedRule({ name: "target" });
+    const bystander = await seedRule({ name: "bystander" });
+
+    expect(await deleteWatchRule(target)).toBe(true);
+    expect(await getWatchRule(target)).toBeNull();
+    expect(await getWatchRule(bystander)).not.toBeNull();
   });
 
-  it("returns true when deleted", async () => {
-    const chain = buildChain([{ id: 1 }]);
+  it("reports false and deletes nothing when the id does not exist", async () => {
+    await seedRule();
 
-    mockDelete.mockReturnValueOnce(chain);
-
-    const result = await deleteWatchRule(1);
-
-    expect(result).toBe(true);
-  });
-
-  it("returns false when not found", async () => {
-    const chain = buildChain([]);
-
-    mockDelete.mockReturnValueOnce(chain);
-
-    const result = await deleteWatchRule(999);
-
-    expect(result).toBe(false);
+    expect(await deleteWatchRule(999)).toBe(false);
+    expect((await listWatchRules({})).total).toBe(1);
   });
 });
