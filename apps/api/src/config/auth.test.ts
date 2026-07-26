@@ -37,6 +37,15 @@ vi.mock("./redis", () => ({
   }),
 }));
 
+const logMocks = vi.hoisted(() => ({
+  warn: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock("./logger", () => ({ logger: logMocks }));
+
 vi.mock("better-auth", () => ({
   betterAuth: (...args: unknown[]) => mocks.betterAuth(...args),
 }));
@@ -304,6 +313,39 @@ describe("auth config", () => {
       const storage = await getStorage();
       await storage.delete("k");
       expect(redisMocks.del).toHaveBeenCalledWith("ba:k");
+    });
+
+    // Every getSession touches secondaryStorage once the 5-minute cookie cache
+    // lapses. A Redis outage must degrade session resolution (fall through to
+    // the mirrored session table), not propagate an error out of getSession.
+    describe("with Redis unavailable", () => {
+      beforeEach(() => {
+        logMocks.warn.mockReset();
+      });
+
+      it("get degrades to a miss instead of throwing", async () => {
+        redisMocks.get.mockRejectedValue(new Error("redis down"));
+        const storage = await getStorage();
+
+        await expect(storage.get("session:abc")).resolves.toBeNull();
+        expect(logMocks.warn).toHaveBeenCalled();
+      });
+
+      it("set does not throw", async () => {
+        redisMocks.set.mockRejectedValue(new Error("redis down"));
+        const storage = await getStorage();
+
+        await expect(storage.set("k", "v", 60)).resolves.toBeUndefined();
+        expect(logMocks.warn).toHaveBeenCalled();
+      });
+
+      it("delete does not throw", async () => {
+        redisMocks.del.mockRejectedValue(new Error("redis down"));
+        const storage = await getStorage();
+
+        await expect(storage.delete("k")).resolves.toBeUndefined();
+        expect(logMocks.warn).toHaveBeenCalled();
+      });
     });
   });
 });

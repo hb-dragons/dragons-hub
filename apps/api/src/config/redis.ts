@@ -2,17 +2,45 @@ import Redis from "ioredis";
 import { env } from "./env";
 import { logger } from "./logger";
 
+/**
+ * How many reconnection attempts a request-path command may sit through before
+ * ioredis rejects it. This is the setting that makes "fail open" reachable: with
+ * `maxRetriesPerRequest: null` a command issued while Redis is unreachable stays
+ * in the offline queue forever — it neither resolves nor rejects — so every
+ * `catch` that logs "failing open" is dead code and the request hangs until the
+ * client or load balancer times out. A small finite value keeps a brief blip
+ * transparent (the offline queue still buffers across a fast reconnect) while
+ * bounding a real outage to a fast rejection the caller can degrade on.
+ */
+const REQUEST_MAX_RETRIES_PER_REQUEST = 2;
+
+/**
+ * A client for connections that must never give up on an in-flight command:
+ * BullMQ requires `maxRetriesPerRequest: null` on the connections it owns
+ * (a blocking read has to survive a reconnect), and the pub/sub pair is
+ * long-lived for the same reason. Never use this on the request path.
+ */
 export function createRedisClient(): Redis {
   return new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
 }
 
+/**
+ * A client for the request path: rate limiters, the sign-in lockout, session
+ * secondary storage, health probes. Commands reject once Redis has been
+ * unreachable for a couple of reconnect attempts, so callers can fail open.
+ */
+export function createRequestRedisClient(): Redis {
+  return new Redis(env.REDIS_URL, {
+    maxRetriesPerRequest: REQUEST_MAX_RETRIES_PER_REQUEST,
+  });
+}
+
 let _redis: Redis | undefined;
 
+/** The shared request-path client. */
 export function getRedis(): Redis {
   if (!_redis) {
-    _redis = new Redis(env.REDIS_URL, {
-      maxRetriesPerRequest: null, // Required by BullMQ
-    });
+    _redis = createRequestRedisClient();
 
     _redis.on("connect", () => {
       logger.info("Redis connected");

@@ -5,6 +5,7 @@ import { admin } from "better-auth/plugins/admin";
 import { ac, roles } from "@dragons/shared";
 import { getDb } from "./database";
 import { env } from "./env";
+import { logger } from "./logger";
 import { getRedis } from "./redis";
 
 const SECONDARY_STORAGE_PREFIX = "ba:";
@@ -23,17 +24,37 @@ export const auth = betterAuth({
     disableSignUp: true,
     minPasswordLength: 12,
   },
+  // Every getSession hits secondaryStorage once the 5-minute cookie cache
+  // lapses, so a Redis outage here would otherwise take down every
+  // authenticated route. Degrade instead: a read failure reports a cache miss
+  // and better-auth falls through to the mirrored session table
+  // (storeSessionInDatabase below); a write failure is logged and swallowed,
+  // since Postgres already holds the durable copy and throwing would turn a
+  // cache outage into a sign-in outage.
   secondaryStorage: {
     async get(key) {
-      return getRedis().get(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      try {
+        return await getRedis().get(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      } catch (err) {
+        logger.warn({ err, key }, "Session cache read failed; treating as a miss");
+        return null;
+      }
     },
     async set(key, value, ttl) {
       const k = `${SECONDARY_STORAGE_PREFIX}${key}`;
-      if (ttl && ttl > 0) await getRedis().set(k, value, "EX", ttl);
-      else await getRedis().set(k, value);
+      try {
+        if (ttl && ttl > 0) await getRedis().set(k, value, "EX", ttl);
+        else await getRedis().set(k, value);
+      } catch (err) {
+        logger.warn({ err, key }, "Session cache write failed; skipping cache");
+      }
     },
     async delete(key) {
-      await getRedis().del(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      try {
+        await getRedis().del(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      } catch (err) {
+        logger.warn({ err, key }, "Session cache delete failed; entry will expire via TTL");
+      }
     },
   },
   rateLimit: {
