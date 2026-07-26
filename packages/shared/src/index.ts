@@ -249,6 +249,9 @@ export * from "./today";
 
 export * from "./referee-history";
 
+// Kickoff "today" resolution + formatting (timezone-explicit; shared by web + native)
+export * from "./kickoff";
+
 // Notification events
 export * from "./notification-events";
 
