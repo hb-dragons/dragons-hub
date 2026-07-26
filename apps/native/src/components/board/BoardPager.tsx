@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, memo, useCallback, useImperativeHandle, useMemo, useRef } from "react";
 import {
   ScrollView,
   useWindowDimensions,
@@ -53,7 +53,7 @@ interface BoardPagerProps {
   scrollEnabled?: boolean;
 }
 
-export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
+const BoardPagerImpl = forwardRef<BoardPagerHandle, BoardPagerProps>(
   function BoardPager(
     {
       columns,
@@ -85,6 +85,28 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
     const scrollXRef = useRef(0);
     const { width: winWidth } = useWindowDimensions();
     const columnWidth = useMemo(() => Math.round(winWidth * 0.85), [winWidth]);
+
+    // One stable ref callback per column id. An inline `ref={(h) => ...}`
+    // changes identity every render, which makes React detach and re-attach
+    // every column's ref — and, because the prop differs, defeats memoising
+    // BoardColumn entirely.
+    const columnRefSetters = useRef<Map<number, (h: BoardColumnHandle | null) => void>>(
+      new Map(),
+    );
+    const columnRefSetter = useCallback(
+      (columnId: number) => {
+        const cached = columnRefSetters.current.get(columnId);
+        if (cached) return cached;
+        const setter = (handle: BoardColumnHandle | null) => {
+          if (!columnRefs) return;
+          if (handle) columnRefs.current.set(columnId, handle);
+          else columnRefs.current.delete(columnId);
+        };
+        columnRefSetters.current.set(columnId, setter);
+        return setter;
+      },
+      [columnRefs],
+    );
 
     useImperativeHandle(
       ref,
@@ -155,14 +177,7 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
         {columns.map((col) => (
           <BoardColumn
             key={col.id}
-            ref={(handle) => {
-              if (!columnRefs) return;
-              if (handle) {
-                columnRefs.current.set(col.id, handle);
-              } else {
-                columnRefs.current.delete(col.id);
-              }
-            }}
+            ref={columnRefSetter(col.id)}
             column={col}
             tasks={tasks}
             width={columnWidth}
@@ -187,3 +202,11 @@ export const BoardPager = forwardRef<BoardPagerHandle, BoardPagerProps>(
     );
   },
 );
+
+/**
+ * Memoised so that screen-level state the pager does not read (e.g. the
+ * refreshing flag flipping, or an unrelated filter chip) does not re-render
+ * every column and card. Its callers must pass stable callbacks for this to
+ * bite — see `admin/boards/[id].tsx`.
+ */
+export const BoardPager = memo(BoardPagerImpl);

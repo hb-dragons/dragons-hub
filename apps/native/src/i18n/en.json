@@ -235,7 +235,10 @@
     "apply": "Apply",
     "loading": "Loading…",
     "vs": "vs",
-    "at": "@"
+    "at": "@",
+    "loadFailed": "Couldn't load this page",
+    "retry": "Retry",
+    "notFound": "Not found"
   },
   "admin": {
     "boards": {

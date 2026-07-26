@@ -15,17 +15,8 @@ import { ClubLogo } from "@/components/brand/ClubLogo";
 import { authClient } from "@/lib/auth-client";
 import { publicApi, refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
+import { kickoffCompact } from "@/lib/format/kickoff";
 import { fontFamilies } from "@/theme/typography";
-
-function formatMatchDate(kickoffDate: string, kickoffTime: string): string {
-  const locale = i18n.locale === "de" ? "de-DE" : "en-US";
-  const d = new Date(kickoffDate + "T00:00:00");
-  const weekday = d.toLocaleDateString(locale, { weekday: "short" });
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const time = kickoffTime.slice(0, 5);
-  return `${weekday} ${day}.${month}. ${time}`;
-}
 
 export default function GameDetailScreen() {
   const { colors, textStyles, spacing, radius, isDark } = useTheme();
@@ -208,7 +199,7 @@ export default function GameDetailScreen() {
                 { color: colors.mutedForeground, textAlign: "center", marginBottom: spacing.sm },
               ]}
             >
-              {formatMatchDate(match.kickoffDate, match.kickoffTime)}
+              {kickoffCompact(match.kickoffDate, match.kickoffTime)}
               {venueName ? ` · ${venueName}` : ""}
             </Text>
 

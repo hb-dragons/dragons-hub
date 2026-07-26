@@ -15,6 +15,7 @@ import Svg, { Path, Circle } from "react-native-svg";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import useSWR from "swr";
+import { useDebouncedValue } from "@/hooks/useDebounce";
 import { APIError } from "@dragons/api-client";
 import type {
   CandidateSearchResponse,
@@ -143,9 +144,14 @@ export function AssignRefereeModal({
     transform: [{ translateY: kbHeight.value }],
   }));
 
+  // Candidate search is a live federation call, so one request per keystroke is
+  // the most expensive instance of this bug in the app. Debounce the value that
+  // feeds both the SWR key and the request body.
+  const debouncedSearch = useDebouncedValue(search);
+
   const swrKey =
     visible && game
-      ? `candidates:${String(game.apiMatchId)}:${String(slotNumber)}:${search}`
+      ? `candidates:${String(game.apiMatchId)}:${String(slotNumber)}:${debouncedSearch}`
       : null;
 
   const { data, isLoading } = useSWR<CandidateSearchResponse>(
@@ -153,7 +159,7 @@ export function AssignRefereeModal({
     () =>
       refereeApi.searchAssignmentCandidates(game!.apiMatchId, {
         slotNumber,
-        search,
+        search: debouncedSearch,
         pageFrom: 0,
         pageSize: 50,
       }),

@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { View, Text, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
@@ -21,6 +22,16 @@ export default function TeamsScreen() {
 
   const { data, isLoading, mutate } = useSWR("teams:all", () => publicApi.getTeams());
 
+  // Stable: TeamCard is memo-wrapped, so an inline arrow here would make the
+  // memo a no-op.
+  const navigateToTeam = useCallback(
+    (team: PublicTeam) => {
+      router.push(`/team/${String(team.id)}`);
+    },
+    [router],
+  );
+
+
   if (isLoading) {
     return (
       <Screen>
@@ -34,10 +45,6 @@ export default function TeamsScreen() {
   const allTeams = (data ?? []).filter((t) => t.isOwnClub === true);
   const seniorTeams = allTeams.filter((t) => !isYouthTeam(t));
   const youthTeams = allTeams.filter((t) => isYouthTeam(t));
-
-  const navigateToTeam = (team: PublicTeam) => {
-    router.push(`/team/${String(team.id)}`);
-  };
 
   return (
     <Screen onRefresh={() => mutate()}>
@@ -63,7 +70,7 @@ export default function TeamsScreen() {
             <TeamCard
               team={seniorTeams[0]!}
               featured
-              onPress={() => navigateToTeam(seniorTeams[0]!)}
+              onPress={navigateToTeam}
             />
           </View>
 
@@ -74,7 +81,7 @@ export default function TeamsScreen() {
                 <View key={team.id} style={{ width: "48%" }}>
                   <TeamCard
                     team={team}
-                    onPress={() => navigateToTeam(team)}
+                    onPress={navigateToTeam}
                   />
                 </View>
               ))}
@@ -100,7 +107,7 @@ export default function TeamsScreen() {
               <View key={team.id} style={{ width: "48%" }}>
                 <TeamCard
                   team={team}
-                  onPress={() => navigateToTeam(team)}
+                  onPress={navigateToTeam}
                 />
               </View>
             ))}

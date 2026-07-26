@@ -3,16 +3,12 @@ import { adminClient, inferAdditionalFields } from "better-auth/client/plugins";
 import { expoClient } from "@better-auth/expo/client";
 import * as SecureStore from "expo-secure-store";
 import { ac, roles, type GateUser } from "@dragons/shared";
+import { resolveApiUrl } from "./api-url";
 
-export function resolveApiUrl(): string {
-  const url = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
-  if (!__DEV__ && !url.startsWith("https://")) {
-    throw new Error(
-      `EXPO_PUBLIC_API_URL must use HTTPS in release builds, got: ${url}`,
-    );
-  }
-  return url;
-}
+// Re-exported so the many `import { resolveApiUrl } from "@/lib/auth-client"`
+// call sites keep working; the implementation lives in `./api-url`, which never
+// throws during module evaluation (see the note there).
+export { resolveApiUrl, getApiUrlConfigError } from "./api-url";
 
 const baseURL = resolveApiUrl();
 type AdminPluginOptions = NonNullable<Parameters<typeof adminClient>[0]>;
