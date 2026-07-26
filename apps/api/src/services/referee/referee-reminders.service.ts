@@ -40,7 +40,7 @@ function parseKickoff(kickoffDate: string, kickoffTime: string): Date {
   const berlinDate = new Date(berlinStr);
   // The difference tells us the offset
   const offsetMs = naive.getTime() - berlinDate.getTime();
-  return new Date(naive.getTime() - offsetMs);
+  return new Date(naive.getTime() + offsetMs);
 }
 
 /**
