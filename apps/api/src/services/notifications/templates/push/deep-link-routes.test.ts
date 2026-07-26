@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { EVENT_TYPES } from "@dragons/shared";
 import { renderPushTemplate } from "./index";
 
 /**
@@ -77,8 +78,18 @@ const routeList = (): string =>
 
 function declaredEventTypes(): string[] {
   const source = readFileSync(path.join(PUSH_TEMPLATE_DIR, "index.ts"), "utf8");
-  const types = [...source.matchAll(/case\s+"([^"]+)":/g)].map((m) => m[1]!);
-  return [...new Set(types)];
+  // The switch labels are `case EVENT_TYPES.MATCH_CANCELLED:` rather than raw
+  // strings, so that a typo'd event name is a compile error (#101). Resolve the
+  // constant back to its value; also accept a string literal so this keeps
+  // working if a template is ever added the other way.
+  const fromConstants = [...source.matchAll(/case\s+EVENT_TYPES\.([A-Z0-9_]+)\s*:/g)].map((m) => {
+    const key = m[1]! as keyof typeof EVENT_TYPES;
+    const value = EVENT_TYPES[key];
+    expect(value, `EVENT_TYPES.${key} is referenced in the push switch but is not defined`).toBeTypeOf("string");
+    return value as string;
+  });
+  const fromLiterals = [...source.matchAll(/case\s+"([^"]+)"\s*:/g)].map((m) => m[1]!);
+  return [...new Set([...fromConstants, ...fromLiterals])];
 }
 
 /**
