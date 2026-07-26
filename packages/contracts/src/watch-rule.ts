@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CHANNEL_TYPES } from "@dragons/shared";
 
 export const watchRuleIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
@@ -15,8 +16,10 @@ const filterConditionSchema = z.object({
   value: z.union([z.string(), z.array(z.string()), z.null()]),
 });
 
+// Derived from CHANNEL_TYPES rather than restated: a watch rule targeting a
+// channel the pipeline has no adapter for delivers nothing and reports nothing.
 const channelTargetSchema = z.object({
-  channel: z.enum(["in_app", "whatsapp_group", "push", "email"]),
+  channel: z.enum(CHANNEL_TYPES),
   targetId: z.string().min(1),
 });
 

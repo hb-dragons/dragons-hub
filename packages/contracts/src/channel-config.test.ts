@@ -21,7 +21,6 @@ const VALID_CONFIG_BY_CHANNEL_TYPE: Record<
   in_app: { audienceRole: "admin", locale: "de" },
   whatsapp_group: { groupId: "4915100000000@g.us", locale: "de" },
   push: { provider: "expo" },
-  email: { locale: "de" },
 };
 
 describe("createChannelConfigSchema", () => {
@@ -76,13 +75,19 @@ describe("createChannelConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("accepts email with locale", () => {
+  // There is no email channel adapter, so the contract must not accept one:
+  // a created email config would swallow every notification it is targeted by.
+  it("rejects type email (no adapter exists)", () => {
     const result = createChannelConfigSchema.safeParse({
       ...base,
       type: "email",
       config: { locale: "de" },
     });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+  });
+
+  it("validateConfigForType resolves no schema for email", () => {
+    expect(validateConfigForType("email", { locale: "de" })).toBeNull();
   });
 
   it("rejects type push (removed from enum)", () => {

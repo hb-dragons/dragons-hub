@@ -18,7 +18,7 @@ import { ExpoPushClient } from "./expo-push.client";
 import { resolveRecipientUserIds } from "./recipient-resolver";
 import { renderRefereeSlotsWhatsApp } from "./templates/referee-slots";
 import { env } from "../../config/env";
-import type { RefereeSlotsPayload } from "@dragons/shared";
+import type { ChannelType, RefereeSlotsPayload } from "@dragons/shared";
 import { parseWhatsAppGroupConfig, readLocale } from "./channel-config-parsers";
 import { logger } from "../../config/logger";
 
@@ -102,6 +102,22 @@ export interface PipelineResult {
 }
 
 // ── Pipeline steps ───────────────────────────────────────────────────────────
+
+/**
+ * Every channel type `dispatchImmediate` below has a delivery branch for.
+ *
+ * Typed as an exhaustive `Record<ChannelType, true>` so a channel added to
+ * `CHANNEL_TYPES` — which is what the provider endpoint offers and the create
+ * contract accepts — is a compile error here until it has an adapter. Without
+ * that link the two drift apart silently: `email` was offerable for months with
+ * no adapter, so every notification an admin routed to it fell through to the
+ * "Unknown channel type" branch and vanished with a log line and no failure.
+ */
+export const DISPATCHABLE_CHANNEL_TYPES: Record<ChannelType, true> = {
+  in_app: true,
+  whatsapp_group: true,
+  push: true,
+};
 
 const inAppAdapter = new InAppChannelAdapter();
 const whatsAppGroupAdapter = new WhatsAppGroupAdapter();
@@ -348,7 +364,13 @@ export async function dispatchImmediate(params: {
     return sendResult.success;
   }
 
-  logger.warn({ channelType, channelConfigId: config.id }, "Unknown channel type, skipping dispatch");
+  // Reachable only for a persisted channel config whose type is no longer
+  // offerable (or never was). Logged at error, not warn: nothing else reports
+  // it, and the notification is gone.
+  logger.error(
+    { channelType, channelConfigId: config.id },
+    "No adapter for channel type, notification not delivered",
+  );
   return false;
 }
 
