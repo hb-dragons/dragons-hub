@@ -66,12 +66,14 @@ vi.mock("./venues.sync", () => ({
 const mockSyncReferees = vi.fn();
 const mockSyncRoles = vi.fn();
 const mockSyncAssignments = vi.fn();
+const mockRemoveAssignments = vi.fn();
 const mockBuildMatchLookup = vi.fn();
 const mockConfirmIntents = vi.fn();
 vi.mock("./referees.sync", () => ({
   syncRefereesFromData: (...args: unknown[]) => mockSyncReferees(...args),
   syncRefereeRolesFromData: (...args: unknown[]) => mockSyncRoles(...args),
   syncRefereeAssignmentsFromData: (...args: unknown[]) => mockSyncAssignments(...args),
+  removeStaleRefereeAssignments: (...args: unknown[]) => mockRemoveAssignments(...args),
   buildMatchIdLookup: (...args: unknown[]) => mockBuildMatchLookup(...args),
   confirmIntentsFromSync: (...args: unknown[]) => mockConfirmIntents(...args),
 }));
@@ -161,6 +163,7 @@ beforeEach(() => {
 
   mockExtractAssignments.mockReturnValue([]);
   mockSyncAssignments.mockResolvedValue({ created: 0, errors: [] });
+  mockRemoveAssignments.mockResolvedValue({ removed: 0, skipped: false, reason: null, errors: [] });
   mockConfirmIntents.mockResolvedValue(0);
 
   mockReconcileAfterSync.mockResolvedValue(undefined);

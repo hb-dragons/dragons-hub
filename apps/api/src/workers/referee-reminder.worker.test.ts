@@ -31,6 +31,8 @@ vi.mock("../config/database", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+  and: vi.fn(),
+  isNull: vi.fn(),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { referees, refereeAssignmentRules, teams, matchReferees } from "@dragons/db/schema";
-import { sql, asc, desc, ilike, and, or, eq, inArray } from "drizzle-orm";
+import { sql, asc, desc, ilike, and, or, eq, inArray, isNull } from "drizzle-orm";
 import type {
   RefereeListItem,
   PaginatedResponse,
@@ -74,7 +74,7 @@ export async function getReferees(
         updatedAt: referees.updatedAt,
       })
       .from(referees)
-      .leftJoin(matchReferees, eq(matchReferees.refereeId, referees.id))
+      .leftJoin(matchReferees, and(eq(matchReferees.refereeId, referees.id), isNull(matchReferees.removedAt)))
       .where(whereClause)
       .groupBy(referees.id)
       .orderBy(...orderBy)
@@ -123,7 +123,7 @@ export async function getRefereeById(refereeId: number): Promise<RefereeListItem
       updatedAt: referees.updatedAt,
     })
     .from(referees)
-    .leftJoin(matchReferees, eq(matchReferees.refereeId, referees.id))
+    .leftJoin(matchReferees, and(eq(matchReferees.refereeId, referees.id), isNull(matchReferees.removedAt)))
     .where(eq(referees.id, refereeId))
     .groupBy(referees.id);
 

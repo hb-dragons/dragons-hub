@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
-import { and, eq, gte, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
 
 const isTrackedLeagueExpr = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
@@ -55,7 +55,8 @@ export async function getRefereeGameById(id: number): Promise<RefereeGameListIte
   const [row] = await getDb()
     .select(refereeGameColumns)
     .from(refereeGames)
-    .where(eq(refereeGames.id, id))
+    // Tombstoned games (issue #105) are withdrawn fixtures, not live ones.
+    .where(and(eq(refereeGames.id, id), isNull(refereeGames.removedAt)))
     .limit(1);
   if (!row) return null;
   return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
@@ -76,7 +77,8 @@ interface GetRefereeGamesParams {
 
 export async function getRefereeGames(params: GetRefereeGamesParams) {
   const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId, slotStatus } = params;
-  const conditions = [];
+  // Games withdrawn from the federation schedule are tombstoned, never listed (issue #105).
+  const conditions = [isNull(refereeGames.removedAt)];
 
   // Status
   if (status === "cancelled") conditions.push(eq(refereeGames.isCancelled, true));

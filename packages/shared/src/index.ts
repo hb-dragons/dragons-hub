@@ -43,6 +43,9 @@ export type {
   MatchChangeHistoryItem,
   MatchChangeHistoryResponse,
   RefereeSlotInfo,
+  RefereeSlotReferee,
+  RefereeSlotRole,
+  RefereeSlotIntent,
 } from "./matches";
 
 export type { OwnClubTeam, TeamReorderItem } from "./teams";

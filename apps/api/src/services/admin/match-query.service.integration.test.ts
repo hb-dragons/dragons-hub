@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
 
 // Real Postgres (pglite) so buildDetailResponse's joins + slot resolution run
 // for real. The co-located mock-unit suite stubs schema/drizzle and only covers
@@ -103,5 +104,64 @@ describe("buildDetailResponse — referee slot resolution (issue #65)", () => {
     expect(slots[0]!.referee?.id).toBe(refA); // slot 1
     expect(slots[1]!.referee).toBeNull(); // slot 2 empty
     expect(slots[2]!.referee?.id).toBe(refC); // slot 3
+  });
+});
+
+describe("buildDetailResponse — removed assignments (issue #105)", () => {
+  it("never returns a slot that is both open and carrying a referee", async () => {
+    const matchId = await seedMatch();
+    const refereeId = await seedReferee(9001, "Eins");
+    // The federation reopened slot 1 but the assignment row is still live —
+    // exactly the state the sync used to leave behind.
+    await ctx.db.update(matches).set({ sr1Open: true }).where(eq(matches.id, matchId));
+    await ctx.db.insert(matchReferees).values({ matchId, refereeId, roleId, slotNumber: 1 });
+
+    const result = await getMatchDetail(matchId);
+    const slots = result!.match.refereeSlots!;
+
+    for (const slot of slots) {
+      expect(slot.isOpen && slot.referee !== null).toBe(false);
+      expect(slot.isOpen && slot.role !== null).toBe(false);
+    }
+  });
+
+  it("drops a tombstoned assignment and reports the slot as open", async () => {
+    const matchId = await seedMatch();
+    const refereeId = await seedReferee(9001, "Eins");
+    await ctx.db.update(matches).set({ sr1Open: true }).where(eq(matches.id, matchId));
+    await ctx.db.insert(matchReferees).values({
+      matchId,
+      refereeId,
+      roleId,
+      slotNumber: 1,
+      removedAt: new Date(),
+    });
+
+    const result = await getMatchDetail(matchId);
+    const slots = result!.match.refereeSlots!;
+
+    expect(slots[0]!.referee).toBeNull();
+    expect(slots[0]!.role).toBeNull();
+    expect(slots[0]!.isOpen).toBe(true);
+  });
+
+  it("still shows the live assignment when a tombstone exists for the same slot", async () => {
+    const matchId = await seedMatch();
+    const oldRef = await seedReferee(9001, "Alt");
+    const newRef = await seedReferee(9002, "Neu");
+    await ctx.db.insert(matchReferees).values({
+      matchId,
+      refereeId: oldRef,
+      roleId,
+      slotNumber: 1,
+      removedAt: new Date(),
+    });
+    // The partial unique index must allow refilling a vacated slot.
+    await ctx.db.insert(matchReferees).values({ matchId, refereeId: newRef, roleId, slotNumber: 1 });
+
+    const result = await getMatchDetail(matchId);
+    const slots = result!.match.refereeSlots!;
+
+    expect(slots[0]!.referee?.id).toBe(newRef);
   });
 });

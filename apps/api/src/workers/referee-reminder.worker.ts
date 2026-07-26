@@ -1,5 +1,5 @@
 import { Worker, type Job } from "bullmq";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "../config/database";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
@@ -38,7 +38,9 @@ async function loadRefereeGame(refereeGameId: number) {
   const [row] = await getDb()
     .select()
     .from(refereeGames)
-    .where(eq(refereeGames.id, refereeGameId));
+    // A withdrawn game (issue #105) must not fire a reminder even if its job
+    // outlived the cancellation attempt.
+    .where(and(eq(refereeGames.id, refereeGameId), isNull(refereeGames.removedAt)));
   return row ?? null;
 }
 

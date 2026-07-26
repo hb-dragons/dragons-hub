@@ -43,6 +43,8 @@ vi.mock("./referee-assignment.service", async () => {
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((_a: unknown, _b: unknown) => ({ eq: [_a, _b] })),
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
+  isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
 }));
 
 vi.mock("@dragons/db/schema", () => ({

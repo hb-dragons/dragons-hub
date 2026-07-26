@@ -361,7 +361,8 @@ export async function buildDetailResponse(
     .from(matchReferees)
     .innerJoin(referees, eq(matchReferees.refereeId, referees.id))
     .innerJoin(refereeRoles, eq(matchReferees.roleId, refereeRoles.id))
-    .where(eq(matchReferees.matchId, matchId));
+    // Tombstoned rows (issue #105) are history, not assignments.
+    .where(and(eq(matchReferees.matchId, matchId), isNull(matchReferees.removedAt)));
 
   // Load intents for this match
   const intentsRows = await client
@@ -378,9 +379,9 @@ export async function buildDetailResponse(
     .where(eq(refereeAssignmentIntents.matchId, matchId));
 
   // Build referee slots array
-  const refereeSlots: RefereeSlotInfo[] = [1, 2, 3].map((slotNumber) => {
+  const refereeSlots: RefereeSlotInfo[] = [1, 2, 3].map((slotNumber): RefereeSlotInfo => {
     const slotKey = `sr${slotNumber}Open` as keyof typeof row;
-    const isOpen = (row[slotKey] as boolean) ?? false;
+    const openFlag = (row[slotKey] as boolean) ?? false;
 
     // Find the assignment for this slot by its real slotNumber — assignments
     // can be non-contiguous (e.g. only slot 2 filled) and come back unordered.
@@ -389,25 +390,42 @@ export async function buildDetailResponse(
     // Find intent for this slot
     const intentRow = intentsRows.find((i) => i.slotNumber === slotNumber) ?? null;
 
-    return {
-      slotNumber,
-      isOpen,
-      referee: assignment
-        ? { id: assignment.refereeId, firstName: assignment.firstName, lastName: assignment.lastName }
-        : null,
-      role: assignment
-        ? { id: assignment.roleId, name: assignment.roleName, shortName: assignment.roleShortName }
-        : null,
-      intent: intentRow
-        ? {
-            refereeId: intentRow.refereeId,
-            refereeFirstName: intentRow.firstName,
-            refereeLastName: intentRow.lastName,
-            clickedAt: intentRow.clickedAt.toISOString(),
-            confirmedBySyncAt: intentRow.confirmedBySyncAt?.toISOString() ?? null,
-          }
-        : null,
-    };
+    const intent = intentRow
+      ? {
+          refereeId: intentRow.refereeId,
+          refereeFirstName: intentRow.firstName,
+          refereeLastName: intentRow.lastName,
+          clickedAt: intentRow.clickedAt.toISOString(),
+          confirmedBySyncAt: intentRow.confirmedBySyncAt?.toISOString() ?? null,
+        }
+      : null;
+
+    // A live match_referees row is positive evidence somebody holds the slot:
+    // the sync tombstones it as soon as a complete fetch stops reporting that
+    // referee (issue #105). matches.srNOpen only mirrors the federation's
+    // `offenAngeboten` flag, which can lag, so the assignment wins and the
+    // "open AND assigned" contradiction never reaches a caller.
+    if (assignment) {
+      return {
+        slotNumber,
+        isOpen: false,
+        referee: {
+          id: assignment.refereeId,
+          firstName: assignment.firstName,
+          lastName: assignment.lastName,
+        },
+        role: {
+          id: assignment.roleId,
+          name: assignment.roleName,
+          shortName: assignment.roleShortName,
+        },
+        intent,
+      };
+    }
+
+    return openFlag
+      ? { slotNumber, isOpen: true, referee: null, role: null, intent }
+      : { slotNumber, isOpen: false, referee: null, role: null, intent };
   });
 
   return {

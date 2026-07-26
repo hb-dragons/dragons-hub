@@ -48,6 +48,9 @@ vi.mock("@dragons/db/schema", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ eq: args })),
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
+  gte: vi.fn((...args: unknown[]) => ({ gte: args })),
+  isNull: vi.fn((...args: unknown[]) => ({ isNull: args })),
   inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
 }));
 
@@ -386,6 +389,16 @@ describe("syncRefereeGames", () => {
       }
       // Batch lookups: refereeGames (call 2) then matches (call 3)
       const batchIndex = currentCall - 2;
+      if (batchIndex > 1) {
+        // Anything after the two batch lookups is the removal pass's live-rows
+        // query (issue #105). Removal has its own pglite suite; here it is a
+        // no-op so these upsert assertions stay about upserts.
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([]),
+          }),
+        };
+      }
       return {
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockImplementation(() => perGameFn(batchIndex)),
@@ -397,7 +410,7 @@ describe("syncRefereeGames", () => {
   it("returns zeros when API returns empty results", async () => {
     mockFetchOffeneSpiele.mockResolvedValue({ total: 0, results: [] });
     const counts = await syncRefereeGames();
-    expect(counts).toEqual({ created: 0, updated: 0, unchanged: 0 });
+    expect(counts).toEqual({ created: 0, updated: 0, unchanged: 0, removed: 0 });
   });
 
   it("inserts new game and emits event when open our-club slot exists", async () => {
