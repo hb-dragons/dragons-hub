@@ -1,8 +1,7 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
-export const refereeRulesParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const refereeRulesParamSchema = idParamSchema;
 
 export const refereeRuleItemSchema = z
   .object({

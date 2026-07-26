@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 import { dateSchema, matchFormSchema } from "@dragons/shared";
 
 export const matchListQuerySchema = z.object({
@@ -15,9 +16,7 @@ export const matchListQuerySchema = z.object({
   teamApiId: z.coerce.number().int().positive().optional(),
 });
 
-export const matchIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const matchIdParamSchema = idParamSchema;
 
 export const matchUpdateBodySchema = matchFormSchema.extend({
   venueId: z.number().int().positive().nullable().optional(),
@@ -56,8 +55,7 @@ export const matchHistoryQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-export const releaseOverrideParamsSchema = z.object({
-  id: z.coerce.number().int().positive(),
+export const releaseOverrideParamsSchema = idParamSchema.extend({
   fieldName: z.string().min(1).max(100),
 });
 

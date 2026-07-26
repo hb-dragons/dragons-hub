@@ -1,10 +1,9 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 import { CHANNEL_TYPES } from "@dragons/shared";
 import type { ChannelConfig, ChannelType } from "@dragons/shared";
 
-export const channelConfigIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const channelConfigIdParamSchema = idParamSchema;
 
 export const channelConfigListQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),

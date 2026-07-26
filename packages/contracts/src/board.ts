@@ -1,8 +1,7 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
-export const boardIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const boardIdParamSchema = idParamSchema;
 
 export const boardCreateBodySchema = z.strictObject({
   name: z.string().min(1).max(100),
@@ -17,8 +16,7 @@ export const boardUpdateBodySchema = z.strictObject({
   description: z.string().max(500).nullable().optional(),
 });
 
-export const columnIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
+export const columnIdParamSchema = idParamSchema.extend({
   colId: z.coerce.number().int().positive(),
 });
 

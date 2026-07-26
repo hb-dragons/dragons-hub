@@ -117,6 +117,8 @@ export function useTriggerSync() {
         durationMs: null,
         errorMessage: null,
         errorStack: null,
+        failedStep: null,
+        ownerInstanceId: null,
         summary: null,
         createdAt: now,
       };
@@ -244,6 +246,8 @@ export function useTriggerRefereeSync() {
         durationMs: null,
         errorMessage: null,
         errorStack: null,
+        failedStep: null,
+        ownerInstanceId: null,
         summary: null,
         createdAt: now,
       };

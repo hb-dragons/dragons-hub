@@ -1,8 +1,7 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
-export const teamIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const teamIdParamSchema = idParamSchema;
 
 export const teamUpdateBodySchema = z.strictObject({
   customName: z.string().max(50).nullable().optional(),

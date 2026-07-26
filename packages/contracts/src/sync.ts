@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 import { ENTITY_TYPES, ENTRY_ACTIONS, SYNC_STATUSES } from "@dragons/shared";
 
 export const syncPaginationSchema = z.object({
@@ -15,9 +16,7 @@ export const syncLogsQuerySchema = syncPaginationSchema.extend({
 
 export type SyncLogsQuery = z.infer<typeof syncLogsQuerySchema>;
 
-export const syncEntryIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const syncEntryIdParamSchema = idParamSchema;
 
 const entityTypeEnum = z.enum(ENTITY_TYPES);
 const entryActionEnum = z.enum(ENTRY_ACTIONS);
@@ -30,9 +29,7 @@ export const syncEntriesQuerySchema = syncPaginationSchema.extend({
 
 export type SyncEntriesQuery = z.infer<typeof syncEntriesQuerySchema>;
 
-export const syncStreamParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const syncStreamParamSchema = idParamSchema;
 
 const validJobStatuses = ["active", "waiting", "delayed", "completed", "failed"] as const;
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
 export const socialMatchesQuerySchema = z.object({
   type: z.enum(["preview", "results"]),
@@ -32,6 +33,4 @@ export const socialGenerateBodySchema = z.strictObject({
 
 export type SocialGenerateBody = z.infer<typeof socialGenerateBodySchema>;
 
-export const socialIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const socialIdParamSchema = idParamSchema;

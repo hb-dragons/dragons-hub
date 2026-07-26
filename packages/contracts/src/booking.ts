@@ -1,9 +1,8 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 import { dateSchema, timeSchema, bookingStatusSchema } from "@dragons/shared";
 
-export const bookingIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const bookingIdParamSchema = idParamSchema;
 
 export const bookingListQuerySchema = z.object({
   status: bookingStatusSchema.optional(),

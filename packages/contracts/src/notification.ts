@@ -1,8 +1,7 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
-export const notificationIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const notificationIdParamSchema = idParamSchema;
 
 export const notificationListQuerySchema = z.object({
   userId: z.string().min(1).optional(),

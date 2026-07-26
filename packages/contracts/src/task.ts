@@ -1,21 +1,18 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 import { dateSchema, taskPrioritySchema } from "@dragons/shared";
 
 export const taskBoardIdParamSchema = z.object({
   boardId: z.coerce.number().int().positive(),
 });
 
-export const taskIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const taskIdParamSchema = idParamSchema;
 
-export const taskChecklistItemParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
+export const taskChecklistItemParamSchema = idParamSchema.extend({
   itemId: z.coerce.number().int().positive(),
 });
 
-export const taskCommentParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
+export const taskCommentParamSchema = idParamSchema.extend({
   commentId: z.coerce.number().int().positive(),
 });
 
@@ -42,8 +39,7 @@ export const taskUpdateBodySchema = z.strictObject({
   dueDate: dateSchema.nullable().optional(),
 });
 
-export const taskAssigneeParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
+export const taskAssigneeParamSchema = idParamSchema.extend({
   userId: z.string().min(1).max(100),
 });
 

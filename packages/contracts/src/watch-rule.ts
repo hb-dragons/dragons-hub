@@ -1,10 +1,9 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 import { CHANNEL_TYPES, EVENT_TYPE_VALUES, EVENT_URGENCIES } from "@dragons/shared";
 import type { EventType } from "@dragons/shared";
 
-export const watchRuleIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const watchRuleIdParamSchema = idParamSchema;
 
 export const watchRuleListQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),

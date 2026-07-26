@@ -1,3 +1,5 @@
+export { idParamSchema, type IdParam } from "./common";
+
 export {
   boardIdParamSchema,
   boardCreateBodySchema,
