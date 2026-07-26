@@ -69,7 +69,9 @@ const validSession = {
 function mockInsertSuccess() {
   mocks.dbInsert.mockReturnValue({
     values: vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 1 }]),
+      }),
     }),
   });
 }
@@ -77,17 +79,19 @@ function mockInsertSuccess() {
 function mockInsertCapture() {
   const valuesCall = vi.fn();
   const setCall = vi.fn();
+  const setWhereCall = vi.fn();
   const values = vi.fn().mockImplementation((v) => {
     valuesCall(v);
     return {
       onConflictDoUpdate: vi.fn().mockImplementation((cfg) => {
         setCall(cfg.set);
-        return Promise.resolve(undefined);
+        setWhereCall(cfg.setWhere);
+        return { returning: vi.fn().mockResolvedValue([{ id: 1 }]) };
       }),
     };
   });
   mocks.dbInsert.mockReturnValue({ values });
-  return { valuesCall, setCall };
+  return { valuesCall, setCall, setWhereCall };
 }
 
 function mockDeleteSuccess() {

@@ -7,7 +7,9 @@ export const boardIdParamSchema = z.object({
 export const boardCreateBodySchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).nullable().optional(),
-  createdBy: z.string().max(100).nullable().optional(),
+  // No createdBy: the audit actor is set server-side from the session, never
+  // accepted from the client (it would be spoofable otherwise). z.object strips
+  // unknown keys, so a body that supplies it is silently ignored.
 });
 
 export const boardUpdateBodySchema = z.object({
