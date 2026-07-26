@@ -375,6 +375,11 @@
       "reload": "Neu laden"
     }
   },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "body": "Dieser Link führt nirgendwo hin. Vielleicht ist er veraltet.",
+    "action": "Zurück zur App"
+  },
   "toast": {
     "saved": "Änderungen gespeichert",
     "saveFailed": "Speichern fehlgeschlagen",

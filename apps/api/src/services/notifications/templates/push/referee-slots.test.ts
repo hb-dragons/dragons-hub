@@ -21,7 +21,20 @@ describe("renderRefereeSlotsPush", () => {
     expect(out.title).toContain("Schiedsrichter");
     expect(out.body).toContain("Dragons U18");
     expect(out.data.eventType).toBe("referee.slots.needed");
-    expect(out.data.deepLink).toBe("/(tabs)/referee");
+    // /game/:id is a declared expo-router route and renders <ClaimGameButton>
+    // for referees, so the tap lands on the claimable game.
+    expect(out.data.deepLink).toBe("/game/99");
+  });
+
+  it("reminder deep-links to the claimable game too", () => {
+    const out = renderRefereeSlotsPush(payload, "de", "reminder");
+    expect(out.data.deepLink).toBe("/game/99");
+  });
+
+  it("falls back to /officiating when the match row is not linked yet", () => {
+    const out = renderRefereeSlotsPush({ ...payload, matchId: null }, "de", "needed");
+    expect(out.data.deepLink).toBe("/officiating");
+    expect(String(out.data.deepLink)).not.toContain("null");
   });
 
   it("reminder reflects days-until kickoff", () => {

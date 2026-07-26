@@ -375,6 +375,11 @@
       "reload": "Reload"
     }
   },
+  "notFound": {
+    "title": "Page not found",
+    "body": "This link doesn't lead anywhere. It may be out of date.",
+    "action": "Back to the app"
+  },
   "toast": {
     "saved": "Changes saved",
     "saveFailed": "Couldn't save",
