@@ -14,8 +14,9 @@ import ssl
 import logging
 import urllib.request, urllib.parse, urllib.error
 import time
-import binascii
 import random
+
+import panel_pipeline
 
 # Resolve sibling files relative to this script so it works under any user account
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -194,82 +195,14 @@ while True:
                         # Calculate Request Start Time
                         StarterTime = time.time() * 1000
 
-                        # Kill the spaces between hex figures
-                        response_hex = response.replace(b' ', b'')
-                        # print("\nResponse_Hex: " + str(response_hex))
+                        # Normalise, split into frames and decide whether this
+                        # one is ours to forward. See panel_pipeline.py.
+                        frame = panel_pipeline.classify(response, remainder_hex)
+                        remainder_hex = frame.remainder_hex
+                        response = frame.body
+                        should_post = frame.should_post
 
-                        # Evaluate if the received data is HEX or needs conversion to HEX
-                        try:
-                            int(response_hex,16)    
-                        except ValueError:
-                            # not hex, needs conversion
-                            response_hex = binascii.hexlify(response)
-                            response_hex = response_hex.upper()
-                            # print("\nResponse_Raw: " + str(response))    
-                            # print("\nResponse_Hex: " + str(response_hex))
-
-                        # Add the remainder to the start of the sequence
-                        response_hex = remainder_hex + response_hex
-
-                        # Evaluate if the received data matches the panel format or not
-                        should_post = False
-                        if ((response_hex.find(b'017F0247') != -1) and (response_hex.rfind(b'03') != -1)):
-                            # found mobatime panel data
-                            # print("Mobatime: " + str(response_hex) + " - " + str(response_hex.find(b'017F0247')))
-                            # Get First and Last Usable Sequence, extract Usable String and put rest in Remainder
-                            StartToken = response_hex.find(b'017F0247')
-                            EndToken = response_hex.rfind(b'03')
-                            # End Token + 4 because after the EndToken there is a checksum byte
-                            remainder_hex = response_hex[EndToken + 4:]
-                            response_hex = response_hex[StartToken:EndToken + 4] + b'017F0247'
-                            # print("Mobatime: ST:" + str(StartToken) + " - ET: " + str(EndToken) + "\n" + str(response_hex) + "\n" + str(remainder_hex))
-                            should_post = False
-                            RetryCount = 0
-
-                        elif (((response_hex.find(b'F83320') != -1) or (response_hex.find(b'E8E8E4') != -1)) and (response_hex.rfind(b'0D'))):
-                            # found stramatel panel data - ours to forward
-                            # print("Stramatel: " + str(response_hex) + " - " + str(response_hex.find(b'F83320')))
-                            StartToken = max(response_hex.find(b'F83320'), response_hex.find(b'E8E8E4'))
-                            EndToken = response_hex.rfind(b'0D')
-                            # End Token + 2 because after the EndToken there is no checksum byte
-                            remainder_hex = response_hex[EndToken + 2:]
-                            response_hex = response_hex[StartToken:EndToken + 2] + b'F83320'
-                            # print("Stramatel: ST:" + str(StartToken) + " - ET: " + str(EndToken) + "\n" + str(response_hex) + "\n" + str(remainder_hex))
-                            RequestURL = '/api/scoreboard/ingest'
-                            should_post = True
-                            RetryCount = 0
-
-                        elif ((response_hex.find(b'00F8E1') != -1) and (response_hex.rfind(b'E5') != -1)):
-                            # found Stramatel 452 M segment protocol - ours to forward.
-                            # Sync on the 3-byte '00 F8 E1'. The 4th marker byte was 'C3'
-                            # until the SC24 shot-clock module was connected; it now inserts a
-                            # variable-length prefix between E1 and C3, so the contiguous
-                            # '00F8E1C3' no longer appears. The 3-byte sync matches both the
-                            # original framing and the SC24-era framing; the API decoder finds
-                            # C3 and decodes relative to the possession byte either way.
-                            StartToken = response_hex.find(b'00F8E1')
-                            EndToken = response_hex.rfind(b'E5')
-                            # End Token + 2: the 'E5' terminator is two hex chars, no checksum follows
-                            remainder_hex = response_hex[EndToken + 2:]
-                            response_hex = response_hex[StartToken:EndToken + 2]
-                            # Forward HEX text: the API route does Buffer.from(hex, "hex").
-                            # The other Stramatel branch posts the raw bytes instead;
-                            # that path is the API-side fallback only and is left as-is.
-                            response = response_hex
-                            RequestURL = '/api/scoreboard/ingest'
-                            should_post = True
-                            RetryCount = 0
-
-                        elif (((response_hex.find(b'0254') != -1) or (response_hex.find(b'0244') != -1)) and (response_hex.rfind(b'03'))):
-                            # found SwissTiming panel data
-                            # print("SwissTiming: " + str(response_hex) + " - " + str(response_hex.find(b'0244')))
-                            StartToken = max(response_hex.find(b'0254'), response_hex.find(b'0244'))
-                            EndToken = response_hex.rfind(b'03')
-                            # End Token + 4 because after the EndToken there is a checksum byte
-                            remainder_hex = response_hex[EndToken + 4:]
-                            response_hex = response_hex[StartToken:EndToken + 4] + b'0254'
-                            # print("SwissTiming: ST:" + str(StartToken) + " - ET: " + str(EndToken) + "\n" + str(response_hex) + "\n" + str(remainder_hex))
-                            should_post = False
+                        if frame.panel is not None:
                             RetryCount = 0
                         else:
                             # if not known format found, then retry as long there are retries left, otherwise change baudrate
@@ -315,13 +248,7 @@ while True:
 
                         if response != b'' and should_post:
                             # Make and Evaluate HTTP Request
-                            headers = {}
-                            headers['Content-type'] = 'application/x-www-form-urlencoded'
-                            headers['Accept'] = 'text/plain'
-                            headers['Content-Type'] = 'text/plain'
-                            headers['Connection'] = 'keep-alive'
-                            headers['Device_ID'] = Device_ID
-                            headers['Authorization'] = 'Bearer ' + SCOREBOARD_KEY
+                            headers = panel_pipeline.build_headers(Device_ID, SCOREBOARD_KEY)
 
                             status, reason = post_frame(RequestURL, response, headers)
                             if status == 200:
