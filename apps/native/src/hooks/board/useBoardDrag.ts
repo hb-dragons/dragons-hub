@@ -16,7 +16,7 @@ import { spacing } from "@/theme/spacing";
 // Types
 // ---------------------------------------------------------------------------
 
-export type ActiveDragState = {
+type ActiveDragState = {
   active: true;
   task: TaskCardData;
   cardWidth: number;
@@ -25,7 +25,7 @@ export type ActiveDragState = {
   dropTargetColumnId: number | null;
 };
 
-export type DragState =
+type DragState =
   | { active: false }
   | ActiveDragState;
 

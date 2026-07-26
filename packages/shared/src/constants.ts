@@ -40,8 +40,7 @@ export const ENTRY_ACTIONS = [
 ] as const;
 export type EntryAction = (typeof ENTRY_ACTIONS)[number];
 
-export const DIFF_STATUSES = ["diverged", "synced", "local-only"] as const;
-export type DiffStatus = (typeof DIFF_STATUSES)[number];
+export type DiffStatus = "diverged" | "synced" | "local-only";
 
 // ── Validation Patterns ─────────────────────────────────────────────────────
 

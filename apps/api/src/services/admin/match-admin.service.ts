@@ -47,26 +47,15 @@ async function loadTeamNames(
 
 // ── Re-exports ──────────────────────────────────────────────────────────────
 
-export { computeDiffs, OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
-export type { DiffStatus, FieldDiff } from "@dragons/shared";
-export type { DiffInput, OverridableField, LocalOnlyField, AllEditableField } from "./match-diff.service";
+export { computeDiffs } from "./match-diff.service";
 
-export type { OverrideInfo, MatchListItem, MatchDetail, MatchDetailResponse } from "@dragons/shared";
+export type { MatchDetailResponse } from "@dragons/shared";
 export {
   getOwnClubMatches,
   getMatchDetail,
   getMatchChangeHistory,
-  queryMatchWithJoins,
-  loadOverrides,
-  loadRemoteSnapshot,
-  buildDetailResponse,
 } from "./match-query.service";
-export type {
-  MatchListParams,
-  MatchUpdateData,
-  MatchRow,
-  TransactionClient,
-} from "./match-query.service";
+export type { MatchUpdateData } from "./match-query.service";
 
 // ── Write operations ────────────────────────────────────────────────────────
 

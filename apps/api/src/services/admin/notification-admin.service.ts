@@ -29,7 +29,7 @@ export async function recipientKeysForUserId(userId: string): Promise<string[]> 
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export interface NotificationCenterItem {
+interface NotificationCenterItem {
   id: number;
   eventId: string;
   watchRuleId: number | null;
@@ -156,23 +156,6 @@ export async function markAllRead(userId: string): Promise<number> {
     .returning({ id: notificationLog.id });
 
   return result.length;
-}
-
-// ── getUnreadCount ──────────────────────────────────────────────────────────
-
-export async function getUnreadCount(userId: string): Promise<number> {
-  const keys = await recipientKeysForUserId(userId);
-  const [row] = await getDb()
-    .select({ count: count() })
-    .from(notificationLog)
-    .where(
-      and(
-        inArray(notificationLog.recipientId, keys),
-        ne(notificationLog.status, "read"),
-      ),
-    );
-
-  return Number(row!.count);
 }
 
 // ── retryFailedNotification ─────────────────────────────────────────────────

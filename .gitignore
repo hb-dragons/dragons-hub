@@ -29,9 +29,6 @@ apps/web/src/messages/*.d.json.ts
 # `pnpm seed:extract`, never commit it (GDPR; no consumer needs it in git)
 apps/api/src/test/fixtures/seed.json
 
-# Mobile app secrets
-apps/mobile/android/app/google-services.json
-
 # Python bytecode
 **/__pycache__/
 *.pyc

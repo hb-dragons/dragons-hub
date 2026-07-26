@@ -11,7 +11,7 @@ export interface ComboboxOption {
   description?: string;
 }
 
-export interface ComboboxProps {
+interface ComboboxProps {
   onSearch: (query: string) => Promise<ComboboxOption[]>;
   onSelect: (option: ComboboxOption) => void;
   value?: string;

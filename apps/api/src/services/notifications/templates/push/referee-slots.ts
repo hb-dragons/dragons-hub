@@ -28,7 +28,7 @@ export interface RefereeSlotsPushPayload {
  * for signed-in referees. When the referee game has no linked `matches` row
  * there is no id to route by, so fall back to the officiating list.
  */
-export function refereeSlotsDeepLink(p: Pick<RefereeSlotsPushPayload, "matchId">): string {
+function refereeSlotsDeepLink(p: Pick<RefereeSlotsPushPayload, "matchId">): string {
   return p.matchId != null ? `/game/${p.matchId}` : FALLBACK_DEEP_LINK;
 }
 

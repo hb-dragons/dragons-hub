@@ -1,6 +1,6 @@
 const HEARTBEAT_MS = 15_000;
 
-export type SafeEnqueue = (text: string) => void;
+type SafeEnqueue = (text: string) => void;
 
 export interface SseStreamArgs {
   onStart: (

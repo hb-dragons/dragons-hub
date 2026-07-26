@@ -8,7 +8,7 @@ export type HubSubtab = "profile" | "upcoming" | "history" | "rules";
 type HubStatus = "open" | "offered" | "any";
 type HubGameType = "home" | "away" | "both";
 type HubScope = "own" | "all";
-export type HubSort = "name" | "workloadAsc" | "workloadDesc";
+type HubSort = "name" | "workloadAsc" | "workloadDesc";
 
 export interface HubFilters {
   status: HubStatus;

@@ -12,7 +12,6 @@ import {
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
 import { clubDayAnchor } from "@dragons/shared";
 import { AssigneeStack } from "./assignee-stack";
-import { LabelsBar } from "./labels-bar.stub";
 
 const priorityVariant: Record<
   TaskPriority,
@@ -26,7 +25,6 @@ const priorityVariant: Record<
 
 interface TaskCardProps {
   task: TaskCardData & {
-    labels?: { id: number; color: string; name?: string | null }[];
     attachmentCount?: number;
     commentCount?: number;
   };
@@ -65,8 +63,6 @@ export function TaskCard({ task, onOpen, dragHandle }: TaskCardProps) {
       tabIndex={0}
       className="bg-card hover:bg-surface-high focus-visible:ring-ring cursor-pointer rounded-md p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
-      <LabelsBar labels={task.labels} />
-
       <div className="flex items-start justify-between gap-2">
         {dragHandle && (
           <button

@@ -29,9 +29,6 @@ export const LOCAL_ONLY_FIELDS = [
   "publicComment",
 ] as const;
 
-export type OverridableField = (typeof OVERRIDABLE_FIELDS)[number];
-export type LocalOnlyField = (typeof LOCAL_ONLY_FIELDS)[number];
-export type AllEditableField = OverridableField | LocalOnlyField;
 
 /** Minimal shape needed by computeDiffs — avoids coupling to the full DB row type. */
 export interface DiffInput {

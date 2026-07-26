@@ -81,28 +81,6 @@ export interface SyncRunEntriesResponse {
   };
 }
 
-export interface SyncJobData {
-  type: string;
-  triggeredBy?: string;
-}
-
-export interface Job {
-  id: string | undefined;
-  name: string;
-  data: SyncJobData;
-  status: string;
-  progress: number | object;
-  timestamp: number | undefined;
-  processedOn: number | undefined;
-  finishedOn: number | undefined;
-  failedReason: string | undefined;
-}
-
-export interface JobsResponse {
-  items: Job[];
-  validStatuses: string[];
-}
-
 export interface SyncScheduleData {
   id: number | null;
   syncType: string;

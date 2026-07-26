@@ -1,4 +1,3 @@
-export type { TaskFilters } from "./task-shared";
 
 export {
   listTasks,

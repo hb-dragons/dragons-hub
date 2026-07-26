@@ -22,17 +22,17 @@ const allCatalogPerms = Object.fromEntries(
   Object.entries(statement).map(([k, v]) => [k, [...v]]),
 ) as { [K in keyof typeof statement]: Array<(typeof statement)[K][number]> };
 
-export const admin = ac.newRole({
+const admin = ac.newRole({
   ...adminAc.statements,
   ...allCatalogPerms,
 });
 
-export const superadmin = ac.newRole({
+const superadmin = ac.newRole({
   ...adminAc.statements,
   ...allCatalogPerms,
 });
 
-export const refereeAdmin = ac.newRole({
+const refereeAdmin = ac.newRole({
   referee:    ["view", "create", "update", "delete"],
   assignment: ["view", "create", "update", "delete", "claim", "release"],
   match:      ["view"],
@@ -40,14 +40,14 @@ export const refereeAdmin = ac.newRole({
   board:      ["view", "create", "update"],
 });
 
-export const venueManager = ac.newRole({
+const venueManager = ac.newRole({
   venue:   ["view", "create", "update", "delete"],
   booking: ["view", "create", "update", "delete"],
   match:   ["view"],
   board:   ["view", "create", "update"],
 });
 
-export const teamManager = ac.newRole({
+const teamManager = ac.newRole({
   team:     ["view", "manage"],
   match:    ["view"],
   standing: ["view"],
@@ -55,7 +55,7 @@ export const teamManager = ac.newRole({
   board:    ["view", "create", "update"],
 });
 
-export const coach = ac.newRole({
+const coach = ac.newRole({
   team:     ["view"],
   match:    ["view"],
   standing: ["view"],
@@ -101,19 +101,6 @@ export function can<R extends Resource>(
   return false;
 }
 
-export function canAll(
-  user: { role?: string | null } | null | undefined,
-  perms: Partial<{ [R in Resource]: Action<R>[] }>,
-): boolean {
-  if (!user) return false;
-  for (const [resource, actions] of Object.entries(perms) as [Resource, string[]][]) {
-    for (const action of actions) {
-      if (!can(user, resource, action as Action<typeof resource>)) return false;
-    }
-  }
-  return true;
-}
-
 export function hasRole(
   user: { role?: string | null } | null | undefined,
   role: RoleName,
@@ -137,12 +124,6 @@ export function isReferee<U extends { refereeId?: number | null }>(
   user: U | null | undefined,
 ): user is U & { refereeId: number } {
   return typeof user?.refereeId === "number";
-}
-
-export function isMember<U extends { memberId?: number | null }>(
-  user: U | null | undefined,
-): user is U & { memberId: number } {
-  return typeof user?.memberId === "number";
 }
 
 export function canViewOpenGames(

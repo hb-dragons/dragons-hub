@@ -1,6 +1,6 @@
 import type { UiPart } from "./messages";
 
-export type ChatToolStatus = "running" | "done" | "error";
+type ChatToolStatus = "running" | "done" | "error";
 export interface ChatToolChip {
   toolKey: string;
   status: ChatToolStatus;

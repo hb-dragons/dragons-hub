@@ -64,7 +64,6 @@ export {
 export {
   notificationIdParamSchema,
   notificationListQuerySchema,
-  notificationUserIdQuerySchema,
   notificationPreferencesBodySchema,
   type NotificationListQuery,
   type NotificationPreferencesBody,
@@ -79,8 +78,6 @@ export {
 
 export {
   refereeRulesParamSchema,
-  refereeRuleItemSchema,
-  refereeRulesArraySchema,
   updateRefereeRulesBodySchema,
   type RefereeRulesParam,
   type UpdateRefereeRulesBodyParsed,
@@ -117,7 +114,6 @@ export {
 } from "./social";
 
 export {
-  syncPaginationSchema,
   syncLogsQuerySchema,
   syncEntryIdParamSchema,
   syncEntriesQuerySchema,

@@ -4,7 +4,7 @@ import type {
   SocialBackground,
   SocialActionResponse,
 } from "@dragons/shared";
-import type { SocialMatchesQuery } from "@dragons/contracts";
+import type { SocialGenerateBody, SocialMatchesQuery } from "@dragons/contracts";
 import type { ApiClient } from "../client";
 
 export function socialEndpoints(client: ApiClient) {
@@ -29,6 +29,10 @@ export function socialEndpoints(client: ApiClient) {
     },
     setDefaultBackground(id: number): Promise<SocialActionResponse> {
       return client.patch(`/admin/social/backgrounds/${id}/default`);
+    },
+    /** Renders the weekend post server-side and returns the PNG as a blob. */
+    generate(body: SocialGenerateBody): Promise<Blob> {
+      return client.postBlob("/admin/social/generate", body);
     },
   };
 }

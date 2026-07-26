@@ -14,4 +14,3 @@ export const COLUMN_COLOR_PRESETS = [
   "#f472b6",
 ] as const;
 
-export type ColumnColorPreset = (typeof COLUMN_COLOR_PRESETS)[number];

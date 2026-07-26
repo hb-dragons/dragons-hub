@@ -55,11 +55,9 @@ export const SWR_KEYS = {
   },
   taskDetail: (id: number) => `/admin/tasks/${id}`,
   bookings: "/admin/bookings",
-  bookingDetail: (id: number) => `/admin/bookings/${id}`,
   settingsBooking: "/admin/settings/booking",
   notifications: (limit?: number, offset?: number) =>
     `/admin/notifications?limit=${limit ?? 20}&offset=${offset ?? 0}`,
-  notificationsUnread: "/admin/notifications/unread-count",
   domainEvents: (params?: string) =>
     `/admin/events${params ? `?${params}` : ""}`,
   domainEventsFailed: (page?: number, limit?: number) =>
@@ -82,23 +80,14 @@ export const SWR_KEYS = {
       qs.set("assignedRefereeApiId", String(q.assignedRefereeApiId));
     return `/referee/games?${qs.toString()}`;
   },
-  refereeMatches: "/referee/matches?limit=500&offset=0",
   refereeSyncStatus: "/admin/sync/status?syncType=referee-games",
   refereeSyncLogs: (limit: number, offset: number) =>
     `/admin/sync/logs?limit=${limit}&offset=${offset}&syncType=referee-games`,
   refereeSyncSchedule: "/admin/sync/schedule?syncType=referee-games",
-  socialPlayerPhotos: "/admin/social/player-photos",
-  socialBackgrounds: "/admin/social/backgrounds",
-  socialMatches: (type: string, week: number, year: number) =>
-    `/admin/social/matches?type=${type}&week=${week}&year=${year}`,
-  refereeHistorySummary: (qs: string) =>
-    `/admin/referee/history/summary${qs ? `?${qs}` : ""}`,
   refereeHistoryGames: (qs: string) =>
     `/admin/referee/history/games${qs ? `?${qs}` : ""}`,
   refereeHistoryGamesCsv: (qs: string) =>
     `/admin/referee/history/games.csv${qs ? `?${qs}` : ""}`,
-  refereeHistoryLeaderboardCsv: (qs: string) =>
-    `/admin/referee/history/leaderboard.csv${qs ? `?${qs}` : ""}`,
   testPushRecent: "/admin/notifications/test-push/recent",
   refereeGameByApiMatch: (apiMatchId: number) =>
     `/referee/games/by-api-match/${apiMatchId}`,

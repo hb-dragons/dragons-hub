@@ -21,7 +21,7 @@ export const OPEN_GAMES_PREFETCH_OPTS: RawRefereeGamesOpts = {
 };
 
 /** Cache keys of every open-games list page, for bulk revalidation. */
-export const OPEN_GAMES_KEY_PREFIX = "/referee/games?";
+const OPEN_GAMES_KEY_PREFIX = "/referee/games?";
 
 /** True for any SWR key that holds an open-games list page. */
 export function isOpenGamesListKey(key: unknown): boolean {

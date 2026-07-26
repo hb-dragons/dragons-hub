@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
-  notificationUserIdQuerySchema,
   notificationPreferencesBodySchema,
 } from "./notification";
 
@@ -83,24 +82,6 @@ describe("notificationListQuerySchema", () => {
     expect(
       notificationListQuerySchema.parse({ userId: "user-1", offset: 0 }),
     ).toEqual({ userId: "user-1", offset: 0 });
-  });
-});
-
-describe("notificationUserIdQuerySchema", () => {
-  it("requires userId", () => {
-    expect(() => notificationUserIdQuerySchema.parse({})).toThrow();
-  });
-
-  it("rejects empty userId", () => {
-    expect(() =>
-      notificationUserIdQuerySchema.parse({ userId: "" }),
-    ).toThrow();
-  });
-
-  it("accepts valid userId", () => {
-    expect(
-      notificationUserIdQuerySchema.parse({ userId: "user-1" }),
-    ).toEqual({ userId: "user-1" });
   });
 });
 

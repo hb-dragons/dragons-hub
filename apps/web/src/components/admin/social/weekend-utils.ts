@@ -1,6 +1,5 @@
 import {
   getSaturday,
-  getSunday,
   previousSaturday,
   nextSaturday,
 } from "@/lib/weekend-utils";
@@ -56,18 +55,11 @@ export function getISOWeekAndYear(date: Date): { week: number; year: number } {
 }
 
 /**
- * Format a weekend date range for display, e.g. "Sat 7. – Sun 8. Mar" (en)
- * or "Sa 7. – So 8. Mär" (de). Weekday/month abbreviations come from
- * `Intl.DateTimeFormat` for the given locale rather than a hardcoded German
- * table — the previous version always rendered "Sa"/"So" and German month
- * abbreviations regardless of the active locale.
+ * Format a date range from YYYY-MM-DD strings for display, e.g.
+ * "Sat 7. – Sun 8. Mar" (en) or "Sa 7. – So 8. Mär" (de). Weekday/month
+ * abbreviations come from `Intl.DateTimeFormat` for the given locale rather
+ * than a hardcoded German table.
  */
-export function formatWeekendLabel(saturday: Date, locale: string): string {
-  const sunday = getSunday(saturday);
-  return formatRange(saturday, sunday, locale);
-}
-
-/** Format a date range from YYYY-MM-DD strings, locale-aware (see `formatWeekendLabel`). */
 export function formatDateRange(dateFrom: string, dateTo: string, locale: string): string {
   const sat = new Date(dateFrom + "T12:00:00");
   const sun = new Date(dateTo + "T12:00:00");

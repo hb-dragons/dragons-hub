@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ROLE_NAMES,
   can,
-  canAll,
   canViewOpenGames,
   hasRole,
-  isMember,
   isReferee,
   parseRoles,
   roles,
@@ -116,22 +114,6 @@ describe("can", () => {
   });
 });
 
-describe("canAll", () => {
-  it("returns true only if every permission holds", () => {
-    const user = { role: "refereeAdmin" };
-    expect(
-      canAll(user, { referee: ["view", "update"], assignment: ["claim"] }),
-    ).toBe(true);
-    expect(
-      canAll(user, { referee: ["view"], venue: ["view"] }),
-    ).toBe(false);
-  });
-
-  it("returns false for null user", () => {
-    expect(canAll(null, { referee: ["view"] })).toBe(false);
-  });
-});
-
 describe("hasRole", () => {
   it("returns true when role is in the user's roles", () => {
     expect(hasRole({ role: "admin,venueManager" }, "venueManager")).toBe(true);
@@ -200,18 +182,6 @@ describe("coach role", () => {
   });
   it("hasRole detects it", () => {
     expect(hasRole(coach, "coach")).toBe(true);
-  });
-});
-
-describe("isMember", () => {
-  it("is true when memberId is a number", () => {
-    expect(isMember({ memberId: 7 })).toBe(true);
-  });
-  it("is false when memberId is missing or null", () => {
-    expect(isMember({ memberId: null })).toBe(false);
-    expect(isMember({})).toBe(false);
-    expect(isMember(null)).toBe(false);
-    expect(isMember(undefined)).toBe(false);
   });
 });
 

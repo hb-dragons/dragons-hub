@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { socialMatchesQuerySchema } from "@dragons/contracts";
+import {
+  socialGenerateBodySchema,
+  socialMatchesQuerySchema,
+} from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { socialEndpoints } from "./social";
 
@@ -57,6 +60,26 @@ describe("social request bodies satisfy @dragons/contracts schemas", () => {
     await api.deleteBackground(4);
     expect(calls[0]!.url).toContain("/admin/social/backgrounds/4");
     expect(calls[0]!.method).toBe("DELETE");
+  });
+
+  it("generate body parses against socialGenerateBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.generate({
+      type: "preview",
+      calendarWeek: 23,
+      year: 2026,
+      matches: [{ matchId: 1, order: 0 }],
+      playerPhotoId: 3,
+      backgroundId: 4,
+      playerPosition: { x: 0.5, y: 0.5, scale: 1 },
+    });
+    const parsed = socialGenerateBodySchema.safeParse(calls[0]!.body);
+    expect(
+      parsed.error?.issues,
+      "socialGenerateBodySchema rejected the generate body",
+    ).toBeUndefined();
+    expect(calls[0]!.url).toContain("/admin/social/generate");
+    expect(calls[0]!.method).toBe("POST");
   });
 
   it("setDefaultBackground patches the background default endpoint", async () => {

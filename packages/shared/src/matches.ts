@@ -1,17 +1,17 @@
 import type { BookingStatus, DiffStatus } from "./constants";
-export interface RefereeSlotReferee {
+interface RefereeSlotReferee {
   id: number;
   firstName: string | null;
   lastName: string | null;
 }
 
-export interface RefereeSlotRole {
+interface RefereeSlotRole {
   id: number;
   name: string;
   shortName: string | null;
 }
 
-export interface RefereeSlotIntent {
+interface RefereeSlotIntent {
   refereeId: number;
   refereeFirstName: string | null;
   refereeLastName: string | null;

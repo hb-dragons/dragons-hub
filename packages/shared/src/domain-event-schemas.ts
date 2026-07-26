@@ -278,7 +278,7 @@ const taskDueReminderSchema = z.object({
   assigneeUserIds: z.array(z.string()),
 });
 
-export const eventPayloadSchemas: Record<EventType, z.ZodType> = {
+const eventPayloadSchemas: Record<EventType, z.ZodType> = {
   [EVENT_TYPES.MATCH_CREATED]: matchCreatedSchema,
   [EVENT_TYPES.MATCH_SCHEDULE_CHANGED]: matchScheduleChangedSchema,
   [EVENT_TYPES.MATCH_VENUE_CHANGED]: matchVenueChangedSchema,

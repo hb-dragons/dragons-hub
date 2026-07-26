@@ -79,7 +79,7 @@ export interface FailedNotificationListResult {
 }
 
 /** One device's Expo ticket result from POST /admin/notifications/test-push. */
-export interface TestPushTicket {
+interface TestPushTicket {
   platform: string;
   status: "sent_ticket" | "failed" | string;
   ticketId: string | null;
@@ -92,7 +92,7 @@ export interface TestPushResponse {
   tickets: TestPushTicket[];
 }
 
-export interface TestPushRecentItem {
+interface TestPushRecentItem {
   id: number;
   sentAt: string | null;
   recipientToken: string | null;

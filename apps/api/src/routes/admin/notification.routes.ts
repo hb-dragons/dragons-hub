@@ -4,7 +4,6 @@ import {
   listNotifications,
   markRead,
   markAllRead,
-  getUnreadCount,
   retryFailedNotification,
 } from "../../services/admin/notification-admin.service";
 import {
@@ -23,7 +22,6 @@ import type {
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
-  notificationUserIdQuerySchema,
   notificationPreferencesBodySchema,
 } from "@dragons/contracts";
 
@@ -90,23 +88,6 @@ notificationRoutes.patch(
     // across every recipient.
     const count = await markAllRead(c.get("user").id);
     return c.json({ updated: count } satisfies NotificationMarkAllReadResponse);
-  },
-);
-
-// GET /admin/notifications/unread-count - Unread count for a user
-notificationRoutes.get(
-  "/notifications/unread-count",
-  settingsUpdate,
-  validator("query", notificationUserIdQuerySchema, validationHook),
-  describeRoute({
-    description: "Get unread count for a user",
-    tags: ["Notifications"],
-    responses: { 200: { description: "Success" } },
-  }),
-  async (c) => {
-    const { userId } = c.req.valid("query");
-    const count = await getUnreadCount(userId);
-    return c.json({ count });
   },
 );
 

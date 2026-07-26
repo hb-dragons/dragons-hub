@@ -585,7 +585,6 @@ plugin under `/api/auth/*`, not by this route group.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/notifications` | List notifications for the caller from the notification log |
-| GET | `/admin/notifications/unread-count` | Unread notification count for the caller |
 | PATCH | `/admin/notifications/:id/read` | Mark one notification as read |
 | PATCH | `/admin/notifications/read-all` | Mark all of the caller's notifications as read |
 | POST | `/admin/notifications/:id/retry` | Retry a failed notification delivery |

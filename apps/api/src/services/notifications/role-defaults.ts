@@ -2,7 +2,7 @@ import { EVENT_TYPES, type EventType } from "@dragons/shared";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export type Channel = "in_app" | "push";
+type Channel = "in_app" | "push";
 
 export interface DefaultNotification {
   audience: "admin" | "referee" | "user";

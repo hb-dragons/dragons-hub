@@ -29,7 +29,7 @@ export function createRedisClient(): Redis {
  * secondary storage, health probes. Commands reject once Redis has been
  * unreachable for a couple of reconnect attempts, so callers can fail open.
  */
-export function createRequestRedisClient(): Redis {
+function createRequestRedisClient(): Redis {
   return new Redis(env.REDIS_URL, {
     maxRetriesPerRequest: REQUEST_MAX_RETRIES_PER_REQUEST,
   });
