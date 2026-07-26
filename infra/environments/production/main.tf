@@ -131,6 +131,12 @@ module "artifact_registry" {
 
 locals {
   artifact_registry_url = module.artifact_registry.repository_url
+
+  # Expo Push access token: a credential, so Secret Manager, never env_vars.
+  # Optional — without it push still works, just on the unauthenticated tier —
+  # so the secret is omitted rather than created empty (Secret Manager rejects
+  # an empty payload, and the API env schema rejects "" for EXPO_ACCESS_TOKEN).
+  expo_access_token_enabled = var.expo_access_token != ""
 }
 
 # Network
@@ -195,7 +201,7 @@ module "secrets" {
 
   project_id             = var.project_id
   service_account_emails = [google_service_account.api.email]
-  secret_names = [
+  secret_names = concat([
     "database-url-production",
     "redis-url-production",
     "sdk-username-production",
@@ -206,8 +212,8 @@ module "secrets" {
     "scoreboard-ingest-key-production",
     "google-generative-ai-api-key-production",
     "mcp-token-production",
-  ]
-  secret_values = {
+  ], local.expo_access_token_enabled ? ["expo-access-token-production"] : [])
+  secret_values = merge({
     "database-url-production"                 = module.database.database_url
     "redis-url-production"                    = module.valkey.connection_url
     "sdk-username-production"                 = var.sdk_username
@@ -218,7 +224,9 @@ module "secrets" {
     "scoreboard-ingest-key-production"        = random_password.scoreboard_ingest_key.result
     "google-generative-ai-api-key-production" = var.google_generative_ai_api_key
     "mcp-token-production"                    = var.mcp_token
-  }
+    }, local.expo_access_token_enabled ? {
+    "expo-access-token-production" = var.expo_access_token
+  } : {})
 
   depends_on = [google_project_service.apis]
 }
@@ -242,7 +250,7 @@ module "api" {
 
   cpu_idle = true
 
-  env_vars = {
+  env_vars = merge({
     NODE_ENV        = "production"
     RUN_MODE        = "api"
     BETTER_AUTH_URL = "https://${var.api_domain}"
@@ -260,9 +268,17 @@ module "api" {
     CHATBOT_MODEL        = var.chatbot_model
     ASSISTANT_ENABLED    = var.assistant_enabled
     ASSISTANT_MODEL      = var.assistant_model
-  }
+    # WhatsApp group delivery. The API dispatches through the same pipeline as
+    # the Worker via the admin "retry failed notification" route, so it needs
+    # these too. Omitted entirely when unset: env.ts validates WAHA_BASE_URL as
+    # a URL and `.optional()` does not accept "", so an empty passthrough would
+    # fail the service at boot rather than just disable the channel.
+    }, var.waha_base_url == "" ? {} : {
+    WAHA_BASE_URL = var.waha_base_url
+    WAHA_SESSION  = var.waha_session
+  })
 
-  secrets = {
+  secrets = merge({
     DATABASE_URL = {
       secret_name = "database-url-production"
       version     = "latest"
@@ -303,7 +319,12 @@ module "api" {
       secret_name = "mcp-token-production"
       version     = "latest"
     }
-  }
+    }, local.expo_access_token_enabled ? {
+    EXPO_ACCESS_TOKEN = {
+      secret_name = "expo-access-token-production"
+      version     = "latest"
+    }
+  } : {})
 
   cloudsql_instances = [module.database.connection_name]
   ingress            = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
@@ -331,7 +352,7 @@ module "worker" {
   concurrency   = 1
   timeout       = "900s"
 
-  env_vars = {
+  env_vars = merge({
     NODE_ENV        = "production"
     RUN_MODE        = "worker"
     BETTER_AUTH_URL = "https://${var.api_domain}"
@@ -348,9 +369,15 @@ module "worker" {
     CHATBOT_MODEL        = var.chatbot_model
     ASSISTANT_ENABLED    = var.assistant_enabled
     ASSISTANT_MODEL      = var.assistant_model
-  }
+    # WhatsApp group delivery. This is the service that runs the event worker,
+    # so without these every WhatsApp notification logs "not configured,
+    # skipping" and is dropped. See the API block for why "" is not passed.
+    }, var.waha_base_url == "" ? {} : {
+    WAHA_BASE_URL = var.waha_base_url
+    WAHA_SESSION  = var.waha_session
+  })
 
-  secrets = {
+  secrets = merge({
     DATABASE_URL = {
       secret_name = "database-url-production"
       version     = "latest"
@@ -387,7 +414,12 @@ module "worker" {
       secret_name = "google-generative-ai-api-key-production"
       version     = "latest"
     }
-  }
+    }, local.expo_access_token_enabled ? {
+    EXPO_ACCESS_TOKEN = {
+      secret_name = "expo-access-token-production"
+      version     = "latest"
+    }
+  } : {})
 
   cloudsql_instances = [module.database.connection_name]
   ingress            = "INGRESS_TRAFFIC_ALL"

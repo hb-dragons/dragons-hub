@@ -323,8 +323,16 @@ describe("GET /channel-configs/providers", () => {
       in_app: { configured: true },
       whatsapp_group: { configured: true },
       push: { configured: true },
-      email: { configured: false },
     });
+  });
+
+  // Email has no channel adapter, so the endpoint must not advertise it at
+  // all — a "configured: false" entry would still be a type the UI could show.
+  it("does not offer email", async () => {
+    const res = await app.request("/channel-configs/providers");
+
+    const body = await json(res);
+    expect(body).not.toHaveProperty("email");
   });
 
   it("in_app is always configured", async () => {
@@ -381,7 +389,10 @@ describe("POST /channel-configs (provider gate)", () => {
     );
   });
 
-  it("returns 400 PROVIDER_NOT_CONFIGURED when email SMTP is not set", async () => {
+  // No SMTP env var can make this succeed: email has no adapter, so the
+  // request contract rejects the type outright rather than the provider gate
+  // rejecting it only while SMTP happens to be unset.
+  it("rejects an email channel config at the contract", async () => {
     const res = await app.request("/channel-configs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -394,10 +405,36 @@ describe("POST /channel-configs (provider gate)", () => {
 
     expect(res.status).toBe(400);
     const body = await json(res);
-    expect(body).toMatchObject({
-      error: 'Provider for "email" is not configured',
-      code: "PROVIDER_NOT_CONFIGURED",
-    });
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mocks.createChannelConfig).not.toHaveBeenCalled();
+  });
+
+  it("rejects an email channel config even when SMTP is fully set", async () => {
+    mocks.env.SMTP_HOST = "smtp.example.com";
+    mocks.env.SMTP_PORT = "587";
+    mocks.env.SMTP_USER = "noreply@example.com";
+    mocks.env.SMTP_PASSWORD = "secret";
+    mocks.env.SMTP_FROM = "Dragons <noreply@example.com>";
+    try {
+      const res = await app.request("/channel-configs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Email Channel",
+          type: "email",
+          config: { locale: "de" },
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(mocks.createChannelConfig).not.toHaveBeenCalled();
+    } finally {
+      delete mocks.env.SMTP_HOST;
+      delete mocks.env.SMTP_PORT;
+      delete mocks.env.SMTP_USER;
+      delete mocks.env.SMTP_PASSWORD;
+      delete mocks.env.SMTP_FROM;
+    }
   });
 });
 

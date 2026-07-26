@@ -1237,8 +1237,7 @@
     "typeLabels": {
       "in_app": "In-App",
       "whatsapp_group": "WhatsApp Group",
-      "push": "Push Notification",
-      "email": "Email"
+      "push": "Push Notification"
     },
     "typeImmutable": "Type cannot be changed after a channel is created."
   },

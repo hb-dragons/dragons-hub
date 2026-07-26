@@ -123,8 +123,9 @@ vi.mock("../../config/redis", () => ({
 
 // --- Import after mocks ---
 
-import { processEvent } from "./notification-pipeline";
+import { processEvent, DISPATCHABLE_CHANNEL_TYPES } from "./notification-pipeline";
 import { domainEvents, type DomainEventRow } from "@dragons/db/schema";
+import { CHANNEL_TYPES } from "@dragons/shared";
 import {
   setupTestDb,
   resetTestDb,
@@ -1272,5 +1273,33 @@ describe("processEvent", () => {
       );
       expect(result.dispatched).toBe(1);
     });
+  });
+});
+
+// ── Channel coverage guard ───────────────────────────────────────────────────
+
+describe("dispatchable channel coverage", () => {
+  /**
+   * The load-bearing property: an admin must never be able to configure a
+   * channel whose notifications disappear. `CHANNEL_TYPES` is what the provider
+   * endpoint offers and what the create contract accepts, so every entry in it
+   * needs a dispatch branch in `dispatchImmediate` — otherwise the config is
+   * created successfully and every notification falls through to the
+   * "No adapter for channel type" branch.
+   *
+   * No DB fixture: these assert on two exported constants, which is the whole
+   * point — the guard holds regardless of what any test seeds.
+   */
+  it("has a dispatch branch for every offerable channel type", () => {
+    const missing = CHANNEL_TYPES.filter(
+      (type) => DISPATCHABLE_CHANNEL_TYPES[type] !== true,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("offers no channel type the pipeline cannot deliver", () => {
+    expect(Object.keys(DISPATCHABLE_CHANNEL_TYPES).sort()).toEqual(
+      [...CHANNEL_TYPES].sort(),
+    );
   });
 });

@@ -5,6 +5,7 @@ import {
   createWatchRuleSchema,
   updateWatchRuleSchema,
 } from "./watch-rule";
+import { CHANNEL_TYPES } from "@dragons/shared";
 
 describe("watchRuleIdParamSchema", () => {
   it("coerces string id to positive integer", () => {
@@ -118,14 +119,22 @@ describe("createWatchRuleSchema", () => {
     expect(result.channels).toHaveLength(2);
   });
 
-  it("accepts all valid channel types", () => {
-    for (const channel of ["in_app", "whatsapp_group", "push", "email"] as const) {
-      const result = createWatchRuleSchema.parse({
-        ...validBody,
-        channels: [{ channel, targetId: "1" }],
-      });
-      expect(result.channels[0]!.channel).toBe(channel);
-    }
+  // Derived from CHANNEL_TYPES rather than restated, so a channel target can
+  // never address a channel the pipeline has no adapter for.
+  it.each(CHANNEL_TYPES)("accepts the shared channel type %s", (channel) => {
+    const result = createWatchRuleSchema.parse({
+      ...validBody,
+      channels: [{ channel, targetId: "1" }],
+    });
+    expect(result.channels[0]!.channel).toBe(channel);
+  });
+
+  it("rejects an email channel target (no adapter exists)", () => {
+    const result = createWatchRuleSchema.safeParse({
+      ...validBody,
+      channels: [{ channel: "email", targetId: "1" }],
+    });
+    expect(result.success).toBe(false);
   });
 
   it("accepts all valid filter fields", () => {

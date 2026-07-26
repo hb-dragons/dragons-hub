@@ -30,10 +30,6 @@ const whatsappGroupConfigSchema = z.object({
   locale: localeSchema,
 });
 
-const emailConfigSchema = z.object({
-  locale: localeSchema,
-});
-
 // Push delivery is fanned out per user device by the Expo adapter, so the
 // config carries the provider rather than a fixed target. Locale is optional:
 // the pipeline prefers the recipient's own preference.
@@ -50,7 +46,6 @@ const configSchemaByType: Record<ChannelType, z.ZodType> = {
   in_app: inAppConfigSchema,
   whatsapp_group: whatsappGroupConfigSchema,
   push: pushConfigSchema,
-  email: emailConfigSchema,
 };
 
 // ── Create schema ───────────────────────────────────────────────────────────

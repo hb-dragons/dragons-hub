@@ -89,8 +89,6 @@ function buildConfig(form: ChannelFormState): Record<string, unknown> {
       return { groupId: form.groupId, locale: form.locale };
     case "push":
       return { provider: "expo", locale: form.locale };
-    case "email":
-      return { locale: form.locale };
   }
 }
 
@@ -110,7 +108,8 @@ function channelTypeLabel(type: string, t: TranslateFunc): string {
     case "in_app": return t("typeLabels.in_app" as never);
     case "whatsapp_group": return t("typeLabels.whatsapp_group" as never);
     case "push": return t("typeLabels.push" as never);
-    case "email": return t("typeLabels.email" as never);
+    // A row persisted under a type that is no longer offerable falls through to
+    // the raw type string rather than a friendly label it no longer has.
     default: return type;
   }
 }

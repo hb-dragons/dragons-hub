@@ -150,10 +150,10 @@ describe("getChannelConfig", () => {
     const createdAt = new Date("2026-01-15T12:30:00.000Z");
     const updatedAt = new Date("2026-03-17T09:45:00.000Z");
     const id = await seedConfig({
-      name: "Email Digest",
-      type: "email",
+      name: "Nightly Digest",
+      type: "in_app",
       enabled: false,
-      config: { locale: "en" } as ChannelConfig,
+      config: { audienceRole: "admin", locale: "en" },
       digestMode: "scheduled",
       digestCron: "0 8 * * *",
       digestTimezone: "America/New_York",
@@ -163,15 +163,33 @@ describe("getChannelConfig", () => {
 
     expect(await getChannelConfig(id)).toEqual({
       id,
-      name: "Email Digest",
-      type: "email",
+      name: "Nightly Digest",
+      type: "in_app",
       enabled: false,
-      config: { locale: "en" },
+      config: { audienceRole: "admin", locale: "en" },
       digestMode: "scheduled",
       digestCron: "0 8 * * *",
       digestTimezone: "America/New_York",
       createdAt: "2026-01-15T12:30:00.000Z",
       updatedAt: "2026-03-17T09:45:00.000Z",
+    });
+  });
+
+  // `channel_configs.type` is plain text with no DB constraint, and `email` was
+  // an offerable type until it turned out to have no adapter. A row left behind
+  // by that era must still read back rather than throwing — it is the admin
+  // UI's only route to seeing and deleting it.
+  it("maps a row whose type is no longer offerable", async () => {
+    const id = await seedConfig({
+      name: "Legacy Email",
+      type: "email",
+      // A shape ChannelConfig deliberately no longer has, which is the point.
+      config: { locale: "en" } as unknown as ChannelConfig,
+    });
+
+    expect(await getChannelConfig(id)).toMatchObject({
+      type: "email",
+      config: { locale: "en" },
     });
   });
 });
@@ -198,9 +216,9 @@ describe("createChannelConfig", () => {
   it("honours explicitly provided non-default values", async () => {
     const created = await createChannelConfig({
       name: "Nightly",
-      type: "email",
+      type: "in_app",
       enabled: false,
-      config: { locale: "en" },
+      config: { audienceRole: "admin", locale: "en" },
       digestMode: "scheduled",
       digestCron: "0 8 * * *",
       digestTimezone: "America/New_York",
@@ -245,7 +263,12 @@ describe("updateChannelConfig", () => {
 
   it.each([
     ["enabled", { enabled: false }, "enabled", false],
-    ["config", { config: { locale: "en" as const } }, "config", { locale: "en" }],
+    [
+      "config",
+      { config: { audienceRole: "admin" as const, locale: "en" as const } },
+      "config",
+      { audienceRole: "admin", locale: "en" },
+    ],
     ["digestMode", { digestMode: "scheduled" as const }, "digestMode", "scheduled"],
     ["digestCron", { digestCron: "0 8 * * *" }, "digestCron", "0 8 * * *"],
     ["digestTimezone", { digestTimezone: "America/New_York" }, "digestTimezone", "America/New_York"],

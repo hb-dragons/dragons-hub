@@ -5,12 +5,19 @@
  * contract (`@dragons/contracts`), the watch-rule channel target and the
  * provider-availability response all derive from this array rather than
  * restating the literals.
+ *
+ * A channel belongs here only once `dispatchImmediate` can actually deliver it
+ * (`DISPATCHABLE_CHANNEL_TYPES` in the API's notification pipeline is exhaustive
+ * over this type, so adding one without an adapter is a compile error). `email`
+ * was listed here with no adapter behind it, which let an admin create a
+ * channel config whose every notification fell through to
+ * "Unknown channel type, skipping dispatch" — configured, enabled, and silent.
+ * It comes back when an SMTP adapter exists, not before.
  */
 export const CHANNEL_TYPES = [
   "in_app",
   "whatsapp_group",
   "push",
-  "email",
 ] as const;
 export type ChannelType = (typeof CHANNEL_TYPES)[number];
 export type DigestMode = "per_sync" | "scheduled" | "none";
@@ -27,20 +34,12 @@ export interface WhatsAppGroupConfig {
   locale: "de" | "en";
 }
 
-export interface EmailConfig {
-  locale: "de" | "en";
-}
-
 export interface PushConfig {
   provider: "expo";
   locale?: "de" | "en";
 }
 
-export type ChannelConfig =
-  | InAppConfig
-  | WhatsAppGroupConfig
-  | EmailConfig
-  | PushConfig;
+export type ChannelConfig = InAppConfig | WhatsAppGroupConfig | PushConfig;
 
 // ── API response types ───────────────────────────────────────────────────────
 

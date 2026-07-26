@@ -100,6 +100,30 @@ variable "google_generative_ai_api_key" {
   sensitive   = true
 }
 
+variable "waha_base_url" {
+  description = "Base URL of the WAHA (WhatsApp HTTP API) instance (WAHA_BASE_URL). Not a credential — the adapter sends no auth header — so it rides in env_vars. Leave empty to leave WhatsApp group delivery disabled; the API env schema rejects a non-URL value at boot, so an empty value is omitted from env_vars entirely rather than passed through as \"\"."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.waha_base_url == "" || can(regex("^https?://", var.waha_base_url))
+    error_message = "waha_base_url must be empty or an http(s) URL."
+  }
+}
+
+variable "waha_session" {
+  description = "WAHA session name (WAHA_SESSION). Only meaningful when waha_base_url is set."
+  type        = string
+  default     = "default"
+}
+
+variable "expo_access_token" {
+  description = "Expo access token (EXPO_ACCESS_TOKEN). Upgrades Expo Push to the authenticated send tier (higher rate limits, better receipt SLA). Credential, so it is stored in Secret Manager. Optional: empty means the secret is not created and push stays on the unauthenticated tier."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "mcp_token" {
   description = "Bearer token for the /mcp endpoint (MCP_TOKEN, min 32 chars). Stored in Secret Manager."
   type        = string

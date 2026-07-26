@@ -39,3 +39,18 @@ google_generative_ai_api_key = "your-google-ai-studio-key"
 
 # Bearer token for the /mcp endpoint — required (no default), min 32 chars.
 mcp_token = "your-mcp-token-at-least-32-characters-long"
+
+# WhatsApp group notifications (WAHA). Not credentials — the adapter sends no
+# auth header — so these ride in Cloud Run env_vars on the API and the Worker.
+# Leave waha_base_url empty to keep WhatsApp delivery disabled; every send then
+# logs "WAHA_BASE_URL not configured, skipping".
+# In CI: vars.WAHA_BASE_URL / vars.WAHA_SESSION.
+waha_base_url = "https://waha.dragons.example.com"
+waha_session  = "default"
+
+# Expo Push access token — optional. Upgrades push to the authenticated send
+# tier (higher rate limits, better receipt SLA). Credential, so it is stored in
+# Secret Manager and mounted on the API and the Worker. Leave empty to stay on
+# the unauthenticated tier; the secret is then not created at all.
+# In CI: secrets.EXPO_ACCESS_TOKEN.
+expo_access_token = ""

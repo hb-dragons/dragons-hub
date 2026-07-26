@@ -38,14 +38,6 @@ function isProviderConfigured(type: string): boolean {
       return true;
     case "whatsapp_group":
       return !!env.WAHA_BASE_URL;
-    case "email":
-      return !!(
-        env.SMTP_HOST &&
-        env.SMTP_PORT &&
-        env.SMTP_USER &&
-        env.SMTP_PASSWORD &&
-        env.SMTP_FROM
-      );
     default:
       return false;
   }
