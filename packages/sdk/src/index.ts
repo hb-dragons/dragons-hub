@@ -23,6 +23,7 @@ export type {
   SdkSpielleitung,
   SdkRefereeSlot,
   SdkGameDetails,
+  SdkGameLiga,
   SdkGetGameResponse,
   SdkOpenGamesSearchParams,
   SdkOffeneSpieleLiga,
