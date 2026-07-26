@@ -16,6 +16,88 @@ export function configureNotificationHandler(): void {
   });
 }
 
+/**
+ * What the handler knows about the session. `"unknown"` is the cold-start
+ * state: better-auth restores the session asynchronously, so a tap can arrive
+ * before we can tell a signed-out user from a signed-in one whose session is
+ * still loading. Guessing wrong in either direction is user-visible, so a tap
+ * is held until the session is definitive.
+ */
+export type PushAuthState = "unknown" | "signed-in" | "signed-out";
+
+/**
+ * Where a signed-out user is sent when the tapped notification points at a
+ * session-gated screen. Declared at `app/(auth)/sign-in.tsx`; signing in
+ * replays the held link.
+ */
+export const SIGNED_OUT_FALLBACK = "/(auth)/sign-in";
+
+/**
+ * First path segment of every route that renders without a session. Everything
+ * else — `/officiating`, `/today`, `/referee-game/:id`, `/profile`, `/admin/*`,
+ * `/assistant` — either has no tab trigger or no data for an anonymous user.
+ * Route-group segments like `(tabs)` are transparent, so they're dropped first.
+ */
+const PUBLIC_ROOT_SEGMENTS = new Set([
+  "", // "/" — the home tab
+  "schedule",
+  "standings",
+  "teams",
+  "game",
+  "team",
+  "h2h",
+  "sign-in",
+]);
+
+export function isPublicDeepLink(link: string): boolean {
+  const segments = link
+    .split("?")[0]!
+    .split("#")[0]!
+    .split("/")
+    .filter((s) => s.length > 0 && !/^\(.+\)$/.test(s));
+  return PUBLIC_ROOT_SEGMENTS.has(segments[0] ?? "");
+}
+
+let authState: PushAuthState = "unknown";
+let pendingDeepLink: string | null = null;
+let coldStartProcessed = false;
+
+/**
+ * Navigate to a deep link carried by a notification, subject to the auth gate.
+ *
+ * A link that needs a session is held rather than followed; `setPushAuthState`
+ * replays it once the session resolves, or drops the user on a valid public
+ * route when they turn out to be signed out. Only absolute in-app paths are
+ * followed — a notification payload is remote input, and an unmatched path
+ * lands on `app/+not-found.tsx` rather than anywhere useful.
+ */
+export function followDeepLink(link: string): void {
+  if (typeof link !== "string" || !link.startsWith("/")) return;
+
+  if (authState === "signed-in" || isPublicDeepLink(link)) {
+    router.push(link as Href);
+    return;
+  }
+
+  pendingDeepLink = link;
+  if (authState === "signed-out") router.push(SIGNED_OUT_FALLBACK as Href);
+}
+
+/**
+ * Report the current session state. Call from the auth tree whenever the
+ * session changes; a transition out of `"unknown"` releases any held tap.
+ */
+export function setPushAuthState(state: PushAuthState): void {
+  if (state === authState) return;
+  authState = state;
+  if (state === "unknown") return;
+
+  const held = pendingDeepLink;
+  if (held === null) return;
+  pendingDeepLink = null;
+  followDeepLink(held);
+}
+
 function handleTap(response: Notifications.NotificationResponse): void {
   const data = response.notification.request.content.data as
     | Record<string, unknown>
@@ -23,11 +105,9 @@ function handleTap(response: Notifications.NotificationResponse): void {
     | undefined;
   const deepLink = data?.["deepLink"];
   if (typeof deepLink === "string" && deepLink.length > 0) {
-    router.push(deepLink as Href);
+    followDeepLink(deepLink);
   }
 }
-
-let coldStartProcessed = false;
 
 /**
  * Subscribe to taps (live) AND process any cold-start tap (app launched by
@@ -51,7 +131,9 @@ export function subscribeToTaps(): () => void {
   return () => sub.remove();
 }
 
-/** Exported for testing only — resets the cold-start guard. */
-export function __resetColdStartGuardForTests(): void {
+/** Exported for testing only — resets the cold-start guard and the auth gate. */
+export function __resetPushHandlerStateForTests(): void {
   coldStartProcessed = false;
+  authState = "unknown";
+  pendingDeepLink = null;
 }

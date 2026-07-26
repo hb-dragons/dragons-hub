@@ -1,7 +1,11 @@
 import { useEffect } from "react";
 import { authClient } from "@/lib/auth-client";
 import { registerForPush } from "@/lib/push/registration";
-import { subscribeToTaps } from "@/lib/push/handler";
+import {
+  setPushAuthState,
+  subscribeToTaps,
+  type PushAuthState,
+} from "@/lib/push/handler";
 
 /**
  * Mounts the push tap subscription and registers the current device's
@@ -11,7 +15,20 @@ import { subscribeToTaps } from "@/lib/push/handler";
  * and above any screen that expects taps to deep-link.
  */
 export function usePushRegistration(): void {
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending } = authClient.useSession();
+
+  // Feed the session state to the deep-link gate FIRST, so a cold-start tap
+  // resolved by the subscription below is held rather than followed blind.
+  // While `isPending`, "no session" is indistinguishable from "not restored
+  // yet", so the gate is told neither.
+  const pushAuthState: PushAuthState = isPending
+    ? "unknown"
+    : session?.user
+      ? "signed-in"
+      : "signed-out";
+  useEffect(() => {
+    setPushAuthState(pushAuthState);
+  }, [pushAuthState]);
 
   // Register when authenticated (every boot — server upserts idempotently)
   useEffect(() => {
