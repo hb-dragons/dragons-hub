@@ -104,6 +104,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 - Use `dataHash` columns for change detection during sync
 - New tables use `serial` primary keys with separate `apiId`/`apiMatchId` etc. for external IDs. The exceptions are inherited: the four better-auth tables use text ids, `domainEvents` uses a text ULID, `broadcastConfigs` is keyed by `deviceId`, `taskAssignees` has a composite PK
 - Unique constraints on external IDs to prevent duplicates
+- `matchReferees` and `refereeGames` are soft-deleted: rows carry a `removedAt` tombstone and are never hard-deleted. **Every live-rows query on them needs `isNull(table.removedAt)`** — omitting it resurrects withdrawn assignments in lists, counts and eligibility checks. See AGENTS.md "Soft deletes (tombstones)"
 - Table inventory lives in `AGENTS.md` and is enforced against the schema exports by `apps/api/src/test/docs-drift.test.ts` — add the row in the same commit as the table
 
 ### Frontend (Next.js)
@@ -112,6 +113,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 - UI components imported from `@dragons/ui`
 - API calls via `apps/web/src/lib/api.ts`
 - Every route sits under a `[locale]` segment (next-intl); admin pages live in `app/[locale]/admin/`
+- Dates and times go through `apps/web/src/lib/tz.ts` — never `toISOString().slice(0, 10)` or `new Date(day + "T00:00:00")`. Tests that touch them must force a non-Berlin `TZ`
 - **Design System:** Read `packages/ui/DESIGN-SYSTEM.md` before building any UI
 
 ### SDK Types
@@ -221,7 +223,7 @@ Note: Club and league tracking configuration is managed via the admin UI (`/admi
 
 1. **New API endpoint**: Add route in `routes/`, add tests, add the row to `AGENTS.md`'s endpoint tables — `apps/api/src/test/docs-drift.test.ts` compares them against the Hono route tree in both directions and fails the build otherwise
 2. **New DB table**: Add schema in `packages/db/src/schema/`, export from index, run `db:generate`, add the row to `AGENTS.md`'s data model table (enforced by `docs-drift.test.ts`)
-3. **New sync entity**: Add `*.sync.ts` in `services/sync/`, then call it from `fullSync()` in `apps/api/src/services/sync/index.ts` (there is no orchestrator class — the pipeline is a module of free functions), add tests, update `AGENTS.md`
+3. **New sync entity**: Add `*.sync.ts` in `services/sync/`, then call it from `fullSync()` in `apps/api/src/services/sync/index.ts` (there is no orchestrator class — the pipeline is a module of free functions), add tests, add the stage to `AGENTS.md`'s Execution Flow block — `docs-drift.test.ts` derives the stage list from `fullSync` and checks the block names every stage **in call order**
 4. **New UI component**: Add to `packages/ui/src/components/`, export from index
 5. **New env var**: Add to Zod schema in `config/env.ts`, add to `.env.example`, document here. All three must agree — `docs-drift.test.ts` checks the schema against both files in both directions, so a var added to the schema alone, or left in a file after removal from the schema, fails the build
 6. **Any change**: Write/update tests to maintain coverage above thresholds

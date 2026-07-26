@@ -149,6 +149,70 @@ describe("AGENTS.md data model", () => {
   });
 });
 
+// ── Sync pipeline ────────────────────────────────────────────────────────────
+
+const syncPipelineSource = readFileSync(
+  path.join(repoRoot, "apps/api/src/services/sync/index.ts"),
+  "utf8",
+);
+
+/**
+ * The stage functions `fullSync()` calls, in call order.
+ *
+ * A stage is anything imported from a module *inside* `services/` — `./x` for a
+ * sibling sync module, `../x/y` for another service. `../../` reaches config,
+ * workers and other plumbing (`getDb`, `logger`, `INSTANCE_ID`), which is not
+ * part of the flow and is deliberately excluded. That rule is mechanical, so a
+ * stage added to the pipeline enrolls itself here with no list to update.
+ */
+function pipelineStages(): string[] {
+  const imports = [
+    ...syncPipelineSource.matchAll(/import\s*\{([^}]*)\}\s*from\s*"(\.[^"]*)";/gs),
+  ];
+  const inServices = imports
+    .filter(([, , from]) => /^\.\.?\//.test(from!) && !from!.startsWith("../../"))
+    .flatMap(([, names]) =>
+      names!
+        .split(",")
+        .map((n) => n.trim())
+        .filter(Boolean),
+    );
+
+  const body = syncPipelineSource.slice(
+    syncPipelineSource.indexOf("export async function fullSync"),
+  );
+  return [...new Set(inServices)]
+    .map((name) => ({ name, at: body.search(new RegExp(`\\b${name}\\s*\\(`)) }))
+    .filter(({ at }) => at >= 0)
+    .sort((a, b) => a.at - b.at)
+    .map(({ name }) => name);
+}
+
+describe("AGENTS.md sync pipeline", () => {
+  const flow = subsection(agentsMd, "Execution Flow");
+  const stages = pipelineStages();
+
+  it("derives a non-trivial stage list from fullSync", () => {
+    // Guard on the extractor itself: a regex that silently matches nothing
+    // would make the two tests below vacuously pass.
+    expect(stages.length).toBeGreaterThan(10);
+    expect(stages).toContain("syncLeagues");
+    expect(stages).toContain("reconcileAfterSync");
+  });
+
+  it("names every stage fullSync calls", () => {
+    const missing = stages.filter((name) => !new RegExp(`\\b${name}\\b`).test(flow));
+    expect(missing).toEqual([]);
+  });
+
+  it("names them in the order fullSync calls them", () => {
+    const documentedOrder = [...stages].sort(
+      (a, b) => flow.search(new RegExp(`\\b${a}\\b`)) - flow.search(new RegExp(`\\b${b}\\b`)),
+    );
+    expect(documentedOrder).toEqual(stages);
+  });
+});
+
 // ── Environment variables ────────────────────────────────────────────────────
 
 // Build-time client variables. They are inlined into the web/native bundles and
