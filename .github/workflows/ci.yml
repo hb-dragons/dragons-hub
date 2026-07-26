@@ -44,6 +44,9 @@ jobs:
       - name: i18n completeness check
         run: pnpm check:i18n
 
+      - name: Design token check
+        run: pnpm check:design-tokens
+
       - name: Typecheck
         run: pnpm typecheck
 
