@@ -94,8 +94,3 @@ export async function clearRepeatables(queue: Queue, jobName?: string): Promise<
     }
   }
 }
-
-// Re-exported for `services/admin/sync-admin.service.ts`, which drives the
-// schedule from the admin UI and imports both through this path. The
-// implementations moved to the sync-jobs service.
-export { updateSyncSchedule, updateRefereeSyncSchedule } from "../services/sync-jobs.service";

@@ -639,3 +639,96 @@ describe("getRefereeHistoryGames refereeApiId filter", () => {
     expect(matchNos).toEqual([11, 22]);
   });
 });
+
+/**
+ * refereeGames is soft-deleted (AGENTS.md, "Soft deletes (tombstones)"): a
+ * withdrawn assignment keeps its row and gains a removedAt timestamp. Every
+ * live-rows query needs isNull(removedAt); this service was the only
+ * refereeGames consumer in the codebase that omitted it, so withdrawn
+ * assignments were being counted everywhere the history screen reads.
+ */
+describe("soft-deleted games are excluded from every history read", () => {
+  beforeEach(async () => { await seedReferees(); });
+
+  it("omits tombstoned rows from KPIs, leaderboard and distinct-referee count", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, kickoffDate: "2025-09-15" }),
+      // Withdrawn after assignment: still on the table, must not be counted.
+      baseGame({
+        apiMatchId: 2,
+        kickoffDate: "2025-09-16",
+        removedAt: new Date("2025-09-17T00:00:00Z"),
+      }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: [],
+    });
+
+    expect(res.kpis.games).toBe(1);
+    expect(res.kpis.obligatedSlots).toBe(2);
+    expect(res.kpis.filledSlots).toBe(2);
+    // Anna + Ben officiated the one live game; the tombstoned game must not
+    // inflate either the per-referee tallies or the distinct-people KPI.
+    expect(res.kpis.distinctReferees).toBe(2);
+
+    const anna = res.leaderboard.find((e) => e.refereeApiId === 100);
+    const ben = res.leaderboard.find((e) => e.refereeApiId === 101);
+    expect(anna).toEqual(expect.objectContaining({ sr1Count: 1, sr2Count: 0, total: 1 }));
+    expect(ben).toEqual(expect.objectContaining({ sr1Count: 0, sr2Count: 1, total: 1 }));
+    // The tombstoned game is the later one, so an unfiltered read would
+    // report 2025-09-16 here.
+    expect(anna!.lastRefereedDate).toBe("2025-09-15");
+  });
+
+  it("omits tombstoned rows from the games list", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, matchNo: 11, kickoffDate: "2025-09-15" }),
+      baseGame({
+        apiMatchId: 2,
+        matchNo: 22,
+        kickoffDate: "2025-09-16",
+        removedAt: new Date("2025-09-17T00:00:00Z"),
+      }),
+    ]);
+
+    const res = await getRefereeHistoryGames({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: [],
+      limit: 50,
+      offset: 0,
+    });
+
+    expect(res.total).toBe(1);
+    expect(res.items.map((i) => i.matchNo)).toEqual([11]);
+  });
+
+  it("omits leagues that only tombstoned games belong to", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({
+        apiMatchId: 1,
+        kickoffDate: "2025-09-15",
+        leagueShort: "BL1",
+        leagueName: "Bezirksliga 1",
+      }),
+      baseGame({
+        apiMatchId: 2,
+        kickoffDate: "2025-09-16",
+        leagueShort: "BL2",
+        leagueName: "Bezirksliga 2",
+        removedAt: new Date("2025-09-17T00:00:00Z"),
+      }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: [],
+    });
+
+    expect(res.availableLeagues.map((l) => l.short)).toEqual(["BL1"]);
+  });
+});

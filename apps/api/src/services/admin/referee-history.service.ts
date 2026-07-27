@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { appSettings, referees, refereeGames } from "@dragons/db/schema";
-import { and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type {
   HistoryAvailableLeague,
   HistoryDateRange,
@@ -80,6 +80,12 @@ function buildBaseConds(
   resolvedTo: string,
 ) {
   const conds = [
+    // refereeGames is soft-deleted: a withdrawn assignment keeps its row and
+    // carries a removedAt tombstone. Without this every history read — the
+    // game list, the leaderboard, the distinct-referee KPI and the league
+    // dropdown — counts assignments that no longer exist. This file was the
+    // only refereeGames consumer in the codebase missing the filter.
+    isNull(refereeGames.removedAt),
     gte(refereeGames.kickoffDate, resolvedFrom),
     lte(refereeGames.kickoffDate, resolvedTo),
     buildRelevantGamesPredicate(),

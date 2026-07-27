@@ -13,7 +13,7 @@ vi.mock("../../config/database", () => ({
   )),
 }));
 
-vi.mock("../../workers/queues", () => ({
+vi.mock("../sync-jobs.service", () => ({
   updateSyncSchedule: vi.fn(),
   updateRefereeSyncSchedule: vi.fn(),
 }));
@@ -29,7 +29,7 @@ import {
   upsertSchedule,
   getMatchChangesForEntry,
 } from "./sync-admin.service";
-import { updateSyncSchedule, updateRefereeSyncSchedule } from "../../workers/queues";
+import { updateSyncSchedule, updateRefereeSyncSchedule } from "../sync-jobs.service";
 import { getTableColumns } from "drizzle-orm";
 import { syncRuns } from "@dragons/db/schema";
 import type { SyncRun } from "@dragons/shared";
