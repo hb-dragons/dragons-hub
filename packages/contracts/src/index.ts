@@ -239,3 +239,8 @@ export {
 } from "./notification-test";
 
 export { qaChatBodySchema, type QaChatBody } from "./qa";
+
+export {
+  unsubscribeQuerySchema,
+  type UnsubscribeQuery,
+} from "./unsubscribe";

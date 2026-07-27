@@ -24,6 +24,7 @@ vi.mock("../../config/database", () => ({
 // --- Imports (after mocks) ---
 
 import { resolveEmailRecipients, resolveRecipientUserIds } from "./recipient-resolver";
+import { unsubscribeByToken } from "./email-subscription.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 let ctx: TestDbContext;
@@ -184,9 +185,82 @@ describe("resolveEmailRecipients", () => {
 
     expect(await resolveEmailRecipients(["u_verified"])).toEqual({
       deliverable: [
-        { userId: "u_verified", name: "Anna Admin", address: "anna@dragons.de" },
+        {
+          userId: "u_verified",
+          name: "Anna Admin",
+          address: "anna@dragons.de",
+          unsubscribeToken: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+        },
       ],
       skipped: [],
+    });
+  });
+
+  describe("unsubscribe state (issue #134)", () => {
+    async function tokenOf(userId: string): Promise<string> {
+      const result = await ctx.client.query<{ unsubscribe_token: string }>(
+        "SELECT unsubscribe_token FROM email_subscriptions WHERE user_id = $1",
+        [userId],
+      );
+      return result.rows[0]!.unsubscribe_token;
+    }
+
+    it("mints exactly one token per member and reuses it on later sends", async () => {
+      await seedUser("u_anna", { emailVerified: true, email: "anna@dragons.de" });
+
+      const first = await resolveEmailRecipients(["u_anna"]);
+      const second = await resolveEmailRecipients(["u_anna"]);
+
+      expect(first.deliverable[0]!.unsubscribeToken).toBe(
+        second.deliverable[0]!.unsubscribeToken,
+      );
+      const rows = await ctx.client.query("SELECT * FROM email_subscriptions");
+      expect(rows.rows).toHaveLength(1);
+    });
+
+    it("gives two members different tokens", async () => {
+      await seedUser("u_anna", { emailVerified: true, email: "anna@dragons.de" });
+      await seedUser("u_bert", { emailVerified: true, email: "bert@dragons.de" });
+
+      const result = await resolveEmailRecipients(["u_anna", "u_bert"]);
+
+      expect(result.deliverable[0]!.unsubscribeToken).not.toBe(
+        result.deliverable[1]!.unsubscribeToken,
+      );
+    });
+
+    it("withholds a member who unsubscribed", async () => {
+      await seedUser("u_anna", { emailVerified: true, email: "anna@dragons.de" });
+      await resolveEmailRecipients(["u_anna"]);
+      await unsubscribeByToken(await tokenOf("u_anna"), "one_click");
+
+      const result = await resolveEmailRecipients(["u_anna"]);
+
+      expect(result.deliverable).toEqual([]);
+      expect(result.skipped).toEqual([{ userId: "u_anna", reason: "unsubscribed" }]);
+    });
+
+    it("withholds only the member who unsubscribed, not the rest of the batch", async () => {
+      await seedUser("u_anna", { emailVerified: true, email: "anna@dragons.de" });
+      await seedUser("u_bert", { emailVerified: true, email: "bert@dragons.de" });
+      await resolveEmailRecipients(["u_anna", "u_bert"]);
+      await unsubscribeByToken(await tokenOf("u_bert"), "confirmation_page");
+
+      const result = await resolveEmailRecipients(["u_anna", "u_bert"]);
+
+      expect(result.deliverable.map((r) => r.userId)).toEqual(["u_anna"]);
+      expect(result.skipped).toEqual([{ userId: "u_bert", reason: "unsubscribed" }]);
+    });
+
+    // Tokens are a send-path artefact: creating one for an address the club
+    // will never mail would leave rows nobody can act on.
+    it("mints no token for an unverified address or a missing account", async () => {
+      await seedUser("u_unverified", { emailVerified: false });
+
+      await resolveEmailRecipients(["u_unverified", "ghost"]);
+
+      const rows = await ctx.client.query("SELECT * FROM email_subscriptions");
+      expect(rows.rows).toEqual([]);
     });
   });
 

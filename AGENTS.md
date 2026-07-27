@@ -96,7 +96,7 @@ Match (0..1) ──── (N) BroadcastConfig (PK deviceId — one row per score
 
 ### Database Tables
 
-44 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
+45 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
 verified against those exports by `apps/api/src/test/docs-drift.test.ts` in both
 directions — adding a `pgTable` without a row here fails the build.
 
@@ -134,6 +134,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `taskComments` | `packages/db/src/schema/tasks.ts` | taskId FK (cascade), authorId, body |
 | `notifications` | `packages/db/src/schema/notifications.ts` | recipientId, channel, title, body, status, sentAt, errorMessage |
 | `userNotificationPreferences` | `packages/db/src/schema/notifications.ts` | userId (unique), whatsappEnabled, whatsappNumber, locale, mutedEventTypes (text[]). Per-event opt-outs live in mutedEventTypes; the user-toggleable catalog is in packages/shared/src/notification-events.ts. |
+| `emailSubscriptions` | `packages/db/src/schema/email-subscriptions.ts` | userId (unique), unsubscribeToken (unique, 32 random bytes base64url), unsubscribedAt (null = still subscribed), unsubscribedVia (`one_click`/`confirmation_page`). The GDPR email opt-out (issue #134): one row switches **email** off for that member, minted on the first send. Nothing in the sync pipeline writes here, so a re-synced `user` row cannot resurrect delivery. |
 | `syncRuns` | `packages/db/src/schema/sync-runs.ts` | syncType, status (`pending`/`running`/`completed`/`failed`/`partial`), triggeredBy, failedStep, ownerInstanceId, records*, durationMs, summary JSONB |
 | `syncRunEntries` | `packages/db/src/schema/sync-runs.ts` | syncRunId FK (cascade), entityType, action, metadata JSONB |
 | `syncSchedule` | `packages/db/src/schema/sync-runs.ts` | enabled, cronExpression, timezone |
@@ -676,6 +677,8 @@ plugin under `/api/auth/*`, not by this route group.
 | GET | `/public/teams/:id/stats` | Season stats and recent form for a team (no auth) |
 | GET | `/public/home/dashboard` | Aggregated home screen data: next game, recent results, upcoming games, club stats (no auth) |
 | GET | `/public/assets/clubs/:id` | Club logo as webp, proxied by club id. The route constrains `:id` to `[0-9]+\.webp` |
+| GET | `/public/notifications/unsubscribe` | Email unsubscribe confirmation page for a per-recipient token (no auth). **Safe** — renders a form and changes nothing, so a link scanner cannot opt a member out. Query: `token`, optional `locale`. 404 + a readable page for an unknown token. |
+| POST | `/public/notifications/unsubscribe` | Record the email opt-out for the token (no auth — the token is the authorisation). Serves both the confirmation form and the RFC 8058 one-click POST, told apart by the body. Idempotent; 404 for an unknown token rather than a reassuring 200. |
 
 ### Device (push registration)
 
@@ -976,10 +979,30 @@ type listed without an adapter is a compile error. All four have adapters:
   maps each user to `user.email`. **An unverified address is skipped**, with the
   reason logged, rather than mailed. Every message carries both a `text` and an
   `html` part, built by `templates/email.ts` from the same `{title, body}` the
-  other channels render. Bounce handling and unsubscribe are not implemented —
-  a relay-level send failure releases the `notification_log` claim so the outbox
-  retries, but a bounce arriving after the relay accepted the message is not
-  observed anywhere.
+  other channels render. A relay-level send failure releases the
+  `notification_log` claim so the outbox retries.
+
+  **Unsubscribe (issue #134).** Opting out is **per channel**: one opt-out
+  switches email off for that member entirely, leaving push and whatsapp_group
+  alone (per-event muting stays in `user_notification_preferences`). State and
+  token live in `email_subscriptions`, one row per member, minted on the first
+  send by `email-subscription.service.ts`. `resolveEmailRecipients` withholds an
+  opted-out member before a message is built and before a `notification_log`
+  claim is taken, and reports them as `skipped` with reason `unsubscribed`.
+  Every outgoing message carries `List-Unsubscribe` (a per-recipient URL on
+  `BETTER_AUTH_URL`, the API's own origin) plus `List-Unsubscribe-Post:
+  List-Unsubscribe=One-Click`, and the same link in both MIME parts for a human
+  to click. `GET /public/notifications/unsubscribe` is safe and only renders a
+  confirmation form — link scanners fetch every URL in a message, so a GET that
+  acted would opt members out silently — and `POST` performs it, with no session
+  required. An unknown token answers 404 with a page saying nothing was changed,
+  never a reassuring 200.
+
+  **Bounces are still not handled** — deliberately out of scope for #134. A
+  bounce arriving after the relay accepted the message is not observed anywhere:
+  plain SMTP gives no callback, so it needs either a return-path inbox with a
+  poller or a transport with a webhook, and that decision is deferred to a
+  separate issue.
 
 ### Workers
 

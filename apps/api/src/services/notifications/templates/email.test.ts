@@ -101,4 +101,68 @@ describe("renderEmailMessage", () => {
       expect(html).toContain(`href="https://hub.test/a&quot;b"`);
     });
   });
+
+  describe("unsubscribe link (issue #134)", () => {
+    const unsubscribe = "https://api.test/public/notifications/unsubscribe?token=t";
+
+    // The List-Unsubscribe header is honoured by mail clients, not by people.
+    // A member reading the message needs a link they can see and click.
+    it("appears in both parts when a URL is given", () => {
+      const rendered = renderEmailMessage(message, "de", undefined, unsubscribe);
+
+      expect(rendered.text).toContain(
+        `Keine E-Mail-Benachrichtigungen mehr erhalten: ${unsubscribe}`,
+      );
+      expect(rendered.html).toContain(`href="${unsubscribe}"`);
+      expect(rendered.html).toContain("Keine E-Mail-Benachrichtigungen mehr erhalten");
+    });
+
+    it("is localised", () => {
+      const rendered = renderEmailMessage(message, "en", undefined, unsubscribe);
+
+      expect(rendered.text).toContain(
+        `Stop receiving email notifications: ${unsubscribe}`,
+      );
+      expect(rendered.html).toContain("Stop receiving email notifications");
+    });
+
+    it("sits alongside the call to action rather than replacing it", () => {
+      const rendered = renderEmailMessage(
+        message,
+        "en",
+        "https://hub.test/matches/7",
+        unsubscribe,
+      );
+
+      expect(rendered.text).toContain("Open in Dragons Hub: https://hub.test/matches/7");
+      expect(rendered.text).toContain(`Stop receiving email notifications: ${unsubscribe}`);
+      expect(rendered.html).toContain(`href="https://hub.test/matches/7"`);
+      expect(rendered.html).toContain(`href="${unsubscribe}"`);
+    });
+
+    it("keeps the body verbatim at the head of the text part", () => {
+      const rendered = renderEmailMessage(message, "de", undefined, unsubscribe);
+
+      expect(rendered.text.startsWith(message.body)).toBe(true);
+    });
+
+    it("is absent from both parts when no URL is given", () => {
+      const rendered = renderEmailMessage(message, "de");
+
+      expect(rendered.text).not.toContain("Keine E-Mail-Benachrichtigungen");
+      expect(rendered.html).not.toContain("Keine E-Mail-Benachrichtigungen");
+    });
+
+    it("escapes the href", () => {
+      const { html } = renderEmailMessage(
+        message,
+        "de",
+        undefined,
+        `https://api.test/u?t="><script>alert(1)</script>`,
+      );
+
+      expect(html).toContain("&quot;&gt;&lt;script&gt;");
+      expect(html).not.toContain("<script>");
+    });
+  });
 });

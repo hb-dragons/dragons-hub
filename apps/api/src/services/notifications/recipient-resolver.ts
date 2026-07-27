@@ -2,6 +2,7 @@ import { eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb } from "../../config/database";
 import { user } from "@dragons/db/schema";
 import { satisfiesRole } from "@dragons/shared";
+import { loadEmailSubscriptions } from "./email-subscription.service";
 
 /**
  * Translate a pipeline recipientId (e.g., "referee:42", "audience:admin",
@@ -55,12 +56,14 @@ interface EmailRecipient {
   userId: string;
   name: string;
   address: string;
+  /** Goes into this member's copy of the message, in the header and the footer. */
+  unsubscribeToken: string;
 }
 
 /** A user the email adapter must not send to, and why. */
 interface SkippedEmailRecipient {
   userId: string;
-  reason: "unverified" | "no_account";
+  reason: "unverified" | "no_account" | "unsubscribed";
 }
 
 export interface EmailRecipientResolution {
@@ -88,6 +91,13 @@ export interface EmailRecipientResolution {
  * A user id with no row at all is reported as `no_account` rather than
  * conflated with an unverified one: it means a recipient key outlived the
  * account it addressed, which is an integrity problem, not a preference.
+ *
+ * **A member who unsubscribed is withheld here** (issue #134), before any
+ * message is built and before a `notification_log` claim is taken, so an
+ * opt-out cannot be defeated by a code path that forgets to ask. The check runs
+ * last of the three because it also mints the token for everyone who survives
+ * it: doing it earlier would create subscription rows for accounts that do not
+ * exist or that the club may never mail.
  */
 export async function resolveEmailRecipients(
   userIds: string[],
@@ -105,8 +115,8 @@ export async function resolveEmailRecipients(
     .where(inArray(user.id, userIds));
 
   const byId = new Map(rows.map((row) => [row.id, row]));
-  const deliverable: EmailRecipient[] = [];
   const skipped: SkippedEmailRecipient[] = [];
+  const mailable: { userId: string; name: string; address: string }[] = [];
 
   for (const userId of userIds) {
     const row = byId.get(userId);
@@ -118,7 +128,23 @@ export async function resolveEmailRecipients(
       skipped.push({ userId, reason: "unverified" });
       continue;
     }
-    deliverable.push({ userId: row.id, name: row.name, address: row.email });
+    mailable.push({ userId: row.id, name: row.name, address: row.email });
+  }
+
+  const subscriptions = await loadEmailSubscriptions(mailable.map((r) => r.userId));
+  const deliverable: EmailRecipient[] = [];
+
+  for (const recipient of mailable) {
+    const subscription = subscriptions.get(recipient.userId);
+    // A member with no subscription state is not mailed either. It cannot
+    // happen — `loadEmailSubscriptions` creates what it does not find — and if
+    // it ever did, there would be no token to unsubscribe with, so sending
+    // would produce mail a member cannot opt out of.
+    if (!subscription || subscription.unsubscribed) {
+      skipped.push({ userId: recipient.userId, reason: "unsubscribed" });
+      continue;
+    }
+    deliverable.push({ ...recipient, unsubscribeToken: subscription.token });
   }
 
   return { deliverable, skipped };

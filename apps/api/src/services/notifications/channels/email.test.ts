@@ -31,6 +31,7 @@ vi.mock("../../../config/logger", () => ({
 // --- Imports (after mocks) ---
 
 import { EmailChannelAdapter, smtpTransportOptions } from "./email";
+import { unsubscribeByToken } from "../email-subscription.service";
 import {
   setupTestDb,
   resetTestDb,
@@ -60,7 +61,8 @@ afterAll(async () => {
 async function insertPrerequisites() {
   await ctx.client.exec(`
     INSERT INTO domain_events (id, type, source, urgency, occurred_at, entity_type, entity_id, entity_name, deep_link_path, payload)
-    VALUES ('evt-001', 'match.cancelled', 'sync', 'immediate', NOW(), 'match', 1, 'Test Match', '/matches/1', '{}');
+    VALUES ('evt-001', 'match.cancelled', 'sync', 'immediate', NOW(), 'match', 1, 'Test Match', '/matches/1', '{}'),
+           ('evt-002', 'match.cancelled', 'sync', 'immediate', NOW(), 'match', 2, 'Later Match', '/matches/2', '{}');
   `);
   await ctx.client.exec(
     `INSERT INTO channel_configs (id, name, type, config) VALUES (1, 'email-channel', 'email', '{"locale":"de"}');`,
@@ -78,6 +80,29 @@ async function seedUser(
   );
 }
 
+/**
+ * The header block of a received message with continuation lines rejoined.
+ * A long `List-Unsubscribe` URL may be folded onto the next line by the MIME
+ * builder, and an assertion that fails on that is an assertion about folding.
+ */
+function unfoldedHeaders(data: string): string {
+  return (data.split("\n\n")[0] ?? "").replace(/\n[ \t]+/g, " ");
+}
+
+function unsubscribeUrlOf(data: string): string {
+  const match = /List-Unsubscribe: <([^>]+)>/.exec(unfoldedHeaders(data));
+  if (!match) throw new Error("no List-Unsubscribe header on the delivered message");
+  return match[1]!;
+}
+
+async function tokenOf(userId: string): Promise<string> {
+  const result = await ctx.client.query<{ unsubscribe_token: string }>(
+    "SELECT unsubscribe_token FROM email_subscriptions WHERE user_id = $1",
+    [userId],
+  );
+  return result.rows[0]!.unsubscribe_token;
+}
+
 async function getLogs() {
   const result = await ctx.client.query("SELECT * FROM notification_log ORDER BY id");
   return result.rows as Record<string, unknown>[];
@@ -90,6 +115,8 @@ beforeEach(async () => {
   smtp.rejectRecipients.clear();
   for (const key of Object.keys(envHolder)) delete envHolder[key];
   Object.assign(envHolder, {
+    // The origin the unsubscribe link is built on.
+    BETTER_AUTH_URL: "https://api.dragons.de",
     SMTP_HOST: "127.0.0.1",
     SMTP_PORT: smtp.port,
     SMTP_USER: "relay-user",
@@ -279,6 +306,133 @@ describe("EmailChannelAdapter", () => {
         secure,
         auth: { user: "u", pass: "p" },
       });
+    });
+  });
+
+  describe("unsubscribe (issue #134)", () => {
+    it("puts List-Unsubscribe and one-click List-Unsubscribe-Post on the message", async () => {
+      await seedUser("u_anna", { email: "anna@dragons.de" });
+
+      await new EmailChannelAdapter().send(params);
+
+      const headers = unfoldedHeaders(smtp.received[0]!.data);
+      expect(headers).toContain("List-Unsubscribe-Post: List-Unsubscribe=One-Click");
+      const url = new URL(unsubscribeUrlOf(smtp.received[0]!.data));
+      expect(url.origin).toBe("https://api.dragons.de");
+      expect(url.pathname).toBe("/public/notifications/unsubscribe");
+      expect(url.searchParams.get("token")).toBe(await tokenOf("u_anna"));
+      expect(url.searchParams.get("locale")).toBe("en");
+    });
+
+    it("also carries a link a human can click, in both MIME parts", async () => {
+      await seedUser("u_anna", { email: "anna@dragons.de" });
+
+      await new EmailChannelAdapter().send(params);
+
+      const mail = smtp.received[0]!;
+      const [, rawText = "", rawHtml = ""] = mail.data.split(
+        /Content-Type: text\/(?:plain|html)/,
+      );
+      const token = await tokenOf("u_anna");
+      expect(decodeQuotedPrintable(rawText)).toContain("Stop receiving email notifications");
+      expect(decodeQuotedPrintable(rawText)).toContain(token);
+      expect(decodeQuotedPrintable(rawHtml)).toContain("Stop receiving email notifications");
+      expect(decodeQuotedPrintable(rawHtml)).toContain(token);
+    });
+
+    // One token per member: a shared one would let any recipient of any message
+    // opt somebody else out.
+    it("gives each recipient their own token", async () => {
+      await seedUser("u_anna", { email: "anna@dragons.de" });
+      await seedUser("u_bert", { email: "bert@dragons.de" });
+
+      await new EmailChannelAdapter().send({
+        ...params,
+        recipientUserIds: ["u_anna", "u_bert"],
+      });
+
+      const tokens = smtp.received.map((m) =>
+        new URL(unsubscribeUrlOf(m.data)).searchParams.get("token"),
+      );
+      expect(new Set(tokens).size).toBe(2);
+      expect(tokens).toContain(await tokenOf("u_anna"));
+      expect(tokens).toContain(await tokenOf("u_bert"));
+    });
+
+    it("sends nothing to a member who unsubscribed, and claims no log row", async () => {
+      await seedUser("u_anna", { email: "anna@dragons.de" });
+      const adapter = new EmailChannelAdapter();
+      await adapter.send(params);
+      await unsubscribeByToken(await tokenOf("u_anna"), "one_click");
+      smtp.received.length = 0;
+
+      // A different event, so nothing but the opt-out can stop this send.
+      const result = await adapter.send({ ...params, eventId: "evt-002" });
+
+      expect(result).toEqual({ success: true, sent: 0, failed: 0, skipped: 1 });
+      expect(smtp.received).toEqual([]);
+      // Only the pre-opt-out delivery is on file; nothing new was claimed.
+      expect(await getLogs()).toHaveLength(1);
+    });
+
+    it("keeps delivering to the rest of the batch", async () => {
+      await seedUser("u_anna", { email: "anna@dragons.de" });
+      await seedUser("u_bert", { email: "bert@dragons.de" });
+      const adapter = new EmailChannelAdapter();
+      await adapter.send({ ...params, recipientUserIds: ["u_anna", "u_bert"] });
+      await unsubscribeByToken(await tokenOf("u_bert"), "one_click");
+      smtp.received.length = 0;
+
+      const result = await adapter.send({
+        ...params,
+        eventId: "evt-002",
+        recipientUserIds: ["u_anna", "u_bert"],
+      });
+
+      expect(result).toEqual({ success: true, sent: 1, failed: 0, skipped: 1 });
+      expect(smtp.received.map((m) => m.rcptTo).flat()).toEqual(["anna@dragons.de"]);
+    });
+
+    /**
+     * The opt-out lives in `email_subscriptions`, keyed by user id, and nothing
+     * in the sync pipeline writes there. This proves the consequence: rewriting
+     * the member's `user` row the way a re-sync does — including re-asserting
+     * `email_verified` and changing the address — leaves email switched off.
+     */
+    it("survives the user record being re-synced", async () => {
+      await seedUser("u_anna", { email: "anna@dragons.de", name: "Anna Admin" });
+      const adapter = new EmailChannelAdapter();
+      await adapter.send(params);
+      await unsubscribeByToken(await tokenOf("u_anna"), "one_click");
+      smtp.received.length = 0;
+
+      // A re-sync upserts the member: new display name, re-asserted
+      // verification, even a new address.
+      await ctx.client.query(
+        `INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
+         VALUES ($1, $2, $3, true, now(), now())
+         ON CONFLICT (id) DO UPDATE
+           SET name = EXCLUDED.name,
+               email = EXCLUDED.email,
+               email_verified = EXCLUDED.email_verified,
+               updated_at = now()`,
+        ["u_anna", "Anna Neumann", "anna.neumann@dragons.de"],
+      );
+      // And the notification preferences row is rewritten alongside it.
+      await ctx.client.query(
+        `INSERT INTO user_notification_preferences (user_id, locale, muted_event_types)
+         VALUES ('u_anna', 'de', '{}')
+         ON CONFLICT (user_id) DO UPDATE SET locale = EXCLUDED.locale, updated_at = now()`,
+      );
+
+      const result = await adapter.send({ ...params, eventId: "evt-002" });
+
+      expect(result).toEqual({ success: true, sent: 0, failed: 0, skipped: 1 });
+      expect(smtp.received).toEqual([]);
+      const rows = await ctx.client.query<{ unsubscribed_at: Date | null }>(
+        "SELECT unsubscribed_at FROM email_subscriptions WHERE user_id = 'u_anna'",
+      );
+      expect(rows.rows[0]!.unsubscribed_at).not.toBeNull();
     });
   });
 

@@ -25,6 +25,11 @@ const LINK_LABEL = {
   en: "Open in Dragons Hub",
 } as const;
 
+const UNSUBSCRIBE_LABEL = {
+  de: "Keine E-Mail-Benachrichtigungen mehr erhalten",
+  en: "Stop receiving email notifications",
+} as const;
+
 function localeKey(locale: string): "de" | "en" {
   return locale.toLowerCase().startsWith("en") ? "en" : "de";
 }
@@ -58,20 +63,34 @@ function bodyToHtml(body: string): string {
  * `link` is optional: only events carrying a deep link get a call to action,
  * and it is rendered into both parts so the text reader is not sent looking for
  * a button that only exists in the HTML.
+ *
+ * `unsubscribeUrl` is likewise rendered into both parts, and for the same
+ * reason turned up to an obligation: the `List-Unsubscribe` header is honoured
+ * by mail clients, not by people, so a member reading the message needs a link
+ * they can see and click. It is per recipient — the token identifies exactly
+ * one member — so this function is called once per recipient, not once per
+ * message.
  */
 export function renderEmailMessage(
   message: RenderedMessage,
   locale: string,
   link?: string,
+  unsubscribeUrl?: string,
 ): RenderedEmail {
   const key = localeKey(locale);
 
-  const text = link
-    ? `${message.body}\n\n${LINK_LABEL[key]}: ${link}\n\n${FOOTER[key]}`
-    : `${message.body}\n\n${FOOTER[key]}`;
+  const textParts = [message.body];
+  if (link) textParts.push(`${LINK_LABEL[key]}: ${link}`);
+  textParts.push(FOOTER[key]);
+  if (unsubscribeUrl) textParts.push(`${UNSUBSCRIBE_LABEL[key]}: ${unsubscribeUrl}`);
+  const text = textParts.join("\n\n");
 
   const linkHtml = link
     ? `<p style="margin:0 0 12px;"><a href="${escapeHtml(link)}">${LINK_LABEL[key]}</a></p>`
+    : "";
+
+  const unsubscribeHtml = unsubscribeUrl
+    ? `<p style="margin:4px 0 0;font-size:12px;color:#666666;"><a href="${escapeHtml(unsubscribeUrl)}" style="color:#666666;">${UNSUBSCRIBE_LABEL[key]}</a></p>`
     : "";
 
   // Inline styles, no <head>, no external assets: mail clients strip <style>
@@ -82,6 +101,7 @@ export function renderEmailMessage(
     bodyToHtml(message.body),
     linkHtml,
     `<p style="margin:16px 0 0;font-size:12px;color:#666666;">${FOOTER[key]}</p>`,
+    unsubscribeHtml,
     `</div>`,
   ].join("");
 
