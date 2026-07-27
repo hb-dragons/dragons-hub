@@ -149,3 +149,57 @@ describe("insertNotificationLogDeduped", () => {
     expect(await countRows()).toBe(0);
   });
 });
+
+// #122 collapsed the admin test-push write to one notification_log row per send
+// (device fan-out became a delivery detail carried as an aggregate status). That
+// fix deliberately did NOT touch `notification_log_dedup_idx` or the conflict
+// target, so every other channel must still dedup on exactly the same tuple.
+describe("dedup semantics are unchanged by the per-send collapse (#122)", () => {
+  it("still refuses a second raw insert for the same (event, channel, recipient)", async () => {
+    await ctx.client.exec(
+      `INSERT INTO channel_configs (id, name, type, config) VALUES (3, 'group', 'whatsapp_group', '{}')`,
+    );
+    const rawInsert = (recipient: string) =>
+      ctx.client.exec(
+        `INSERT INTO notification_log (event_id, channel_config_id, recipient_id, title, body, status)
+         VALUES ('evt-001', 3, '${recipient}', 'Title', 'Body', 'sent')`,
+      );
+
+    await rawInsert("user:1");
+
+    // No ON CONFLICT: the unique index itself has to reject this.
+    await expect(rawInsert("user:1")).rejects.toThrow(/unique|duplicate key/i);
+    expect(await countRows()).toBe(1);
+  });
+
+  it("still collapses a redelivery on a non-push channel to one row", async () => {
+    const first = await insertNotificationLogDeduped(
+      writer,
+      values({ recipientId: "user:7", channelConfigId: 1 }),
+    );
+    const redelivery = await insertNotificationLogDeduped(
+      writer,
+      values({ recipientId: "user:7", channelConfigId: 1, title: "Again" }),
+    );
+
+    expect(first).toHaveLength(1);
+    expect(redelivery).toEqual([]);
+    expect(await countRows()).toBe(1);
+  });
+
+  it("still lets a different event through on the same channel and recipient", async () => {
+    await ctx.client.exec(`
+      INSERT INTO domain_events (id, type, source, urgency, occurred_at, entity_type, entity_id, entity_name, deep_link_path, payload)
+      VALUES ('evt-002', 'match.cancelled', 'sync', 'immediate', NOW(), 'match', 2, 'Other Match', '/matches/2', '{}')
+    `);
+
+    await insertNotificationLogDeduped(writer, values({ recipientId: "user:1" }));
+    const other = await insertNotificationLogDeduped(
+      writer,
+      values({ recipientId: "user:1", eventId: "evt-002" }),
+    );
+
+    expect(other).toHaveLength(1);
+    expect(await countRows()).toBe(2);
+  });
+});

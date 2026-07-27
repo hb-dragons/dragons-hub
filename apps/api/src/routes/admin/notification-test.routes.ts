@@ -64,7 +64,10 @@ notificationTestRoutes.post(
     const devices = await getDb()
       .select()
       .from(pushDevices)
-      .where(eq(pushDevices.userId, callerId));
+      .where(eq(pushDevices.userId, callerId))
+      // Ordered so that "the device the aggregate log row represents" (below) is
+      // the oldest registration, not whatever the heap happened to return.
+      .orderBy(pushDevices.id);
 
     if (devices.length === 0) {
       return c.json(
@@ -113,23 +116,52 @@ notificationTestRoutes.post(
       tickets = devices.map(() => ({ status: "error" as const, message }));
     }
 
-    const rows = devices.map((d, i) => {
+    const perDevice = devices.map((d, i) => {
       const t = tickets[i];
       const ok = t?.status === "ok";
       return {
-        eventId,
-        channelConfigId: pushChannel.id,
-        recipientId: callerId,
-        recipientToken: d.token,
-        title: "Dragons — Test",
-        body: text,
+        platform: d.platform,
+        token: d.token,
         locale: d.locale ?? "de",
+        ok,
         status: ok ? "sent_ticket" : "failed",
-        sentAt: ok ? sentAt : null,
-        providerTicketId: ok ? (t.id ?? null) : null,
-        errorMessage: mapTicketError(t),
+        ticketId: ok ? (t.id ?? null) : null,
+        error: mapTicketError(t),
       };
     });
+
+    // ONE notification_log row per send, never one per device.
+    //
+    // `notification_log_dedup_idx` (migration 0018) makes
+    // (event_id, channel_config_id, COALESCE(recipient_id, '__group__')) UNIQUE,
+    // so a row *is* "this notification, for this recipient, on this channel".
+    // Device fan-out is a delivery detail underneath that, not a second
+    // notification — writing a row per device violated the index and 500'd every
+    // admin with two or more devices (issue #122).
+    //
+    // The row therefore carries an aggregate delivery status, matching what
+    // PushChannelAdapter already does for regular sends:
+    //   sent_ticket  if at least one device was accepted by Expo, keeping that
+    //                device's ticket id + token and errorMessage = null;
+    //   failed       if every device failed, keeping the first failing device's
+    //                token and error message.
+    // Per-device detail still comes back in the response for the admin UI.
+    const accepted = perDevice.find((d) => d.ok);
+    const firstFailure = perDevice.find((d) => !d.ok);
+    const representative = accepted ?? firstFailure!;
+    const row = {
+      eventId,
+      channelConfigId: pushChannel.id,
+      recipientId: callerId,
+      recipientToken: representative.token,
+      title: "Dragons — Test",
+      body: text,
+      locale: representative.locale,
+      status: accepted ? "sent_ticket" : "failed",
+      sentAt: accepted ? sentAt : null,
+      providerTicketId: accepted?.ticketId ?? null,
+      errorMessage: accepted ? null : representative.error,
+    };
 
     // Synthetic domain_events row so notification_log FK is satisfied.
     // Wrapped in a transaction so the event + log rows land atomically.
@@ -151,16 +183,16 @@ notificationTestRoutes.post(
           message: text,
         },
       });
-      await tx.insert(notificationLog).values(rows);
+      await tx.insert(notificationLog).values(row);
     });
 
     return c.json({
       deviceCount: devices.length,
-      tickets: rows.map((r, i) => ({
-        platform: devices[i]!.platform,
-        status: r.status,
-        ticketId: r.providerTicketId,
-        error: r.errorMessage,
+      tickets: perDevice.map((d) => ({
+        platform: d.platform,
+        status: d.status,
+        ticketId: d.ticketId,
+        error: d.error,
       })),
     });
   },
