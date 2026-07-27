@@ -300,14 +300,11 @@ describe("POST /notifications/test-push — persisted audit trail", () => {
     expect(logged[0]!.body).toBe("hello");
   });
 
-  it("currently fails with 500 for an admin with two devices (known defect)", async () => {
-    // DEFECT, not desired behaviour. The route writes one notification_log row
-    // per device, but every row of one send shares (event_id, channel_config_id,
-    // recipient_id) — which is exactly the tuple `notification_log_dedup_idx`
-    // (migration 0018) declares UNIQUE. The second row violates it, the wrapping
-    // transaction aborts, and the admin gets a 500 with nothing written. The
-    // previous suite stubbed the insert, so it never saw the constraint at all.
-    // Asserted here so the eventual fix has to come past a failing test.
+  it("writes one aggregate log row — not one per device — for a two-device admin", async () => {
+    // A notification_log row is one *send*, not one device: every row of one
+    // send shares (event_id, channel_config_id, recipient_id), the tuple
+    // `notification_log_dedup_idx` (migration 0018) declares UNIQUE. Writing a
+    // row per device violated it and 500'd every multi-device admin (#122).
     await seedPushChannel();
     await seedDevice(ADMIN, "ExponentPushToken[x1]");
     await seedDevice(ADMIN, "ExponentPushToken[x2]", "android", null);
@@ -317,10 +314,91 @@ describe("POST /notifications/test-push — persisted audit trail", () => {
     ]);
 
     const res = await post({ message: "hello" });
+    const body = (await res.json()) as {
+      deviceCount: number;
+      tickets: Array<{
+        platform: string;
+        status: string;
+        ticketId: string | null;
+        error: string | null;
+      }>;
+    };
 
-    expect(res.status).toBe(500);
-    expect(await logRows()).toEqual([]);
-    expect(await ctx.db.select().from(domainEvents)).toEqual([]);
+    expect(res.status).toBe(200);
+    // Both devices were pushed to, and the response still reports each one.
+    expect(body.deviceCount).toBe(2);
+    expect(body.tickets).toEqual([
+      { platform: "ios", status: "sent_ticket", ticketId: "tkt_1", error: null },
+      { platform: "android", status: "sent_ticket", ticketId: "tkt_2", error: null },
+    ]);
+
+    const events = await ctx.db.select().from(domainEvents);
+    expect(events).toHaveLength(1);
+    const rows = await logRows();
+    expect(rows).toEqual([
+      {
+        event_id: events[0]!.id,
+        recipient_id: ADMIN,
+        // The accepted device is the row's representative.
+        recipient_token: "ExponentPushToken[x1]",
+        status: "sent_ticket",
+        provider_ticket_id: "tkt_1",
+      },
+    ]);
+  });
+
+  it("aggregates to sent_ticket when only the second of two devices is accepted", async () => {
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[dead]");
+    await seedDevice(ADMIN, "ExponentPushToken[live]", "android", "en-GB");
+    mocks.sendBatch.mockResolvedValueOnce([
+      { status: "error", message: "DeviceNotRegistered" },
+      { status: "ok", id: "tkt_2" },
+    ]);
+
+    const res = await post();
+    const body = (await res.json()) as { tickets: Array<{ status: string }> };
+
+    expect(res.status).toBe(200);
+    expect(body.tickets.map((t) => t.status)).toEqual(["failed", "sent_ticket"]);
+
+    const stored = await ctx.db.select().from(notificationLog);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({
+      status: "sent_ticket",
+      recipientToken: "ExponentPushToken[live]",
+      providerTicketId: "tkt_2",
+      // One dead device does not make the send a failure.
+      errorMessage: null,
+      // The accepted device's locale is the one that was actually rendered.
+      locale: "en-GB",
+    });
+    expect(stored[0]!.sentAt).not.toBeNull();
+  });
+
+  it("aggregates to failed, keeping the first error, when every device fails", async () => {
+    await seedPushChannel();
+    await seedDevice(ADMIN, "ExponentPushToken[a]", "ios", null);
+    await seedDevice(ADMIN, "ExponentPushToken[b]", "android", "de-DE");
+    mocks.sendBatch.mockResolvedValueOnce([
+      { status: "error", message: "first boom" },
+      { status: "error", message: "second boom" },
+    ]);
+
+    const res = await post();
+
+    expect(res.status).toBe(200);
+    const stored = await ctx.db.select().from(notificationLog);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({
+      status: "failed",
+      sentAt: null,
+      providerTicketId: null,
+      recipientToken: "ExponentPushToken[a]",
+      errorMessage: "first boom",
+      // The device with a null locale falls back to "de".
+      locale: "de",
+    });
   });
 
   it("falls back to the default body when no message is supplied", async () => {
