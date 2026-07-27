@@ -87,6 +87,34 @@ describe("searchVenues", () => {
     expect(result[0]!.name).toBe("Sporthalle Mitte");
   });
 
+  // Without escapeLikePattern, `%` matched every venue in the table and `_`
+  // matched any character — a search box that silently ignored its own input.
+  it("treats a bare % as a literal character, not a wildcard", async () => {
+    await insertVenue({ api_id: 1, name: "Sporthalle Mitte" });
+    await insertVenue({ api_id: 2, name: "Turnhalle Nord" });
+
+    const result = await searchVenues("%");
+
+    expect(result).toEqual([]);
+  });
+
+  it("treats _ as a literal character, not a single-character wildcard", async () => {
+    await insertVenue({ api_id: 1, name: "Sporthalle Mitte" });
+
+    const result = await searchVenues("Spo_thalle");
+
+    expect(result).toEqual([]);
+  });
+
+  it("finds a venue whose name genuinely contains an underscore", async () => {
+    await insertVenue({ api_id: 1, name: "Halle_A" });
+    await insertVenue({ api_id: 2, name: "HalleXA" });
+
+    const result = await searchVenues("Halle_A");
+
+    expect(result.map((r) => r.name)).toEqual(["Halle_A"]);
+  });
+
   it("returns id, name, street, city fields", async () => {
     await insertVenue({ api_id: 1, name: "Sporthalle Mitte", street: "Hauptstr. 1", city: "Berlin" });
 

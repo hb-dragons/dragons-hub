@@ -2,15 +2,17 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // --- Mock setup ---
 
+// A single stable child logger, so tests can assert on what the module logged
+// (notably: that the submit payload never reaches an error line).
+const mockLog = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
 vi.mock("../../config/logger", () => ({
-  logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
-  },
+  logger: { child: () => mockLog },
 }));
 
 const mockEnv = vi.hoisted(() => ({
@@ -497,6 +499,57 @@ describe("SdkClient", () => {
         .mockResolvedValueOnce({ ok: false, status: 500 });
 
       await expect(withTimers(client.getGameDetails(1000))).rejects.toThrow();
+    });
+  });
+
+  describe("request timeout", () => {
+    it("attaches an AbortSignal to the login request", async () => {
+      setupLogin();
+
+      await client.ensureAuthenticated();
+
+      const loginCall = mockFetch.mock.calls[0]!;
+      expect(loginCall[1].signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("attaches an AbortSignal to authenticated federation fetches", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ game1: {} }),
+      });
+
+      await client.getGameDetails(1);
+
+      for (const call of mockFetch.mock.calls) {
+        expect(call[1].signal).toBeInstanceOf(AbortSignal);
+      }
+    });
+
+    it("aborts a federation request that never settles", async () => {
+      // Without the timeout, withRetry never sees a rejection, so a hung
+      // socket parks the whole sync stage instead of retrying.
+      mockFetch.mockImplementation(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              const err = new Error("The operation was aborted.");
+              err.name = "AbortError";
+              reject(err);
+            });
+          }),
+      );
+
+      const promise = client.ensureAuthenticated();
+      promise.catch(() => {});
+      // 3 login attempts x 30s timeout, plus exponential backoff between them.
+      for (let i = 0; i < 40; i++) {
+        await vi.advanceTimersByTimeAsync(5_000);
+      }
+
+      await expect(promise).rejects.toThrow(/login failed after 3 attempts/);
+      mockFetch.mockReset();
     });
   });
 
@@ -1128,11 +1181,46 @@ describe("SdkClient", () => {
     it("throws on non-ok response", async () => {
       setupLogin();
       for (let i = 0; i < 3; i++) {
-        mockFetch.mockResolvedValueOnce({ ok: false, status: 422 });
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 422,
+          text: vi.fn().mockResolvedValue("nope"),
+        });
       }
 
       await expect(withTimers(client.submitRefereeAssignment(100, 1, candidate))).rejects.toThrow(
         "submit assignment failed: 422",
+      );
+    });
+
+    // The submit body embeds the whole federation candidate record — name,
+    // email, street address, licence number. It used to go into the error line
+    // verbatim as `payload`.
+    it("keeps the submit payload out of the error log", async () => {
+      setupLogin();
+      for (let i = 0; i < 3; i++) {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 422,
+          text: vi.fn().mockResolvedValue("rejected"),
+        });
+      }
+
+      await expect(
+        withTimers(client.submitRefereeAssignment(100, 1, candidate)),
+      ).rejects.toThrow();
+
+      expect(mockLog.error).toHaveBeenCalled();
+      for (const call of mockLog.error.mock.calls) {
+        const fields = call[0] as Record<string, unknown>;
+        expect(fields).not.toHaveProperty("payload");
+        const serialized = JSON.stringify(fields);
+        expect(serialized).not.toContain("jane@example.com");
+        expect(serialized).not.toContain("Teststr. 1");
+      }
+      expect(mockLog.error).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 422, spielplanId: 100, slotNumber: 1 }),
+        "submit assignment failed",
       );
     });
   });

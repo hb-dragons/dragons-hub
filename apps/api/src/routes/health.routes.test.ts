@@ -26,6 +26,13 @@ const mocks = vi.hoisted(() => ({
   syncQueueCounts: vi.fn(),
   eventsQueueCounts: vi.fn(),
   outboxPollQueueCounts: vi.fn(),
+  getSession: vi.fn(),
+}));
+
+// Real rbac middleware over a stubbed session store, so the admin gate on
+// /health/deep is exercised rather than mocked away.
+vi.mock("../config/auth", () => ({
+  auth: { api: { getSession: (...a: unknown[]) => mocks.getSession(...a) } },
 }));
 
 vi.mock("../config/database", () => ({
@@ -60,6 +67,11 @@ import { domainEvents, syncRuns } from "@dragons/db/schema";
 
 const app = new Hono().route("/", healthRoutes);
 
+const ADMIN_SESSION = {
+  user: { id: "u-admin", role: "admin" },
+  session: { id: "s1" },
+};
+
 interface DeepBody {
   status: string;
   checks: Record<string, unknown>;
@@ -80,6 +92,7 @@ beforeEach(async () => {
   mocks.syncQueueCounts.mockResolvedValue({ waiting: 0 });
   mocks.eventsQueueCounts.mockResolvedValue({ waiting: 0 });
   mocks.outboxPollQueueCounts.mockResolvedValue({ waiting: 0 });
+  mocks.getSession.mockResolvedValue(ADMIN_SESSION);
 });
 
 afterAll(async () => {
@@ -158,6 +171,60 @@ describe("GET /health", () => {
     const res = await app.request("/health");
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ status: "degraded", db: "ok", redis: "error" });
+  });
+});
+
+describe("GET /health/deep — admin gate", () => {
+  it("returns 401 to an anonymous caller", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    const res = await app.request("/health/deep");
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("returns 403 to a signed-in non-admin", async () => {
+    mocks.getSession.mockResolvedValue({
+      user: { id: "u-member", role: "user" },
+      session: { id: "s2" },
+    });
+
+    const res = await app.request("/health/deep");
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("leaks no queue depths or sync freshness in the rejection body", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    mocks.syncQueueCounts.mockResolvedValue({ waiting: 42 });
+    await seedSyncRun("full", "completed", minutesAgo(5));
+
+    const res = await app.request("/health/deep");
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body).not.toHaveProperty("checks");
+    expect(JSON.stringify(body)).not.toContain("42");
+    // The probes must not even run for an unauthenticated caller.
+    expect(mocks.syncQueueCounts).not.toHaveBeenCalled();
+  });
+
+  it("still serves the shallow /health without a session", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    // Uptime probes poll this one; gating it would page on every deploy.
+    const res = await app.request("/health");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getSession).not.toHaveBeenCalled();
+  });
+
+  it("serves the full payload to an admin", async () => {
+    const { res, body } = await deep();
+
+    expect(res.status).toBe(200);
+    expect(body.checks).toBeDefined();
   });
 });
 

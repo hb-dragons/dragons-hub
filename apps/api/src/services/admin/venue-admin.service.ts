@@ -2,6 +2,7 @@ import { asc, ilike } from "drizzle-orm";
 import { getDb } from "../../config/database";
 import { venues } from "@dragons/db/schema";
 import type { VenueSearchResult, VenueListItem } from "@dragons/shared";
+import { escapeLikePattern } from "../utils/sql";
 
 export async function searchVenues(
   query: string,
@@ -15,7 +16,8 @@ export async function searchVenues(
       city: venues.city,
     })
     .from(venues)
-    .where(ilike(venues.name, `%${query}%`))
+    // Escape LIKE metacharacters: a bare `%` would otherwise match every venue.
+    .where(ilike(venues.name, `%${escapeLikePattern(query)}%`))
     .limit(limit);
 
   return rows;

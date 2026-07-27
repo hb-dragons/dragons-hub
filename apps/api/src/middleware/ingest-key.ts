@@ -7,7 +7,11 @@ import { getRedis } from "../config/redis";
 const RATE_LIMIT_PER_SECOND = 30;
 const RATE_LIMIT_KEY_PREFIX = "rl:ingest:";
 
-function constantTimeEquals(a: string, b: string): boolean {
+/**
+ * Length-safe `timingSafeEqual`. Shared with the MCP bearer check so both
+ * token comparisons in the API leak the same (nothing) about a wrong token.
+ */
+export function constantTimeEquals(a: string, b: string): boolean {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);
   if (ab.length !== bb.length) return false;

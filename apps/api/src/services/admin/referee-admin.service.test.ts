@@ -214,6 +214,46 @@ describe("getReferees — search", () => {
     expect(result.items.map((r) => r.lastName)).toEqual(["Zimmer"]);
     expect(result.total).toBe(1);
   });
+
+  // Without escapeLikePattern the search string is spliced straight into a LIKE
+  // pattern, so `%` matches everything and `_` matches any character — an
+  // admin-facing wildcard nobody asked for.
+  it("treats a bare % as a literal character, not a wildcard", async () => {
+    await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+    await seedReferee({ firstName: "Bernd", lastName: "Yilmaz", isOwnClub: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "%" });
+
+    // Unescaped, `%…%` would return both referees; the count follows the same
+    // predicate, so both the page and the total have to come back empty.
+    expect(result.items).toEqual([]);
+    expect(result.total).toBe(0);
+  });
+
+  it("treats _ as a literal character, not a single-character wildcard", async () => {
+    await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "A_na" });
+
+    expect(result.items).toEqual([]);
+  });
+
+  it("finds a name that genuinely contains an underscore", async () => {
+    await seedReferee({ firstName: "A_na", lastName: "Zimmer", isOwnClub: true });
+    await seedReferee({ firstName: "Anna", lastName: "Yilmaz", isOwnClub: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "A_na" });
+
+    expect(result.items.map((r) => r.firstName)).toEqual(["A_na"]);
+  });
+
+  it("treats a backslash as a literal character", async () => {
+    await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "\\" });
+
+    expect(result.items).toEqual([]);
+  });
 });
 
 describe("getReferees — workload", () => {

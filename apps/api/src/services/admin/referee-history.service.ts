@@ -125,6 +125,38 @@ function buildLeagueScopeWhere(
   return and(...buildBaseConds(params, resolvedFrom, resolvedTo))!;
 }
 
+/**
+ * How many distinct people refereed inside `where`, counted in the database.
+ *
+ * This used to be read off `leaderboard.length`, which is capped at 100 rows —
+ * so a season with more than 100 referees silently reported exactly 100. The
+ * grouping key matches the leaderboard's: a federation api id when known,
+ * otherwise the raw name, so the same referee is not counted twice.
+ */
+async function countDistinctReferees(
+  where: ReturnType<typeof buildBaseWhere>,
+): Promise<number> {
+  const result = await getDb().execute(sql`
+    WITH appearances AS (
+      SELECT ${refereeGames.sr1RefereeApiId} AS api_id,
+             ${refereeGames.sr1Name} AS raw_name
+      FROM ${refereeGames}
+      WHERE ${where}
+        AND (${refereeGames.sr1RefereeApiId} IS NOT NULL OR ${refereeGames.sr1Name} IS NOT NULL)
+      UNION ALL
+      SELECT ${refereeGames.sr2RefereeApiId},
+             ${refereeGames.sr2Name}
+      FROM ${refereeGames}
+      WHERE ${where}
+        AND (${refereeGames.sr2RefereeApiId} IS NOT NULL OR ${refereeGames.sr2Name} IS NOT NULL)
+    )
+    SELECT COUNT(DISTINCT COALESCE(a.api_id::text, a.raw_name))::int AS count
+    FROM appearances a
+  `);
+  const first = result.rows[0] as { count: number } | undefined;
+  return Number(first?.count ?? 0);
+}
+
 export async function getRefereeHistorySummary(
   params: HistoryFilterParams,
 ): Promise<HistorySummaryResponse> {
@@ -155,19 +187,20 @@ export async function getRefereeHistorySummary(
     .from(refereeGames)
     .where(where);
 
-  const kpis = {
+  const [leaderboard, distinctReferees] = await Promise.all([
+    getRefereeHistoryLeaderboard(params, { limit: 100 }),
+    countDistinctReferees(where),
+  ]);
+
+  const finalKpis = {
     games: row?.games ?? 0,
     obligatedSlots: row?.obligatedSlots ?? 0,
     filledSlots: (row?.filledSr1 ?? 0) + (row?.filledSr2 ?? 0),
     unfilledSlots: (row?.unfilledSr1 ?? 0) + (row?.unfilledSr2 ?? 0),
     cancelled: row?.cancelled ?? 0,
     forfeited: row?.forfeited ?? 0,
-    distinctReferees: 0, // filled in by leaderboard step
+    distinctReferees,
   };
-
-  const leaderboard = await getRefereeHistoryLeaderboard(params, { limit: 100 });
-
-  const finalKpis = { ...kpis, distinctReferees: leaderboard.length };
 
   const leagueScope = buildLeagueScopeWhere(params, range.from, range.to);
   const leagueRows = await getDb()

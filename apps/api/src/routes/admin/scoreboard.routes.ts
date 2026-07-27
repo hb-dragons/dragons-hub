@@ -13,6 +13,10 @@ import {
   SCOREBOARD_ONLINE_THRESHOLD_MS,
 } from "../../services/scoreboard/constants";
 import { scoreboardListQuerySchema } from "@dragons/contracts";
+import {
+  isConfiguredDevice,
+  UNKNOWN_DEVICE_BODY,
+} from "../../services/scoreboard/device-allowlist";
 import type { AppEnv } from "../../types";
 
 const adminScoreboardRoutes = new Hono<AppEnv>();
@@ -27,10 +31,14 @@ adminScoreboardRoutes.get(
     responses: {
       200: { description: "Snapshots" },
       400: { description: "Bad request" },
+      404: { description: "Unknown device" },
     },
   }),
   async (c) => {
     const query = c.req.valid("query");
+    if (!isConfiguredDevice(query.deviceId)) {
+      return c.json(UNKNOWN_DEVICE_BODY, 404);
+    }
     const where =
       query.afterId !== undefined
         ? and(
@@ -54,12 +62,19 @@ adminScoreboardRoutes.get(
   describeRoute({
     description: "Connection health for the scoreboard ingest",
     tags: ["Scoreboard"],
-    responses: { 200: { description: "Health" } },
+    responses: {
+      200: { description: "Health" },
+      400: { description: "Bad request" },
+      404: { description: "Unknown device" },
+    },
   }),
   async (c) => {
     const deviceId = c.req.query("deviceId");
     if (!deviceId) {
       return c.json({ error: "deviceId required", code: "BAD_REQUEST" }, 400);
+    }
+    if (!isConfiguredDevice(deviceId)) {
+      return c.json(UNKNOWN_DEVICE_BODY, 404);
     }
     const rows = await getDb()
       .select()

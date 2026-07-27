@@ -19,6 +19,10 @@ import {
 } from "../../services/broadcast/publisher";
 import { validationHook } from "../../middleware/validation";
 import {
+  isConfiguredDevice,
+  UNKNOWN_DEVICE_BODY,
+} from "../../services/scoreboard/device-allowlist";
+import {
   broadcastUpsertSchema,
   broadcastStartStopSchema,
   broadcastMatchesQuerySchema,
@@ -33,12 +37,18 @@ adminBroadcastRoutes.get(
   describeRoute({
     description: "Get the broadcast config for a device",
     tags: ["Broadcast"],
-    responses: { 200: { description: "Config + joined match" } },
+    responses: {
+      200: { description: "Config + joined match" },
+      404: { description: "Unknown device" },
+    },
   }),
   async (c) => {
     const deviceId = c.req.query("deviceId");
     if (!deviceId) {
       return c.json({ error: "deviceId required", code: "BAD_REQUEST" }, 400);
+    }
+    if (!isConfiguredDevice(deviceId)) {
+      return c.json(UNKNOWN_DEVICE_BODY, 404);
     }
     const config = await getBroadcastConfig(deviceId);
     const match = config
@@ -64,10 +74,14 @@ adminBroadcastRoutes.put(
     responses: {
       200: { description: "Updated" },
       400: { description: "Invalid body" },
+      404: { description: "Unknown device" },
     },
   }),
   async (c) => {
     const body = c.req.valid("json");
+    if (!isConfiguredDevice(body.deviceId)) {
+      return c.json(UNKNOWN_DEVICE_BODY, 404);
+    }
     const config = await upsertBroadcastConfig(body);
     invalidateMatchCache(body.deviceId);
     await publishBroadcastForDevice(body.deviceId);
@@ -85,10 +99,14 @@ adminBroadcastRoutes.post(
     responses: {
       200: { description: "Started" },
       400: { description: "No match bound" },
+      404: { description: "Unknown device" },
     },
   }),
   async (c) => {
     const body = c.req.valid("json");
+    if (!isConfiguredDevice(body.deviceId)) {
+      return c.json(UNKNOWN_DEVICE_BODY, 404);
+    }
     try {
       const config = await setBroadcastLive(body.deviceId, true);
       await publishBroadcastForDevice(body.deviceId);
@@ -112,10 +130,16 @@ adminBroadcastRoutes.post(
   describeRoute({
     description: "Set isLive=false",
     tags: ["Broadcast"],
-    responses: { 200: { description: "Stopped" } },
+    responses: {
+      200: { description: "Stopped" },
+      404: { description: "Unknown device" },
+    },
   }),
   async (c) => {
     const body = c.req.valid("json");
+    if (!isConfiguredDevice(body.deviceId)) {
+      return c.json(UNKNOWN_DEVICE_BODY, 404);
+    }
     const config = await setBroadcastLive(body.deviceId, false);
     await publishBroadcastForDevice(body.deviceId);
     return c.json({ config });

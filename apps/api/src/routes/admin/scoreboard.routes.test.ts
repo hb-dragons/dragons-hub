@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import type { AppEnv } from "../../types";
+import type * as ConfigEnv from "../../config/env";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -15,6 +16,19 @@ vi.mock("../../config/auth", () => ({
     },
   },
 }));
+
+// "d1" stands in for the single configured scoreboard panel.
+vi.mock("../../config/env", async () => {
+  const actual = await vi.importActual<typeof ConfigEnv>("../../config/env");
+  return {
+    env: new Proxy(actual.env, {
+      get(target, prop) {
+        if (prop === "SCOREBOARD_DEVICE_ID") return "d1";
+        return Reflect.get(target, prop);
+      },
+    }),
+  };
+});
 
 vi.mock("../../config/database", () => ({
   getDb: () => ({
@@ -85,5 +99,27 @@ describe("admin scoreboard routes", () => {
     expect(r.status).toBe(200);
     const body = (await r.json()) as { online: boolean };
     expect(body.online).toBe(true);
+  });
+
+  it.each(["snapshots", "health"])(
+    "404s /%s for a deviceId that is not the configured panel",
+    async (path) => {
+      mocks.getSession.mockResolvedValue(adminSession);
+
+      const r = await app.request(`/admin/scoreboard/${path}?deviceId=other`);
+
+      expect(r.status).toBe(404);
+      expect(await r.json()).toMatchObject({ code: "UNKNOWN_DEVICE" });
+      expect(mocks.selectSnapshots).not.toHaveBeenCalled();
+      expect(mocks.selectLive).not.toHaveBeenCalled();
+    },
+  );
+
+  it("400s /health without a deviceId", async () => {
+    mocks.getSession.mockResolvedValue(adminSession);
+
+    const r = await app.request("/admin/scoreboard/health");
+
+    expect(r.status).toBe(400);
   });
 });

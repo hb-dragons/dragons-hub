@@ -77,6 +77,15 @@ const REDACT_PATHS = [
   ...SENSITIVE_KEYS.flatMap((k) => [`*.${k}`, ...SENSITIVE_CONTAINERS.map((c) => `*.${c}.${k}`)]),
 ];
 
+// Redaction is environment-independent on purpose. A developer's terminal and a
+// CI test log are still places a password or bearer token must not land, and
+// keeping the rule identical everywhere means a redaction gap is visible during
+// development instead of only in production.
+const REDACT: LoggerOptions["redact"] = {
+  paths: REDACT_PATHS,
+  censor: "[REDACTED]",
+};
+
 const prodOptions: LoggerOptions = {
   level: env.LOG_LEVEL,
   messageKey: "message",
@@ -86,12 +95,13 @@ const prodOptions: LoggerOptions = {
     level: (label) => ({ severity: GCP_SEVERITY[label] ?? "DEFAULT" }),
   },
   mixin: logContextMixin,
-  redact: { paths: REDACT_PATHS, censor: "[REDACTED]" },
+  redact: REDACT,
 };
 
 const devOptions: LoggerOptions = {
   level: env.LOG_LEVEL,
   mixin: logContextMixin,
+  redact: REDACT,
   transport: {
     target: "pino-pretty",
     options: {
@@ -105,9 +115,10 @@ const devOptions: LoggerOptions = {
 const testOptions: LoggerOptions = {
   level: env.LOG_LEVEL,
   mixin: logContextMixin,
+  redact: REDACT,
 };
 
-function buildOptions(): LoggerOptions {
+export function buildOptions(): LoggerOptions {
   if (isDev) return devOptions;
   if (isProd) return prodOptions;
   return testOptions;
