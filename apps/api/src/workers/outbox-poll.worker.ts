@@ -9,7 +9,7 @@ const log = logger.child({ worker: "outbox-poll" });
 /**
  * BullMQ Worker — polls the domain-events outbox on each repeatable job fire.
  * Queue is defined in `workers/queues.ts`. Schedule is created in
- * `workers/queues.ts` via `initializeScheduledJobs()`.
+ * `services/sync-jobs.service.ts` via `initializeScheduledJobs()`.
  *
  * runWithTrace(undefined, ...) is safe: when no carrier is present the function
  * calls fn() directly without establishing a log context.

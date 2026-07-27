@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import { env } from "../config/env";
 import { logger as rootLogger } from "../config/logger";
+import { SyncAlreadyQueuedError } from "../services/sync-jobs.errors";
 import type { AppEnv } from "../types";
 
 // Marker that tells Cloud Error Reporting to ingest this log entry.
@@ -23,6 +24,12 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
       },
       400,
     );
+  }
+
+  // A manual sync trigger that collides with an in-flight run. Handled here so
+  // the route stays a single success path instead of sniffing an error envelope.
+  if (error instanceof SyncAlreadyQueuedError) {
+    return c.json({ error: error.message, code: error.code }, 409);
   }
 
   if (error instanceof HTTPException) {
