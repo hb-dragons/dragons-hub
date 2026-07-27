@@ -76,6 +76,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 - Test framework: Vitest (v4) with `@hono/node-server` for API tests. `apps/native` uses a node-environment, logic-first vitest setup (react-native/expo are mocked per test; no RN component rendering).
 - Run tests before committing: `pnpm --filter @dragons/api test` (or the relevant package)
 - Coverage report: `pnpm --filter @dragons/api coverage`
+- **API integration tests run against a real PGlite database** via `setupTestDb` / `resetTestDb` / `closeTestDb` in `apps/api/src/test/setup-test-db.ts` — never mock `drizzle-orm` or `@dragons/db/schema` in a new test. The migrations are replayed once per machine by `apps/api/vitest.global-setup.ts` and cached as a data-directory tarball under `apps/api/node_modules/.cache/dragons-test-db/`, keyed by a hash of the migration files; each test file restores that snapshot instead of migrating. `resetTestDb` derives its own scope from live database state — no test file declares which tables it touches — and nothing wraps a test in a transaction, so tests may open their own. The full decision and its trade-offs are recorded at the top of `setup-test-db.ts`.
 
 ## Linting
 
