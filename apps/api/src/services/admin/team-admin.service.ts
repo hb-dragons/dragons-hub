@@ -2,6 +2,7 @@ import { getDb } from "../../config/database";
 import { teams, standings, leagues } from "@dragons/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
+import { TeamReorderError } from "./team-admin.errors";
 
 export type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
 
@@ -71,7 +72,7 @@ export async function reorderOwnClubTeams(
   // Reject duplicates
   const unique = new Set(teamIds);
   if (unique.size !== teamIds.length) {
-    throw new Error("DUPLICATE_TEAM_ID");
+    throw TeamReorderError.duplicateTeamId();
   }
 
   return await getDb().transaction(async (tx) => {
@@ -88,7 +89,7 @@ export async function reorderOwnClubTeams(
       ownClubIds.size !== teamIds.length ||
       teamIds.some((id) => !ownClubIds.has(id))
     ) {
-      throw new Error("INVALID_TEAM_SET");
+      throw TeamReorderError.invalidTeamSet();
     }
 
     // ::integer cast forces the bound parameter type — without it, node-postgres sends
