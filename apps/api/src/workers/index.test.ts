@@ -71,10 +71,13 @@ const mockTaskRemindersQueueGetRepeatableJobs = vi.fn().mockResolvedValue([]);
 const mockTaskRemindersQueueClose = vi.fn().mockResolvedValue(undefined);
 const mockOutboxPollQueueClose = vi.fn().mockResolvedValue(undefined);
 const mockTriggerRefereeGamesSync = vi.fn().mockResolvedValue(null);
-vi.mock("./queues", () => ({
+vi.mock("../services/sync-jobs.service", () => ({
   initializeScheduledJobs: (...args: unknown[]) => mockInitScheduledJobs(...args),
   initTaskReminders: (...args: unknown[]) => mockInitTaskReminders(...args),
   triggerRefereeGamesSync: (...args: unknown[]) => mockTriggerRefereeGamesSync(...args),
+}));
+
+vi.mock("./queues", () => ({
   syncQueue: {
     close: (...args: unknown[]) => mockSyncQueueClose(...args),
     add: (...args: unknown[]) => mockSyncQueueAdd(...args),

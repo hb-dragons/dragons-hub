@@ -134,7 +134,7 @@ settingsRoutes.post(
     responses: { 200: { description: "Sync triggered" } },
   }),
   async (c) => {
-    const { triggerRefereeGamesSync } = await import("../../workers/queues");
+    const { triggerRefereeGamesSync } = await import("../../services/sync-jobs.service");
     const userId = c.get("user")?.id;
     const result = await triggerRefereeGamesSync(userId);
     if (result === null) {

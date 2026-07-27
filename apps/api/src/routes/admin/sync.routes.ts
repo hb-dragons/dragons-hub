@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { describeRoute, validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
-import { triggerManualSync, getJobStatus, syncQueue } from "../../workers/queues";
+import { syncQueue } from "../../workers/queues";
+import { triggerManualSync, getJobStatus } from "../../services/sync-jobs.service";
 import {
   getSyncStatus,
   getSyncLogs,
@@ -37,17 +38,16 @@ syncRoutes.post(
   describeRoute({
     description: "Trigger manual sync via queue (non-blocking)",
     tags: ["Sync"],
-    responses: { 200: { description: "Success" } },
+    responses: {
+      200: { description: "Success" },
+      409: { description: "Sync already in progress or queued" },
+    },
   }),
   async (c) => {
     const userId = c.get("user")?.id;
+    // A sync already active/queued throws SyncAlreadyQueuedError, which the
+    // central error handler renders as 409 — no error branch belongs here.
     const result = await triggerManualSync(userId);
-    // triggerManualSync returns an error envelope when a sync is already
-    // active/queued — surface it as 409 so the typed client throws instead of
-    // treating the rejected trigger as a successful TriggerResponse.
-    if ("code" in result) {
-      return c.json(result, 409);
-    }
     return c.json(result);
   },
 );

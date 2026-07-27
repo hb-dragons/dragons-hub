@@ -178,7 +178,7 @@ function getDefaultClient(): ExpoPushClient {
 /**
  * BullMQ Worker — runs the reconcile on every repeatable job fire.
  * Queue is defined in `workers/queues.ts`. Schedule is created in
- * `workers/queues.ts` via `initializeScheduledJobs()`.
+ * `services/sync-jobs.service.ts` via `initializeScheduledJobs()`.
  */
 export const pushReceiptWorker = new Worker<unknown>(
   "push-receipt",

@@ -1009,6 +1009,21 @@ Sample API responses: `packages/sdk/src/samples/` — `getLigaList.json`, `getSp
   `task-reminders`, `outbox-poll`.
 - `sync` default: 3 attempts, exponential backoff (5s base); keeps last 100
   completed and 500 failed jobs; worker concurrency 1.
+- `queues.ts` holds queue *configuration* only, plus `clearRepeatables(queue,
+  jobName?)` — the "drop the old cron entries before re-registering" step every
+  scheduler needs. Deciding *what* to enqueue lives in
+  `apps/api/src/services/sync-jobs.service.ts`: the manual/referee triggers with
+  their Redis NX locks and `sync_runs` bookkeeping, `getJobStatus`, and the
+  repeatable schedules read from `sync_schedule`
+  (`initializeScheduledJobs`, `updateSyncSchedule`, `updateRefereeSyncSchedule`,
+  `initTaskReminders`). `queues.ts` re-exports the two schedule mutators so
+  `services/admin/sync-admin.service.ts` keeps its existing import path.
+- A manual full sync that collides with an in-flight one throws
+  `SyncAlreadyQueuedError` (`apps/api/src/services/sync-jobs.errors.ts`), which
+  `middleware/error.ts` maps to a 409 `{error, code: "SYNC_ALREADY_QUEUED"}`.
+  The error class sits in its own leaf module so the error middleware does not
+  import the service — and therefore does not construct the BullMQ queues.
+  `POST /admin/sync/trigger` has no error branch of its own.
 
 ### Notification Channels
 
@@ -1056,7 +1071,8 @@ type listed without an adapter is a compile error. All four have adapters:
 
 ### Workers
 
-Located in `apps/api/src/workers/`. Queues configured in `workers/queues.ts`.
+Located in `apps/api/src/workers/`. Queues configured in `workers/queues.ts`;
+their schedules are registered by `services/sync-jobs.service.ts`.
 
 - **sync.worker** — Processes `sync` queue jobs (full/partial sync). Default concurrency 1.
 - **event.worker** — Fan-out for domain events into per-recipient notification dispatch.

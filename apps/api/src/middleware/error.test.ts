@@ -36,6 +36,7 @@ vi.mock("../config/env", () => ({
 // --- Imports (after mocks) ---
 
 import { errorHandler } from "./error";
+import { SyncAlreadyQueuedError } from "../services/sync-jobs.errors";
 
 // App WITHOUT request logger middleware — error handler falls back to root logger
 function createBareApp() {
@@ -55,6 +56,10 @@ function createBareApp() {
 
   app.get("/throw-non-error", () => {
     throw new Error("Unknown error occurred");
+  });
+
+  app.get("/throw-sync-already-queued", () => {
+    throw new SyncAlreadyQueuedError();
   });
 
   app.get("/throw-http-401", () => {
@@ -109,6 +114,24 @@ describe("errorHandler", () => {
     expect(body.code).toBe("VALIDATION_ERROR");
     expect(body.details).toHaveLength(1);
     expect(body.details[0].path).toBe("name");
+  });
+
+  it("returns 409 with the SYNC_ALREADY_QUEUED code for SyncAlreadyQueuedError", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-sync-already-queued");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Sync already in progress or queued",
+      code: "SYNC_ALREADY_QUEUED",
+    });
+  });
+
+  it("does not report SyncAlreadyQueuedError to the error logger", async () => {
+    const app = createBareApp();
+    await app.request("/throw-sync-already-queued");
+
+    expect(mocks.rootLogger.error).not.toHaveBeenCalled();
   });
 
   it("does not call logger for ZodError", async () => {

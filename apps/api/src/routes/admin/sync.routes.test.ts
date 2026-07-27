@@ -25,9 +25,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../workers/queues", () => ({
+  syncQueue: mocks.syncQueue,
+}));
+
+vi.mock("../../services/sync-jobs.service", () => ({
   triggerManualSync: mocks.triggerManualSync,
   getJobStatus: mocks.getJobStatus,
-  syncQueue: mocks.syncQueue,
 }));
 
 vi.mock("../../services/admin/sync-admin.service", () => ({
@@ -60,6 +63,7 @@ vi.mock("../../services/sync/sync-log-stream", () => ({
 
 import { syncRoutes } from "./sync.routes";
 import { errorHandler } from "../../middleware/error";
+import { SyncAlreadyQueuedError } from "../../services/sync-jobs.errors";
 import { SYNC_STATUSES } from "@dragons/shared";
 
 // Test app without auth middleware — inject a fake user for routes that need it
@@ -109,16 +113,13 @@ describe("POST /sync/trigger", () => {
     expect(mocks.triggerManualSync).toHaveBeenCalledWith("test-user-123");
   });
 
-  it("returns error when sync already queued", async () => {
-    mocks.triggerManualSync.mockResolvedValue({
-      error: "Sync already in progress or queued",
-      code: "SYNC_ALREADY_QUEUED",
-    });
+  it("maps SyncAlreadyQueuedError to 409 through the central error handler", async () => {
+    mocks.triggerManualSync.mockRejectedValue(new SyncAlreadyQueuedError());
 
     const res = await app.request("/sync/trigger", { method: "POST" });
 
     expect(res.status).toBe(409);
-    expect(await json(res)).toMatchObject({
+    expect(await json(res)).toEqual({
       error: "Sync already in progress or queued",
       code: "SYNC_ALREADY_QUEUED",
     });

@@ -23,7 +23,7 @@ vi.mock("../../services/admin/settings.service", () => ({
   upsertSetting: mocks.upsertSetting,
 }));
 
-vi.mock("../../workers/queues", () => ({
+vi.mock("../../services/sync-jobs.service", () => ({
   triggerRefereeGamesSync: mocks.triggerRefereeGamesSync,
 }));
 
