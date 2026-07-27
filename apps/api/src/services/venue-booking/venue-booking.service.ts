@@ -24,18 +24,19 @@ const log = logger.child({ service: "venue-booking" });
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
+// `venue_booking_due_days_before` is deliberately absent: this config feeds the
+// booking time-window calculation only. The due-date setting is read by
+// `services/admin/settings.service.ts`, which owns it.
 const SETTING_KEYS = {
   bufferBefore: "venue_booking_buffer_before",
   bufferAfter: "venue_booking_buffer_after",
   gameDuration: "venue_booking_game_duration",
-  dueDaysBefore: "venue_booking_due_days_before",
 } as const;
 
 const DEFAULTS = {
   bufferBefore: 60,
   bufferAfter: 60,
   gameDuration: 90,
-  dueDaysBefore: 7,
 } as const;
 
 export async function getBookingConfig(): Promise<BookingConfig> {

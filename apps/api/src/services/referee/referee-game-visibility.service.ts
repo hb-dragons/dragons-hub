@@ -369,7 +369,7 @@ function buildHomeVisibility(
 }
 
 function buildAwayVisibility(
-  referee: { allowAllHomeGames: boolean; allowAwayGames: boolean },
+  referee: { allowAwayGames: boolean },
 ) {
   if (!referee.allowAwayGames) return null;
   return eq(refereeGames.isHomeGame, false);

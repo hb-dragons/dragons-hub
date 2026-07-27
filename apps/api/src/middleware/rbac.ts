@@ -1,5 +1,4 @@
 import type { Context, MiddlewareHandler } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { auth } from "../config/auth";
 import type { Resource, Action, RoleName } from "@dragons/shared";
 import { isReferee, satisfiesRole } from "@dragons/shared";
@@ -60,27 +59,6 @@ export function requirePermission<R extends Resource>(
     }
     await next();
   };
-}
-
-// Throws HTTPException so error middleware can produce the JSON response.
-export async function assertPermission<R extends Resource>(
-  c: Context,
-  resource: R,
-  action: Action<R>,
-): Promise<void> {
-  const user = c.get("user") as { id: string } | undefined;
-  if (!user) {
-    throw new HTTPException(401, { message: "Unauthorized" });
-  }
-  const result = await auth.api.userHasPermission({
-    body: {
-      userId: user.id,
-      permissions: { [resource]: [action] } as Record<string, string[]>,
-    },
-  });
-  if (!result.success) {
-    throw new HTTPException(403, { message: "Forbidden" });
-  }
 }
 
 export function requireAnyRole(...names: RoleName[]): MiddlewareHandler {
