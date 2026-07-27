@@ -1,6 +1,7 @@
 // Constants & enums
 export {
   TASK_PRIORITIES,
+  BOOKING_STATUSES,
   SYNC_STATUSES,
   ENTITY_TYPES,
   ENTRY_ACTIONS,

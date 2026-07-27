@@ -142,7 +142,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `broadcastConfigs` | `packages/db/src/schema/broadcast-configs.ts` | deviceId (text PK), matchId FK, isLive, home/guestAbbr, home/guestColorOverride, startedAt, endedAt |
 | `domainEvents` | `packages/db/src/schema/domain-events.ts` | id (text ULID PK), type, source, urgency, occurredAt, syncRunId FK, entityType, entityId, deepLinkPath, enqueuedAt (lease), processedAt, payload JSONB — the outbox |
 | `watchRules` | `packages/db/src/schema/watch-rules.ts` | name, enabled, eventTypes (text[]), filters JSONB, channels JSONB (`{ channel, targetId }[]`), urgencyOverride, templateOverride |
-| `channelConfigs` | `packages/db/src/schema/channel-configs.ts` | name, type (ChannelType), enabled, config JSONB, digestMode, digestCron, digestTimezone |
+| `channelConfigs` | `packages/db/src/schema/channel-configs.ts` | name, type (ChannelType), enabled, config JSONB, digestMode (DigestMode), digestCron, digestTimezone |
 | `notificationLog` | `packages/db/src/schema/notification-log.ts` | eventId FK, watchRuleId FK (set null), channelConfigId FK, recipientId, title, body, locale, status, sentAt, readAt, retryCount, providerTicketId, recipientToken — dedup via a COALESCE unique index (migration 0018), not expressible in Drizzle |
 | `digestBuffer` | `packages/db/src/schema/digest-buffer.ts` | eventId FK, channelConfigId FK — unique(eventId, channelConfigId) |
 | `pushDevices` | `packages/db/src/schema/push-devices.ts` | userId, token (unique), platform, locale, lastSeenAt |

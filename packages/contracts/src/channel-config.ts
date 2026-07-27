@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { idParamSchema } from "./common";
-import { CHANNEL_TYPES } from "@dragons/shared";
+import { CHANNEL_TYPES, DIGEST_MODES } from "@dragons/shared";
 import type { ChannelConfig, ChannelType } from "@dragons/shared";
 
 export const channelConfigIdParamSchema = idParamSchema;
@@ -64,7 +64,7 @@ export const createChannelConfigSchema = z
     type: channelTypeSchema,
     enabled: z.boolean().optional(),
     config: z.record(z.string(), z.unknown()),
-    digestMode: z.enum(["per_sync", "scheduled", "none"]).optional(),
+    digestMode: z.enum(DIGEST_MODES).optional(),
     digestCron: z.string().nullable().optional(),
     digestTimezone: z.string().optional(),
   })
@@ -105,7 +105,7 @@ export const updateChannelConfigSchema = z.strictObject({
   // existing watch rules and notification_log entries referencing this config.
   enabled: z.boolean().optional(),
   config: z.record(z.string(), z.unknown()).optional(),
-  digestMode: z.enum(["per_sync", "scheduled", "none"]).optional(),
+  digestMode: z.enum(DIGEST_MODES).optional(),
   digestCron: z.string().nullable().optional(),
   digestTimezone: z.string().optional(),
 });

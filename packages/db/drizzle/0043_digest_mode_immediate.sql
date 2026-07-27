@@ -1,0 +1,16 @@
+-- Hand-written: a data fix, so `drizzle-kit generate` has nothing to diff and
+-- writes no snapshot for it (see drizzle/README.md).
+--
+-- Migration 0030 seeds the Expo Push channel config with digest_mode
+-- 'immediate'. That value is not a member of `DigestMode`
+-- ("per_sync" | "scheduled" | "none") — it belongs to EVENT_URGENCIES, a
+-- different enum. Every database built from the migration chain therefore
+-- carries a row whose column contradicts the TypeScript type it is read as.
+--
+-- 'none' is the member that matches the behaviour the row already had: the
+-- worker buffers only digest_mode = 'per_sync' and schedules a cron digest only
+-- for 'scheduled', so 'immediate' fell through both and every notification went
+-- out as it happened. Rewriting it to 'none' names that behaviour without
+-- changing it; 'per_sync' (the column default) would silently start batching
+-- push notifications behind a sync run.
+UPDATE "channel_configs" SET "digest_mode" = 'none' WHERE "digest_mode" = 'immediate';
