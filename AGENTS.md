@@ -910,6 +910,36 @@ Anything testing this must force a non-Berlin `TZ` — a developer machine set t
 
 Raw `fetch` is lint-banned in web components (`no-restricted-globals` in `apps/web/eslint.config.mjs`, scoped to `src/**` outside `src/lib/**` and tests). The only exceptions are non-JSON requests — blob downloads and multipart uploads — which carry an inline `eslint-disable-next-line no-restricted-globals` with a reason (the social post generator's preview download and photo upload).
 
+### Hardcoded-string scanner (web)
+
+`pnpm check:i18n` runs `@lingual/i18n-check` (DE/EN catalog parity) and then
+`apps/web/scripts/check-i18n-literals.mjs`, which parses every `src/**/*.ts(x)`
+and reports letter-containing string literals that reach the user without
+passing through a message catalog. It finds three things:
+
+- JSX children — `<div>Loading…</div>`, `<div>{"Loading…"}</div>`
+- the accessible-name attributes in `TARGET_ATTRIBUTES` (`aria-label`, `title`,
+  `placeholder`, `alt`); every other attribute is ignored
+- arguments in the call positions listed in `USER_FACING_CALL_RULES`
+  (`apps/web/scripts/i18n-literal-scan.core.mjs`) — currently `toast.*(…)`
+  first arguments and `description` options, and Zod's message arguments on
+  `.min` / `.max` / `.length` / `.email` / `.url` / `.regex`, including the
+  `{ message: … }` and `{ error: … }` forms
+
+Call positions are an allowlist, never inferred (issue #135):
+`logger.error("sync failed")` and `toast.error("Sync failed")` parse
+identically, so inference reports log lines and query keys as translation debt
+and the check stops being believed. `USER_FACING_CALL_RULES` is the only place
+a callee name appears — the traversal reads it as data — so covering a new
+helper is one entry there plus a test.
+
+Findings are gated by a **file-level ratchet**:
+`apps/web/scripts/i18n-literal-baseline.json` grandfathers in pre-existing
+offenders, a file not on it fails the build, and a baselined file with zero
+remaining violations *also* fails, with an instruction to drop it from the list.
+The baseline only ever shrinks. Widening the scanner is the one time it may be
+re-measured, and that re-measurement belongs in the same commit as the widening.
+
 ## UI Component Library
 
 Two import paths, both valid:
