@@ -329,12 +329,13 @@ export function WatchRulesList() {
                       variant="ghost"
                       size="icon"
                       onClick={() => openEdit(rule)}
+                      aria-label={t("edit")}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" aria-label={t("delete")}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </AlertDialogTrigger>
@@ -390,7 +391,7 @@ export function WatchRulesList() {
 
             {/* Event types */}
             <div className="space-y-2">
-              <Label>{t("when")} &mdash; {t("eventTypes")}</Label>
+              <Label>{t("when")} {"\u2014"} {t("eventTypes")}</Label>
               <div className="flex flex-wrap gap-1.5">
                 {ALL_EVENT_TYPES.map((et) => (
                   <button
@@ -415,7 +416,7 @@ export function WatchRulesList() {
             {/* Filters */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>{t("and")} &mdash; {t("filters")}</Label>
+                <Label>{t("and")} {"\u2014"} {t("filters")}</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -497,6 +498,7 @@ export function WatchRulesList() {
                     variant="ghost"
                     size="icon"
                     onClick={() => removeFilter(idx)}
+                    aria-label={t("removeFilter")}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -506,10 +508,10 @@ export function WatchRulesList() {
 
             {/* Channels */}
             <div className="space-y-2">
-              <Label>{t("then")} &mdash; {t("channels")}</Label>
+              <Label>{t("then")} {"\u2014"} {t("channels")}</Label>
               {availableChannels.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No channels available
+                  {t("noChannels")}
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">

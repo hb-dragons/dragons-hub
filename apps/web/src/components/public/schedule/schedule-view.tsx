@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { useFormatter } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import type { MatchListItem } from "@dragons/shared";
 import { api } from "@/lib/api";
 import { ErrorState } from "@/components/ui/error-state";
@@ -35,6 +35,7 @@ export function ScheduleView({
 }: ScheduleViewProps) {
   const searchParams = useSearchParams();
   const format = useFormatter();
+  const t = useTranslations("public");
 
   const formatDate = useCallback(
     (date: string) =>
@@ -46,14 +47,17 @@ export function ScheduleView({
     [format],
   );
 
+  // "Sa/So 14/15 Mär" is a sentence, not a concatenation: the weekday
+  // abbreviations and the day/month order differ per locale, so the whole
+  // shape lives in the catalog as an ICU message.
   const formatWeekendLabel = useCallback(
-    (sat: Date, sun: Date) => {
-      const satDay = sat.getDate();
-      const sunDay = sun.getDate();
-      const month = format.dateTime(sat, { month: "short" });
-      return `Sa/So ${satDay}/${sunDay} ${month}`;
-    },
-    [format],
+    (sat: Date, sun: Date) =>
+      t("weekendLabel", {
+        satDay: sat.getDate(),
+        sunDay: sun.getDate(),
+        month: format.dateTime(sat, { month: "short" }),
+      }),
+    [format, t],
   );
 
   const teamParam = searchParams.get("team");

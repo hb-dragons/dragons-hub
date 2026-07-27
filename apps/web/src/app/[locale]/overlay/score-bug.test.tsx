@@ -1,8 +1,19 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/react";
+import { render as rtlRender } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import type { BroadcastMatch, PublicLiveSnapshot } from "@dragons/shared";
 import { ScoreBug } from "./score-bug";
+import messages from "@/messages/en.json";
+
+/** The score bug reads its labels from the catalog, so every render needs one. */
+function render(ui: React.ReactNode) {
+  return rtlRender(
+    <NextIntlClientProvider locale="en" messages={messages}>
+      {ui}
+    </NextIntlClientProvider>,
+  );
+}
 
 const match: BroadcastMatch = {
   id: 1,
@@ -119,8 +130,7 @@ describe("ScoreBug", () => {
   });
 
   function timeoutPipCount(container: HTMLElement, team: "home" | "guest"): number {
-    const aria = team === "home" ? "Timeouts " : "Timeouts ";
-    const labels = container.querySelectorAll(`[aria-label^="${aria}"]`);
+    const labels = container.querySelectorAll('[aria-label^="Timeouts"]');
     // First match = home, second = guest
     const node = labels[team === "home" ? 0 : 1];
     return node ? node.children.length : 0;

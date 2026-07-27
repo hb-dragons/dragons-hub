@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import NumberFlow, { NumberFlowGroup } from "@number-flow/react";
+import { useTranslations } from "next-intl";
 import type { BroadcastMatch, PublicLiveSnapshot } from "@dragons/shared";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -25,8 +26,11 @@ function logoUrl(clubId: number): string {
 }
 
 function PeriodBadge({ period }: { period: number }): ReactNode {
+  const t = useTranslations("broadcast.overlay");
   if (period <= 0) return "—";
   if (period <= 4) {
+    // English broadcast ordinal notation ("1ST"…"4TH") is the convention on
+    // the TV graphic itself and is deliberately not localised.
     const suffix = (["ST", "ND", "RD", "TH"] as const)[period - 1];
     return (
       <span className="inline-flex items-baseline gap-px whitespace-nowrap leading-none tracking-normal">
@@ -36,11 +40,11 @@ function PeriodBadge({ period }: { period: number }): ReactNode {
     );
   }
   if (period === 5) {
-    return <span className="tracking-[0.2em]">OT</span>;
+    return <span className="tracking-[0.2em]">{t("overtime")}</span>;
   }
   return (
-    <span className="tracking-[0.2em]">
-      OT<span className="tabular-nums">{period - 4}</span>
+    <span className="tabular-nums tracking-[0.2em]">
+      {t("overtimeNumbered", { number: period - 4 })}
     </span>
   );
 }
@@ -184,14 +188,15 @@ function ShotClockCap({
   shotClockText: string;
   timeoutActive: boolean;
 }) {
+  const t = useTranslations("broadcast.overlay");
   if (timeoutActive) {
     return (
       <div
         className="flex w-12 h-8 shrink-0 items-center justify-center bg-red-500"
-        aria-label="Timeout"
+        aria-label={t("timeout")}
       >
         <span className="text-xl font-black uppercase text-white">
-          TO
+          {t("timeoutShort")}
         </span>
       </div>
     );
@@ -214,10 +219,11 @@ function ShotClockCap({
 }
 
 function FoulPips({ fouls }: { fouls: number }) {
+  const t = useTranslations("broadcast.overlay");
   const filled = Math.min(Math.max(fouls, 0), MAX_FOUL_PIPS);
   const bonus = fouls >= TEAM_FOUL_BONUS_AT;
   return (
-    <div className="flex items-center gap-1" aria-label={`Fouls ${fouls}`}>
+    <div className="flex items-center gap-1" aria-label={t("foulsLabel", { count: fouls })}>
       {Array.from({ length: MAX_FOUL_PIPS }, (_, i) => {
         const isBonus = i === MAX_FOUL_PIPS - 1;
         const active = isBonus ? bonus : i < filled;
@@ -233,10 +239,11 @@ function FoulPips({ fouls }: { fouls: number }) {
 }
 
 function TimeoutPips({ timeouts, period }: { timeouts: number; period: number }) {
+  const t = useTranslations("broadcast.overlay");
   const total = timeoutPipsForPeriod(period);
   const filled = Math.min(Math.max(timeouts, 0), total);
   return (
-    <div className="flex items-center gap-1" aria-label={`Timeouts ${filled}`}>
+    <div className="flex items-center gap-1" aria-label={t("timeoutsLabel", { count: filled })}>
       {Array.from({ length: total }, (_, i) => (
         <span
           key={i}

@@ -31,9 +31,20 @@ interface QuarterColumn {
   guest: number | null;
 }
 
+/**
+ * Column headers are ICU messages, not concatenations: "Q3" and "OT2" are one
+ * label each, and the German catalog abbreviates overtime as "VL".
+ */
+interface QuarterLabels {
+  quarter: (number: number) => string;
+  halftime: string;
+  overtime: (number: number) => string;
+  total: string;
+}
+
 function buildQuarterColumns(
   match: PublicMatchDetail,
-  labels: { halftime: string; overtime: string; total: string },
+  labels: QuarterLabels,
 ): QuarterColumn[] {
   const cols: QuarterColumn[] = [];
 
@@ -42,7 +53,7 @@ function buildQuarterColumns(
     const h = match[`homeQ${n}` as keyof PublicMatchDetail] as number | null;
     const g = match[`guestQ${n}` as keyof PublicMatchDetail] as number | null;
     if (h !== null || g !== null) {
-      cols.push({ label: `Q${n}`, home: h, guest: g });
+      cols.push({ label: labels.quarter(n), home: h, guest: g });
     }
   }
 
@@ -57,10 +68,10 @@ function buildQuarterColumns(
 
   // Overtime
   if (match.homeOt1 !== null || match.guestOt1 !== null) {
-    cols.push({ label: `${labels.overtime}1`, home: match.homeOt1, guest: match.guestOt1 });
+    cols.push({ label: labels.overtime(1), home: match.homeOt1, guest: match.guestOt1 });
   }
   if (match.homeOt2 !== null || match.guestOt2 !== null) {
-    cols.push({ label: `${labels.overtime}2`, home: match.homeOt2, guest: match.guestOt2 });
+    cols.push({ label: labels.overtime(2), home: match.homeOt2, guest: match.guestOt2 });
   }
 
   // Total
@@ -109,34 +120,8 @@ export default async function GameDetailPage({
   if (Number.isNaN(numId)) notFound();
 
   const t = await getTranslations("public");
+  const gd = await getTranslations("public.gameDetail");
   const format = await getFormatter();
-
-  const tRaw = t.raw as (key: string) => unknown;
-  const gd = tRaw("gameDetail") as {
-    final: string;
-    quarters: string;
-    halftime: string;
-    overtime: string;
-    total: string;
-    headToHead: string;
-    viewAllH2H: string;
-    form: string;
-    details: string;
-    venue: string;
-    address: string;
-    scorer: string;
-    timekeeper: string;
-    status: string;
-    confirmed: string;
-    cancelled: string;
-    forfeited: string;
-    win: string;
-    loss: string;
-    record: string;
-    ptsFor: string;
-    ptsAgainst: string;
-    noData: string;
-  };
 
   const api = getPublicServerApi();
   const [match, context] = await Promise.all([
@@ -163,10 +148,24 @@ export default async function GameDetailPage({
     ? match.guestTeamApiId
     : match.homeTeamApiId;
 
+  // "Sat 2 May · 19:30" — one ICU message, not a hand-built separator.
+  const kickoffDateLabel = format.dateTime(
+    new Date(match.kickoffDate + "T12:00:00"),
+    { weekday: "short", day: "numeric", month: "short" },
+  );
+  const kickoffLabel = match.kickoffTime
+    ? t("kickoffDateTime", {
+        date: kickoffDateLabel,
+        time: match.kickoffTime.slice(0, 5),
+      })
+    : kickoffDateLabel;
+
+  const totalLabel = gd("total");
   const quarterCols = buildQuarterColumns(match, {
-    halftime: gd.halftime,
-    overtime: gd.overtime,
-    total: gd.total,
+    quarter: (number) => gd("quarterLabel", { number }),
+    halftime: gd("halftime"),
+    overtime: (number) => gd("overtimeLabel", { number }),
+    total: totalLabel,
   });
 
   return (
@@ -176,14 +175,7 @@ export default async function GameDetailPage({
         {/* Meta: date / time / league / venue */}
         <div className="mb-4 space-y-0.5 text-center">
           {match.kickoffDate && (
-            <p className="text-xs text-muted-foreground">
-              {format.dateTime(new Date(match.kickoffDate + "T12:00:00"), {
-                weekday: "short",
-                day: "numeric",
-                month: "short",
-              })}
-              {match.kickoffTime && ` · ${match.kickoffTime.slice(0, 5)}`}
-            </p>
+            <p className="text-xs text-muted-foreground">{kickoffLabel}</p>
           )}
           {match.leagueName && (
             <p className="text-xs text-muted-foreground">{match.leagueName}</p>
@@ -256,17 +248,17 @@ export default async function GameDetailPage({
         <div className="mt-3 flex flex-col items-center gap-1.5">
           {hasScore && (
             <span className="font-display text-xs font-medium uppercase tracking-wider text-primary">
-              {gd.final}
+              {gd("final")}
             </span>
           )}
           {match.isCancelled && (
             <span className="rounded-4xl bg-destructive/15 px-2.5 py-0.5 font-display text-xs font-semibold uppercase tracking-wide text-destructive">
-              {gd.cancelled}
+              {gd("cancelled")}
             </span>
           )}
           {match.isForfeited && (
             <span className="rounded-4xl bg-heat/10 px-2.5 py-0.5 font-display text-xs font-semibold uppercase tracking-wide text-heat">
-              {gd.forfeited}
+              {gd("forfeited")}
             </span>
           )}
         </div>
@@ -276,21 +268,22 @@ export default async function GameDetailPage({
       {quarterCols.length > 0 && (
         <section>
           <p className="mb-2 font-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            {gd.quarters}
+            {gd("quarters")}
           </p>
           <div className="overflow-x-auto rounded-md bg-card">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-surface-low">
+                  {/* The row header column: named for screen readers, blank on screen. */}
                   <th className="px-3 py-2 text-left font-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    &nbsp;
+                    <span className="sr-only">{gd("teamColumn")}</span>
                   </th>
                   {quarterCols.map((col) => (
                     <th
                       key={col.label}
                       className={cn(
                         "px-3 py-2 text-center font-display text-xs font-medium uppercase tracking-wider text-muted-foreground",
-                        col.label === gd.total && "bg-surface-low",
+                        col.label === totalLabel && "bg-surface-low",
                       )}
                     >
                       {col.label}
@@ -314,7 +307,7 @@ export default async function GameDetailPage({
                       key={col.label}
                       className={cn(
                         "px-3 py-2 text-center tabular-nums",
-                        col.label === gd.total && "font-bold",
+                        col.label === totalLabel && "font-bold",
                       )}
                     >
                       {col.home ?? "-"}
@@ -338,7 +331,7 @@ export default async function GameDetailPage({
                       key={col.label}
                       className={cn(
                         "px-3 py-2 text-center tabular-nums",
-                        col.label === gd.total && "font-bold",
+                        col.label === totalLabel && "font-bold",
                       )}
                     >
                       {col.guest ?? "-"}
@@ -355,7 +348,7 @@ export default async function GameDetailPage({
       {context && context.headToHead.previousMeetings.length > 0 && (
         <section>
           <p className="mb-2 font-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            {gd.headToHead}
+            {gd("headToHead")}
           </p>
           <div className="rounded-md bg-card p-4">
             {/* Summary stats */}
@@ -364,26 +357,26 @@ export default async function GameDetailPage({
                 <p className="font-display text-xl font-bold text-primary">
                   {context.headToHead.wins}
                 </p>
-                <p className="text-xs text-muted-foreground">{gd.win}</p>
+                <p className="text-xs text-muted-foreground">{gd("win")}</p>
               </div>
               <div>
                 <p className="font-display text-xl font-bold text-destructive">
                   {context.headToHead.losses}
                 </p>
-                <p className="text-xs text-muted-foreground">{gd.loss}</p>
+                <p className="text-xs text-muted-foreground">{gd("loss")}</p>
               </div>
               <div>
                 <p className="font-display text-xl font-bold">
                   {context.headToHead.pointsFor}
                 </p>
-                <p className="text-xs text-muted-foreground">{gd.ptsFor}</p>
+                <p className="text-xs text-muted-foreground">{gd("ptsFor")}</p>
               </div>
               <div>
                 <p className="font-display text-xl font-bold">
                   {context.headToHead.pointsAgainst}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {gd.ptsAgainst}
+                  {gd("ptsAgainst")}
                 </p>
               </div>
             </div>
@@ -442,7 +435,7 @@ export default async function GameDetailPage({
                 href={`/h2h/${opponentApiId}`}
                 className="text-xs font-medium text-primary hover:underline"
               >
-                {gd.viewAllH2H}
+                {gd("viewAllH2H")}
               </Link>
             </div>
           </div>
@@ -454,7 +447,7 @@ export default async function GameDetailPage({
         (context.homeForm.length > 0 || context.guestForm.length > 0) && (
           <section>
             <p className="mb-2 font-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {gd.form}
+              {gd("form")}
             </p>
             <div className="space-y-3 rounded-md bg-card p-4">
               {/* Own-club form first */}
@@ -468,7 +461,7 @@ export default async function GameDetailPage({
                       ? context.homeForm
                       : context.guestForm
                   }
-                  labels={{ win: gd.win, loss: gd.loss }}
+                  labels={{ win: gd("win"), loss: gd("loss") }}
                 />
               </div>
               {/* Opponent form */}
@@ -482,7 +475,7 @@ export default async function GameDetailPage({
                       ? context.guestForm
                       : context.homeForm
                   }
-                  labels={{ win: gd.win, loss: gd.loss }}
+                  labels={{ win: gd("win"), loss: gd("loss") }}
                 />
               </div>
             </div>
@@ -492,25 +485,25 @@ export default async function GameDetailPage({
       {/* ── 5. Details ── */}
       <section>
         <p className="mb-2 font-display text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {gd.details}
+          {gd("details")}
         </p>
         <div className="rounded-md bg-card p-4">
           <dl className="space-y-3 text-sm">
             {venueName && (
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">{gd.venue}</dt>
+                <dt className="text-muted-foreground">{gd("venue")}</dt>
                 <dd className="text-right font-medium">{venueName}</dd>
               </div>
             )}
             {address && (
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">{gd.address}</dt>
+                <dt className="text-muted-foreground">{gd("address")}</dt>
                 <dd className="text-right font-medium">{address}</dd>
               </div>
             )}
             {match.anschreiber && (
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">{gd.scorer}</dt>
+                <dt className="text-muted-foreground">{gd("scorer")}</dt>
                 <dd className="text-right font-medium">
                   {match.anschreiber}
                 </dd>
@@ -518,28 +511,28 @@ export default async function GameDetailPage({
             )}
             {match.zeitnehmer && (
               <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">{gd.timekeeper}</dt>
+                <dt className="text-muted-foreground">{gd("timekeeper")}</dt>
                 <dd className="text-right font-medium">
                   {match.zeitnehmer}
                 </dd>
               </div>
             )}
             <div className="flex items-center justify-between gap-4">
-              <dt className="text-muted-foreground">{gd.status}</dt>
+              <dt className="text-muted-foreground">{gd("status")}</dt>
               <dd className="flex gap-2">
                 {match.isConfirmed && (
                   <span className="rounded-4xl bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                    {gd.confirmed}
+                    {gd("confirmed")}
                   </span>
                 )}
                 {match.isCancelled && (
                   <span className="rounded-4xl bg-destructive/15 px-2.5 py-0.5 text-xs font-semibold text-destructive">
-                    {gd.cancelled}
+                    {gd("cancelled")}
                   </span>
                 )}
                 {match.isForfeited && (
                   <span className="rounded-4xl bg-heat/10 px-2.5 py-0.5 text-xs font-semibold text-heat">
-                    {gd.forfeited}
+                    {gd("forfeited")}
                   </span>
                 )}
               </dd>

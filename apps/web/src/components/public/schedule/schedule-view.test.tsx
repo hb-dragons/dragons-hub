@@ -81,8 +81,8 @@ describe("<ScheduleView> stale-response handling", () => {
 
     renderView();
     // Two rapid pages forward: request A then request B.
-    fireEvent.click(screen.getByLabelText("Next weekend"));
-    fireEvent.click(screen.getByLabelText("Next weekend"));
+    fireEvent.click(screen.getByLabelText("nextWeekend"));
+    fireEvent.click(screen.getByLabelText("nextWeekend"));
     expect(getMatches).toHaveBeenCalledTimes(2);
 
     // B lands first, then the stale A. The view must keep B.
@@ -99,11 +99,11 @@ describe("<ScheduleView> stale-response handling", () => {
     getMatches.mockReturnValue(deferred<{ items: MatchListItem[] }>().promise);
     renderView();
 
-    fireEvent.click(screen.getByLabelText("Next weekend"));
+    fireEvent.click(screen.getByLabelText("nextWeekend"));
     const firstSignal = (getMatches.mock.calls[0]![1] as { signal: AbortSignal }).signal;
     expect(firstSignal.aborted).toBe(false);
 
-    fireEvent.click(screen.getByLabelText("Next weekend"));
+    fireEvent.click(screen.getByLabelText("nextWeekend"));
     expect(firstSignal.aborted).toBe(true);
   });
 
@@ -113,8 +113,8 @@ describe("<ScheduleView> stale-response handling", () => {
     getMatches.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
 
     renderView();
-    fireEvent.click(screen.getByLabelText("Next weekend"));
-    fireEvent.click(screen.getByLabelText("Next weekend"));
+    fireEvent.click(screen.getByLabelText("nextWeekend"));
+    fireEvent.click(screen.getByLabelText("nextWeekend"));
 
     second.resolve({ items: [match(20)] });
     await waitFor(() => expect(screen.getByTestId("matches")).toHaveTextContent("20"));
@@ -135,7 +135,7 @@ describe("<ScheduleView> failure handling", () => {
   it("renders an error state with retry instead of 'no matches this weekend'", async () => {
     getMatches.mockRejectedValueOnce(new Error("server down"));
     renderView();
-    fireEvent.click(screen.getByLabelText("Next weekend"));
+    fireEvent.click(screen.getByLabelText("nextWeekend"));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.queryByTestId("matches")).not.toBeInTheDocument();

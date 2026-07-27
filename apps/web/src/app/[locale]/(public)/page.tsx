@@ -19,30 +19,39 @@ function getTeamName(match: MatchListItem, side: "home" | "guest") {
   });
 }
 
-function getCountdown(
-  kickoffDate: string,
-  labels: { today: string; tomorrow: string; inDays: (count: number) => string },
-): string {
+/** Whole days from today to the kickoff date; negative once it is in the past. */
+function daysUntil(kickoffDate: string): number {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const game = new Date(kickoffDate + "T00:00:00");
   game.setHours(0, 0, 0, 0);
-  const days = Math.round((game.getTime() - now.getTime()) / 86400000);
-  if (days === 0) return labels.today;
-  if (days === 1) return labels.tomorrow;
-  return labels.inDays(days);
+  return Math.round((game.getTime() - now.getTime()) / 86400000);
 }
 
 export default async function HomePage() {
   const t = await getTranslations("public");
   const format = await getFormatter();
 
-  // next-intl's NamespacedMessageKeys type can't resolve 2-level-deep keys
-  // under the "public" namespace in TS 6 (gameDetail/teamDetail/h2h cause
-  // the union to exceed the complexity limit). Use raw() for nested keys.
-  const tRaw = t.raw as (key: string) => unknown;
-  const countdown = tRaw("countdown") as { today: string; tomorrow: string; inDays: string };
-  const stats = tRaw("stats") as { teams: string; wins: string; losses: string; winRate: string };
+  const tCountdown = await getTranslations("public.countdown");
+  const tStats = await getTranslations("public.stats");
+
+  function countdownLabel(kickoffDate: string): string {
+    const days = daysUntil(kickoffDate);
+    if (days === 0) return tCountdown("today");
+    if (days === 1) return tCountdown("tomorrow");
+    return tCountdown("inDays", { count: days });
+  }
+
+  /** "Sat 2 May · 19:30" — one ICU message, not a hand-built separator. */
+  function kickoffLabel(kickoffDate: string, kickoffTime: string | null): string {
+    const date = format.dateTime(new Date(kickoffDate + "T12:00:00"), {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+    if (!kickoffTime) return date;
+    return t("kickoffDateTime", { date, time: kickoffTime.slice(0, 5) });
+  }
 
   const dashboard = await getPublicServerApi()
     .getHomeDashboard()
@@ -63,9 +72,9 @@ export default async function HomePage() {
       {/* Hero */}
       <section className="flex flex-col items-center gap-2 pt-8 pb-4 text-center">
         <h1 className="font-display text-4xl font-bold uppercase tracking-tight md:text-5xl">
-          Dragons
+          {t("heroTitle")}
         </h1>
-        <p className="text-muted-foreground text-sm">Basketball</p>
+        <p className="text-muted-foreground text-sm">{t("heroSubtitle")}</p>
       </section>
 
       {/* Next Game */}
@@ -76,11 +85,7 @@ export default async function HomePage() {
               {t("nextMatch")}
             </p>
             <span className="rounded-4xl bg-heat/10 px-2.5 py-0.5 font-display text-xs font-semibold uppercase tracking-wide text-heat">
-              {getCountdown(nextGame.kickoffDate, {
-              today: countdown.today,
-              tomorrow: countdown.tomorrow,
-              inDays: (count) => countdown.inDays.replace("{count}", String(count)),
-            })}
+              {countdownLabel(nextGame.kickoffDate)}
             </span>
           </div>
           <Link href={`/game/${nextGame.id}`} className="block">
@@ -103,12 +108,7 @@ export default async function HomePage() {
               <div className="mt-3 space-y-0.5 text-center">
                 {nextGame.kickoffDate && (
                   <p className="text-xs text-muted-foreground">
-                    {format.dateTime(new Date(nextGame.kickoffDate + "T12:00:00"), {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    })}
-                    {nextGame.kickoffTime && ` · ${nextGame.kickoffTime.slice(0, 5)}`}
+                    {kickoffLabel(nextGame.kickoffDate, nextGame.kickoffTime)}
                   </p>
                 )}
                 {nextGame.leagueName && (
@@ -157,19 +157,19 @@ export default async function HomePage() {
         <div className="grid grid-cols-4 gap-4 text-center">
           <div>
             <p className="font-display text-2xl font-bold">{clubStats.teamCount}</p>
-            <p className="text-xs text-muted-foreground">{stats.teams}</p>
+            <p className="text-xs text-muted-foreground">{tStats("teams")}</p>
           </div>
           <div>
             <p className="font-display text-2xl font-bold text-primary">{clubStats.totalWins}</p>
-            <p className="text-xs text-muted-foreground">{stats.wins}</p>
+            <p className="text-xs text-muted-foreground">{tStats("wins")}</p>
           </div>
           <div>
             <p className="font-display text-2xl font-bold text-destructive">{clubStats.totalLosses}</p>
-            <p className="text-xs text-muted-foreground">{stats.losses}</p>
+            <p className="text-xs text-muted-foreground">{tStats("losses")}</p>
           </div>
           <div>
             <p className="font-display text-2xl font-bold">{Math.round(clubStats.winPercentage)}%</p>
-            <p className="text-xs text-muted-foreground">{stats.winRate}</p>
+            <p className="text-xs text-muted-foreground">{tStats("winRate")}</p>
           </div>
         </div>
       </section>

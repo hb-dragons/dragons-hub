@@ -2,6 +2,7 @@
 
 import { Button } from "@dragons/ui/components/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useCallback, useRef } from "react";
 
 interface WeekendPickerProps {
@@ -20,6 +21,7 @@ export function WeekendPicker({
   hasPrevious,
   hasNext,
 }: WeekendPickerProps) {
+  const t = useTranslations("public");
   const touchStartX = useRef<number | null>(null);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -52,7 +54,7 @@ export function WeekendPicker({
         size="icon"
         onClick={onPrevious}
         disabled={!hasPrevious}
-        aria-label="Previous weekend"
+        aria-label={t("previousWeekend")}
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
@@ -62,7 +64,7 @@ export function WeekendPicker({
         size="icon"
         onClick={onNext}
         disabled={!hasNext}
-        aria-label="Next weekend"
+        aria-label={t("nextWeekend")}
       >
         <ChevronRight className="h-4 w-4" />
       </Button>

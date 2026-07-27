@@ -9,7 +9,7 @@ import {
   type ButtonHTMLAttributes,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import { useFormatter } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { MatchListItem } from "@dragons/shared";
 import { api } from "@/lib/api";
@@ -131,6 +131,7 @@ export function CalendarView({
 }: CalendarViewProps) {
   const searchParams = useSearchParams();
   const format = useFormatter();
+  const t = useTranslations("public");
 
   const teamParam = searchParams.get("team");
   const selectedTeamApiId = teamParam ? Number(teamParam) : null;
@@ -290,11 +291,23 @@ export function CalendarView({
     <div className="space-y-4">
       {/* Month navigation header */}
       <div className="flex items-center justify-between px-1">
-        <Button variant="ghost" size="icon" className="size-8" onClick={goToPreviousMonth}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={goToPreviousMonth}
+          aria-label={t("previousMonth")}
+        >
           <ChevronLeftIcon className="size-4" />
         </Button>
         <span className="text-sm font-semibold capitalize">{monthLabel}</span>
-        <Button variant="ghost" size="icon" className="size-8" onClick={goToNextMonth}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8"
+          onClick={goToNextMonth}
+          aria-label={t("nextMonth")}
+        >
           <ChevronRightIcon className="size-4" />
         </Button>
       </div>

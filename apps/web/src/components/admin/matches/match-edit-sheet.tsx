@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useId, useRef } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { useRouter } from "@/lib/navigation";
 import { useForm, Controller } from "react-hook-form";
@@ -74,6 +74,7 @@ import type { MatchUpdateBody } from "@dragons/api-client";
 // ---------------------------------------------------------------------------
 
 function OverrideField({
+  controlId,
   label,
   remoteDisplay,
   children,
@@ -83,6 +84,8 @@ function OverrideField({
   onReset,
   canEdit,
 }: {
+  /** id of the control this label names — without it the label is decoration. */
+  controlId: string;
   label: string;
   remoteDisplay?: string;
   children: React.ReactNode;
@@ -98,7 +101,7 @@ function OverrideField({
   return (
     <Field>
       <div className="flex min-h-6 items-center justify-between">
-        <FieldLabel>{label}</FieldLabel>
+        <FieldLabel htmlFor={controlId}>{label}</FieldLabel>
         <div className="flex items-center gap-1">
           {canEdit && isDirty && onReset && (
             <Button
@@ -212,6 +215,11 @@ export function MatchEditSheet({
   const t = useTranslations();
   const format = useFormatter();
   const router = useRouter();
+  // One prefix per mounted sheet: `${fieldIds}-kickoffDate` names the control,
+  // `${fieldIds}-kickoffDate-error` the message that describes it.
+  const fieldIds = useId();
+  const controlId = (name: keyof MatchFormValues) => `${fieldIds}-${name}`;
+  const errorId = (name: keyof MatchFormValues) => `${fieldIds}-${name}-error`;
   const { data: session } = authClient.useSession();
   const canEdit = can(session?.user ?? null, "match", "update");
   const [loading, setLoading] = useState(false);
@@ -425,19 +433,24 @@ export function MatchEditSheet({
           onClick={handleClose}
         >
           <X />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t("common.close")}</span>
         </Button>
 
         <SheetHeader>
           <SheetTitle>
             {match
-              ? `${match.homeTeamName} vs ${match.guestTeamName}`
+              ? t("matchDetail.editTitle", {
+                  home: match.homeTeamName,
+                  guest: match.guestTeamName,
+                })
               : t("matches.title")}
           </SheetTitle>
           {match && (
             <SheetDescription>
-              {t("matchDetail.info.matchday")} {match.matchDay} &middot;{" "}
-              {match.leagueName ?? "\u2014"}
+              {t("matchDetail.info.matchdaySummary", {
+                day: match.matchDay,
+                league: match.leagueName ?? "\u2014",
+              })}
             </SheetDescription>
           )}
         </SheetHeader>
@@ -587,6 +600,7 @@ export function MatchEditSheet({
                     name="kickoffDate"
                     render={({ field }) => (
                       <OverrideField
+                        controlId={controlId("kickoffDate")}
                         label={t("matchDetail.overrides.date")}
                         remoteDisplay={
                           remoteKickoffDate
@@ -601,6 +615,7 @@ export function MatchEditSheet({
                       >
                         <div className={dirtyRing("kickoffDate")}>
                           <DatePicker
+                            id={controlId("kickoffDate")}
                             value={
                               typeof field.value === "string" ? field.value : null
                             }
@@ -618,6 +633,7 @@ export function MatchEditSheet({
                     name="kickoffTime"
                     render={({ field }) => (
                       <OverrideField
+                        controlId={controlId("kickoffTime")}
                         label={t("matchDetail.overrides.time")}
                         remoteDisplay={
                           remoteKickoffTime
@@ -632,6 +648,7 @@ export function MatchEditSheet({
                       >
                         <div className={dirtyRing("kickoffTime")}>
                           <TimePicker
+                            id={controlId("kickoffTime")}
                             value={
                               typeof field.value === "string" ? field.value : null
                             }
@@ -653,7 +670,7 @@ export function MatchEditSheet({
                     render={({ field }) => (
                       <Field className="flex items-center justify-start gap-4 space-y-0">
                         <div className="flex items-center gap-2">
-                          <FieldLabel>
+                          <FieldLabel htmlFor={controlId("isForfeited")}>
                             {t("matchDetail.overrides.forfeited")}
                           </FieldLabel>
                           {match.overriddenFields.includes("isForfeited") && (
@@ -665,6 +682,7 @@ export function MatchEditSheet({
                         </div>
                         <div className="flex items-center gap-2">
                           <Switch
+                            id={controlId("isForfeited")}
                             checked={field.value === true}
                             onCheckedChange={(checked) => field.onChange(checked)}
                             disabled={!canEdit}
@@ -693,7 +711,7 @@ export function MatchEditSheet({
                     render={({ field }) => (
                       <Field className="flex items-center justify-start gap-4 space-y-0">
                         <div className="flex items-center gap-2">
-                          <FieldLabel>
+                          <FieldLabel htmlFor={controlId("isCancelled")}>
                             {t("matchDetail.overrides.cancelled")}
                           </FieldLabel>
                           {match.overriddenFields.includes("isCancelled") && (
@@ -705,6 +723,7 @@ export function MatchEditSheet({
                         </div>
                         <div className="flex items-center gap-2">
                           <Switch
+                            id={controlId("isCancelled")}
                             checked={field.value === true}
                             onCheckedChange={(checked) => field.onChange(checked)}
                             disabled={!canEdit}
@@ -734,6 +753,7 @@ export function MatchEditSheet({
                   name="venueNameOverride"
                   render={({ field, fieldState }) => (
                     <OverrideField
+                      controlId={controlId("venueNameOverride")}
                       label={t("matchDetail.overrides.venue")}
                       remoteDisplay={
                         match.venueName
@@ -757,6 +777,13 @@ export function MatchEditSheet({
                     >
                       <div className={dirtyRing("venueNameOverride")}>
                         <Combobox
+                          id={controlId("venueNameOverride")}
+                          aria-invalid={!!fieldState.error}
+                          aria-describedby={
+                            fieldState.error
+                              ? errorId("venueNameOverride")
+                              : undefined
+                          }
                           value={field.value ?? ""}
                           onChange={(v) => field.onChange(v || null)}
                           onSearch={async (q) => {
@@ -783,7 +810,9 @@ export function MatchEditSheet({
                           disabled={!canEdit}
                         />
                       </div>
-                      <FieldError>{fieldState.error?.message}</FieldError>
+                      <FieldError id={errorId("venueNameOverride")}>
+                        {fieldState.error?.message}
+                      </FieldError>
                     </OverrideField>
                   )}
                 />
@@ -836,14 +865,23 @@ export function MatchEditSheet({
                       name={fieldName}
                       render={({ field, fieldState }) => (
                         <Field>
-                          <FieldLabel>{t(`matchDetail.staff.${fieldName}`)}</FieldLabel>
+                          <FieldLabel htmlFor={controlId(fieldName)}>
+                            {t(`matchDetail.staff.${fieldName}`)}
+                          </FieldLabel>
                           <div className="flex items-center gap-1">
                             <Select
                               value={field.value ?? ""}
                               onValueChange={(v) => field.onChange(v)}
                               disabled={!canEdit}
                             >
-                              <SelectTrigger className={`h-9 w-full ${dirtyRing(fieldName)}`}>
+                              <SelectTrigger
+                                id={controlId(fieldName)}
+                                aria-invalid={!!fieldState.error}
+                                aria-describedby={
+                                  fieldState.error ? errorId(fieldName) : undefined
+                                }
+                                className={`h-9 w-full ${dirtyRing(fieldName)}`}
+                              >
                                 <SelectValue placeholder={t("matchDetail.staff.placeholder")} />
                               </SelectTrigger>
                               <SelectContent>
@@ -863,13 +901,18 @@ export function MatchEditSheet({
                                 variant="ghost"
                                 size="icon-sm"
                                 className="shrink-0 text-muted-foreground"
+                                aria-label={t("matchDetail.staff.clear", {
+                                  role: t(`matchDetail.staff.${fieldName}`),
+                                })}
                                 onClick={() => field.onChange(null)}
                               >
                                 <X className="h-3.5 w-3.5" />
                               </Button>
                             )}
                           </div>
-                          <FieldError>{fieldState.error?.message}</FieldError>
+                          <FieldError id={errorId(fieldName)}>
+                            {fieldState.error?.message}
+                          </FieldError>
                         </Field>
                       )}
                     />
@@ -923,12 +966,21 @@ export function MatchEditSheet({
                   name="internalNotes"
                   render={({ field, fieldState }) => (
                     <Field>
-                      <FieldLabel>{t("matchDetail.notes.internal")}</FieldLabel>
-                      <FieldDescription>
+                      <FieldLabel htmlFor={controlId("internalNotes")}>
+                        {t("matchDetail.notes.internal")}
+                      </FieldLabel>
+                      <FieldDescription id={`${controlId("internalNotes")}-hint`}>
                         {t("matchDetail.notes.internalDescription")}
                       </FieldDescription>
                       <Textarea
+                        id={controlId("internalNotes")}
                         rows={4}
+                        aria-invalid={!!fieldState.error}
+                        aria-describedby={
+                          fieldState.error
+                            ? `${controlId("internalNotes")}-hint ${errorId("internalNotes")}`
+                            : `${controlId("internalNotes")}-hint`
+                        }
                         value={field.value ?? ""}
                         onChange={(e) =>
                           field.onChange(e.target.value || null)
@@ -937,7 +989,9 @@ export function MatchEditSheet({
                         disabled={!canEdit}
                         className={dirtyRing("internalNotes")}
                       />
-                      <FieldError>{fieldState.error?.message}</FieldError>
+                      <FieldError id={errorId("internalNotes")}>
+                        {fieldState.error?.message}
+                      </FieldError>
                     </Field>
                   )}
                 />
@@ -947,12 +1001,21 @@ export function MatchEditSheet({
                   name="publicComment"
                   render={({ field, fieldState }) => (
                     <Field>
-                      <FieldLabel>{t("matchDetail.notes.public")}</FieldLabel>
-                      <FieldDescription>
+                      <FieldLabel htmlFor={controlId("publicComment")}>
+                        {t("matchDetail.notes.public")}
+                      </FieldLabel>
+                      <FieldDescription id={`${controlId("publicComment")}-hint`}>
                         {t("matchDetail.notes.publicDescription")}
                       </FieldDescription>
                       <Textarea
+                        id={controlId("publicComment")}
                         rows={3}
+                        aria-invalid={!!fieldState.error}
+                        aria-describedby={
+                          fieldState.error
+                            ? `${controlId("publicComment")}-hint ${errorId("publicComment")}`
+                            : `${controlId("publicComment")}-hint`
+                        }
                         value={field.value ?? ""}
                         onChange={(e) =>
                           field.onChange(e.target.value || null)
@@ -961,7 +1024,9 @@ export function MatchEditSheet({
                         disabled={!canEdit}
                         className={dirtyRing("publicComment")}
                       />
-                      <FieldError>{fieldState.error?.message}</FieldError>
+                      <FieldError id={errorId("publicComment")}>
+                        {fieldState.error?.message}
+                      </FieldError>
                     </Field>
                   )}
                 />

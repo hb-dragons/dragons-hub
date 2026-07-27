@@ -121,9 +121,11 @@ const messages = {
     discard: "Discard",
     discardTitle: "Discard changes?",
     discardDescription: "Unsaved changes will be lost.",
+    editTitle: "{home} vs {guest}",
     info: {
       title: "Match Info",
       matchday: "Matchday",
+      matchdaySummary: "Matchday {day} · {league}",
       matchNo: "Match No",
       league: "League",
       venue: "Venue",
@@ -153,6 +155,7 @@ const messages = {
       anschreiber: "Anschreiber",
       zeitnehmer: "Zeitnehmer",
       shotclock: "Shotclock",
+      clear: "Clear {role}",
     },
     booking: { title: "Booking", needsReconfirmation: "Needs reconfirmation" },
     notes: {
@@ -281,6 +284,63 @@ describe("MatchEditSheet venue override", () => {
     });
     const body = mocks.updateMatch.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(body).not.toHaveProperty("venueId");
+  });
+});
+
+/**
+ * Every FieldLabel in the sheet used to be a bare <label> with no htmlFor, so
+ * a screen reader announced the controls unnamed and clicking a label did
+ * nothing. These assert the association survives, keyed on the accessible name
+ * rather than on the ids, which are useId()-generated and unstable.
+ */
+describe("MatchEditSheet field labelling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    const match = makeMatch();
+    mocks.getMatch.mockResolvedValue({ match, diffs: [] });
+    mocks.listTeams.mockResolvedValue([]);
+    mocks.searchVenues.mockResolvedValue({ venues: [] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it.each([
+    ["Date", "button"],
+    ["Venue", "textbox"],
+    ["Anschreiber", "combobox"],
+    ["Zeitnehmer", "combobox"],
+    ["Shotclock", "combobox"],
+    ["Internal", "textbox"],
+    ["Public", "textbox"],
+  ])("names the %s control through its label", async (label, role) => {
+    await renderSheet();
+    expect(
+      screen.getByRole(role, { name: label, hidden: true }),
+    ).toBeInTheDocument();
+  });
+
+  it("names the forfeited and cancelled switches", async () => {
+    await renderSheet();
+    for (const name of ["Forfeited", "Cancelled"]) {
+      expect(
+        screen.getByRole("switch", { name, hidden: true }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("points a field's aria-describedby at its own error message", async () => {
+    await renderSheet();
+    const notes = screen.getByRole("textbox", { name: "Internal", hidden: true });
+    const describedBy = notes.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    // The description is present even with no error; the error id joins it only
+    // once react-hook-form reports one, so it must not be dangling here.
+    for (const id of describedBy!.split(" ")) {
+      expect(document.getElementById(id)).not.toBeNull();
+    }
   });
 });
 
