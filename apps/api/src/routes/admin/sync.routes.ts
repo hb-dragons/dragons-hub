@@ -23,6 +23,7 @@ import {
   syncJobStatusesQuerySchema,
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
+  SYNC_JOB_STATUSES,
 } from "@dragons/contracts";
 import type { JobType } from "bullmq";
 import { subscribeSyncLog, syncLogChannel } from "../../services/sync/sync-log-stream";
@@ -126,7 +127,9 @@ syncRoutes.get(
 
     return c.json({
       items: formattedJobs,
-      validStatuses: ["active", "waiting", "delayed", "completed", "failed"],
+      // Straight from the contract the `statuses` filter validates against, so
+      // the advertised list cannot drift from the accepted one.
+      validStatuses: SYNC_JOB_STATUSES,
     });
   },
 );

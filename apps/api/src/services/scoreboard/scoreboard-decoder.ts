@@ -1,8 +1,9 @@
 import type { StramatelSnapshot } from "@dragons/shared";
 import {
   decodeSegmentBlock,
-  findSegmentFrames,
+  findFrames,
   findShotFrames,
+  isTypeCFrame,
 } from "./stramatel-segment-decoder";
 import { decodeScoreFrame, findScoreFrames } from "./stramatel-decoder";
 import { decodeShotClock, type ShotClockReading } from "./shot-clock-decoder";
@@ -44,12 +45,15 @@ function latestShotReading(frames: Buffer[]) {
 }
 
 export function decodeLatestFrame(buf: Buffer): DecodedFrame | null {
-  const segmentFrames = findSegmentFrames(buf);
-  // Shot clock rides on both the main and companion block variants, which
-  // alternate each second; scan the broad frame set so neither odd- nor
-  // even-second values are dropped. Always prefer the freshest reading in the
-  // buffer over the chosen main block's own prefix.
-  const shot = latestShotReading(findShotFrames(buf));
+  // One walk over the buffer, then two views of it. Shot clock rides on both
+  // the main and companion block variants, which alternate each second, so it
+  // reads every frame; the scoreboard state reads only the type-C ones. These
+  // used to be two independent scans from byte zero on every ingest POST.
+  const allFrames = findFrames(buf);
+  const segmentFrames = allFrames.filter(isTypeCFrame);
+  // Always prefer the freshest reading in the buffer over the chosen main
+  // block's own prefix.
+  const shot = latestShotReading(allFrames);
   for (let i = segmentFrames.length - 1; i >= 0; i--) {
     const frame = segmentFrames[i]!;
     const snapshot = decodeSegmentBlock(frame);
