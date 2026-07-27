@@ -27,13 +27,20 @@ function recordingClient() {
 describe("notification request bodies satisfy @dragons/contracts schemas", () => {
   it("list query parses against notificationListQuerySchema", async () => {
     const { api, calls } = recordingClient();
-    await api.list({ limit: 20, offset: 0, userId: "user-1" });
+    await api.list({ limit: 20, offset: 0 });
     const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
     const parsed = notificationListQuerySchema.safeParse(query);
     expect(
       parsed.error?.issues,
       "notificationListQuerySchema rejected the list query",
     ).toBeUndefined();
+  });
+
+  it("list never sends a userId — the server reads it from the session (#123)", async () => {
+    const { api, calls } = recordingClient();
+    await api.list({ limit: 20, offset: 0 });
+    const query = new URL(calls[0]!.url).searchParams;
+    expect(query.has("userId")).toBe(false);
   });
 
   it("updatePreferences body parses against notificationPreferencesBodySchema", async () => {

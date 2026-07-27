@@ -204,14 +204,17 @@ describe("listNotifications", () => {
     expect(titles).toEqual(["Audience", "Direct"]);
   });
 
-  it("returns all notifications when no userId is given (admin view)", async () => {
-    await insertNotification({ recipient_id: "user:user-1", title: "N1" });
-    await insertNotification({ recipient_id: "audience:admin", title: "N2" });
-    await insertNotification({ recipient_id: "user:user-2", title: "N3" });
+  it("never returns another user's rows (issue #123)", async () => {
+    await insertNotification({ recipient_id: "user:user-1", title: "Mine" });
+    await insertNotification({ recipient_id: "user:user-2", title: "Theirs" });
+    await insertNotification({ recipient_id: "audience:admin", title: "Admins" });
 
-    const result = await listNotifications({});
+    // userId is required, so there is no longer an unscoped call that returns
+    // the whole log across every recipient.
+    const result = await listNotifications({ userId: "user-1" });
 
-    expect(result.total).toBe(3);
+    expect(result.total).toBe(1);
+    expect(result.notifications.map((n) => n.title)).toEqual(["Mine"]);
   });
 
   it("orders by createdAt descending", async () => {
