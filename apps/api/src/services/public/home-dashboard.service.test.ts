@@ -5,6 +5,7 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { traceQueries, type QueryTrace } from "../../test/trace-queries";
 
 // --- Mocks (hoisted before imports) ---
 //
@@ -44,10 +45,12 @@ import { leagues, standings, teams } from "@dragons/db/schema";
 
 let ctx: TestDbContext;
 let leagueId: number;
+let trace: QueryTrace;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
-  dbHolder.ref = ctx.db;
+  trace = traceQueries(ctx.db as object);
+  dbHolder.ref = trace.db;
 });
 
 beforeEach(async () => {
@@ -65,6 +68,7 @@ beforeEach(async () => {
     .returning({ id: leagues.id });
   leagueId = league!.id;
   mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0 });
+  trace.reset();
 });
 
 afterAll(async () => {
@@ -214,5 +218,21 @@ describe("getHomeDashboard — club stats", () => {
     expect(typeof clubStats.teamCount).toBe("number");
     expect(typeof clubStats.totalWins).toBe("number");
     expect(typeof clubStats.totalLosses).toBe("number");
+  });
+});
+
+describe("getHomeDashboard — query fan-out", () => {
+  it("issues the team-count query alongside the standings aggregate, not after it", async () => {
+    await seedTeam(10, "Dragons 1", true);
+    await seedStanding(10, 3, 1);
+    trace.reset();
+
+    await getHomeDashboard();
+
+    // Two selects, both in flight at once. The second one starting before the
+    // first came back is exactly what a trailing `await` outside the
+    // `Promise.all` would break.
+    expect(trace.startCount()).toBe(2);
+    expect(trace.overlaps(1)).toBe(true);
   });
 });

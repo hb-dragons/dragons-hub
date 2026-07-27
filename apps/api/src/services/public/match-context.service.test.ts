@@ -5,6 +5,7 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { traceQueries, type QueryTrace } from "../../test/trace-queries";
 
 // --- Mocks (hoisted before imports) ---
 //
@@ -39,15 +40,18 @@ const RIVALS = 20;
 const THIRD = 30;
 
 let ctx: TestDbContext;
+let trace: QueryTrace;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
-  dbHolder.ref = ctx.db;
+  trace = traceQueries(ctx.db as object);
+  dbHolder.ref = trace.db;
 });
 
 beforeEach(async () => {
   await resetTestDb(ctx);
   vi.clearAllMocks();
+  trace.reset();
 });
 
 afterAll(async () => {
@@ -331,5 +335,19 @@ describe("getMatchContext — per-team form", () => {
     await seedMatch({ apiMatchId: 203, home: DRAGONS, guest: THIRD, kickoffDate: "2026-03-10" });
 
     expect((await getMatchContext(matchId))!.homeForm).toEqual([]);
+  });
+});
+
+describe("getMatchContext — query fan-out", () => {
+  it("pairs the two team lookups and the two form queries instead of awaiting them one by one", async () => {
+    const matchId = await seedUpcomingFixture();
+    trace.reset();
+
+    await getMatchContext(matchId);
+
+    // 0 match, 1 head-to-head, 2 home team, 3 guest team, 4 home form, 5 guest form.
+    expect(trace.startCount()).toBe(6);
+    expect(trace.overlaps(3)).toBe(true);
+    expect(trace.overlaps(5)).toBe(true);
   });
 });

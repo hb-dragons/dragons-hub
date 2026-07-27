@@ -6,9 +6,9 @@ import {
   matches,
   teams,
   venues,
-  appSettings,
 } from "@dragons/db/schema";
 import { eq, and, or, inArray, sql } from "drizzle-orm";
+import { readSettings, readIntSetting } from "../settings/app-settings.reader";
 import { type BookingConfig } from "./booking-calculator";
 import { planReconciliation } from "./booking-planner";
 import type {
@@ -39,30 +39,20 @@ const DEFAULTS = {
 } as const;
 
 export async function getBookingConfig(): Promise<BookingConfig> {
-  const rows = await getDb()
-    .select({ key: appSettings.key, value: appSettings.value })
-    .from(appSettings)
-    .where(
-      inArray(appSettings.key, [
-        SETTING_KEYS.bufferBefore,
-        SETTING_KEYS.bufferAfter,
-        SETTING_KEYS.gameDuration,
-      ]),
-    );
-
-  const settings = new Map(rows.map((r) => [r.key, r.value]));
-
-  function parse(key: string, fallback: number): number {
-    const raw = settings.get(key);
-    if (raw == null) return fallback;
-    const parsed = parseInt(raw, 10);
-    return Number.isNaN(parsed) ? fallback : parsed;
-  }
+  const settings = await readSettings([
+    SETTING_KEYS.bufferBefore,
+    SETTING_KEYS.bufferAfter,
+    SETTING_KEYS.gameDuration,
+  ]);
 
   return {
-    bufferBeforeMinutes: parse(SETTING_KEYS.bufferBefore, DEFAULTS.bufferBefore),
-    bufferAfterMinutes: parse(SETTING_KEYS.bufferAfter, DEFAULTS.bufferAfter),
-    defaultGameDurationMinutes: parse(SETTING_KEYS.gameDuration, DEFAULTS.gameDuration),
+    bufferBeforeMinutes: readIntSetting(settings, SETTING_KEYS.bufferBefore, DEFAULTS.bufferBefore),
+    bufferAfterMinutes: readIntSetting(settings, SETTING_KEYS.bufferAfter, DEFAULTS.bufferAfter),
+    defaultGameDurationMinutes: readIntSetting(
+      settings,
+      SETTING_KEYS.gameDuration,
+      DEFAULTS.gameDuration,
+    ),
   };
 }
 

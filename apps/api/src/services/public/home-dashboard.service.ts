@@ -7,7 +7,7 @@ import type { HomeDashboard, ClubStats } from "@dragons/shared";
 export async function getHomeDashboard(): Promise<HomeDashboard> {
   const today = new Date().toISOString().split("T")[0]!;
 
-  const [nextGameResult, recentResultsResult, upcomingGamesResult, statsRows] =
+  const [nextGameResult, recentResultsResult, upcomingGamesResult, statsRows, teamCountRows] =
     await Promise.all([
       getOwnClubMatches({
         limit: 1,
@@ -41,14 +41,13 @@ export async function getHomeDashboard(): Promise<HomeDashboard> {
         .from(standings)
         .innerJoin(teams, eq(standings.teamApiId, teams.apiTeamPermanentId))
         .where(eq(teams.isOwnClub, true)),
+      getDb()
+        .select({ count: sql<number>`count(*)::int` })
+        .from(teams)
+        .where(eq(teams.isOwnClub, true)),
     ]);
 
-  const [teamCountRow] = await getDb()
-    .select({ count: sql<number>`count(*)::int` })
-    .from(teams)
-    .where(eq(teams.isOwnClub, true));
-
-  const teamCount = teamCountRow?.count ?? 0;
+  const teamCount = teamCountRows[0]?.count ?? 0;
   const totalWins = statsRows[0]?.totalWins ?? 0;
   const totalLosses = statsRows[0]?.totalLosses ?? 0;
   const totalGames = totalWins + totalLosses;
