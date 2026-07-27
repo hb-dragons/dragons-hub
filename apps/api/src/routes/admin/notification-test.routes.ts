@@ -3,13 +3,9 @@ import { describeRoute } from "hono-openapi";
 import { and, eq, isNull, like, desc } from "drizzle-orm";
 import { ulid } from "ulid";
 import { getDb } from "../../config/database";
-import {
-  pushDevices,
-  notificationLog,
-  channelConfigs,
-  domainEvents,
-} from "@dragons/db/schema";
+import { pushDevices, notificationLog, channelConfigs } from "@dragons/db/schema";
 import { ExpoPushClient, mapTicketError } from "../../services/notifications/expo-push.client";
+import { publishSystemEvent } from "../../services/events/event-publisher";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
 import { getRedis } from "../../config/redis";
@@ -163,26 +159,26 @@ notificationTestRoutes.post(
       errorMessage: accepted ? null : representative.error,
     };
 
-    // Synthetic domain_events row so notification_log FK is satisfied.
-    // Wrapped in a transaction so the event + log rows land atomically.
+    // Synthetic domain_events row so notification_log FK is satisfied, written
+    // through the events service rather than by hand here. Wrapped in a
+    // transaction so the event + log rows land atomically.
     await getDb().transaction(async (tx) => {
-      await tx.insert(domainEvents).values({
-        id: eventId,
-        type: "admin.test_push",
-        source: "manual",
-        urgency: "immediate",
-        occurredAt: sentAt,
-        actor: callerId,
-        entityType: "user",
-        entityId: 0,
-        entityName: "admin test",
-        deepLinkPath: "/",
-        payload: {
-          isTest: true,
-          sentAt: sentAt.toISOString(),
-          message: text,
+      await publishSystemEvent(
+        {
+          id: eventId,
+          type: "admin.test_push",
+          occurredAt: sentAt,
+          actor: callerId,
+          entityName: "admin test",
+          deepLinkPath: "/",
+          payload: {
+            isTest: true,
+            sentAt: sentAt.toISOString(),
+            message: text,
+          },
         },
-      });
+        tx,
+      );
       await tx.insert(notificationLog).values(row);
     });
 

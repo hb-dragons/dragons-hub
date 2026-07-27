@@ -20,6 +20,28 @@ const ENQUEUE_CONCURRENCY = 10;
 // backoff) so a job that is still retrying isn't enqueued a second time.
 const CLAIM_LEASE_MS = 5 * 60 * 1000;
 
+/**
+ * Claim a batch of unprocessed events and stamp the lease.
+ *
+ * **No ordering guarantee, by design (issue #79).** `ORDER BY created_at` is a
+ * fairness rule that stops a backlog from starving the oldest events; it is not
+ * a sequencing guarantee, and nothing downstream treats it as one:
+ *
+ *   - `created_at` defaults to `now()`, which in Postgres is transaction *start*
+ *     time. Two writers can therefore commit in the opposite order to their
+ *     `created_at`, and the later-committing one is claimed first.
+ *   - `FOR UPDATE SKIP LOCKED` lets a concurrent poller take a different slice.
+ *   - The event worker runs `concurrency: 5`, so five claimed events are in
+ *     flight at once regardless of the order they were enqueued in.
+ *
+ * A per-entity FIFO would mean a serialization key through BullMQ (its group
+ * ordering is a Pro feature) or a per-entity advisory lock held across delivery,
+ * and it would buy nothing today: notifications are independent, each carries
+ * its own rendered snapshot of the change rather than a delta applied to the
+ * last one, and the coalescing claim in the pipeline already collapses a burst
+ * on one entity. Introduce a FIFO key only alongside a consumer that actually
+ * folds events together — and record it here when you do.
+ */
 async function claimBatch(): Promise<ClaimedEvent[]> {
   const oneSecondAgo = new Date(Date.now() - 1000);
   const leaseExpiry = new Date(Date.now() - CLAIM_LEASE_MS);
