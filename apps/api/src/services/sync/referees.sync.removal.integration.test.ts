@@ -344,6 +344,37 @@ describe("removeStaleRefereeAssignments — removal semantics (issue #105)", () 
     expect(advertised[0]!.payload).toMatchObject({ sr1Open: true, matchId });
   });
 
+  // Regression: loadRemovalContext read refereeGames with no tombstone filter,
+  // so a game the federation had already withdrawn was still advertised as
+  // needing a referee when one of its matchReferees rows later went stale.
+  it("does not re-advertise a slot on a tombstoned referee game", async () => {
+    const roleId = await seedTeamsAndRole();
+    const refId = await seedReferee(9001, "Weg");
+    const matchId = await seedMatch(1000, true);
+    await ctx.db.insert(matchReferees).values({ matchId, refereeId: refId, roleId, slotNumber: 1 });
+    await ctx.db.insert(refereeGames).values({
+      apiMatchId: 1000,
+      matchId,
+      matchNo: 1000,
+      kickoffDate: "2025-01-15",
+      kickoffTime: "18:00:00",
+      homeTeamName: "Home",
+      guestTeamName: "Guest",
+      leagueName: "Test Liga",
+      sr1OurClub: true,
+      sr2OurClub: false,
+      // The federation stopped listing this game; it is history, not an opening.
+      removedAt: new Date(),
+    });
+
+    await removeStaleRefereeAssignments(completeFetch([1000]), [], new Map([[1000, matchId]]));
+
+    const advertised = publishMock.mock.calls
+      .map((c) => c[0])
+      .filter((e) => e.type === "referee.slots.needed");
+    expect(advertised).toHaveLength(0);
+  });
+
   it("does not re-advertise a slot the federation has not reopened", async () => {
     const roleId = await seedTeamsAndRole();
     const refId = await seedReferee(9001, "Weg");

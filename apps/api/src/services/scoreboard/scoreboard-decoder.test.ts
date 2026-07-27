@@ -36,6 +36,41 @@ function oldProtocolFrame(): Buffer {
   ]);
 }
 
+describe("decodeLatestFrame — buffer scanning", () => {
+  // Regression: the shot-clock view and the scoreboard view used to be two
+  // independent walks from byte zero, so every ingest POST scanned the buffer
+  // twice. They now share one walk and filter its output.
+  it("walks the buffer once, not once per view", () => {
+    const buf = Buffer.concat([
+      buildTypeCBlock({ 4: 0x0f, 5: 0xec }), // companion block
+      buildTypeCBlock(),
+    ]);
+
+    // Every frame boundary the walk finds costs one sync lookup. A second
+    // independent walk would repeat the whole sequence from cursor 0.
+    const indexOf = Buffer.prototype.indexOf;
+    let syncLookups = 0;
+    const spy = function (this: Buffer, ...args: Parameters<typeof indexOf>) {
+      const needle = args[0];
+      if (Buffer.isBuffer(needle) && needle.length === 3 && needle[0] === 0x00) {
+        syncLookups++;
+      }
+      return indexOf.apply(this, args);
+    };
+    Buffer.prototype.indexOf = spy as typeof indexOf;
+    try {
+      decodeLatestFrame(buf);
+    } finally {
+      Buffer.prototype.indexOf = indexOf;
+    }
+
+    // One sync lookup per frame, and the loop exits on the cursor reaching the
+    // buffer end rather than on a failed lookup: 2 for a single walk over two
+    // frames. The two-walk version scanned this buffer 4 times.
+    expect(syncLookups).toBe(2);
+  });
+});
+
 describe("decodeLatestFrame", () => {
   it("routes a segment-protocol buffer through the segment decoder", () => {
     const result = decodeLatestFrame(fixture("segment-score-h2.bin"));

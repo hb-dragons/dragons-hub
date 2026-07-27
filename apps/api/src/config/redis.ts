@@ -71,6 +71,36 @@ export function getRedis(): Redis {
 }
 
 /**
+ * Bump a fixed-window counter and guarantee it carries a TTL, atomically.
+ *
+ * `INCR` followed by a separate `EXPIRE` is two round trips with a gap in the
+ * middle: a process crash, a failover or a dropped connection after the INCR
+ * leaves the counter with no expiry, and a key that never expires never resets.
+ * For a rate limiter that means the caller stays limited until someone deletes
+ * the key by hand; for the sign-in failure counter it means failures accumulate
+ * across all time and eventually lock out a legitimate user. One script runs
+ * both in a single atomic round trip.
+ *
+ * The `TTL < 0` arm also repairs a key that already lost its expiry, so
+ * counters stranded by the previous non-atomic code heal on their next request
+ * instead of needing a manual flush.
+ */
+const INCR_WITH_TTL = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 or redis.call('TTL', KEYS[1]) < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+`;
+
+export async function incrementWithTtl(
+  key: string,
+  ttlSeconds: number,
+): Promise<number> {
+  return Number(await getRedis().eval(INCR_WITH_TTL, 1, key, String(ttlSeconds)));
+}
+
+/**
  * Quit the shared request-path client. Called from the graceful-shutdown
  * sequence after the HTTP server and the workers are done, so no in-flight
  * request loses its Redis connection mid-command. Clients handed out by

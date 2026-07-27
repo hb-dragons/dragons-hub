@@ -5,7 +5,7 @@ import { refereeReminderWorker } from "./referee-reminder.worker";
 import { pushReceiptWorker } from "./push-receipt.worker";
 import { taskReminderWorker } from "./task-reminder.worker";
 import { outboxPollWorker } from "./outbox-poll.worker";
-import { syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue, outboxPollQueue } from "./queues";
+import { syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue, outboxPollQueue, clearRepeatables } from "./queues";
 import { initializeScheduledJobs, initTaskReminders, triggerRefereeGamesSync } from "../services/sync-jobs.service";
 import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
 import { getDb } from "../config/database";
@@ -209,10 +209,7 @@ export async function cleanupOldDomainEvents(
  */
 export async function initializeScheduledDigests(): Promise<void> {
   // Remove existing repeatable digest jobs to avoid duplicates
-  const repeatableJobs = await digestQueue.getRepeatableJobs();
-  for (const job of repeatableJobs) {
-    await digestQueue.removeRepeatableByKey(job.key);
-  }
+  await clearRepeatables(digestQueue);
 
   const scheduledChannels = await getDb()
     .select()

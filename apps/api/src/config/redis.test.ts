@@ -16,6 +16,10 @@ const mockOn = vi.fn().mockImplementation(function (this: unknown, event: string
 
 const constructed: { url: string; options: Record<string, unknown> }[] = [];
 
+const mockEval = vi.fn();
+const mockIncr = vi.fn();
+const mockExpire = vi.fn();
+
 vi.mock("ioredis", () => ({
   default: class MockRedis {
     constructor(url: string, options: Record<string, unknown>) {
@@ -24,6 +28,9 @@ vi.mock("ioredis", () => ({
     on = mockOn;
     ping = vi.fn().mockResolvedValue("PONG");
     quit = vi.fn().mockResolvedValue("OK");
+    eval = mockEval;
+    incr = mockIncr;
+    expire = mockExpire;
   },
 }));
 
@@ -148,5 +155,71 @@ describe("redis config", () => {
     expect(constructed).toHaveLength(2);
     expect(constructed[0]!.options.maxRetriesPerRequest).not.toBeNull();
     expect(constructed[1]!.options.maxRetriesPerRequest).toBeNull();
+  });
+});
+
+// The counter and its expiry used to be an INCR followed by a separate EXPIRE.
+// Anything that interrupted the process between them left a key with no TTL,
+// and a key that never expires never resets: a rate-limited caller stayed
+// limited forever, and the sign-in failure counter accumulated across all time
+// until it locked out a legitimate user. EVAL runs the whole thing server-side
+// in one atomic step, so there is no gap to be interrupted in.
+describe("incrementWithTtl", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    constructed.length = 0;
+  });
+
+  it("issues exactly one Redis command, never a separate INCR and EXPIRE", async () => {
+    const { incrementWithTtl } = await import("./redis");
+    mockEval.mockResolvedValue(1);
+
+    await incrementWithTtl("rl:qa:u1:99", 60);
+
+    expect(mockEval).toHaveBeenCalledTimes(1);
+    expect(mockIncr).not.toHaveBeenCalled();
+    expect(mockExpire).not.toHaveBeenCalled();
+  });
+
+  it("passes the key and TTL to a script that sets the expiry", async () => {
+    const { incrementWithTtl } = await import("./redis");
+    mockEval.mockResolvedValue(1);
+
+    await incrementWithTtl("rl:qa:u1:99", 60);
+
+    const [script, numKeys, key, ttl] = mockEval.mock.calls[0]!;
+    expect(numKeys).toBe(1);
+    expect(key).toBe("rl:qa:u1:99");
+    expect(ttl).toBe("60");
+    expect(script).toContain("INCR");
+    expect(script).toContain("EXPIRE");
+  });
+
+  it("re-applies the expiry to a key that already lost its TTL", async () => {
+    const { incrementWithTtl } = await import("./redis");
+    mockEval.mockResolvedValue(7);
+
+    await incrementWithTtl("rl:qa:u1:99", 60);
+
+    // Counters stranded without a TTL by the previous non-atomic code heal on
+    // their next request rather than needing a manual flush.
+    const [script] = mockEval.mock.calls[0]!;
+    expect(script).toContain("TTL");
+    expect(script).toMatch(/count == 1 or/);
+  });
+
+  it("returns the counter as a number", async () => {
+    const { incrementWithTtl } = await import("./redis");
+    mockEval.mockResolvedValue("4");
+
+    await expect(incrementWithTtl("rl:qa:u1:99", 60)).resolves.toBe(4);
+  });
+
+  it("propagates a Redis failure so callers can fail open", async () => {
+    const { incrementWithTtl } = await import("./redis");
+    mockEval.mockRejectedValue(new Error("redis down"));
+
+    await expect(incrementWithTtl("rl:qa:u1:99", 60)).rejects.toThrow("redis down");
   });
 });

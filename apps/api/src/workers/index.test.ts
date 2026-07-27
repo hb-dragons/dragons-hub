@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import type * as Queues from "./queues";
 
 // --- Mock setup ---
 //
@@ -77,7 +78,11 @@ vi.mock("../services/sync-jobs.service", () => ({
   triggerRefereeGamesSync: (...args: unknown[]) => mockTriggerRefereeGamesSync(...args),
 }));
 
-vi.mock("./queues", () => ({
+vi.mock("./queues", async (importOriginal) => ({
+  // `clearRepeatables` is real: it only calls getRepeatableJobs/removeRepeatableByKey
+  // on whichever queue it is handed, so it runs fine against the mocks below and the
+  // assertions keep exercising the actual clearing logic.
+  clearRepeatables: (await importOriginal<typeof Queues>()).clearRepeatables,
   syncQueue: {
     close: (...args: unknown[]) => mockSyncQueueClose(...args),
     add: (...args: unknown[]) => mockSyncQueueAdd(...args),

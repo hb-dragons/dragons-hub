@@ -137,6 +137,7 @@ export async function fullSync(
     allErrors.push(...teamsRes.errors);
     allErrors.push(...venuesRes.errors);
     allErrors.push(...refereesRes.errors);
+    allErrors.push(...rolesRes.errors);
     allErrors.push(...standingsRes.errors);
 
     // Step 4: Matches sync (needs venue FK lookup)

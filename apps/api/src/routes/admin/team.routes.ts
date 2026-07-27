@@ -45,17 +45,9 @@ teamRoutes.put(
     },
   }),
   async (c) => {
+    // TeamReorderError is mapped to 400 centrally in middleware/error.ts.
     const { teamIds } = c.req.valid("json");
-    try {
-      const result = await reorderOwnClubTeams(teamIds);
-      return c.json(result);
-    } catch (err) {
-      const code = err instanceof Error ? err.message : "REORDER_FAILED";
-      if (code === "INVALID_TEAM_SET" || code === "DUPLICATE_TEAM_ID") {
-        return c.json({ error: code, code }, 400);
-      }
-      throw err;
-    }
+    return c.json(await reorderOwnClubTeams(teamIds));
   },
 );
 

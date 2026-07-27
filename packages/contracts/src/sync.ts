@@ -31,7 +31,15 @@ export type SyncEntriesQuery = z.infer<typeof syncEntriesQuerySchema>;
 
 export const syncStreamParamSchema = idParamSchema;
 
-const validJobStatuses = ["active", "waiting", "delayed", "completed", "failed"] as const;
+/**
+ * The queue job statuses the `statuses` query filter accepts. Exported because
+ * `GET /admin/sync/jobs` echoes the same list back to the client as
+ * `validStatuses`; the route used to repeat the literal, so widening the filter
+ * here silently left the advertised list behind.
+ */
+export const SYNC_JOB_STATUSES = ["active", "waiting", "delayed", "completed", "failed"] as const;
+
+const validJobStatuses = SYNC_JOB_STATUSES;
 
 export const syncJobStatusesQuerySchema = z.object({
   statuses: z

@@ -30,6 +30,7 @@ vi.mock("../../config/logger", () => ({
 
 import { teamRoutes } from "./team.routes";
 import { errorHandler } from "../../middleware/error";
+import { TeamReorderError } from "../../services/admin/team-admin.errors";
 
 // Test app without auth middleware
 const app = new Hono<AppEnv>();
@@ -270,7 +271,7 @@ describe("PUT /teams/order", () => {
   });
 
   it("returns 400 when service throws INVALID_TEAM_SET", async () => {
-    mocks.reorderOwnClubTeams.mockRejectedValue(new Error("INVALID_TEAM_SET"));
+    mocks.reorderOwnClubTeams.mockRejectedValue(TeamReorderError.invalidTeamSet());
 
     const res = await app.request("/teams/order", {
       method: "PUT",
@@ -279,12 +280,14 @@ describe("PUT /teams/order", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = (await json(res)) as { code: string };
+    const body = (await json(res)) as { code: string; error: string };
     expect(body.code).toBe("INVALID_TEAM_SET");
+    // The human-readable field is a sentence, not the code echoed back.
+    expect(body.error).toMatch(/own-club team/);
   });
 
   it("returns 400 when service throws DUPLICATE_TEAM_ID", async () => {
-    mocks.reorderOwnClubTeams.mockRejectedValue(new Error("DUPLICATE_TEAM_ID"));
+    mocks.reorderOwnClubTeams.mockRejectedValue(TeamReorderError.duplicateTeamId());
 
     const res = await app.request("/teams/order", {
       method: "PUT",
@@ -293,7 +296,25 @@ describe("PUT /teams/order", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = (await json(res)) as { code: string };
+    const body = (await json(res)) as { code: string; error: string };
     expect(body.code).toBe("DUPLICATE_TEAM_ID");
+    expect(body.error).toMatch(/more than once/);
+  });
+
+  // Regression: the route used to read the code out of `err.message`, so any
+  // unrelated failure whose message happened to spell INVALID_TEAM_SET became a
+  // 400. Only the typed error may produce one.
+  it("does not turn an unrelated error with a matching message into a 400", async () => {
+    mocks.reorderOwnClubTeams.mockRejectedValue(new Error("INVALID_TEAM_SET"));
+
+    const res = await app.request("/teams/order", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teamIds: [1, 2] }),
+    });
+
+    expect(res.status).toBe(500);
+    const body = (await json(res)) as { code: string };
+    expect(body.code).toBe("INTERNAL_ERROR");
   });
 });

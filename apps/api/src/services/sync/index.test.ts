@@ -185,7 +185,7 @@ beforeEach(async () => {
   });
 
   mockSyncRoles.mockResolvedValue({
-    created: 1, updated: 1, skipped: 0, failed: 0, roleIdLookup: new Map(),
+    created: 1, updated: 1, skipped: 0, failed: 0, errors: [], roleIdLookup: new Map(),
   });
 
   mockSyncStandings.mockResolvedValue({
@@ -381,6 +381,24 @@ describe("fullSync", () => {
       expect(result.totalErrors).toContain("team error");
     });
 
+    // Regression: rolesRes was the only one of the five entity results whose
+    // errors were never pushed into allErrors, so a total role-sync failure
+    // finished the run as "completed" with recordsFailed 0 and no errorMessage.
+    it("collects errors from the role sync step", async () => {
+      mockSyncRoles.mockResolvedValue({
+        created: 0, updated: 0, skipped: 0, failed: 3,
+        errors: ["Batch role sync failed: DB error"], roleIdLookup: new Map(),
+      });
+
+      const result = await fullSync("manual");
+
+      expect(result.totalErrors).toContain("Batch role sync failed: DB error");
+
+      const [row] = await ctx.db.select().from(syncRuns);
+      expect(row!.recordsFailed).toBe(1);
+      expect(row!.errorMessage).toBe("Batch role sync failed: DB error");
+    });
+
     it("handles fatal error during sync", async () => {
       mockSyncLeagues.mockRejectedValue(new Error("Fatal crash"));
 
@@ -522,7 +540,7 @@ describe("fullSync", () => {
       mockSyncReferees.mockResolvedValue({
         created: 2, updated: 1, skipped: 0, refereeIdLookup: new Map(), errors: [],
       });
-      mockSyncRoles.mockResolvedValue({ created: 1, updated: 2, skipped: 1, failed: 0, roleIdLookup: new Map() });
+      mockSyncRoles.mockResolvedValue({ created: 1, updated: 2, skipped: 1, failed: 0, errors: [], roleIdLookup: new Map() });
       mockSyncAssignments.mockResolvedValue({ created: 5, errors: [] });
 
       const result = await fullSync("manual");

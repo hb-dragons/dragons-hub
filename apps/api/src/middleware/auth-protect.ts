@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { logger } from "../config/logger";
-import { getRedis } from "../config/redis";
+import { getRedis, incrementWithTtl } from "../config/redis";
 import type { AppEnv } from "../types";
 
 const FAIL_WINDOW_SEC = 15 * 60;
@@ -55,8 +55,7 @@ export async function isLockedOut(ip: string, email: string): Promise<boolean> {
 
 export async function recordAuthFailure(ip: string, email: string): Promise<void> {
   const key = failKey(ip, email);
-  const count = await getRedis().incr(key);
-  if (count === 1) await getRedis().expire(key, FAIL_WINDOW_SEC);
+  const count = await incrementWithTtl(key, FAIL_WINDOW_SEC);
   if (count >= FAIL_THRESHOLD) {
     await getRedis().set(lockKey(ip, email), "1", "EX", LOCKOUT_SEC);
     await getRedis().del(key);

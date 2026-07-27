@@ -178,14 +178,16 @@ export function decodeSegmentBlock(frame: Buffer): StramatelSnapshot | null {
 }
 
 /**
- * Find every well-formed type-C frame in a buffer.
+ * Every well-formed frame in a buffer, of any block type.
  *
  * A frame runs from the `00 F8 E1` sync to the next `0xE5` terminator after its
- * `C3` delimiter. Frames without a type-C signature (type A/B, other kinds) and
- * truncated tails (no terminator) are dropped. Works for both the original
- * 57-byte framing and the variable-length SC24-era framing.
+ * `C3` delimiter. Truncated tails (no terminator) are dropped. Works for both
+ * the original 57-byte framing and the variable-length SC24-era framing.
+ *
+ * This is the single walk over the buffer; the two exported views below filter
+ * its output rather than each re-scanning from byte zero.
  */
-export function findSegmentFrames(buf: Buffer): Buffer[] {
+export function findFrames(buf: Buffer): Buffer[] {
   const frames: Buffer[] = [];
   let cursor = 0;
   while (cursor < buf.length) {
@@ -195,11 +197,24 @@ export function findSegmentFrames(buf: Buffer): Buffer[] {
     if (c3 < 0) break;
     const end = buf.indexOf(TERMINATOR, c3 + 1);
     if (end < 0) break;
-    const frame = buf.subarray(sync, end + 1);
-    if (typeCPossIndex(frame) >= 0) frames.push(frame);
+    frames.push(buf.subarray(sync, end + 1));
     cursor = end + 1;
   }
   return frames;
+}
+
+/** Whether a frame carries a type-C signature (type A/B and others do not). */
+export function isTypeCFrame(frame: Buffer): boolean {
+  return typeCPossIndex(frame) >= 0;
+}
+
+/**
+ * Find every well-formed type-C frame in a buffer.
+ *
+ * Frames without a type-C signature (type A/B, other kinds) are dropped.
+ */
+export function findSegmentFrames(buf: Buffer): Buffer[] {
+  return findFrames(buf).filter(isTypeCFrame);
 }
 
 /**
@@ -218,17 +233,5 @@ export function findSegmentFrames(buf: Buffer): Buffer[] {
  * that carry no shot data contribute nothing.
  */
 export function findShotFrames(buf: Buffer): Buffer[] {
-  const frames: Buffer[] = [];
-  let cursor = 0;
-  while (cursor < buf.length) {
-    const sync = buf.indexOf(SYNC, cursor);
-    if (sync < 0) break;
-    const c3 = buf.indexOf(C3, sync + SYNC.length);
-    if (c3 < 0) break;
-    const end = buf.indexOf(TERMINATOR, c3 + 1);
-    if (end < 0) break;
-    frames.push(buf.subarray(sync, end + 1));
-    cursor = end + 1;
-  }
-  return frames;
+  return findFrames(buf);
 }

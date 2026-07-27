@@ -121,6 +121,7 @@ export {
   syncJobStatusesQuerySchema,
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
+  SYNC_JOB_STATUSES,
   type SyncLogsQuery,
   type SyncEntriesQuery,
   type SyncUpdateScheduleBody,

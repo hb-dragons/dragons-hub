@@ -423,7 +423,7 @@ taskRoutes.delete(
   async (c) => {
     const { id, userId } = c.req.valid("param");
     const callerId = c.get("user")?.id;
-    if (!callerId) return c.json({ error: "Unauthorized" }, 401);
+    if (!callerId) return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     const removed = await removeAssignee(id, userId, callerId);
     if (!removed) {
       return c.json({ error: "Assignee not found", code: "NOT_FOUND" }, 404);

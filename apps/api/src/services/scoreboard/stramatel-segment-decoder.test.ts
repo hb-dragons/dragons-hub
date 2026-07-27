@@ -4,8 +4,10 @@ import { resolve } from "node:path";
 import {
   decodeDigit,
   decodeSegmentBlock,
+  findFrames,
   findSegmentFrames,
   findShotFrames,
+  isTypeCFrame,
 } from "./stramatel-segment-decoder";
 import { decodeShotClock } from "./shot-clock-decoder";
 import {
@@ -77,6 +79,38 @@ describe("findSegmentFrames", () => {
   it("drops a block whose terminator is wrong", () => {
     const bad = buildTypeCBlock({ 56: 0x00 });
     expect(findSegmentFrames(bad)).toEqual([]);
+  });
+});
+
+// findSegmentFrames and findShotFrames used to be two byte-identical walks that
+// differed only in the type-C filter, and the ingest path ran both over the same
+// buffer. They are now one walk plus a predicate.
+describe("findFrames / isTypeCFrame", () => {
+  const typeA = buildTypeCBlock({ 4: 0x0f, 5: 0x64 });
+  const typeB = buildTypeCBlock({ 4: 0x0f, 5: 0xec });
+  const typeC = buildTypeCBlock();
+  const mixed = Buffer.concat([typeA, typeB, typeC]);
+
+  it("returns every well-formed frame regardless of block type", () => {
+    expect(findFrames(mixed)).toHaveLength(3);
+  });
+
+  it("still drops truncated tails", () => {
+    const truncated = buildTypeCBlock().subarray(0, 30);
+    expect(findFrames(Buffer.concat([typeC, truncated]))).toHaveLength(1);
+  });
+
+  it("identifies exactly the type-C frames", () => {
+    const found = findFrames(mixed);
+    expect(found.map(isTypeCFrame)).toEqual([false, false, true]);
+  });
+
+  it("findSegmentFrames is the type-C subset of findFrames", () => {
+    expect(findSegmentFrames(mixed)).toEqual(findFrames(mixed).filter(isTypeCFrame));
+  });
+
+  it("findShotFrames is the unfiltered walk", () => {
+    expect(findShotFrames(mixed)).toEqual(findFrames(mixed));
   });
 });
 

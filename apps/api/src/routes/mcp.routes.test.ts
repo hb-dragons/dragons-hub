@@ -10,8 +10,7 @@ const envOverrides = vi.hoisted(
   () => ({ ref: {} as Record<string, unknown> }),
 );
 const mocks = vi.hoisted(() => ({
-  incr: vi.fn(),
-  expire: vi.fn(),
+  incrementWithTtl: vi.fn(),
   handleRequest: vi.fn(),
   transportClose: vi.fn(),
   serverClose: vi.fn(),
@@ -31,10 +30,7 @@ vi.mock("../config/env", async () => {
 });
 
 vi.mock("../config/redis", () => ({
-  getRedis: () => ({
-    incr: (...a: unknown[]) => mocks.incr(...a),
-    expire: (...a: unknown[]) => mocks.expire(...a),
-  }),
+  incrementWithTtl: (...a: unknown[]) => mocks.incrementWithTtl(...a),
 }));
 
 vi.mock("../ai/mcp-server", () => ({
@@ -79,8 +75,7 @@ function post(
 beforeEach(() => {
   vi.clearAllMocks();
   envOverrides.ref = { MCP_TOKEN: TOKEN, ASSISTANT_ENABLED: true };
-  mocks.incr.mockResolvedValue(1);
-  mocks.expire.mockResolvedValue(1);
+  mocks.incrementWithTtl.mockResolvedValue(1);
   mocks.handleRequest.mockResolvedValue(undefined);
 });
 
@@ -185,7 +180,7 @@ describe("POST /mcp — body limit", () => {
 
 describe("POST /mcp — rate limit", () => {
   it("returns 429 once the window budget is spent", async () => {
-    mocks.incr.mockResolvedValue(121);
+    mocks.incrementWithTtl.mockResolvedValue(121);
 
     const res = await post({ token: TOKEN });
 
@@ -195,7 +190,7 @@ describe("POST /mcp — rate limit", () => {
   });
 
   it("lets a request inside the budget through", async () => {
-    mocks.incr.mockResolvedValue(120);
+    mocks.incrementWithTtl.mockResolvedValue(120);
 
     const res = await post({ token: TOKEN });
 
@@ -203,7 +198,7 @@ describe("POST /mcp — rate limit", () => {
   });
 
   it("fails open when Redis is unreachable", async () => {
-    mocks.incr.mockRejectedValue(new Error("redis down"));
+    mocks.incrementWithTtl.mockRejectedValue(new Error("redis down"));
 
     const res = await post({ token: TOKEN });
 
