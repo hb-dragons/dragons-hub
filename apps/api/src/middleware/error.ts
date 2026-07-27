@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import { env } from "../config/env";
 import { logger as rootLogger } from "../config/logger";
+import { RefereeSdkNotConfiguredError } from "../services/sync/sdk-client.errors";
 import { SyncAlreadyQueuedError } from "../services/sync-jobs.errors";
 import type { AppEnv } from "../types";
 
@@ -30,6 +31,12 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
   // the route stays a single success path instead of sniffing an error envelope.
   if (error instanceof SyncAlreadyQueuedError) {
     return c.json({ error: error.message, code: error.code }, 409);
+  }
+
+  // A referee assignment operation on a deployment with no REFEREE_SDK_*
+  // credentials. The request is fine; the deployment cannot serve it.
+  if (error instanceof RefereeSdkNotConfiguredError) {
+    return c.json({ error: error.message, code: error.code }, 503);
   }
 
   if (error instanceof HTTPException) {

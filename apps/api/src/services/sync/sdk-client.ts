@@ -3,6 +3,7 @@ import pLimit from "p-limit";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
 import { currentTraceparent } from "../../config/log-context";
+import { RefereeSdkNotConfiguredError } from "./sdk-client.errors";
 
 const log = logger.child({ service: "sdk-client" });
 
@@ -324,6 +325,17 @@ export class SdkClient {
   }
 
   private async ensureRefereeAuthenticated(): Promise<void> {
+    // Without REFEREE_SDK_* the referee auth client is constructed with no
+    // credentials and falls back to the main federation account. That account
+    // must never stand in for the referee one on a write: the federation
+    // records the assignment against whoever submitted it, so a misconfigured
+    // deployment would quietly file real assignments under the wrong identity.
+    // Fail loudly instead. (`fetchOffeneSpiele` — a read — returns early before
+    // reaching here and stays inert, which is the intended behaviour there.)
+    if (!env.REFEREE_SDK_USERNAME || !env.REFEREE_SDK_PASSWORD) {
+      throw new RefereeSdkNotConfiguredError();
+    }
+
     const sessionAge = Date.now() - this.refereeAuthClient.authenticatedAt;
     if (!this.refereeAuthClient.authenticated || sessionAge > SdkClient.SESSION_MAX_AGE_MS) {
       if (this.refereeAuthClient.authenticated) {

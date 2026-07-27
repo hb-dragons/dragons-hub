@@ -37,6 +37,7 @@ vi.mock("../config/env", () => ({
 
 import { errorHandler } from "./error";
 import { SyncAlreadyQueuedError } from "../services/sync-jobs.errors";
+import { RefereeSdkNotConfiguredError } from "../services/sync/sdk-client.errors";
 
 // App WITHOUT request logger middleware — error handler falls back to root logger
 function createBareApp() {
@@ -60,6 +61,10 @@ function createBareApp() {
 
   app.get("/throw-sync-already-queued", () => {
     throw new SyncAlreadyQueuedError();
+  });
+
+  app.get("/throw-referee-sdk-not-configured", () => {
+    throw new RefereeSdkNotConfiguredError();
   });
 
   app.get("/throw-http-401", () => {
@@ -132,6 +137,16 @@ describe("errorHandler", () => {
     await app.request("/throw-sync-already-queued");
 
     expect(mocks.rootLogger.error).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 with the REFEREE_SDK_NOT_CONFIGURED code for RefereeSdkNotConfiguredError", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-referee-sdk-not-configured");
+
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.code).toBe("REFEREE_SDK_NOT_CONFIGURED");
+    expect(body.error).toMatch(/REFEREE_SDK_USERNAME/);
   });
 
   it("does not call logger for ZodError", async () => {

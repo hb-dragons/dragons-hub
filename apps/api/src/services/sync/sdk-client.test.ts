@@ -894,6 +894,39 @@ describe("SdkClient", () => {
       });
   }
 
+  // Regression: with REFEREE_SDK_* unset the referee auth client is built with
+  // no credentials and logs in as the main federation account, which would file
+  // real assignments under the wrong identity. Every referee operation that
+  // authenticates must refuse rather than fall back.
+  describe("referee operations without referee credentials", () => {
+    const cases: [string, () => Promise<unknown>][] = [
+      ["searchRefereesForGame", () => client.searchRefereesForGame(999)],
+      ["submitRefereeAssignment", () =>
+        client.submitRefereeAssignment(999, 1, { personId: 1 } as never)],
+      ["submitRefereeUnassignment", () => client.submitRefereeUnassignment(999, 1)],
+    ];
+
+    for (const [name, call] of cases) {
+      it(`${name} throws instead of using the main account when the username is unset`, async () => {
+        mockEnv.REFEREE_SDK_USERNAME = undefined;
+
+        await expect(call()).rejects.toThrow(
+          /Referee SDK credentials are not configured/,
+        );
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+
+      it(`${name} throws when only the password is unset`, async () => {
+        mockEnv.REFEREE_SDK_PASSWORD = undefined;
+
+        await expect(call()).rejects.toThrow(
+          /Referee SDK credentials are not configured/,
+        );
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+    }
+  });
+
   describe("searchRefereesForGame", () => {
     it("returns referee list on happy path", async () => {
       setupLogin();
