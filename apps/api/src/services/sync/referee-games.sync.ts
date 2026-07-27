@@ -284,6 +284,8 @@ export async function removeWithdrawnRefereeGames(
             leagueId: null,
             teamIds: [row.homeTeamId, row.guestTeamId].filter((id): id is number => id !== null),
             reason: "withdrawn from federation schedule",
+            // Null until the referee game has been linked to a synced match.
+            matchId: row.matchId,
           },
         });
       } catch (err) {

@@ -97,6 +97,34 @@ describe("validateEventPayload", () => {
     },
   );
 
+  it("match.cancelled carries the match id and kickoff its push template deep-links and renders from", () => {
+    const base = {
+      matchNo: 1234,
+      homeTeam: "Dragons",
+      guestTeam: "Sharks",
+      leagueName: "Oberliga",
+      leagueId: 7,
+      teamIds: [11, 22],
+    };
+    expect(
+      validateEventPayload(EVENT_TYPES.MATCH_CANCELLED, {
+        ...base,
+        matchId: 555,
+        kickoffDate: "2026-06-01",
+        kickoffTime: "18:00:00",
+        reason: "Hallensperrung",
+      }).valid,
+    ).toBe(true);
+    // Still optional: referee-games.sync publishes match.removed for a game
+    // with no linked matches row, and has no kickoff to hand.
+    expect(
+      validateEventPayload(EVENT_TYPES.MATCH_REMOVED, { ...base, matchId: null }).valid,
+    ).toBe(true);
+    expect(
+      validateEventPayload(EVENT_TYPES.MATCH_CANCELLED, { ...base, matchId: "555" }).issues,
+    ).toEqual([expect.stringContaining("matchId")]);
+  });
+
   it("override.conflict accepts both `field`/`overrideValue` and the legacy `fieldName`/`localValue` shape", () => {
     const a = validateEventPayload(EVENT_TYPES.OVERRIDE_CONFLICT, {
       matchNo: 1,

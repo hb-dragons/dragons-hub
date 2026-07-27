@@ -205,6 +205,12 @@ export async function updateMatchLocal(
 
     const teamIds = [locked.homeTeamApiId, locked.guestTeamApiId];
     const teamNames = await loadTeamNames(tx, locked.homeTeamApiId, locked.guestTeamApiId);
+    // Kickoff *after* this edit: `updateValues` holds what is being written,
+    // `locked` the pre-edit row.
+    const effectiveKickoff = (field: "kickoffDate" | "kickoffTime"): string | null => {
+      const value = field in updateValues ? updateValues[field] : locked[field];
+      return value == null ? null : String(value);
+    };
     const emitEvent = async (eventType: string, extraPayload: Record<string, unknown>) => {
       try {
         await publishDomainEvent({
@@ -221,6 +227,12 @@ export async function updateMatchLocal(
             guestTeam: teamNames.guest,
             leagueId: locked.leagueId,
             teamIds,
+            // The local matches row id, so the push templates can deep-link to
+            // /game/:id. Without it match.cancelled emitted "/game/undefined"
+            // and its template threw out of dispatch on the missing kickoff.
+            matchId: id,
+            kickoffDate: effectiveKickoff("kickoffDate"),
+            kickoffTime: effectiveKickoff("kickoffTime"),
             ...extraPayload,
           },
         }, tx);
@@ -230,15 +242,10 @@ export async function updateMatchLocal(
     };
 
     if (changedFieldNames.has("kickoffDate") || changedFieldNames.has("kickoffTime")) {
-      // Include the effective kickoffDate so urgency can be classified
-      // based on how soon the match is, even for time-only changes.
-      const effectiveDate = ("kickoffDate" in updateValues
-        ? String(updateValues.kickoffDate)
-        : String(locked.kickoffDate)) ?? null;
-
+      // The base payload already carries the effective kickoffDate, so urgency
+      // is classified on how soon the match is even for a time-only change.
       await emitEvent(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, {
         leagueName: "",
-        kickoffDate: effectiveDate,
         changes: fieldChanges
           .filter((c) => c.field === "kickoffDate" || c.field === "kickoffTime")
           .map((c) => ({ field: c.field, oldValue: c.oldValue, newValue: c.newValue })),

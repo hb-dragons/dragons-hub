@@ -150,6 +150,7 @@ export type {
 // Domain events
 export * from "./domain-events";
 export { validateEventPayload } from "./domain-event-schemas";
+export type { EventPayload, RefereeSlotsPayload } from "./domain-event-schemas";
 
 // Watch rules
 export * from "./watch-rules";

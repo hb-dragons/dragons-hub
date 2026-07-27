@@ -77,30 +77,13 @@ export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
  */
 export const EVENT_TYPE_VALUES = Object.values(EVENT_TYPES) as readonly EventType[];
 
-// ── Payload interfaces ───────────────────────────────────────────────────────
+// ── Payload types ────────────────────────────────────────────────────────────
 //
-// The runtime contract for every event payload lives in `domain-event-schemas.ts`
-// (zod), which `validateEventPayload` enforces before an event is published.
-// Only payloads a caller needs to name in a type position are declared here.
-
-export interface RefereeSlotsPayload {
-  matchId: number | null;
-  matchNo: number | null;
-  homeTeam: string;
-  guestTeam: string;
-  leagueId: number | null;
-  leagueName: string;
-  kickoffDate: string;
-  kickoffTime: string;
-  venueId: number | null;
-  venueName: string | null;
-  sr1Open: boolean;
-  sr2Open: boolean;
-  sr1Assigned: string | null;
-  sr2Assigned: string | null;
-  reminderLevel?: number;
-  deepLink: string;
-}
+// The contract for every event payload lives in `domain-event-schemas.ts` (zod),
+// which `validateEventPayload` enforces at publish time. Payloads a caller needs
+// to name in a type position — `RefereeSlotsPayload`, or `EventPayload<E>` for
+// any event — are derived from those schemas there, never restated by hand: a
+// second declaration is free to drift from what producers actually publish.
 
 // ── API response types ───────────────────────────────────────────────────────
 

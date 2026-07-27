@@ -531,7 +531,20 @@ export async function syncMatchesFromData(
                     leagueName,
                     leagueId: data.leagueDbId,
                     teamIds,
+                    // The local matches row id, so push templates can deep-link
+                    // to /game/:id instead of emitting "/game/undefined".
+                    matchId: existing.id,
                   };
+
+                  if (
+                    eventType === EVENT_TYPES.MATCH_CANCELLED ||
+                    eventType === EVENT_TYPES.MATCH_FORFEITED
+                  ) {
+                    // The outcome templates name the kickoff the outcome applies
+                    // to; the post-update remote values are that kickoff.
+                    eventPayload.kickoffDate = updateSet.kickoffDate ?? locked.kickoffDate;
+                    eventPayload.kickoffTime = updateSet.kickoffTime ?? locked.kickoffTime;
+                  }
 
                   if (eventType === EVENT_TYPES.MATCH_SCHEDULE_CHANGED) {
                     eventPayload.changes = effective
