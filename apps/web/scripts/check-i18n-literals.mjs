@@ -69,7 +69,8 @@ let failed = false;
 if (newOffenders.length > 0) {
   failed = true;
   console.error(
-    "i18n literal check failed: hardcoded user-facing text found in JSX.\n" +
+    "i18n literal check failed: hardcoded user-facing text found in JSX or an " +
+      "allowlisted call argument (see USER_FACING_CALL_RULES in scripts/i18n-literal-scan.core.mjs).\n" +
       "Move these strings into src/messages/{en,de}.json and read them via useTranslations/getTranslations.\n",
   );
   for (const [relFile, violations] of newOffenders) {
