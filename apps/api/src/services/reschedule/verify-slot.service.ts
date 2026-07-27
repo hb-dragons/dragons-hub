@@ -4,14 +4,17 @@ import { matches, teams, venues, venueBookings, venueBookingMatches } from "@dra
 import { calculateTimeWindow } from "../venue-booking/booking-calculator";
 import { getBookingConfig } from "../venue-booking/venue-booking.service";
 import type { SlotConflict, VerifySlotInput, VerifySlotResult } from "./reschedule.types";
-import { verifySlotInputSchema } from "./reschedule.types";
 
 function windowsOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
   return aStart < bEnd && bStart < aEnd;
 }
 
-export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotResult> {
-  const input = verifySlotInputSchema.parse(rawInput);
+/**
+ * `input` is already validated and normalised: every caller reaches this through
+ * `defineTool`, which parses the raw tool arguments with `verifySlotInputSchema`
+ * before invoking the handler. Re-parsing here would only repeat that work.
+ */
+export async function verifySlot(input: VerifySlotInput): Promise<VerifySlotResult> {
   const conflicts: SlotConflict[] = [];
 
   const [match] = await getDb()
@@ -44,12 +47,26 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
   }
 
   if (venue) {
-    const config = await getBookingConfig();
-    const [homeTeam] = await getDb()
-      .select({ duration: teams.estimatedGameDuration })
-      .from(teams)
-      .where(eq(teams.apiTeamPermanentId, match.homeTeamApiId))
-      .limit(1);
+    // Three independent reads: the booking config, the home team's game length
+    // and that venue's bookings for the day.
+    const [config, [homeTeam], bookingsThatDay] = await Promise.all([
+      getBookingConfig(),
+      getDb()
+        .select({ duration: teams.estimatedGameDuration })
+        .from(teams)
+        .where(eq(teams.apiTeamPermanentId, match.homeTeamApiId))
+        .limit(1),
+      getDb()
+        .select({
+          id: venueBookings.id,
+          calcStart: venueBookings.calculatedStartTime,
+          calcEnd: venueBookings.calculatedEndTime,
+          ovrStart: venueBookings.overrideStartTime,
+          ovrEnd: venueBookings.overrideEndTime,
+        })
+        .from(venueBookings)
+        .where(and(eq(venueBookings.venueId, input.venueId), eq(venueBookings.date, input.date))),
+    ]);
 
     // calculateTimeWindow always returns a window for a single-element input array
     const proposed = calculateTimeWindow(
@@ -57,24 +74,13 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
       config,
     )!;
 
-    const bookingsThatDay = await getDb()
-      .select({
-        id: venueBookings.id,
-        calcStart: venueBookings.calculatedStartTime,
-        calcEnd: venueBookings.calculatedEndTime,
-        ovrStart: venueBookings.overrideStartTime,
-        ovrEnd: venueBookings.overrideEndTime,
-      })
-      .from(venueBookings)
-      .where(and(eq(venueBookings.venueId, input.venueId), eq(venueBookings.date, input.date)));
+    // One query for every booking's linked matches instead of one per booking.
+    const linkedByBooking = await loadLinkedMatchIds(bookingsThatDay.map((b) => b.id));
 
     for (const b of bookingsThatDay) {
-      const linked = await getDb()
-        .select({ matchId: venueBookingMatches.matchId })
-        .from(venueBookingMatches)
-        .where(eq(venueBookingMatches.venueBookingId, b.id));
+      const linked = linkedByBooking.get(b.id) ?? [];
 
-      const onlyThisMatch = linked.length > 0 && linked.every((l) => l.matchId === input.matchId);
+      const onlyThisMatch = linked.length > 0 && linked.every((id) => id === input.matchId);
       if (onlyThisMatch) continue;
 
       const bStart = b.ovrStart ?? b.calcStart;
@@ -143,4 +149,25 @@ export async function verifySlot(rawInput: VerifySlotInput): Promise<VerifySlotR
   }
 
   return { ok: conflicts.every((c) => c.severity !== "blocking"), conflicts };
+}
+
+/** Match ids linked to each of the given bookings, keyed by booking id. */
+async function loadLinkedMatchIds(bookingIds: number[]): Promise<Map<number, number[]>> {
+  if (bookingIds.length === 0) return new Map();
+
+  const rows = await getDb()
+    .select({
+      venueBookingId: venueBookingMatches.venueBookingId,
+      matchId: venueBookingMatches.matchId,
+    })
+    .from(venueBookingMatches)
+    .where(inArray(venueBookingMatches.venueBookingId, bookingIds));
+
+  const map = new Map<number, number[]>();
+  for (const row of rows) {
+    const list = map.get(row.venueBookingId);
+    if (list) list.push(row.matchId);
+    else map.set(row.venueBookingId, [row.matchId]);
+  }
+  return map;
 }

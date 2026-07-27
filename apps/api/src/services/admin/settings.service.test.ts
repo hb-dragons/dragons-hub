@@ -38,16 +38,20 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { traceQueries, type QueryTrace } from "../../test/trace-queries";
 
 let ctx: TestDbContext;
+let trace: QueryTrace;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
-  dbHolder.ref = ctx.db;
+  trace = traceQueries(ctx.db as object);
+  dbHolder.ref = trace.db;
 });
 
 beforeEach(async () => {
   await resetTestDb(ctx);
+  trace.reset();
 });
 
 afterAll(async () => {
@@ -140,6 +144,15 @@ describe("getClubConfig", () => {
 
     expect(await getClubConfig()).toEqual({ clubId: 4121, clubName: "" });
   });
+
+  it("reads both keys in a single query", async () => {
+    await setClubConfig(4121, "Dragons");
+    trace.reset();
+
+    await getClubConfig();
+
+    expect(trace.startCount()).toBe(1);
+  });
 });
 
 describe("setClubConfig", () => {
@@ -195,6 +208,32 @@ describe("getBookingSettings", () => {
       gameDuration: 120,
       dueDaysBefore: 7,
     });
+  });
+
+  it("keeps a stored zero rather than treating it as unset", async () => {
+    await upsertSetting("venue_booking_buffer_before", "0");
+
+    expect((await getBookingSettings()).bufferBefore).toBe(0);
+  });
+
+  it("falls back to the default when a stored value is not a number", async () => {
+    await upsertSetting("venue_booking_buffer_after", "not-a-number");
+
+    expect((await getBookingSettings()).bufferAfter).toBe(60);
+  });
+
+  it("reads all four keys in a single query", async () => {
+    await setBookingSettings({
+      bufferBefore: 45,
+      bufferAfter: 30,
+      gameDuration: 120,
+      dueDaysBefore: 14,
+    });
+    trace.reset();
+
+    await getBookingSettings();
+
+    expect(trace.startCount()).toBe(1);
   });
 });
 

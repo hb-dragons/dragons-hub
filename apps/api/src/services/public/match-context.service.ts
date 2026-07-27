@@ -35,17 +35,20 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
     )
     .orderBy(desc(matches.kickoffDate));
 
-  const [homeTeamRow] = await getDb()
-    .select({ isOwnClub: teams.isOwnClub, name: teams.name })
-    .from(teams)
-    .where(eq(teams.apiTeamPermanentId, homeTeamApiId))
-    .limit(1);
-
-  const [guestTeamRow] = await getDb()
-    .select({ isOwnClub: teams.isOwnClub, name: teams.name })
-    .from(teams)
-    .where(eq(teams.apiTeamPermanentId, guestTeamApiId))
-    .limit(1);
+  // Independent single-row lookups: issue them together rather than paying two
+  // sequential round trips.
+  const [[homeTeamRow], [guestTeamRow]] = await Promise.all([
+    getDb()
+      .select({ isOwnClub: teams.isOwnClub, name: teams.name })
+      .from(teams)
+      .where(eq(teams.apiTeamPermanentId, homeTeamApiId))
+      .limit(1),
+    getDb()
+      .select({ isOwnClub: teams.isOwnClub, name: teams.name })
+      .from(teams)
+      .where(eq(teams.apiTeamPermanentId, guestTeamApiId))
+      .limit(1),
+  ]);
 
   // The match-detail route only surfaces context for a match with exactly one
   // own-club side. With zero own-club teams the "our team" perspective (W/L,
@@ -83,8 +86,10 @@ export async function getMatchContext(matchId: number): Promise<MatchContext | n
     }
   }
 
-  const homeForm = await getTeamForm(homeTeamApiId);
-  const guestForm = await getTeamForm(guestTeamApiId);
+  const [homeForm, guestForm] = await Promise.all([
+    getTeamForm(homeTeamApiId),
+    getTeamForm(guestTeamApiId),
+  ]);
 
   return {
     headToHead: { wins, losses, pointsFor, pointsAgainst, previousMeetings },

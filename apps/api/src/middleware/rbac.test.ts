@@ -181,6 +181,82 @@ describe("requirePermission", () => {
   });
 });
 
+// --- session reuse ---
+//
+// Production mounts these guards behind `app.use("/admin/*", requireAuth)`, so
+// every admin request used to resolve the session twice: once in requireAuth and
+// again in the granular guard. The guards now read what requireAuth left on the
+// context, and still fetch when nothing is there.
+describe("session lookups per request", () => {
+  const withAuth = new Hono();
+  withAuth.use("/admin/*", requireAuth);
+  withAuth.use("/admin/perm/*", requirePermission("referee", "update"));
+  withAuth.use("/admin/role/*", requireAnyRole("admin"));
+  withAuth.get("/admin/perm/x", (c) => c.json({ ok: true }));
+  withAuth.get("/admin/role/x", (c) => c.json({ ok: true }));
+
+  const adminSession = { user: { id: "u1", role: "admin" }, session: { id: "s1" } };
+
+  it("resolves the session once when requireAuth precedes requirePermission", async () => {
+    mockGetSession.mockResolvedValue(adminSession);
+    mockUserHasPermission.mockResolvedValue({ success: true });
+
+    const res = await withAuth.request("/admin/perm/x");
+
+    expect(res.status).toBe(200);
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves the session once when requireAuth precedes requireAnyRole", async () => {
+    mockGetSession.mockResolvedValue(adminSession);
+
+    const res = await withAuth.request("/admin/role/x");
+
+    expect(res.status).toBe(200);
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("still passes the cached user id to userHasPermission", async () => {
+    mockGetSession.mockResolvedValue(adminSession);
+    mockUserHasPermission.mockResolvedValue({ success: true });
+
+    await withAuth.request("/admin/perm/x");
+
+    expect(mockUserHasPermission).toHaveBeenCalledWith({
+      body: { userId: "u1", permissions: { referee: ["update"] } },
+    });
+  });
+
+  // The guards must not assume requireAuth ran: mounted alone they fetch the
+  // session themselves and populate the context for downstream handlers.
+  it("fetches and populates the context when requirePermission is mounted alone", async () => {
+    const solo = new Hono<AppEnv>();
+    solo.use("/solo/*", requirePermission("referee", "update"));
+    solo.get("/solo/x", (c) => c.json({ userId: c.get("user").id, sessionId: c.get("session").id }));
+
+    mockGetSession.mockResolvedValue(adminSession);
+    mockUserHasPermission.mockResolvedValue({ success: true });
+
+    const res = await solo.request("/solo/x");
+
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(await res.json()).toEqual({ userId: "u1", sessionId: "s1" });
+  });
+
+  it("fetches and populates the context when requireAnyRole is mounted alone", async () => {
+    const solo = new Hono<AppEnv>();
+    solo.use("/solo/*", requireAnyRole("admin"));
+    solo.get("/solo/x", (c) => c.json({ userId: c.get("user").id, sessionId: c.get("session").id }));
+
+    mockGetSession.mockResolvedValue(adminSession);
+
+    const res = await solo.request("/solo/x");
+
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(await res.json()).toEqual({ userId: "u1", sessionId: "s1" });
+  });
+});
+
 // --- assertPermission ---
 describe("assertPermission", () => {
   const app = new Hono();
