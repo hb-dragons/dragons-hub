@@ -21,11 +21,17 @@ const SKIP_DIRS = new Set([
  * Recorded 2026-07-26 (issue #109). These are exemptions from the *no tests at
  * all* check only; none of them is exempt from being tested later, and each has
  * a follow-up noted in the issue.
+ *
+ * Currently empty. @dragons/ui was the last entry and came off the list on
+ * 2026-07-27 (issue #131): its exemption claimed the package was vendored
+ * shadcn/Radix re-exported unmodified, which the git history contradicts —
+ * sidebar.tsx carries cookie persistence, a Cmd/Ctrl+B shortcut and a split
+ * mobile/desktop state, and combobox/date-picker/time-picker are local
+ * compositions. It now has a vitest harness scoped to that hand-written
+ * behaviour. The list itself stays: the next package to ship source without
+ * tests needs somewhere to record why.
  */
-const UNTESTED_PACKAGE_EXEMPTIONS = {
-  "@dragons/ui":
-    "Vendored shadcn/Radix primitives re-exported unmodified. Behaviour that matters is asserted where the components are composed, in @dragons/web's component tests; testing the wrappers here would assert Radix's behaviour, not ours.",
-};
+const UNTESTED_PACKAGE_EXEMPTIONS = {};
 
 function walk(dir, visit) {
   for (const entry of readdirSync(dir)) {
