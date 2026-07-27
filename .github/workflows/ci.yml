@@ -96,6 +96,9 @@ jobs:
       - name: Coverage-script check
         run: pnpm check:coverage-scripts
 
+      - name: Skipped-test check
+        run: pnpm check:skipped-tests
+
       - name: Coverage
         run: pnpm coverage
 
