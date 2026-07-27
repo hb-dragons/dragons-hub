@@ -588,11 +588,14 @@ describe("createBooking", () => {
     // calculated* seed from the supplied override times.
     expect(result!.calculatedStartTime).toBe("14:00:00");
     expect(result!.calculatedEndTime).toBe("17:00:00");
+    // Published with a transaction client (issue #77): the event row commits
+    // with the booking rather than after it.
     expect(publishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: EVENT_TYPES.BOOKING_CREATED,
         payload: expect.objectContaining({ venueName: "Main Hall", matchCount: 0 }),
       }),
+      expect.anything(),
     );
   });
 
@@ -612,6 +615,7 @@ describe("createBooking", () => {
     expect(result!.matches.map((m) => m.id)).toEqual([m1, m2]);
     expect(publishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ payload: expect.objectContaining({ matchCount: 2 }) }),
+      expect.anything(),
     );
   });
 
@@ -655,6 +659,45 @@ describe("createBooking", () => {
 
     expect(result).not.toBeNull();
     expect(result!.venueName).toBe("Hall B");
+  });
+
+  it("writes nothing when the booking.created event cannot be recorded (#77)", async () => {
+    const venueId = await seedVenue("Main Hall");
+    const matchId = await seedMatch({ kickoffTime: "15:00:00" });
+    vi.mocked(publishDomainEvent).mockRejectedValueOnce(new Error("outbox down"));
+
+    await expect(
+      createBooking({
+        venueId,
+        date: "2025-03-15",
+        overrideStartTime: "14:00:00",
+        overrideEndTime: "17:00:00",
+        matchIds: [matchId],
+      }),
+    ).rejects.toThrow("outbox down");
+
+    // The booking row and its match links share the event's transaction, so
+    // there is no booking left behind that nobody was told about.
+    expect(await ctx.db.select().from(venueBookings)).toHaveLength(0);
+    expect(await ctx.db.select().from(venueBookingMatches)).toHaveLength(0);
+  });
+
+  it("links duplicate match ids once", async () => {
+    const venueId = await seedVenue("Main Hall");
+    const matchId = await seedMatch({ kickoffTime: "15:00:00" });
+
+    const result = await createBooking({
+      venueId,
+      date: "2025-03-15",
+      overrideStartTime: "14:00:00",
+      overrideEndTime: "17:00:00",
+      matchIds: [matchId, matchId],
+    });
+
+    // One multi-row insert replaced the per-match loop, so a repeated id has to
+    // be collapsed before it reaches `venue_booking_matches_uniq`.
+    expect(result!.matches.map((m) => m.id)).toEqual([matchId]);
+    expect(await ctx.db.select().from(venueBookingMatches)).toHaveLength(1);
   });
 });
 

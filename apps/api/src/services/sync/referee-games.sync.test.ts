@@ -404,10 +404,79 @@ function feed(...results: SdkOffeneSpielResult[]) {
   return { total: results.length, results };
 }
 
-/** Swap getDb() for a proxy overriding one method and delegating the rest. */
-function overrideDbMethod(name: string, impl: unknown) {
+/**
+ * A referee_games row as a run that raced us would have left it: same
+ * apiMatchId, stale everything else.
+ */
+async function seedRacedRow(
+  overrides: Partial<typeof refereeGames.$inferInsert> = {},
+  apiMatchId = 1001,
+) {
+  await ctx.db.insert(refereeGames).values({
+    apiMatchId,
+    matchNo: 1,
+    kickoffDate: "2020-01-01",
+    kickoffTime: "09:00:00",
+    homeTeamName: "stale home",
+    guestTeamName: "stale guest",
+    sr1OurClub: false,
+    sr2OurClub: false,
+    dataHash: "stale",
+    ...overrides,
+  });
+}
+
+/**
+ * Hide the referee_games batch pre-load from the sync, so it takes the INSERT
+ * branch for a row that already exists — what a run whose insert commits after
+ * our pre-load looks like from here. Everything else, including the re-read on
+ * the conflict path, still goes to the real database.
+ */
+/**
+ * Make the nth `getDb().transaction(...)` call fail. Each game's write is a
+ * transaction (issue #77), so that is where a database failure now surfaces.
+ */
+function failNthTransaction(n: number, error: Error) {
   const real = ctx.db as unknown as Record<string | symbol, unknown>;
-  dbHolder.ref = new Proxy({}, { get: (_t, prop) => (prop === name ? impl : real[prop]) });
+  let call = 0;
+  dbHolder.ref = new Proxy(
+    {},
+    {
+      get: (_t, prop) =>
+        prop === "transaction"
+          ? (...args: unknown[]) => {
+              call++;
+              if (call === n) return Promise.reject(error);
+              return (real.transaction as (...a: unknown[]) => unknown).call(real, ...args);
+            }
+          : real[prop],
+    },
+  );
+}
+
+function hideRefereeGamesPreload({ alsoHideConflictReread = false } = {}) {
+  const real = ctx.db as unknown as Record<string | symbol, unknown>;
+  let selectCall = 0;
+  dbHolder.ref = new Proxy(
+    {},
+    {
+      get: (_t, prop) =>
+        prop === "select"
+          ? (...args: unknown[]) => {
+              selectCall++;
+              // 3rd select is the refereeGames batch pre-load.
+              if (selectCall === 3) {
+                return { from: () => ({ where: async () => [] }) };
+              }
+              // 5th is the conflict-path re-read of the row that beat us.
+              if (alsoHideConflictReread && selectCall === 5) {
+                return { from: () => ({ where: () => ({ limit: async () => [] }) }) };
+              }
+              return (real.select as (...a: unknown[]) => unknown)(...args);
+            }
+          : real[prop],
+    },
+  );
 }
 
 describe("syncRefereeGames", () => {
@@ -459,6 +528,8 @@ describe("syncRefereeGames", () => {
           deepLink: "/referee/games?apiMatchId=1001",
         }),
       }),
+      // Published with the transaction client so the event commits with the row.
+      expect.anything(),
     );
     expect(mockScheduleReminderJobs).toHaveBeenCalledWith(1001, row.id, "2026-04-25", "14:00");
   });
@@ -494,6 +565,7 @@ describe("syncRefereeGames", () => {
           deepLink: `/referee/matches?take=${match!.id}`,
         }),
       }),
+      expect.anything(),
     );
   });
 
@@ -525,45 +597,126 @@ describe("syncRefereeGames", () => {
     // A row already exists for this apiMatchId with stale data, but it is hidden
     // from the batch pre-load (as it would be for a run that raced us), so the
     // sync takes the INSERT branch and must resolve the conflict by updating.
-    await ctx.db.insert(refereeGames).values({
-      apiMatchId: 1001,
-      matchNo: 1,
-      kickoffDate: "2020-01-01",
-      kickoffTime: "09:00:00",
-      homeTeamName: "stale home",
-      guestTeamName: "stale guest",
-      sr1OurClub: false,
-      sr2OurClub: false,
-      dataHash: "stale",
-    });
-    const real = ctx.db as unknown as Record<string | symbol, unknown>;
-    let selectCall = 0;
-    dbHolder.ref = new Proxy(
-      {},
-      {
-        get: (_t, prop) =>
-          prop === "select"
-            ? (...args: unknown[]) => {
-                selectCall++;
-                // 3rd select is the refereeGames batch pre-load.
-                if (selectCall === 3) {
-                  return { from: () => ({ where: async () => [] }) };
-                }
-                return (real.select as (...a: unknown[]) => unknown)(...args);
-              }
-            : real[prop],
-      },
-    );
+    await seedRacedRow({ sr1Status: "assigned", sr1Name: "Stale Ref" });
+    hideRefereeGamesPreload();
 
     const counts = await syncRefereeGames();
 
-    expect(counts.created).toBe(1);
     const rows = await gameRows();
     expect(rows).toHaveLength(1); // no duplicate row
     expect(rows[0]!.matchNo).toBe(42);
     expect(rows[0]!.homeTeamName).toBe("Dragons 1");
     expect(rows[0]!.kickoffDate).toBe("2026-04-25");
     expect(rows[0]!.dataHash).toBe(computeRefereeGameHash(mapApiResultToRow(result)));
+
+    // Issue #85: the conflict UPDATEs an existing row, so it counts as an
+    // update, not a creation.
+    expect(counts.created).toBe(0);
+    expect(counts.updated).toBe(1);
+  });
+
+  it("runs the UPDATE-branch transitions, not the INSERT ones, when the insert loses the race (#85)", async () => {
+    // Our club's SR1 slot was assigned on the row a concurrent run wrote; the
+    // feed now reports it open again. That is the slot-opened transition, which
+    // only the UPDATE branch knows how to detect — the old conflict path ran the
+    // INSERT side effects instead and scheduled a fresh set of reminder jobs.
+    const result = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    mockFetchOffeneSpiele.mockResolvedValue(feed(result));
+    // Same kickoff as the feed, so the only transition in play is the slot one.
+    await seedRacedRow({
+      sr1Status: "assigned",
+      sr1Name: "Stale Ref",
+      sr1OurClub: true,
+      kickoffDate: "2026-04-25",
+      kickoffTime: "14:00:00",
+    });
+    hideRefereeGamesPreload();
+
+    const counts = await syncRefereeGames();
+
+    expect(counts).toMatchObject({ created: 0, updated: 1, unchanged: 0 });
+
+    const row = await gameRow();
+    expect(row.sr1Status).toBe("open");
+    // The event carries the id of the row that already existed.
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "referee.slots.needed", entityId: row.id }),
+      expect.anything(),
+    );
+    // Reminder jobs were rescheduled, which only the UPDATE branch does — the
+    // INSERT branch never cancels.
+    expect(mockCancelReminderJobs).toHaveBeenCalledWith(1001);
+  });
+
+  it("cancels reminders when the raced-in row is now cancelled (#85)", async () => {
+    // The cancellation transition lives only in the UPDATE branch; on the old
+    // conflict path a game that was withdrawn between the two runs kept its
+    // reminder jobs and re-emitted "slots needed" instead.
+    const result = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    result.sp.abgesagt = true;
+    mockFetchOffeneSpiele.mockResolvedValue(feed(result));
+    // Same kickoff as the feed, so the only transition in play is the slot one.
+    await seedRacedRow({
+      sr1Status: "assigned",
+      sr1Name: "Stale Ref",
+      sr1OurClub: true,
+      kickoffDate: "2026-04-25",
+      kickoffTime: "14:00:00",
+    });
+    hideRefereeGamesPreload();
+
+    const counts = await syncRefereeGames();
+
+    expect(counts).toMatchObject({ created: 0, updated: 1 });
+    expect((await gameRow()).isCancelled).toBe(true);
+    expect(mockCancelReminderJobs).toHaveBeenCalledWith(1001);
+    expect(mockPublishDomainEvent).not.toHaveBeenCalled();
+    expect(mockScheduleReminderJobs).not.toHaveBeenCalled();
+  });
+
+  it("skips the game when the row that won the race cannot be read back (#85)", async () => {
+    const result = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    mockFetchOffeneSpiele.mockResolvedValue(feed(result));
+    await seedRacedRow();
+    hideRefereeGamesPreload({ alsoHideConflictReread: true });
+
+    const counts = await syncRefereeGames();
+
+    // Nothing to compare against means no transition can be decided, so the
+    // game is left for the next run rather than counted or acted on.
+    expect(counts).toMatchObject({ created: 0, updated: 0, unchanged: 0 });
+    expect(mockPublishDomainEvent).not.toHaveBeenCalled();
+    expect(mockScheduleReminderJobs).not.toHaveBeenCalled();
+  });
+
+  it("resolves two racing upserts of the same game into one insert and one update (#85)", async () => {
+    // Two entries for the same apiMatchId in one run: the first takes the
+    // INSERT branch, the second finds the row missing from the batch pre-load
+    // (it was read before the first insert committed) and hits the real unique
+    // constraint. That is the same collision two concurrent runs produce, and it
+    // is resolved against a real PGlite index, not a stubbed branch.
+    const first = makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+    const second = makeApiResult({ sr1: makeSr(), sr1MeinVerein: true, sr1OffenAngeboten: false });
+    mockFetchOffeneSpiele.mockResolvedValue(feed(first, second));
+
+    const counts = await syncRefereeGames();
+
+    expect(counts).toMatchObject({ created: 1, updated: 1, unchanged: 0 });
+
+    const rows = await gameRows();
+    expect(rows).toHaveLength(1);
+    // The second writer's data wins, and the row carries its hash.
+    expect(rows[0]!.sr1Status).toBe("assigned");
+    expect(rows[0]!.sr1Name).toBe("Hans Müller");
+    expect(rows[0]!.dataHash).toBe(computeRefereeGameHash(mapApiResultToRow(second)));
+
+    // The insert emitted "slots needed" once; the conflicting write took the
+    // update path, where both slots are not yet filled and nothing reopened, so
+    // it emitted nothing further.
+    const slotEvents = mockPublishDomainEvent.mock.calls.filter(
+      (c) => (c[0] as { type: string }).type === "referee.slots.needed",
+    );
+    expect(slotEvents).toHaveLength(1);
   });
 
   it("skips an unchanged game on re-sync", async () => {
@@ -656,6 +809,7 @@ describe("syncRefereeGames", () => {
     expect((await gameRow()).sr1Status).toBe("open");
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "referee.slots.needed" }),
+      expect.anything(),
     );
   });
 
@@ -677,6 +831,7 @@ describe("syncRefereeGames", () => {
     expect(counts.updated).toBe(1);
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "referee.slots.needed" }),
+      expect.anything(),
     );
   });
 
@@ -706,29 +861,7 @@ describe("syncRefereeGames", () => {
     second.sp.spielnr = 99;
     mockFetchOffeneSpiele.mockResolvedValue(feed(first, second));
 
-    const real = ctx.db as unknown as Record<string | symbol, unknown>;
-    let insertCall = 0;
-    dbHolder.ref = new Proxy(
-      {},
-      {
-        get: (_t, prop) =>
-          prop === "insert"
-            ? (...args: unknown[]) => {
-                insertCall++;
-                if (insertCall === 1) {
-                  return {
-                    values: () => ({
-                      onConflictDoUpdate: () => ({
-                        returning: () => Promise.reject(new Error("DB connection lost")),
-                      }),
-                    }),
-                  };
-                }
-                return (real.insert as (...a: unknown[]) => unknown)(...args);
-              }
-            : real[prop],
-      },
-    );
+    failNthTransaction(1, new Error("DB connection lost"));
 
     const counts = await syncRefereeGames();
 
@@ -868,11 +1001,7 @@ describe("syncRefereeGames", () => {
   it("logs a failed entry when a game cannot be written", async () => {
     const mockLogger = { log: vi.fn().mockResolvedValue(undefined) };
     mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
-    overrideDbMethod("insert", () => ({
-      values: () => ({
-        onConflictDoUpdate: () => ({ returning: () => Promise.reject(new Error("nope")) }),
-      }),
-    }));
+    failNthTransaction(1, new Error("nope"));
 
     await syncRefereeGames(mockLogger as never);
 
@@ -920,7 +1049,12 @@ describe("syncRefereeGames", () => {
 
   it("still returns counts when publishing sync.completed fails", async () => {
     mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult()));
-    mockPublishDomainEvent.mockRejectedValue(new Error("outbox down"));
+    // Only the run-level event fails; the per-game write must be unaffected.
+    mockPublishDomainEvent.mockImplementation((event: { type: string }) =>
+      event.type === "sync.completed"
+        ? Promise.reject(new Error("outbox down"))
+        : Promise.resolve(undefined),
+    );
 
     const counts = await syncRefereeGames(undefined, 77);
 
@@ -940,7 +1074,7 @@ describe("syncRefereeGames", () => {
     expect(await gameRows()).toHaveLength(1);
   });
 
-  it("survives an event-publishing failure on insert", async () => {
+  it("rolls the insert back when the slots-needed event cannot be recorded (#77)", async () => {
     mockPublishDomainEvent.mockRejectedValue(new Error("outbox down"));
     mockFetchOffeneSpiele.mockResolvedValue(
       feed(makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false })),
@@ -948,8 +1082,13 @@ describe("syncRefereeGames", () => {
 
     const counts = await syncRefereeGames();
 
-    expect(counts.created).toBe(1);
-    expect(mockScheduleReminderJobs).toHaveBeenCalled();
+    // The game row and its referee.slots.needed event share a transaction: a
+    // game nobody can be told about is not stored at all, and the next sync
+    // retries it. The old behaviour stored the game, warned, and left the open
+    // slot permanently unannounced.
+    expect(counts.created).toBe(0);
+    expect(await gameRows()).toHaveLength(0);
+    expect(mockScheduleReminderJobs).not.toHaveBeenCalled();
   });
 
   it("survives a reminder-cancellation failure when both slots fill", async () => {
@@ -1015,7 +1154,7 @@ describe("syncRefereeGames", () => {
     expect((await gameRow()).kickoffDate).toBe("2026-04-25");
   });
 
-  it("survives an event-publishing failure when a slot opens", async () => {
+  it("rolls the update back when the slot-opened event cannot be recorded (#77)", async () => {
     mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr() })));
     await syncRefereeGames();
     mockPublishDomainEvent.mockRejectedValue(new Error("outbox down"));
@@ -1025,7 +1164,9 @@ describe("syncRefereeGames", () => {
 
     const counts = await syncRefereeGames();
 
-    expect(counts.updated).toBe(1);
-    expect((await gameRow()).sr1Status).toBe("open");
+    // Same unit of work as the insert: the row must not quietly record the slot
+    // as open while the notification that it reopened was lost.
+    expect(counts.updated).toBe(0);
+    expect((await gameRow()).sr1Status).toBe("assigned");
   });
 });

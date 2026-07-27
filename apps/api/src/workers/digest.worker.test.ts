@@ -341,6 +341,30 @@ describe("digest worker processor", () => {
       expect(await bufferRows()).toHaveLength(1);
     });
 
+    it("anchors on the oldest buffered row, so a later arrival cannot change the dedup key (#77)", async () => {
+      const { channelConfigId } = await seedTwoEventDigest({ config: { locale: "en" } });
+
+      await capturedProcessor!(makeJob({ channelConfigId, digestRunId: 100 }));
+
+      // Re-buffer the same two events and add one that arrived afterwards —
+      // what a second execution of the job sees when it reads the buffer a
+      // moment later than the first. The anchor is the lowest buffer id, so it
+      // is still evt-a and the dedup index still recognises the delivery.
+      // Anchoring on an arbitrary row (an unordered read) would pick evt-c here
+      // and send the digest a second time.
+      await bufferEvent("evt-a", channelConfigId);
+      await bufferEvent("evt-b", channelConfigId);
+      await seedEvent("evt-c", { type: "match.created", entityName: "Team E vs Team F" });
+      await bufferEvent("evt-c", channelConfigId);
+
+      await capturedProcessor!(makeJob({ channelConfigId, digestRunId: 200 }));
+
+      const logs = await logRows();
+      expect(logs).toHaveLength(1);
+      expect(logs[0]!.event_id).toBe("evt-a");
+      expect(logs[0]!.digest_run_id).toBe(100);
+    });
+
     it("uses default locale 'de' when config has no locale", async () => {
       const { channelConfigId } = await seedTwoEventDigest({ config: {} });
 
