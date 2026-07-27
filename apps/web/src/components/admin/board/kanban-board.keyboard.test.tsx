@@ -168,7 +168,8 @@ describe("KanbanBoard keyboard drag and drop", () => {
       }
     };
     // The live region only ever holds the newest message and several land in a
-    // single flush, so reconstruct the sequence from each mutation's oldValue.
+    // single flush, so the sequence is reconstructed from each mutation's
+    // oldValue.
     const observer = new MutationObserver((records) => {
       for (const r of records) record(r.oldValue);
       record(liveRegion.textContent);
@@ -180,19 +181,30 @@ describe("KanbanBoard keyboard drag and drop", () => {
       characterDataOldValue: true,
     });
 
+    // happy-dom drops mutation records often enough to matter — roughly 1 run
+    // in 13 it delivered the pickup records and then silently missed the
+    // ArrowRight one. Waiting on `announced` alone is unrecoverable when that
+    // happens: the DOM already holds the right text, but the array has stopped
+    // growing, so the condition can never come true and no timeout rescues it.
+    // That stalled the full 20s in a stress run and is what made this file fail
+    // under `pnpm coverage` in CI. Sampling the region on every poll makes the
+    // wait depend on the DOM rather than on record delivery; the observer stays
+    // only to catch messages replaced between two polls.
+    const waitForAnnouncement = (needle: string) =>
+      waitFor(() => {
+        record(liveRegion.textContent);
+        expect(announced.some((a) => a.includes(needle))).toBe(true);
+      });
+
     handle.focus();
     fireEvent.keyDown(handle, { key: " ", code: "Space" });
-    await waitFor(() => expect(announced.length).toBeGreaterThan(0));
+    await waitForAnnouncement("Picked up Book gym");
 
     fireEvent.keyDown(handle, { key: "ArrowRight", code: "ArrowRight" });
-    await waitFor(() =>
-      expect(announced.some((a) => a.includes("Now in Doing"))).toBe(true),
-    );
+    await waitForAnnouncement("Now in Doing");
 
     fireEvent.keyDown(handle, { key: " ", code: "Space" });
-    await waitFor(() =>
-      expect(announced.some((a) => a.includes("Dropped in Doing"))).toBe(true),
-    );
+    await waitForAnnouncement("Dropped in Doing");
     observer.disconnect();
 
     expect(announced.some((a) => a.includes("Picked up Book gym"))).toBe(true);
