@@ -25,6 +25,12 @@ export interface RefereeRolesSyncResult {
   updated: number;
   skipped: number;
   failed: number;
+  /**
+   * Batch failures, in the same shape every other sync stage returns. `fullSync`
+   * folds these into the run's `allErrors`; without them a total role-sync
+   * failure left the run reporting `completed` with zero records failed.
+   */
+  errors: string[];
   roleIdLookup: Map<number, number>;
 }
 
@@ -33,7 +39,7 @@ export async function syncRefereeRolesFromData(
   logger?: SyncLogger,
 ): Promise<RefereeRolesSyncResult> {
   if (rolesMap.size === 0) {
-    return { created: 0, updated: 0, skipped: 0, failed: 0, roleIdLookup: new Map() };
+    return { created: 0, updated: 0, skipped: 0, failed: 0, errors: [], roleIdLookup: new Map() };
   }
 
   log.info({ count: rolesMap.size }, "Batch syncing referee roles");
@@ -93,16 +99,24 @@ export async function syncRefereeRolesFromData(
     for (const row of upsertResult) {
       roleIdLookup.set(row.apiId, row.id);
     }
-    return { created, updated, skipped, failed: 0, roleIdLookup };
+    return { created, updated, skipped, failed: 0, errors: [], roleIdLookup };
   } catch (error) {
+    const message = `Batch role sync failed: ${error instanceof Error ? error.message : "Unknown error"}`;
     log.error({ err: error }, "Batch role sync failed");
     await logger?.log({
       entityType: "refereeRole",
       entityId: "batch",
       action: "failed",
-      message: `Batch role sync failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      message,
     });
-    return { created: 0, updated: 0, skipped: 0, failed: rolesMap.size, roleIdLookup: new Map() };
+    return {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      failed: rolesMap.size,
+      errors: [message],
+      roleIdLookup: new Map(),
+    };
   }
 }
 

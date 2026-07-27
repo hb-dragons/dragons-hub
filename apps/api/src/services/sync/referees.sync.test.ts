@@ -199,6 +199,7 @@ describe("syncRefereeRolesFromData", () => {
       updated: 0,
       skipped: 0,
       failed: 0,
+      errors: [],
       roleIdLookup: new Map(),
     });
     expect(await ctx.db.select().from(refereeRoles)).toEqual([]);
@@ -263,6 +264,23 @@ describe("syncRefereeRolesFromData", () => {
     expect(result.failed).toBe(1);
     expect(result.roleIdLookup.size).toBe(0);
     expect(await ctx.db.select().from(refereeRoles)).toEqual([]);
+  });
+
+  // Regression: the batch failure used to be reported only as `failed`, which
+  // fullSync never reads, so a total role-sync failure left the run "completed"
+  // with recordsFailed 0. The errors[] is what reaches allErrors.
+  it("returns the failure in errors[] so fullSync can report it", async () => {
+    const result = await withFailingUpsert(new Error("DB error"), () =>
+      syncRefereeRolesFromData(new Map([[1, makeRole()]])),
+    );
+
+    expect(result.errors).toEqual(["Batch role sync failed: DB error"]);
+  });
+
+  it("returns no errors on a successful batch", async () => {
+    const result = await syncRefereeRolesFromData(new Map([[1, makeRole()]]));
+
+    expect(result.errors).toEqual([]);
   });
 
   it("handles a non-Error batch failure", async () => {
