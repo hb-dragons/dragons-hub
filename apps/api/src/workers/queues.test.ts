@@ -1,15 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { Queue } from "bullmq";
 
-// The queue module re-exports the two schedule mutators for
-// `services/admin/sync-admin.service.ts`; stub the service so importing the
-// queues does not drag the database/Redis singletons into this test.
-const serviceMocks = vi.hoisted(() => ({
-  updateSyncSchedule: vi.fn(),
-  updateRefereeSyncSchedule: vi.fn(),
-}));
-vi.mock("../services/sync-jobs.service", () => serviceMocks);
-
 vi.mock("bullmq", () => ({
   Queue: class MockQueue {
     constructor(
@@ -28,7 +19,6 @@ import {
   pushReceiptQueue,
   taskRemindersQueue,
   outboxPollQueue,
-  updateSyncSchedule,
 } from "./queues";
 
 function fakeQueue(repeatables: { name: string; key: string }[]) {
@@ -114,13 +104,5 @@ describe("clearRepeatables", () => {
     await clearRepeatables(queue);
 
     expect(removeRepeatableByKey).not.toHaveBeenCalled();
-  });
-});
-
-describe("schedule mutator re-exports", () => {
-  it("forwards to the sync-jobs service implementation", async () => {
-    await updateSyncSchedule(true, "0 5 * * *", "UTC");
-
-    expect(serviceMocks.updateSyncSchedule).toHaveBeenCalledWith(true, "0 5 * * *", "UTC");
   });
 });
