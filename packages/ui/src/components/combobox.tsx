@@ -20,6 +20,10 @@ interface ComboboxProps {
   debounceMs?: number;
   className?: string;
   disabled?: boolean;
+  /** Lands on the inner input so a <label htmlFor> can name this control. */
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
 }
 
 export function Combobox({
@@ -31,6 +35,9 @@ export function Combobox({
   debounceMs = 300,
   className,
   disabled,
+  id,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
 }: ComboboxProps) {
   const isControlled = value !== undefined;
   const [internalQuery, setInternalQuery] = React.useState("");
@@ -106,6 +113,9 @@ export function Combobox({
       <PopoverAnchor asChild>
         <Input
           ref={inputRef}
+          id={id}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid}
           value={displayValue}
           onChange={handleInputChange}
           placeholder={placeholder}

@@ -231,7 +231,7 @@ export function BookingDetailSheet({
           onClick={handleClose}
         >
           <X />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t("common.close")}</span>
         </Button>
 
         <SheetHeader>
@@ -367,7 +367,9 @@ export function BookingDetailSheet({
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <TeamBadge name={teamName} badgeColor={m.homeBadgeColor} />
-                              <span className="text-sm">vs {m.guestTeam}</span>
+                              <span className="text-sm">
+                                {t("bookings.detail.opponent", { guest: m.guestTeam })}
+                              </span>
                             </div>
                             <span className="tabular-nums text-sm text-muted-foreground">
                               {m.kickoffTime}

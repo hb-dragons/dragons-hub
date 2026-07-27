@@ -47,6 +47,10 @@ const messages = {
     obsUrl: "OBS URL",
     copy: "Copy",
     noMatch: "No match",
+    matchTitle: "{home} vs {guest}",
+    matchSubtitle: "{date} · {time}",
+    preview: "Preview",
+    previewTitle: "Overlay preview",
     errors: { matchRequired: "Match required" },
   },
 };
@@ -86,7 +90,7 @@ describe("BroadcastControl", () => {
         />,
       ),
     );
-    const iframe = screen.getByTitle("overlay-preview") as HTMLIFrameElement;
+    const iframe = screen.getByTitle("Overlay preview") as HTMLIFrameElement;
     expect(iframe).toBeInTheDocument();
     expect(iframe.getAttribute("src")).toBe("/overlay");
   });
@@ -100,6 +104,6 @@ describe("BroadcastControl", () => {
         />,
       ),
     );
-    expect(screen.queryByTitle("overlay-preview")).toBeNull();
+    expect(screen.queryByTitle("Overlay preview")).toBeNull();
   });
 });

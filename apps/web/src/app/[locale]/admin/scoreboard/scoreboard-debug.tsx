@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import type {
   ScoreboardHealth,
@@ -19,6 +20,7 @@ interface PublishEvent extends StramatelSnapshot {
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
+  const t = useTranslations("scoreboard.debug");
   const [snapshots, setSnapshots] = useState<ScoreboardSnapshotRow[]>([]);
   const [paused, setPaused] = useState(false);
 
@@ -95,33 +97,35 @@ export function ScoreboardDebug({ deviceId }: { deviceId: string }) {
         <span
           className={`inline-block size-2 rounded-full ${health?.online ? "bg-primary" : "bg-destructive"}`}
         />
-        <span>{deviceId || "(no device id configured)"}</span>
+        <span>{deviceId || t("noDeviceId")}</span>
         <span className="text-muted-foreground">
-          Last frame: {health?.lastFrameAt ?? "—"} (
-          {health?.secondsSinceLastFrame ?? "—"}s ago)
+          {t("lastFrame", {
+            at: health?.lastFrameAt ?? "—",
+            seconds: health?.secondsSinceLastFrame ?? "—",
+          })}
         </span>
         <button
           type="button"
           className="bg-input border-border/20 ml-auto rounded-md border px-2 py-1"
           onClick={() => setPaused((p) => !p)}
         >
-          {paused ? "Resume" : "Pause"}
+          {paused ? t("resume") : t("pause")}
         </button>
       </div>
       <table className="w-full text-sm">
         <thead className="bg-surface-low font-display text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th className="px-2">id</th>
-            <th className="px-2">at</th>
-            <th className="px-2">H</th>
-            <th className="px-2">G</th>
-            <th className="px-2">Q</th>
-            <th className="px-2">clock</th>
-            <th className="px-2">SC</th>
-            <th className="px-2" title="Fouls home / guest">F H/G</th>
-            <th className="px-2" title="Timeouts home / guest">TO H/G</th>
-            <th className="px-2" title="Timeout active / clock running">flags</th>
-            <th className="px-2">hex</th>
+            <th className="px-2">{t("columns.id")}</th>
+            <th className="px-2">{t("columns.at")}</th>
+            <th className="px-2">{t("columns.home")}</th>
+            <th className="px-2">{t("columns.guest")}</th>
+            <th className="px-2">{t("columns.period")}</th>
+            <th className="px-2">{t("columns.clock")}</th>
+            <th className="px-2">{t("columns.shotClock")}</th>
+            <th className="px-2" title={t("foulsTitle")}>{t("columns.fouls")}</th>
+            <th className="px-2" title={t("timeoutsTitle")}>{t("columns.timeouts")}</th>
+            <th className="px-2" title={t("flagsTitle")}>{t("columns.flags")}</th>
+            <th className="px-2">{t("columns.hex")}</th>
           </tr>
         </thead>
         <tbody>

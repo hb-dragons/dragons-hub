@@ -63,6 +63,32 @@ const entityTypeVariantMap: Record<
   referee: "outline",
 };
 
+// The API types entityType/status/urgency as bare strings, so an unrecognised
+// value is reachable at runtime. Map only what the catalog actually has and
+// fall back to a generic label rather than rendering the raw enum token.
+const ENTITY_TYPE_KEYS = new Set(["match", "booking", "referee", "task"]);
+const STATUS_KEYS = new Set([
+  "pending",
+  "sent",
+  "sent_ticket",
+  "delivered",
+  "read",
+  "failed",
+]);
+const URGENCY_KEYS = new Set(["immediate", "routine"]);
+
+type NotificationsTranslator = ReturnType<typeof useTranslations<"notifications">>;
+
+function enumLabel(
+  t: NotificationsTranslator,
+  group: "entityTypes" | "statuses" | "urgencies",
+  known: Set<string>,
+  value: string,
+): string {
+  const key = known.has(value) ? value : "unknown";
+  return t(`${group}.${key}` as Parameters<typeof t>[0]);
+}
+
 export function NotificationCenter() {
   const t = useTranslations("notifications");
   const format = useFormatter();
@@ -199,6 +225,7 @@ export function NotificationCenter() {
               onNext={() =>
                 setPage((p) => Math.min(totalInboxPages - 1, p + 1))
               }
+              t={t}
             />
           </>
         )}
@@ -232,6 +259,7 @@ export function NotificationCenter() {
               onNext={() =>
                 setFailedPage((p) => Math.min(totalFailedPages, p + 1))
               }
+              t={t}
             />
           </>
         )}
@@ -288,19 +316,19 @@ function InboxCard({
               variant={entityTypeVariantMap[item.entityType] ?? "outline"}
               className="text-xs"
             >
-              {item.entityType}
+              {enumLabel(t, "entityTypes", ENTITY_TYPE_KEYS, item.entityType)}
             </Badge>
             <Badge
               variant={statusVariantMap[item.status] ?? "outline"}
               className="text-xs"
             >
-              {item.status}
+              {enumLabel(t, "statuses", STATUS_KEYS, item.status)}
             </Badge>
             <Badge
               variant={urgencyVariantMap[item.urgency] ?? "secondary"}
               className="text-xs"
             >
-              {item.urgency}
+              {enumLabel(t, "urgencies", URGENCY_KEYS, item.urgency)}
             </Badge>
             <span className="text-xs text-muted-foreground">
               {item.entityName}
@@ -360,7 +388,7 @@ function FailedCard({
               {item.entityName}
             </Badge>
             <Badge variant="destructive" className="text-xs">
-              {item.status}
+              {enumLabel(t, "statuses", STATUS_KEYS, item.status)}
             </Badge>
             <span className="text-xs text-muted-foreground">
               {t("columns.retries")}: {item.retryCount}
@@ -386,11 +414,13 @@ function Pagination({
   totalPages,
   onPrev,
   onNext,
+  t,
 }: {
   page: number;
   totalPages: number;
   onPrev: () => void;
   onNext: () => void;
+  t: NotificationsTranslator;
 }) {
   return (
     <div className="flex items-center justify-center gap-2 pt-2">
@@ -400,11 +430,12 @@ function Pagination({
         className="h-8 w-8"
         disabled={page <= 0}
         onClick={onPrev}
+        aria-label={t("pagination.previous")}
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
       <span className="text-sm tabular-nums text-muted-foreground">
-        {page + 1} / {totalPages}
+        {t("pagination.pageOf", { page: page + 1, total: totalPages })}
       </span>
       <Button
         variant="outline"
@@ -412,6 +443,7 @@ function Pagination({
         className="h-8 w-8"
         disabled={page >= totalPages - 1}
         onClick={onNext}
+        aria-label={t("pagination.next")}
       >
         <ChevronRight className="h-4 w-4" />
       </Button>

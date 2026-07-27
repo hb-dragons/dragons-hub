@@ -2,6 +2,7 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 
 vi.mock("swr", () => ({
   default: vi.fn(() => ({
@@ -51,11 +52,16 @@ beforeEach(() => {
 });
 
 import { ScoreboardDebug } from "./scoreboard-debug";
+import messages from "@/messages/en.json";
 
 describe("ScoreboardDebug", () => {
   it("renders the snapshots table from the initial fetch", async () => {
     await act(async () => {
-      render(<ScoreboardDebug deviceId="d1" />);
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <ScoreboardDebug deviceId="d1" />
+        </NextIntlClientProvider>,
+      );
     });
     expect(await screen.findByText(/^5$/)).toBeInTheDocument();
   });

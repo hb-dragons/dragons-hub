@@ -15,6 +15,15 @@
 // data-testid, …) to avoid drowning in non-user-facing noise, and it ignores
 // `attr={t("key")}` / `{t("key")}` call expressions, which are exactly the
 // translated form we want people to use instead.
+//
+// Scope decision (issue #129): the scanner stays JSX-only. It cannot see
+// hardcoded strings in call arguments — `toast.error("Save failed")`, Zod's
+// `.min(3, "Too short")` — and that hole is real, but closing it here would
+// have added a batch of newly-visible offenders to the baseline in the same
+// change that was meant to shrink it, which is exactly what the shrink-only
+// ratchet exists to prevent. Extending the scanner to call arguments in known
+// user-facing positions is tracked as its own issue, to land against a
+// baseline that is not moving underneath it.
 import ts from "typescript";
 
 export const TARGET_ATTRIBUTES = new Set(["aria-label", "title", "placeholder", "alt"]);

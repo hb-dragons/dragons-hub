@@ -281,10 +281,12 @@
     "matchdayBadge": "ST {day}",
     "overrideCount": "{count, plural, =1 {# Override} other {# Overrides}}",
     "overrideActive": "Override aktiv",
+    "editTitle": "{home} vs. {guest}",
     "info": {
       "title": "Spielinfo",
       "matchNo": "Spielnr.",
       "matchday": "Spieltag",
+      "matchdaySummary": "Spieltag {day} · {league}",
       "league": "Liga",
       "date": "Datum",
       "time": "Uhrzeit",
@@ -327,7 +329,8 @@
       "anschreiber": "Anschreiber",
       "zeitnehmer": "Zeitnehmer",
       "shotclock": "Shotclock",
-      "placeholder": "Team auswählen..."
+      "placeholder": "Team auswählen...",
+      "clear": "{role} zurücksetzen"
     },
     "notes": {
       "title": "Notizen",
@@ -893,6 +896,7 @@
       "calculated": "Berechnet",
       "reasonPlaceholder": "Grund für Überschreibung...",
       "linkedMatches": "Verknüpfte Spiele",
+      "opponent": "vs. {guest}",
       "notes": "Notizen",
       "notesPlaceholder": "Notizen hinzufügen...",
       "delete": "Buchung löschen",
@@ -1046,6 +1050,14 @@
     "instructionApple": "Kalender → Ablage → Neues Kalenderabo",
     "instructionGoogle": "Einstellungen → Weitere Kalender → Per URL",
     "instructionOutlook": "Kalender hinzufügen → Aus dem Internet",
+    "heroTitle": "Dragons",
+    "heroSubtitle": "Basketball",
+    "weekendLabel": "Sa/So {satDay}/{sunDay} {month}",
+    "previousWeekend": "Vorheriges Wochenende",
+    "nextWeekend": "Nächstes Wochenende",
+    "previousMonth": "Vorheriger Monat",
+    "nextMonth": "Nächster Monat",
+    "kickoffDateTime": "{date} · {time}",
     "countdown": {
       "today": "Heute",
       "tomorrow": "Morgen",
@@ -1080,7 +1092,10 @@
       "record": "Bilanz",
       "ptsFor": "Pkt. dafür",
       "ptsAgainst": "Pkt. dagegen",
-      "noData": "Keine Spieldaten verfügbar"
+      "noData": "Keine Spieldaten verfügbar",
+      "quarterLabel": "Q{number}",
+      "overtimeLabel": "VL{number}",
+      "teamColumn": "Mannschaft"
     },
     "teamDetail": {
       "form": "Form",
@@ -1113,6 +1128,28 @@
       "online": "Live",
       "connecting": "Verbinde…",
       "offline": "Warte auf Daten…"
+    },
+    "debug": {
+      "noDeviceId": "(keine Geräte-ID konfiguriert)",
+      "lastFrame": "Letztes Bild: {at} (vor {seconds}s)",
+      "pause": "Pause",
+      "resume": "Fortsetzen",
+      "foulsTitle": "Fouls Heim / Gast",
+      "timeoutsTitle": "Auszeiten Heim / Gast",
+      "flagsTitle": "Auszeit aktiv / Uhr läuft",
+      "columns": {
+        "id": "id",
+        "at": "Zeit",
+        "home": "H",
+        "guest": "G",
+        "period": "Q",
+        "clock": "Uhr",
+        "shotClock": "WU",
+        "fouls": "F H/G",
+        "timeouts": "AZ H/G",
+        "flags": "Flags",
+        "hex": "hex"
+      }
     }
   },
   "broadcast": {
@@ -1141,13 +1178,24 @@
     "noMatchesFound": "Keine Spiele gefunden.",
     "pickerTitle": "Spiel wählen",
     "useDefault": "(Standard)",
+    "matchTitle": "{home} vs. {guest}",
+    "matchSubtitle": "{date} · {time}",
+    "preview": "Vorschau",
+    "previewTitle": "Overlay-Vorschau",
     "errors": {
       "matchRequired": "Vor dem Live-Gang ein Spiel auswählen."
     },
     "overlay": {
       "live": "Live",
       "offline": "Aus",
-      "stale": "Verbindung instabil"
+      "stale": "Verbindung instabil",
+      "overtime": "OT",
+      "overtimeNumbered": "OT{number}",
+      "timeout": "Auszeit",
+      "timeoutShort": "TO",
+      "tipOff": "Tip-Off",
+      "foulsLabel": "Fouls: {count}",
+      "timeoutsLabel": "Auszeiten: {count}"
     }
   },
   "notifications": {
@@ -1179,6 +1227,32 @@
       "urgency": "Priorität",
       "error": "Fehler",
       "retries": "Versuche"
+    },
+    "entityTypes": {
+      "match": "Spiel",
+      "booking": "Buchung",
+      "referee": "Schiedsrichter",
+      "task": "Aufgabe",
+      "unknown": "Sonstiges"
+    },
+    "statuses": {
+      "pending": "Ausstehend",
+      "sent": "Gesendet",
+      "sent_ticket": "Angenommen",
+      "delivered": "Zugestellt",
+      "read": "Gelesen",
+      "failed": "Fehlgeschlagen",
+      "unknown": "Unbekannt"
+    },
+    "urgencies": {
+      "immediate": "Sofort",
+      "routine": "Routine",
+      "unknown": "Unbekannt"
+    },
+    "pagination": {
+      "previous": "Vorherige Seite",
+      "next": "Nächste Seite",
+      "pageOf": "{page} / {total}"
     }
   },
   "watchRules": {
@@ -1199,6 +1273,8 @@
     "channels": "Kanäle",
     "urgencyOverride": "Priorität überschreiben",
     "noOverride": "Standard",
+    "noChannels": "Keine Kanäle verfügbar",
+    "removeFilter": "Filter entfernen",
     "addFilter": "Filter hinzufügen",
     "when": "Wenn",
     "and": "Und",
@@ -1431,6 +1507,9 @@
         "allow": "Erlauben",
         "selectTeam": "Team",
         "none": "Keine Regeln",
+        "allowSr1": "SR1",
+        "allowSr2": "SR2",
+        "removeRule": "Regel entfernen",
         "disabledHint": "Schiedsrichter erst als vereinseigen markieren",
         "markOwnClub": "Als eigenen Verein markieren",
         "save": {
