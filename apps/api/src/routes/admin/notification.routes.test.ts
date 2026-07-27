@@ -61,19 +61,21 @@ beforeEach(() => {
 });
 
 describe("GET /notifications", () => {
-  it("returns notifications for a user", async () => {
+  it("returns the caller's notifications", async () => {
     const payload = {
       notifications: [{ id: 1, title: "Test" }],
       total: 1,
     };
     mocks.listNotifications.mockResolvedValue(payload);
 
-    const res = await app.request("/notifications?userId=user-1");
+    const res = await app.request("/notifications");
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(payload);
     expect(mocks.listNotifications).toHaveBeenCalledWith({
-      userId: "user-1",
+      userId: "test-user-1",
+      limit: undefined,
+      offset: undefined,
     });
   });
 
@@ -83,46 +85,91 @@ describe("GET /notifications", () => {
       total: 0,
     });
 
-    await app.request("/notifications?userId=user-1&limit=10&offset=20");
+    await app.request("/notifications?limit=10&offset=20");
 
     expect(mocks.listNotifications).toHaveBeenCalledWith({
-      userId: "user-1",
+      userId: "test-user-1",
       limit: 10,
       offset: 20,
     });
   });
 
-  it("returns 200 when userId is missing (optional)", async () => {
-    mocks.listNotifications.mockResolvedValue({
-      notifications: [],
-      total: 0,
-    });
-
-    const res = await app.request("/notifications");
-
-    expect(res.status).toBe(200);
-    expect(mocks.listNotifications).toHaveBeenCalledWith({});
-  });
-
   it("returns 400 for invalid limit", async () => {
-    const res = await app.request("/notifications?userId=user-1&limit=0");
+    const res = await app.request("/notifications?limit=0");
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
   it("returns 400 for limit exceeding maximum", async () => {
-    const res = await app.request("/notifications?userId=user-1&limit=101");
+    const res = await app.request("/notifications?limit=101");
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
   it("returns 400 for negative offset", async () => {
-    const res = await app.request("/notifications?userId=user-1&offset=-1");
+    const res = await app.request("/notifications?offset=-1");
 
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+// Issue #123: cross-user reads of the notification log are not intended. The
+// caller here holds settings:update (rbac is mocked to a pass-through, which is
+// the permissive case), so these assert the scoping the route does on its own.
+describe("GET /notifications cross-user reads (#123)", () => {
+  it("ignores ?userId= and lists as the session user", async () => {
+    mocks.listNotifications.mockResolvedValue({ notifications: [], total: 0 });
+
+    const res = await app.request("/notifications?userId=victim-user-2");
+
+    expect(res.status).toBe(200);
+    expect(mocks.listNotifications).toHaveBeenCalledWith({
+      userId: "test-user-1",
+      limit: undefined,
+      offset: undefined,
+    });
+    expect(mocks.listNotifications).not.toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "victim-user-2" }),
+    );
+  });
+
+  it("returns user A's rows, not the requested user B's", async () => {
+    // The service is scoped by the id it is handed, so mirror that: it only
+    // ever yields rows for whoever the route passed.
+    mocks.listNotifications.mockImplementation(
+      ({ userId }: { userId: string }) => ({
+        notifications: [{ id: 1, title: `inbox of ${userId}` }],
+        total: 1,
+      }),
+    );
+
+    const res = await app.request("/notifications?userId=victim-user-2");
+
+    expect(await json(res)).toEqual({
+      notifications: [{ id: 1, title: "inbox of test-user-1" }],
+      total: 1,
+    });
+  });
+
+  it("keeps limit and offset while still ignoring userId", async () => {
+    mocks.listNotifications.mockResolvedValue({ notifications: [], total: 0 });
+
+    await app.request("/notifications?userId=victim-user-2&limit=5&offset=1");
+
+    expect(mocks.listNotifications).toHaveBeenCalledWith({
+      userId: "test-user-1",
+      limit: 5,
+      offset: 1,
+    });
+  });
+
+  it("has no unread-count route to read another user's count from", async () => {
+    const res = await app.request("/notifications/unread-count?userId=victim-user-2");
+
+    expect(res.status).toBe(404);
   });
 });
 

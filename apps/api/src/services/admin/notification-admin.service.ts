@@ -62,17 +62,20 @@ export interface NotificationCenterListResult {
 // ── listNotifications ───────────────────────────────────────────────────────
 
 export async function listNotifications(params: {
-  userId?: string;
+  userId: string;
   limit?: number;
   offset?: number;
 }): Promise<NotificationCenterListResult> {
   const { userId, limit = 20, offset = 0 } = params;
 
-  // userId scopes to that user's recipient keys; omitting it returns the whole
-  // log (admin monitoring view).
-  const where = userId
-    ? inArray(notificationLog.recipientId, await recipientKeysForUserId(userId))
-    : undefined;
+  // userId is required: it used to be optional, and omitting it returned the
+  // entire log across every recipient. Both that and the `?userId=` query
+  // param are gone (issue #123) — a read is always scoped to one user's
+  // recipient keys, and the route supplies the caller's id from the session.
+  const where = inArray(
+    notificationLog.recipientId,
+    await recipientKeysForUserId(userId),
+  );
 
   const [totalRow] = await getDb()
     .select({ count: count() })

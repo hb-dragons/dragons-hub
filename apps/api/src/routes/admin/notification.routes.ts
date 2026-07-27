@@ -28,19 +28,27 @@ import {
 const notificationRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
 
-// GET /admin/notifications - List notifications for a user
+// GET /admin/notifications - List the caller's notifications
 notificationRoutes.get(
   "/notifications",
   settingsUpdate,
   validator("query", notificationListQuerySchema, validationHook),
   describeRoute({
-    description: "List notifications for a user from the notification log",
+    description: "List the caller's notifications from the notification log",
     tags: ["Notifications"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = c.req.valid("query");
-    const result: NotificationListResult = await listNotifications(query);
+    const { limit, offset } = c.req.valid("query");
+    // Decision (issue #123): cross-user reads of the notification log are not
+    // intended, so the recipient comes from the session and `userId` is gone
+    // from the query contract. `settings:update` is held by several roles; it
+    // is authorisation to use the admin UI, not to read someone else's inbox.
+    const result: NotificationListResult = await listNotifications({
+      userId: c.get("user").id,
+      limit,
+      offset,
+    });
     return c.json(result);
   },
 );

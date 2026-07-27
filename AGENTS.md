@@ -584,7 +584,7 @@ plugin under `/api/auth/*`, not by this route group.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/admin/notifications` | List notifications for the caller from the notification log |
+| GET | `/admin/notifications` | List notifications for the caller from the notification log. Query: `{ limit?, offset? }` — the recipient comes from the session, never the request, so there is no `userId` param and no cross-user read (issue #123). |
 | PATCH | `/admin/notifications/:id/read` | Mark one notification as read |
 | PATCH | `/admin/notifications/read-all` | Mark all of the caller's notifications as read |
 | POST | `/admin/notifications/:id/retry` | Retry a failed notification delivery |
