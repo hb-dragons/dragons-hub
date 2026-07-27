@@ -12,12 +12,13 @@
  * was listed here with no adapter behind it, which let an admin create a
  * channel config whose every notification fell through to
  * "Unknown channel type, skipping dispatch" — configured, enabled, and silent.
- * It comes back when an SMTP adapter exists, not before.
+ * It is back because `channels/email.ts` now delivers it over SMTP.
  */
 export const CHANNEL_TYPES = [
   "in_app",
   "whatsapp_group",
   "push",
+  "email",
 ] as const;
 export type ChannelType = (typeof CHANNEL_TYPES)[number];
 /**
@@ -53,7 +54,20 @@ interface PushConfig {
   locale?: "de" | "en";
 }
 
-export type ChannelConfig = InAppConfig | WhatsAppGroupConfig | PushConfig;
+/**
+ * Email carries no target of its own. The pipeline's recipient key resolves to
+ * user ids and the adapter reads each user's own address, so the config only
+ * pins the language the message body is rendered in.
+ */
+interface EmailConfig {
+  locale: "de" | "en";
+}
+
+export type ChannelConfig =
+  | InAppConfig
+  | WhatsAppGroupConfig
+  | PushConfig
+  | EmailConfig;
 
 // ── API response types ───────────────────────────────────────────────────────
 

@@ -14,6 +14,7 @@ import { renderEventMessage } from "./templates/index";
 import { InAppChannelAdapter } from "./channels/in-app";
 import { WhatsAppGroupAdapter } from "./channels/whatsapp-group";
 import { PushChannelAdapter } from "./channels/push";
+import { EmailChannelAdapter } from "./channels/email";
 import { ExpoPushClient } from "./expo-push.client";
 import { resolveRecipientUserIds } from "./recipient-resolver";
 import { renderRefereeSlotsWhatsApp } from "./templates/referee-slots";
@@ -117,12 +118,14 @@ export const DISPATCHABLE_CHANNEL_TYPES: Record<ChannelType, true> = {
   in_app: true,
   whatsapp_group: true,
   push: true,
+  email: true,
 };
 
 const inAppAdapter = new InAppChannelAdapter();
 const whatsAppGroupAdapter = new WhatsAppGroupAdapter();
 const expoPushClient = new ExpoPushClient({ accessToken: env.EXPO_ACCESS_TOKEN });
 const pushAdapter = new PushChannelAdapter(expoPushClient);
+const emailAdapter = new EmailChannelAdapter();
 
 /**
  * Step 1: Load watch rules and channel configs from DB.
@@ -189,10 +192,14 @@ function evaluateWatchRules(
  * Derive the recipient key a watch-rule match addresses, from its channel
  * config. `in_app` configs carry an audienceRole ("admin" | "referee") which
  * maps to `audience:<role>` — an inbox-addressable, push-resolvable key.
- * Channels without an audience (whatsapp_group, email) deliver to a fixed
- * target, not a user inbox, so they get a non-resolvable label that never
- * masquerades as a user or audience. Never the bare channel-config id, which
- * matches no inbox key and resolves to zero push recipients.
+ * Configs without an audience get `channel:<id>` — a deliberately
+ * non-resolvable label that never masquerades as a user or an audience.
+ * `whatsapp_group` delivers to a fixed group rather than an inbox and ignores
+ * the key entirely; `push` and `email` fan out per user, so a watch rule
+ * pointed at one of those resolves to zero recipients rather than to the wrong
+ * ones. Give such a config an audienceRole to address it by watch rule; the
+ * role-based defaults path supplies its own `user:` / `referee:` /
+ * `audience:` keys and is unaffected.
  */
 function watchRuleRecipientId(config: { id: number; config: unknown }): string {
   const cfg = config.config;
@@ -360,6 +367,25 @@ export async function dispatchImmediate(params: {
       watchRuleId,
       channelConfigId: config.id,
       recipientUserIds: userIds,
+    });
+    return sendResult.success;
+  }
+
+  if (channelType === "email") {
+    // Same recipient resolution as push — the config carries no address, only a
+    // locale — then each user's own verified address inside the adapter.
+    const userIds = await resolveRecipientUserIds(recipientId);
+    if (userIds.length === 0) return false;
+    const publicUrl = env.TRUSTED_ORIGINS[0] ?? "http://localhost:3000";
+    const sendResult = await emailAdapter.send({
+      eventId: event.id,
+      watchRuleId,
+      channelConfigId: config.id,
+      recipientUserIds: userIds,
+      title: message.title,
+      body: message.body,
+      locale,
+      link: event.deepLinkPath ? `${publicUrl}${event.deepLinkPath}` : undefined,
     });
     return sendResult.success;
   }

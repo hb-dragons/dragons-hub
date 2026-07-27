@@ -182,6 +182,11 @@ GCS_PROJECT_ID=<GCP project owning that bucket>
 SERVICE_VERSION=<falls back to K_REVISION, which Cloud Run sets, then "unknown">
 GCP_PROJECT_ID=<required for Cloud Logging → Cloud Trace correlation>
 WAHA_BASE_URL=<WhatsApp HTTP API base URL; whatsapp_group delivery is inert without it>
+SMTP_HOST=<SMTP relay host>
+SMTP_PORT=<SMTP relay port; 465 uses implicit TLS, anything else STARTTLS>
+SMTP_USER=<SMTP username>
+SMTP_PASSWORD=<SMTP password>
+SMTP_FROM=<From header, e.g. "Dragons <noreply@example.de>">
 REFEREE_SDK_USERNAME=<separate federation account for referee assignment>
 REFEREE_SDK_PASSWORD=<separate federation account for referee assignment>
 EXPO_ACCESS_TOKEN=<enables the authenticated Expo Push send tier: higher rate limits + better receipt SLA>
@@ -190,14 +195,17 @@ GOOGLE_GENERATIVE_AI_API_KEY=<google ai studio key; required when ASSISTANT_ENAB
 MCP_TOKEN=<random string min 32 chars; bearer token for the /mcp endpoint>
 ```
 
-There are no `SMTP_*` vars, and `email` is not a channel type. Both were removed
-once it turned out `email` was offerable with no adapter behind it, so an admin
-could create a channel config whose every notification was dropped. A channel
-type belongs in `CHANNEL_TYPES` (`packages/shared/src/channel-configs.ts`) only
-once `DISPATCHABLE_CHANNEL_TYPES` in
+The five `SMTP_*` vars are all-or-nothing: `readSmtpSettings()`
+(`apps/api/src/services/notifications/channels/smtp-settings.ts`) treats a
+partial set as "not configured", so the provider-availability endpoint stops
+offering `email` and the adapter sends nothing. A channel type belongs in
+`CHANNEL_TYPES` (`packages/shared/src/channel-configs.ts`) only once
+`DISPATCHABLE_CHANNEL_TYPES` in
 `apps/api/src/services/notifications/notification-pipeline.ts` can deliver it;
 that record is exhaustive over `ChannelType`, so the two cannot drift apart
-without a compile error. The vars come back with the adapter.
+without a compile error. `email` was removed from both when it turned out to be
+offerable with no adapter behind it, and returned with
+`channels/email.ts`.
 
 Build-time client variables. These never reach `config/env.ts` — Next.js and
 Expo inline them into their bundles, so changing one needs a rebuild:
@@ -222,9 +230,10 @@ The chatbot/assistant/MCP feature vars are threaded from GitHub through TF (set 
 - **Secrets** `GOOGLE_GENERATIVE_AI_API_KEY` (required when either flag is `true` — the API env schema rejects boot otherwise) and `MCP_TOKEN`: GitHub Actions secrets → `TF_VAR_*` → Secret Manager (`google-generative-ai-api-key-production`, `mcp-token-production`) → mounted via `secrets`. The Google key is mounted on both API + Worker (both run the same env schema); `MCP_TOKEN` only on the API, which serves `/mcp`.
 - **Native** `EXPO_PUBLIC_CHATBOT_ENABLED`: set per build profile in `apps/native/eas.json` (native ships via EAS, not GitHub Actions).
 
-Notification delivery credentials follow the same route. Both are optional, and both are wired into the API *and* the Worker: the Worker runs the event worker (and the push-receipt worker), while the API dispatches through the same pipeline from the admin test-send and "retry failed notification" routes.
+Notification delivery credentials follow the same route. Each is optional, and each is wired into the API *and* the Worker: the Worker runs the event worker (and the push-receipt worker), while the API dispatches through the same pipeline from the admin test-send and "retry failed notification" routes.
 - **`WAHA_BASE_URL` / `WAHA_SESSION`** (WhatsApp group delivery): GitHub repository *variables* → `TF_VAR_waha_base_url` / `TF_VAR_waha_session` → API/Worker `env_vars`. Not credentials — the adapter sends no auth header — so they do not belong in Secret Manager. `main.tf` omits both keys entirely when `waha_base_url` is `""`, because `env.ts` validates `WAHA_BASE_URL` as a URL and `.optional()` does not accept an empty string, so passing `""` through would fail the service at boot instead of just leaving the channel off.
 - **`EXPO_ACCESS_TOKEN`** (authenticated Expo Push tier): GitHub Actions *secret* → `TF_VAR_expo_access_token` → Secret Manager (`expo-access-token-production`) → mounted on API + Worker via `secrets`. When the variable is `""` the secret, its version and both mounts are skipped (Secret Manager rejects an empty payload) and push runs on the unauthenticated tier.
+- **`SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_FROM` / `SMTP_PASSWORD`** (email delivery): the first four are GitHub repository *variables* → `TF_VAR_smtp_host` / `TF_VAR_smtp_port` / `TF_VAR_smtp_user` / `TF_VAR_smtp_from` → API/Worker `env_vars`; only `SMTP_PASSWORD` is a credential, so it is a GitHub Actions *secret* → `TF_VAR_smtp_password` → Secret Manager (`smtp-password-production`) → mounted on API + Worker via `secrets`. Presence gating follows WAHA: `main.tf` omits all four `env_vars` keys, plus the secret, its version and both mounts, when `smtp_host` is `""` — `env.ts` rejects `""` for every one of them (`.min(1)` / a positive int), so passing empties through would fail the service at boot instead of leaving the channel off.
 
 Note: Club and league tracking configuration is managed via the admin UI (`/admin/settings`) and stored in the `app_settings` database table.
 

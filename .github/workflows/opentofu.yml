@@ -85,6 +85,15 @@ jobs:
       # Expo Push authenticated send tier. A credential, so a repo secret; unset
       # renders "" and leaves push on the unauthenticated tier.
       TF_VAR_expo_access_token: ${{ secrets.EXPO_ACCESS_TOKEN }}
+      # Email delivery. Only the password is a credential; the relay coordinates
+      # are repo variables and land in Cloud Run env_vars. An unset SMTP_HOST
+      # renders "", which TF reads as "leave email disabled" and omits the whole
+      # set rather than passing empties the API env schema rejects at boot.
+      TF_VAR_smtp_host: ${{ vars.SMTP_HOST }}
+      TF_VAR_smtp_port: ${{ vars.SMTP_PORT || '587' }}
+      TF_VAR_smtp_user: ${{ vars.SMTP_USER }}
+      TF_VAR_smtp_from: ${{ vars.SMTP_FROM }}
+      TF_VAR_smtp_password: ${{ secrets.SMTP_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
