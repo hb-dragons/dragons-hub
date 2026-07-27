@@ -50,6 +50,7 @@ import {
   insertDomainEvent,
   enqueueDomainEvent,
   publishDomainEvent,
+  publishSystemEvent,
   type DomainEvent,
   type TransactionClient,
 } from "./event-publisher";
@@ -355,5 +356,48 @@ describe("publishDomainEvent", () => {
     // Un-enqueued and unprocessed: exactly what the outbox poller looks for.
     expect(rows[0]!.enqueued_at).toBeNull();
     expect(rows[0]!.processed_at).toBeNull();
+  });
+});
+
+describe("publishSystemEvent", () => {
+  const testPush = {
+    id: "admin_test:u_admin:01ABC",
+    type: "admin.test_push" as const,
+    occurredAt: new Date("2026-07-27T09:00:00Z"),
+    actor: "u_admin",
+    entityName: "admin test",
+    deepLinkPath: "/",
+    payload: { isTest: true },
+  };
+
+  it("writes the anchor row with the caller's id and does not enqueue", async () => {
+    await publishSystemEvent(testPush);
+
+    const rows = await eventRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      // The id is the caller's, not a ULID: the admin route scopes its /recent
+      // lookup by an `admin_test:<caller>:` prefix.
+      id: "admin_test:u_admin:01ABC",
+      type: "admin.test_push",
+      source: "manual",
+      urgency: "immediate",
+      actor: "u_admin",
+      entity_type: "user",
+      entity_id: 0,
+      entity_name: "admin test",
+    });
+    expect(mockQueueAdd).not.toHaveBeenCalled();
+  });
+
+  it("joins the caller's transaction, so a later failure takes the event with it", async () => {
+    await expect(
+      ctx.db.transaction(async (tx) => {
+        await publishSystemEvent(testPush, tx as TransactionClient);
+        throw new Error("log insert failed");
+      }),
+    ).rejects.toThrow("log insert failed");
+
+    expect(await eventRows()).toEqual([]);
   });
 });

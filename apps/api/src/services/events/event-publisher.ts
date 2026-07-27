@@ -77,21 +77,95 @@ export async function insertDomainEvent(
   event: DomainEvent,
   tx?: TransactionClient,
 ): Promise<void> {
+  await insertEventRow(
+    {
+      id: event.id,
+      type: event.type,
+      source: event.source,
+      urgency: event.urgency,
+      occurredAt: event.occurredAt,
+      actor: event.actor,
+      syncRunId: event.syncRunId,
+      entityType: event.entityType,
+      entityId: event.entityId,
+      entityName: event.entityName,
+      deepLinkPath: event.deepLinkPath,
+      payload: event.payload,
+    },
+    tx,
+  );
+}
+
+async function insertEventRow(
+  values: typeof domainEvents.$inferInsert,
+  tx?: TransactionClient,
+): Promise<void> {
   const client = tx ?? getDb();
-  await client.insert(domainEvents).values({
-    id: event.id,
-    type: event.type,
-    source: event.source,
-    urgency: event.urgency,
-    occurredAt: event.occurredAt,
-    actor: event.actor,
-    syncRunId: event.syncRunId,
-    entityType: event.entityType,
-    entityId: event.entityId,
-    entityName: event.entityName,
-    deepLinkPath: event.deepLinkPath,
-    payload: event.payload,
-  });
+  await client.insert(domainEvents).values(values);
+}
+
+/**
+ * An event that exists only to anchor rows the schema requires an event for,
+ * never to notify anyone.
+ *
+ * `admin.test_push` is deliberately **not** in `EVENT_TYPES`: `notification_log`
+ * has a foreign key to `domain_events`, so the admin test-push route needs a row
+ * to point at, but the type must stay out of the public vocabulary or an admin
+ * could aim a watch rule at it or fire one from the manual trigger. The
+ * pipeline finds no rule and no role default for it and does nothing, which is
+ * the intent — the push itself was already sent directly by the route.
+ */
+export type SystemEventType = "admin.test_push";
+
+export interface PublishSystemEventParams {
+  /** Caller-chosen id. The route encodes its own scoping prefix into it. */
+  id: string;
+  type: SystemEventType;
+  occurredAt: Date;
+  /** The admin who triggered it. */
+  actor: string;
+  entityName: string;
+  deepLinkPath: string;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Persist a system event through the events service rather than having a route
+ * hand-write the `domain_events` columns (issue #79).
+ *
+ * `publishDomainEvent` is the path for anything real: it mints the ULID,
+ * classifies urgency, validates the payload against the event's schema and
+ * enqueues. None of that applies to a synthetic anchor — its id is chosen by
+ * the caller, its type has no payload schema, and nothing should be dispatched
+ * for it — so it gets its own narrow entry point instead of loopholes in that
+ * one. `entity_type`/`entity_id` are fixed here because a system event is about
+ * an account action, not a tracked entity; `source: "manual"` because a human
+ * pressed a button.
+ *
+ * Takes the caller's transaction so the event and whatever references it land
+ * atomically. As with a transactional `publishDomainEvent`, nothing is enqueued
+ * here; the outbox poller picks the row up after the commit.
+ */
+export async function publishSystemEvent(
+  params: PublishSystemEventParams,
+  tx?: TransactionClient,
+): Promise<void> {
+  await insertEventRow(
+    {
+      id: params.id,
+      type: params.type,
+      source: "manual",
+      urgency: "immediate",
+      occurredAt: params.occurredAt,
+      actor: params.actor,
+      entityType: "user",
+      entityId: 0,
+      entityName: params.entityName,
+      deepLinkPath: params.deepLinkPath,
+      payload: params.payload,
+    },
+    tx,
+  );
 }
 
 /**

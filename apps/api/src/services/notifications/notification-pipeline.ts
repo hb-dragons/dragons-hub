@@ -3,6 +3,7 @@ import {
   watchRules,
   channelConfigs,
   digestBuffer,
+  user,
   userNotificationPreferences,
 } from "@dragons/db/schema";
 import type { DomainEventRow } from "@dragons/db/schema";
@@ -37,29 +38,65 @@ const COALESCE_WINDOW_SEC = 60;
  * Load muted event types from user_notification_preferences.
  * Returns a Map from recipientId → Set of muted event type strings.
  *
- * For "referee:123" recipients, maps the refereeId back to a userId
- * to look up preferences. For "audience:admin", muting is not applied
- * (group recipients don't have individual preferences).
+ * `user_notification_preferences.user_id` is always a bare `user.id`:
+ * `user-preferences.service` writes it from the signed-in account and knows
+ * nothing about referee ids. A `referee:<id>` recipient is therefore resolved
+ * through `user.referee_id` (UNIQUE since migration 0036, so at most one
+ * account per referee) before the lookup. Keying the map by the literal
+ * "referee:<id>" — as this did — matched a row no UI can write, so a referee
+ * who muted an event type still got every notification addressed to their
+ * referee identity (issue #79).
+ *
+ * `audience:*` recipients are groups, not people, and carry no individual
+ * preferences; muting is not applied to them.
+ *
+ * **Fails closed on a DB error.** A preferences read that throws leaves this
+ * unable to tell a muted recipient from an unmuted one, and the old behaviour
+ * (swallow, log at `debug`) resolved that unknown by delivering to everyone —
+ * the single outcome a member who muted the event type asked not to happen, and
+ * the one that cannot be taken back once the push has landed. Rethrowing costs
+ * nothing in delivery: this runs before any dispatch, the event worker leaves
+ * `processed_at` NULL when the pipeline throws, BullMQ retries the job, and the
+ * outbox poller reclaims the event once the lease expires — the notification is
+ * delayed, not lost. Step 1 (`loadRulesAndConfigs`) already lets a DB error
+ * propagate, so catching here only made this one table's failure special.
  */
 async function loadMutedEventTypes(
   recipientIds: string[],
 ): Promise<Map<string, Set<string>>> {
   const result = new Map<string, Set<string>>();
 
-  const refereeRecipients = recipientIds.filter((r) => r.startsWith("referee:"));
-  const userRecipients = recipientIds.filter((r) => r.startsWith("user:"));
+  const refereeRecipients = [
+    ...new Set(recipientIds.filter((r) => r.startsWith("referee:"))),
+  ];
+  const userRecipients = [...new Set(recipientIds.filter((r) => r.startsWith("user:")))];
   if (refereeRecipients.length === 0 && userRecipients.length === 0) return result;
 
-  // The stored user_id is the literal "referee:<id>" for referee prefs but the
-  // bare id for user prefs (the recipient strips the "user:" prefix below), so
-  // build the lookup set to match both keyings — and constrain the query to it
-  // instead of scanning the whole preferences table on every event.
-  const lookupIds = [
-    ...refereeRecipients,
-    ...userRecipients.map((r) => r.slice("user:".length)),
-  ];
+  const refereeIdOf = (recipientId: string) => Number(recipientId.slice("referee:".length));
 
   try {
+    const refereeIds = refereeRecipients.map(refereeIdOf).filter(Number.isFinite);
+    const userIdByRefereeId = new Map<number, string>();
+    if (refereeIds.length > 0) {
+      const linkedAccounts = await getDb()
+        .select({ id: user.id, refereeId: user.refereeId })
+        .from(user)
+        .where(inArray(user.refereeId, refereeIds));
+      for (const account of linkedAccounts) {
+        if (account.refereeId !== null) userIdByRefereeId.set(account.refereeId, account.id);
+      }
+    }
+
+    // Constrain the preferences read to the accounts this event addresses
+    // instead of scanning the whole table on every event.
+    const lookupIds = [
+      ...new Set([
+        ...userIdByRefereeId.values(),
+        ...userRecipients.map((r) => r.slice("user:".length)),
+      ]),
+    ];
+    if (lookupIds.length === 0) return result;
+
     const prefs = await getDb()
       .select({
         userId: userNotificationPreferences.userId,
@@ -76,17 +113,21 @@ async function loadMutedEventTypes(
     }
 
     for (const rid of refereeRecipients) {
-      const muted = userMutedMap.get(rid);
+      const userId = userIdByRefereeId.get(refereeIdOf(rid));
+      const muted = userId === undefined ? undefined : userMutedMap.get(userId);
       if (muted) result.set(rid, muted);
     }
 
     for (const rid of userRecipients) {
-      const userId = rid.slice("user:".length);
-      const muted = userMutedMap.get(userId);
+      const muted = userMutedMap.get(rid.slice("user:".length));
       if (muted) result.set(rid, muted);
     }
-  } catch {
-    logger.debug("Could not load muted event types, skipping preference check");
+  } catch (error) {
+    logger.warn(
+      { error, recipientCount: refereeRecipients.length + userRecipients.length },
+      "Could not load muted event types; failing closed and letting the event retry",
+    );
+    throw error;
   }
 
   return result;
@@ -261,19 +302,35 @@ function evaluateDefaults(
 
 /**
  * Step 4: Buffer an event for digest delivery.
+ *
+ * Returns whether the channel takes digests at all. `digestMode = "none"` means
+ * "deliver each notification as it happens": nothing ever drains that channel's
+ * buffer — the event worker only enqueues a digest job for `per_sync`, and only
+ * `scheduled` gets a cron — so a row written for it is dead on arrival and sits
+ * in `digest_buffer` until `cleanupOldDomainEvents` takes it out with its event,
+ * a year later. Skipping the insert is the difference between an empty table and
+ * one row per (event × none-mode channel) forever.
+ *
+ * A failed insert still counts as buffered: the row is the digest's problem, and
+ * the immediate dispatch below must not be skipped because of it.
  */
-async function bufferForDigest(eventId: string, channelConfigId: number): Promise<void> {
+async function bufferForDigest(
+  eventId: string,
+  config: { id: number; digestMode: string },
+): Promise<boolean> {
+  if (config.digestMode === "none") return false;
   try {
     await getDb()
       .insert(digestBuffer)
-      .values({ eventId, channelConfigId })
+      .values({ eventId, channelConfigId: config.id })
       .onConflictDoNothing();
   } catch (error) {
     logger.warn(
-      { eventId, channelConfigId, error },
+      { eventId, channelConfigId: config.id, error },
       "Failed to buffer event for digest",
     );
   }
+  return true;
 }
 
 async function resolveLocaleForRecipient(
@@ -462,7 +519,7 @@ async function claimAndDispatch(params: {
  * 2. Evaluate watch rules (condition matching)
  * 3. Evaluate role-based defaults
  * 4. Load muted event types for targeted recipients
- * 5. Buffer for digest (unless muted)
+ * 5. Buffer for digest (unless muted, or the channel's digestMode is "none")
  * 6. Claim the per-target coalescing slot and dispatch immediate notifications
  *    (unless muted or coalesced)
  */
@@ -498,9 +555,8 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
     if (dispatched.has(match.dedupKey)) continue;
     dispatched.add(match.dedupKey);
 
-    // Always buffer for digest
-    await bufferForDigest(event.id, match.config.id);
-    result.buffered++;
+    // Buffer for digest, unless this channel takes no digest
+    if (await bufferForDigest(event.id, match.config)) result.buffered++;
 
     // Dispatch immediately if urgent (or in_app, which has no delivery cost) and not coalesced
     const shouldDispatchRule = match.urgency === "immediate" || match.channelTarget.channel === "in_app";
@@ -530,9 +586,8 @@ export async function processEvent(event: DomainEventRow): Promise<PipelineResul
       continue; // skip both buffering and dispatch
     }
 
-    // Always buffer for digest
-    await bufferForDigest(event.id, match.config.id);
-    result.buffered++;
+    // Buffer for digest, unless this channel takes no digest
+    if (await bufferForDigest(event.id, match.config)) result.buffered++;
 
     // Dispatch immediately if urgent (or in_app, which has no delivery cost) and not coalesced
     const shouldDispatchDefault = match.urgency === "immediate" || match.config.type === "in_app";

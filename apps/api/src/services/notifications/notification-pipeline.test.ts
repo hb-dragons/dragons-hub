@@ -133,6 +133,7 @@ vi.mock("../../config/redis", () => ({
 // --- Import after mocks ---
 
 import { processEvent, DISPATCHABLE_CHANNEL_TYPES } from "./notification-pipeline";
+import { logger } from "../../config/logger";
 import { domainEvents, type DomainEventRow } from "@dragons/db/schema";
 import { CHANNEL_TYPES } from "@dragons/shared";
 import {
@@ -296,6 +297,40 @@ async function seedPref(
      VALUES ($1, $2, $3)`,
     [userId, opts.mutedEventTypes ?? [], opts.locale ?? "de"],
   );
+}
+
+let nextRefereeApiId = 9000;
+
+async function seedReferee(apiId: number = nextRefereeApiId++): Promise<number> {
+  const r = await ctx.client.query<{ id: number }>(
+    `INSERT INTO referees (api_id, first_name) VALUES ($1, 'Ref') RETURNING id`,
+    [apiId],
+  );
+  return r.rows[0]!.id;
+}
+
+async function seedUser(id: string, opts: { refereeId?: number } = {}): Promise<void> {
+  await ctx.client.query(
+    `INSERT INTO "user" (id, name, email, email_verified, referee_id, created_at, updated_at)
+     VALUES ($1, $1, $2, true, $3, now(), now())`,
+    [id, `${id}@test.de`, opts.refereeId ?? null],
+  );
+}
+
+/**
+ * A referee identity with the account that carries it, and that account's mute
+ * list. Returns the referee id the pipeline addresses as `referee:<id>`.
+ */
+async function seedRefereeWithAccount(
+  userId: string,
+  opts: { apiId?: number; mutedEventTypes?: string[] } = {},
+): Promise<number> {
+  const refereeId = await seedReferee(opts.apiId);
+  await seedUser(userId, { refereeId });
+  if (opts.mutedEventTypes) {
+    await seedPref(userId, { mutedEventTypes: opts.mutedEventTypes });
+  }
+  return refereeId;
 }
 
 async function digestBufferRows(): Promise<{ event_id: string; channel_config_id: number }[]> {
@@ -875,11 +910,17 @@ describe("processEvent", () => {
   });
 
   describe("muted event types", () => {
-    it("skips dispatch and buffer for recipients who muted the event type", async () => {
+    it("mutes a referee: recipient whose account muted the event type (#79)", async () => {
+      // The mute lives on the *account*, keyed by the bare user id — that is the
+      // only keying the preferences UI can write. Resolving `referee:<id>`
+      // through user.referee_id is what connects the two; keying the mute map by
+      // the literal "referee:<id>" silently delivered anyway.
       await seedConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
-      await seedPref("referee:77", { mutedEventTypes: ["match.cancelled"] });
+      const refereeId = await seedRefereeWithAccount("u_whistle", {
+        mutedEventTypes: ["match.cancelled"],
+      });
       mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "referee", channel: "in_app", refereeId: 77 },
+        { audience: "referee", channel: "in_app", refereeId },
       ]);
 
       const result = await processEvent(await seedEvent());
@@ -893,14 +934,32 @@ describe("processEvent", () => {
 
     it("does not mute when event type is not in muted list", async () => {
       await seedConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
-      await seedPref("referee:77", { mutedEventTypes: ["match.created"] });
+      const refereeId = await seedRefereeWithAccount("u_whistle", {
+        mutedEventTypes: ["match.created"],
+      });
       mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "referee", channel: "in_app", refereeId: 77 },
+        { audience: "referee", channel: "in_app", refereeId },
       ]);
 
       const result = await processEvent(await seedEvent()); // type is match.cancelled
 
       expect(mockInAppSend).toHaveBeenCalledTimes(1);
+      expect(result.muted).toBe(0);
+      expect(result.dispatched).toBe(1);
+    });
+
+    it("does not mute a referee identity that no account is linked to", async () => {
+      await seedConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
+      const refereeId = await seedReferee();
+      // A preference row keyed by the referee id itself is not a preference of
+      // anyone's — no UI writes one, and it must not silence the referee.
+      await seedPref(String(refereeId), { mutedEventTypes: ["match.cancelled"] });
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "referee", channel: "in_app", refereeId },
+      ]);
+
+      const result = await processEvent(await seedEvent());
+
       expect(result.muted).toBe(0);
       expect(result.dispatched).toBe(1);
     });
@@ -918,14 +977,17 @@ describe("processEvent", () => {
       expect(result.muted).toBe(0);
     });
 
-    it("applies only the addressed recipient's mute, not another user's (#72)", async () => {
+    it("applies only the addressed recipient's mute, not another referee's (#72)", async () => {
       await seedConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
-      // Somebody else muted this event type. If the prefs load is not
-      // constrained to the resolved recipient ids, this row silences referee 77.
-      await seedPref("referee:99", { mutedEventTypes: ["match.cancelled"] });
-      await seedPref("referee:77", { mutedEventTypes: ["match.created"] });
+      // Another referee muted this event type. If the prefs load is not
+      // constrained to the resolved recipient ids, this row silences the
+      // addressed referee too.
+      await seedRefereeWithAccount("u_other", { mutedEventTypes: ["match.cancelled"] });
+      const refereeId = await seedRefereeWithAccount("u_whistle", {
+        mutedEventTypes: ["match.created"],
+      });
       mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "referee", channel: "in_app", refereeId: 77 },
+        { audience: "referee", channel: "in_app", refereeId },
       ]);
 
       const result = await processEvent(await seedEvent());
@@ -952,33 +1014,109 @@ describe("processEvent", () => {
   });
 
   describe("loadMutedEventTypes error handling", () => {
-    it("continues processing when the preferences query fails", async () => {
+    it("fails closed when the preferences query fails, dispatching nothing (#79)", async () => {
       await seedConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
+      const refereeId = await seedRefereeWithAccount("u_whistle", {
+        mutedEventTypes: ["match.cancelled"],
+      });
       mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "referee", channel: "in_app", refereeId: 77 },
+        { audience: "referee", channel: "in_app", refereeId },
       ]);
       const event = await seedEvent();
 
-      // Take the preferences table away so the query throws for real. The
-      // pipeline must swallow it and carry on delivering.
+      // Take the preferences table away so the query throws for real. Swallowing
+      // it would deliver to a recipient who muted this exact event type, which
+      // cannot be undone; throwing leaves the event retriable instead.
       await ctx.client.exec(
         `ALTER TABLE user_notification_preferences RENAME TO unp_hidden`,
       );
-      let result;
       try {
-        result = await processEvent(event);
+        await expect(processEvent(event)).rejects.toThrow();
       } finally {
         await ctx.client.exec(
           `ALTER TABLE unp_hidden RENAME TO user_notification_preferences`,
         );
       }
 
-      expect(result.dispatched).toBe(1);
-      expect(result.muted).toBe(0); // no muting applied due to error
+      expect(mockInAppSend).not.toHaveBeenCalled();
+      expect(await digestBufferRows()).toEqual([]);
+    });
+
+    it("logs the failure at warn, not debug (#79)", async () => {
+      await seedConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
+      const refereeId = await seedRefereeWithAccount("u_whistle");
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "referee", channel: "in_app", refereeId },
+      ]);
+      const event = await seedEvent();
+
+      await ctx.client.exec(
+        `ALTER TABLE user_notification_preferences RENAME TO unp_hidden`,
+      );
+      try {
+        await expect(processEvent(event)).rejects.toThrow();
+      } finally {
+        await ctx.client.exec(
+          `ALTER TABLE unp_hidden RENAME TO user_notification_preferences`,
+        );
+      }
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientCount: 1 }),
+        expect.stringContaining("Could not load muted event types"),
+      );
+      expect(logger.debug).not.toHaveBeenCalled();
     });
   });
 
   describe("digest buffer", () => {
+    it("does not buffer for a channel whose digestMode is none (#79)", async () => {
+      await seedRule();
+      await seedConfig({ id: 10, digestMode: "none" });
+      ruleMatches([{ channel: "in_app", targetId: "10" }]);
+
+      const result = await processEvent(await seedEvent());
+
+      // Nothing drains a none-mode channel's buffer, so a row here would sit
+      // until the 365-day domain-event cleanup.
+      expect(await digestBufferRows()).toEqual([]);
+      expect(result.buffered).toBe(0);
+      // Delivery is unaffected.
+      expect(result.dispatched).toBe(1);
+    });
+
+    it("does not buffer a role-default match for a none-mode channel (#79)", async () => {
+      await seedConfig({
+        id: 10,
+        type: "in_app",
+        digestMode: "none",
+        config: { audienceRole: "referee", locale: "de" },
+      });
+      const refereeId = await seedRefereeWithAccount("u_whistle");
+      mockGetDefaultNotificationsForEvent.mockReturnValue([
+        { audience: "referee", channel: "in_app", refereeId },
+      ]);
+
+      const result = await processEvent(await seedEvent());
+
+      expect(await digestBufferRows()).toEqual([]);
+      expect(result.buffered).toBe(0);
+      expect(result.dispatched).toBe(1);
+    });
+
+    it("still buffers for scheduled and per_sync channels", async () => {
+      await seedRule({ id: 1, channels: [{ channel: "in_app", targetId: "10" }] });
+      await seedConfig({ id: 10, digestMode: "scheduled" });
+      ruleMatches([{ channel: "in_app", targetId: "10" }]);
+
+      const result = await processEvent(await seedEvent());
+
+      expect(await digestBufferRows()).toEqual([
+        { event_id: "evt-1", channel_config_id: 10 },
+      ]);
+      expect(result.buffered).toBe(1);
+    });
+
     it("continues processing when the buffer insert fails", async () => {
       await seedRule();
       await seedConfig();
@@ -1307,9 +1445,9 @@ describe("processEvent", () => {
     it("does not add recipient to muted map when mutedEventTypes is empty", async () => {
       await seedConfig({ id: 10, type: "in_app", config: { audienceRole: "referee", locale: "de" } });
       // The pref row exists but mutes nothing.
-      await seedPref("referee:77", { mutedEventTypes: [] });
+      const refereeId = await seedRefereeWithAccount("u_whistle", { mutedEventTypes: [] });
       mockGetDefaultNotificationsForEvent.mockReturnValue([
-        { audience: "referee", channel: "in_app", refereeId: 77 },
+        { audience: "referee", channel: "in_app", refereeId },
       ]);
 
       const result = await processEvent(await seedEvent());
