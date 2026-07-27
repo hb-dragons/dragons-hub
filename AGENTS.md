@@ -319,6 +319,8 @@ Wrapper around basketball-bund-sdk at `services/sync/sdk-client.ts`:
 - Rate limiting: 15 burst, 10/sec refill
 - Batch game details: 10 concurrent requests max
 - Methods: `getAllLigen()`, `getSpielplan()`, `getTabelle()`, `getTabelleResponse()`, `getGameDetails()`, `getGameDetailsBatch()`, `searchClubs()`, `getClubMatches()`
+- Referee-account methods go through a second `AuthenticatedClient` built from `REFEREE_SDK_USERNAME` / `REFEREE_SDK_PASSWORD`, so they share the rate limiter, `withRetry` and the 401/403 re-login path: `searchRefereesForGame()`, `submitRefereeAssignment()`, `submitRefereeUnassignment()`, `fetchOffeneSpiele()`
+- `fetchOffeneSpiele()` pages `/rest/offenespiele/search` 200 rows at a time and stops on the first empty page, on reaching the reported `total`, or at a hard 50-page ceiling — a `total` the feed never satisfies must not loop against basketball-bund.net. It returns `{ total: 0, results: [] }` when the referee credentials are unset, because the referee auth client otherwise falls back to the main SDK account
 
 ## Domain Events
 

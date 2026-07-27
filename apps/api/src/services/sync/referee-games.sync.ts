@@ -3,7 +3,7 @@ import { getDb } from "../../config/database";
 import { refereeGames, matches, leagues, teams } from "@dragons/db/schema";
 import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 import { logger } from "../../config/logger";
-import { createRefereeSdkClient } from "./referee-sdk-client";
+import { sdkClient } from "./sdk-client";
 import { getClubConfig } from "../admin/settings.service";
 import { publishDomainEvent } from "../events/event-publisher";
 import { scheduleReminderJobs, cancelReminderJobs } from "../referee/referee-reminders.service";
@@ -322,8 +322,7 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
   unchanged: number;
   removed: number;
 }> {
-  const client = createRefereeSdkClient();
-  const response = await client.fetchOffeneSpiele();
+  const response = await sdkClient.fetchOffeneSpiele();
 
   if (response.results.length === 0) {
     // An empty feed is never treated as "everything was withdrawn" — see the

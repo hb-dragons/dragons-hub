@@ -13,10 +13,16 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
+const mockEnv = vi.hoisted(() => ({
+  SDK_USERNAME: "testuser",
+  SDK_PASSWORD: "testpass",
+  REFEREE_SDK_USERNAME: "refereeuser" as string | undefined,
+  REFEREE_SDK_PASSWORD: "refereepass" as string | undefined,
+}));
+
 vi.mock("../../config/env", () => ({
-  env: {
-    SDK_USERNAME: "testuser",
-    SDK_PASSWORD: "testpass",
+  get env() {
+    return mockEnv;
   },
 }));
 
@@ -51,6 +57,8 @@ let client: SdkClient;
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
+  mockEnv.REFEREE_SDK_USERNAME = "refereeuser";
+  mockEnv.REFEREE_SDK_PASSWORD = "refereepass";
   client = new SdkClient();
 });
 
@@ -1234,6 +1242,151 @@ describe("SdkClient", () => {
 
       await expect(withTimers(client.submitRefereeUnassignment(200, 1))).rejects.toThrow(
         "submit unassignment failed: 500",
+      );
+    });
+  });
+
+  describe("fetchOffeneSpiele", () => {
+    const SEARCH_PATH = "/rest/offenespiele/search";
+
+    function makePage(total: number, count: number) {
+      return {
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({
+          total,
+          results: Array.from({ length: count }, (_, i) => ({
+            sp: { spielplanId: i + 1 },
+          })),
+        }),
+      };
+    }
+
+    function searchCalls() {
+      return mockFetch.mock.calls.filter(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes(SEARCH_PATH),
+      );
+    }
+
+    it("returns an empty feed and never fetches without referee credentials", async () => {
+      mockEnv.REFEREE_SDK_USERNAME = undefined;
+
+      const result = await client.fetchOffeneSpiele();
+
+      expect(result).toEqual({ total: 0, results: [] });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("returns an empty feed when only the referee password is unset", async () => {
+      mockEnv.REFEREE_SDK_PASSWORD = undefined;
+
+      const result = await client.fetchOffeneSpiele();
+
+      expect(result).toEqual({ total: 0, results: [] });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("logs in once and fetches a single page", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce(makePage(3, 3));
+
+      const result = await client.fetchOffeneSpiele();
+
+      expect(result.total).toBe(3);
+      expect(result.results).toHaveLength(3);
+
+      const calls = searchCalls();
+      expect(calls).toHaveLength(1);
+      const init = calls[0]![1] as RequestInit;
+      expect(init.method).toBe("POST");
+      const body = JSON.parse(init.body as string);
+      expect(body.pageFrom).toBe(0);
+      expect(body.pageSize).toBe(200);
+      expect(body.vereinsSpiele).toBe("VEREIN");
+
+      const loginCalls = mockFetch.mock.calls.filter((c) =>
+        (c[0] as string).includes("login.do"),
+      );
+      expect(loginCalls).toHaveLength(1);
+    });
+
+    it("pages until the reported total is reached", async () => {
+      setupLogin();
+      mockFetch
+        .mockResolvedValueOnce(makePage(350, 200))
+        .mockResolvedValueOnce(makePage(350, 150));
+
+      const result = await client.fetchOffeneSpiele();
+
+      expect(result.total).toBe(350);
+      expect(result.results).toHaveLength(350);
+
+      const calls = searchCalls();
+      expect(calls).toHaveLength(2);
+      const secondBody = JSON.parse((calls[1]![1] as RequestInit).body as string);
+      expect(secondBody.pageFrom).toBe(200);
+    });
+
+    it("stops on an empty page even when the feed claims more rows", async () => {
+      setupLogin();
+      mockFetch
+        .mockResolvedValueOnce(makePage(10_000, 200))
+        .mockResolvedValueOnce(makePage(10_000, 0));
+
+      const result = await client.fetchOffeneSpiele();
+
+      expect(result.total).toBe(10_000);
+      expect(result.results).toHaveLength(200);
+      expect(searchCalls()).toHaveLength(2);
+    });
+
+    it("stops at the page ceiling when the total is never satisfied", async () => {
+      setupLogin();
+      // Every page reports a total the feed will never reach, so only the hard
+      // ceiling ends the loop.
+      mockFetch.mockResolvedValue(makePage(1_000_000, 200));
+
+      const promise = client.fetchOffeneSpiele();
+      await vi.runAllTimersAsync();
+      const result = await promise;
+
+      expect(searchCalls()).toHaveLength(50);
+      expect(result.results).toHaveLength(50 * 200);
+      expect(result.total).toBe(1_000_000);
+    });
+
+    it("re-authenticates on 401 and returns the page", async () => {
+      setupLogin();
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+      setupLogin("SESSION=new; Path=/");
+      mockFetch.mockResolvedValueOnce(makePage(1, 1));
+
+      const result = await client.fetchOffeneSpiele();
+
+      expect(result.results).toHaveLength(1);
+    });
+
+    it("throws on a non-ok response instead of looping", async () => {
+      setupLogin();
+      for (let i = 0; i < 3; i++) {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 502 });
+      }
+
+      await expect(withTimers(client.fetchOffeneSpiele())).rejects.toThrow(
+        "offenespiele search failed: 502",
+      );
+    });
+
+    it("throws when the retry after re-auth is still not ok", async () => {
+      setupLogin();
+      for (let i = 0; i < 3; i++) {
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+        setupLogin("SESSION=new; Path=/");
+        mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+      }
+
+      await expect(withTimers(client.fetchOffeneSpiele())).rejects.toThrow(
+        "offenespiele search failed: 500",
       );
     });
   });
