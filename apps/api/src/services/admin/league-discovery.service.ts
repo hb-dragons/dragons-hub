@@ -36,34 +36,21 @@ export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<Re
     }
   }
 
-  // Upsert matched leagues
-  for (const liga of matchedByLigaNr.values()) {
-    const [existing] = await getDb()
-      .select()
-      .from(leagues)
-      .where(eq(leagues.apiLigaId, liga.ligaId))
-      .limit(1);
+  const matchedLigaIds = Array.from(matchedByLigaNr.values()).map((l) => l.ligaId);
 
-    if (existing) {
-      await getDb()
-        .update(leagues)
-        .set({
-          ligaNr: liga.liganr,
-          name: liga.liganame,
-          seasonId: liga.seasonId ?? 0,
-          seasonName: liga.seasonName ?? "",
-          skName: liga.skName || null,
-          akName: liga.akName || null,
-          geschlecht: liga.geschlecht || null,
-          verbandId: liga.verbandId || null,
-          verbandName: liga.verbandName || null,
-          isTracked: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(leagues.id, existing.id));
-    } else {
-      await getDb().insert(leagues).values({
-        apiLigaId: liga.ligaId,
+  // The tracked set is replaced as a whole: every matched league is tracked and
+  // everything else is untracked. Split across statements outside a transaction,
+  // a failure part-way through leaves the configuration half-applied — some
+  // leagues tracked, some already untracked — and a concurrent read (the sync
+  // picks its work from `isTracked`) can observe that state. One transaction,
+  // and the per-league SELECT-then-INSERT-or-UPDATE becomes a single atomic
+  // upsert on the `api_liga_id` unique constraint, so two callers resolving the
+  // same league cannot both take the insert branch.
+  const untrackedCount = await getDb().transaction(async (tx) => {
+    const now = new Date();
+
+    for (const liga of matchedByLigaNr.values()) {
+      const values = {
         ligaNr: liga.liganr,
         name: liga.liganame,
         seasonId: liga.seasonId ?? 0,
@@ -73,34 +60,40 @@ export async function resolveAndSaveLeagues(leagueNumbers: number[]): Promise<Re
         geschlecht: liga.geschlecht || null,
         verbandId: liga.verbandId || null,
         verbandName: liga.verbandName || null,
-        isActive: true,
         isTracked: true,
-        discoveredAt: new Date(),
-        updatedAt: new Date(),
-      });
+        updatedAt: now,
+      };
+
+      await tx
+        .insert(leagues)
+        .values({
+          apiLigaId: liga.ligaId,
+          isActive: true,
+          discoveredAt: now,
+          ...values,
+        })
+        .onConflictDoUpdate({
+          target: leagues.apiLigaId,
+          // `isActive` and `discoveredAt` are insert-only: a league that was
+          // deactivated locally must not be silently reactivated, and the
+          // original discovery timestamp is history.
+          set: values,
+        });
     }
-  }
 
-  // Untrack leagues that are no longer in the set
-  const matchedLigaIds = Array.from(matchedByLigaNr.values()).map((l) => l.ligaId);
-  let untrackedCount = 0;
+    // Untrack leagues that are no longer in the set
+    const untracked = await tx
+      .update(leagues)
+      .set({ isTracked: false, updatedAt: now })
+      .where(
+        matchedLigaIds.length > 0
+          ? and(eq(leagues.isTracked, true), notInArray(leagues.apiLigaId, matchedLigaIds))
+          : eq(leagues.isTracked, true),
+      )
+      .returning({ id: leagues.id });
 
-  if (matchedLigaIds.length > 0) {
-    const untrackedResult = await getDb()
-      .update(leagues)
-      .set({ isTracked: false, updatedAt: new Date() })
-      .where(and(eq(leagues.isTracked, true), notInArray(leagues.apiLigaId, matchedLigaIds)))
-      .returning({ id: leagues.id });
-    untrackedCount = untrackedResult.length;
-  } else {
-    // No matched leagues — untrack all
-    const untrackedResult = await getDb()
-      .update(leagues)
-      .set({ isTracked: false, updatedAt: new Date() })
-      .where(eq(leagues.isTracked, true))
-      .returning({ id: leagues.id });
-    untrackedCount = untrackedResult.length;
-  }
+    return untracked.length;
+  });
 
   return {
     resolved,

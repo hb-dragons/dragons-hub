@@ -153,6 +153,78 @@ describe("resolveAndSaveLeagues", () => {
     expect(rows[0]!.isTracked).toBe(true);
   });
 
+  it("keeps insert-only columns when the upsert takes the conflict path (#77)", async () => {
+    // The per-league SELECT-then-INSERT-or-UPDATE is one atomic upsert now.
+    // `isActive` and `discoveredAt` must stay insert-only: a league someone
+    // deactivated locally must not come back to life on the next resolve, and
+    // the discovery timestamp is history, not current state.
+    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: false });
+    const discoveredAt = new Date("2020-01-01T00:00:00Z");
+    await ctx.db
+      .update(leagues)
+      .set({ isActive: false, discoveredAt })
+      .where(eq(leagues.apiLigaId, 58001));
+
+    mocks.getAllLigen.mockResolvedValue([makeLiga({ liganame: "Fresh name" })]);
+
+    await resolveAndSaveLeagues([4102]);
+
+    const rows = await allLeagues();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.name).toBe("Fresh name");
+    expect(rows[0]!.isTracked).toBe(true);
+    expect(rows[0]!.isActive).toBe(false);
+    expect(rows[0]!.discoveredAt).toEqual(discoveredAt);
+  });
+
+  it("leaves the tracked set untouched when the untrack pass fails (#77)", async () => {
+    // Tracking is replaced as a whole. Split across statements, a failure
+    // part-way left some leagues tracked and others already untracked, and the
+    // sync picks its work from exactly that flag.
+    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true });
+    await seedLeague({ apiLigaId: 58002, ligaNr: 4103, isTracked: true });
+    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
+
+    const real = ctx.db as unknown as Record<string | symbol, unknown>;
+    dbHolder.ref = new Proxy(
+      {},
+      {
+        get: (_t, prop) =>
+          prop === "transaction"
+            ? (...args: unknown[]) => {
+                const [cb, ...rest] = args as [(tx: unknown) => unknown, ...unknown[]];
+                return (real.transaction as (...a: unknown[]) => unknown).call(
+                  real,
+                  (tx: Record<string | symbol, unknown>) =>
+                    cb(
+                      new Proxy(
+                        {},
+                        {
+                          get: (_t2, p2) =>
+                            p2 === "update"
+                              ? () => {
+                                  throw new Error("untrack failed");
+                                }
+                              : tx[p2],
+                        },
+                      ),
+                    ),
+                  ...rest,
+                );
+              }
+            : real[prop],
+      },
+    );
+
+    await expect(resolveAndSaveLeagues([4102])).rejects.toThrow("untrack failed");
+
+    dbHolder.ref = ctx.db;
+    const rows = await allLeagues();
+    // The upsert of 58001 rolled back with the failed untrack of 58002.
+    expect(rows.map((r) => r.isTracked)).toEqual([true, true]);
+    expect(rows.find((r) => r.apiLigaId === 58001)!.name).toBe("League 4102");
+  });
+
   it("reports league numbers the federation does not know", async () => {
     mocks.getAllLigen.mockResolvedValue([makeLiga()]);
 

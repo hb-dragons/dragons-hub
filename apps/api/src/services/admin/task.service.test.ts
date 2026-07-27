@@ -405,6 +405,25 @@ describe("addChecklistItem", () => {
     const result = await addChecklistItem(999, { label: "Item" });
     expect(result).toBeNull();
   });
+
+  it("gives each item on a task a distinct position (#77)", async () => {
+    const { boardId, todoColId } = await createBoardWithColumns();
+    await createTask(boardId, { title: "Task A", columnId: todoColId }, "test-user");
+    await createTask(boardId, { title: "Task B", columnId: todoColId }, "test-user");
+
+    // `MAX(position) + 1` is a read-modify-write; adds are serialised per task
+    // by locking the task row, so positions cannot collide. Items on a
+    // different task number independently.
+    const [a1, a2, a3] = await Promise.all([
+      addChecklistItem(1, { label: "A1" }),
+      addChecklistItem(1, { label: "A2" }),
+      addChecklistItem(1, { label: "A3" }),
+    ]);
+    const b1 = await addChecklistItem(2, { label: "B1" });
+
+    expect([a1!.position, a2!.position, a3!.position].sort()).toEqual([0, 1, 2]);
+    expect(b1!.position).toBe(0);
+  });
 });
 
 describe("updateChecklistItem", () => {

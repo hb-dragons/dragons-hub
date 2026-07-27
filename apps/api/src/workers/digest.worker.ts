@@ -1,5 +1,5 @@
 import { Worker, type Job } from "bullmq";
-import { eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { digestBuffer, domainEvents, channelConfigs } from "@dragons/db/schema";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
@@ -51,7 +51,12 @@ export const digestWorker = new Worker<DigestJobData>(
       })
       .from(digestBuffer)
       .innerJoin(domainEvents, eq(digestBuffer.eventId, domainEvents.id))
-      .where(eq(digestBuffer.channelConfigId, channelConfigId));
+      .where(eq(digestBuffer.channelConfigId, channelConfigId))
+      // Ordered because the first row is the dedup anchor below, not only for
+      // presentation. Without an ORDER BY the row order is whatever the plan
+      // happens to produce, so two executions of the same job could anchor on
+      // different events and both write a notification_log row.
+      .orderBy(asc(digestBuffer.id));
 
     if (bufferedRows.length === 0) {
       log.info("No buffered events, skipping digest");
@@ -80,6 +85,25 @@ export const digestWorker = new Worker<DigestJobData>(
 
     await getDb().transaction(async (tx) => {
       if (config.type === "in_app") {
+        // The oldest buffered event anchors the row. `notification_log` needs a
+        // single event_id and a digest covers many, so one has to stand in for
+        // the batch, and it is the event_id component of the dedup index —
+        // which event stands in decides whether two deliveries collide.
+        //
+        // Reading `bufferedRows[0]` off an unordered query made that arbitrary:
+        // two executions of this job for the same channel could anchor on
+        // different events and both write a notification_log row, because the
+        // index (event_id, channel_config_id, coalesce(recipient_id,
+        // '__group__')) saw two distinct keys. The ordered read above pins it to
+        // the lowest buffer id. Buffer rows are only ever appended, and they are
+        // deleted in this same transaction, so two concurrent executions agree
+        // on the oldest row even when one of them sees later arrivals the other
+        // does not.
+        //
+        // `digestRunId` is deliberately *not* part of the key. It identifies the
+        // attempt, not the content, so keying on it would let the same buffered
+        // events go out twice under two run ids — exactly what a re-buffered
+        // retry does.
         const anchorEventId = bufferedRows[0]!.eventId;
 
         // Insert notification_log entry (dedup via notification_log_dedup_idx,

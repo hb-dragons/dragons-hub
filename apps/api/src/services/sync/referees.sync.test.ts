@@ -140,6 +140,42 @@ function overrideDbMethod(name: string, impl: unknown) {
   dbHolder.ref = new Proxy({}, { get: (_t, prop) => (prop === name ? impl : real[prop]) });
 }
 
+/**
+ * Point getDb() at a db whose `transaction()` rejects. Each assignment write is
+ * a transaction (issue #77), so that is the seam a database failure comes
+ * through — overriding `insert` no longer reaches the statements inside it.
+ */
+function failTransactionWith(reason: unknown) {
+  overrideDbMethod("transaction", () => {
+    if (reason instanceof Error) return Promise.reject(reason);
+    throw reason;
+  });
+}
+
+/**
+ * Run `fn` with a real database trigger that rejects every `match_changes`
+ * insert. The failure comes from Postgres, mid-transaction and after the slot
+ * write has already succeeded, which is what makes it evidence that the two
+ * roll back together — a stubbed insert could not fail *inside* the real
+ * transaction at all.
+ */
+async function withFailingMatchChangesInsert<T>(fn: () => Promise<T>): Promise<T> {
+  await ctx.client.exec(`
+    CREATE FUNCTION fail_match_changes() RETURNS trigger AS $$
+    BEGIN RAISE EXCEPTION 'history down'; END $$ LANGUAGE plpgsql;
+    CREATE TRIGGER fail_match_changes BEFORE INSERT ON match_changes
+      FOR EACH ROW EXECUTE FUNCTION fail_match_changes();
+  `);
+  try {
+    return await fn();
+  } finally {
+    await ctx.client.exec(`
+      DROP TRIGGER fail_match_changes ON match_changes;
+      DROP FUNCTION fail_match_changes();
+    `);
+  }
+}
+
 /** Point getDb() at a db whose upsert rejects while reads stay real. */
 async function withFailingUpsert<T>(reason: unknown, fn: () => Promise<T>): Promise<T> {
   overrideDbMethod("insert", () => ({
@@ -644,9 +680,7 @@ describe("syncRefereeAssignmentsFromData", () => {
 
   it("reports a failure when the assignment write is rejected", async () => {
     const world = await seedAssignmentWorld();
-    overrideDbMethod("insert", () => ({
-      values: () => Promise.reject(new Error("Insert failed")),
-    }));
+    failTransactionWith(new Error("Insert failed"));
     const mockLogger = { log: vi.fn() };
 
     const result = await runAssignments(world, [makeAssignment()], mockLogger);
@@ -660,9 +694,7 @@ describe("syncRefereeAssignmentsFromData", () => {
 
   it("reports a non-Error failure as 'Unknown error'", async () => {
     const world = await seedAssignmentWorld();
-    overrideDbMethod("insert", () => {
-      throw "string error";
-    });
+    failTransactionWith("string error");
 
     const result = await runAssignments(world, [makeAssignment()]);
 
@@ -708,6 +740,9 @@ describe("syncRefereeAssignmentsFromData", () => {
           teamIds: [10, 20],
         }),
       }),
+      // Published with the transaction client: the event commits with the
+      // assignment (issue #77).
+      expect.anything(),
     );
   });
 
@@ -718,6 +753,7 @@ describe("syncRefereeAssignmentsFromData", () => {
 
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "referee.assigned", syncRunId: null }),
+      expect.anything(),
     );
   });
 
@@ -739,6 +775,7 @@ describe("syncRefereeAssignmentsFromData", () => {
           newRefereeId: world.refereeIds.get(200),
         }),
       }),
+      expect.anything(),
     );
   });
 
@@ -753,32 +790,32 @@ describe("syncRefereeAssignmentsFromData", () => {
     expect((await liveAssignments())[0]!.roleId).toBe(world.roleIds.get(2));
   });
 
-  it("keeps going when publishing referee.assigned throws", async () => {
+  it("rolls the assignment back when referee.assigned cannot be recorded (#77)", async () => {
     const world = await seedAssignmentWorld();
     mockPublishDomainEvent.mockRejectedValue(new Error("Event failed"));
 
     const result = await runAssignments(world, [makeAssignment()]);
 
-    expect(result.created).toBe(1);
-    expect(result.errors).toEqual([]);
-    expect(mockLogWarn).toHaveBeenCalledWith(
-      expect.objectContaining({ matchId: world.matchId }),
-      "Failed to emit referee.assigned event",
-    );
+    // The assignment, its history entry and the event are one unit of work.
+    // Storing the assignment while losing the event left a referee assigned
+    // that nobody was ever told about, with no outbox row to recover from; the
+    // failure is now reported and the next sync retries the whole thing.
+    expect(result.created).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    expect(await liveAssignments()).toEqual([]);
+    expect(await ctx.db.select().from(matchChanges)).toEqual([]);
   });
 
-  it("keeps going when publishing referee.reassigned throws", async () => {
+  it("rolls the reassignment back when referee.reassigned cannot be recorded (#77)", async () => {
     const world = await seedAssignmentWorld();
     await runAssignments(world, [makeAssignment()]);
     mockPublishDomainEvent.mockRejectedValue(new Error("Event failed"));
 
-    await runAssignments(world, [makeAssignment({ schiedsrichterId: 200 })]);
+    const result = await runAssignments(world, [makeAssignment({ schiedsrichterId: 200 })]);
 
-    expect(mockLogWarn).toHaveBeenCalledWith(
-      expect.objectContaining({ matchId: world.matchId }),
-      "Failed to emit referee.reassigned event",
-    );
-    expect((await liveAssignments())[0]!.refereeId).toBe(world.refereeIds.get(200));
+    expect(result.errors).toHaveLength(1);
+    // The slot still holds the original referee.
+    expect((await liveAssignments())[0]!.refereeId).toBe(world.refereeIds.get(100));
   });
 
   it("emits nothing when the lookup points at a match that does not exist", async () => {
@@ -794,50 +831,30 @@ describe("syncRefereeAssignmentsFromData", () => {
     expect(await ctx.db.select().from(matchChanges)).toEqual([]);
   });
 
-  it("warns but continues when the match-history write fails", async () => {
+  it("rolls the assignment back when the match-history write fails (#77)", async () => {
     const world = await seedAssignmentWorld();
-    const real = ctx.db as unknown as Record<string | symbol, unknown>;
-    let insertCall = 0;
-    dbHolder.ref = new Proxy(
-      {},
-      {
-        get: (_t, prop) =>
-          prop === "insert"
-            ? (...args: unknown[]) => {
-                insertCall++;
-                // 1st insert = matchReferees (must succeed), 2nd = matchChanges.
-                if (insertCall === 2) {
-                  return { values: () => Promise.reject(new Error("history down")) };
-                }
-                return (real.insert as (...a: unknown[]) => unknown)(...args);
-              }
-            : real[prop],
-      },
+
+    const result = await withFailingMatchChangesInsert(() =>
+      runAssignments(world, [makeAssignment()]),
     );
 
-    const result = await runAssignments(world, [makeAssignment()]);
-
-    expect(result.created).toBe(1);
-    expect(result.errors).toEqual([]);
-    expect(mockLogWarn).toHaveBeenCalledWith(
-      expect.objectContaining({ matchId: world.matchId }),
-      "Failed to record referee assignment in match history",
-    );
+    expect(result.created).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    // The slot write is rolled back with the history write that failed after
+    // it, rather than surviving as an assignment with no recorded provenance.
+    expect(await liveAssignments()).toEqual([]);
   });
 
-  it("warns but continues when the reassignment history write fails", async () => {
+  it("rolls the reassignment back when the history write fails (#77)", async () => {
     const world = await seedAssignmentWorld();
     await runAssignments(world, [makeAssignment()]);
-    overrideDbMethod("insert", () => ({
-      values: () => Promise.reject(new Error("history down")),
-    }));
 
-    await runAssignments(world, [makeAssignment({ schiedsrichterId: 200 })]);
-
-    expect(mockLogWarn).toHaveBeenCalledWith(
-      expect.objectContaining({ matchId: world.matchId }),
-      "Failed to record referee reassignment in match history",
+    const result = await withFailingMatchChangesInsert(() =>
+      runAssignments(world, [makeAssignment({ schiedsrichterId: 200 })]),
     );
+
+    expect(result.errors).toHaveLength(1);
+    expect((await liveAssignments())[0]!.refereeId).toBe(world.refereeIds.get(100));
   });
 });
 

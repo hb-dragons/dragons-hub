@@ -321,6 +321,29 @@ describe("deleteColumn", () => {
     expect(result).toBe(false);
   });
 
+  it("leaves the column and its tasks intact when the delete is refused (#77)", async () => {
+    // `tasks.column_id` has no ON DELETE action, so a delete that slipped past
+    // the emptiness check would raise a foreign-key violation — a 500 — rather
+    // than answering false. The check and the delete now share a transaction
+    // with the column row locked, so the refusal is the only outcome.
+    const board = await createBoard("Board");
+    const colId = board.columns[0]!.id;
+    await ctx.client.exec(
+      `INSERT INTO tasks (board_id, column_id, title) VALUES (${board.id}, ${colId}, 'Task 1')`,
+    );
+
+    await expect(deleteColumn(board.id, colId)).resolves.toBe(false);
+
+    const cols = await ctx.client.query<{ cnt: number }>(
+      `SELECT COUNT(*)::int AS cnt FROM board_columns WHERE id = ${colId}`,
+    );
+    const tasksLeft = await ctx.client.query<{ cnt: number }>(
+      `SELECT COUNT(*)::int AS cnt FROM tasks WHERE column_id = ${colId}`,
+    );
+    expect(cols.rows[0]!.cnt).toBe(1);
+    expect(tasksLeft.rows[0]!.cnt).toBe(1);
+  });
+
   it("returns false for non-existent column", async () => {
     const board = await createBoard("Board");
 

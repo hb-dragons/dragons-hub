@@ -298,22 +298,29 @@ export async function syncRefereeAssignmentsFromData(
       const existing = existingBySlot.get(`${matchId}-${slotNumber}`) ?? null;
 
       if (!existing) {
-        await getDb().insert(matchReferees).values({
-          matchId,
-          refereeId,
-          roleId,
-          slotNumber,
-          createdAt: now,
-        });
-        created++;
-
-        // Record referee assignment in match change history
         const refName = refNameMap.get(refereeId) ?? "Unknown";
         const matchInfo = matchInfoMap.get(matchId);
         const roleName = roleNameMap.get(roleId) ?? "Unknown";
 
-        try {
-          await getDb().insert(matchChanges).values({
+        // The assignment row, its match-history entry and the referee.assigned
+        // event are one unit of work. Written separately they could disagree:
+        // a crash after the assignment insert left an assignment nobody was
+        // ever notified about and no history entry explaining where it came
+        // from, and the individual try/catch blocks turned each partial write
+        // into a warning rather than a retryable failure. Passing `tx` to
+        // publishDomainEvent commits the event row with the assignment (outbox);
+        // the poller enqueues it after commit.
+        await getDb().transaction(async (tx) => {
+          await tx.insert(matchReferees).values({
+            matchId,
+            refereeId,
+            roleId,
+            slotNumber,
+            createdAt: now,
+          });
+
+          // Record referee assignment in match change history
+          await tx.insert(matchChanges).values({
             matchId,
             track: "remote",
             versionNumber: matchInfo?.currentRemoteVersion ?? 0,
@@ -321,74 +328,12 @@ export async function syncRefereeAssignmentsFromData(
             oldValue: null,
             newValue: `${refName} (${roleName})`,
           });
-        } catch (error) {
-          log.warn({ err: error, matchId, refereeId }, "Failed to record referee assignment in match history");
-        }
 
-        // Emit referee.assigned event
-        try {
+          // Emit referee.assigned event
           if (matchInfo) {
-            await publishDomainEvent({
-              type: EVENT_TYPES.REFEREE_ASSIGNED,
-              source: "sync",
-              entityType: "referee",
-              entityId: matchId,
-              entityName: matchInfo.entityName,
-              deepLinkPath: `/admin/matches/${matchId}`,
-              syncRunId: syncRunId ?? null,
-              payload: {
-                matchNo: matchInfo.matchNo,
-                homeTeam: matchInfo.homeTeam,
-                guestTeam: matchInfo.guestTeam,
-                refereeName: refName,
-                role: roleName,
-                refereeId,
-                teamIds: matchInfo.teamIds,
-              },
-            });
-          }
-        } catch (error) {
-          log.warn({ err: error, matchId, refereeId }, "Failed to emit referee.assigned event");
-        }
-
-        await logger?.log({
-          entityType: "referee",
-          entityId: `${matchId}-${refereeId}-${roleId}`,
-          action: "created",
-          message: `Created referee assignment for match ${matchId} slot ${slotNumber}`,
-        });
-      } else if (existing.refereeId !== refereeId || existing.roleId !== roleId) {
-        const oldRefereeId = existing.refereeId;
-
-        await getDb()
-          .update(matchReferees)
-          .set({ refereeId, roleId })
-          .where(eq(matchReferees.id, existing.id));
-
-        // Record reassignment in match change history and emit event
-        if (oldRefereeId !== refereeId) {
-          const oldRefName = refNameMap.get(oldRefereeId) ?? "Unknown";
-          const newRefName = refNameMap.get(refereeId) ?? "Unknown";
-          const matchInfo = matchInfoMap.get(matchId);
-          const roleName = roleNameMap.get(roleId) ?? "Unknown";
-
-          try {
-            await getDb().insert(matchChanges).values({
-              matchId,
-              track: "remote",
-              versionNumber: matchInfo?.currentRemoteVersion ?? 0,
-              fieldName: `referee_slot_${slotNumber}`,
-              oldValue: `${oldRefName} (${roleName})`,
-              newValue: `${newRefName} (${roleName})`,
-            });
-          } catch (error) {
-            log.warn({ err: error, matchId, refereeId }, "Failed to record referee reassignment in match history");
-          }
-
-          try {
-            if (matchInfo) {
-              await publishDomainEvent({
-                type: EVENT_TYPES.REFEREE_REASSIGNED,
+            await publishDomainEvent(
+              {
+                type: EVENT_TYPES.REFEREE_ASSIGNED,
                 source: "sync",
                 entityType: "referee",
                 entityId: matchId,
@@ -399,18 +344,99 @@ export async function syncRefereeAssignmentsFromData(
                   matchNo: matchInfo.matchNo,
                   homeTeam: matchInfo.homeTeam,
                   guestTeam: matchInfo.guestTeam,
-                  oldRefereeName: oldRefName,
-                  newRefereeName: newRefName,
+                  refereeName: refName,
                   role: roleName,
-                  oldRefereeId: oldRefereeId,
-                  newRefereeId: refereeId,
+                  refereeId,
                   teamIds: matchInfo.teamIds,
                 },
-              });
-            }
-          } catch (error) {
-            log.warn({ err: error, matchId, refereeId }, "Failed to emit referee.reassigned event");
+              },
+              tx,
+            );
           }
+        });
+
+        created++;
+
+        await logger?.log({
+          entityType: "referee",
+          entityId: `${matchId}-${refereeId}-${roleId}`,
+          action: "created",
+          message: `Created referee assignment for match ${matchId} slot ${slotNumber}`,
+        });
+      } else if (existing.refereeId !== refereeId || existing.roleId !== roleId) {
+        const oldRefereeId = existing.refereeId;
+        const oldRefName = refNameMap.get(oldRefereeId) ?? "Unknown";
+        const newRefName = refNameMap.get(refereeId) ?? "Unknown";
+        const matchInfo = matchInfoMap.get(matchId);
+        const roleName = roleNameMap.get(roleId) ?? "Unknown";
+
+        // Same unit-of-work argument as the insert branch above: the slot
+        // update, the history entry and referee.reassigned commit together or
+        // not at all. The UPDATE is also guarded on the referee/role we read,
+        // so a concurrent writer that already moved this slot on wins and this
+        // pass becomes a no-op instead of overwriting it with stale data.
+        const applied = await getDb().transaction(async (tx) => {
+          const moved = await tx
+            .update(matchReferees)
+            .set({ refereeId, roleId })
+            .where(
+              and(
+                eq(matchReferees.id, existing.id),
+                eq(matchReferees.refereeId, existing.refereeId),
+                eq(matchReferees.roleId, existing.roleId),
+                isNull(matchReferees.removedAt),
+              ),
+            )
+            .returning({ id: matchReferees.id });
+
+          if (moved.length === 0) return false;
+
+          // Record reassignment in match change history and emit event
+          if (oldRefereeId !== refereeId) {
+            await tx.insert(matchChanges).values({
+              matchId,
+              track: "remote",
+              versionNumber: matchInfo?.currentRemoteVersion ?? 0,
+              fieldName: `referee_slot_${slotNumber}`,
+              oldValue: `${oldRefName} (${roleName})`,
+              newValue: `${newRefName} (${roleName})`,
+            });
+
+            if (matchInfo) {
+              await publishDomainEvent(
+                {
+                  type: EVENT_TYPES.REFEREE_REASSIGNED,
+                  source: "sync",
+                  entityType: "referee",
+                  entityId: matchId,
+                  entityName: matchInfo.entityName,
+                  deepLinkPath: `/admin/matches/${matchId}`,
+                  syncRunId: syncRunId ?? null,
+                  payload: {
+                    matchNo: matchInfo.matchNo,
+                    homeTeam: matchInfo.homeTeam,
+                    guestTeam: matchInfo.guestTeam,
+                    oldRefereeName: oldRefName,
+                    newRefereeName: newRefName,
+                    role: roleName,
+                    oldRefereeId: oldRefereeId,
+                    newRefereeId: refereeId,
+                    teamIds: matchInfo.teamIds,
+                  },
+                },
+                tx,
+              );
+            }
+          }
+
+          return true;
+        });
+
+        if (!applied) {
+          log.info(
+            { matchId, slotNumber, refereeId },
+            "Referee slot changed concurrently; skipping stale reassignment",
+          );
         }
       }
     } catch (error) {

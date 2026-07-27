@@ -64,6 +64,7 @@ import {
   refereeAssignmentRules,
   refereeAssignmentIntents,
 } from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
 import {
   setupTestDb,
   resetTestDb,
@@ -952,7 +953,7 @@ describe("unassignReferee", () => {
     expect(mocks.publishDomainEvent.mock.calls[0]![0].payload.refereeId).toBeUndefined();
   });
 
-  it("skips intent deletion when the slot held no referee", async () => {
+  it("is a no-op for an already-open slot: no federation call, no event (#77)", async () => {
     const { matchId } = await seedMatch();
     await seedGame({ matchId, sr1Status: "open", sr1RefereeApiId: null });
     const refereeId = await seedReferee();
@@ -961,11 +962,59 @@ describe("unassignReferee", () => {
       .values({ matchId, refereeId, slotNumber: 1 });
     mocks.submitRefereeUnassignment.mockResolvedValue(SUCCESS_RESPONSE);
 
-    await unassignReferee(SPIELPLAN_ID, 1);
+    const result = await unassignReferee(SPIELPLAN_ID, 1);
 
+    // Idempotent success — a double-click still answers "the slot is open".
+    expect(result).toEqual({ success: true, slot: "sr1", status: "open" });
+    // There is nothing to undo, so the federation is not told to clear a slot
+    // that is already clear, and no referee.unassigned goes out for a referee
+    // who was never there (it used to, with entityId 0 and an empty name).
+    expect(mocks.submitRefereeUnassignment).not.toHaveBeenCalled();
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
     expect(await intentRows()).toEqual([
       { match_id: matchId, referee_id: refereeId, slot_number: 1 },
     ]);
+  });
+
+  it("retracts an offered slot without emitting referee.unassigned (#77)", async () => {
+    await seedGame({ sr1Status: "offered", sr1RefereeApiId: null });
+    mocks.submitRefereeUnassignment.mockResolvedValue(SUCCESS_RESPONSE);
+
+    const result = await unassignReferee(SPIELPLAN_ID, 1);
+
+    expect(result).toEqual({ success: true, slot: "sr1", status: "open" });
+    // The offer is real, so the federation is told; but nobody was assigned, so
+    // there is no unassignment to announce.
+    expect(mocks.submitRefereeUnassignment).toHaveBeenCalledWith(SPIELPLAN_ID, 1);
+    expect((await slotRow()).sr1_status).toBe("open");
+    expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not clear a referee a rival assigned while the federation call was in flight (#77)", async () => {
+    await seedGame({
+      sr1Status: "assigned",
+      sr1RefereeApiId: REF_API_ID,
+      sr1Name: "Max Muster",
+    });
+    // The federation call is the window: another caller re-fills the slot with
+    // a different referee while we are waiting on it.
+    mocks.submitRefereeUnassignment.mockImplementation(async () => {
+      await ctx.db
+        .update(refereeGames)
+        .set({ sr1RefereeApiId: 9999, sr1Name: "Rival Ref", sr1Status: "assigned" })
+        .where(eq(refereeGames.apiMatchId, SPIELPLAN_ID));
+      return SUCCESS_RESPONSE;
+    });
+
+    await unassignReferee(SPIELPLAN_ID, 1);
+
+    // The clear is a compare-and-set on the referee we read, so it matches
+    // nothing and the rival's assignment survives.
+    expect(await slotRow()).toMatchObject({
+      sr1_referee_api_id: 9999,
+      sr1_name: "Rival Ref",
+      sr1_status: "assigned",
+    });
   });
 
   it("publishes entityId 0 when the assigned referee is unknown locally", async () => {

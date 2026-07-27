@@ -226,9 +226,26 @@ describe("removeWithdrawnRefereeGames — removal semantics (issue #105)", () =>
     expect(cancelMock).not.toHaveBeenCalled();
   });
 
-  it("still tombstones when reminder cancellation and event publishing throw", async () => {
+  it("still tombstones when reminder cancellation throws", async () => {
     await seedGame(1000, "2026-04-01");
     cancelMock.mockRejectedValueOnce(new Error("redis down"));
+
+    const result = await removeWithdrawnRefereeGames(
+      { total: 1, received: 1 },
+      [9999],
+      undefined,
+      null,
+      NOW,
+    );
+
+    // Reminder cancellation is Redis work outside the transaction: a queue
+    // outage must not undo a removal the federation already made.
+    expect(result.removed).toBe(1);
+    expect((await readGame(1000)).removedAt).toBeInstanceOf(Date);
+  });
+
+  it("rolls the tombstone back when the match.removed event cannot be recorded (#77)", async () => {
+    await seedGame(1000, "2026-04-01");
     publishMock.mockRejectedValueOnce(new Error("event bus down"));
 
     const result = await removeWithdrawnRefereeGames(
@@ -239,8 +256,13 @@ describe("removeWithdrawnRefereeGames — removal semantics (issue #105)", () =>
       NOW,
     );
 
-    expect(result.removed).toBe(1);
-    expect((await readGame(1000)).removedAt).toBeInstanceOf(Date);
+    // The tombstone is the only evidence behind a match.removed notification.
+    // They now share a transaction, so a game cannot end up silently withdrawn
+    // with no event and nothing in the outbox to recover it; the row stays live
+    // and the next sync retries the removal.
+    expect(result.removed).toBe(0);
+    expect((await readGame(1000)).removedAt).toBeNull();
+    expect(cancelMock).not.toHaveBeenCalled();
   });
 
   it("leaves an already tombstoned game alone", async () => {
