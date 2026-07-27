@@ -10,6 +10,7 @@ import type {
   RefereeVisibilityBody,
   UpdateRefereeRulesBodyParsed,
 } from "@dragons/contracts";
+import { escapeLikePattern } from "../utils/sql";
 
 export class RefereeSettingsError extends Error {
   constructor(
@@ -43,11 +44,11 @@ export async function getReferees(
   const conditions = [];
   if (scope === "own") conditions.push(eq(referees.isOwnClub, true));
   if (search) {
+    // Escape LIKE metacharacters so a name containing `%` or `_` searches for
+    // that literal character instead of turning into a wildcard.
+    const pattern = `%${escapeLikePattern(search)}%`;
     conditions.push(
-      or(
-        ilike(referees.firstName, `%${search}%`),
-        ilike(referees.lastName, `%${search}%`),
-      ),
+      or(ilike(referees.firstName, pattern), ilike(referees.lastName, pattern)),
     );
   }
 

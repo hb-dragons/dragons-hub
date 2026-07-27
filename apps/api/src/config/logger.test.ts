@@ -384,12 +384,110 @@ describe("logger", () => {
     const opts = pinoMock.mock.calls[0]![0] as Record<string, unknown>;
     expect(opts.transport).toBeUndefined();
     expect(opts.formatters).toBeUndefined();
-    expect(opts.redact).toBeUndefined();
     expect(opts.mixin).toBeTypeOf("function");
     expect(opts.level).toBe("warn");
     // Prevents noise in tests
     expect((pinoMock.mock.calls[0] as PinoMockCall)[0]).not.toHaveProperty(
       "transport",
+    );
+  });
+
+  // Redaction used to be configured only in the production branch, so a
+  // password or bearer token logged during development or in CI went out in
+  // clear text. The paths must be byte-identical across all three branches —
+  // anything else means a gap that only shows up after deploy.
+  describe("redaction applies in every environment", () => {
+    async function redactOptionsFor(
+      nodeEnv: string,
+    ): Promise<{ paths: string[]; censor: string }> {
+      vi.resetModules();
+      vi.doMock("./env", () => ({
+        env: {
+          NODE_ENV: nodeEnv,
+          LOG_LEVEL: "info",
+          SERVICE_NAME: "api",
+          SERVICE_VERSION: "1.0",
+          GCP_PROJECT_ID: undefined,
+        },
+      }));
+      const pinoMock = vi.fn().mockReturnValue(makeMockLogger());
+      const stdTimeFunctions = { isoTime: () => "T" };
+      vi.doMock("pino", () => ({
+        default: Object.assign(pinoMock, { stdTimeFunctions }),
+        stdTimeFunctions,
+      }));
+
+      await import("./logger");
+      const opts = pinoMock.mock.calls[0]![0] as Record<string, unknown>;
+      return opts.redact as { paths: string[]; censor: string };
+    }
+
+    it.each(["production", "development", "test"])(
+      "configures redact in NODE_ENV=%s",
+      async (nodeEnv) => {
+        const redact = await redactOptionsFor(nodeEnv);
+
+        expect(redact).toBeDefined();
+        expect(redact.censor).toBe("[REDACTED]");
+        expect(redact.paths).toContain("req.headers.authorization");
+        expect(redact.paths).toContain("SDK_PASSWORD");
+        expect(redact.paths).toContain("*.password");
+        expect(redact.paths).toContain("*.body.token");
+      },
+    );
+
+    it("uses identical redact paths in dev/test as in production", async () => {
+      const prod = await redactOptionsFor("production");
+      const dev = await redactOptionsFor("development");
+      const test = await redactOptionsFor("test");
+
+      expect(dev.paths).toEqual(prod.paths);
+      expect(test.paths).toEqual(prod.paths);
+    });
+
+    // The assertions above check the options object; this one checks that the
+    // options actually censor when a real pino writes a line.
+    it.each(["test", "development"])(
+      "censors a secret written through a real pino in NODE_ENV=%s",
+      async (nodeEnv) => {
+        vi.resetModules();
+        // Earlier cases in this file register a pino mock, and doMock survives
+        // resetModules. This case needs the real serializer.
+        vi.doUnmock("pino");
+        vi.doMock("./env", () => ({
+          env: { NODE_ENV: nodeEnv, LOG_LEVEL: "info" },
+        }));
+
+        const written: string[] = [];
+        const { buildOptions } = await import("./logger");
+        const pino = (await import("pino")).default;
+
+        // Drop the pino-pretty transport: a worker thread would swallow the
+        // writes. Redaction happens before serialization either way.
+        const { transport: _transport, ...options } = buildOptions();
+        const probe = pino(options, {
+          write: (chunk: string) => {
+            written.push(chunk);
+          },
+        });
+
+        // `*.password` / `*.body.token`: the paths cover nested objects, which
+        // is how services log request context. Shape the payload accordingly.
+        probe.info(
+          {
+            creds: { password: "hunter2" },
+            req: { body: { token: "bearer-abc" } },
+            keep: "visible",
+          },
+          "probe",
+        );
+
+        const line = written.join("");
+        expect(line).not.toContain("hunter2");
+        expect(line).not.toContain("bearer-abc");
+        expect(line).toContain("[REDACTED]");
+        expect(line).toContain("visible");
+      },
     );
   });
 });

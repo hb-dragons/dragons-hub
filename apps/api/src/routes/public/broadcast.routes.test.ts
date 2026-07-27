@@ -15,6 +15,15 @@ const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
   subscribe: vi.fn(),
   closeSub: vi.fn(),
+  incr: vi.fn(),
+  expire: vi.fn(),
+}));
+
+vi.mock("../../config/redis", () => ({
+  getRedis: () => ({
+    incr: (...a: unknown[]) => mocks.incr(...a),
+    expire: (...a: unknown[]) => mocks.expire(...a),
+  }),
 }));
 
 vi.mock("../../config/env", async () => {
@@ -67,6 +76,10 @@ beforeEach(async () => {
   await resetTestDb(ctx);
   mocks.subscribe.mockReset();
   mocks.subscribe.mockResolvedValue(async () => mocks.closeSub());
+  mocks.incr.mockReset();
+  mocks.incr.mockResolvedValue(1);
+  mocks.expire.mockReset();
+  mocks.expire.mockResolvedValue(1);
 });
 afterAll(async () => {
   await closeTestDb(ctx);
@@ -102,6 +115,61 @@ describe("GET /public/broadcast/state", () => {
     );
     const body = (await res.json()) as { isLive: boolean };
     expect(body.isLive).toBe(true);
+  });
+
+  // `/stream` has always enforced this; `/state` returned broadcast state for
+  // any id an anonymous caller asked about.
+  it("returns 404 for a deviceId that is not the configured panel", async () => {
+    const res = await makeApp().request(
+      "/public/broadcast/state?deviceId=other",
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: "UNKNOWN_DEVICE" });
+  });
+
+  it("does not touch the database for a non-allowlisted deviceId", async () => {
+    await ctx.db.insert(broadcastConfigs).values({
+      deviceId: "someone-elses-panel",
+      isLive: true,
+    });
+
+    const res = await makeApp().request(
+      "/public/broadcast/state?deviceId=someone-elses-panel",
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.text()).not.toContain("isLive");
+  });
+
+  it("returns 429 once the anonymous window budget is spent", async () => {
+    mocks.incr.mockResolvedValue(601);
+
+    const res = await makeApp().request(
+      "/public/broadcast/state?deviceId=d1",
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
+  });
+
+  it("serves a request inside the budget", async () => {
+    mocks.incr.mockResolvedValue(600);
+
+    const res = await makeApp().request(
+      "/public/broadcast/state?deviceId=d1",
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  it("fails open when Redis is unreachable", async () => {
+    mocks.incr.mockRejectedValue(new Error("redis down"));
+
+    const res = await makeApp().request(
+      "/public/broadcast/state?deviceId=d1",
+    );
+
+    expect(res.status).toBe(200);
   });
 });
 

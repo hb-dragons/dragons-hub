@@ -368,6 +368,74 @@ describe("getRefereeHistorySummary leaderboard", () => {
     expect(res.leaderboard).toEqual([]);
     expect(res.kpis.distinctReferees).toBe(0);
   });
+
+  // distinctReferees used to be read off `leaderboard.length`, which the query
+  // truncates at 100 — so any season busier than that reported exactly 100.
+  it("counts every distinct referee, not just the leaderboard's first 100", async () => {
+    const games = Array.from({ length: 65 }, (_, i) =>
+      baseGame({
+        apiMatchId: 10_000 + i,
+        kickoffDate: "2025-09-15",
+        sr1RefereeApiId: 1000 + i * 2,
+        sr2RefereeApiId: 1001 + i * 2,
+        sr1Name: `Ref, A${i}`,
+        sr2Name: `Ref, B${i}`,
+      }),
+    );
+    await ctx.db.insert(refereeGames).values(games);
+
+    const res = await getRefereeHistorySummary({
+      status: [],
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+    });
+
+    expect(res.leaderboard).toHaveLength(100);
+    expect(res.kpis.distinctReferees).toBe(130);
+  });
+
+  it("counts a referee appearing in both slots once", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 20_001, sr1RefereeApiId: 100, sr2RefereeApiId: 100 }),
+      baseGame({ apiMatchId: 20_002, sr1RefereeApiId: 100, sr2RefereeApiId: 101 }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      status: [],
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+    });
+
+    expect(res.kpis.distinctReferees).toBe(2);
+  });
+
+  it("groups an api-id-less referee by name, matching the leaderboard", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({
+        apiMatchId: 30_001,
+        sr1RefereeApiId: null,
+        sr2RefereeApiId: null,
+        sr1Name: "Nameless, Only",
+        sr2Name: "Nameless, Only",
+      }),
+      baseGame({
+        apiMatchId: 30_002,
+        sr1RefereeApiId: null,
+        sr2RefereeApiId: null,
+        sr1Name: "Nameless, Only",
+        sr2Name: "Other, Person",
+      }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      status: [],
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+    });
+
+    expect(res.kpis.distinctReferees).toBe(2);
+    expect(res.leaderboard).toHaveLength(2);
+  });
 });
 
 describe("getRefereeHistorySummary availableLeagues", () => {

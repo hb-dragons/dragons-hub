@@ -16,7 +16,7 @@ const LOCKOUT_SEC = 30 * 60;
 //
 // If only one entry is present (no trusted proxy in front, e.g. local dev),
 // fall back to using it as-is rather than dropping the header.
-function clientFromForwardedFor(value: string | undefined): string | null {
+export function clientFromForwardedFor(value: string | undefined): string | null {
   if (!value) return null;
   const parts = value.split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.length === 0) return null;

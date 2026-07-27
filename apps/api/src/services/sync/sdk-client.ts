@@ -34,6 +34,30 @@ import type {
 
 const BASE_URL = "https://www.basketball-bund.net";
 
+/**
+ * Ceiling on a single federation HTTP call. basketball-bund.net has no SLA and
+ * a hung socket otherwise parks a sync stage forever: `withRetry` only reacts
+ * to a rejection, so a request that never settles never retries and never
+ * fails. An `AbortError` turns that hang into a retryable error.
+ */
+const FEDERATION_REQUEST_TIMEOUT_MS = 30_000;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    FEDERATION_REQUEST_TIMEOUT_MS,
+  );
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Rate limiter: token bucket with 15 burst, refilling at 10/sec
 class TokenBucket {
   private tokens: number;
@@ -138,7 +162,7 @@ class AuthenticatedClient {
       password: this.password,
     }).toString();
 
-    const res = await fetch(loginUrl, {
+    const res = await fetchWithTimeout(loginUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -196,7 +220,7 @@ class AuthenticatedClient {
     if (!this.sessionCookie) {
       throw new Error("Not authenticated. Call login() first.");
     }
-    return fetch(`${BASE_URL}${path}`, {
+    return fetchWithTimeout(`${BASE_URL}${path}`, {
       ...options,
       headers: {
         ...options.headers,
@@ -599,7 +623,13 @@ export class SdkClient {
         }
         if (!res.ok) {
           const errorBody = typeof res.text === "function" ? await res.text() : "";
-          log.error({ status: res.status, errorBody, payload: body }, "submit assignment failed");
+          // The submit payload carries the referee candidate record (name,
+          // licence, contact fields the federation hands back), so it stays out
+          // of the log. Slot number plus game id is enough to find the call.
+          log.error(
+            { status: res.status, errorBody, spielplanId, slotNumber },
+            "submit assignment failed",
+          );
           throw new Error(`submit assignment failed: ${res.status}`);
         }
         return res.json() as Promise<SdkSubmitResponse>;

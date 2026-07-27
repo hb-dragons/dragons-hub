@@ -407,7 +407,7 @@ documented in the description column, not in the path.
 |--------|------|-------------|
 | GET | `/` | Service metadata |
 | GET | `/health` | Liveness: API, database, Redis |
-| GET | `/health/deep` | Deep probe: DB, Redis, queue counts, outbox lag, sync freshness |
+| GET | `/health/deep` | Deep probe: DB, Redis, queue counts, outbox lag, sync freshness. **Admin only** (`requireAnyRole("admin")`) — queue depths and sync staleness are operational detail, so only the shallow `/health` above stays public for uptime probes |
 | GET | `/openapi.json` | OpenAPI 3.1 spec (auto-generated from route annotations). **Not public in production** — `requireAuth + requireAnyRole("admin")`; open only when `NODE_ENV !== "production"` |
 | GET | `/docs` | Interactive API docs (Scalar UI). Same production gate as `/openapi.json` |
 
@@ -505,7 +505,7 @@ Match list and detail responses include associated venue booking data when avail
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/mcp` | Streamable-HTTP MCP endpoint. Bearer-token auth (`Authorization: Bearer $MCP_TOKEN`), not the admin session gate. Exposes the read-only reschedule tools (`get_match`, `list_club_matches`, `list_venue_bookings`, `list_club_venues`, `get_round_window`, `get_referee_context`, `verify_slot`). Stateless. 401 on missing/invalid token. |
+| POST | `/mcp` | Streamable-HTTP MCP endpoint. Bearer-token auth (`Authorization: Bearer $MCP_TOKEN`), not the admin session gate. Exposes the read-only reschedule tools (`get_match`, `list_club_matches`, `list_venue_bookings`, `list_club_venues`, `get_round_window`, `get_referee_context`, `verify_slot`). Stateless. Gated by `ASSISTANT_ENABLED` (503 when off, same flag as the in-app copilot it shares tools with). Body capped at 256 KiB (413) and rate-limited (429). The bearer check is constant-time; 401 on missing/invalid token. |
 
 The same provider-neutral tool registry that backs the in-app chat is served here for external hosts (Claude Desktop, Cursor). The tools are read-only: they never write to the federation. Attach a host with:
 
@@ -669,20 +669,26 @@ plugin under `/api/auth/*`, not by this route group.
 | POST | `/api/scoreboard/ingest` | Stramatel raw-hex ingest from the Raspberry Pi (Bearer `SCOREBOARD_INGEST_KEY` + matching device id header) |
 | GET | `/public/scoreboard/latest` | Latest decoded snapshot for a device (no auth) |
 | GET | `/public/scoreboard/stream` | SSE stream of decoded snapshots (no auth) |
-| GET | `/admin/scoreboard/snapshots` | Paginated snapshot history (admin) |
-| GET | `/admin/scoreboard/health` | Ingest health (admin) |
+| GET | `/admin/scoreboard/snapshots` | Paginated snapshot history (admin). 404 unless `deviceId` is the configured `SCOREBOARD_DEVICE_ID` |
+| GET | `/admin/scoreboard/health` | Ingest health (admin). 404 unless `deviceId` is the configured `SCOREBOARD_DEVICE_ID` |
 
 ### Broadcast overlay
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/public/broadcast/state` | Current broadcast state for a device (no auth) |
-| GET | `/public/broadcast/stream` | SSE stream of broadcast state changes (no auth) |
+| GET | `/public/broadcast/state` | Current broadcast state for a device (no auth). Rate-limited (429); 404 unless `deviceId` is the configured `SCOREBOARD_DEVICE_ID` |
+| GET | `/public/broadcast/stream` | SSE stream of broadcast state changes (no auth). 404 unless `deviceId` is the configured `SCOREBOARD_DEVICE_ID` |
 | GET | `/admin/broadcast/config` | Get the broadcast config for a device |
 | PUT | `/admin/broadcast/config` | Upsert the broadcast config for a device (bound match, abbreviations, colour overrides) |
 | GET | `/admin/broadcast/matches` | Own-club matches available for broadcast binding |
 | POST | `/admin/broadcast/start` | Set `isLive = true` |
 | POST | `/admin/broadcast/stop` | Set `isLive = false` |
+
+Every `/admin/broadcast/*` route that takes a `deviceId` — and both
+`/admin/scoreboard/*` routes — answer 404 `UNKNOWN_DEVICE` unless it equals the
+configured `SCOREBOARD_DEVICE_ID`. The API is wired to one panel; an
+admin-supplied id must not create broadcast config rows or publish Redis events
+for a device that does not exist.
 
 ### Public
 
