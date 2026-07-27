@@ -713,7 +713,15 @@ async function loadRemovalContext(
       })
       .from(matches)
       .where(inArray(matches.id, matchIds)),
-    getDb().select().from(refereeGames).where(inArray(refereeGames.matchId, matchIds)),
+    // Live rows only. `advertiseReopenedSlot` publishes referee.slots.needed
+    // straight off these rows, so a tombstoned game — one the federation has
+    // already stopped listing — would otherwise be advertised as needing a
+    // referee. A tombstoned row can also shadow the live one for the same
+    // matchId in the Map built below.
+    getDb()
+      .select()
+      .from(refereeGames)
+      .where(and(inArray(refereeGames.matchId, matchIds), isNull(refereeGames.removedAt))),
   ]);
 
   const teamApiIds = [
