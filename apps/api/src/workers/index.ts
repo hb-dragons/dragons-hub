@@ -19,7 +19,12 @@ import {
   channelConfigs,
 } from "@dragons/db/schema";
 import { eq, lt, and, inArray } from "drizzle-orm";
-import { startHeartbeat, stopHeartbeat, isInstanceAlive, INSTANCE_ID } from "./instance-heartbeat";
+import {
+  startHeartbeat,
+  stopHeartbeat,
+  filterAliveInstances,
+  INSTANCE_ID,
+} from "./instance-heartbeat";
 
 export async function initializeWorkers() {
   logger.info("Initializing workers...");
@@ -35,13 +40,12 @@ export async function initializeWorkers() {
     .from(syncRuns)
     .where(eq(syncRuns.status, "running"));
 
-  const deadRunIds: number[] = [];
-  for (const run of candidateRuns) {
-    const alive = await isInstanceAlive(run.ownerInstanceId);
-    if (!alive) {
-      deadRunIds.push(run.id);
-    }
-  }
+  const aliveOwners = await filterAliveInstances(
+    candidateRuns.map((run) => run.ownerInstanceId),
+  );
+  const deadRunIds = candidateRuns
+    .filter((run) => !run.ownerInstanceId || !aliveOwners.has(run.ownerInstanceId))
+    .map((run) => run.id);
 
   if (deadRunIds.length > 0) {
     await getDb()

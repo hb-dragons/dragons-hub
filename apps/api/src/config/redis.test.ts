@@ -72,7 +72,29 @@ describe("redis config", () => {
     const errorHandler = handlers["error"];
     expect(errorHandler).toBeDefined();
     errorHandler!(err);
-    expect(logger.error).toHaveBeenCalledWith({ err }, "Redis connection error");
+    expect(logger.error).toHaveBeenCalledWith(
+      { err, kind: "request" },
+      "Redis connection error",
+    );
+  });
+
+  // An ioredis client with no `error` listener turns a connection drop into an
+  // unhandled rejection, which takes the process down. Every factory in this
+  // module has to attach one, so the assertion is over the factories, not over
+  // one of them.
+  it.each([
+    ["getRedis", "request"],
+    ["createRedisClient", "blocking"],
+  ] as const)("%s attaches an error listener", async (factory, kind) => {
+    const mod = (await import("./redis")) as unknown as Record<string, () => unknown>;
+    const { logger } = await import("./logger");
+
+    mod[factory]!();
+
+    expect(mockOn).toHaveBeenCalledWith("error", expect.any(Function));
+    const err = new Error("boom");
+    handlers["error"]!(err);
+    expect(logger.error).toHaveBeenCalledWith({ err, kind }, "Redis connection error");
   });
 
   it("closeRedis quits the client and clears the singleton", async () => {

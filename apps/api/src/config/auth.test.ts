@@ -111,6 +111,7 @@ describe("auth config", () => {
 
   it("enables cross-subdomain cookies and secure flag in production", async () => {
     mocks.env.NODE_ENV = "production";
+    mocks.env.BETTER_AUTH_URL = "https://api.app.hbdragons.de";
     await import("./auth");
     const config = mocks.betterAuth.mock.calls[0]![0] as {
       advanced: {
@@ -123,6 +124,32 @@ describe("auth config", () => {
       domain: ".app.hbdragons.de",
     });
     expect(config.advanced.defaultCookieAttributes.secure).toBe(true);
+  });
+
+  // The domain used to be the literal ".app.hbdragons.de" regardless of where
+  // BETTER_AUTH_URL pointed. Moving the API then scoped every session cookie to
+  // a domain the browser never sends it back to.
+  it("derives the production cookie domain from BETTER_AUTH_URL", async () => {
+    mocks.env.NODE_ENV = "production";
+    mocks.env.BETTER_AUTH_URL = "https://api.dragons.example.com";
+    await import("./auth");
+    const config = mocks.betterAuth.mock.calls[0]![0] as {
+      advanced: { crossSubDomainCookies: { enabled: boolean; domain?: string } };
+    };
+    expect(config.advanced.crossSubDomainCookies).toEqual({
+      enabled: true,
+      domain: ".dragons.example.com",
+    });
+  });
+
+  it("leaves cross-subdomain cookies off when the host has no domain to scope to", async () => {
+    mocks.env.NODE_ENV = "production";
+    mocks.env.BETTER_AUTH_URL = "http://localhost:3001";
+    await import("./auth");
+    const config = mocks.betterAuth.mock.calls[0]![0] as {
+      advanced: { crossSubDomainCookies: { enabled: boolean; domain?: string } };
+    };
+    expect(config.advanced.crossSubDomainCookies).toEqual({ enabled: false });
   });
 
   it("does not pre-bake __Secure- into the cookie prefix", async () => {
@@ -347,5 +374,26 @@ describe("auth config", () => {
         expect(logMocks.warn).toHaveBeenCalled();
       });
     });
+  });
+});
+
+describe("deriveCookieDomain", () => {
+  it.each([
+    // [BETTER_AUTH_URL, expected cookie domain]
+    ["https://api.app.hbdragons.de", ".app.hbdragons.de"],
+    ["https://api.dragons.example.com", ".dragons.example.com"],
+    // Already a registrable domain: no service label to strip, still shareable.
+    ["https://hbdragons.de", ".hbdragons.de"],
+    ["https://a.b.c.example.org", ".b.c.example.org"],
+    // A port must not leak into the domain attribute.
+    ["https://api.example.de:8443", ".example.de"],
+    // Nothing to scope to — the caller disables cross-subdomain cookies.
+    ["http://localhost:3001", undefined],
+    ["http://127.0.0.1:3001", undefined],
+    ["http://[::1]:3001", undefined],
+    ["not a url", undefined],
+  ])("%s -> %s", async (baseUrl, expected) => {
+    const { deriveCookieDomain } = await import("./auth");
+    expect(deriveCookieDomain(baseUrl)).toBe(expected);
   });
 });

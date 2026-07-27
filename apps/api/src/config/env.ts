@@ -1,10 +1,60 @@
 import { z } from "zod";
 
+/**
+ * Spellings of "on" and "off" that a boolean env var actually arrives in.
+ * Terraform renders an unset variable as `""`, shell wrappers and CI matrices
+ * use `1`/`0`, humans write `yes`/`no`. The schema used to accept only the two
+ * literals `"true"` and `"false"`, so every other spelling failed the whole
+ * parse and the process refused to boot over a flag that only decides whether
+ * an optional feature runs.
+ */
+const TRUTHY_FLAG_VALUES = new Set(["1", "true", "yes", "y", "on"]);
+const FALSY_FLAG_VALUES = new Set(["0", "false", "no", "n", "off"]);
+
+const FLAG_MESSAGE =
+  'must be boolean-ish: "true"/"false", "1"/"0", "yes"/"no", "on"/"off", or blank for the default';
+
+function normalizeFlag(raw: string | undefined): string {
+  return raw?.trim().toLowerCase() ?? "";
+}
+
+/**
+ * A boolean feature flag. Blank or absent means "unset" and falls back to
+ * `defaultValue`; an unrecognised spelling is still a hard error, so a typo
+ * like `CHATBOT_ENABLED=ture` fails loudly instead of silently reading as off.
+ *
+ * Only feature flags get this tolerance. The URL and credential vars
+ * (`WAHA_BASE_URL`, the five `SMTP_*`) deliberately reject `""`: production
+ * Terraform omits those keys entirely to leave a channel off, so an empty
+ * value there means a broken deploy, not "off".
+ */
+function booleanFlag(defaultValue = false) {
+  return z
+    .string()
+    .optional()
+    .refine(
+      (raw) => {
+        const value = normalizeFlag(raw);
+        return value === "" || TRUTHY_FLAG_VALUES.has(value) || FALSY_FLAG_VALUES.has(value);
+      },
+      { message: FLAG_MESSAGE },
+    )
+    .transform((raw) => {
+      const value = normalizeFlag(raw);
+      return value === "" ? defaultValue : TRUTHY_FLAG_VALUES.has(value);
+    });
+}
+
 export const envSchema = z
   .object({
     DATABASE_URL: z.string().min(1),
     REDIS_URL: z.string().min(1),
-    PORT: z.coerce.number().default(3001),
+    // Blank means unset: `PORT=""` coerces to 0, which binds an arbitrary
+    // ephemeral port and leaves the platform health check knocking on 8080.
+    PORT: z.preprocess(
+      (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+      z.coerce.number().int().positive().max(65535).default(3001),
+    ),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
     SDK_USERNAME: z.string().min(1),
     SDK_PASSWORD: z.string().min(1),
@@ -35,15 +85,9 @@ export const envSchema = z
     REFEREE_SDK_PASSWORD: z.string().min(1).optional(),
 
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
-    ASSISTANT_ENABLED: z
-      .union([z.literal("true"), z.literal("false")])
-      .default("false")
-      .transform((v) => v === "true"),
+    ASSISTANT_ENABLED: booleanFlag(),
     ASSISTANT_MODEL: z.string().min(1).default("gemini-2.5-flash"),
-    CHATBOT_ENABLED: z
-      .union([z.literal("true"), z.literal("false")])
-      .default("false")
-      .transform((v) => v === "true"),
+    CHATBOT_ENABLED: booleanFlag(),
     CHATBOT_MODEL: z.string().min(1).default("gemini-2.5-flash"),
     MCP_TOKEN: z.string().min(32).optional(),
 
@@ -62,10 +106,7 @@ export const envSchema = z
 
     SYNC_RUN_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
     DOMAIN_EVENT_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
-    VERBOSE_ERRORS: z
-      .union([z.literal("true"), z.literal("false")])
-      .default("false")
-      .transform((v) => v === "true"),
+    VERBOSE_ERRORS: booleanFlag(),
   })
   .superRefine((env, ctx) => {
     if (env.ASSISTANT_ENABLED && !env.GOOGLE_GENERATIVE_AI_API_KEY) {
@@ -106,19 +147,54 @@ export type Env = z.infer<typeof envSchema>;
 
 let _env: Env | undefined;
 
+/**
+ * Parse `process.env` once, on first access. Deferring the parse keeps import
+ * order from mattering (dotenv in `index.ts` runs before anything reads a var)
+ * and keeps a test able to stub the environment before touching `env`.
+ */
+function loadEnv(): Env {
+  if (!_env) {
+    const result = envSchema.safeParse(process.env);
+    if (!result.success) {
+      console.error("Invalid environment variables:");
+      for (const issue of result.error.issues) {
+        console.error(`  ${issue.path.join(".")}: ${issue.message}`);
+      }
+      throw new Error("Invalid environment variables");
+    }
+    _env = result.data;
+  }
+  return _env;
+}
+
+/**
+ * The parsed environment, behind a lazy Proxy.
+ *
+ * The traps beyond `get` are not decoration: with only `get`, the target is a
+ * bare `{}`, so `"CHATBOT_ENABLED" in env` is false, `Object.keys(env)` is
+ * empty and `{ ...env }` spreads to nothing — each of which reads as "not
+ * configured" at exactly the call sites that check for configuration.
+ * `getOwnPropertyDescriptor` has to report `configurable: true` because the
+ * keys do not exist on the target; the Proxy invariants reject anything else.
+ */
 export const env: Env = new Proxy({} as Env, {
   get(_target, prop) {
-    if (!_env) {
-      const result = envSchema.safeParse(process.env);
-      if (!result.success) {
-        console.error("Invalid environment variables:");
-        for (const issue of result.error.issues) {
-          console.error(`  ${issue.path.join(".")}: ${issue.message}`);
-        }
-        throw new Error("Invalid environment variables");
-      }
-      _env = result.data;
-    }
-    return _env[prop as keyof Env];
+    return loadEnv()[prop as keyof Env];
+  },
+  has(_target, prop) {
+    return prop in loadEnv();
+  },
+  ownKeys() {
+    return Reflect.ownKeys(loadEnv());
+  },
+  getOwnPropertyDescriptor(_target, prop) {
+    const parsed = loadEnv();
+    if (!(prop in parsed)) return undefined;
+    return {
+      value: parsed[prop as keyof Env],
+      enumerable: true,
+      configurable: true,
+      writable: false,
+    };
   },
 });

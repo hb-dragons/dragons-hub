@@ -2,7 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   bucket: vi.fn(),
-  env: { GCS_PROJECT_ID: "test-project", GCS_BUCKET_NAME: "test-bucket" as string | undefined },
+  env: {
+    GCS_PROJECT_ID: "test-project" as string | undefined,
+    GCS_BUCKET_NAME: "test-bucket" as string | undefined,
+  },
   StorageCtor: vi.fn(),
 }));
 
@@ -33,6 +36,17 @@ describe("getGcsStorage", () => {
     const s1 = getGcsStorage();
     expect(mocks.StorageCtor).toHaveBeenCalledWith({ projectId: "test-project" });
     expect(s1).toBeDefined();
+  });
+
+  // The bucket guard throws on a missing name; projectId used to fall through
+  // as `undefined`, which silently binds to whatever project the ambient
+  // credentials resolve to. Both vars are now guarded the same way.
+  it.each([undefined, ""])("throws when GCS_PROJECT_ID is %p", async (value) => {
+    mocks.env.GCS_PROJECT_ID = value;
+    const { getGcsStorage } = await import("./gcs");
+
+    expect(() => getGcsStorage()).toThrow("GCS_PROJECT_ID is required for social features");
+    expect(mocks.StorageCtor).not.toHaveBeenCalled();
   });
 
   it("memoizes the Storage instance across calls", async () => {
