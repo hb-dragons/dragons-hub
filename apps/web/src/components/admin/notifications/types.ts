@@ -29,8 +29,8 @@ export type {
 // Channel config shapes live in @dragons/shared (the API's ChannelType /
 // per-channel config shapes / ChannelConfigItem+ListResult / provider
 // availability); re-export so call sites keep one name.
-export { CHANNEL_TYPES, EVENT_TYPE_VALUES, EVENT_URGENCIES } from "@dragons/shared";
-export type { EventType, EventUrgency } from "@dragons/shared";
+export { CHANNEL_TYPES, DIGEST_MODES, EVENT_TYPE_VALUES, EVENT_URGENCIES } from "@dragons/shared";
+export type { DigestMode, EventType, EventUrgency } from "@dragons/shared";
 export type {
   ChannelType,
   ChannelConfigItem,

@@ -41,14 +41,15 @@ exist, so a missing dedup index would succeed and write a duplicate notification
 error. With the target named, Postgres raises `42P10` instead — a loud failure rather
 than unbounded duplicate notifications.
 
-## Snapshot gaps at 0019, 0028 and 0035 are intentional
+## Snapshot gaps at 0019, 0028, 0035 and 0043 are intentional
 
-`meta/_journal.json` has 41 entries (idx 0–40) but `meta/` holds 38 `*_snapshot.json`
-files. Snapshots are missing for exactly the three hand-written migrations:
+`meta/_journal.json` has 44 entries (idx 0–43) but `meta/` holds 40 `*_snapshot.json`
+files. Snapshots are missing for exactly the four hand-written migrations:
 
 - `0019_outbox_partial_index`
 - `0028_rbac_role_cleanup`
 - `0035_referee_games_status_kickoff_index`
+- `0043_digest_mode_immediate`
 
 These were authored as SQL rather than produced by `drizzle-kit generate`, so no
 snapshot was ever written for them. This is left as-is on purpose:
@@ -56,10 +57,23 @@ snapshot was ever written for them. This is left as-is on purpose:
 - `db:migrate` reads `_journal.json` and the `.sql` files; it never reads snapshots, so
   every migration applies normally.
 - `db:generate` diffs the current schema against the *latest* snapshot
-  (`0040_snapshot.json`), which exists. Intermediate snapshots are not consulted.
+  (`0042_snapshot.json`), which exists. Intermediate snapshots are not consulted, and
+  0043 changes data rather than schema, so that snapshot still describes the schema.
 - `drizzle-kit check` passes (verified).
 
-Back-filling the three snapshots would mean hand-writing drizzle-kit internal state to
+Back-filling the four snapshots would mean hand-writing drizzle-kit internal state to
 describe changes it never generated — more risk than the gap it closes. If you add a
 hand-written migration, add its journal entry and expect no snapshot for it, and add its
 indexes to the table above plus `migration-indexes.test.ts`.
+
+## Data seeded by migrations must hold values the TypeScript types allow
+
+`0024` seeds `sync_schedule` and `0030` seeds the Expo Push `channel_configs` row. A
+literal in a SQL file passes through no type check, which is how `0030` came to write
+`digest_mode = 'immediate'` — a value from `EVENT_URGENCIES`, not `DigestMode`. `0043`
+rewrites those rows to `none`.
+
+`apps/api/src/test/enum-column-values.test.ts` guards the class rather than the
+instance: it migrates a fresh database and asserts that every column backed by a const
+array in `@dragons/shared` holds only members of that array, defaults included. Adding a
+shared enum array without registering (or exempting) it fails that test too.

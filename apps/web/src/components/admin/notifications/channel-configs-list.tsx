@@ -33,15 +33,12 @@ import {
 import { Switch } from "@dragons/ui/components/switch";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { CHANNEL_TYPES } from "./types";
+import { CHANNEL_TYPES, DIGEST_MODES } from "./types";
 import type {
   ChannelConfigItem,
   ChannelType,
+  DigestMode,
 } from "./types";
-
-type DigestMode = ChannelConfigItem["digestMode"];
-
-const DIGEST_MODES: DigestMode[] = ["per_sync", "scheduled", "none"];
 
 interface ChannelFormState {
   name: string;

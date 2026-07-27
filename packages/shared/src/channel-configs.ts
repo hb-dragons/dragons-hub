@@ -20,7 +20,21 @@ export const CHANNEL_TYPES = [
   "push",
 ] as const;
 export type ChannelType = (typeof CHANNEL_TYPES)[number];
-export type DigestMode = "per_sync" | "scheduled" | "none";
+/**
+ * How a channel batches its notifications. Single source of truth — the request
+ * contract (`@dragons/contracts`) derives its enum from this array, and
+ * `apps/api/src/test/enum-column-values.test.ts` asserts that no
+ * `channel_configs.digest_mode` value in a migration-built database falls
+ * outside it.
+ *
+ * `none` means "deliver each notification as it happens": the worker only
+ * buffers for `per_sync` and only schedules a cron digest for `scheduled`.
+ * Migration 0030 seeded the push channel with `immediate`, a value from
+ * `EVENT_URGENCIES` rather than this array — it behaved like `none` by falling
+ * through both comparisons, and 0043 rewrites it to `none`.
+ */
+export const DIGEST_MODES = ["per_sync", "scheduled", "none"] as const;
+export type DigestMode = (typeof DIGEST_MODES)[number];
 
 // ── Per-channel config shapes ───────────────────────────────────────────────
 
