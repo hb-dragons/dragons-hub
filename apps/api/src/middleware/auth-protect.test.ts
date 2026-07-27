@@ -26,23 +26,22 @@ vi.mock("../config/redis", () => ({
       if (ttl) expiries.set(key, Date.now() + ttl * 1000);
       return "OK";
     },
-    async incr(key: string) {
-      guard();
-      const next = (Number(store.get(key)) || 0) + 1;
-      store.set(key, String(next));
-      return next;
-    },
-    async expire(key: string, seconds: number) {
-      guard();
-      ttls.set(key, seconds);
-      return 1;
-    },
     async del(...keys: string[]) {
       guard();
       for (const k of keys) store.delete(k);
       return 0;
     },
   }),
+  // Stands in for the real EVAL-backed helper: bump the counter and stamp the
+  // TTL in one step, so the failure counter can never be left without an expiry
+  // (which would make failures accumulate forever and lock out a real user).
+  async incrementWithTtl(key: string, seconds: number) {
+    guard();
+    const next = (Number(store.get(key)) || 0) + 1;
+    store.set(key, String(next));
+    ttls.set(key, seconds);
+    return next;
+  },
 }));
 
 const log = vi.hoisted(() => ({

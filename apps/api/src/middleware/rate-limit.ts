@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { logger } from "../config/logger";
-import { getRedis } from "../config/redis";
+import { incrementWithTtl } from "../config/redis";
 import type { AppEnv } from "../types";
 
 export function rateLimit(opts: {
@@ -16,11 +16,7 @@ export function rateLimit(opts: {
 
     let count: number;
     try {
-      const redis = getRedis();
-      count = await redis.incr(key);
-      if (count === 1) {
-        await redis.expire(key, opts.windowSeconds);
-      }
+      count = await incrementWithTtl(key, opts.windowSeconds);
     } catch (err) {
       // Fail open: a Redis outage must not 500 every rate-limited route.
       logger.warn(

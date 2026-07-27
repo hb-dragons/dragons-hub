@@ -11,17 +11,14 @@ vi.mock("../config/env", () => ({
 const counters = new Map<string, number>();
 const redisState = { fail: false };
 vi.mock("../config/redis", () => ({
-  getRedis: () => ({
-    async incr(key: string) {
-      if (redisState.fail) throw new Error("redis down");
-      const next = (counters.get(key) ?? 0) + 1;
-      counters.set(key, next);
-      return next;
-    },
-    async expire() {
-      if (redisState.fail) throw new Error("redis down");
-    },
-  }),
+  // Stands in for the real EVAL-backed helper: bump the counter and stamp the
+  // TTL in one step, so there is no window where a key exists without an expiry.
+  async incrementWithTtl(key: string) {
+    if (redisState.fail) throw new Error("redis down");
+    const next = (counters.get(key) ?? 0) + 1;
+    counters.set(key, next);
+    return next;
+  },
 }));
 
 const log = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }));
