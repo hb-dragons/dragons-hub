@@ -49,15 +49,22 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
       thresholds: {
-        // Measured floor 2026-07-26 (issue #109), raised from 9/10/12/12.
-        // Actual at the time: 29.95 branches / 32.34 functions / 37.14 lines /
-        // 36.62 statements. The old numbers had drifted ~25 points below
-        // actual, which left enough slack to delete a quarter of the suite with
-        // CI still green. Ratchet up over time; never lower.
-        branches: 29,
-        functions: 32,
-        lines: 37,
-        statements: 36,
+        // Measured floor 2026-07-27, ratcheted up from 29/32/37/36 after the
+        // #129 + #132 batch landed. Actual: 35.40 branches / 39.20 functions /
+        // 43.73 lines / 42.87 statements — roughly +5 points, from #132
+        // un-skipping two files (6 dead tests became 9 live ones) and #129
+        // adding tests alongside its i18n/a11y work. #132 deliberately left the
+        // old numbers in place so concurrent branches would not red-line at
+        // merge time; that reason expired once the batch was merged.
+        //
+        // Prior floor measured 2026-07-26 (issue #109), itself raised from
+        // 9/10/12/12 after the old numbers had drifted ~25 points below actual,
+        // leaving enough slack to delete a quarter of the suite with CI green.
+        // Ratchet up over time; never lower.
+        branches: 35,
+        functions: 39,
+        lines: 43,
+        statements: 42,
       },
     },
   },
