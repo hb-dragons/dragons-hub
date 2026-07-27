@@ -6,6 +6,7 @@ import { getDb } from "../../../config/database";
 import { notificationLog } from "@dragons/db/schema";
 import { logger } from "../../../config/logger";
 import { insertNotificationLogDeduped } from "../notification-log-dedup";
+import { buildUnsubscribeUrl } from "../email-subscription.service";
 import { resolveEmailRecipients } from "../recipient-resolver";
 import { renderEmailMessage } from "../templates/email";
 import { readSmtpSettings, type SmtpSettings } from "./smtp-settings";
@@ -28,7 +29,10 @@ export interface EmailSendResult {
   success: boolean;
   sent: number;
   failed: number;
-  /** Recipients withheld before any send — currently unverified addresses. */
+  /**
+   * Recipients withheld before any send: unverified addresses, ids with no
+   * account, and members who unsubscribed from email (issue #134).
+   */
   skipped: number;
 }
 
@@ -121,18 +125,24 @@ export class EmailChannelAdapter {
     const toSend = deliverable.filter((r) => claimIdByUser.has(r.userId));
     if (toSend.length === 0) return result;
 
-    const message = renderEmailMessage(
-      { title: params.title, body: params.body },
-      params.locale,
-      params.link,
-    );
-
     const transport = createTransport(settings);
     const releasedClaimIds: number[] = [];
 
     try {
       for (const recipient of toSend) {
         const claimId = claimIdByUser.get(recipient.userId)!;
+        // Rendered per recipient, not per message: the unsubscribe token
+        // identifies exactly one member, so no two copies are the same bytes.
+        const unsubscribeUrl = buildUnsubscribeUrl(
+          recipient.unsubscribeToken,
+          params.locale,
+        );
+        const message = renderEmailMessage(
+          { title: params.title, body: params.body },
+          params.locale,
+          params.link,
+          unsubscribeUrl,
+        );
         try {
           const info = await transport.sendMail({
             from: settings.from,
@@ -142,6 +152,16 @@ export class EmailChannelAdapter {
             subject: message.subject,
             text: message.text,
             html: message.html,
+            headers: {
+              // RFC 2369 + RFC 8058. The header is what a mail client's own
+              // "unsubscribe" button uses; `List-Unsubscribe-Post` is what
+              // makes that button a single POST instead of sending the member
+              // to a page. Both are required for one-click: a client that sees
+              // only the URL falls back to opening it, which is a GET and
+              // therefore the confirmation page, never a silent opt-out.
+              "List-Unsubscribe": `<${unsubscribeUrl}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
           });
 
           await getDb()

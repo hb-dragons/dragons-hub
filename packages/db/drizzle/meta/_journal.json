@@ -309,6 +309,13 @@
       "when": 1785136641719,
       "tag": "0043_digest_mode_immediate",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1785165406303,
+      "tag": "0044_quick_umar",
+      "breakpoints": true
     }
   ]
 }
