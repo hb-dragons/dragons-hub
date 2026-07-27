@@ -4,6 +4,7 @@ import {
   matchOverrides,
   matchRemoteVersions,
   matchChanges,
+  teams,
 } from "@dragons/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { parseResult } from "@dragons/sdk";
@@ -131,7 +132,7 @@ function toRemoteSnapshot(
  * persisted and no domain event fires. (issue #127)
  *
  * Covered: the whole `SNAPSHOT_DB_FIELDS` set, plus `homeTeamApiId` /
- * `guestTeamApiId` (insert-only), `leagueId`, and the resolved `venueId`.
+ * `guestTeamApiId` (see `TEAM_ID_FIELDS`), `leagueId`, and the resolved `venueId`.
  *
  * Deliberately outside the payload:
  * - `apiMatchId` — the identity the row is looked up by, constant by construction.
@@ -284,6 +285,20 @@ const SNAPSHOT_DB_FIELDS = [
   "sr3Open",
 ] as const;
 
+/**
+ * The two team ids, handled like `leagueId` / `venueId`: hashed, written on both
+ * insert and update, but kept out of `SNAPSHOT_DB_FIELDS` so `matchOverrides`
+ * cannot lock them — they are the match's identity, not user-editable data.
+ *
+ * Before issue #133 they were hashed and inserted but never updated, so a
+ * federation team swap flipped the hash (bypassing the O(1) skip), wrote a
+ * `matchRemoteVersions` snapshot carrying the new ids, and left the row on the
+ * old ones forever — every later run hashed equal and skipped. The update path
+ * now writes them and records a `matchChanges` audit row per changed id.
+ * `classifyMatchChanges` has no event type for a swap, so a swap on its own is
+ * audit-only and emits no `match.*` event.
+ */
+const TEAM_ID_FIELDS = ["homeTeamApiId", "guestTeamApiId"] as const;
 
 export { buildMatchEntityName };
 
@@ -320,6 +335,36 @@ export async function syncMatchesFromData(
     }
   }
 
+  // `matches.homeTeamApiId` / `guestTeamApiId` are non-deferrable FKs on
+  // `teams.apiTeamPermanentId`. In `fullSync` the teams stage commits every team
+  // in this payload before matches run, but a team swap can still name a team
+  // that stage never saw, and writing it would abort the whole per-match
+  // transaction on an FK violation — losing the version snapshot and audit rows
+  // with it. One batch SELECT tells us which ids are safe; a match naming an
+  // unknown one is skipped whole, so neither the row nor its hash advances and
+  // the next run (after the team lands) applies it. (issue #133)
+  const allTeamApiIds = [
+    ...new Set(
+      leagueData.flatMap((d) =>
+        d.spielplan.flatMap((m) => [
+          m.homeTeam?.teamPermanentId,
+          m.guestTeam?.teamPermanentId,
+        ]),
+      ).filter((id): id is number => typeof id === "number"),
+    ),
+  ];
+
+  const knownTeamApiIds = new Set<number>();
+  if (allTeamApiIds.length > 0) {
+    const knownTeams = await getDb()
+      .select({ apiTeamPermanentId: teams.apiTeamPermanentId })
+      .from(teams)
+      .where(inArray(teams.apiTeamPermanentId, allTeamApiIds));
+    for (const t of knownTeams) {
+      knownTeamApiIds.add(t.apiTeamPermanentId);
+    }
+  }
+
   for (const data of leagueData) {
     if (!data.leagueDbId) {
       result.errors.push(`No DB ID for league API ID ${data.leagueApiId}`);
@@ -353,6 +398,30 @@ export async function syncMatchesFromData(
             entityName,
             action: "skipped",
             message: "Missing home or guest team",
+          });
+          continue;
+        }
+
+        // FK guard, see `knownTeamApiIds` above. Skipping leaves the row and its
+        // hash untouched, so this run persists nothing rather than half of a
+        // swap, and the change is picked up once the team exists. (issue #133)
+        const unknownTeamApiId = [
+          basicMatch.homeTeam.teamPermanentId,
+          basicMatch.guestTeam.teamPermanentId,
+        ].find((id) => !knownTeamApiIds.has(id));
+
+        if (unknownTeamApiId !== undefined) {
+          result.skipped++;
+          log.warn(
+            { apiMatchId, teamApiId: unknownTeamApiId },
+            "Match references a team that has not been synced yet — deferring",
+          );
+          await logger?.log({
+            entityType: "match",
+            entityId: String(apiMatchId),
+            entityName,
+            action: "skipped",
+            message: `Team ${unknownTeamApiId} not synced yet`,
           });
           continue;
         }
@@ -439,6 +508,13 @@ export async function syncMatchesFromData(
               ? internalVenueId
               : (internalVenueId ?? locked.venueId);
 
+            // The team ids are unconditional: they sit outside the override
+            // machinery on purpose (see TEAM_ID_FIELDS), and the FK guard above
+            // has already established both are in `teams`. (issue #133)
+            for (const field of TEAM_ID_FIELDS) {
+              updateSet[field] = remoteSnapshot[field];
+            }
+
             // When game details are unavailable, preserve every detail-sourced
             // field (scores arrive null, sr*Open flags arrive false) from the
             // persisted row so a detail-fetch failure neither regresses data nor
@@ -454,6 +530,20 @@ export async function syncMatchesFromData(
 
             // Compute effective changes (what actually changes in DB)
             const effective = computeEffectiveChanges(locked, updateSet);
+
+            // Team swap (team ids not in SNAPSHOT_DB_FIELDS, checked separately).
+            // Audit-only: `classifyMatchChanges` maps no event onto these field
+            // names, so a swap alone bumps the version and writes `matchChanges`
+            // rows without emitting a `match.*` event. (issue #133)
+            for (const field of TEAM_ID_FIELDS) {
+              if (locked[field] !== remoteSnapshot[field]) {
+                effective.push({
+                  fieldName: field,
+                  oldValue: String(locked[field]),
+                  newValue: String(remoteSnapshot[field]),
+                });
+              }
+            }
 
             // Venue change (venueId not in SNAPSHOT_DB_FIELDS, checked separately)
             if (String(locked.venueId ?? "") !== String(updateSet.venueId ?? "")) {

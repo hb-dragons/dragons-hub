@@ -1021,6 +1021,192 @@ describe("syncMatchesFromData — update path", () => {
   });
 });
 
+// Regression for issue #133. The team ids were hashed and inserted but never
+// updated, so a federation swap bypassed the O(1) skip, wrote a version snapshot
+// carrying the new ids and left the row on the old ones — permanently, because
+// every later run then hashed equal and skipped.
+describe("syncMatchesFromData — remote team swap", () => {
+  /** A guest team the seeded match does not use, already present in `teams`. */
+  async function seedReplacementTeam(apiTeamPermanentId = 30) {
+    await ctx.db.insert(teams).values({
+      apiTeamPermanentId,
+      seasonTeamId: 300,
+      teamCompetitionId: 3,
+      name: "Replacement",
+      clubId: 3,
+    });
+  }
+
+  /** The same fixture match with its guest team swapped for `apiTeamPermanentId`. */
+  function swappedMatch(apiTeamPermanentId = 30): SdkSpielplanMatch {
+    return makeBasicMatch({
+      guestTeam: {
+        teamPermanentId: apiTeamPermanentId,
+        seasonTeamId: 300,
+        teamCompetitionId: 3,
+        teamname: "Replacement",
+        teamnameSmall: "R",
+        clubId: 3,
+        verzicht: false,
+      },
+    });
+  }
+
+  it("writes the new ids, audits them, and keeps the row and the version snapshot in agreement", async () => {
+    await seedReplacementTeam();
+    const created = await seedMatch();
+    expect(created.guestTeamApiId).toBe(20);
+
+    const result = await syncMatchesFromData(
+      [makeLeagueData({ spielplan: [swappedMatch()] })],
+      VENUE_LOOKUP,
+      2,
+    );
+
+    expect(result.updated).toBe(1);
+    expect(result.skipped).toBe(0);
+    expect(result.failed).toBe(0);
+
+    const row = await matchRow();
+    expect(row.homeTeamApiId).toBe(10);
+    expect(row.guestTeamApiId).toBe(30);
+    expect(row.currentRemoteVersion).toBe(2);
+
+    // The audit trail names the swap, one row per changed id.
+    const changes = await changeRows();
+    expect(changes.map((c) => c.fieldName)).toEqual(["guestTeamApiId"]);
+    expect(changes[0]).toMatchObject({
+      track: "remote",
+      versionNumber: 2,
+      oldValue: "20",
+      newValue: "30",
+    });
+
+    // The snapshot the run stored must describe the row it wrote.
+    const versions = await versionRows();
+    expect(versions.map((v) => v.versionNumber)).toEqual([1, 2]);
+    const snapshot = versions[1]!.snapshot as unknown as {
+      homeTeamApiId: number;
+      guestTeamApiId: number;
+    };
+    expect(snapshot.homeTeamApiId).toBe(row.homeTeamApiId);
+    expect(snapshot.guestTeamApiId).toBe(row.guestTeamApiId);
+    expect(versions[1]!.dataHash).toBe(row.remoteDataHash);
+
+    // Audit-only: no event type is mapped onto a team swap, so nobody is notified.
+    expect(publishedEventTypes().filter((t) => t.startsWith("match."))).toEqual([]);
+  });
+
+  it("re-skips the swapped match on the next run instead of leaving stale ids behind", async () => {
+    await seedReplacementTeam();
+    await seedMatch();
+    await syncMatchesFromData([makeLeagueData({ spielplan: [swappedMatch()] })], VENUE_LOOKUP, 2);
+
+    const result = await syncMatchesFromData(
+      [makeLeagueData({ spielplan: [swappedMatch()] })],
+      VENUE_LOOKUP,
+      3,
+    );
+
+    expect(result.skipped).toBe(1);
+    expect((await matchRow()).guestTeamApiId).toBe(30);
+    expect((await versionRows()).length).toBe(2);
+  });
+
+  it("also swaps both ids at once", async () => {
+    await seedReplacementTeam(30);
+    await seedReplacementTeam(40);
+    await seedMatch();
+
+    await syncMatchesFromData(
+      [
+        makeLeagueData({
+          spielplan: [
+            makeBasicMatch({
+              homeTeam: { ...swappedMatch(40).guestTeam!, teamPermanentId: 40 },
+              guestTeam: swappedMatch(30).guestTeam,
+            }),
+          ],
+        }),
+      ],
+      VENUE_LOOKUP,
+      2,
+    );
+
+    const row = await matchRow();
+    expect([row.homeTeamApiId, row.guestTeamApiId]).toEqual([40, 30]);
+    expect((await changeRows()).map((c) => c.fieldName)).toEqual([
+      "guestTeamApiId",
+      "homeTeamApiId",
+    ]);
+  });
+
+  // `matches.home_team_api_id` is a non-deferrable FK on `teams`. Writing an id the
+  // teams stage has not committed yet would abort the whole per-match transaction,
+  // taking the version snapshot and audit rows with it, so the match is deferred.
+  it("defers a swap to a team that has not been synced yet, then applies it once the team lands", async () => {
+    const created = await seedMatch();
+
+    const deferred = await syncMatchesFromData(
+      [makeLeagueData({ spielplan: [swappedMatch(99)] })],
+      VENUE_LOOKUP,
+      2,
+    );
+
+    expect(deferred.skipped).toBe(1);
+    expect(deferred.failed).toBe(0);
+    expect(deferred.errors).toEqual([]);
+
+    // Nothing was written — not the ids, not the hash, not a version row.
+    const untouched = await matchRow();
+    expect(untouched.guestTeamApiId).toBe(20);
+    expect(untouched.remoteDataHash).toBe(created.remoteDataHash);
+    expect(untouched.currentRemoteVersion).toBe(1);
+    expect((await versionRows()).length).toBe(1);
+    expect(await changeRows()).toEqual([]);
+
+    // The teams stage catches up; the deferred swap then applies normally.
+    await seedReplacementTeam(99);
+    const applied = await syncMatchesFromData(
+      [makeLeagueData({ spielplan: [swappedMatch(99)] })],
+      VENUE_LOOKUP,
+      3,
+    );
+
+    expect(applied.updated).toBe(1);
+    expect((await matchRow()).guestTeamApiId).toBe(99);
+    expect((await changeRows()).map((c) => c.fieldName)).toEqual(["guestTeamApiId"]);
+  });
+
+  it("defers a brand-new match whose team is not synced yet rather than failing on the FK", async () => {
+    const result = await syncMatchesFromData(
+      [makeLeagueData({ spielplan: [swappedMatch(99)] })],
+      VENUE_LOOKUP,
+      1,
+    );
+
+    expect(result.skipped).toBe(1);
+    expect(result.created).toBe(0);
+    expect(result.failed).toBe(0);
+    expect(await matchRowOrNull()).toBeNull();
+  });
+
+  it("logs the deferral against the match", async () => {
+    const mockLogger = { log: vi.fn() };
+
+    await syncMatchesFromData(
+      [makeLeagueData({ spielplan: [swappedMatch(99)] })],
+      VENUE_LOOKUP,
+      1,
+      mockLogger as never,
+    );
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "skipped", message: "Team 99 not synced yet" }),
+    );
+  });
+});
+
 describe("syncMatchesFromData — local overrides", () => {
   it("leaves an overridden field untouched while updating the rest", async () => {
     const created = await seedMatch();

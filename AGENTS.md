@@ -296,6 +296,24 @@ silently. `matches` lost venue changes this way until issue #127; the reasoning
 for every field in and out of the payload is documented on `snapshotToHashData`
 in `services/sync/matches.sync.ts`.
 
+Hashing a column is only half the job — the update path has to write it too, or
+the run bypasses the skip, stores a `matchRemoteVersions` snapshot describing the
+new value and then leaves the row on the old one, where every later run hashes
+equal and skips. `matches.homeTeamApiId` / `guestTeamApiId` sat in that state
+until issue #133.
+
+**Remote team swaps** (decision, 2026-07-27, issue #133). When the federation
+re-points an existing match at a different team, sync overwrites the stored ids
+so the row and its version snapshot agree, and writes one `matchChanges` audit
+row per changed id. It emits **no** `match.*` event — `classifyMatchChanges` maps
+nothing onto these field names, so a swap notifies nobody. The ids stay out of
+`SNAPSHOT_DB_FIELDS`, so `matchOverrides` cannot lock them: they are the match's
+identity, not user-editable data. Both columns are non-deferrable FKs on
+`teams.apiTeamPermanentId`, so `syncMatchesFromData` batch-loads the known team
+ids up front and defers any match naming an unknown one — nothing is written, not
+even the hash, and the next run applies it once the teams stage has committed the
+team.
+
 Changing a payload's shape invalidates every stored hash of that entity. No
 migration is needed — the next sync recomputes and rewrites them. That one run
 takes the update path for every row instead of the O(1) skip; for `matches` the
