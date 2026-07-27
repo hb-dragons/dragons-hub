@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import type { ComponentRef } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
@@ -348,7 +349,14 @@ function TaskCardImpl({
     transform: [{ scale: dropPulse.value }],
   }));
 
-  const cardRef = useAnimatedRef<Animated.View>();
+  // Typed against the component the ref is actually attached to
+  // (AnimatedPressable), not Animated.View. The two are distinct types even
+  // under @types/react 19.2.14 — that version just still accepts the
+  // assignment, so the old annotation type-checked by accident. 19.2.17
+  // tells a Pressable's ReactNativeElement apart from a View instance and
+  // rejects it, and the `^19.2.14` range already admits 19.2.17, so this is
+  // a latent break rather than a hypothetical one.
+  const cardRef = useAnimatedRef<ComponentRef<typeof AnimatedPressable>>();
 
   // Built once per (onDrag, task) rather than on every render: `Gesture.Pan()`
   // constructs a new gesture object and, when its identity changes,
