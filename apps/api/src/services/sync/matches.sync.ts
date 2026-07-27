@@ -124,12 +124,44 @@ function toRemoteSnapshot(
   };
 }
 
-function snapshotToHashData(snapshot: RemoteSnapshot): Record<string, unknown> {
+/**
+ * The hash payload behind the O(1) sync skip. It must cover every column the
+ * sync writes from remote data, or a change confined to a missing column is
+ * silently swallowed: the hash matches, the row is skipped, nothing is
+ * persisted and no domain event fires. (issue #127)
+ *
+ * Covered: the whole `SNAPSHOT_DB_FIELDS` set, plus `homeTeamApiId` /
+ * `guestTeamApiId` (insert-only), `leagueId`, and the resolved `venueId`.
+ *
+ * Deliberately outside the payload:
+ * - `apiMatchId` — the identity the row is looked up by, constant by construction.
+ * - `venueApiId` — superseded by `venueId`, see below.
+ * - `homeQ5`–`guestQ8` — only an "achtel" match would fill them and
+ *   `extractPeriodScores` returns all-null for that format, so sync never writes them.
+ * - `currentRemoteVersion`, `currentLocalVersion`, `remoteDataHash`,
+ *   `lastRemoteSync`, `createdAt`, `updatedAt` — sync bookkeeping, not remote data
+ *   (hashing `remoteDataHash` would be self-referential).
+ * - `venueNameOverride`, `anschreiber`, `zeitnehmer`, `shotclock`,
+ *   `internalNotes`, `publicComment` — local-only columns the sync never touches.
+ *
+ * `venueId` is the *resolved internal* id (what actually lands in the column),
+ * not the raw `venueApiId`. Two reasons: the raw id is unrecoverable from the
+ * stored row, so it could not be preserved across a detail-fetch failure the way
+ * `PRESERVED_DETAIL_FIELDS` are and would flip the hash on every failed fetch
+ * (issue #49); and hashing the resolved id also catches the case where the venue
+ * only becomes mappable on a later run, which a remote-id hash would skip forever.
+ */
+function snapshotToHashData(
+  snapshot: RemoteSnapshot,
+  venueId: number | null,
+): Record<string, unknown> {
   return {
     matchNo: snapshot.matchNo,
     matchDay: snapshot.matchDay,
     kickoffDate: snapshot.kickoffDate,
     kickoffTime: snapshot.kickoffTime,
+    leagueId: snapshot.leagueId,
+    venueId,
     homeTeamApiId: snapshot.homeTeamApiId,
     guestTeamApiId: snapshot.guestTeamApiId,
     isConfirmed: snapshot.isConfirmed,
@@ -341,12 +373,22 @@ export async function syncMatchesFromData(
           details,
           existing,
         );
-        const newHash = computeEntityHash(snapshotToHashData(hashSnapshot));
-
         const apiVenueId = remoteSnapshot.venueApiId;
         const internalVenueId = apiVenueId
           ? (venueIdLookup.get(apiVenueId) ?? null)
           : null;
+
+        // The venue this run will actually persist: with details the remote value
+        // wins (an unmapped or cleared venue clears the column); without them the
+        // stored venue survives, exactly like PRESERVED_DETAIL_FIELDS. Hashing the
+        // resolved value keeps the hash equal to what is stored. (issues #49, #127)
+        const resolvedVenueId = details
+          ? internalVenueId
+          : (internalVenueId ?? existing?.venueId ?? null);
+
+        const newHash = computeEntityHash(
+          snapshotToHashData(hashSnapshot, resolvedVenueId),
+        );
 
         if (existing) {
           // Hash-based skip: O(1) comparison
@@ -388,7 +430,10 @@ export async function syncMatchesFromData(
               }
             }
 
-            // Handle special fields not in SNAPSHOT_DB_FIELDS
+            // Handle special fields not in SNAPSHOT_DB_FIELDS. Both are hashed
+            // (issue #127), so a change confined to either still reaches here.
+            // `venueId` repeats the `resolvedVenueId` rule against the locked
+            // re-read, the same way PRESERVED_DETAIL_FIELDS below prefer `locked`.
             updateSet.leagueId = remoteSnapshot.leagueId;
             updateSet.venueId = details
               ? internalVenueId
