@@ -10,6 +10,41 @@ import { getRedis } from "./redis";
 
 const SECONDARY_STORAGE_PREFIX = "ba:";
 
+/**
+ * The cookie domain that lets the API and the web app share a session, derived
+ * from `BETTER_AUTH_URL` rather than hardcoded. The literal `.app.hbdragons.de`
+ * that used to sit here was correct only as long as nobody moved the API: point
+ * `BETTER_AUTH_URL` at another host and every session cookie is scoped to a
+ * domain the browser will not send it back to, which reads as "signed out on
+ * every request" with nothing logged.
+ *
+ * The service label is dropped so `api.app.example.de` yields `.app.example.de`
+ * and the sibling web host sees the same cookie. Hosts with no parent to scope
+ * to — a bare `localhost`, an IP literal, an unparseable URL — return
+ * `undefined`, and the caller leaves cross-subdomain cookies off instead of
+ * emitting a domain the browser would reject.
+ */
+export function deriveCookieDomain(baseUrl: string): string | undefined {
+  let hostname: string;
+  try {
+    hostname = new URL(baseUrl).hostname;
+  } catch {
+    return undefined;
+  }
+
+  // `URL` keeps IPv6 literals bracketed; neither form has a parent domain.
+  if (hostname.startsWith("[") || /^\d+(\.\d+)*$/.test(hostname)) return undefined;
+
+  const labels = hostname.split(".").filter(Boolean);
+  if (labels.length < 2) return undefined;
+
+  const scope = labels.length > 2 ? labels.slice(1) : labels;
+  return `.${scope.join(".")}`;
+}
+
+const cookieDomain =
+  env.NODE_ENV === "production" ? deriveCookieDomain(env.BETTER_AUTH_URL) : undefined;
+
 export const auth = betterAuth({
   database: drizzleAdapter(getDb(), { provider: "pg" }),
   secret: env.BETTER_AUTH_SECRET,
@@ -98,10 +133,9 @@ export const auth = betterAuth({
     // header-size ceilings on Cloud Run / GCLB, and cookieCache decode flips
     // to null on the next request.
     cookiePrefix: "dragons",
-    crossSubDomainCookies:
-      env.NODE_ENV === "production"
-        ? { enabled: true, domain: ".app.hbdragons.de" }
-        : { enabled: false },
+    crossSubDomainCookies: cookieDomain
+      ? { enabled: true, domain: cookieDomain }
+      : { enabled: false },
     defaultCookieAttributes: {
       sameSite: "lax",
       httpOnly: true,

@@ -48,9 +48,12 @@ function attachErrorLogging(client: Redis, kind: string): Redis {
  * unreachable for a couple of reconnect attempts, so callers can fail open.
  */
 function createRequestRedisClient(): Redis {
-  return new Redis(env.REDIS_URL, {
-    maxRetriesPerRequest: REQUEST_MAX_RETRIES_PER_REQUEST,
-  });
+  return attachErrorLogging(
+    new Redis(env.REDIS_URL, {
+      maxRetriesPerRequest: REQUEST_MAX_RETRIES_PER_REQUEST,
+    }),
+    "request",
+  );
 }
 
 let _redis: Redis | undefined;
@@ -63,14 +66,16 @@ export function getRedis(): Redis {
     _redis.on("connect", () => {
       logger.info("Redis connected");
     });
-
-    _redis.on("error", (err) => {
-      logger.error({ err }, "Redis connection error");
-    });
   }
   return _redis;
 }
 
+/**
+ * Quit the shared request-path client. Called from the graceful-shutdown
+ * sequence after the HTTP server and the workers are done, so no in-flight
+ * request loses its Redis connection mid-command. Clients handed out by
+ * `createRedisClient()` belong to BullMQ and are closed by `shutdownWorkers`.
+ */
 export async function closeRedis(): Promise<void> {
   if (_redis) {
     await _redis.quit();

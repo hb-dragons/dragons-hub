@@ -10,7 +10,10 @@ const { env } = await import("./config/env");
 const { logger, flushLogger } = await import("./config/logger");
 
 const mode = env.RUN_MODE;
-const port = Number(process.env.PORT ?? 3001);
+// Both come from the validated schema. Reading `process.env.PORT` directly
+// bypassed the range check and turned a blank or malformed value into
+// `Number("")` === 0 — a listener on an arbitrary ephemeral port.
+const port = env.PORT;
 
 interface Closable {
   close(cb?: (err?: Error) => void): void;

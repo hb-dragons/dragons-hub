@@ -47,11 +47,12 @@ vi.mock("../config/logger", () => {
 const INSTANCE_ID = "MOCK_INSTANCE_ID";
 const mockStartHeartbeat = vi.fn();
 const mockStopHeartbeat = vi.fn();
-const mockIsInstanceAlive = vi.fn().mockResolvedValue(false);
+const mockFilterAliveInstances =
+  vi.fn<(ids: (string | null)[]) => Promise<Set<string>>>(async () => new Set());
 vi.mock("./instance-heartbeat", () => ({
   startHeartbeat: (...args: unknown[]) => mockStartHeartbeat(...args),
   stopHeartbeat: (...args: unknown[]) => mockStopHeartbeat(...args),
-  isInstanceAlive: (...args: unknown[]) => mockIsInstanceAlive(...args),
+  filterAliveInstances: (ids: (string | null)[]) => mockFilterAliveInstances(ids),
   INSTANCE_ID: "MOCK_INSTANCE_ID",
 }));
 
@@ -172,7 +173,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await resetTestDb(ctx);
   vi.clearAllMocks();
-  mockIsInstanceAlive.mockResolvedValue(false);
+  mockFilterAliveInstances.mockResolvedValue(new Set());
   mockDigestQueueGetRepeatableJobs.mockResolvedValue([]);
   mockTaskRemindersQueueGetRepeatableJobs.mockResolvedValue([]);
   mockDigestQueueAdd.mockResolvedValue({ id: "digest-job-1" });
@@ -320,9 +321,12 @@ describe("initializeWorkers", () => {
     // Not "running": must never be considered for reclaim.
     const pending = await seedRun({ status: "pending", ownerInstanceId: "dead-instance" });
     const completed = await seedRun({ status: "completed", ownerInstanceId: "dead-instance" });
-    mockIsInstanceAlive.mockResolvedValue(false);
+    mockFilterAliveInstances.mockResolvedValue(new Set());
 
     await initializeWorkers();
+
+    // One heartbeat probe for the whole reclaim, not one per candidate run.
+    expect(mockFilterAliveInstances).toHaveBeenCalledOnce();
 
     const rows = await runRows();
     for (const id of [dead1, dead2]) {
@@ -347,7 +351,7 @@ describe("initializeWorkers", () => {
 
   it("leaves a run owned by a live instance running (rolling deploy)", async () => {
     const live = await seedRun({ status: "running", ownerInstanceId: "live-instance" });
-    mockIsInstanceAlive.mockResolvedValue(true);
+    mockFilterAliveInstances.mockResolvedValue(new Set(["live-instance"]));
 
     await initializeWorkers();
 
@@ -365,7 +369,7 @@ describe("initializeWorkers", () => {
   it("reclaims only the dead owner's run when live and dead instances coexist", async () => {
     const dead = await seedRun({ status: "running", ownerInstanceId: "dead-instance" });
     const live = await seedRun({ status: "running", ownerInstanceId: "live-instance" });
-    mockIsInstanceAlive.mockImplementation(async (id: string | null) => id === "live-instance");
+    mockFilterAliveInstances.mockResolvedValue(new Set(["live-instance"]));
 
     await initializeWorkers();
 
@@ -376,6 +380,23 @@ describe("initializeWorkers", () => {
       { count: 1, ids: [dead] },
       "Marked stale running sync runs as failed",
     );
+    // The reclaim asks about owners, once, not about runs.
+    expect(mockFilterAliveInstances).toHaveBeenCalledOnce();
+    expect(mockFilterAliveInstances.mock.calls[0]![0]).toEqual([
+      "dead-instance",
+      "live-instance",
+    ]);
+  });
+
+  // A run written before owner_instance_id existed (or by a crash mid-insert)
+  // has no owner to probe, so nothing can vouch for it: reclaim it.
+  it("reclaims a running run with no owner instance", async () => {
+    const orphan = await seedRun({ status: "running", ownerInstanceId: null });
+    mockFilterAliveInstances.mockResolvedValue(new Set());
+
+    await initializeWorkers();
+
+    expect((await runRows()).find((r) => r.id === orphan)!.status).toBe("failed");
   });
 
   it("does not log warning when no stale runs found", async () => {

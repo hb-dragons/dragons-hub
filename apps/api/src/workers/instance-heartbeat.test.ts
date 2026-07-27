@@ -3,12 +3,20 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 // --- Mock setup ---
 
 const mockRedisSet = vi.fn().mockResolvedValue("OK");
-const mockRedisExists = vi.fn().mockResolvedValue(0);
+const mockPipelineExists = vi.fn();
+const mockPipelineExec = vi.fn<() => Promise<[Error | null, unknown][] | null>>(async () => []);
+const mockPipeline = vi.fn();
 
 vi.mock("../config/redis", () => ({
   getRedis: () => ({
     set: (...args: unknown[]) => mockRedisSet(...args),
-    exists: (...args: unknown[]) => mockRedisExists(...args),
+    pipeline: () => {
+      mockPipeline();
+      return {
+        exists: (...args: unknown[]) => mockPipelineExists(...args),
+        exec: () => mockPipelineExec(),
+      };
+    },
   }),
 }));
 
@@ -27,13 +35,14 @@ vi.mock("../config/logger", () => {
 import {
   INSTANCE_ID,
   writeHeartbeat,
-  isInstanceAlive,
+  filterAliveInstances,
   startHeartbeat,
   stopHeartbeat,
 } from "./instance-heartbeat";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockPipelineExec.mockImplementation(async () => []);
   // Ensure heartbeat timer is clean between tests
   stopHeartbeat();
 });
@@ -70,30 +79,67 @@ describe("writeHeartbeat", () => {
   });
 });
 
-describe("isInstanceAlive", () => {
-  it("returns false without calling redis when instanceId is null", async () => {
-    const result = await isInstanceAlive(null);
+describe("filterAliveInstances", () => {
+  it.each([[[]], [[null, null]]])(
+    "returns an empty set without touching redis for %j",
+    async (ids: (string | null)[]) => {
+      const alive = await filterAliveInstances(ids);
 
-    expect(result).toBe(false);
-    expect(mockRedisExists).not.toHaveBeenCalled();
+      expect(alive).toEqual(new Set());
+      expect(mockPipeline).not.toHaveBeenCalled();
+    },
+  );
+
+  it("probes every id in one pipelined round trip", async () => {
+    mockPipelineExec.mockResolvedValueOnce([
+      [null, 1],
+      [null, 0],
+    ]);
+
+    const alive = await filterAliveInstances(["a", "b"]);
+
+    expect(alive).toEqual(new Set(["a"]));
+    expect(mockPipeline).toHaveBeenCalledOnce();
+    expect(mockPipelineExec).toHaveBeenCalledOnce();
+    expect(mockPipelineExists.mock.calls).toEqual([["worker:hb:a"], ["worker:hb:b"]]);
   });
 
-  it("returns true when redis.exists returns 1", async () => {
-    mockRedisExists.mockResolvedValueOnce(1);
+  // One instance owns many runs; probing the same heartbeat key once per run
+  // is what made the boot-time reclaim N round trips in the first place.
+  it("deduplicates ids and drops nulls before probing", async () => {
+    mockPipelineExec.mockResolvedValueOnce([[null, 1]]);
 
-    const result = await isInstanceAlive("some-instance-id");
+    const alive = await filterAliveInstances(["a", "a", null]);
 
-    expect(result).toBe(true);
-    expect(mockRedisExists).toHaveBeenCalledWith("worker:hb:some-instance-id");
+    expect(alive).toEqual(new Set(["a"]));
+    expect(mockPipelineExists).toHaveBeenCalledOnce();
   });
 
-  it("returns false when redis.exists returns 0", async () => {
-    mockRedisExists.mockResolvedValueOnce(0);
+  // Marking a run failed is destructive. A probe we could not complete must
+  // not be read as "the owner is dead".
+  it("assumes alive when a probe errors", async () => {
+    mockPipelineExec.mockResolvedValueOnce([
+      [new Error("redis down"), null],
+      [null, 0],
+    ]);
 
-    const result = await isInstanceAlive("some-instance-id");
+    const alive = await filterAliveInstances(["a", "b"]);
 
-    expect(result).toBe(false);
-    expect(mockRedisExists).toHaveBeenCalledWith("worker:hb:some-instance-id");
+    expect(alive).toEqual(new Set(["a"]));
+  });
+
+  it("assumes alive when the pipeline returns no result for an id", async () => {
+    mockPipelineExec.mockResolvedValueOnce(null);
+
+    const alive = await filterAliveInstances(["a", "b"]);
+
+    expect(alive).toEqual(new Set(["a", "b"]));
+  });
+
+  it("propagates a pipeline-level failure", async () => {
+    mockPipelineExec.mockRejectedValueOnce(new Error("redis down"));
+
+    await expect(filterAliveInstances(["a"])).rejects.toThrow("redis down");
   });
 });
 

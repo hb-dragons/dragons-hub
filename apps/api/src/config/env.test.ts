@@ -197,6 +197,135 @@ describe("assistant env vars", () => {
   });
 });
 
+describe("boolean feature flags", () => {
+  const FLAGS = ["VERBOSE_ERRORS", "ASSISTANT_ENABLED", "CHATBOT_ENABLED"] as const;
+
+  // The schema used to accept only the literals "true"/"false". Terraform
+  // renders an unset variable as "", shells pass "1"/"0" — each of those failed
+  // the whole parse and the process refused to boot over an optional feature.
+  describe.each(FLAGS)("%s", (flag) => {
+    it.each([
+      ["true", true],
+      ["TRUE", true],
+      [" true ", true],
+      ["1", true],
+      ["yes", true],
+      ["on", true],
+      ["false", false],
+      ["0", false],
+      ["no", false],
+      ["off", false],
+      // Blank and absent both mean "unset" and fall back to the default.
+      ["", false],
+    ] as const)("parses %p as %p", (raw, expected) => {
+      const parsed = envSchema.parse({
+        ...baseEnv,
+        GOOGLE_GENERATIVE_AI_API_KEY: "k",
+        [flag]: raw,
+      });
+      expect(parsed[flag]).toBe(expected);
+    });
+
+    it("defaults to false when unset", () => {
+      const parsed = envSchema.parse(baseEnv);
+      expect(parsed[flag]).toBe(false);
+    });
+
+    // A typo must not read as "off": that would disable a feature silently.
+    it.each(["ture", "enabled", "2"])("rejects %p", (raw) => {
+      const result = envSchema.safeParse({ ...baseEnv, [flag]: raw });
+      expect(result.success).toBe(false);
+      expect(result.success ? [] : result.error.issues.map((i) => i.path.join("."))).toContain(
+        flag,
+      );
+    });
+  });
+
+  // CLAUDE.md's deployment contract: production Terraform omits these keys
+  // entirely rather than passing "", because an empty value is a broken deploy
+  // and not "leave the channel off". The tolerance above must not reach them.
+  it.each(["WAHA_BASE_URL", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"])(
+    "still rejects an empty %s",
+    (name) => {
+      expect(envSchema.safeParse({ ...baseEnv, [name]: "" }).success).toBe(false);
+    },
+  );
+});
+
+describe("PORT", () => {
+  it("parses a numeric port", () => {
+    expect(envSchema.parse({ ...baseEnv, PORT: "8080" }).PORT).toBe(8080);
+  });
+
+  // `Number("")` is 0, which binds an arbitrary ephemeral port and leaves the
+  // platform health check knocking on a port nothing listens on.
+  it.each([undefined, ""])("falls back to 3001 when PORT is %p", (value) => {
+    const raw = { ...baseEnv, ...(value === undefined ? {} : { PORT: value }) };
+    expect(envSchema.parse(raw).PORT).toBe(3001);
+  });
+
+  it.each(["0", "-1", "70000", "http", "3001.5"])("rejects %p", (value) => {
+    expect(envSchema.safeParse({ ...baseEnv, PORT: value }).success).toBe(false);
+  });
+});
+
+describe("env proxy", () => {
+  const ORIGINAL = { ...process.env };
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...ORIGINAL, ...baseEnv };
+    // The ambient environment may carry these; the assertions below pin the
+    // defaults, so start from "not set".
+    delete process.env.PORT;
+    delete process.env.VERBOSE_ERRORS;
+  });
+  afterEach(() => {
+    process.env = { ...ORIGINAL };
+  });
+
+  // With only a `get` trap the target is a bare `{}`, so `in`, `Object.keys`
+  // and spread all report an empty object — which reads as "not configured"
+  // at exactly the call sites that probe for configuration.
+  it("answers `in` from the parsed env", async () => {
+    const { env } = await import("./env");
+    expect("DATABASE_URL" in env).toBe(true);
+    expect("NOT_A_REAL_VAR" in env).toBe(false);
+  });
+
+  it("enumerates its keys", async () => {
+    const { env } = await import("./env");
+    const keys = Object.keys(env);
+    expect(keys).toContain("DATABASE_URL");
+    expect(keys).toContain("CHATBOT_ENABLED");
+    expect(keys).toEqual(Object.keys(envSchema.parse(process.env)));
+  });
+
+  it("spreads into a plain object", async () => {
+    const { env } = await import("./env");
+    const copy = { ...env };
+    expect(copy.DATABASE_URL).toBe(baseEnv.DATABASE_URL);
+    expect(copy.PORT).toBe(3001);
+    expect(copy.VERBOSE_ERRORS).toBe(false);
+  });
+
+  it("reports own property descriptors for parsed keys only", async () => {
+    const { env } = await import("./env");
+    expect(Object.getOwnPropertyDescriptor(env, "PORT")).toMatchObject({
+      value: 3001,
+      enumerable: true,
+      configurable: true,
+    });
+    expect(Object.getOwnPropertyDescriptor(env, "NOT_A_REAL_VAR")).toBeUndefined();
+  });
+
+  it("throws through every trap when the environment is invalid", async () => {
+    delete process.env.DATABASE_URL;
+    const { env } = await import("./env");
+    expect(() => "DATABASE_URL" in env).toThrow("Invalid environment variables");
+    expect(() => Object.keys(env)).toThrow("Invalid environment variables");
+  });
+});
+
 describe("CHATBOT_* env", () => {
   it("defaults CHATBOT_ENABLED=false and CHATBOT_MODEL=gemini-2.5-flash", () => {
     const parsed = envSchema.parse(baseEnv);
