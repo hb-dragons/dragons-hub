@@ -351,6 +351,8 @@ describe("syncMatchesFromData — create path", () => {
         matchDay: 1,
         kickoffDate: "2025-01-15",
         kickoffTime: "18:00",
+        leagueId: LEAGUE_DB_ID,
+        venueId: 500,
         homeTeamApiId: 10,
         guestTeamApiId: 20,
         isConfirmed: true,
@@ -820,8 +822,6 @@ describe("syncMatchesFromData — update path", () => {
     const result = await syncMatchesFromData(
       [
         makeLeagueData({
-          // venueApiId is not part of the hash, so a hashed field has to move as
-          // well for the update path to run at all — see the "venue-only" test below.
           spielplan: [makeBasicMatch({ matchNo: 42 })],
           gameDetails: new Map([[API_MATCH_ID, makeGameDetails({ spielfeldId: 60 })]]),
         }),
@@ -836,8 +836,12 @@ describe("syncMatchesFromData — update path", () => {
     expect(venueChange).toMatchObject({ oldValue: "500", newValue: "600" });
   });
 
-  it("skips a venue-only change, because venueApiId is outside the hashed field set", async () => {
+  // Regression for issue #127: the venue used to sit outside the hashed field set,
+  // so the O(1) skip fired before the venue diff was ever computed and a federation
+  // venue move was silently dropped until some other hashed field happened to change.
+  it("detects and persists a venue-only change", async () => {
     const created = await seedMatch();
+    expect(created.venueId).toBe(500);
 
     const result = await syncMatchesFromData(
       [
@@ -849,12 +853,105 @@ describe("syncMatchesFromData — update path", () => {
       2,
     );
 
-    // Documents current behaviour: `snapshotToHashData` omits venueApiId, so the
-    // O(1) hash skip fires before the venue diff is ever computed and the moved
-    // venue is not persisted until some hashed field also changes.
+    expect(result.updated).toBe(1);
+    expect(result.skipped).toBe(0);
+
+    const row = await matchRow();
+    expect(row.venueId).toBe(600);
+    expect(row.currentRemoteVersion).toBe(2);
+    expect(row.remoteDataHash).not.toBe(created.remoteDataHash);
+
+    expect((await changeRows()).map((c) => c.fieldName)).toEqual(["venueId"]);
+    expect((await versionRows()).map((v) => v.versionNumber)).toEqual([1, 2]);
+  });
+
+  it("emits match.venue.changed for a venue-only change", async () => {
+    const created = await seedMatch();
+
+    await syncMatchesFromData(
+      [
+        makeLeagueData({
+          gameDetails: new Map([[API_MATCH_ID, makeGameDetails({ spielfeldId: 60 })]]),
+        }),
+      ],
+      VENUE_LOOKUP,
+      2,
+    );
+
+    expect(publishedEventTypes()).toEqual(["match.venue.changed"]);
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "match.venue.changed",
+        entityId: created.id,
+        payload: expect.objectContaining({ oldVenueId: 500, newVenueId: 600 }),
+      }),
+      expect.objectContaining({ insert: expect.any(Function) }),
+    );
+  });
+
+  it("persists the venue once an unmapped venue becomes mappable", async () => {
+    // Venue 70 exists remotely but has no row yet, so the first run stores null.
+    const created = await seedMatch(
+      makeLeagueData({
+        gameDetails: new Map([[API_MATCH_ID, makeGameDetails({ spielfeldId: 70 })]]),
+      }),
+    );
+    expect(created.venueId).toBeNull();
+
+    await ctx.db.insert(venues).values({ id: 700, apiId: 70, name: "Hall 70" });
+
+    // Nothing about the remote payload moved — only the lookup gained the venue.
+    const result = await syncMatchesFromData(
+      [
+        makeLeagueData({
+          gameDetails: new Map([[API_MATCH_ID, makeGameDetails({ spielfeldId: 70 })]]),
+        }),
+      ],
+      new Map([...VENUE_LOOKUP, [70, 700]]),
+      2,
+    );
+
+    expect(result.updated).toBe(1);
+    expect((await matchRow()).venueId).toBe(700);
+  });
+
+  it("detects and persists a league-only change", async () => {
+    const created = await seedMatch();
+    await ctx.db.insert(leagues).values({
+      id: 11,
+      apiLigaId: 2,
+      ligaNr: 2,
+      name: "Kreisliga",
+      seasonId: 2025,
+      seasonName: "2025/26",
+    });
+
+    // Same match, same payload, now reported under a different league.
+    await syncMatchesFromData(
+      [makeLeagueData({ leagueApiId: 2, leagueDbId: 11, leagueName: "Kreisliga" })],
+      VENUE_LOOKUP,
+      2,
+    );
+
+    const row = await matchRow();
+    expect(row.leagueId).toBe(11);
+    expect(row.remoteDataHash).not.toBe(created.remoteDataHash);
+  });
+
+  it("does not flip the hash when the detail fetch produced nothing", async () => {
+    // The venue is hashed as the resolved internal id, so a detail-fetch failure
+    // (which drops venueApiId to null) must not disturb the O(1) skip. (issue #49)
+    await seedMatch();
+
+    const result = await syncMatchesFromData(
+      [makeLeagueData({ gameDetails: new Map() })],
+      VENUE_LOOKUP,
+      2,
+    );
+
     expect(result.skipped).toBe(1);
     expect(result.updated).toBe(0);
-    expect((await matchRow()).venueId).toBe(created.venueId);
+    expect(await versionRows()).toHaveLength(1);
   });
 
   it("clears venueId when details are present but carry no venue", async () => {

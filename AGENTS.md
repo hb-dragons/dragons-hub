@@ -289,6 +289,19 @@ nothing. `syncRuns.ownerInstanceId` stamps the worker instance that owns the run
 
 Each entity computes a SHA-256 hash from its data fields (see `services/sync/hash.ts`). The hash is stored in a `dataHash` column. During sync, the new hash is compared to the stored one - if identical, the entity is skipped.
 
+The hash payload must cover **every column that sync writes from remote data**. A
+column left out of the payload can change upstream without moving the hash, so
+the row is skipped, the new value is never persisted and no domain event fires —
+silently. `matches` lost venue changes this way until issue #127; the reasoning
+for every field in and out of the payload is documented on `snapshotToHashData`
+in `services/sync/matches.sync.ts`.
+
+Changing a payload's shape invalidates every stored hash of that entity. No
+migration is needed — the next sync recomputes and rewrites them. That one run
+takes the update path for every row instead of the O(1) skip; for `matches` the
+write is still gated on `computeEffectiveChanges`, so a rehash on its own creates
+no version rows, no audit rows and no notifications.
+
 ### SyncLogger
 
 Real-time logging via `services/sync/sync-logger.ts`:
