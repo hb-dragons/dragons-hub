@@ -121,7 +121,14 @@ const KITCHEN_SINK_PAYLOAD: Record<string, unknown> = {
   eventId: "evt_1",
 };
 
-function renderedDeepLinks(extra: Record<string, unknown>): { eventType: string; link: string }[] {
+interface Rendered {
+  eventType: string;
+  link: string;
+  title: string;
+  body: string;
+}
+
+function renderedPushes(extra: Record<string, unknown>): Rendered[] {
   return declaredEventTypes().flatMap((eventType) =>
     (["de", "en"] as const).map((locale) => {
       const out = renderPushTemplate({
@@ -131,7 +138,12 @@ function renderedDeepLinks(extra: Record<string, unknown>): { eventType: string;
         eventId: "evt_1",
       });
       expect(out, `no push template rendered for ${eventType}`).not.toBeNull();
-      return { eventType, link: String(out!.data["deepLink"]) };
+      return {
+        eventType,
+        link: String(out!.data["deepLink"]),
+        title: out!.title,
+        body: out!.body,
+      };
     }),
   );
 }
@@ -181,7 +193,7 @@ describe("push deep links resolve to declared expo-router routes", () => {
   });
 
   it("every rendered push deep link matches a declared route", () => {
-    const rendered = renderedDeepLinks({});
+    const rendered = renderedPushes({});
     expect(rendered.length).toBeGreaterThan(0);
     for (const { eventType, link } of rendered) {
       expect(
@@ -192,7 +204,7 @@ describe("push deep links resolve to declared expo-router routes", () => {
   });
 
   it("stays valid when the event payload carries its own deep link", () => {
-    for (const { eventType, link } of renderedDeepLinks({ deepLink: "/referee-game/55" })) {
+    for (const { eventType, link } of renderedPushes({ deepLink: "/referee-game/55" })) {
       expect(
         matchesDeclaredRoute(link),
         `${eventType} emitted deepLink "${link}", which matches no route in apps/native/src/app`,
@@ -201,14 +213,43 @@ describe("push deep links resolve to declared expo-router routes", () => {
   });
 
   it("stays valid when optional payload ids are missing", () => {
-    // NB: this asserts route *shape* only. `/game/undefined` is shape-valid and
-    // is what the match templates emit today when the emitter omits `matchId`
-    // (see match-admin.service.ts) — tracked separately, not this test's job.
-    for (const { eventType, link } of renderedDeepLinks({ matchId: null, deepLink: null })) {
+    for (const { eventType, link } of renderedPushes({ matchId: null, deepLink: null })) {
       expect(
         matchesDeclaredRoute(link),
         `${eventType} emitted deepLink "${link}", which matches no route in apps/native/src/app`,
       ).toBe(true);
+    }
+  });
+
+  // This assertion covers every template, not a subset. It was narrowed once,
+  // when `match.cancelled` and `match.schedule.changed` rendered "/game/undefined"
+  // from payloads no emit site published (#101, #124) — narrowing it is how that
+  // stayed invisible. A template that cannot fill a field must shorten its
+  // sentence or fall back to a valid route, never stringify the gap.
+  it.each([
+    ["complete payload", {}],
+    ["missing optional ids", { matchId: null, deepLink: null }],
+    // Everything the canonical schemas mark optional/nullable. (`kickoffDate`
+    // and `kickoffTime` stay: `referee.slots.*` is contracted to carry them,
+    // and the match templates' kickoff-less paths are covered by
+    // match-push-contract.test.ts.)
+    ["nothing but the required fields", {
+      matchId: undefined,
+      deepLink: undefined,
+      reminderLevel: undefined,
+      reason: undefined,
+      venueName: undefined,
+      leagueId: undefined,
+      changes: undefined,
+    }],
+  ])("renders no 'undefined' or 'null' with a %s", (_case, extra) => {
+    const rendered = renderedPushes(extra);
+    expect(rendered.length).toBeGreaterThan(0);
+    for (const { eventType, link, title, body } of rendered) {
+      for (const [field, value] of [["deepLink", link], ["title", title], ["body", body]] as const) {
+        expect(value, `${eventType} rendered "${value}" into its ${field}`).not.toContain("undefined");
+        expect(value, `${eventType} rendered "${value}" into its ${field}`).not.toContain("null");
+      }
     }
   });
 

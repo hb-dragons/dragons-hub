@@ -33,6 +33,9 @@ const matchScheduleChangedSchema = z.object({
   teamIds: z.array(z.number()),
   changes: z.array(fieldChangeSchema),
   kickoffDate: z.string().optional(),
+  // Local `matches.id`, so a push can deep-link to /game/:id. Nullish because
+  // the federation-sync path does not always have a persisted row to point at.
+  matchId: z.number().nullish(),
 });
 
 const matchVenueChangedSchema = z.object({
@@ -48,6 +51,10 @@ const matchVenueChangedSchema = z.object({
   newVenueName: z.string().nullable(),
 });
 
+// match.cancelled / match.forfeited / match.removed. Not `.passthrough()`: an
+// index signature would make `keyof` this payload `string`, so every field name
+// a consumer invents would type-check against it and the push-template contract
+// in `templates/push/index.ts` would be inert.
 const matchOutcomeSchema = z.object({
   matchNo: z.number(),
   homeTeam: z.string(),
@@ -56,7 +63,12 @@ const matchOutcomeSchema = z.object({
   leagueId: z.number().nullish(),
   teamIds: z.array(z.number()),
   reason: z.string().nullish(),
-}).passthrough();
+  // Local `matches.id` plus the kickoff the outcome applies to. Nullish because
+  // not every producer has them (referee-games.sync may have no linked match).
+  matchId: z.number().nullish(),
+  kickoffDate: z.string().nullish(),
+  kickoffTime: z.string().nullish(),
+});
 
 const matchScoreChangedSchema = z.object({
   matchNo: z.number(),
@@ -278,7 +290,10 @@ const taskDueReminderSchema = z.object({
   assigneeUserIds: z.array(z.string()),
 });
 
-const eventPayloadSchemas: Record<EventType, z.ZodType> = {
+// `satisfies` rather than a `Record<EventType, z.ZodType>` annotation: the
+// annotation erases each entry's own schema type, and `EventPayload` below needs
+// the per-event inference to stay intact.
+const eventPayloadSchemas = {
   [EVENT_TYPES.MATCH_CREATED]: matchCreatedSchema,
   [EVENT_TYPES.MATCH_SCHEDULE_CHANGED]: matchScheduleChangedSchema,
   [EVENT_TYPES.MATCH_VENUE_CHANGED]: matchVenueChangedSchema,
@@ -305,7 +320,24 @@ const eventPayloadSchemas: Record<EventType, z.ZodType> = {
   [EVENT_TYPES.TASK_UNASSIGNED]: taskUnassignedSchema,
   [EVENT_TYPES.TASK_COMMENT_ADDED]: taskCommentAddedSchema,
   [EVENT_TYPES.TASK_DUE_REMINDER]: taskDueReminderSchema,
-};
+} satisfies Record<EventType, z.ZodType>;
+
+/**
+ * The payload shape a producer of `E` is contracted to publish — inferred from
+ * the same schema `validateEventPayload` checks at publish time, so a consumer
+ * (push template, notification template, admin UI) that names a field no
+ * producer sends is a compile error rather than an `undefined` in a user-facing
+ * message. See the push-template contract in
+ * `apps/api/src/services/notifications/templates/push/index.ts`.
+ */
+export type EventPayload<E extends EventType> = z.infer<(typeof eventPayloadSchemas)[E]>;
+
+/**
+ * Referee slot payload. Named separately because the emit sites
+ * (`referee-games.sync.ts`, `referee-reminder.worker.ts`) annotate the object
+ * they build with it, which is what makes the producer side schema-checked.
+ */
+export type RefereeSlotsPayload = EventPayload<typeof EVENT_TYPES.REFEREE_SLOTS_NEEDED>;
 
 export interface PayloadValidation {
   valid: boolean;

@@ -18,7 +18,6 @@ export interface RefereeSlotsPushPayload {
   sr1Assigned: string | null;
   sr2Assigned: string | null;
   reminderLevel?: number;
-  eventId: string;
 }
 
 /**
@@ -43,7 +42,8 @@ export function renderRefereeSlotsPush(
     data: {
       deepLink: refereeSlotsDeepLink(p),
       eventType: variant === "needed" ? "referee.slots.needed" : "referee.slots.reminder",
-      eventId: p.eventId,
+      // `eventId` is injected by renderPushTemplate — it lives on the dispatch
+      // envelope, not in the payload, and no emit site publishes it.
       matchId: p.matchId,
     },
   };

@@ -64,6 +64,8 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { EVENT_TYPES, validateEventPayload } from "@dragons/shared";
+import { renderPushTemplate } from "../notifications/templates/push";
 
 let ctx: TestDbContext;
 
@@ -1260,6 +1262,38 @@ describe("classifyMatchChanges via syncMatchesFromData", () => {
     );
 
     expect(publishedEventTypes()).toContain(expected);
+  });
+
+  it("publishes a match.cancelled payload the push template can render", async () => {
+    const created = await seedMatch();
+
+    await syncMatchesFromData(
+      [makeLeagueData({ spielplan: [makeBasicMatch({ abgesagt: true })] })],
+      VENUE_LOOKUP,
+      2,
+    );
+
+    const call = mockPublishDomainEvent.mock.calls.find(
+      (c: unknown[]) => (c[0] as Record<string, unknown>).type === "match.cancelled",
+    );
+    const payload = (call![0] as { payload: Record<string, unknown> }).payload;
+    // The template deep-links to /game/:id and names the kickoff. Without these
+    // it rendered "/game/undefined" and threw out of dispatch (#124).
+    expect(payload).toMatchObject({
+      matchId: created.id,
+      kickoffDate: "2025-01-15",
+      kickoffTime: "18:00",
+    });
+    expect(validateEventPayload(EVENT_TYPES.MATCH_CANCELLED, payload).issues ?? []).toEqual([]);
+
+    const push = renderPushTemplate({
+      eventType: EVENT_TYPES.MATCH_CANCELLED,
+      payload,
+      locale: "de",
+      eventId: "evt_1",
+    });
+    expect(push!.data.deepLink).toBe(`/game/${created.id}`);
+    expect(push!.body).not.toContain("undefined");
   });
 
   it("emits match.result_entered when the score goes from null to a value", async () => {
