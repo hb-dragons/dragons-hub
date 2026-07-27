@@ -46,10 +46,10 @@ vi.mock("../referee/referee-reminders.service", () => ({
 }));
 
 const mockFetchOffeneSpiele = vi.fn();
-vi.mock("./referee-sdk-client", () => ({
-  createRefereeSdkClient: () => ({
+vi.mock("./sdk-client", () => ({
+  sdkClient: {
     fetchOffeneSpiele: () => mockFetchOffeneSpiele(),
-  }),
+  },
 }));
 
 const mockGetClubConfig = vi.fn();

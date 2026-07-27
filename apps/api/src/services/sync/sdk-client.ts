@@ -27,6 +27,9 @@ import type {
   SdkSubmitPayload,
   SdkSubmitSlotPayload,
   SdkSubmitResponse,
+  SdkOffeneSpielResult,
+  SdkOffeneSpieleResponse,
+  SdkOpenGamesSearchParams,
 } from "@dragons/sdk";
 
 const BASE_URL = "https://www.basketball-bund.net";
@@ -238,6 +241,32 @@ export class SdkClient {
     ansetzenVerein: null,
     aufhebenVerein: null,
     ansetzenFuerSpiel: 0,
+  };
+
+  private static readonly OFFENE_SPIELE_PAGE_SIZE = 200;
+
+  /**
+   * Upper bound on `/rest/offenespiele/search` pages per call. A federation
+   * response whose `total` never agrees with the rows it hands back would
+   * otherwise loop forever against basketball-bund.net. At 200 rows a page this
+   * caps one fetch at 10,000 games, far above any real club's open-game feed.
+   */
+  private static readonly OFFENE_SPIELE_MAX_PAGES = 50;
+
+  private static readonly OFFENE_SPIELE_SEARCH_BASE: Omit<
+    SdkOpenGamesSearchParams,
+    "datum" | "pageFrom"
+  > = {
+    ats: null,
+    ligaKurz: null,
+    pageSize: SdkClient.OFFENE_SPIELE_PAGE_SIZE,
+    sortBy: "sp.spieldatum",
+    sortOrder: "asc",
+    spielStatus: "ALLE",
+    srName: null,
+    vereinsDelegation: "ALLE",
+    vereinsSpiele: "VEREIN",
+    zeitraum: "all",
   };
 
   private static readonly SLOT_KEY_MAP = {
@@ -628,6 +657,91 @@ export class SdkClient {
       3,
       `submitRefereeUnassignment(${spielplanId}, slot=${slotNumber})`,
     );
+  }
+
+  private async fetchOffeneSpielePage(
+    pageFrom: number,
+  ): Promise<SdkOffeneSpieleResponse> {
+    await this.rateLimiter.acquire();
+
+    const path = "/rest/offenespiele/search";
+    const payload: SdkOpenGamesSearchParams = {
+      ...SdkClient.OFFENE_SPIELE_SEARCH_BASE,
+      datum: "2000-01-01T00:00:00.000Z",
+      pageFrom,
+    };
+    const init: RequestInit = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    };
+
+    return withRetry(
+      async () => {
+        const res = await this.refereeAuthClient.authenticatedFetch(path, init);
+        if (res.status === 401 || res.status === 403) {
+          await this.refereeAuthClient.login();
+          const retry = await this.refereeAuthClient.authenticatedFetch(
+            path,
+            init,
+          );
+          if (!retry.ok)
+            throw new Error(`offenespiele search failed: ${retry.status}`);
+          return retry.json() as Promise<SdkOffeneSpieleResponse>;
+        }
+        if (!res.ok)
+          throw new Error(`offenespiele search failed: ${res.status}`);
+        return res.json() as Promise<SdkOffeneSpieleResponse>;
+      },
+      3,
+      `fetchOffeneSpiele(pageFrom=${pageFrom})`,
+    );
+  }
+
+  /**
+   * Every open game the referee account can see, paged out of
+   * `/rest/offenespiele/search`. Inert without referee credentials — the
+   * referee auth client falls back to the main SDK account, and that account
+   * must not silently stand in for the referee one.
+   */
+  async fetchOffeneSpiele(): Promise<SdkOffeneSpieleResponse> {
+    if (!env.REFEREE_SDK_USERNAME || !env.REFEREE_SDK_PASSWORD) {
+      log.info(
+        "Referee SDK credentials not configured, skipping offenespiele fetch",
+      );
+      return { total: 0, results: [] };
+    }
+
+    await this.ensureRefereeAuthenticated();
+
+    const results: SdkOffeneSpielResult[] = [];
+    let total = 0;
+
+    for (let page = 0; page < SdkClient.OFFENE_SPIELE_MAX_PAGES; page++) {
+      const body = await this.fetchOffeneSpielePage(
+        page * SdkClient.OFFENE_SPIELE_PAGE_SIZE,
+      );
+      if (page === 0) total = body?.total ?? 0;
+
+      const pageResults = body?.results ?? [];
+      if (pageResults.length === 0) break;
+
+      results.push(...pageResults);
+      if (results.length >= total) break;
+    }
+
+    if (results.length < total) {
+      log.warn(
+        {
+          fetched: results.length,
+          total,
+          maxPages: SdkClient.OFFENE_SPIELE_MAX_PAGES,
+        },
+        "offenespiele pagination stopped before the reported total was reached",
+      );
+    }
+
+    return { total, results };
   }
 
   logout(): void {
