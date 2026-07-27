@@ -23,8 +23,6 @@ const SKIP_DIRS = new Set([
  * a follow-up noted in the issue.
  */
 const UNTESTED_PACKAGE_EXEMPTIONS = {
-  "@dragons/db":
-    "Drizzle table/column declarations with no runtime branching. Exercised end to end by @dragons/api's PGlite integration suite, which builds every table from this schema and runs real SQL against it.",
   "@dragons/ui":
     "Vendored shadcn/Radix primitives re-exported unmodified. Behaviour that matters is asserted where the components are composed, in @dragons/web's component tests; testing the wrappers here would assert Radix's behaviour, not ours.",
 };
