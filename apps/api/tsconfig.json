@@ -11,7 +11,8 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
-    "vitest.setup.ts"
+    "vitest.setup.ts",
+    "vitest.global-setup.ts"
   ],
   "exclude": [
     "dist",
