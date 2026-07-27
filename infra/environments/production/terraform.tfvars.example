@@ -48,6 +48,19 @@ mcp_token = "your-mcp-token-at-least-32-characters-long"
 waha_base_url = "https://waha.dragons.example.com"
 waha_session  = "default"
 
+# Email notifications (SMTP). Host/port/user/from are relay coordinates, not
+# credentials, so they ride in Cloud Run env_vars on the API and the Worker;
+# only smtp_password goes to Secret Manager. Leave smtp_host empty to keep
+# email delivery disabled — every SMTP_* key and the password secret are then
+# omitted, and the provider endpoint stops offering the channel.
+# In CI: vars.SMTP_HOST / vars.SMTP_PORT / vars.SMTP_USER / vars.SMTP_FROM and
+# secrets.SMTP_PASSWORD.
+smtp_host     = ""
+smtp_port     = 587
+smtp_user     = "noreply@dragons.example.com"
+smtp_from     = "Dragons <noreply@dragons.example.com>"
+smtp_password = ""
+
 # Expo Push access token — optional. Upgrades push to the authenticated send
 # tier (higher rate limits, better receipt SLA). Credential, so it is stored in
 # Secret Manager and mounted on the API and the Worker. Leave empty to stay on

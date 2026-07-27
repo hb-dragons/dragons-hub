@@ -117,6 +117,42 @@ variable "waha_session" {
   default     = "default"
 }
 
+variable "smtp_host" {
+  description = "SMTP relay host (SMTP_HOST) for the email notification channel. Not a credential, so it rides in env_vars. Leave empty to leave email delivery disabled: every SMTP_* key, and the smtp-password secret, is then omitted entirely rather than passed through as \"\", which the API env schema rejects at boot."
+  type        = string
+  default     = ""
+}
+
+variable "smtp_port" {
+  description = "SMTP relay port (SMTP_PORT). 465 uses implicit TLS; anything else upgrades via STARTTLS. Only meaningful when smtp_host is set."
+  type        = number
+  default     = 587
+
+  validation {
+    condition     = var.smtp_port > 0 && var.smtp_port <= 65535
+    error_message = "smtp_port must be a valid TCP port."
+  }
+}
+
+variable "smtp_user" {
+  description = "SMTP username (SMTP_USER). Only meaningful when smtp_host is set."
+  type        = string
+  default     = ""
+}
+
+variable "smtp_from" {
+  description = "From header for notification email (SMTP_FROM), e.g. \"Dragons <noreply@example.de>\". Only meaningful when smtp_host is set."
+  type        = string
+  default     = ""
+}
+
+variable "smtp_password" {
+  description = "SMTP password (SMTP_PASSWORD). The only credential in the set, so it is stored in Secret Manager rather than env_vars. Ignored when smtp_host is empty; the secret is then not created at all."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "expo_access_token" {
   description = "Expo access token (EXPO_ACCESS_TOKEN). Upgrades Expo Push to the authenticated send tier (higher rate limits, better receipt SLA). Credential, so it is stored in Secret Manager. Optional: empty means the secret is not created and push stays on the unauthenticated tier."
   type        = string

@@ -129,10 +129,10 @@ describe("createWatchRuleSchema", () => {
     expect(result.channels[0]!.channel).toBe(channel);
   });
 
-  it("rejects an email channel target (no adapter exists)", () => {
+  it("rejects a channel target the shared list does not name", () => {
     const result = createWatchRuleSchema.safeParse({
       ...validBody,
-      channels: [{ channel: "email", targetId: "1" }],
+      channels: [{ channel: "carrier_pigeon", targetId: "1" }],
     });
     expect(result.success).toBe(false);
   });

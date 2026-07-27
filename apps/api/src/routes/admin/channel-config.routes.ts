@@ -21,6 +21,7 @@ import type { ChannelConfigUpdateBodyParsed } from "@dragons/contracts";
 import { CHANNEL_TYPES } from "@dragons/shared";
 import type { ProviderAvailability } from "@dragons/shared";
 import { env } from "../../config/env";
+import { readSmtpSettings } from "../../services/notifications/channels/smtp-settings";
 
 const channelConfigRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
@@ -35,6 +36,11 @@ function isProviderConfigured(type: string): boolean {
       return true;
     case "whatsapp_group":
       return !!env.WAHA_BASE_URL;
+    case "email":
+      // All five or nothing — `readSmtpSettings()` in the adapter applies the
+      // same rule, so the endpoint never advertises a relay the adapter would
+      // then refuse to use.
+      return readSmtpSettings() !== null;
     default:
       return false;
   }

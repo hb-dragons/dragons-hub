@@ -66,6 +66,15 @@ vi.mock("./channels/push", () => ({
   },
 }));
 
+const mockEmailSend = vi.fn().mockResolvedValue({ success: true });
+vi.mock("./channels/email", () => ({
+  EmailChannelAdapter: class {
+    send(...args: unknown[]) {
+      return mockEmailSend(...args);
+    }
+  },
+}));
+
 vi.mock("./expo-push.client", () => ({
   ExpoPushClient: class {
     constructor() {}
@@ -153,6 +162,7 @@ beforeEach(async () => {
   });
   mockInAppSend.mockResolvedValue({ success: true });
   mockPushSend.mockResolvedValue({ success: true });
+  mockEmailSend.mockResolvedValue({ success: true });
   mockWhatsAppSend.mockResolvedValue({ success: true });
   mockRenderRefereeSlotsWhatsApp.mockReturnValue("*Referee slots message*");
   mockResolveRecipientUserIds.mockResolvedValue([]);
@@ -1148,6 +1158,66 @@ describe("processEvent", () => {
       const result = await processEvent(await seedEvent());
 
       expect(mockPushSend).toHaveBeenCalledTimes(1);
+      expect(result.dispatched).toBe(0);
+    });
+  });
+
+  describe("email channel dispatch", () => {
+    async function setupEmail() {
+      await seedRule({ channels: [{ channel: "email", targetId: "10" }] });
+      await seedConfig({ id: 10, type: "email", config: { locale: "de" } });
+      ruleMatches([{ channel: "email", targetId: "10" }], "immediate");
+    }
+
+    it("dispatches via the email adapter with the resolved user ids and rendered message", async () => {
+      await setupEmail();
+      mockResolveRecipientUserIds.mockResolvedValueOnce(["user-abc"]);
+
+      const result = await processEvent(await seedEvent());
+
+      expect(mockEmailSend).toHaveBeenCalledTimes(1);
+      expect(mockEmailSend).toHaveBeenCalledWith({
+        eventId: "evt-1",
+        watchRuleId: 1,
+        channelConfigId: 10,
+        recipientUserIds: ["user-abc"],
+        title: "Match Cancelled",
+        body: "The match has been cancelled.",
+        locale: "de",
+        link: "http://localhost:3000/admin/matches/42",
+      });
+      expect(result.dispatched).toBe(1);
+    });
+
+    it("omits the call to action when the event carries no deep link", async () => {
+      await setupEmail();
+      mockResolveRecipientUserIds.mockResolvedValueOnce(["user-abc"]);
+
+      await processEvent(await seedEvent({ deepLinkPath: "" }));
+
+      expect(mockEmailSend).toHaveBeenCalledWith(
+        expect.objectContaining({ link: undefined }),
+      );
+    });
+
+    it("skips email dispatch when the recipient resolves to no users", async () => {
+      await setupEmail();
+      mockResolveRecipientUserIds.mockResolvedValueOnce([]);
+
+      const result = await processEvent(await seedEvent());
+
+      expect(mockEmailSend).not.toHaveBeenCalled();
+      expect(result.dispatched).toBe(0);
+    });
+
+    it("counts a failed email send as not dispatched", async () => {
+      await setupEmail();
+      mockResolveRecipientUserIds.mockResolvedValueOnce(["user-xyz"]);
+      mockEmailSend.mockResolvedValueOnce({ success: false });
+
+      const result = await processEvent(await seedEvent());
+
+      expect(mockEmailSend).toHaveBeenCalledTimes(1);
       expect(result.dispatched).toBe(0);
     });
   });

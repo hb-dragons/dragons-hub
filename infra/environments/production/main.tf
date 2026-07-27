@@ -137,6 +137,28 @@ locals {
   # so the secret is omitted rather than created empty (Secret Manager rejects
   # an empty payload, and the API env schema rejects "" for EXPO_ACCESS_TOKEN).
   expo_access_token_enabled = var.expo_access_token != ""
+
+  # Email delivery. `smtp_host` is the single switch for the whole set: the API
+  # env schema requires all five SMTP_* vars together (readSmtpSettings() treats
+  # a partial set as "not configured") and rejects "" for each of them, so the
+  # keys are omitted entirely rather than passed through empty — the same
+  # precedent as WAHA_BASE_URL above.
+  smtp_enabled = var.smtp_host != ""
+
+  smtp_env_vars = local.smtp_enabled ? {
+    SMTP_HOST = var.smtp_host
+    SMTP_PORT = tostring(var.smtp_port)
+    SMTP_USER = var.smtp_user
+    SMTP_FROM = var.smtp_from
+  } : {}
+
+  # Only the password is a credential; the rest are relay coordinates.
+  smtp_secrets = local.smtp_enabled ? {
+    SMTP_PASSWORD = {
+      secret_name = "smtp-password-production"
+      version     = "latest"
+    }
+  } : {}
 }
 
 # Network
@@ -212,7 +234,8 @@ module "secrets" {
     "scoreboard-ingest-key-production",
     "google-generative-ai-api-key-production",
     "mcp-token-production",
-  ], local.expo_access_token_enabled ? ["expo-access-token-production"] : [])
+    ], local.expo_access_token_enabled ? ["expo-access-token-production"] : [],
+  local.smtp_enabled ? ["smtp-password-production"] : [])
   secret_values = merge({
     "database-url-production"                 = module.database.database_url
     "redis-url-production"                    = module.valkey.connection_url
@@ -226,6 +249,8 @@ module "secrets" {
     "mcp-token-production"                    = var.mcp_token
     }, local.expo_access_token_enabled ? {
     "expo-access-token-production" = var.expo_access_token
+    } : {}, local.smtp_enabled ? {
+    "smtp-password-production" = var.smtp_password
   } : {})
 
   depends_on = [google_project_service.apis]
@@ -276,7 +301,10 @@ module "api" {
     }, var.waha_base_url == "" ? {} : {
     WAHA_BASE_URL = var.waha_base_url
     WAHA_SESSION  = var.waha_session
-  })
+    # Email delivery. The API needs these for the same reason it needs WAHA:
+    # the admin test-send and "retry failed notification" routes dispatch
+    # through the same pipeline. Gated as one set on smtp_host — see locals.
+  }, local.smtp_env_vars)
 
   secrets = merge({
     DATABASE_URL = {
@@ -324,7 +352,7 @@ module "api" {
       secret_name = "expo-access-token-production"
       version     = "latest"
     }
-  } : {})
+  } : {}, local.smtp_secrets)
 
   cloudsql_instances = [module.database.connection_name]
   ingress            = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
@@ -375,7 +403,10 @@ module "worker" {
     }, var.waha_base_url == "" ? {} : {
     WAHA_BASE_URL = var.waha_base_url
     WAHA_SESSION  = var.waha_session
-  })
+    # Email delivery. This is the service that runs the event worker, so without
+    # these every email notification logs "SMTP is not configured" and is
+    # dropped. Gated as one set on smtp_host — see locals.
+  }, local.smtp_env_vars)
 
   secrets = merge({
     DATABASE_URL = {
@@ -419,7 +450,7 @@ module "worker" {
       secret_name = "expo-access-token-production"
       version     = "latest"
     }
-  } : {})
+  } : {}, local.smtp_secrets)
 
   cloudsql_instances = [module.database.connection_name]
   ingress            = "INGRESS_TRAFFIC_ALL"

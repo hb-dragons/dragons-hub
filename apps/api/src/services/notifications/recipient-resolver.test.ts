@@ -23,7 +23,7 @@ vi.mock("../../config/database", () => ({
 
 // --- Imports (after mocks) ---
 
-import { resolveRecipientUserIds } from "./recipient-resolver";
+import { resolveEmailRecipients, resolveRecipientUserIds } from "./recipient-resolver";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 let ctx: TestDbContext;
@@ -45,12 +45,25 @@ afterAll(async () => {
 
 async function seedUser(
   id: string,
-  opts: { role?: string | null; refereeId?: number } = {},
+  opts: {
+    role?: string | null;
+    refereeId?: number;
+    emailVerified?: boolean;
+    email?: string;
+    name?: string;
+  } = {},
 ): Promise<void> {
   await ctx.client.query(
     `INSERT INTO "user" (id, name, email, email_verified, role, referee_id, created_at, updated_at)
-     VALUES ($1, $2, $3, false, $4, $5, now(), now())`,
-    [id, id, `${id}@test.de`, opts.role ?? null, opts.refereeId ?? null],
+     VALUES ($1, $2, $3, $4, $5, $6, now(), now())`,
+    [
+      id,
+      opts.name ?? id,
+      opts.email ?? `${id}@test.de`,
+      opts.emailVerified ?? false,
+      opts.role ?? null,
+      opts.refereeId ?? null,
+    ],
   );
 }
 
@@ -158,5 +171,62 @@ describe("resolveRecipientUserIds", () => {
       const result = await resolveRecipientUserIds("something:else");
       expect(result).toEqual([]);
     });
+  });
+});
+
+describe("resolveEmailRecipients", () => {
+  it("returns a verified user's own address and display name", async () => {
+    await seedUser("u_verified", {
+      emailVerified: true,
+      email: "anna@dragons.de",
+      name: "Anna Admin",
+    });
+
+    expect(await resolveEmailRecipients(["u_verified"])).toEqual({
+      deliverable: [
+        { userId: "u_verified", name: "Anna Admin", address: "anna@dragons.de" },
+      ],
+      skipped: [],
+    });
+  });
+
+  // The load-bearing decision: an unverified address is not a valid recipient.
+  // Nobody has proved they own it, so it may be a typo into a stranger's
+  // mailbox — and mailing it earns the relay hard bounces.
+  it("skips an unverified address instead of mailing it", async () => {
+    await seedUser("u_unverified", { emailVerified: false });
+
+    const result = await resolveEmailRecipients(["u_unverified"]);
+
+    expect(result.deliverable).toEqual([]);
+    expect(result.skipped).toEqual([{ userId: "u_unverified", reason: "unverified" }]);
+  });
+
+  it("reports a user id with no account separately from an unverified one", async () => {
+    const result = await resolveEmailRecipients(["ghost"]);
+
+    expect(result.deliverable).toEqual([]);
+    expect(result.skipped).toEqual([{ userId: "ghost", reason: "no_account" }]);
+  });
+
+  it("partitions a mixed batch and preserves the requested order", async () => {
+    await seedUser("u_a", { emailVerified: true, email: "a@dragons.de" });
+    await seedUser("u_b", { emailVerified: false });
+    await seedUser("u_c", { emailVerified: true, email: "c@dragons.de" });
+
+    const result = await resolveEmailRecipients(["u_c", "u_b", "u_a", "u_missing"]);
+
+    expect(result.deliverable.map((r) => r.address)).toEqual([
+      "c@dragons.de",
+      "a@dragons.de",
+    ]);
+    expect(result.skipped).toEqual([
+      { userId: "u_b", reason: "unverified" },
+      { userId: "u_missing", reason: "no_account" },
+    ]);
+  });
+
+  it("issues no query for an empty batch", async () => {
+    expect(await resolveEmailRecipients([])).toEqual({ deliverable: [], skipped: [] });
   });
 });

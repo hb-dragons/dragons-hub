@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   env: {
     WAHA_BASE_URL: "http://waha:3000",
     // SMTP vars not set — email provider is unconfigured
-  } as Record<string, string | undefined>,
+  } as Record<string, string | number | undefined>,
 }));
 
 vi.mock("../../services/admin/channel-config-admin.service", () => ({
@@ -60,6 +60,19 @@ app.route("/", channelConfigRoutes);
 
 function json(response: Response) {
   return response.json();
+}
+
+/** A complete SMTP relay configuration, as `readSmtpSettings` requires it. */
+const FULL_SMTP_ENV = {
+  SMTP_HOST: "smtp.example.com",
+  SMTP_PORT: 587,
+  SMTP_USER: "noreply@example.com",
+  SMTP_PASSWORD: "secret",
+  SMTP_FROM: "Dragons <noreply@example.com>",
+} as const;
+
+function clearSmtpEnv() {
+  for (const key of Object.keys(FULL_SMTP_ENV)) delete mocks.env[key];
 }
 
 const sampleConfig = {
@@ -323,17 +336,37 @@ describe("GET /channel-configs/providers", () => {
       in_app: { configured: true },
       whatsapp_group: { configured: true },
       push: { configured: true },
+      email: { configured: false },
     });
   });
 
-  // Email has no channel adapter, so the endpoint must not advertise it at
-  // all — a "configured: false" entry would still be a type the UI could show.
-  it("does not offer email", async () => {
-    const res = await app.request("/channel-configs/providers");
+  it("reports email as configured once every SMTP var is set", async () => {
+    Object.assign(mocks.env, FULL_SMTP_ENV);
+    try {
+      const res = await app.request("/channel-configs/providers");
 
-    const body = await json(res);
-    expect(body).not.toHaveProperty("email");
+      expect((await json(res)).email).toEqual({ configured: true });
+    } finally {
+      clearSmtpEnv();
+    }
   });
+
+  // The provider gate applies the same all-or-nothing rule the adapter does,
+  // so a half-configured relay is never advertised as usable.
+  it.each(Object.keys(FULL_SMTP_ENV))(
+    "reports email as unconfigured when only %s is missing",
+    async (missing) => {
+      Object.assign(mocks.env, FULL_SMTP_ENV);
+      delete mocks.env[missing];
+      try {
+        const res = await app.request("/channel-configs/providers");
+
+        expect((await json(res)).email).toEqual({ configured: false });
+      } finally {
+        clearSmtpEnv();
+      }
+    },
+  );
 
   it("in_app is always configured", async () => {
     // Even with empty env, in_app should be true
@@ -389,32 +422,14 @@ describe("POST /channel-configs (provider gate)", () => {
     );
   });
 
-  // No SMTP env var can make this succeed: email has no adapter, so the
-  // request contract rejects the type outright rather than the provider gate
-  // rejecting it only while SMTP happens to be unset.
-  it("rejects an email channel config at the contract", async () => {
-    const res = await app.request("/channel-configs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: "Email Channel",
-        type: "email",
-        config: { locale: "de" },
-      }),
+  it("creates an email channel config when SMTP is fully set", async () => {
+    Object.assign(mocks.env, FULL_SMTP_ENV);
+    mocks.createChannelConfig.mockResolvedValue({
+      ...sampleConfig,
+      name: "Email Channel",
+      type: "email",
+      config: { locale: "de" },
     });
-
-    expect(res.status).toBe(400);
-    const body = await json(res);
-    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
-    expect(mocks.createChannelConfig).not.toHaveBeenCalled();
-  });
-
-  it("rejects an email channel config even when SMTP is fully set", async () => {
-    mocks.env.SMTP_HOST = "smtp.example.com";
-    mocks.env.SMTP_PORT = "587";
-    mocks.env.SMTP_USER = "noreply@example.com";
-    mocks.env.SMTP_PASSWORD = "secret";
-    mocks.env.SMTP_FROM = "Dragons <noreply@example.com>";
     try {
       const res = await app.request("/channel-configs", {
         method: "POST",
@@ -426,15 +441,34 @@ describe("POST /channel-configs (provider gate)", () => {
         }),
       });
 
-      expect(res.status).toBe(400);
-      expect(mocks.createChannelConfig).not.toHaveBeenCalled();
+      expect(res.status).toBe(201);
+      expect(mocks.createChannelConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "email", config: { locale: "de" } }),
+      );
     } finally {
-      delete mocks.env.SMTP_HOST;
-      delete mocks.env.SMTP_PORT;
-      delete mocks.env.SMTP_USER;
-      delete mocks.env.SMTP_PASSWORD;
-      delete mocks.env.SMTP_FROM;
+      clearSmtpEnv();
     }
+  });
+
+  // The channel is offerable, but a config created against a relay that does
+  // not exist would black-hole every notification routed to it.
+  it("returns 400 PROVIDER_NOT_CONFIGURED when email SMTP is not set", async () => {
+    const res = await app.request("/channel-configs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Email Channel",
+        type: "email",
+        config: { locale: "de" },
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({
+      error: 'Provider for "email" is not configured',
+      code: "PROVIDER_NOT_CONFIGURED",
+    });
+    expect(mocks.createChannelConfig).not.toHaveBeenCalled();
   });
 });
 

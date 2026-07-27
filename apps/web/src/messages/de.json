@@ -1237,7 +1237,8 @@
     "typeLabels": {
       "in_app": "In-App",
       "whatsapp_group": "WhatsApp-Gruppe",
-      "push": "Push-Benachrichtigung"
+      "push": "Push-Benachrichtigung",
+      "email": "E-Mail"
     },
     "typeImmutable": "Der Typ kann nach dem Anlegen nicht mehr geändert werden."
   },

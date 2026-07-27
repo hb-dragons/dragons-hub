@@ -47,9 +47,15 @@ export const envSchema = z
     CHATBOT_MODEL: z.string().min(1).default("gemini-2.5-flash"),
     MCP_TOKEN: z.string().min(32).optional(),
 
-    // SMTP_* deliberately absent: there is no email channel adapter, so
-    // accepting SMTP credentials would only advertise a channel that cannot
-    // deliver. They return with the adapter.
+    // SMTP relay for the `email` channel (channels/email.ts). All five are
+    // optional and all five are required together: `readSmtpSettings()` treats
+    // a partial set as "not configured" and the provider endpoint stops
+    // offering the channel, which is why none of them carries a default.
+    SMTP_HOST: z.string().min(1).optional(),
+    SMTP_PORT: z.coerce.number().int().positive().optional(),
+    SMTP_USER: z.string().min(1).optional(),
+    SMTP_PASSWORD: z.string().min(1).optional(),
+    SMTP_FROM: z.string().min(1).optional(),
 
     SCOREBOARD_INGEST_KEY: z.string().min(32),
     SCOREBOARD_DEVICE_ID: z.string().min(1),

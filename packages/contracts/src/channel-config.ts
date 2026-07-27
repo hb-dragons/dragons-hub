@@ -37,6 +37,13 @@ const pushConfigSchema = z.object({
   locale: localeSchema.optional(),
 });
 
+// Email delivery is fanned out per recipient user by the SMTP adapter, which
+// reads each user's own verified address, so the config carries no target —
+// only the language the message is rendered in.
+const emailConfigSchema = z.object({
+  locale: localeSchema,
+});
+
 /**
  * Exhaustive over ChannelType — a channel type added to CHANNEL_TYPES is a
  * compile error here until it is given a config shape.
@@ -45,6 +52,7 @@ const configSchemaByType: Record<ChannelType, z.ZodType> = {
   in_app: inAppConfigSchema,
   whatsapp_group: whatsappGroupConfigSchema,
   push: pushConfigSchema,
+  email: emailConfigSchema,
 };
 
 // ── Create schema ───────────────────────────────────────────────────────────

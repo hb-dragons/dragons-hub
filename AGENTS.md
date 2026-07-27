@@ -962,16 +962,24 @@ Sample API responses: `packages/sdk/src/samples/` — `getLigaList.json`, `getSp
 Channel adapters live in `apps/api/src/services/notifications/channels/` and are dispatched by the notification pipeline per user preference + channel config.
 
 `CHANNEL_TYPES` in `packages/shared/src/channel-configs.ts` is the single source
-of truth for the four channel types. Three have adapters:
+of truth for the four channel types, and `DISPATCHABLE_CHANNEL_TYPES` in
+`notification-pipeline.ts` is an exhaustive `Record<ChannelType, true>`, so a
+type listed without an adapter is a compile error. All four have adapters:
 
 - **in_app** — Writes to `notification_log` for in-app inbox rendering. Adapter: `channels/in-app.ts`.
 - **whatsapp_group** — Posts to a WhatsApp group via configured provider. Adapter: `channels/whatsapp-group.ts`.
 - **push** — Native push notifications via Expo Push Service. Delivers `PUSH_ELIGIBLE_EVENTS` (referee assignments, slot requests/reminders, urgent match changes) to devices registered via `POST /api/devices/register`. Adapter: `channels/push.ts`. HTTP wrapper: `expo-push.client.ts`. Device tokens live in `push_devices`; delivery receipts reconciled via the `push-receipt` worker.
-- **email** — Declared in `CHANNEL_TYPES` and accepted by the channel-config API
-  (`EmailConfig` exists, `SMTP_*` env vars exist), but **there is no adapter**.
-  `dispatchImmediate` in `notification-pipeline.ts` falls through to its
-  "Unknown channel type, skipping dispatch" branch, logs a warning and returns
-  false. An email channel config can be created and will never deliver.
+- **email** — SMTP delivery via nodemailer. Adapter: `channels/email.ts`;
+  relay settings: `channels/smtp-settings.ts` (all five `SMTP_*` vars or the
+  channel is not offered). The config carries only a locale: recipients resolve
+  through `resolveRecipientUserIds` like push, then `resolveEmailRecipients`
+  maps each user to `user.email`. **An unverified address is skipped**, with the
+  reason logged, rather than mailed. Every message carries both a `text` and an
+  `html` part, built by `templates/email.ts` from the same `{title, body}` the
+  other channels render. Bounce handling and unsubscribe are not implemented —
+  a relay-level send failure releases the `notification_log` claim so the outbox
+  retries, but a bounce arriving after the relay accepted the message is not
+  observed anywhere.
 
 ### Workers
 
