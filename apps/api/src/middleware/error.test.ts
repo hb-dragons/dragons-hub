@@ -36,8 +36,14 @@ vi.mock("../config/env", () => ({
 // --- Imports (after mocks) ---
 
 import { errorHandler } from "./error";
+import { AppError } from "../app-error";
 import { SyncAlreadyQueuedError } from "../services/sync-jobs.errors";
 import { RefereeSdkNotConfiguredError } from "../services/sync/sdk-client.errors";
+import { TeamReorderError } from "../services/admin/team-admin.errors";
+
+// A stand-in for any service's AppError subclass. The handler must map it from
+// the instance's own `status`, with no knowledge of the subclass.
+class TestAppError extends AppError {}
 
 // App WITHOUT request logger middleware — error handler falls back to root logger
 function createBareApp() {
@@ -65,6 +71,18 @@ function createBareApp() {
 
   app.get("/throw-referee-sdk-not-configured", () => {
     throw new RefereeSdkNotConfiguredError();
+  });
+
+  app.get("/throw-team-reorder", () => {
+    throw TeamReorderError.invalidTeamSet();
+  });
+
+  app.get("/throw-app-error-422", () => {
+    throw new TestAppError("Referee is not qualified", "NOT_QUALIFIED", 422);
+  });
+
+  app.get("/throw-app-error-502", () => {
+    throw new TestAppError("Federation rejected the write", "FEDERATION_ERROR", 502);
   });
 
   app.get("/throw-http-401", () => {
@@ -147,6 +165,57 @@ describe("errorHandler", () => {
     const body = await res.json();
     expect(body.code).toBe("REFEREE_SDK_NOT_CONFIGURED");
     expect(body.error).toMatch(/REFEREE_SDK_USERNAME/);
+  });
+
+  it("returns 400 with the INVALID_TEAM_SET code for TeamReorderError", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-team-reorder");
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "The team order must list every own-club team exactly once.",
+      code: "INVALID_TEAM_SET",
+    });
+  });
+
+  it("maps an AppError to the status carried on the instance", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-app-error-422");
+
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({
+      error: "Referee is not qualified",
+      code: "NOT_QUALIFIED",
+    });
+  });
+
+  it("does not report a 4xx AppError to the error logger", async () => {
+    const app = createBareApp();
+    await app.request("/throw-app-error-422");
+
+    expect(mocks.rootLogger.error).not.toHaveBeenCalled();
+  });
+
+  it("reports a 5xx AppError to Cloud Error Reporting", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-app-error-502");
+
+    expect(res.status).toBe(502);
+    expect(mocks.rootLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.any(TestAppError),
+        stack_trace: expect.any(String),
+        "@type":
+          "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent",
+      }),
+      "Federation rejected the write",
+    );
+  });
+
+  it("names an AppError subclass after its own class", () => {
+    const error = new TestAppError("boom", "BOOM", 400);
+
+    expect(error.name).toBe("TestAppError");
   });
 
   it("does not call logger for ZodError", async () => {

@@ -417,6 +417,37 @@ Every table below is checked against the Hono route tree by
 `apps/api/src/test/docs-drift.test.ts`, in both directions. Query strings are
 documented in the description column, not in the path.
 
+### Error responses (`AppError`)
+
+Every typed service error extends `AppError` (`apps/api/src/app-error.ts`),
+which carries `message`, `code` and `status`. `middleware/error.ts` maps all of
+them through one `instanceof AppError` branch into `{error, code}` at the
+error's own status, and reports any 5xx to Cloud Error Reporting. **A route must
+not catch its own service errors** — it stays a single success path.
+
+Rules when adding one:
+
+- The class goes in a leaf `*.errors.ts` module next to its service, never in
+  the service file. `middleware/error.ts` imports only `app-error.ts`, but the
+  services themselves pull in BullMQ's Redis client, the federation SDK and the
+  database client, and a leaf module keeps those out of every module that
+  touches the error handler.
+- A class with several codes keeps its own `Record<ItsCodeUnion,
+  ContentfulStatusCode>` table beside it. Keying by the union makes a code with
+  no status a compile error instead of a silent 500.
+- Do not hoist those tables into one shared code→status map. `NOT_OWN_CLUB` is
+  403 from `AssignmentError` (the caller may not act) and 400 from
+  `RefereeSettingsError` (the body names the wrong referee); one table would
+  have to pick.
+- In a route test that mocks the service wholesale, import the **real** error
+  class from its `*.errors.ts` module. A stand-in `extends Error` double is not
+  an `AppError`, so it falls through to a 500 and the status assertions stop
+  testing anything. The leaf module has no heavy imports, so using it is free.
+
+Current subclasses: `SyncAlreadyQueuedError` (409), `RefereeSdkNotConfiguredError`
+(503), `TeamReorderError` (400), `AssignmentError` (7 codes),
+`RefereeSettingsError` (3 codes), `BroadcastError` (2 codes).
+
 ### Service & docs
 
 | Method | Path | Description |
@@ -1045,7 +1076,8 @@ Sample API responses: `packages/sdk/src/samples/` — `getLigaList.json`, `getSp
   `middleware/error.ts` maps to a 409 `{error, code: "SYNC_ALREADY_QUEUED"}`.
   The error class sits in its own leaf module so the error middleware does not
   import the service — and therefore does not construct the BullMQ queues.
-  `POST /admin/sync/trigger` has no error branch of its own.
+  `POST /admin/sync/trigger` has no error branch of its own. See
+  "Error responses (`AppError`)" for the general convention.
 
 ### Notification Channels
 

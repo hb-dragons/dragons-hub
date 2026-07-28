@@ -7,6 +7,8 @@
  * the error handler.
  */
 
+import { AppError } from "../../app-error";
+
 /**
  * A referee assignment operation was attempted without `REFEREE_SDK_USERNAME` /
  * `REFEREE_SDK_PASSWORD` configured. The referee auth client falls back to the
@@ -17,15 +19,14 @@
  * Mapped to HTTP 503 by the central error handler — the request is well-formed,
  * the deployment is simply missing the credentials to serve it.
  */
-export class RefereeSdkNotConfiguredError extends Error {
-  readonly code = "REFEREE_SDK_NOT_CONFIGURED";
+export class RefereeSdkNotConfiguredError extends AppError {
+  declare readonly code: "REFEREE_SDK_NOT_CONFIGURED";
 
   constructor(
     message = "Referee SDK credentials are not configured. Set REFEREE_SDK_USERNAME "
       + "and REFEREE_SDK_PASSWORD; the main federation account must not be used for "
       + "referee assignment operations.",
   ) {
-    super(message);
-    this.name = "RefereeSdkNotConfiguredError";
+    super(message, "REFEREE_SDK_NOT_CONFIGURED", 503);
   }
 }

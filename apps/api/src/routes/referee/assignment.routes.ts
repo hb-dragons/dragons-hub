@@ -4,27 +4,14 @@ import { requireRefereeSelf } from "../../middleware/rbac";
 import { getDb } from "../../config/database";
 import { referees } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
-import {
-  assignReferee,
-  AssignmentError,
-} from "../../services/referee/referee-assignment.service";
+import { assignReferee } from "../../services/referee/referee-assignment.service";
 import {
   claimRefereeGame,
   unclaimRefereeGame,
 } from "../../services/referee/referee-claim.service";
 import { refereeAssignBodySchema, refereeClaimBodySchema } from "@dragons/contracts";
 
-const ERROR_STATUS_MAP: Record<string, number> = {
-  GAME_NOT_FOUND: 404,
-  NOT_QUALIFIED: 422,
-  SLOT_TAKEN: 409,
-  DENY_RULE: 403,
-  FEDERATION_ERROR: 502,
-  FORBIDDEN: 403,
-  NOT_OWN_CLUB: 403,
-  NOT_ASSIGNED: 409,
-};
-
+// AssignmentError carries its own status; middleware/error.ts maps it.
 // Admin-override variants live in admin/referee-assignment.routes.ts.
 const refereeAssignmentRoutes = new Hono<AppEnv>();
 
@@ -62,16 +49,8 @@ refereeAssignmentRoutes.post("/games/:spielplanId/assign", requireRefereeSelf, a
     return c.json({ error: "Referee is not an own-club referee", code: "NOT_OWN_CLUB" }, 403);
   }
 
-  try {
-    const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
-    return c.json(result);
-  } catch (error) {
-    if (error instanceof AssignmentError) {
-      const status = ERROR_STATUS_MAP[error.code] ?? 500;
-      return c.json({ error: error.message, code: error.code }, status as never);
-    }
-    throw error;
-  }
+  const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
+  return c.json(result);
 });
 
 refereeAssignmentRoutes.post("/games/:id/claim", requireRefereeSelf, async (c) => {
@@ -93,20 +72,12 @@ refereeAssignmentRoutes.post("/games/:id/claim", requireRefereeSelf, async (c) =
     return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
   }
 
-  try {
-    const result = await claimRefereeGame({
-      refereeId,
-      gameId: id,
-      slotNumber: parsed?.slotNumber,
-    });
-    return c.json(result);
-  } catch (error) {
-    if (error instanceof AssignmentError) {
-      const status = ERROR_STATUS_MAP[error.code] ?? 500;
-      return c.json({ error: error.message, code: error.code }, status as never);
-    }
-    throw error;
-  }
+  const result = await claimRefereeGame({
+    refereeId,
+    gameId: id,
+    slotNumber: parsed?.slotNumber,
+  });
+  return c.json(result);
 });
 
 refereeAssignmentRoutes.delete("/games/:id/claim", requireRefereeSelf, async (c) => {
@@ -120,19 +91,11 @@ refereeAssignmentRoutes.delete("/games/:id/claim", requireRefereeSelf, async (c)
     return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
   }
 
-  try {
-    const result = await unclaimRefereeGame({
-      refereeId,
-      gameId: id,
-    });
-    return c.json(result);
-  } catch (error) {
-    if (error instanceof AssignmentError) {
-      const status = ERROR_STATUS_MAP[error.code] ?? 500;
-      return c.json({ error: error.message, code: error.code }, status as never);
-    }
-    throw error;
-  }
+  const result = await unclaimRefereeGame({
+    refereeId,
+    gameId: id,
+  });
+  return c.json(result);
 });
 
 export { refereeAssignmentRoutes };

@@ -6,7 +6,6 @@ import {
   getRefereeById,
   updateRefereeVisibility,
   updateRefereeRules,
-  RefereeSettingsError,
 } from "../../services/admin/referee-admin.service";
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
@@ -68,15 +67,9 @@ refereeRoutes.patch(
       return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
     }
     const body = c.req.valid("json");
-    try {
-      const result = await updateRefereeVisibility(id, body);
-      return c.json(result);
-    } catch (err) {
-      if (err instanceof RefereeSettingsError) {
-        return c.json({ error: err.message, code: err.code }, err.code === "NOT_FOUND" ? 404 : 400);
-      }
-      throw err;
-    }
+    // RefereeSettingsError carries its own status; middleware/error.ts maps it.
+    const result = await updateRefereeVisibility(id, body);
+    return c.json(result);
   },
 );
 
@@ -99,16 +92,8 @@ refereeRoutes.patch(
       return c.json({ error: "Invalid referee ID", code: "VALIDATION_ERROR" }, 400);
     }
     const body = c.req.valid("json");
-    try {
-      const result = await updateRefereeRules(id, body);
-      return c.json(result);
-    } catch (err) {
-      if (err instanceof RefereeSettingsError) {
-        const status = err.code === "NOT_FOUND" ? 404 : 400;
-        return c.json({ error: err.message, code: err.code }, status);
-      }
-      throw err;
-    }
+    const result = await updateRefereeRules(id, body);
+    return c.json(result);
   },
 );
 

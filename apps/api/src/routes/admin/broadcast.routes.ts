@@ -7,7 +7,6 @@ import { matches, leagues, teams } from "@dragons/db/schema";
 import { requireAnyRole } from "../../middleware/rbac";
 import { escapeLikePattern } from "../../services/utils/sql";
 import {
-  BroadcastError,
   getBroadcastConfig,
   loadJoinedMatch,
   setBroadcastLive,
@@ -107,19 +106,10 @@ adminBroadcastRoutes.post(
     if (!isConfiguredDevice(body.deviceId)) {
       return c.json(UNKNOWN_DEVICE_BODY, 404);
     }
-    try {
-      const config = await setBroadcastLive(body.deviceId, true);
-      await publishBroadcastForDevice(body.deviceId);
-      return c.json({ config });
-    } catch (err) {
-      if (err instanceof BroadcastError && err.code === "MISSING_MATCH") {
-        return c.json(
-          { error: "Cannot go live without matchId", code: "MISSING_MATCH" },
-          400,
-        );
-      }
-      throw err;
-    }
+    // BroadcastError carries its own status; middleware/error.ts maps it.
+    const config = await setBroadcastLive(body.deviceId, true);
+    await publishBroadcastForDevice(body.deviceId);
+    return c.json({ config });
   },
 );
 

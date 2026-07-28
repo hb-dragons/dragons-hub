@@ -1,11 +1,9 @@
 import type { ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
+import { AppError } from "../app-error";
 import { env } from "../config/env";
 import { logger as rootLogger } from "../config/logger";
-import { TeamReorderError } from "../services/admin/team-admin.errors";
-import { RefereeSdkNotConfiguredError } from "../services/sync/sdk-client.errors";
-import { SyncAlreadyQueuedError } from "../services/sync-jobs.errors";
 import type { AppEnv } from "../types";
 
 // Marker that tells Cloud Error Reporting to ingest this log entry.
@@ -28,21 +26,20 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
     );
   }
 
-  // A manual sync trigger that collides with an in-flight run. Handled here so
-  // the route stays a single success path instead of sniffing an error envelope.
-  if (error instanceof SyncAlreadyQueuedError) {
-    return c.json({ error: error.message, code: error.code }, 409);
-  }
-
-  // A referee assignment operation on a deployment with no REFEREE_SDK_*
-  // credentials. The request is fine; the deployment cannot serve it.
-  if (error instanceof RefereeSdkNotConfiguredError) {
-    return c.json({ error: error.message, code: error.code }, 503);
-  }
-
-  // A team reorder that does not name every own-club team exactly once.
-  if (error instanceof TeamReorderError) {
-    return c.json({ error: error.message, code: error.code }, 400);
+  // Every typed service error. The status rides on the instance, so routes stay
+  // a single success path and no route holds an opinion about what a service's
+  // error code means.
+  if (error instanceof AppError) {
+    // A 5xx AppError is still a server fault and has to reach Cloud Error
+    // Reporting; without this it would skip the reporting path at the bottom.
+    if (error.status >= 500) {
+      const log = c.get("logger") ?? rootLogger;
+      log.error(
+        { err: error, stack_trace: error.stack, "@type": REPORTED_ERROR_TYPE },
+        error.message,
+      );
+    }
+    return c.json({ error: error.message, code: error.code }, error.status);
   }
 
   if (error instanceof HTTPException) {
