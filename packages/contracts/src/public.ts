@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { dateSchema } from "@dragons/shared";
+import { idParamSchema } from "./common";
+
+export const publicTeamIdParamSchema = idParamSchema;
 
 export const publicScheduleIcsQuerySchema = z.object({
   teamApiId: z.coerce.number().int().positive().optional(),

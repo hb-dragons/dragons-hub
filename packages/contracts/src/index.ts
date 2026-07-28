@@ -179,6 +179,7 @@ export {
 } from "./watch-rule";
 
 export {
+  publicTeamIdParamSchema,
   publicScheduleIcsQuerySchema,
   type PublicScheduleIcsQuery,
 } from "./public";

@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
-import { getDb } from "../../config/database";
-import { teams } from "@dragons/db/schema";
-import { desc, asc } from "drizzle-orm";
+import { describeRoute, validator } from "hono-openapi";
+import { publicTeamIdParamSchema } from "@dragons/contracts";
+import { validationHook } from "../../middleware/validation";
+import { listPublicTeams } from "../../services/public/team-list.service";
 import { getTeamStats } from "../../services/public/team-stats.service";
 
 const publicTeamRoutes = new Hono();
@@ -16,18 +16,13 @@ publicTeamRoutes.get(
     security: [],
     responses: { 200: { description: "Success" } },
   }),
-  async (c) => {
-    const result = await getDb()
-      .select()
-      .from(teams)
-      .orderBy(desc(teams.isOwnClub), asc(teams.displayOrder), asc(teams.name));
-    return c.json(result);
-  },
+  async (c) => c.json(await listPublicTeams()),
 );
 
 // GET /public/teams/:id/stats - Season stats and recent form for a team
 publicTeamRoutes.get(
   "/teams/:id/stats",
+  validator("param", publicTeamIdParamSchema, validationHook),
   describeRoute({
     description: "Get season stats and recent form for a team (public)",
     tags: ["Public"],
@@ -39,13 +34,10 @@ publicTeamRoutes.get(
     },
   }),
   async (c) => {
-    const raw = Number(c.req.param("id"));
-    if (!Number.isInteger(raw) || raw <= 0) {
-      return c.json({ error: "Invalid team id" }, 400);
-    }
-    const stats = await getTeamStats(raw);
+    const { id } = c.req.valid("param");
+    const stats = await getTeamStats(id);
     if (!stats) {
-      return c.json({ error: "Team not found" }, 404);
+      return c.json({ error: "Team not found", code: "NOT_FOUND" }, 404);
     }
     return c.json(stats);
   },
