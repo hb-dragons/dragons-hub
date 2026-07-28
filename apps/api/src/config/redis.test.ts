@@ -223,3 +223,90 @@ describe("incrementWithTtl", () => {
     await expect(incrementWithTtl("rl:qa:u1:99", 60)).rejects.toThrow("redis down");
   });
 });
+
+// The sliding-window limiter needs the current window's count and the previous
+// window's in one atomic step. Two separate commands can straddle a rollover,
+// which would pair a fresh window's count with a bucket that is already two
+// windows old and let the burst through anyway.
+describe("incrementSlidingWindow", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    constructed.length = 0;
+  });
+
+  it("issues exactly one Redis command for both windows", async () => {
+    const { incrementSlidingWindow } = await import("./redis");
+    mockEval.mockResolvedValue([1, 0]);
+
+    await incrementSlidingWindow("qa:u1:99", "qa:u1:98", 60);
+
+    expect(mockEval).toHaveBeenCalledTimes(1);
+    expect(mockIncr).not.toHaveBeenCalled();
+    expect(mockExpire).not.toHaveBeenCalled();
+  });
+
+  it("passes both keys to a script that INCRs one and GETs the other", async () => {
+    const { incrementSlidingWindow } = await import("./redis");
+    mockEval.mockResolvedValue([1, 0]);
+
+    await incrementSlidingWindow("qa:u1:99", "qa:u1:98", 60);
+
+    const [script, numKeys, key, previousKey] = mockEval.mock.calls[0]!;
+    expect(numKeys).toBe(2);
+    expect(key).toBe("qa:u1:99");
+    expect(previousKey).toBe("qa:u1:98");
+    expect(script).toContain("INCR");
+    expect(script).toContain("GET");
+    expect(script).toContain("EXPIRE");
+  });
+
+  // A one-window TTL would drop the current bucket exactly when the next window
+  // starts needing to read it as its `previous`, restoring the 2x edge burst.
+  it("expires the counter after two windows, not one", async () => {
+    const { incrementSlidingWindow } = await import("./redis");
+    mockEval.mockResolvedValue([1, 0]);
+
+    await incrementSlidingWindow("qa:u1:99", "qa:u1:98", 60);
+
+    const ttl = mockEval.mock.calls[0]![4];
+    expect(ttl).toBe("120");
+  });
+
+  it("re-applies the expiry to a key that already lost its TTL", async () => {
+    const { incrementSlidingWindow } = await import("./redis");
+    mockEval.mockResolvedValue([7, 3]);
+
+    await incrementSlidingWindow("qa:u1:99", "qa:u1:98", 60);
+
+    const [script] = mockEval.mock.calls[0]!;
+    expect(script).toContain("TTL");
+    expect(script).toMatch(/current == 1 or/);
+  });
+
+  it("returns both counters as numbers", async () => {
+    const { incrementSlidingWindow } = await import("./redis");
+    mockEval.mockResolvedValue(["4", "9"]);
+
+    await expect(incrementSlidingWindow("qa:u1:99", "qa:u1:98", 60)).resolves.toEqual([4, 9]);
+  });
+
+  // Redis GET on a missing key is Lua `false`, which the script turns into 0 —
+  // a caller with no previous window must weight 0, never NaN.
+  it("treats an absent previous window as zero", async () => {
+    const { incrementSlidingWindow } = await import("./redis");
+    mockEval.mockResolvedValue([1, 0]);
+
+    await expect(incrementSlidingWindow("qa:u1:99", "qa:u1:98", 60)).resolves.toEqual([1, 0]);
+    expect(mockEval.mock.calls[0]![0]).toMatch(/tonumber\(previous\) or 0/);
+  });
+
+  it("propagates a Redis failure so callers can fail open", async () => {
+    const { incrementSlidingWindow } = await import("./redis");
+    mockEval.mockRejectedValue(new Error("redis down"));
+
+    await expect(incrementSlidingWindow("qa:u1:99", "qa:u1:98", 60)).rejects.toThrow(
+      "redis down",
+    );
+  });
+});

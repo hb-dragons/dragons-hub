@@ -101,6 +101,47 @@ export async function incrementWithTtl(
 }
 
 /**
+ * Bump the current window's counter and read the previous window's, atomically.
+ *
+ * This is the Redis half of a sliding-window-counter rate limiter: the caller
+ * weights `previous` by how far the clock has moved into the current window and
+ * adds `current`, so usage decays continuously instead of being forgiven all at
+ * once on a window boundary. See `middleware/rate-limit.ts` for the weighting.
+ *
+ * Both reads have to be one round trip for the same reason `INCR_WITH_TTL` is:
+ * a separate INCR and GET can straddle a window rollover, which would pair the
+ * new window's count with a previous window that is already two windows old.
+ *
+ * The expiry is deliberately **two** windows, not one. The current window's key
+ * must outlive its own window, because it becomes the `previous` key that the
+ * next window reads. A one-window TTL would delete it exactly when it starts
+ * being needed and hand back the 2x burst this is meant to close.
+ */
+const INCREMENT_SLIDING_WINDOW = `
+local current = redis.call('INCR', KEYS[1])
+if current == 1 or redis.call('TTL', KEYS[1]) < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+local previous = redis.call('GET', KEYS[2])
+return { current, tonumber(previous) or 0 }
+`;
+
+export async function incrementSlidingWindow(
+  key: string,
+  previousKey: string,
+  windowSeconds: number,
+): Promise<[current: number, previous: number]> {
+  const result = (await getRedis().eval(
+    INCREMENT_SLIDING_WINDOW,
+    2,
+    key,
+    previousKey,
+    String(windowSeconds * 2),
+  )) as [unknown, unknown];
+  return [Number(result[0]), Number(result[1])];
+}
+
+/**
  * Quit the shared request-path client. Called from the graceful-shutdown
  * sequence after the HTTP server and the workers are done, so no in-flight
  * request loses its Redis connection mid-command. Clients handed out by
