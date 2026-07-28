@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   setClubConfig: vi.fn(),
   getBookingSettings: vi.fn(),
   setBookingSettings: vi.fn(),
-  getSetting: vi.fn(),
   upsertSetting: vi.fn(),
   getRefereeReminderDays: vi.fn(),
   triggerRefereeGamesSync: vi.fn(),
@@ -20,7 +19,6 @@ vi.mock("../../services/admin/settings.service", () => ({
   setClubConfig: mocks.setClubConfig,
   getBookingSettings: mocks.getBookingSettings,
   setBookingSettings: mocks.setBookingSettings,
-  getSetting: mocks.getSetting,
   upsertSetting: mocks.upsertSetting,
   getRefereeReminderDays: mocks.getRefereeReminderDays,
 }));
