@@ -55,6 +55,35 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe("id param validation (shared envelope)", () => {
+  // Paths are relative to this file's mount point ("/"), not the app's
+  // "/admin" prefix in routes/index.ts — this test app mounts refereeRoutes
+  // at "/" directly, matching every other test in this file.
+  //
+  // Bodies must satisfy each PATCH handler's own body schema (both
+  // z.strictObject with required fields). An empty `{}` would fail body
+  // validation before the handler's id guard ever runs, and the JSON
+  // validator's rejection shape happens to also be
+  // { code: "VALIDATION_ERROR", details: [...] } — so the test would pass
+  // without ever exercising the id param, for the wrong reason.
+  it.each([
+    ["PATCH", "/referees/abc/visibility", { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }],
+    ["PATCH", "/referees/abc/rules", { rules: [] }],
+    ["GET", "/referees/abc", undefined],
+  ])("%s %s rejects a non-numeric id with the shared envelope", async (method, path, body) => {
+    const res = await app.request(path, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: expect.any(Array),
+    });
+  });
+});
+
 describe("GET /referees", () => {
   it("defaults scope to 'own' and sort to 'name'", async () => {
     const listResult = { items: [], total: 0, limit: 50, offset: 0, hasMore: false };
@@ -228,8 +257,7 @@ describe("PATCH /referees/:id/visibility", () => {
 
     expect(res.status).toBe(400);
     const body = await json(res);
-    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
-    expect(body.error).toBe("Invalid referee ID");
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR", details: expect.any(Array) });
   });
 
   it("returns 400 for negative referee ID", async () => {
@@ -241,8 +269,7 @@ describe("PATCH /referees/:id/visibility", () => {
 
     expect(res.status).toBe(400);
     const body = await json(res);
-    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
-    expect(body.error).toBe("Invalid referee ID");
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR", details: expect.any(Array) });
   });
 
   it("returns 400 for invalid body", async () => {
@@ -340,8 +367,7 @@ describe("PATCH /referees/:id/rules", () => {
     });
     expect(res.status).toBe(400);
     const body = await json(res);
-    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
-    expect(body.error).toBe("Invalid referee ID");
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR", details: expect.any(Array) });
   });
 
   it("returns 404 when service throws NOT_FOUND", async () => {

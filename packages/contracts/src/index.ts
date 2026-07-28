@@ -89,11 +89,13 @@ export {
   refereeApiMatchParamSchema,
   refereeMatchIdParamSchema,
   refereeGameIdParamSchema,
+  refereeIdParamSchema,
   type RefereeListQuery,
   type RefereeVisibilityBody,
   type RefereeApiMatchParam,
   type RefereeMatchIdParam,
   type RefereeGameIdParam,
+  type RefereeIdParam,
 } from "./referee";
 
 export {
