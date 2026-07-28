@@ -72,11 +72,23 @@ describe("listPublicTeams", () => {
         isOwnClub: true,
         displayOrder: 1,
       },
+      // Shares both isOwnClub and displayOrder with Beta, differing only in
+      // name — without this, isOwnClub + displayOrder alone already produce
+      // the expected array below and asc(teams.name) is never exercised.
+      {
+        apiTeamPermanentId: 4,
+        seasonTeamId: 4,
+        teamCompetitionId: 4,
+        clubId: 1,
+        name: "Aaron",
+        isOwnClub: true,
+        displayOrder: 1,
+      },
     ]);
 
     const result = await listPublicTeams();
 
-    expect(result.map((t) => t.name)).toEqual(["Beta", "Alpha", "Zeta"]);
+    expect(result.map((t) => t.name)).toEqual(["Aaron", "Beta", "Alpha", "Zeta"]);
   });
 
   it("returns an empty array when no teams exist", async () => {
