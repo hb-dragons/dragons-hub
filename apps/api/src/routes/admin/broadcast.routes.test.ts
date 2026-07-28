@@ -70,6 +70,7 @@ import {
   matches,
   teams,
 } from "@dragons/db/schema";
+import { todayInClubZone } from "@dragons/shared";
 import { adminBroadcastRoutes } from "./broadcast.routes";
 import { errorHandler } from "../../middleware/error";
 
@@ -131,7 +132,9 @@ async function seedMatch(): Promise<{ matchId: number }> {
       apiMatchId: 1,
       matchNo: 1,
       matchDay: 1,
-      kickoffDate: new Date().toISOString().slice(0, 10),
+      // Club day, matching the picker's scope=today filter — a UTC slice would
+      // seed yesterday's fixture between club midnight and UTC midnight.
+      kickoffDate: todayInClubZone(),
       kickoffTime: "19:30:00",
       leagueId: 100,
       homeTeamApiId: 1,
@@ -328,7 +331,7 @@ describe("GET /admin/broadcast/matches", () => {
         isOwnClub: false,
       },
     ]);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInClubZone();
     await ctx.db.insert(matches).values([
       {
         apiMatchId: 10,

@@ -1,4 +1,13 @@
-import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import {
+  describe,
+  expect,
+  it,
+  vi,
+  beforeAll,
+  beforeEach,
+  afterAll,
+  afterEach,
+} from "vitest";
 
 // --- Mocks (hoisted before imports) ---
 
@@ -24,6 +33,7 @@ import {
   type TestDbContext,
 } from "../../test/setup-test-db";
 import { matches, teams } from "@dragons/db/schema";
+import { todayInClubZone } from "@dragons/shared";
 import { listBroadcastableMatches } from "./match-picker";
 
 let ctx: TestDbContext;
@@ -37,9 +47,34 @@ beforeEach(async () => {
   await resetTestDb(ctx);
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 afterAll(async () => {
   await closeTestDb(ctx);
 });
+
+async function seedOwnClubTeams(): Promise<void> {
+  await ctx.db.insert(teams).values([
+    {
+      apiTeamPermanentId: 10,
+      seasonTeamId: 10,
+      teamCompetitionId: 10,
+      clubId: 1,
+      name: "Dragons",
+      isOwnClub: true,
+    },
+    {
+      apiTeamPermanentId: 20,
+      seasonTeamId: 20,
+      teamCompetitionId: 20,
+      clubId: 2,
+      name: "Visitors",
+      isOwnClub: false,
+    },
+  ]);
+}
 
 describe("listBroadcastableMatches", () => {
   it("returns an empty list when the club owns no teams", async () => {
@@ -78,28 +113,9 @@ describe("listBroadcastableMatches", () => {
   });
 
   it("filters to today when scope is today", async () => {
-    await ctx.db.insert(teams).values([
-      {
-        apiTeamPermanentId: 10,
-        seasonTeamId: 10,
-        teamCompetitionId: 10,
-        clubId: 1,
-        name: "Dragons",
-        isOwnClub: true,
-      },
-      {
-        apiTeamPermanentId: 20,
-        seasonTeamId: 20,
-        teamCompetitionId: 20,
-        clubId: 2,
-        name: "Visitors",
-        isOwnClub: false,
-      },
-    ]);
-    // Matches production: the route/service computes "today" via
-    // new Date().toISOString().slice(0, 10) (UTC-sliced, not Berlin-aware).
-    // Preserved verbatim from the pre-extraction handler; not fixed here.
-    const today = new Date().toISOString().slice(0, 10);
+    await seedOwnClubTeams();
+    // Same helper the service uses: the club day, not the UTC day.
+    const today = todayInClubZone();
     await ctx.db.insert(matches).values([
       {
         apiMatchId: 1,
@@ -125,6 +141,50 @@ describe("listBroadcastableMatches", () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.kickoffDate).toBe(today);
   });
+
+  // Both instants sit in the window between club midnight and UTC midnight,
+  // where the UTC calendar day is still yesterday in Berlin — the exact case a
+  // late-evening scoreboard setup for the next day's fixture hits. One per
+  // offset so a CET-only or CEST-only fix does not pass.
+  it.each([
+    { label: "CEST (+02:00)", now: "2026-04-25T22:30:00Z", clubDay: "2026-04-26" },
+    { label: "CET (+01:00)", now: "2026-01-15T23:30:00Z", clubDay: "2026-01-16" },
+  ])(
+    "scope=today follows the club day, not the UTC day, at $label midnight",
+    async ({ now, clubDay }) => {
+      // Date only: the PGlite driver needs the real timer queue to resolve.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(now));
+      const utcDay = new Date(now).toISOString().slice(0, 10);
+      // Guards the fixture itself: if these ever agree the test proves nothing.
+      expect(utcDay).not.toBe(clubDay);
+
+      await seedOwnClubTeams();
+      await ctx.db.insert(matches).values([
+        {
+          apiMatchId: 1,
+          matchNo: 1,
+          matchDay: 1,
+          kickoffDate: clubDay,
+          kickoffTime: "19:00:00",
+          homeTeamApiId: 10,
+          guestTeamApiId: 20,
+        },
+        {
+          apiMatchId: 2,
+          matchNo: 2,
+          matchDay: 2,
+          kickoffDate: utcDay,
+          kickoffTime: "19:00:00",
+          homeTeamApiId: 10,
+          guestTeamApiId: 20,
+        },
+      ]);
+
+      const result = await listBroadcastableMatches({ scope: "today" });
+      expect(result.map((m) => m.kickoffDate)).toEqual([clubDay]);
+    },
+  );
 
   it("escapes LIKE metacharacters in the text filter", async () => {
     await ctx.db.insert(teams).values([

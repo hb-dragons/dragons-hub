@@ -2,6 +2,7 @@ import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "../../config/database";
 import { matches, leagues, teams } from "@dragons/db/schema";
+import { todayInClubZone } from "@dragons/shared";
 import { escapeLikePattern } from "../utils/sql";
 
 const homeTeam = alias(teams, "home_team");
@@ -18,22 +19,20 @@ export interface BroadcastableMatch {
 
 /**
  * Own-club matches available for broadcast binding (admin match picker).
- * `scope: "today"` narrows to today's kickoff date via a UTC date slice — a
- * known pre-existing defect carried over by this extraction, not a design
- * choice: `task-reminder.worker.ts` and `referee-reminders.service.ts` are both
- * explicitly Berlin-aware for exactly this reason, and the club is in Berlin.
- * Around the UTC/CET boundary this can pick the wrong "today". Fixing it is
- * deliberately deferred to a follow-up issue. Anything else (including "all"
- * or omitted) leaves every date in scope. `q` does a case-insensitive
- * substring match against team name/short name, LIKE metacharacters escaped so
- * a literal "%" or "_" in a search term can't be read as a wildcard.
+ * `scope: "today"` narrows to today's kickoff date in the club timezone —
+ * `kickoffDate` is a club-local calendar day, and between club midnight and UTC
+ * midnight a UTC date slice would filter on yesterday, hiding the fixture an
+ * admin is setting up late in the evening. Anything else (including "all" or
+ * omitted) leaves every date in scope. `q` does a case-insensitive substring
+ * match against team name/short name, LIKE metacharacters escaped so a literal
+ * "%" or "_" in a search term can't be read as a wildcard.
  */
 export async function listBroadcastableMatches(opts: {
   q?: string;
   scope?: "today" | "all";
 }): Promise<BroadcastableMatch[]> {
   const { q, scope } = opts;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInClubZone();
 
   const ownIds = await getDb()
     .select({ id: teams.apiTeamPermanentId })
