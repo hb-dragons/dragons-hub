@@ -10,8 +10,23 @@ import { z } from "zod";
  * message-shaped before any of it reaches a model.
  */
 const MAX_MESSAGES = 60;
-const MAX_PARTS_PER_MESSAGE = 20;
 const MAX_TEXT_CHARS = 8000;
+
+/**
+ * Derived from `chat.ts`'s `stopWhen: stepCountIs(8)` — this route's tool loop
+ * can run up to 8 steps against `reschedTools` (7 tools), unlike `qa.ts`'s
+ * chat, which has no tools and stops at 5 steps. Every step boundary
+ * materialises as its own `step-start` part on the assistant `UIMessage`, and
+ * a step can add several parallel `tool-*` parts (Gemini can call more than
+ * one tool per step) plus text. 8 steps x (1 step-start + up to ~4 tool-call
+ * parts) + a trailing text part ~= 48. Copying `qa.ts`'s value of 20 here
+ * would let a full tool-heavy turn overflow the bound: `useChat` keeps that
+ * oversized assistant message in state, and `DefaultChatTransport` re-sends
+ * the whole list on every subsequent turn, so the chat gets stuck 400ing until
+ * the page reloads. If `stepCountIs()` in `chat.ts` or the tool count changes
+ * materially, re-derive this.
+ */
+const MAX_PARTS_PER_MESSAGE = 48;
 
 /**
  * `looseObject`, not `strictObject`: the AI SDK adds fields to `UIMessage` and

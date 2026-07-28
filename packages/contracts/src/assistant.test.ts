@@ -47,11 +47,42 @@ describe("assistantRescheduleChatBodySchema", () => {
   });
 
   it("rejects an unbounded parts array", () => {
-    const parts = Array.from({ length: 21 }, () => ({ type: "text", text: "x" }));
+    const parts = Array.from({ length: 49 }, () => ({ type: "text", text: "x" }));
     expect(
       assistantRescheduleChatBodySchema.safeParse({ messages: [{ ...message(), parts }] })
         .success,
     ).toBe(false);
+  });
+
+  // Regression for the bound copied verbatim from qa.ts (20) before it was
+  // re-derived for this route's 8-step tool loop (chat.ts's
+  // stopWhen: stepCountIs(8) against 7 reschedTools). A full tool-heavy turn
+  // emits a step-start part per step plus several parallel tool-call parts per
+  // step, comfortably clearing 20 and getting the assistant message itself
+  // rejected — which then gets stuck in useChat state and 400s every
+  // subsequent send/regenerate. This builds that shape and asserts it parses.
+  it("accepts a realistic 8-step tool-heavy assistant message", () => {
+    const parts: Array<Record<string, unknown>> = [];
+    for (let step = 0; step < 8; step++) {
+      parts.push({ type: "step-start" });
+      for (let call = 0; call < 4; call++) {
+        parts.push({
+          type: "tool-verify_slot",
+          toolCallId: `call-${step}-${call}`,
+          state: "output-available",
+          input: { date: "2026-08-01", time: "18:00", venueId: 1 },
+          output: { ok: true, conflicts: [] },
+        });
+      }
+    }
+    parts.push({ type: "text", text: "Saturday 18:00 at the main hall is free." });
+
+    const result = assistantRescheduleChatBodySchema.safeParse({
+      messages: [
+        { id: "assistant-1", role: "assistant", parts },
+      ],
+    });
+    expect(result.error?.issues ?? []).toEqual([]);
   });
 
   it("rejects a key the body schema does not declare", () => {

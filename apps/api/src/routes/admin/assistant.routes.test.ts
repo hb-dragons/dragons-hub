@@ -1,8 +1,25 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 
-const mocks = vi.hoisted(() => ({ streamRescheduleChat: vi.fn(), enabled: true }));
-vi.mock("../../middleware/rbac", () => ({ requirePermission: vi.fn(() => async (_c: unknown, next: () => Promise<void>) => next()) }));
+const mocks = vi.hoisted(() => ({
+  streamRescheduleChat: vi.fn(),
+  enabled: true,
+  rejectPermission: false,
+}));
+vi.mock("../../middleware/rbac", () => ({
+  requirePermission: vi.fn(
+    () =>
+      async (
+        c: { json: (body: unknown, status: number) => Response },
+        next: () => Promise<void>,
+      ) => {
+        if (mocks.rejectPermission) {
+          return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
+        }
+        return next();
+      },
+  ),
+}));
 vi.mock("../../middleware/rate-limit", () => ({ rateLimit: vi.fn(() => async (_c: unknown, next: () => Promise<void>) => next()) }));
 vi.mock("../../config/logger", () => ({ logger: { error: vi.fn(), child: vi.fn().mockReturnValue({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }) } }));
 vi.mock("../../config/env", () => ({ env: { get ASSISTANT_ENABLED() { return mocks.enabled; } } }));
@@ -29,10 +46,28 @@ describe("POST /admin/assistant/reschedule/chat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.enabled = true;
+    mocks.rejectPermission = false;
   });
 
   it("returns 503 with ASSISTANT_DISABLED when the assistant is disabled", async () => {
     mocks.enabled = false;
+    const res = await makeApp().request("/admin/assistant/reschedule/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [message()] }),
+    });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: "ASSISTANT_DISABLED" });
+    expect(mocks.streamRescheduleChat).not.toHaveBeenCalled();
+  });
+
+  // The gate must run before requirePermission: an unauthorized caller hitting
+  // a disabled feature should still learn it's disabled, not get a 403 that
+  // both masks the flag and (if the ordering ever flipped) would let a
+  // permission check run ahead of the kill switch.
+  it("returns 503, not 403, when disabled even for a caller requirePermission would reject", async () => {
+    mocks.enabled = false;
+    mocks.rejectPermission = true;
     const res = await makeApp().request("/admin/assistant/reschedule/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
