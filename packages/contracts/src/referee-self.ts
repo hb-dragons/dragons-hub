@@ -40,8 +40,9 @@ export type RefereeGamesQuery = z.infer<typeof refereeGamesQuerySchema>;
 
 /**
  * Body for POST /referee/games/:spielplanId/assign.
- * The referee may only assign themselves; the ownership check happens in the
- * route handler after parsing.
+ * The referee may only assign themselves; the ownership check happens in
+ * `assignRefereeAsSelf` (`apps/api/src/services/referee/referee-assignment.service.ts`),
+ * not the route handler.
  */
 export const refereeAssignBodySchema = z.strictObject({
   slotNumber: z.union([z.literal(1), z.literal(2)]),

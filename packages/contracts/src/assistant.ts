@@ -15,7 +15,8 @@ const MAX_TEXT_CHARS = 8000;
 /**
  * Derived from `chat.ts`'s `stopWhen: stepCountIs(8)` — this route's tool loop
  * can run up to 8 steps against `reschedTools` (7 tools), unlike `qa.ts`'s
- * chat, which has no tools and stops at 5 steps. Every step boundary
+ * chat, which stops at 5 steps against a smaller tool set (`qa-tools.ts`
+ * defines 3: `get_dashboard`, `get_standings`, `list_matches`). Every step boundary
  * materialises as its own `step-start` part on the assistant `UIMessage`, and
  * a step can add several parallel `tool-*` parts (Gemini can call more than
  * one tool per step) plus text. 8 steps x (1 step-start + up to ~4 tool-call

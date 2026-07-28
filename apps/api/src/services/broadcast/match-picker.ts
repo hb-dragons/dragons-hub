@@ -18,12 +18,15 @@ export interface BroadcastableMatch {
 
 /**
  * Own-club matches available for broadcast binding (admin match picker).
- * `scope: "today"` narrows to today's kickoff date (UTC-sliced, matching the
- * rest of this query's date handling — not timezone-aware); anything else
- * (including "all" or omitted) leaves every date in scope. `q` does a
- * case-insensitive substring match against team name/short name, LIKE
- * metacharacters escaped so a literal "%" or "_" in a search term can't be
- * read as a wildcard.
+ * `scope: "today"` narrows to today's kickoff date via a UTC date slice — a
+ * known pre-existing defect carried over by this extraction, not a design
+ * choice: `task-reminder.worker.ts` and `referee-reminders.service.ts` are both
+ * explicitly Berlin-aware for exactly this reason, and the club is in Berlin.
+ * Around the UTC/CET boundary this can pick the wrong "today". Fixing it is
+ * deliberately deferred to a follow-up issue. Anything else (including "all"
+ * or omitted) leaves every date in scope. `q` does a case-insensitive
+ * substring match against team name/short name, LIKE metacharacters escaped so
+ * a literal "%" or "_" in a search term can't be read as a wildcard.
  */
 export async function listBroadcastableMatches(opts: {
   q?: string;
