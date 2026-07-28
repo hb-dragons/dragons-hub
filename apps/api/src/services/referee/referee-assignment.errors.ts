@@ -16,6 +16,7 @@ export type AssignmentErrorCode =
   | "SLOT_TAKEN"
   | "DENY_RULE"
   | "FEDERATION_ERROR"
+  | "FORBIDDEN"
   | "NOT_OWN_CLUB"
   | "NOT_ASSIGNED";
 
@@ -28,6 +29,10 @@ export type AssignmentErrorCode =
  * gap produced no live 500 — the table is here so a future caller cannot fall
  * into it. Being keyed by `AssignmentErrorCode` also makes a new code without a
  * status a compile error rather than a silent 500.
+ *
+ * `FORBIDDEN` (#75, #52) is `assignRefereeAsSelf`'s own-referee-only guard,
+ * matching the 403 the route hand-rolled for the same message before the
+ * ownership check moved into the service.
  */
 const ASSIGNMENT_ERROR_STATUS: Record<AssignmentErrorCode, ContentfulStatusCode> = {
   GAME_NOT_FOUND: 404,
@@ -35,6 +40,7 @@ const ASSIGNMENT_ERROR_STATUS: Record<AssignmentErrorCode, ContentfulStatusCode>
   SLOT_TAKEN: 409,
   DENY_RULE: 403,
   FEDERATION_ERROR: 502,
+  FORBIDDEN: 403,
   NOT_OWN_CLUB: 403,
   NOT_ASSIGNED: 409,
 };

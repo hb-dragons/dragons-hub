@@ -1,4 +1,19 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
+
+/**
+ * Path param for POST /referee/games/:spielplanId/assign.
+ */
+export const refereeAssignParamSchema = z.object({
+  spielplanId: z.coerce.number().int().positive(),
+});
+export type RefereeAssignParam = z.infer<typeof refereeAssignParamSchema>;
+
+/**
+ * Path param for POST/DELETE /referee/games/:id/claim.
+ */
+export const refereeClaimParamSchema = idParamSchema;
+export type RefereeClaimParam = z.infer<typeof refereeClaimParamSchema>;
 
 /**
  * Query params for GET /referee/games.

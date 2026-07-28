@@ -1,101 +1,88 @@
 import { Hono } from "hono";
+import { validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import { requireRefereeSelf } from "../../middleware/rbac";
-import { getDb } from "../../config/database";
-import { referees } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
-import { assignReferee } from "../../services/referee/referee-assignment.service";
+import { validationHook } from "../../middleware/validation";
+import { assignRefereeAsSelf } from "../../services/referee/referee-assignment.service";
 import {
   claimRefereeGame,
   unclaimRefereeGame,
 } from "../../services/referee/referee-claim.service";
-import { refereeAssignBodySchema, refereeClaimBodySchema } from "@dragons/contracts";
+import {
+  refereeAssignBodySchema,
+  refereeAssignParamSchema,
+  refereeClaimBodySchema,
+  refereeClaimParamSchema,
+} from "@dragons/contracts";
 
 // AssignmentError carries its own status; middleware/error.ts maps it.
 // Admin-override variants live in admin/referee-assignment.routes.ts.
 const refereeAssignmentRoutes = new Hono<AppEnv>();
 
-refereeAssignmentRoutes.post("/games/:spielplanId/assign", requireRefereeSelf, async (c) => {
-  const spielplanId = Number(c.req.param("spielplanId"));
-  if (!Number.isInteger(spielplanId) || spielplanId <= 0) {
-    return c.json({ error: "Invalid spielplanId", code: "VALIDATION_ERROR" }, 400);
-  }
+refereeAssignmentRoutes.post(
+  "/games/:spielplanId/assign",
+  requireRefereeSelf,
+  validator("param", refereeAssignParamSchema, validationHook),
+  validator("json", refereeAssignBodySchema, validationHook),
+  async (c) => {
+    const { spielplanId } = c.req.valid("param");
+    const { slotNumber, refereeApiId } = c.req.valid("json");
 
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
-  }
-  const { slotNumber, refereeApiId } = refereeAssignBodySchema.parse(body);
+    // Not a caught service error: this is a middleware-context check (the
+    // session has no linked referee row at all), so there is nothing for
+    // assignRefereeAsSelf to look up yet.
+    const refereeId = c.get("refereeId");
+    if (refereeId === undefined) {
+      return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
+    }
 
-  // Ownership check: referee can only assign themselves.
-  const refereeId = c.get("refereeId");
-  if (refereeId === undefined) {
-    return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
-  }
+    const result = await assignRefereeAsSelf(spielplanId, slotNumber, refereeApiId, refereeId);
+    return c.json(result);
+  },
+);
 
-  const [refereeRow] = await getDb()
-    .select({ apiId: referees.apiId, isOwnClub: referees.isOwnClub })
-    .from(referees)
-    .where(eq(referees.id, refereeId))
-    .limit(1);
+refereeAssignmentRoutes.post(
+  "/games/:id/claim",
+  requireRefereeSelf,
+  validator("param", refereeClaimParamSchema, validationHook),
+  validator("json", refereeClaimBodySchema, validationHook),
+  async (c) => {
+    const { id } = c.req.valid("param");
 
-  if (!refereeRow || refereeRow.apiId !== refereeApiId) {
-    return c.json({ error: "Cannot assign another referee", code: "FORBIDDEN" }, 403);
-  }
+    const refereeId = c.get("refereeId");
+    if (refereeId === undefined) {
+      return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
+    }
 
-  if (!refereeRow.isOwnClub) {
-    return c.json({ error: "Referee is not an own-club referee", code: "NOT_OWN_CLUB" }, 403);
-  }
+    const body = c.req.valid("json");
 
-  const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
-  return c.json(result);
-});
+    const result = await claimRefereeGame({
+      refereeId,
+      gameId: id,
+      slotNumber: body?.slotNumber,
+    });
+    return c.json(result);
+  },
+);
 
-refereeAssignmentRoutes.post("/games/:id/claim", requireRefereeSelf, async (c) => {
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || id <= 0) {
-    return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
-  }
+refereeAssignmentRoutes.delete(
+  "/games/:id/claim",
+  requireRefereeSelf,
+  validator("param", refereeClaimParamSchema, validationHook),
+  async (c) => {
+    const { id } = c.req.valid("param");
 
-  const refereeId = c.get("refereeId");
-  if (refereeId === undefined) {
-    return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
-  }
+    const refereeId = c.get("refereeId");
+    if (refereeId === undefined) {
+      return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
+    }
 
-  let parsed: { slotNumber?: 1 | 2 } | undefined;
-  try {
-    const raw = await c.req.text();
-    parsed = raw ? refereeClaimBodySchema.parse(JSON.parse(raw)) : undefined;
-  } catch {
-    return c.json({ error: "Invalid JSON body", code: "VALIDATION_ERROR" }, 400);
-  }
-
-  const result = await claimRefereeGame({
-    refereeId,
-    gameId: id,
-    slotNumber: parsed?.slotNumber,
-  });
-  return c.json(result);
-});
-
-refereeAssignmentRoutes.delete("/games/:id/claim", requireRefereeSelf, async (c) => {
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || id <= 0) {
-    return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
-  }
-
-  const refereeId = c.get("refereeId");
-  if (refereeId === undefined) {
-    return c.json({ error: "Referee profile not linked", code: "FORBIDDEN" }, 403);
-  }
-
-  const result = await unclaimRefereeGame({
-    refereeId,
-    gameId: id,
-  });
-  return c.json(result);
-});
+    const result = await unclaimRefereeGame({
+      refereeId,
+      gameId: id,
+    });
+    return c.json(result);
+  },
+);
 
 export { refereeAssignmentRoutes };

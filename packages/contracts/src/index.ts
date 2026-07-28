@@ -185,9 +185,13 @@ export {
   refereeGamesQuerySchema,
   refereeAssignBodySchema,
   refereeClaimBodySchema,
+  refereeAssignParamSchema,
+  refereeClaimParamSchema,
   type RefereeGamesQuery,
   type RefereeAssignBody,
   type RefereeClaimBody,
+  type RefereeAssignParam,
+  type RefereeClaimParam,
 } from "./referee-self";
 
 export {
