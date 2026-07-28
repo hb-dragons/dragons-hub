@@ -14,6 +14,17 @@ export const matchListQuerySchema = z.object({
     .transform((v) => v === "true")
     .optional(),
   teamApiId: z.coerce.number().int().positive().optional(),
+});
+
+// GET /admin/matches shares matchListQuerySchema above and passes the entire
+// validated query straight through to getOwnClubMatches — it never
+// destructures individual keys. Bounding opponentApiId there directly would
+// silently turn it into a live, undocumented admin filter (and turn a
+// previously-tolerated unknown `opponentApiId` into a 400, since neither
+// schema is .strict()). The public route is the only one with a declared
+// opponentApiId filter, so it gets its own schema instead of widening the
+// shared one.
+export const publicMatchListQuerySchema = matchListQuerySchema.extend({
   opponentApiId: z.coerce.number().int().positive().optional(),
 });
 
@@ -62,6 +73,7 @@ export const releaseOverrideParamsSchema = idParamSchema.extend({
 });
 
 export type MatchListQuery = z.infer<typeof matchListQuerySchema>;
+export type PublicMatchListQuery = z.infer<typeof publicMatchListQuerySchema>;
 export type MatchUpdateBody = z.infer<typeof matchUpdateBodySchema>;
 export type MatchIdParam = z.infer<typeof matchIdParamSchema>;
 export type MatchHistoryQuery = z.infer<typeof matchHistoryQuerySchema>;

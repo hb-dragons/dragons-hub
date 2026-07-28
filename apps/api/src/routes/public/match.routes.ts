@@ -5,7 +5,7 @@ import { getPublicMatchDetail } from "../../services/admin/match-query.service";
 import { getMatchContext } from "../../services/public/match-context.service";
 import { buildCalendarFeed } from "../../services/public/calendar.service";
 import {
-  matchListQuerySchema,
+  publicMatchListQuerySchema,
   publicScheduleIcsQuerySchema,
   publicMatchIdParamSchema,
 } from "@dragons/contracts";
@@ -25,7 +25,7 @@ const publicMatchRoutes = new Hono();
 // GET /public/matches - List own club matches (no auth required)
 publicMatchRoutes.get(
   "/matches",
-  validator("query", matchListQuerySchema, validationHook),
+  validator("query", publicMatchListQuerySchema, validationHook),
   describeRoute({
     description: "List own club matches (public)",
     tags: ["Public"],

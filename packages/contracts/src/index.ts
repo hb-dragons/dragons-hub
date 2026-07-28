@@ -17,12 +17,14 @@ export {
 
 export {
   matchListQuerySchema,
+  publicMatchListQuerySchema,
   matchIdParamSchema,
   publicMatchIdParamSchema,
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
   releaseOverrideParamsSchema,
   type MatchListQuery,
+  type PublicMatchListQuery,
   type MatchUpdateBody,
   type MatchIdParam,
   type MatchHistoryQuery,

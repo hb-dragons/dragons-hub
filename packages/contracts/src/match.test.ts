@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   matchListQuerySchema,
+  publicMatchListQuerySchema,
   matchIdParamSchema,
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
@@ -48,21 +49,15 @@ describe("matchListQuerySchema", () => {
     expect(result).toMatchObject({ teamApiId: 42 });
   });
 
-  it("coerces opponentApiId to number", () => {
-    const result = matchListQuerySchema.parse({ opponentApiId: "42" });
-    expect(result).toMatchObject({ opponentApiId: 42 });
-  });
-
-  it("rejects zero opponentApiId", () => {
-    expect(() => matchListQuerySchema.parse({ opponentApiId: "0" })).toThrow();
-  });
-
-  it("rejects negative opponentApiId", () => {
-    expect(() => matchListQuerySchema.parse({ opponentApiId: "-1" })).toThrow();
-  });
-
-  it("rejects non-numeric opponentApiId string", () => {
-    expect(() => matchListQuerySchema.parse({ opponentApiId: "abc" })).toThrow();
+  // matchListQuerySchema is shared with GET /admin/matches, which passes the
+  // whole validated query straight through to getOwnClubMatches without
+  // destructuring individual keys. It deliberately has no opponentApiId
+  // field — see publicMatchListQuerySchema below — and isn't .strict(), so an
+  // unknown opponentApiId key is silently stripped rather than rejected. This
+  // is the pre-Task-8 behaviour and must stay that way for the admin route.
+  it("silently strips an unrecognized opponentApiId key", () => {
+    const result = matchListQuerySchema.parse({ opponentApiId: "abc" });
+    expect(result).not.toHaveProperty("opponentApiId");
   });
 
   it("rejects invalid dateFrom format", () => {
@@ -95,6 +90,35 @@ describe("matchListQuerySchema", () => {
 
   it("rejects non-numeric leagueId string", () => {
     expect(() => matchListQuerySchema.parse({ leagueId: "abc" })).toThrow();
+  });
+});
+
+describe("publicMatchListQuerySchema", () => {
+  it("parses minimal input with the same defaults as matchListQuerySchema", () => {
+    const result = publicMatchListQuerySchema.parse({});
+    expect(result).toEqual({ limit: 1000, offset: 0, sort: "asc" });
+  });
+
+  it("still accepts every matchListQuerySchema field", () => {
+    const result = publicMatchListQuerySchema.parse({ teamApiId: "7", leagueId: "3", sort: "desc" });
+    expect(result).toMatchObject({ teamApiId: 7, leagueId: 3, sort: "desc" });
+  });
+
+  it("coerces opponentApiId to number", () => {
+    const result = publicMatchListQuerySchema.parse({ opponentApiId: "42" });
+    expect(result).toMatchObject({ opponentApiId: 42 });
+  });
+
+  it("rejects zero opponentApiId", () => {
+    expect(() => publicMatchListQuerySchema.parse({ opponentApiId: "0" })).toThrow();
+  });
+
+  it("rejects negative opponentApiId", () => {
+    expect(() => publicMatchListQuerySchema.parse({ opponentApiId: "-1" })).toThrow();
+  });
+
+  it("rejects non-numeric opponentApiId string", () => {
+    expect(() => publicMatchListQuerySchema.parse({ opponentApiId: "abc" })).toThrow();
   });
 });
 
