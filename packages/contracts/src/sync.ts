@@ -53,6 +53,7 @@ export const syncJobStatusesQuerySchema = z.object({
           validJobStatuses.includes(s as (typeof validJobStatuses)[number]),
         );
     }),
+  limit: z.coerce.number().int().positive().max(500).default(100),
 });
 
 export const syncUpdateScheduleBodySchema = z.strictObject({

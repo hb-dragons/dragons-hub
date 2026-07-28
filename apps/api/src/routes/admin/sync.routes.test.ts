@@ -215,6 +215,12 @@ describe("GET /sync/jobs", () => {
     expect(res.status).toBe(200);
     expect(mocks.syncQueue.getJobs).toHaveBeenCalledWith(["active"], 0, 100, false);
   });
+
+  it("rejects a limit above the cap instead of silently clamping", async () => {
+    const res = await app.request("/sync/jobs?limit=9999");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
 });
 
 describe("POST /sync/jobs/:jobId/retry", () => {

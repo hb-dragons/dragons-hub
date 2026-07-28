@@ -5,7 +5,7 @@ import {
   setClubConfig,
   getBookingSettings,
   setBookingSettings,
-  getSetting,
+  getRefereeReminderDays,
   upsertSetting,
 } from "../../services/admin/settings.service";
 import { requirePermission } from "../../middleware/rbac";
@@ -93,16 +93,7 @@ settingsRoutes.get(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const value = await getSetting("referee_reminder_days");
-    let days: unknown = [7, 3, 1];
-    if (value) {
-      try {
-        days = JSON.parse(value);
-      } catch {
-        days = [7, 3, 1];
-      }
-    }
-    return c.json({ days });
+    return c.json({ days: await getRefereeReminderDays() });
   },
 );
 
@@ -138,7 +129,13 @@ settingsRoutes.post(
     const userId = c.get("user")?.id;
     const result = await triggerRefereeGamesSync(userId);
     if (result === null) {
-      return c.json({ error: "Referee games sync already in progress or queued" }, 409);
+      return c.json(
+        {
+          error: "Referee games sync already in progress or queued",
+          code: "SYNC_ALREADY_QUEUED",
+        },
+        409,
+      );
     }
     return c.json({ success: true, syncRunId: result.syncRunId, message: "Referee games sync triggered" });
   },

@@ -29,6 +29,7 @@ import {
   setClubConfig,
   getBookingSettings,
   setBookingSettings,
+  getRefereeReminderDays,
 } from "./settings.service";
 import { appSettings } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
@@ -251,5 +252,29 @@ describe("setBookingSettings", () => {
     expect(await readRaw("venue_booking_game_duration")).toBe("120");
     expect(await readRaw("venue_booking_due_days_before")).toBe("14");
     expect(await ctx.db.select().from(appSettings)).toHaveLength(4);
+  });
+});
+
+describe("getRefereeReminderDays", () => {
+  it("returns the stored days when valid", async () => {
+    await upsertSetting("referee_reminder_days", JSON.stringify([7, 3, 1]));
+
+    expect(await getRefereeReminderDays()).toEqual([7, 3, 1]);
+  });
+
+  it("returns the default [7, 3, 1] when not configured", async () => {
+    expect(await getRefereeReminderDays()).toEqual([7, 3, 1]);
+  });
+
+  it("falls back to the default when the stored value is malformed JSON", async () => {
+    await upsertSetting("referee_reminder_days", "not json");
+
+    expect(await getRefereeReminderDays()).toEqual([7, 3, 1]);
+  });
+
+  it("falls back to the default when the stored value is not an array of numbers", async () => {
+    await upsertSetting("referee_reminder_days", JSON.stringify({ nope: true }));
+
+    await expect(getRefereeReminderDays()).resolves.toEqual([7, 3, 1]);
   });
 });
