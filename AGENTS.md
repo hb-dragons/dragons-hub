@@ -192,6 +192,22 @@ Consequences for anything reading those tables:
   block refilling the slot. Unlike the three indexes listed in
   `packages/db/drizzle/README.md`, this one **is** declared in the Drizzle
   schema, so drizzle-kit can see it.
+- **A tombstone is not permanent: presence in the feed means live.** The two
+  tables reach that end differently, and the difference is the unique
+  constraint. `matchReferees` is partial-unique, so a re-listed assignment
+  simply inserts a new live row and the tombstone stays as history.
+  `refereeGames.apiMatchId` is *fully* unique, so there can only ever be one row
+  per game and it has to **resurrect in place**: the upsert reads tombstoned
+  rows deliberately (an insert would collide) and clears `removedAt` on the
+  update path (issue #142).
+- Resurrection has to bypass the `dataHash` equality skip. A game re-listed with
+  identical data hashes the same, so the skip would leave it tombstoned forever
+  with no later sync able to recover it.
+- A resurrected `refereeGames` row is treated like a new one: it re-emits
+  `referee.slots.needed` when an our-club slot is open and re-arms its reminder
+  jobs. The withdrawal emitted `match.removed` and cancelled those jobs, so
+  reviving the row without them leaves a game that is visible but unannounced
+  and unreminded.
 
 ## Sync Pipeline
 
