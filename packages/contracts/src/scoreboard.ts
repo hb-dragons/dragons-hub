@@ -9,6 +9,16 @@ export const scoreboardListQuerySchema = z.object({
 export type ScoreboardListQuery = z.infer<typeof scoreboardListQuerySchema>;
 
 /**
+ * The single required parameter shared by every public scoreboard/broadcast
+ * read: which device's data to fetch.
+ */
+export const scoreboardDeviceQuerySchema = z.object({
+  deviceId: z.string().min(1),
+});
+
+export type ScoreboardDeviceQuery = z.infer<typeof scoreboardDeviceQuerySchema>;
+
+/**
  * The numeric `Last-Event-ID` header for SSE reconnection on
  * GET /public/scoreboard/stream. A positive int when present; absent or
  * malformed values yield `undefined` so reconnection degrades gracefully

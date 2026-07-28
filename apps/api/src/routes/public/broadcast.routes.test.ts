@@ -10,6 +10,7 @@ import {
 import { Hono } from "hono";
 import type * as ConfigEnv from "../../config/env";
 import type * as ScoreboardPubsub from "../../services/scoreboard/pubsub";
+import type { AppEnv } from "../../types";
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
@@ -19,7 +20,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/redis", () => ({
-  incrementSlidingWindow: (...a: unknown[]) => mocks.incrementSlidingWindow(...a),
+  incrementSlidingWindow: (...a: unknown[]) =>
+    mocks.incrementSlidingWindow(...a),
+}));
+
+vi.mock("../../config/logger", () => ({
+  logger: {
+    error: vi.fn(),
+    warn: vi.fn(),
+    child: () => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }),
+  },
 }));
 
 vi.mock("../../config/env", async () => {
@@ -35,13 +45,14 @@ vi.mock("../../config/env", async () => {
 });
 
 vi.mock("../../config/database", () => ({
-  getDb: () => (new Proxy(
-    {},
-    {
-      get: (_t, prop) =>
-        (dbHolder.ref as Record<string | symbol, unknown>)[prop],
-    },
-  )),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_t, prop) =>
+          (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
 vi.mock("../../services/scoreboard/pubsub", async () => {
@@ -62,6 +73,8 @@ import {
 import type { TestDbContext } from "../../test/setup-test-db";
 import { broadcastConfigs } from "@dragons/db/schema";
 import { publicBroadcastRoutes } from "./broadcast.routes";
+import { errorHandler } from "../../middleware/error";
+import * as publisher from "../../services/broadcast/publisher";
 
 let ctx: TestDbContext;
 beforeAll(async () => {
@@ -80,19 +93,41 @@ afterAll(async () => {
 });
 
 function makeApp() {
-  return new Hono().route("/public/broadcast", publicBroadcastRoutes);
+  const app = new Hono<AppEnv>();
+  app.onError(errorHandler);
+  app.route("/public/broadcast", publicBroadcastRoutes);
+  return app;
 }
 
 describe("GET /public/broadcast/state", () => {
-  it("returns 400 without deviceId", async () => {
+  it("rejects a missing deviceId with the shared envelope", async () => {
     const res = await makeApp().request("/public/broadcast/state");
     expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: expect.any(Array),
+    });
+  });
+
+  it("returns 500 through the shared error handler when the service throws", async () => {
+    const spy = vi
+      .spyOn(publisher, "buildBroadcastState")
+      .mockRejectedValueOnce(new Error("boom"));
+
+    try {
+      const res = await makeApp().request(
+        "/public/broadcast/state?deviceId=d1",
+      );
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toMatchObject({ code: "INTERNAL_ERROR" });
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("returns idle state when no config exists", async () => {
-    const res = await makeApp().request(
-      "/public/broadcast/state?deviceId=d1",
-    );
+    const res = await makeApp().request("/public/broadcast/state?deviceId=d1");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { phase: string; isLive: boolean };
     expect(body.phase).toBe("idle");
@@ -104,9 +139,7 @@ describe("GET /public/broadcast/state", () => {
       deviceId: "d1",
       isLive: true,
     });
-    const res = await makeApp().request(
-      "/public/broadcast/state?deviceId=d1",
-    );
+    const res = await makeApp().request("/public/broadcast/state?deviceId=d1");
     const body = (await res.json()) as { isLive: boolean };
     expect(body.isLive).toBe(true);
   });
@@ -138,9 +171,7 @@ describe("GET /public/broadcast/state", () => {
   it("returns 429 once the anonymous window budget is spent", async () => {
     mocks.incrementSlidingWindow.mockResolvedValue([601, 0]);
 
-    const res = await makeApp().request(
-      "/public/broadcast/state?deviceId=d1",
-    );
+    const res = await makeApp().request("/public/broadcast/state?deviceId=d1");
 
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("60");
@@ -149,9 +180,7 @@ describe("GET /public/broadcast/state", () => {
   it("serves a request inside the budget", async () => {
     mocks.incrementSlidingWindow.mockResolvedValue([600, 0]);
 
-    const res = await makeApp().request(
-      "/public/broadcast/state?deviceId=d1",
-    );
+    const res = await makeApp().request("/public/broadcast/state?deviceId=d1");
 
     expect(res.status).toBe(200);
   });
@@ -159,9 +188,7 @@ describe("GET /public/broadcast/state", () => {
   it("fails open when Redis is unreachable", async () => {
     mocks.incrementSlidingWindow.mockRejectedValue(new Error("redis down"));
 
-    const res = await makeApp().request(
-      "/public/broadcast/state?deviceId=d1",
-    );
+    const res = await makeApp().request("/public/broadcast/state?deviceId=d1");
 
     expect(res.status).toBe(200);
   });
@@ -169,16 +196,18 @@ describe("GET /public/broadcast/state", () => {
 
 describe("GET /public/broadcast/stream", () => {
   it("returns text/event-stream", async () => {
-    const res = await makeApp().request(
-      "/public/broadcast/stream?deviceId=d1",
-    );
+    const res = await makeApp().request("/public/broadcast/stream?deviceId=d1");
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     await res.body?.cancel();
   });
 
-  it("returns 400 without deviceId", async () => {
+  it("rejects a missing deviceId with the shared envelope", async () => {
     const res = await makeApp().request("/public/broadcast/stream");
     expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: expect.any(Array),
+    });
   });
 
   it("returns 404 for unknown deviceId", async () => {

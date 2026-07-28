@@ -217,8 +217,10 @@ export {
 export {
   scoreboardListQuerySchema,
   scoreboardLastEventIdSchema,
+  scoreboardDeviceQuerySchema,
   type ScoreboardListQuery,
   type ScoreboardLastEventId,
+  type ScoreboardDeviceQuery,
 } from "./scoreboard";
 
 export {
