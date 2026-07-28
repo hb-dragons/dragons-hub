@@ -15,9 +15,16 @@ const settingsUpdate = requirePermission("settings", "update");
 
 notificationTestRoutes.post(
   "/notifications/test-push",
+  // Ordering matters both ways: `settingsUpdate` must run before `rateLimit`
+  // because rate-limit.ts reads c.get("user") to key the bucket per caller —
+  // swapping them would bucket every unauthenticated caller as "anon" and
+  // share one global cooldown. `validator` must run before `rateLimit` because
+  // this route's window is `limit: 1` — a malformed body that increments the
+  // counter before validation rejects it would burn the caller's only slot on
+  // a request that never sent a real test push, 429ing their next, valid, one.
   settingsUpdate,
-  rateLimit({ limit: 1, windowSeconds: 10, keyPrefix: "test-push" }),
   validator("json", notificationTestSendBodySchema, validationHook),
+  rateLimit({ limit: 1, windowSeconds: 10, keyPrefix: "test-push" }),
   describeRoute({
     description:
       "Send a test push notification to the calling admin's own devices",

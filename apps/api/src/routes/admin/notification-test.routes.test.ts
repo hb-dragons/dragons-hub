@@ -116,6 +116,23 @@ describe("POST /notifications/test-push — validation", () => {
       message: undefined,
     });
   });
+
+  // Regression: validator() must run before rateLimit(). The route's window is
+  // `limit: 1, windowSeconds: 10` — if the limiter ran first, a malformed body
+  // would still increment the counter and burn the caller's only slot, so a
+  // genuinely valid send right after would 429 instead of sending. Asserting
+  // incrementSlidingWindow was never called for the rejected request proves the
+  // limiter did not run at all, not just that the second request happened to
+  // succeed.
+  it("does not consume the rate-limit budget on a malformed body", async () => {
+    const rejected = await post({ message: 42 });
+    expect(rejected.status).toBe(400);
+    expect(mocks.incrementSlidingWindow).not.toHaveBeenCalled();
+
+    mocks.incrementSlidingWindow.mockResolvedValueOnce([1, 0]);
+    const accepted = await post({ message: "hello" });
+    expect(accepted.status).toBe(200);
+  });
 });
 
 describe("POST /notifications/test-push — success delegation", () => {

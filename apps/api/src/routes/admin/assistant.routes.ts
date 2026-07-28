@@ -30,6 +30,7 @@ assistantRoutes.post(
     responses: {
       200: { description: "UI message stream" },
       400: { description: "Bad request" },
+      413: { description: "Body too large" },
       429: { description: "Rate limited" },
       503: { description: "Assistant disabled" },
     },
