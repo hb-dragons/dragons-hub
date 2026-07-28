@@ -19,7 +19,7 @@ import {
   syncQueue,
   taskRemindersQueue,
 } from "../workers/queues";
-import { SyncAlreadyQueuedError } from "./sync-jobs.errors";
+import { SyncAlreadyQueuedError, SyncJobNotFailedError } from "./sync-jobs.errors";
 
 interface SyncJobPayload {
   type: "full" | "referee-games";
@@ -270,6 +270,28 @@ export async function getJobStatus(jobId: string) {
     result: job.returnvalue,
     error: job.failedReason,
   };
+}
+
+/**
+ * Retry a failed queue job.
+ *
+ * Returns `null` when no such job exists (the route renders that as a 404, the
+ * same shape {@link getJobStatus} gets). Throws {@link SyncJobNotFailedError}
+ * for a job in any other state — "only a failed job may be retried" is a rule
+ * about sync jobs, not about HTTP, so it lives here and carries its own 400 to
+ * the central error handler.
+ */
+export async function retrySyncJob(jobId: string): Promise<{ status: "retried" } | null> {
+  const job = await syncQueue.getJob(jobId);
+  if (!job) return null;
+
+  const state = await job.getState();
+  if (state !== "failed") {
+    throw new SyncJobNotFailedError(state);
+  }
+
+  await job.retry();
+  return { status: "retried" };
 }
 
 export async function updateSyncSchedule(

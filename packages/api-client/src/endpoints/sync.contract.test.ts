@@ -3,6 +3,7 @@ import {
   syncLogsQuerySchema,
   syncEntriesQuerySchema,
   syncUpdateScheduleBodySchema,
+  syncTypeQuerySchema,
 } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { syncEndpoints } from "./sync";
@@ -89,11 +90,14 @@ describe("sync request bodies satisfy @dragons/contracts schemas", () => {
     expect(calls[0]!.url).toContain("/admin/sync/trigger");
   });
 
-  it("status passes syncType as a query param when provided", async () => {
+  it("status query parses against syncTypeQuerySchema", async () => {
     const { api, calls } = recordingClient();
     await api.status("referee-games");
     const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
-    expect(query.syncType).toBe("referee-games");
+    const parsed = syncTypeQuerySchema.safeParse(query);
+    expect(parsed.data, "syncTypeQuerySchema rejected the status query").toEqual({
+      syncType: "referee-games",
+    });
   });
 
   it("status omits the query string when no syncType is given", async () => {
@@ -102,11 +106,14 @@ describe("sync request bodies satisfy @dragons/contracts schemas", () => {
     expect(calls[0]!.url).not.toContain("?");
   });
 
-  it("schedule passes syncType as a query param when provided", async () => {
+  it("schedule query parses against syncTypeQuerySchema", async () => {
     const { api, calls } = recordingClient();
     await api.schedule("referee-games");
     const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
-    expect(query.syncType).toBe("referee-games");
+    const parsed = syncTypeQuerySchema.safeParse(query);
+    expect(parsed.data, "syncTypeQuerySchema rejected the schedule query").toEqual({
+      syncType: "referee-games",
+    });
   });
 
   it("schedule omits the query string when no syncType is given", async () => {

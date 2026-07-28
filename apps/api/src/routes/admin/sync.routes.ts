@@ -3,7 +3,7 @@ import { streamSSE } from "hono/streaming";
 import { describeRoute, validator } from "hono-openapi";
 import type { AppEnv } from "../../types";
 import { syncQueue } from "../../workers/queues";
-import { triggerManualSync, getJobStatus } from "../../services/sync-jobs.service";
+import { triggerManualSync, getJobStatus, retrySyncJob } from "../../services/sync-jobs.service";
 import {
   getSyncStatus,
   getSyncLogs,
@@ -21,6 +21,8 @@ import {
   syncEntriesQuerySchema,
   syncStreamParamSchema,
   syncJobStatusesQuerySchema,
+  syncJobIdParamSchema,
+  syncTypeQuerySchema,
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
   SYNC_JOB_STATUSES,
@@ -57,13 +59,14 @@ syncRoutes.post(
 syncRoutes.get(
   "/sync/status",
   requirePermission("sync", "view"),
+  validator("query", syncTypeQuerySchema, validationHook),
   describeRoute({
     description: "Get overall sync status",
     tags: ["Sync"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const syncType = c.req.query("syncType");
+    const { syncType } = c.req.valid("query");
     const result = await getSyncStatus(syncType);
     return c.json(result);
   },
@@ -73,6 +76,7 @@ syncRoutes.get(
 syncRoutes.get(
   "/sync/status/:jobId",
   requirePermission("sync", "view"),
+  validator("param", syncJobIdParamSchema, validationHook),
   describeRoute({
     description: "Get specific job status",
     tags: ["Sync"],
@@ -82,7 +86,7 @@ syncRoutes.get(
     },
   }),
   async (c) => {
-    const jobId = c.req.param("jobId");
+    const { jobId } = c.req.valid("param");
     const status = await getJobStatus(jobId);
 
     if (!status) {
@@ -136,6 +140,7 @@ syncRoutes.get(
 syncRoutes.post(
   "/sync/jobs/:jobId/retry",
   requirePermission("sync", "trigger"),
+  validator("param", syncJobIdParamSchema, validationHook),
   describeRoute({
     description: "Retry a failed job",
     tags: ["Sync"],
@@ -146,20 +151,16 @@ syncRoutes.post(
     },
   }),
   async (c) => {
-    const jobId = c.req.param("jobId");
-    const job = await syncQueue.getJob(jobId);
+    const { jobId } = c.req.valid("param");
+    // A job in any state but `failed` throws SyncJobNotFailedError, which the
+    // central error handler renders as 400 — no state branch belongs here.
+    const result = await retrySyncJob(jobId);
 
-    if (!job) {
+    if (!result) {
       return c.json({ error: "Job not found", code: "NOT_FOUND" }, 404);
     }
 
-    const state = await job.getState();
-    if (state !== "failed") {
-      return c.json({ error: `Job is not in failed state (current: ${state})`, code: "INVALID_STATE" }, 400);
-    }
-
-    await job.retry();
-    return c.json({ status: "retried" });
+    return c.json(result);
   },
 );
 
@@ -167,6 +168,7 @@ syncRoutes.post(
 syncRoutes.delete(
   "/sync/jobs/:jobId",
   requirePermission("sync", "trigger"),
+  validator("param", syncJobIdParamSchema, validationHook),
   describeRoute({
     description: "Remove a job from the queue",
     tags: ["Sync"],
@@ -176,7 +178,7 @@ syncRoutes.delete(
     },
   }),
   async (c) => {
-    const jobId = c.req.param("jobId");
+    const { jobId } = c.req.valid("param");
     const job = await syncQueue.getJob(jobId);
 
     if (!job) {
@@ -192,6 +194,7 @@ syncRoutes.delete(
 syncRoutes.get(
   "/sync/jobs/:jobId/logs",
   requirePermission("sync", "view"),
+  validator("param", syncJobIdParamSchema, validationHook),
   describeRoute({
     description: "Get BullMQ logs for a job",
     tags: ["Sync"],
@@ -201,7 +204,7 @@ syncRoutes.get(
     },
   }),
   async (c) => {
-    const jobId = c.req.param("jobId");
+    const { jobId } = c.req.valid("param");
     const job = await syncQueue.getJob(jobId);
 
     if (!job) {
@@ -382,14 +385,15 @@ syncRoutes.get(
 syncRoutes.get(
   "/sync/schedule",
   requirePermission("sync", "view"),
+  validator("query", syncTypeQuerySchema, validationHook),
   describeRoute({
     description: "Get current sync schedule",
     tags: ["Sync"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const syncType = c.req.query("syncType") ?? "full";
-    const schedule = await getSchedule(syncType);
+    const { syncType } = c.req.valid("query");
+    const schedule = await getSchedule(syncType ?? "full");
     return c.json(schedule);
   },
 );

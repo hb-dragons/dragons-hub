@@ -20,3 +20,16 @@ export class SyncAlreadyQueuedError extends AppError {
     super(message, "SYNC_ALREADY_QUEUED", 409);
   }
 }
+
+/**
+ * A retry was requested for a queue job that is not in the `failed` state.
+ * Only a failed job may be retried; every other state is a no-op the caller
+ * should be told about. Mapped to HTTP 400 by the central error handler.
+ */
+export class SyncJobNotFailedError extends AppError {
+  declare readonly code: "INVALID_STATE";
+
+  constructor(state: string) {
+    super(`Job is not in failed state (current: ${state})`, "INVALID_STATE", 400);
+  }
+}
