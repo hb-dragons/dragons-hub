@@ -265,12 +265,13 @@ describe("POST /games/:spielplanId/assign — gating and validation", () => {
     expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
   });
 
-  it("returns 400 for a non-numeric spielplanId", async () => {
+  it("rejects a non-numeric spielplanId with the shared validation envelope", async () => {
     await signInAsReferee();
 
     const res = await assignRequest({ slotNumber: 1, refereeApiId: REF_API_ID }, "abc");
 
     expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
     expect(mocks.submitRefereeAssignment).not.toHaveBeenCalled();
   });
 });
@@ -477,6 +478,13 @@ describe("POST /games/:id/claim", () => {
   });
 
   it("claims the auto-picked slot when there is no body", async () => {
+    // Every field on refereeClaimBodySchema is optional, and Hono's validator
+    // sets value = {} when Content-Type is absent (as here — no headers, no
+    // body at all), so this bodyless POST must still mean "no slot preference"
+    // rather than a 400. The api-client (referee.ts:62) always sends a real
+    // `{}` JSON body instead, which the same optional schema parses just as
+    // permissively — this test covers the other real client shape: a caller
+    // that posts with no body and no Content-Type at all.
     await signInAsReferee();
     const gameId = await seedGame();
     federationAccepts();
@@ -493,6 +501,26 @@ describe("POST /games/:id/claim", () => {
     };
     expect(body).toEqual(expected);
     expect((await slotStatuses()).sr1_referee_api_id).toBe(REF_API_ID);
+  });
+
+  it("claims the auto-picked slot for an explicit empty-object body (the api-client's shape)", async () => {
+    // packages/api-client/src/endpoints/referee.ts:62 sends `params ?? {}` with
+    // Content-Type: application/json — a real (non-empty) "{}" body, distinct
+    // from the no-body/no-Content-Type case above. Both must mean "no slot
+    // preference".
+    await signInAsReferee();
+    const gameId = await seedGame();
+    federationAccepts();
+
+    const res = await app.request(`/games/${gameId}/claim`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const body = (await json(res)) as AssignRefereeResponse;
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({ success: true, slot: "sr1" });
   });
 
   it("claims the explicitly requested slot", async () => {

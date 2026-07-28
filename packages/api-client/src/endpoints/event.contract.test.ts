@@ -64,7 +64,7 @@ describe("event request queries/bodies satisfy @dragons/contracts schemas", () =
   it("trigger body parses against triggerEventSchema", async () => {
     const { api, calls } = recordingClient();
     await api.trigger({
-      type: "match.time_changed",
+      type: "match.schedule.changed",
       entityType: "match",
       entityId: 123,
       entityName: "Dragons vs. Tigers",

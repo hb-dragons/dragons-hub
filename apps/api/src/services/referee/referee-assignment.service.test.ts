@@ -52,6 +52,7 @@ vi.mock("../events/event-publisher", () => ({
 
 import {
   assignReferee,
+  assignRefereeAsSelf,
   unassignReferee,
   searchCandidates,
   rankCandidates,
@@ -783,6 +784,68 @@ describe("assignReferee — idempotent self-reclaim (#86)", () => {
       code: "SLOT_TAKEN",
     });
     expect(mocks.publishDomainEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("assignRefereeAsSelf — ownership (#75, #52)", () => {
+  // assignReferee itself stays unrestricted — admin/referee-assignment.routes.ts
+  // and referee-claim.service.ts both call it directly and must keep assigning
+  // any qualified referee. assignRefereeAsSelf is the explicit wrapper the
+  // self-service route uses instead, so "forgot to pass a caller id" is a
+  // missing argument (a typecheck failure), not a silently-skipped check.
+  it("throws NOT_OWN_CLUB when the caller's referee is not own-club", async () => {
+    const [ref] = await ctx.db
+      .insert(referees)
+      .values({ apiId: 4242, firstName: "Outsider", lastName: "Ref", isOwnClub: false })
+      .returning({ id: referees.id });
+
+    await expect(assignRefereeAsSelf(1, 1, 4242, ref!.id)).rejects.toMatchObject({
+      code: "NOT_OWN_CLUB",
+      status: 403,
+    });
+  });
+
+  it("throws FORBIDDEN when assigning a different referee", async () => {
+    const [ref] = await ctx.db
+      .insert(referees)
+      .values({ apiId: 1111, firstName: "Self", lastName: "Ref", isOwnClub: true })
+      .returning({ id: referees.id });
+
+    await expect(assignRefereeAsSelf(1, 1, 9999, ref!.id)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      status: 403,
+    });
+  });
+
+  it("throws FORBIDDEN when the caller's referee row no longer exists (stale session)", async () => {
+    // A session can outlive the referee row it was linked to (row deleted
+    // out from under it). The !refereeRow half of the guard is the one that
+    // catches that — a non-existent id must fail closed like a mismatched one,
+    // not throw an unrelated error or fall through.
+    const NO_SUCH_REFEREE_ID = 999_999;
+
+    await expect(
+      assignRefereeAsSelf(1, 1, 4242, NO_SUCH_REFEREE_ID),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      status: 403,
+    });
+  });
+
+  it("delegates to assignReferee (unmodified) once ownership passes", async () => {
+    const gameId = await seedGame();
+    const refereeId = await seedReferee();
+    federationAccepts();
+
+    const result = await assignRefereeAsSelf(SPIELPLAN_ID, 1, REF_API_ID, refereeId);
+
+    expect(result).toEqual({
+      success: true,
+      slot: "sr1",
+      status: "assigned",
+      refereeName: "Max Muster",
+    });
+    expect(gameId).toBeGreaterThan(0);
   });
 });
 

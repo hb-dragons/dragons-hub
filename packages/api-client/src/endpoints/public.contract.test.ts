@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { matchListQuerySchema } from "@dragons/contracts";
+import { publicMatchListQuerySchema } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { publicEndpoints } from "./public";
 
@@ -27,15 +27,31 @@ describe("public request queries satisfy @dragons/contracts schemas", () => {
     await api.getMatches({ limit: 10, sort: "desc", leagueId: 5, teamApiId: 7, hasScore: true });
     // GET passes filters as query params — extract what the client actually serialized
     const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
-    const parsed = matchListQuerySchema.safeParse(query);
-    expect(parsed.error?.issues, "matchListQuerySchema rejected the getMatches query").toBeUndefined();
+    const parsed = publicMatchListQuerySchema.safeParse(query);
+    expect(parsed.error?.issues, "publicMatchListQuerySchema rejected the getMatches query").toBeUndefined();
   });
 
   it("getMatches query parses against matchListQuerySchema (minimal empty filter)", async () => {
     const { api, calls } = recordingClient();
     await api.getMatches({});
     const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
-    const parsed = matchListQuerySchema.safeParse(query);
-    expect(parsed.error?.issues, "matchListQuerySchema rejected the getMatches query").toBeUndefined();
+    const parsed = publicMatchListQuerySchema.safeParse(query);
+    expect(parsed.error?.issues, "publicMatchListQuerySchema rejected the getMatches query").toBeUndefined();
+  });
+
+  // opponentApiId only exists on publicMatchListQuerySchema, not the shared
+  // matchListQuerySchema — this is the field a whole fix round was needed for
+  // (#75, #52), so it needs its own drift coverage rather than riding along
+  // with the other params.
+  it("getMatches query parses against publicMatchListQuerySchema (opponentApiId)", async () => {
+    const { api, calls } = recordingClient();
+    await api.getMatches({ opponentApiId: 99 });
+    const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
+    expect(query.opponentApiId).toBe("99");
+    const parsed = publicMatchListQuerySchema.safeParse(query);
+    expect(
+      parsed.error?.issues,
+      "publicMatchListQuerySchema rejected the getMatches query with opponentApiId",
+    ).toBeUndefined();
   });
 });

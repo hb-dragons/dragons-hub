@@ -1,12 +1,14 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
+import { describeRoute, validator } from "hono-openapi";
 import { buildBroadcastState } from "../../services/broadcast/publisher";
 import { subscribeBroadcast } from "../../services/scoreboard/pubsub";
-import { env } from "../../config/env";
+import { validationHook } from "../../middleware/validation";
+import { scoreboardDeviceQuerySchema } from "@dragons/contracts";
 import {
-  tryAcquire,
-  release,
-} from "../../services/scoreboard/connection-cap";
+  isConfiguredDevice,
+  UNKNOWN_DEVICE_BODY,
+} from "../../services/scoreboard/device-allowlist";
+import { tryAcquire, release } from "../../services/scoreboard/connection-cap";
 import {
   createSseResponse,
   sseEvent,
@@ -21,11 +23,16 @@ const publicBroadcastRoutes = new Hono<AppEnv>();
 // the overlay reads it once per page load with `/stream` carrying the updates,
 // so a per-minute ceiling well above normal overlay traffic still stops a
 // scripted poll from turning one public GET into unbounded database load.
-const STATE_RATE_LIMIT = { limit: 600, windowSeconds: 60, keyPrefix: "public-broadcast-state" };
+const STATE_RATE_LIMIT = {
+  limit: 600,
+  windowSeconds: 60,
+  keyPrefix: "public-broadcast-state",
+};
 
 publicBroadcastRoutes.get(
   "/state",
   rateLimit(STATE_RATE_LIMIT),
+  validator("query", scoreboardDeviceQuerySchema, validationHook),
   describeRoute({
     description: "Current broadcast state for a device",
     tags: ["Broadcast"],
@@ -37,14 +44,11 @@ publicBroadcastRoutes.get(
     },
   }),
   async (c) => {
-    const deviceId = c.req.query("deviceId");
-    if (!deviceId) {
-      return c.json({ error: "deviceId required", code: "BAD_REQUEST" }, 400);
-    }
+    const { deviceId } = c.req.valid("query");
     // Same allowlist `/stream` enforces: without it any caller could probe
     // broadcast state for arbitrary device ids.
-    if (deviceId !== env.SCOREBOARD_DEVICE_ID) {
-      return c.json({ error: "Unknown device", code: "UNKNOWN_DEVICE" }, 404);
+    if (!isConfiguredDevice(deviceId)) {
+      return c.json(UNKNOWN_DEVICE_BODY, 404);
     }
     const state = await buildBroadcastState(deviceId);
     c.header("Cache-Control", "no-store");
@@ -54,18 +58,16 @@ publicBroadcastRoutes.get(
 
 publicBroadcastRoutes.get(
   "/stream",
+  validator("query", scoreboardDeviceQuerySchema, validationHook),
   describeRoute({
     description: "SSE stream of broadcast state changes",
     tags: ["Broadcast"],
     responses: { 200: { description: "text/event-stream" } },
   }),
   async (c) => {
-    const deviceId = c.req.query("deviceId");
-    if (!deviceId) {
-      return c.json({ error: "deviceId required", code: "BAD_REQUEST" }, 400);
-    }
-    if (deviceId !== env.SCOREBOARD_DEVICE_ID) {
-      return c.json({ error: "Unknown device", code: "UNKNOWN_DEVICE" }, 404);
+    const { deviceId } = c.req.valid("query");
+    if (!isConfiguredDevice(deviceId)) {
+      return c.json(UNKNOWN_DEVICE_BODY, 404);
     }
     if (!tryAcquire(deviceId)) {
       c.header("Retry-After", "5");

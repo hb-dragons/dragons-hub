@@ -29,7 +29,7 @@ Two dependency edges are easy to get wrong and matter:
 - **`@dragons/db` is not a leaf.** It depends on `@dragons/shared` and re-exports
   `SyncRunSummary` from it, so a schema-only import still crosses that edge.
 
-**Request contracts:** `@dragons/contracts` (`packages/contracts/src/<group>.ts`) is the sole declaration of each API endpoint's request schema. The API validates via `hono-openapi`'s `validator(..., validationHook)` (which also registers the schema into `/openapi.json`); `@dragons/api-client` infers `z.infer` request types from the same schemas; `*.contract.test.ts` files guard against client/server drift. A handful of endpoints with optional/empty bodies or custom JSON-parse handling (referee self/admin assign + claim, notification test-push) deliberately keep a manual `schema.parse()` but still source the schema from `@dragons/contracts`.
+**Request contracts:** `@dragons/contracts` (`packages/contracts/src/<group>.ts`) is the sole declaration of each API endpoint's request schema. The API validates via `hono-openapi`'s `validator(..., validationHook)` (which also registers the schema into `/openapi.json`); `@dragons/api-client` infers `z.infer` request types from the same schemas; `*.contract.test.ts` files guard against client/server drift. Every route body goes through `validator()` + `c.req.valid(...)`, as does every query and path param outside the two exceptions named below. A few endpoints still read something by hand because it isn't a validator-shaped request at all: `GET /public/scoreboard/stream` parses the `Last-Event-ID` SSE reconnection header with `scoreboardLastEventIdSchema` (whose own `.catch(undefined)` degrades a malformed header to a fresh stream rather than rejecting the connection); `POST /mcp` reads its JSON-RPC body with `c.req.json()` and hands it untouched to the MCP SDK's own transport; `POST /api/scoreboard/ingest` reads a raw hex string from the Pi plus a device-id header; and the public unsubscribe `POST` reads its body as raw text only to tell an RFC 8058 one-click ping apart from the confirmation form's submit, never parsing it as JSON. None of these hand-roll a body-schema `schema.parse()` in place of `validator()`. Two route files do still read query/param values raw and are the exception to the sentence above, not a pattern to copy: `admin/sync.routes.ts` reads `syncType` and `jobId` directly and keeps one status rule (`state !== "failed"`) in the handler, deliberately left for a later pass; and `public/assets.routes.ts` hand-parses its `:id` because the router pattern `:id{[0-9]+\.webp}` already does the real validation.
 
 ## Data Model
 
@@ -445,8 +445,10 @@ Rules when adding one:
   testing anything. The leaf module has no heavy imports, so using it is free.
 
 Current subclasses: `SyncAlreadyQueuedError` (409), `RefereeSdkNotConfiguredError`
-(503), `TeamReorderError` (400), `AssignmentError` (7 codes),
-`RefereeSettingsError` (3 codes), `BroadcastError` (2 codes).
+(503), `TeamReorderError` (400), `AssignmentError` (8 codes),
+`RefereeSettingsError` (3 codes), `BroadcastError` (2 codes), `UserAdminError`
+(2 codes, both 404), `PushDeviceError` (`TOKEN_OWNED_BY_ANOTHER_USER`, 409),
+`TestPushError` (`NO_DEVICES` 400, `PUSH_CHANNEL_MISSING` 500).
 
 ### Service & docs
 
@@ -540,7 +542,7 @@ Match list and detail responses include associated venue booking data when avail
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/admin/assistant/reschedule/chat` | Rescheduling copilot chat (AI SDK UI message stream). 503 when ASSISTANT_ENABLED=false. Permission: match:update |
+| POST | `/admin/assistant/reschedule/chat` | Rescheduling copilot chat (AI SDK UI message stream). 503 when ASSISTANT_ENABLED=false. Permission: match:update. Body capped at 512 KiB (413) and rate-limited (429). |
 
 ### Club Q&A Assistant
 

@@ -4,7 +4,11 @@ import { getOwnClubMatches } from "../../services/admin/match-admin.service";
 import { getPublicMatchDetail } from "../../services/admin/match-query.service";
 import { getMatchContext } from "../../services/public/match-context.service";
 import { buildCalendarFeed } from "../../services/public/calendar.service";
-import { matchListQuerySchema, publicScheduleIcsQuerySchema } from "@dragons/contracts";
+import {
+  publicMatchListQuerySchema,
+  publicScheduleIcsQuerySchema,
+  publicMatchIdParamSchema,
+} from "@dragons/contracts";
 import { validationHook } from "../../middleware/validation";
 import { env } from "../../config/env";
 
@@ -21,7 +25,7 @@ const publicMatchRoutes = new Hono();
 // GET /public/matches - List own club matches (no auth required)
 publicMatchRoutes.get(
   "/matches",
-  validator("query", matchListQuerySchema, validationHook),
+  validator("query", publicMatchListQuerySchema, validationHook),
   describeRoute({
     description: "List own club matches (public)",
     tags: ["Public"],
@@ -30,12 +34,7 @@ publicMatchRoutes.get(
   }),
   async (c) => {
     const query = c.req.valid("query");
-    const opponentApiId = c.req.query("opponentApiId");
-    const result = await getOwnClubMatches({
-      ...query,
-      opponentApiId: opponentApiId ? Number(opponentApiId) : undefined,
-      excludeInactive: true,
-    });
+    const result = await getOwnClubMatches({ ...query, excludeInactive: true });
     return c.json(result);
   },
 );
@@ -93,16 +92,16 @@ publicMatchRoutes.get(
 // GET /public/matches/:id - Get a single own-club match with quarter scores
 publicMatchRoutes.get(
   "/matches/:id",
+  validator("param", publicMatchIdParamSchema, validationHook),
   describeRoute({
     description: "Get a single own-club match with quarter scores",
     tags: ["Public"],
     responses: { 200: { description: "Match detail" }, 404: { description: "Not found" } },
   }),
   async (c) => {
-    const id = Number(c.req.param("id"));
-    if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+    const { id } = c.req.valid("param");
     const match = await getPublicMatchDetail(id);
-    if (!match) return c.json({ error: "Not found" }, 404);
+    if (!match) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     return c.json(match);
   },
 );
@@ -110,16 +109,16 @@ publicMatchRoutes.get(
 // GET /public/matches/:id/context - Get H2H record and form for both teams
 publicMatchRoutes.get(
   "/matches/:id/context",
+  validator("param", publicMatchIdParamSchema, validationHook),
   describeRoute({
     description: "Get H2H record and form for both teams in a match",
     tags: ["Public"],
     responses: { 200: { description: "Match context" }, 404: { description: "Not found" } },
   }),
   async (c) => {
-    const id = Number(c.req.param("id"));
-    if (Number.isNaN(id)) return c.json({ error: "Invalid ID" }, 400);
+    const { id } = c.req.valid("param");
     const context = await getMatchContext(id);
-    if (!context) return c.json({ error: "Not found" }, 404);
+    if (!context) return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     return c.json(context);
   },
 );

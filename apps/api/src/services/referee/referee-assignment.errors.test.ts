@@ -17,6 +17,7 @@ describe("AssignmentError", () => {
     ["SLOT_TAKEN", 409],
     ["DENY_RULE", 403],
     ["FEDERATION_ERROR", 502],
+    ["FORBIDDEN", 403],
     ["NOT_OWN_CLUB", 403],
     ["NOT_ASSIGNED", 409],
   ];

@@ -306,6 +306,42 @@ export async function assignReferee(
   };
 }
 
+/**
+ * Self-service entry point: a referee may only assign themselves.
+ *
+ * `assignReferee` itself stays unrestricted — `admin/referee-assignment.routes.ts`
+ * assigns any qualified referee under `requirePermission`, and
+ * `referee-claim.service.ts` calls it internally after already resolving and
+ * validating the referee itself — so hoisting an ownership check into
+ * `assignReferee` would either break admin assignment (which has no "caller
+ * referee" concept at all) or make the check skippable by a caller that simply
+ * omits an optional argument. This wrapper is the one and only path a
+ * self-service caller uses, so the ownership check cannot be bypassed by a
+ * missed argument: `callerRefereeId` is required, and a call site that forgets
+ * it fails to typecheck.
+ */
+export async function assignRefereeAsSelf(
+  spielplanId: number,
+  slotNumber: 1 | 2,
+  refereeApiId: number,
+  callerRefereeId: number,
+): Promise<AssignRefereeResponse> {
+  const [refereeRow] = await getDb()
+    .select({ apiId: referees.apiId, isOwnClub: referees.isOwnClub })
+    .from(referees)
+    .where(eq(referees.id, callerRefereeId))
+    .limit(1);
+
+  if (!refereeRow || refereeRow.apiId !== refereeApiId) {
+    throw new AssignmentError("Cannot assign another referee", "FORBIDDEN");
+  }
+  if (!refereeRow.isOwnClub) {
+    throw new AssignmentError("Referee is not an own-club referee", "NOT_OWN_CLUB");
+  }
+
+  return assignReferee(spielplanId, slotNumber, refereeApiId);
+}
+
 export async function unassignReferee(
   spielplanId: number,
   slotNumber: 1 | 2,

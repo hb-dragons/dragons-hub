@@ -1,9 +1,23 @@
 import { getDb } from "../../config/database";
-import { refereeAssignmentRules, teams } from "@dragons/db/schema";
+import { refereeAssignmentRules, referees, teams } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import type { RefereeRulesResponse } from "@dragons/shared";
+import { RefereeSettingsError } from "../admin/referee-admin.errors";
 
 export async function getRulesForReferee(refereeId: number): Promise<RefereeRulesResponse> {
+  const [referee] = await getDb()
+    .select({ isOwnClub: referees.isOwnClub })
+    .from(referees)
+    .where(eq(referees.id, refereeId))
+    .limit(1);
+
+  if (!referee) {
+    throw new RefereeSettingsError("Referee not found", "NOT_FOUND");
+  }
+  if (!referee.isOwnClub) {
+    throw new RefereeSettingsError("Referee is not an own-club referee", "NOT_OWN_CLUB");
+  }
+
   const rows = await getDb()
     .select({
       id: refereeAssignmentRules.id,

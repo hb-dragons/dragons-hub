@@ -104,9 +104,7 @@ syncRoutes.get(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const { statuses } = c.req.valid("query");
-    const limitRaw = Number(c.req.query("limit"));
-    const limit = Number.isInteger(limitRaw) && limitRaw > 0 && limitRaw <= 500 ? limitRaw : 100;
+    const { statuses, limit } = c.req.valid("query");
 
     const jobStatuses: JobType[] = statuses && statuses.length > 0 ? statuses : DEFAULT_JOB_STATUSES;
     const jobs = await syncQueue.getJobs(jobStatuses, 0, limit, false);

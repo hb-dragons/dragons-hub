@@ -1,9 +1,15 @@
+import { z } from "zod";
 import { getDb } from "../../config/database";
 import { appSettings } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import type { ClubConfig, BookingSettings } from "@dragons/shared";
 import { BOOKING_DEFAULTS } from "@dragons/shared";
 import { readSettings, readIntSetting } from "../settings/app-settings.reader";
+
+// Validates the *stored* value, not a request — request schemas live in
+// @dragons/contracts; this one never sees the wire (spec decision D5).
+const REFEREE_REMINDER_DAYS_FALLBACK = [7, 3, 1] as const;
+const refereeReminderDaysSchema = z.array(z.number().int().positive()).min(1);
 
 const CLUB_KEYS = { id: "club_id", name: "club_name" } as const;
 
@@ -65,4 +71,18 @@ export async function setBookingSettings(settings: BookingSettings): Promise<voi
   await upsertSetting(BOOKING_KEYS.bufferAfter, String(settings.bufferAfter));
   await upsertSetting(BOOKING_KEYS.gameDuration, String(settings.gameDuration));
   await upsertSetting(BOOKING_KEYS.dueDaysBefore, String(settings.dueDaysBefore));
+}
+
+export async function getRefereeReminderDays(): Promise<number[]> {
+  const value = await getSetting("referee_reminder_days");
+  // Always a fresh copy — callers get `number[]`, not the shared readonly
+  // default, so sorting or mutating a returned fallback can't corrupt it for
+  // the next caller.
+  if (!value) return [...REFEREE_REMINDER_DAYS_FALLBACK];
+  try {
+    const parsed = refereeReminderDaysSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : [...REFEREE_REMINDER_DAYS_FALLBACK];
+  } catch {
+    return [...REFEREE_REMINDER_DAYS_FALLBACK];
+  }
 }

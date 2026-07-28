@@ -44,13 +44,15 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
 
   if (error instanceof HTTPException) {
     const code =
-      error.status === 401
-        ? "UNAUTHORIZED"
-        : error.status === 403
-          ? "FORBIDDEN"
-          : error.status === 404
-            ? "NOT_FOUND"
-            : "HTTP_ERROR";
+      error.status === 400
+        ? "VALIDATION_ERROR"
+        : error.status === 401
+          ? "UNAUTHORIZED"
+          : error.status === 403
+            ? "FORBIDDEN"
+            : error.status === 404
+              ? "NOT_FOUND"
+              : "HTTP_ERROR";
     return c.json({ error: error.message, code }, error.status);
   }
 

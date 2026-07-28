@@ -84,7 +84,7 @@ export async function listDomainEvents(params: {
 // ── triggerManualEvent ──────────────────────────────────────────────────────
 
 export interface TriggerEventParams {
-  type: string;
+  type: EventType;
   entityType: string;
   entityId: number;
   entityName: string;
@@ -97,7 +97,7 @@ export interface TriggerEventParams {
 export async function triggerManualEvent(params: TriggerEventParams) {
   // Build the event first so we can override urgency before persisting
   const event = buildDomainEvent({
-    type: params.type as EventType,
+    type: params.type,
     source: "manual",
     entityType: params.entityType as EventEntityType,
     entityId: params.entityId,

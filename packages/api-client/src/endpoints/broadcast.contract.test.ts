@@ -3,6 +3,7 @@ import {
   broadcastUpsertSchema,
   broadcastStartStopSchema,
   broadcastMatchesQuerySchema,
+  scoreboardDeviceQuerySchema,
 } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { broadcastEndpoints } from "./broadcast";
@@ -99,6 +100,13 @@ describe("broadcast read endpoints target the right path + verb", () => {
     const { api, calls } = recordingClient();
     await api.state("panel-1");
     const url = new URL(calls[0]!.url);
+    const parsed = scoreboardDeviceQuerySchema.safeParse(
+      Object.fromEntries(url.searchParams),
+    );
+    expect(
+      parsed.error?.issues,
+      "scoreboardDeviceQuerySchema rejected the state query",
+    ).toBeUndefined();
     expect(url.pathname).toBe("/public/broadcast/state");
     expect(url.searchParams.get("deviceId")).toBe("panel-1");
     expect(calls[0]!.method).toBe("GET");

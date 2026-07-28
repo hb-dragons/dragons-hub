@@ -36,7 +36,7 @@ function renderBrowser(events: DomainEventItem[] = [], total = 0, locale: "en" |
 
 const baseEvent: DomainEventItem = {
   id: "evt_1",
-  type: "match.time_changed",
+  type: "match.schedule.changed",
   source: "sync",
   urgency: "immediate",
   occurredAt: "2026-05-01T10:00:00.000Z",

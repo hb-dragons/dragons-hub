@@ -53,7 +53,7 @@ afterAll(async () => {
 async function seedReferee(apiId: number): Promise<number> {
   const [row] = await ctx.db
     .insert(referees)
-    .values({ apiId, firstName: "Ref", lastName: String(apiId) })
+    .values({ apiId, firstName: "Ref", lastName: String(apiId), isOwnClub: true })
     .returning({ id: referees.id });
   return row!.id;
 }
@@ -125,6 +125,25 @@ describe("getRulesForReferee", () => {
     const refId = await seedReferee(9001);
 
     expect(await getRulesForReferee(refId)).toEqual({ rules: [] });
+  });
+
+  it("throws NOT_FOUND for an unknown referee", async () => {
+    await expect(getRulesForReferee(999999)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      status: 404,
+    });
+  });
+
+  it("throws NOT_OWN_CLUB for a referee outside the club", async () => {
+    const [ref] = await ctx.db
+      .insert(referees)
+      .values({ apiId: 7777, firstName: "Ref", lastName: "Outsider", isOwnClub: false })
+      .returning({ id: referees.id });
+
+    await expect(getRulesForReferee(ref!.id)).rejects.toMatchObject({
+      code: "NOT_OWN_CLUB",
+      status: 400,
+    });
   });
 });
 

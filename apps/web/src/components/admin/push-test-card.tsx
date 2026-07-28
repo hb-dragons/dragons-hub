@@ -82,7 +82,7 @@ export function PushTestCard() {
       await mutate();
     } catch (err) {
       if (err instanceof APIError) {
-        if (err.status === 400 && /no_devices/i.test(err.message)) {
+        if (err.code === "NO_DEVICES") {
           toast.error(t("noDevicesError"));
         } else if (err.status === 403) {
           toast.error(t("permissionError"));

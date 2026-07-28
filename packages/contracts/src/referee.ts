@@ -32,6 +32,10 @@ export const refereeMatchIdParamSchema = z.object({
 /** Path param for GET /referee/games/:id */
 export const refereeGameIdParamSchema = idParamSchema;
 
+/** Path param for the admin referee routes: PATCH/GET /admin/referees/:id[...] */
+export const refereeIdParamSchema = idParamSchema;
+
 export type RefereeApiMatchParam = z.infer<typeof refereeApiMatchParamSchema>;
 export type RefereeMatchIdParam = z.infer<typeof refereeMatchIdParamSchema>;
 export type RefereeGameIdParam = z.infer<typeof refereeGameIdParamSchema>;
+export type RefereeIdParam = z.infer<typeof refereeIdParamSchema>;
