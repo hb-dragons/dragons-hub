@@ -15,11 +15,11 @@ const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
   subscribe: vi.fn(),
   closeSub: vi.fn(),
-  incrementWithTtl: vi.fn(),
+  incrementSlidingWindow: vi.fn(),
 }));
 
 vi.mock("../../config/redis", () => ({
-  incrementWithTtl: (...a: unknown[]) => mocks.incrementWithTtl(...a),
+  incrementSlidingWindow: (...a: unknown[]) => mocks.incrementSlidingWindow(...a),
 }));
 
 vi.mock("../../config/env", async () => {
@@ -72,8 +72,8 @@ beforeEach(async () => {
   await resetTestDb(ctx);
   mocks.subscribe.mockReset();
   mocks.subscribe.mockResolvedValue(async () => mocks.closeSub());
-  mocks.incrementWithTtl.mockReset();
-  mocks.incrementWithTtl.mockResolvedValue(1);
+  mocks.incrementSlidingWindow.mockReset();
+  mocks.incrementSlidingWindow.mockResolvedValue([1, 0]);
 });
 afterAll(async () => {
   await closeTestDb(ctx);
@@ -136,7 +136,7 @@ describe("GET /public/broadcast/state", () => {
   });
 
   it("returns 429 once the anonymous window budget is spent", async () => {
-    mocks.incrementWithTtl.mockResolvedValue(601);
+    mocks.incrementSlidingWindow.mockResolvedValue([601, 0]);
 
     const res = await makeApp().request(
       "/public/broadcast/state?deviceId=d1",
@@ -147,7 +147,7 @@ describe("GET /public/broadcast/state", () => {
   });
 
   it("serves a request inside the budget", async () => {
-    mocks.incrementWithTtl.mockResolvedValue(600);
+    mocks.incrementSlidingWindow.mockResolvedValue([600, 0]);
 
     const res = await makeApp().request(
       "/public/broadcast/state?deviceId=d1",
@@ -157,7 +157,7 @@ describe("GET /public/broadcast/state", () => {
   });
 
   it("fails open when Redis is unreachable", async () => {
-    mocks.incrementWithTtl.mockRejectedValue(new Error("redis down"));
+    mocks.incrementSlidingWindow.mockRejectedValue(new Error("redis down"));
 
     const res = await makeApp().request(
       "/public/broadcast/state?deviceId=d1",
