@@ -1,13 +1,5 @@
 import { z } from "zod";
 
-export const scoreboardListQuerySchema = z.object({
-  deviceId: z.string().min(1),
-  limit: z.coerce.number().int().min(1).max(500).default(100),
-  afterId: z.coerce.number().int().min(0).optional(),
-});
-
-export type ScoreboardListQuery = z.infer<typeof scoreboardListQuerySchema>;
-
 /**
  * The single required parameter shared by every public scoreboard/broadcast
  * read: which device's data to fetch.
@@ -17,6 +9,14 @@ export const scoreboardDeviceQuerySchema = z.object({
 });
 
 export type ScoreboardDeviceQuery = z.infer<typeof scoreboardDeviceQuerySchema>;
+
+// The admin snapshot list query is the device query plus paging.
+export const scoreboardListQuerySchema = scoreboardDeviceQuerySchema.extend({
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  afterId: z.coerce.number().int().min(0).optional(),
+});
+
+export type ScoreboardListQuery = z.infer<typeof scoreboardListQuerySchema>;
 
 /**
  * The numeric `Last-Event-ID` header for SSE reconnection on

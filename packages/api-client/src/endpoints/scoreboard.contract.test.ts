@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { scoreboardListQuerySchema } from "@dragons/contracts";
+import {
+  scoreboardListQuerySchema,
+  scoreboardDeviceQuerySchema,
+} from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { scoreboardEndpoints } from "./scoreboard";
 
@@ -57,6 +60,13 @@ describe("scoreboard read endpoints target the right path + verb", () => {
     const { api, calls } = recordingClient();
     await api.health("panel-1");
     const url = new URL(calls[0]!.url);
+    const parsed = scoreboardDeviceQuerySchema.safeParse(
+      Object.fromEntries(url.searchParams),
+    );
+    expect(
+      parsed.error?.issues,
+      "scoreboardDeviceQuerySchema rejected the health query",
+    ).toBeUndefined();
     expect(url.pathname).toBe("/admin/scoreboard/health");
     expect(url.searchParams.get("deviceId")).toBe("panel-1");
     expect(calls[0]!.method).toBe("GET");
@@ -66,6 +76,13 @@ describe("scoreboard read endpoints target the right path + verb", () => {
     const { api, calls } = recordingClient();
     await api.latest("panel-1");
     const url = new URL(calls[0]!.url);
+    const parsed = scoreboardDeviceQuerySchema.safeParse(
+      Object.fromEntries(url.searchParams),
+    );
+    expect(
+      parsed.error?.issues,
+      "scoreboardDeviceQuerySchema rejected the latest query",
+    ).toBeUndefined();
     expect(url.pathname).toBe("/public/scoreboard/latest");
     expect(url.searchParams.get("deviceId")).toBe("panel-1");
     expect(calls[0]!.method).toBe("GET");
