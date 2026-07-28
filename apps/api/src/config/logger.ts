@@ -74,7 +74,13 @@ const REDACT_PATHS = [
   "SCOREBOARD_INGEST_KEY",
   "REFEREE_SDK_PASSWORD",
   "EXPO_ACCESS_TOKEN",
-  ...SENSITIVE_KEYS.flatMap((k) => [`*.${k}`, ...SENSITIVE_CONTAINERS.map((c) => `*.${c}.${k}`)]),
+  // The bare `k` matters: `*.${k}` is a pino wildcard for "a `k` property one
+  // level down", so it does not match `logger.info({ password })` at the root.
+  ...SENSITIVE_KEYS.flatMap((k) => [
+    k,
+    `*.${k}`,
+    ...SENSITIVE_CONTAINERS.map((c) => `*.${c}.${k}`),
+  ]),
 ];
 
 // Redaction is environment-independent on purpose. A developer's terminal and a
