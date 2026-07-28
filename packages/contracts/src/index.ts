@@ -202,7 +202,9 @@ export {
 
 export {
   deviceRegisterBodySchema,
+  deviceTokenParamSchema,
   type DeviceRegisterBody,
+  type DeviceTokenParam,
 } from "./devices";
 
 export {
