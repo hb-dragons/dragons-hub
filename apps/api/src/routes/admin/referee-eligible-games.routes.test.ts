@@ -136,6 +136,11 @@ describe("GET /admin/referees/:id/eligible-open-games", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.code).toBe("VALIDATION_ERROR");
+    // The route used to hand-roll `{ error, code }` with no `details`. Routing
+    // the id through the shared validator now produces the same
+    // `{ error, code, details }` envelope every validated route emits — this
+    // asserts the shape actually changed, not just that it stayed 400.
+    expect(body.details).toEqual([{ path: "id", message: expect.any(String) }]);
   });
 
   it("returns 400 for a non-numeric id", async () => {

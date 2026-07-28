@@ -1,5 +1,27 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getEligibleOpenGames } from "./eligible-open-games.service";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import { getEligibleOpenGames, getEligibleOpenGamesForReferee } from "./eligible-open-games.service";
+
+// --- Mocks (hoisted before imports) ---
+//
+// drizzle-orm and @dragons/db/schema are deliberately NOT mocked — the new
+// getEligibleOpenGamesForReferee wrapper runs a real referee lookup, and this
+// runs it against a real (in-process PGlite) Postgres rather than a stubbed
+// `eq`. referee-assignment.service and referee-games.service stay mocked: they
+// are what getEligibleOpenGames itself calls out to (the federation-backed
+// candidate search and the open-games list), unrelated to the wrapper's own
+// referee lookup.
+
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+
+vi.mock("../../config/database", () => ({
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
+}));
 
 vi.mock("./referee-assignment.service", () => ({
   searchCandidates: vi.fn(),
@@ -10,9 +32,27 @@ vi.mock("./referee-games.service", () => ({
 
 import { searchCandidates } from "./referee-assignment.service";
 import { getRefereeGames } from "./referee-games.service";
+import { referees } from "@dragons/db/schema";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
 const mockedSearch = vi.mocked(searchCandidates);
 const mockedGames = vi.mocked(getRefereeGames);
+
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
 // Minimal SdkRefCandidate fixture — fields required by isRefereeEligibleForGame
 // plus srId for identification. Other SdkRefCandidate fields are cast via `as any`.
@@ -52,7 +92,8 @@ const makeCandidate = (srId: number, overrides: {
   ...overrides,
 });
 
-beforeEach(() => {
+beforeEach(async () => {
+  await resetTestDb(ctx);
   vi.clearAllMocks();
 });
 
@@ -219,5 +260,58 @@ describe("getEligibleOpenGames", () => {
     // Promise.all preserves input order, so output apiMatchIds should match input order
     const expectedIds = gameItems.map((g) => g.apiMatchId);
     expect(result.items.map((g) => g.apiMatchId)).toEqual(expectedIds);
+  });
+});
+
+describe("getEligibleOpenGamesForReferee", () => {
+  it("throws NOT_FOUND for an unknown referee id", async () => {
+    await expect(getEligibleOpenGamesForReferee(999999)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      status: 404,
+    });
+  });
+
+  it("resolves the requested referee's apiId, not another row's", async () => {
+    // Two referees, two different apiIds. The federation candidate list below
+    // only names apiId 3131 as eligible, so this can only pass if the wrapper
+    // looked up the apiId that belongs to the referee id it was actually
+    // called with — a wrapper that resolved the wrong row (e.g. always the
+    // first referee inserted) would flip which of these two calls comes back
+    // empty.
+    mockedGames.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          apiMatchId: 700,
+          sr1Status: "open",
+          sr2Status: "assigned",
+          sr1RefereeApiId: null,
+          sr2RefereeApiId: 999,
+        } as any,
+      ],
+      total: 1,
+      limit: 500,
+      offset: 0,
+      hasMore: false,
+    });
+    mockedSearch.mockResolvedValue({
+      results: [makeCandidate(3131)],
+      total: 1,
+    } as any);
+
+    const [decoy] = await ctx.db
+      .insert(referees)
+      .values({ apiId: 4242, firstName: "Decoy", lastName: "Ref", isOwnClub: true })
+      .returning({ id: referees.id });
+    const [target] = await ctx.db
+      .insert(referees)
+      .values({ apiId: 3131, firstName: "Ref", lastName: "Target", isOwnClub: true })
+      .returning({ id: referees.id });
+
+    const decoyResult = await getEligibleOpenGamesForReferee(decoy!.id);
+    expect(decoyResult.items).toEqual([]);
+
+    const targetResult = await getEligibleOpenGamesForReferee(target!.id);
+    expect(targetResult.items.map((g) => g.apiMatchId)).toEqual([700]);
   });
 });
