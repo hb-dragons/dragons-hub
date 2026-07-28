@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eventListQuerySchema, triggerEventSchema } from "./event";
-import { EVENT_ENTITY_TYPES } from "@dragons/shared";
+import { EVENT_ENTITY_TYPES, EVENT_TYPE_VALUES } from "@dragons/shared";
 
 describe("eventListQuerySchema", () => {
   it("parses empty input with no defaults", () => {
@@ -150,22 +150,9 @@ describe("triggerEventSchema", () => {
     expect(result.deepLinkPath).toHaveLength(500);
   });
 
-  it("accepts type at max length (100)", () => {
-    const result = triggerEventSchema.parse({ ...validBody, type: "a".repeat(100) });
-    expect(result.type).toHaveLength(100);
-  });
-
   it("rejects missing type", () => {
     const { type: _type, ...rest } = validBody;
     expect(() => triggerEventSchema.parse(rest)).toThrow();
-  });
-
-  it("rejects empty type string", () => {
-    expect(() => triggerEventSchema.parse({ ...validBody, type: "" })).toThrow();
-  });
-
-  it("rejects type exceeding 100 chars", () => {
-    expect(() => triggerEventSchema.parse({ ...validBody, type: "a".repeat(101) })).toThrow();
   });
 
   it("rejects invalid entityType", () => {
@@ -214,5 +201,39 @@ describe("triggerEventSchema", () => {
     expect(() =>
       triggerEventSchema.parse({ ...validBody, urgencyOverride: "urgent" }),
     ).toThrow();
+  });
+});
+
+describe("eventListQuerySchema date bounds", () => {
+  it("rejects a non-date from", () => {
+    expect(eventListQuerySchema.safeParse({ from: "garbage" }).success).toBe(false);
+  });
+
+  it("accepts an ISO date", () => {
+    expect(eventListQuerySchema.safeParse({ from: "2026-07-28" }).success).toBe(true);
+  });
+});
+
+describe("triggerEventSchema type", () => {
+  it("rejects a type outside EVENT_TYPE_VALUES", () => {
+    const result = triggerEventSchema.safeParse({
+      type: "not.a.real.event",
+      entityType: "match",
+      entityId: 1,
+      entityName: "x",
+      deepLinkPath: "/x",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a known event type", () => {
+    const result = triggerEventSchema.safeParse({
+      type: EVENT_TYPE_VALUES[0],
+      entityType: "match",
+      entityId: 1,
+      entityName: "x",
+      deepLinkPath: "/x",
+    });
+    expect(result.success).toBe(true);
   });
 });

@@ -55,8 +55,13 @@ import type {
 } from "./types";
 
 // Dialog form state: the trigger body fields the user edits directly.
-// `payload` and `urgencyOverride` are assembled at submit time.
-type TriggerEventForm = Omit<TriggerEventBody, "payload" | "urgencyOverride">;
+// `payload` and `urgencyOverride` are assembled at submit time. `type` is
+// typed as a plain string here — the admin free-types it into an Input — and
+// narrowed to TriggerEventBody["type"] at submission; the server rejects an
+// unknown event type via the tightened triggerEventSchema.
+type TriggerEventForm = Omit<TriggerEventBody, "payload" | "urgencyOverride" | "type"> & {
+  type: string;
+};
 
 // ---------------------------------------------------------------------------
 // Badge variant helpers
@@ -217,6 +222,7 @@ export function EventBrowser() {
     try {
       const body: TriggerEventBody = {
         ...triggerForm,
+        type: triggerForm.type as TriggerEventBody["type"],
         payload: triggerPayload ? JSON.parse(triggerPayload) : {},
         ...(triggerUrgency
           ? { urgencyOverride: triggerUrgency as "immediate" | "routine" }
