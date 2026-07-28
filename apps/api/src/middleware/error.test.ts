@@ -347,4 +347,19 @@ describe("errorHandler", () => {
     const body = await res.json();
     expect(body).toEqual({ error: "I'm a teapot", code: "HTTP_ERROR" });
   });
+
+  it("maps a 400 HTTPException to VALIDATION_ERROR", async () => {
+    const app = new Hono<AppEnv>();
+    app.onError(errorHandler);
+    app.get("/boom", () => {
+      throw new HTTPException(400, { message: "Malformed JSON in request body" });
+    });
+
+    const res = await app.request("/boom");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Malformed JSON in request body",
+      code: "VALIDATION_ERROR",
+    });
+  });
 });
