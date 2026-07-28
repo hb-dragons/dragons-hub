@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import type { Logger } from "pino";
 
 type PinoMockCall = [Record<string, unknown>];
 
@@ -445,31 +446,48 @@ describe("logger", () => {
       expect(test.paths).toEqual(prod.paths);
     });
 
+    // Builds a real pino against a capture stream using the logger's own
+    // options, so these cases assert what actually reaches stdout rather than
+    // the shape of the paths array.
+    async function realProbe(
+      nodeEnv: string,
+    ): Promise<{ probe: Logger; written: string[] }> {
+      vi.resetModules();
+      // Earlier cases in this file register a pino mock, and doMock survives
+      // resetModules. These cases need the real serializer.
+      vi.doUnmock("pino");
+      vi.doMock("./env", () => ({
+        env: {
+          NODE_ENV: nodeEnv,
+          LOG_LEVEL: "info",
+          SERVICE_NAME: "api",
+          SERVICE_VERSION: "1.0",
+          GCP_PROJECT_ID: undefined,
+        },
+      }));
+
+      const written: string[] = [];
+      const { buildOptions } = await import("./logger");
+      const pino = (await import("pino")).default;
+
+      // Drop the pino-pretty transport: a worker thread would swallow the
+      // writes. Redaction happens before serialization either way.
+      const { transport: _transport, ...options } = buildOptions();
+      const probe = pino(options, {
+        write: (chunk: string) => {
+          written.push(chunk);
+        },
+      });
+
+      return { probe, written };
+    }
+
     // The assertions above check the options object; this one checks that the
     // options actually censor when a real pino writes a line.
     it.each(["test", "development"])(
       "censors a secret written through a real pino in NODE_ENV=%s",
       async (nodeEnv) => {
-        vi.resetModules();
-        // Earlier cases in this file register a pino mock, and doMock survives
-        // resetModules. This case needs the real serializer.
-        vi.doUnmock("pino");
-        vi.doMock("./env", () => ({
-          env: { NODE_ENV: nodeEnv, LOG_LEVEL: "info" },
-        }));
-
-        const written: string[] = [];
-        const { buildOptions } = await import("./logger");
-        const pino = (await import("pino")).default;
-
-        // Drop the pino-pretty transport: a worker thread would swallow the
-        // writes. Redaction happens before serialization either way.
-        const { transport: _transport, ...options } = buildOptions();
-        const probe = pino(options, {
-          write: (chunk: string) => {
-            written.push(chunk);
-          },
-        });
+        const { probe, written } = await realProbe(nodeEnv);
 
         // `*.password` / `*.body.token`: the paths cover nested objects, which
         // is how services log request context. Shape the payload accordingly.
@@ -489,5 +507,64 @@ describe("logger", () => {
         expect(line).toContain("visible");
       },
     );
+
+    // `*.password` is a pino wildcard for "a password one level down", so it
+    // does not match a password at the root of the logged object. Every
+    // sensitive key had that hole, and `logger.debug({ token })` while poking
+    // at an auth path is an easy thing to write. Listed here independently of
+    // the implementation on purpose: this is the intent, not a mirror of
+    // SENSITIVE_KEYS.
+    const ROOT_SECRETS = {
+      password: "root-password-value",
+      token: "root-token-value",
+      accessToken: "root-accessToken-value",
+      refreshToken: "root-refreshToken-value",
+      apiKey: "root-apiKey-value",
+      api_key: "root-api_key-value",
+      secret: "root-secret-value",
+      authorization: "root-authorization-value",
+      cookie: "root-cookie-value",
+    };
+
+    it.each(["production", "development", "test"])(
+      "censors a top-level sensitive key in NODE_ENV=%s",
+      async (nodeEnv) => {
+        const { probe, written } = await realProbe(nodeEnv);
+
+        probe.info({ ...ROOT_SECRETS, keep: "visible" }, "probe");
+
+        const line = written.join("");
+        for (const [key, value] of Object.entries(ROOT_SECRETS)) {
+          expect(line, `top-level ${key} leaked`).not.toContain(value);
+        }
+        expect(line).toContain("[REDACTED]");
+        expect(line).toContain("visible");
+      },
+    );
+
+    // The nested cases above only run in test/development; production carries
+    // the same paths but a different options object, so prove it there too.
+    it("still censors nested and header secrets in NODE_ENV=production", async () => {
+      const { probe, written } = await realProbe("production");
+
+      probe.info(
+        {
+          creds: { password: "nested-hunter2" },
+          req: {
+            body: { token: "nested-bearer" },
+            headers: { authorization: "Bearer header-secret" },
+          },
+          keep: "visible",
+        },
+        "probe",
+      );
+
+      const line = written.join("");
+      expect(line).not.toContain("nested-hunter2");
+      expect(line).not.toContain("nested-bearer");
+      expect(line).not.toContain("header-secret");
+      expect(line).toContain("[REDACTED]");
+      expect(line).toContain("visible");
+    });
   });
 });
