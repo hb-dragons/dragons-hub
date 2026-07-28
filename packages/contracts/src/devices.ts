@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 export const deviceRegisterBodySchema = z.strictObject({
-  token: z.string().min(1),
+  // Capped to match deviceTokenParamSchema below. A token longer than 512
+  // chars could be registered but never unregistered (DELETE /:token would
+  // 400 forever on its own length check) — the asymmetry never mattered while
+  // Expo tokens stayed ~41 chars, but the bound belongs on both ends.
+  token: z.string().min(1).max(512),
   platform: z.enum(["ios", "android"]),
   locale: z.string().min(2).max(15).optional(),
 });

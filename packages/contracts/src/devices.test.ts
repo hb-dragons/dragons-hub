@@ -58,6 +58,22 @@ describe("deviceRegisterBodySchema", () => {
     ).toThrow();
   });
 
+  it("parses a token at the 512-char maximum", () => {
+    const token = "a".repeat(512);
+    const result = deviceRegisterBodySchema.parse({ token, platform: "ios" });
+    expect(result.token).toBe(token);
+  });
+
+  // Matches deviceTokenParamSchema's bound in the same file: a token this
+  // service ever registered above 512 chars could never be unregistered again
+  // (DELETE /:token rejects it on the param schema's own max).
+  it("rejects a token longer than 512 chars", () => {
+    const token = "a".repeat(513);
+    expect(() =>
+      deviceRegisterBodySchema.parse({ token, platform: "ios" }),
+    ).toThrow();
+  });
+
   it("rejects missing platform", () => {
     expect(() =>
       deviceRegisterBodySchema.parse({ token: "fcm-abc" }),
