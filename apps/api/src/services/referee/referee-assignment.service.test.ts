@@ -817,6 +817,21 @@ describe("assignRefereeAsSelf — ownership (#75, #52)", () => {
     });
   });
 
+  it("throws FORBIDDEN when the caller's referee row no longer exists (stale session)", async () => {
+    // A session can outlive the referee row it was linked to (row deleted
+    // out from under it). The !refereeRow half of the guard is the one that
+    // catches that — a non-existent id must fail closed like a mismatched one,
+    // not throw an unrelated error or fall through.
+    const NO_SUCH_REFEREE_ID = 999_999;
+
+    await expect(
+      assignRefereeAsSelf(1, 1, 4242, NO_SUCH_REFEREE_ID),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      status: 403,
+    });
+  });
+
   it("delegates to assignReferee (unmodified) once ownership passes", async () => {
     const gameId = await seedGame();
     const refereeId = await seedReferee();

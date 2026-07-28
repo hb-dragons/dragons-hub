@@ -34,6 +34,7 @@ import {
 import { liveScoreboards, scoreboardSnapshots } from "@dragons/db/schema";
 import { getDb } from "../../config/database";
 import { getLatestSnapshot, listSnapshots, getDeviceHealth } from "./live-snapshot";
+import { SCOREBOARD_ONLINE_THRESHOLD_MS } from "./constants";
 
 // The columns `scoreboard_snapshots` requires NOT NULL with no default.
 const baseSnapshot = {
@@ -122,6 +123,19 @@ describe("getDeviceHealth", () => {
     await expect(getDeviceHealth("d1")).resolves.toMatchObject({
       deviceId: "d1",
       online: true,
+    });
+  });
+
+  it("reports a device whose row is older than the online threshold as offline", async () => {
+    const staleLastFrameAt = new Date(
+      Date.now() - SCOREBOARD_ONLINE_THRESHOLD_MS - 5_000,
+    );
+    await getDb()
+      .insert(liveScoreboards)
+      .values({ deviceId: "d1", lastFrameAt: staleLastFrameAt });
+    await expect(getDeviceHealth("d1")).resolves.toMatchObject({
+      deviceId: "d1",
+      online: false,
     });
   });
 });

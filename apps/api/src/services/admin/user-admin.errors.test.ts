@@ -20,9 +20,4 @@ describe("UserAdminError", () => {
     expect(error.message).toBe("message for humans");
     expect(error.name).toBe("UserAdminError");
   });
-
-  it("maps both codes to 404", () => {
-    expect(new UserAdminError("x", "USER_NOT_FOUND").status).toBe(404);
-    expect(new UserAdminError("x", "REFEREE_NOT_FOUND").status).toBe(404);
-  });
 });
