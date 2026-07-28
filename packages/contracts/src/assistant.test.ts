@@ -47,7 +47,7 @@ describe("assistantRescheduleChatBodySchema", () => {
   });
 
   it("rejects an unbounded parts array", () => {
-    const parts = Array.from({ length: 49 }, () => ({ type: "text", text: "x" }));
+    const parts = Array.from({ length: 81 }, () => ({ type: "text", text: "x" }));
     expect(
       assistantRescheduleChatBodySchema.safeParse({ messages: [{ ...message(), parts }] })
         .success,
@@ -61,6 +61,8 @@ describe("assistantRescheduleChatBodySchema", () => {
   // step, comfortably clearing 20 and getting the assistant message itself
   // rejected — which then gets stuck in useChat state and 400s every
   // subsequent send/regenerate. This builds that shape and asserts it parses.
+  // `apps/api/src/ai/chat-part-budget.test.ts` checks the same thing against the
+  // route's live step budget and tool list rather than these hard-coded numbers.
   it("accepts a realistic 8-step tool-heavy assistant message", () => {
     const parts: Array<Record<string, unknown>> = [];
     for (let step = 0; step < 8; step++) {
