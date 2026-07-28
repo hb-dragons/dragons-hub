@@ -32,10 +32,20 @@ describe("every :id path param comes from the shared schema", () => {
       : undefined;
   };
 
+  // A handful of *ParamSchema exports carry a non-numeric id on purpose and
+  // are exempted by name rather than by weakening the check for everyone
+  // else: `userIdParamSchema` validates a better-auth text id
+  // (`user.id` is `text().primaryKey()`), not the serial-int ids every other
+  // route's :id param addresses.
+  const NON_NUMERIC_ID_PARAM_SCHEMAS = new Set(["userIdParamSchema"]);
+
   // Path-param schemas only. A body schema may legitimately carry an unrelated
   // `id` — `qaChatBodySchema.id` is the AI SDK's chat id, a string.
   const schemasWithId = Object.entries(contracts)
-    .filter(([name]) => /Params?Schema$/.test(name))
+    .filter(
+      ([name]) =>
+        /Params?Schema$/.test(name) && !NON_NUMERIC_ID_PARAM_SCHEMAS.has(name),
+    )
     .map(([name, value]) => [name, shapeOf(value)] as const)
     .filter(
       (entry): entry is [string, Record<string, unknown>] =>
