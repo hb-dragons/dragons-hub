@@ -48,6 +48,23 @@ describe("matchListQuerySchema", () => {
     expect(result).toMatchObject({ teamApiId: 42 });
   });
 
+  it("coerces opponentApiId to number", () => {
+    const result = matchListQuerySchema.parse({ opponentApiId: "42" });
+    expect(result).toMatchObject({ opponentApiId: 42 });
+  });
+
+  it("rejects zero opponentApiId", () => {
+    expect(() => matchListQuerySchema.parse({ opponentApiId: "0" })).toThrow();
+  });
+
+  it("rejects negative opponentApiId", () => {
+    expect(() => matchListQuerySchema.parse({ opponentApiId: "-1" })).toThrow();
+  });
+
+  it("rejects non-numeric opponentApiId string", () => {
+    expect(() => matchListQuerySchema.parse({ opponentApiId: "abc" })).toThrow();
+  });
+
   it("rejects invalid dateFrom format", () => {
     expect(() => matchListQuerySchema.parse({ dateFrom: "01-01-2025" })).toThrow();
   });

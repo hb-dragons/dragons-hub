@@ -18,6 +18,7 @@ export {
 export {
   matchListQuerySchema,
   matchIdParamSchema,
+  publicMatchIdParamSchema,
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
   releaseOverrideParamsSchema,

@@ -14,9 +14,11 @@ export const matchListQuerySchema = z.object({
     .transform((v) => v === "true")
     .optional(),
   teamApiId: z.coerce.number().int().positive().optional(),
+  opponentApiId: z.coerce.number().int().positive().optional(),
 });
 
 export const matchIdParamSchema = idParamSchema;
+export const publicMatchIdParamSchema = idParamSchema;
 
 export const matchUpdateBodySchema = matchFormSchema.extend({
   venueId: z.number().int().positive().nullable().optional(),
