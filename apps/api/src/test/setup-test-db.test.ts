@@ -69,6 +69,16 @@ describe("setupTestDb", () => {
     expect(league!.name).toBe("Regionalliga West");
   });
 
+  // Boots a *second* PGlite instance, which is the whole point — the
+  // independence property is what is under test, so this cannot be made to
+  // share `ctx`. That boot is CPU-heavy, and under v8 coverage instrumentation
+  // plus a loaded box it blew through vitest's 5s default (issue #139).
+  //
+  // Measured on a 24-core machine, this test against increasing contention:
+  // idle 421ms, 32 spinners 2.1s, 96 spinners 3.8s, 256 spinners 8.7s (fails).
+  // Nothing about the assertion is slow and the boot cost is bounded, so the
+  // fixture-heavy cases get an explicit timeout rather than the global default
+  // being raised — that default is what catches genuinely hung tests.
   it("hands out independent databases", async () => {
     const other = await setupTestDb();
     try {
@@ -80,7 +90,7 @@ describe("setupTestDb", () => {
     } finally {
       await closeTestDb(other);
     }
-  });
+  }, 30_000);
 });
 
 describe("resetTestDb", () => {
@@ -103,6 +113,10 @@ describe("resetTestDb", () => {
     expect(result).toEqual([]);
   });
 
+  // The other second-instance case; same reasoning and same measurements as
+  // "hands out independent databases" above (issue #139). A fresh database is
+  // required because the migration-seeded rows only exist before the first
+  // reset, so `ctx` cannot stand in for it.
   it("clears migration-seeded tables the first time it runs", async () => {
     const fresh = await setupTestDb();
     try {
@@ -120,7 +134,7 @@ describe("resetTestDb", () => {
     } finally {
       await closeTestDb(fresh);
     }
-  });
+  }, 30_000);
 
   it("clears rows regardless of foreign-key ordering", async () => {
     const [venue] = await ctx.db
