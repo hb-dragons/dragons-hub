@@ -1169,4 +1169,139 @@ describe("syncRefereeGames", () => {
     expect(counts.updated).toBe(0);
     expect((await gameRow()).sr1Status).toBe("assigned");
   });
+
+  /**
+   * Issue #142. `refereeGames.apiMatchId` is unique, so the upsert deliberately
+   * reads tombstoned rows — otherwise the insert would collide. What was missing
+   * is the other half: the update left `removedAt` set, so a game the federation
+   * withdrew and then re-listed stayed invisible everywhere (list, claim flow,
+   * visibility service, history reads, reminder worker) while quietly receiving
+   * fresh data.
+   *
+   * Decision: a game present in the feed is live, so the row resurrects in place.
+   * A resurrected game is then treated like a new one — withdrawal cancelled its
+   * reminder jobs and emitted match.removed, so reviving the row without
+   * re-arming those leaves it visible but silent, which is the same missed
+   * officiating duty in a different disguise.
+   *
+   * The withdrawal itself is applied directly here rather than driven through
+   * `removeWithdrawnRefereeGames`; that function's guards have their own pglite
+   * suite in referee-games.removal.integration.test.ts.
+   */
+  describe("re-listed after withdrawal (#142)", () => {
+    async function tombstone(apiMatchId = 1001) {
+      await ctx.db
+        .update(refereeGames)
+        .set({ removedAt: new Date("2026-03-01T00:00:00Z") })
+        .where(eq(refereeGames.apiMatchId, apiMatchId));
+    }
+
+    const openSlotResult = () =>
+      makeApiResult({ sr1: null, sr1MeinVerein: true, sr1OffenAngeboten: false });
+
+    it("clears the tombstone when the game comes back with changed data", async () => {
+      mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr() })));
+      await syncRefereeGames();
+      const before = await gameRow();
+      await tombstone();
+      vi.clearAllMocks();
+
+      // Comes back with the slot open — different data, so the hash differs too.
+      mockFetchOffeneSpiele.mockResolvedValue(feed(openSlotResult()));
+      const counts = await syncRefereeGames();
+
+      const after = await gameRow();
+      expect(counts.updated).toBe(1);
+      expect(after.id).toBe(before.id); // resurrected in place, not a new row
+      expect(after.removedAt).toBeNull();
+      expect(after.sr1Status).toBe("open");
+    });
+
+    /**
+     * The nastier half. `existing.dataHash !== hash` skipped the update
+     * entirely, so a game re-listed with byte-identical data stayed tombstoned
+     * forever — no amount of re-syncing would ever bring it back.
+     */
+    it("clears the tombstone even when the data is unchanged", async () => {
+      mockFetchOffeneSpiele.mockResolvedValue(feed(openSlotResult()));
+      await syncRefereeGames();
+      const before = await gameRow();
+      await tombstone();
+      vi.clearAllMocks();
+
+      mockFetchOffeneSpiele.mockResolvedValue(feed(openSlotResult()));
+      const counts = await syncRefereeGames();
+
+      const after = await gameRow();
+      expect(after.removedAt).toBeNull();
+      expect(after.id).toBe(before.id);
+      expect(after.dataHash).toBe(before.dataHash);
+      // Counted as an update, not skipped as unchanged: the row did change.
+      expect(counts).toMatchObject({ updated: 1, unchanged: 0 });
+    });
+
+    it("re-emits referee.slots.needed and re-arms reminders for a revived open slot", async () => {
+      mockFetchOffeneSpiele.mockResolvedValue(feed(openSlotResult()));
+      await syncRefereeGames();
+      await tombstone();
+      vi.clearAllMocks();
+
+      mockFetchOffeneSpiele.mockResolvedValue(feed(openSlotResult()));
+      await syncRefereeGames();
+
+      const row = await gameRow();
+      expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "referee.slots.needed" }),
+        expect.anything(),
+      );
+      expect(mockScheduleReminderJobs).toHaveBeenCalledWith(1001, row.id, "2026-04-25", "14:00");
+    });
+
+    it("revives a re-listed game that is now cancelled without notifying", async () => {
+      mockFetchOffeneSpiele.mockResolvedValue(feed(openSlotResult()));
+      await syncRefereeGames();
+      await tombstone();
+      vi.clearAllMocks();
+
+      const cancelled = openSlotResult();
+      cancelled.sp.abgesagt = true;
+      mockFetchOffeneSpiele.mockResolvedValue(feed(cancelled));
+      await syncRefereeGames();
+
+      const row = await gameRow();
+      expect(row.removedAt).toBeNull();
+      expect(row.isCancelled).toBe(true);
+      expect(mockPublishDomainEvent).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: "referee.slots.needed" }),
+        expect.anything(),
+      );
+      expect(mockScheduleReminderJobs).not.toHaveBeenCalled();
+    });
+
+    it("does not re-arm reminders for a revived game whose slots are already filled", async () => {
+      mockFetchOffeneSpiele.mockResolvedValue(feed(openSlotResult()));
+      await syncRefereeGames();
+      await tombstone();
+      vi.clearAllMocks();
+
+      // Both slots taken by the time the federation re-lists it.
+      const sr2 = makeSr({ spielleitungId: 2 });
+      mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr(), sr2 })));
+      await syncRefereeGames();
+
+      expect((await gameRow()).removedAt).toBeNull();
+      expect(mockScheduleReminderJobs).not.toHaveBeenCalled();
+    });
+
+    it("leaves a live row's removedAt alone on an ordinary update", async () => {
+      mockFetchOffeneSpiele.mockResolvedValue(feed(makeApiResult({ sr1: makeSr() })));
+      await syncRefereeGames();
+      vi.clearAllMocks();
+
+      mockFetchOffeneSpiele.mockResolvedValue(feed(openSlotResult()));
+      await syncRefereeGames();
+
+      expect((await gameRow()).removedAt).toBeNull();
+    });
+  });
 });

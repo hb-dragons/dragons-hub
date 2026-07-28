@@ -535,7 +535,19 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
         existing = raced;
       }
 
-      if (existing.dataHash !== hash) {
+      // The federation is listing this game again after withdrawing it, so the
+      // row is live again (issue #142). The upsert reads tombstoned rows on
+      // purpose — apiMatchId is unique, so an insert would collide — but the
+      // update used to leave `removedAt` set, and every consumer filters on
+      // `isNull(removedAt)`. The game kept receiving fresh data while staying
+      // invisible in the game list, the claim flow, the visibility service, the
+      // history reads and the reminder worker.
+      const resurrected = existing.removedAt !== null;
+
+      // `|| resurrected` matters as much as the tombstone clear itself: a game
+      // re-listed with byte-identical data hashes the same, so the skip below
+      // would leave it tombstoned forever, with no later sync able to recover it.
+      if (existing.dataHash !== hash || resurrected) {
         // UPDATE
         const now = new Date();
 
@@ -562,13 +574,20 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
 
         const existingId = existing.id;
 
+        // A revived game is news in the same way a brand-new one is: the
+        // withdrawal emitted match.removed and cancelled its reminders, so
+        // reviving the row silently would leave it visible but unannounced and
+        // unreminded — the same missed officiating duty, better hidden.
+        const revivedWithOpenSlot =
+          resurrected && !nowCancelledOrForfeited && hasOpenOurClubSlot(mapped);
+
         await getDb().transaction(async (tx) => {
           await tx
             .update(refereeGames)
-            .set({ ...rowValues, lastSyncedAt: now, updatedAt: now })
+            .set({ ...rowValues, removedAt: null, lastSyncedAt: now, updatedAt: now })
             .where(eq(refereeGames.id, existingId));
 
-          if (slotOpened) {
+          if (slotOpened || revivedWithOpenSlot) {
             await publishDomainEvent(
               {
                 type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
@@ -591,11 +610,31 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
           entityId: String(mapped.apiMatchId),
           entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
           action: "updated",
-          message: "Game data changed",
+          message: resurrected ? "Game re-listed by federation" : "Game data changed",
         });
 
         // Reminder jobs are Redis work; they run after the row is committed.
-        if (justCancelled) {
+        if (resurrected) {
+          // Cancel before scheduling even though the withdrawal already
+          // cancelled: that call is best-effort (it only logs on failure), so a
+          // revival must not stack a second set of reminders on a surviving one.
+          try {
+            await cancelReminderJobs(mapped.apiMatchId);
+            if (revivedWithOpenSlot) {
+              await scheduleReminderJobs(
+                mapped.apiMatchId,
+                existingId,
+                mapped.kickoffDate,
+                mapped.kickoffTime,
+              );
+            }
+          } catch (err) {
+            log.warn(
+              { err, apiMatchId: mapped.apiMatchId },
+              "Failed to re-arm reminder jobs for a re-listed game",
+            );
+          }
+        } else if (justCancelled) {
           try {
             await cancelReminderJobs(mapped.apiMatchId);
           } catch (err) {
