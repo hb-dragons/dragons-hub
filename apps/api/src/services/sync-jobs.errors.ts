@@ -7,15 +7,16 @@
  * error handler.
  */
 
+import { AppError } from "../app-error";
+
 /**
  * A manual full sync was requested while one is already active, waiting or
  * delayed. Mapped to HTTP 409 by the central error handler.
  */
-export class SyncAlreadyQueuedError extends Error {
-  readonly code = "SYNC_ALREADY_QUEUED";
+export class SyncAlreadyQueuedError extends AppError {
+  declare readonly code: "SYNC_ALREADY_QUEUED";
 
   constructor(message = "Sync already in progress or queued") {
-    super(message);
-    this.name = "SyncAlreadyQueuedError";
+    super(message, "SYNC_ALREADY_QUEUED", 409);
   }
 }

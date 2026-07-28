@@ -9,11 +9,8 @@ import type {
   AssignRefereeResponse,
   UnassignRefereeResponse,
 } from "@dragons/shared";
-import {
-  assignReferee,
-  unassignReferee,
-  AssignmentError,
-} from "./referee-assignment.service";
+import { assignReferee, unassignReferee } from "./referee-assignment.service";
+import { AssignmentError } from "./referee-assignment.errors";
 import { resolveClaimableSlots } from "./referee-slot-resolver";
 
 export interface ClaimRefereeGameParams {

@@ -5,6 +5,8 @@
  * centrally without importing `team-admin.service.ts` and its database client.
  */
 
+import { AppError } from "../../app-error";
+
 /**
  * A team reorder request that cannot be satisfied. `code` is the stable part of
  * the wire contract; the message is for humans.
@@ -14,13 +16,11 @@
  * whose message happened to match and gave the client `{"error": "INVALID_TEAM_SET"}`
  * as its human-readable text.
  */
-export class TeamReorderError extends Error {
-  constructor(
-    readonly code: "INVALID_TEAM_SET" | "DUPLICATE_TEAM_ID",
-    message: string,
-  ) {
-    super(message);
-    this.name = "TeamReorderError";
+export class TeamReorderError extends AppError {
+  declare readonly code: "INVALID_TEAM_SET" | "DUPLICATE_TEAM_ID";
+
+  constructor(code: "INVALID_TEAM_SET" | "DUPLICATE_TEAM_ID", message: string) {
+    super(message, code, 400);
   }
 
   static duplicateTeamId(): TeamReorderError {

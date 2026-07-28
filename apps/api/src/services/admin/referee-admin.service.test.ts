@@ -31,8 +31,8 @@ import {
   getRefereeCounts,
   updateRefereeVisibility,
   updateRefereeRules,
-  RefereeSettingsError,
 } from "./referee-admin.service";
+import { RefereeSettingsError } from "./referee-admin.errors";
 import {
   matches,
   matchReferees,

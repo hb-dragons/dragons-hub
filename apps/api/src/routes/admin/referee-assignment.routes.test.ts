@@ -14,11 +14,6 @@ vi.mock("../../services/referee/referee-assignment.service", () => ({
   assignReferee: mocks.assignReferee,
   unassignReferee: mocks.unassignReferee,
   searchCandidates: mocks.searchCandidates,
-  AssignmentError: class AssignmentError extends Error {
-    constructor(message: string, public code: string) {
-      super(message);
-    }
-  },
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -38,8 +33,19 @@ vi.mock("../../middleware/rbac", () => ({
   ),
 }));
 
+// FEDERATION_ERROR is a 502, and errorHandler reports every 5xx to Cloud Error
+// Reporting. Real behaviour, but it would print pino JSON through this suite.
+vi.mock("../../config/logger", () => ({
+  logger: { error: vi.fn() },
+}));
+
 import { adminRefereeAssignmentRoutes } from "./referee-assignment.routes";
 import { errorHandler } from "../../middleware/error";
+// The real class, deliberately not mocked: errorHandler maps it by
+// `instanceof AppError`, so a stand-in `extends Error` double would fall
+// through to a 500 and these status assertions would test nothing. The errors
+// module is a leaf with no database or SDK imports, so using it here is free.
+import { AssignmentError } from "../../services/referee/referee-assignment.errors";
 
 const app = new Hono<AppEnv>();
 app.onError(errorHandler);
@@ -126,9 +132,6 @@ describe("GET /referee/games/:spielplanId/candidates", () => {
   });
 
   it("returns mapped error status for AssignmentError", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
     mocks.searchCandidates.mockRejectedValue(new AssignmentError("Game not found", "GAME_NOT_FOUND"));
 
     const res = await app.request("/referee/games/12345/candidates?slotNumber=1");
@@ -180,9 +183,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 404 for GAME_NOT_FOUND", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
     mocks.assignReferee.mockRejectedValue(new AssignmentError("Game not found", "GAME_NOT_FOUND"));
     const res = await app.request("/referee/games/12345/assign", {
       method: "POST",
@@ -194,9 +194,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 502 for FEDERATION_ERROR", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
     mocks.assignReferee.mockRejectedValue(new AssignmentError("Federation error", "FEDERATION_ERROR"));
     const res = await app.request("/referee/games/12345/assign", {
       method: "POST",
@@ -235,9 +232,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 409 for SLOT_TAKEN", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
     mocks.assignReferee.mockRejectedValue(new AssignmentError("Slot taken", "SLOT_TAKEN"));
     const res = await app.request("/referee/games/12345/assign", {
       method: "POST",
@@ -249,9 +243,6 @@ describe("POST /referee/games/:spielplanId/assign", () => {
   });
 
   it("returns 422 for NOT_QUALIFIED", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
     mocks.assignReferee.mockRejectedValue(new AssignmentError("Not qualified", "NOT_QUALIFIED"));
     const res = await app.request("/referee/games/12345/assign", {
       method: "POST",
@@ -304,9 +295,6 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("returns 404 for GAME_NOT_FOUND", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
     mocks.unassignReferee.mockRejectedValue(new AssignmentError("Game not found", "GAME_NOT_FOUND"));
     const res = await app.request("/referee/games/12345/assignment/1", {
       method: "DELETE",
@@ -316,9 +304,6 @@ describe("DELETE /referee/games/:spielplanId/assignment/:slotNumber", () => {
   });
 
   it("returns 502 for FEDERATION_ERROR", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
     mocks.unassignReferee.mockRejectedValue(new AssignmentError("Federation error", "FEDERATION_ERROR"));
     const res = await app.request("/referee/games/12345/assignment/1", {
       method: "DELETE",
@@ -368,48 +353,7 @@ describe("error re-throw for non-AssignmentError", () => {
   });
 });
 
-// Covers the `ERROR_STATUS_MAP[error.code] ?? 500` fallback branch when an
-// AssignmentError uses a code that isn't in the map.
-describe("unknown AssignmentError code falls back to 500", () => {
-  it("candidates returns 500 for unmapped code", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
-    mocks.searchCandidates.mockRejectedValue(
-      new AssignmentError("Surprise", "UNKNOWN_CODE"),
-    );
-    const res = await app.request("/referee/games/12345/candidates");
-    expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ code: "UNKNOWN_CODE" });
-  });
-
-  it("assign returns 500 for unmapped code", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
-    mocks.assignReferee.mockRejectedValue(
-      new AssignmentError("Surprise", "UNKNOWN_CODE"),
-    );
-    const res = await app.request("/referee/games/12345/assign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slotNumber: 1, refereeApiId: 9001 }),
-    });
-    expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ code: "UNKNOWN_CODE" });
-  });
-
-  it("unassign returns 500 for unmapped code", async () => {
-    const { AssignmentError } = await import(
-      "../../services/referee/referee-assignment.service"
-    );
-    mocks.unassignReferee.mockRejectedValue(
-      new AssignmentError("Surprise", "UNKNOWN_CODE"),
-    );
-    const res = await app.request("/referee/games/12345/assignment/1", {
-      method: "DELETE",
-    });
-    expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ code: "UNKNOWN_CODE" });
-  });
-});
+// The `ERROR_STATUS_MAP[error.code] ?? 500` fallback these three tests covered
+// no longer exists. AssignmentError's status table is keyed by
+// AssignmentErrorCode, so a code with no status is a compile error rather than a
+// runtime 500 — see referee-assignment.errors.test.ts for the table itself.

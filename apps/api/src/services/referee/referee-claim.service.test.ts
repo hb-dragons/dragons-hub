@@ -45,7 +45,7 @@ vi.mock("./referee-assignment.service", async () => {
 
 import { claimRefereeGame, unclaimRefereeGame } from "./referee-claim.service";
 import { resolveClaimableSlots } from "./referee-slot-resolver";
-import { AssignmentError } from "./referee-assignment.service";
+import { AssignmentError } from "./referee-assignment.errors";
 import { refereeGames, referees, teams, refereeAssignmentRules } from "@dragons/db/schema";
 import {
   setupTestDb,

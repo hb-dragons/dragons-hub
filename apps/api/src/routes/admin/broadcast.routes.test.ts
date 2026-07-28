@@ -8,6 +8,7 @@ import {
   vi,
 } from "vitest";
 import { Hono } from "hono";
+import type { AppEnv } from "../../types";
 import type * as BroadcastPublisher from "../../services/broadcast/publisher";
 import type * as ConfigEnv from "../../config/env";
 
@@ -70,6 +71,7 @@ import {
   teams,
 } from "@dragons/db/schema";
 import { adminBroadcastRoutes } from "./broadcast.routes";
+import { errorHandler } from "../../middleware/error";
 
 let ctx: TestDbContext;
 beforeAll(async () => {
@@ -85,8 +87,13 @@ afterAll(async () => {
   await closeTestDb(ctx);
 });
 
+// errorHandler is what turns a BroadcastError into its status now that the
+// route no longer catches it. app.ts registers it globally, so wiring it here
+// keeps the test app faithful to production.
 function app() {
-  return new Hono().route("/admin/broadcast", adminBroadcastRoutes);
+  return new Hono<AppEnv>()
+    .onError(errorHandler)
+    .route("/admin/broadcast", adminBroadcastRoutes);
 }
 
 async function seedMatch(): Promise<{ matchId: number }> {

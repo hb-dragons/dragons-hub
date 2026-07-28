@@ -17,16 +17,7 @@ import type {
   CandidateSearchResponse,
 } from "@dragons/shared";
 import { isRefereeEligibleForGame, type EligibilitySlot } from "./referee-slot-resolver";
-
-export class AssignmentError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-  ) {
-    super(message);
-    this.name = "AssignmentError";
-  }
-}
+import { AssignmentError } from "./referee-assignment.errors";
 
 const FEDERATION_SUCCESS = "Änderungen erfolgreich übernommen";
 

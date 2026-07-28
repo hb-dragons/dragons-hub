@@ -11,19 +11,7 @@ import type {
   UpdateRefereeRulesBodyParsed,
 } from "@dragons/contracts";
 import { escapeLikePattern } from "../utils/sql";
-
-export class RefereeSettingsError extends Error {
-  constructor(
-    message: string,
-    public readonly code:
-      | "NOT_FOUND"
-      | "NOT_OWN_CLUB"
-      | "VALIDATION_ERROR",
-  ) {
-    super(message);
-    this.name = "RefereeSettingsError";
-  }
-}
+import { RefereeSettingsError } from "./referee-admin.errors";
 
 type RefereeScope = "own" | "all";
 type RefereeSort = "name" | "workloadAsc" | "workloadDesc";
