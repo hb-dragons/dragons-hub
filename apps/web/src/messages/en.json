@@ -1372,7 +1372,7 @@
       "next": "Next page",
       "last": "Last page"
     },
-    "triggerTypePlaceholder": "match.time_changed",
+    "triggerTypePlaceholder": "match.schedule.changed",
     "entityNamePlaceholder": "Dragons vs. Tigers",
     "deepLinkPathPlaceholder": "/admin/matches/123",
     "urgencyDefaultPlaceholder": "Default",
