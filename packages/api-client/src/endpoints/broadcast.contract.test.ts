@@ -87,12 +87,18 @@ describe("broadcast request bodies/queries satisfy @dragons/contracts schemas", 
 });
 
 describe("broadcast read endpoints target the right path + verb", () => {
-  it("config targets the admin config endpoint with GET + deviceId query", async () => {
+  it("config targets the admin config endpoint with GET + a deviceId query the contract accepts", async () => {
     const { api, calls } = recordingClient();
     await api.config("panel-1");
     const url = new URL(calls[0]!.url);
+    const parsed = scoreboardDeviceQuerySchema.safeParse(
+      Object.fromEntries(url.searchParams),
+    );
+    expect(
+      parsed.data,
+      "scoreboardDeviceQuerySchema rejected the config query",
+    ).toEqual({ deviceId: "panel-1" });
     expect(url.pathname).toBe("/admin/broadcast/config");
-    expect(url.searchParams.get("deviceId")).toBe("panel-1");
     expect(calls[0]!.method).toBe("GET");
   });
 
