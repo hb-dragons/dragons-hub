@@ -21,6 +21,7 @@ import {
   broadcastUpsertSchema,
   broadcastStartStopSchema,
   broadcastMatchesQuerySchema,
+  scoreboardDeviceQuerySchema,
 } from "@dragons/contracts";
 import type { AppEnv } from "../../types";
 
@@ -29,19 +30,18 @@ const adminBroadcastRoutes = new Hono<AppEnv>();
 adminBroadcastRoutes.get(
   "/config",
   requireAnyRole("admin"),
+  validator("query", scoreboardDeviceQuerySchema, validationHook),
   describeRoute({
     description: "Get the broadcast config for a device",
     tags: ["Broadcast"],
     responses: {
       200: { description: "Config + joined match" },
+      400: { description: "Invalid query" },
       404: { description: "Unknown device" },
     },
   }),
   async (c) => {
-    const deviceId = c.req.query("deviceId");
-    if (!deviceId) {
-      return c.json({ error: "deviceId required", code: "BAD_REQUEST" }, 400);
-    }
+    const { deviceId } = c.req.valid("query");
     if (!isConfiguredDevice(deviceId)) {
       return c.json(UNKNOWN_DEVICE_BODY, 404);
     }
