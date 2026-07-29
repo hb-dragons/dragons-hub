@@ -10,7 +10,7 @@ import {
   taskAssignees,
 } from "@dragons/db/schema";
 import { publishDomainEvent } from "../services/events/event-publisher";
-import { EVENT_TYPES } from "@dragons/shared";
+import { CLUB_TIME_ZONE, EVENT_TYPES, todayInClubZone } from "@dragons/shared";
 
 const log = logger.child({ service: "task-reminder-worker" });
 
@@ -28,7 +28,11 @@ async function loadLeadCandidates(): Promise<TaskReminderRow[]> {
   // handled by loadDayOfCandidates, which renders "Due today" text. Without
   // this exclusion a task due today would match both queries and produce a
   // misleading "Due tomorrow" in-app message alongside the day-of one.
-  const todayStr = new Date().toISOString().slice(0, 10);
+  //
+  // Club-local, matching loadDayOfCandidates and the stored dueDate. A UTC
+  // "today" is yesterday between club midnight and 01:00/02:00, which stops
+  // the exclusion excluding today and produces exactly that double-send.
+  const todayStr = todayInClubZone();
   return await getDb()
     .select({
       id: tasks.id,
@@ -51,28 +55,25 @@ async function loadLeadCandidates(): Promise<TaskReminderRow[]> {
     );
 }
 
-// "Due today" and the 08:00 send gate are club-local (Europe/Berlin), not UTC —
-// otherwise a task due today wouldn't surface until 08:00 UTC (09:00/10:00
-// local), and near midnight the date itself would be off by one.
-function berlinNow(now: Date): { hour: number; dateStr: string } {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Berlin",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
-  const get = (t: string) => parts.find((p) => p.type === t)!.value;
-  return {
-    hour: Number(get("hour")) % 24, // some ICU builds emit "24" at midnight
-    dateStr: `${get("year")}-${get("month")}-${get("day")}`,
-  };
+// The 08:00 send gate is club-local, not UTC — otherwise a task due today
+// wouldn't surface until 08:00 UTC (09:00/10:00 local). The club *day* comes
+// from todayInClubZone(); only the hour has no shared equivalent, so this is
+// the one piece that stays here. `hourCycle: "h23"` keeps midnight as "00" —
+// some ICU builds otherwise emit "24".
+function clubHour(now: Date): number {
+  return Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: CLUB_TIME_ZONE,
+      hourCycle: "h23",
+      hour: "2-digit",
+    }).format(now),
+  );
 }
 
 async function loadDayOfCandidates(): Promise<TaskReminderRow[]> {
-  const { hour, dateStr: todayStr } = berlinNow(new Date());
-  if (hour < 8) return [];
+  const now = new Date();
+  if (clubHour(now) < 8) return [];
+  const todayStr = todayInClubZone(now);
   return await getDb()
     .select({
       id: tasks.id,
