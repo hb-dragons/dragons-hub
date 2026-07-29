@@ -16,7 +16,7 @@ import {
 } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
-import { refereeGameColumns, computeMySlot } from "./referee-games.service";
+import { refereeGameColumns, computeMySlot, toRefereeGameListItem } from "./referee-games.service";
 import { resolveClaimableSlots } from "./referee-slot-resolver";
 
 function buildAssignedToMe(refereeApiId: number | null) {
@@ -127,11 +127,9 @@ export async function getVisibleRefereeGames(
     ]);
 
     const total = countResult[0]?.count ?? 0;
-    const decorated = items.map((row) => ({
-      ...row,
-      mySlot: null,
-      claimableSlots: [],
-    })) as RefereeGameListItem[];
+    const decorated: RefereeGameListItem[] = items.map((row) =>
+      toRefereeGameListItem(row, { mySlot: null, claimableSlots: [] }),
+    );
     return {
       items: decorated,
       total, limit, offset,
@@ -292,11 +290,12 @@ export async function getVisibleRefereeGames(
   ]);
 
   const total = countResult[0]?.count ?? 0;
-  const decorated = items.map((row) => ({
-    ...row,
-    mySlot: computeMySlot(row, referee.apiId ?? null),
-    claimableSlots: resolveClaimableSlots(row, referee, rules),
-  })) as RefereeGameListItem[];
+  const decorated: RefereeGameListItem[] = items.map((row) =>
+    toRefereeGameListItem(row, {
+      mySlot: computeMySlot(row, referee.apiId ?? null),
+      claimableSlots: resolveClaimableSlots(row, referee, rules),
+    }),
+  );
   return {
     items: decorated,
     total, limit, offset,
@@ -398,7 +397,7 @@ async function getVisibleRefereeGame(
       .where(and(lookup, isNull(refereeGames.removedAt)))
       .limit(1);
     if (!row) return null;
-    return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
+    return toRefereeGameListItem(row, { mySlot: null, claimableSlots: [] });
   }
 
   const [referee] = await getDb()
@@ -453,11 +452,10 @@ async function getVisibleRefereeGame(
     .limit(1);
 
   if (!row) return null;
-  return {
-    ...row,
+  return toRefereeGameListItem(row, {
     mySlot: computeMySlot(row, referee.apiId ?? null),
     claimableSlots: resolveClaimableSlots(row, referee, rules),
-  } as RefereeGameListItem;
+  });
 }
 
 /**

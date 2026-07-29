@@ -11,6 +11,12 @@ export const BOOKING_STATUSES = [
 ] as const;
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
+// State of one referee slot (SR1/SR2) on a federation fixture. Derived during
+// sync by `deriveSrStatus`, and set to "assigned"/"open" by the assignment
+// service — those are the only writers, so `refereeGames.sr{1,2}Status` carries
+// this as its `$type` rather than a bare `string`.
+export type RefereeSlotStatus = "open" | "offered" | "assigned";
+
 export const SYNC_STATUSES = [
   "pending",
   "running",

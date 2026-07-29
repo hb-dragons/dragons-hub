@@ -9,6 +9,7 @@ export {
 export type {
   TaskPriority,
   BookingStatus,
+  RefereeSlotStatus,
   SyncStatus,
   EntityType,
   EntryAction,

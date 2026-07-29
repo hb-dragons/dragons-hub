@@ -357,7 +357,7 @@ export async function getRefereeHistoryGames(
 
   const total = countResult[0]?.count ?? 0;
   return {
-    items: items as HistoryGameItem[],
+    items,
     total,
     limit: params.limit,
     offset: params.offset,

@@ -60,10 +60,10 @@ export class PushChannelAdapter {
       return result;
     }
 
-    const prefs = (await getDb()
+    const prefs: PrefRow[] = await getDb()
       .select()
       .from(userNotificationPreferences)
-      .where(inArray(userNotificationPreferences.userId, params.recipientUserIds))) as PrefRow[];
+      .where(inArray(userNotificationPreferences.userId, params.recipientUserIds));
     const prefByUser = new Map(prefs.map((p) => [p.userId, p]));
 
     type Outgoing = {

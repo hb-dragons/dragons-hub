@@ -495,7 +495,33 @@ describe("getRefereeGames — projected row shape", () => {
       mySlot: null,
       claimableSlots: [],
     });
-    expect(item.lastSyncedAt).toEqual(new Date("2026-04-14T10:00:00Z"));
+    expect(item.lastSyncedAt).toBe("2026-04-14T10:00:00.000Z");
+  });
+
+  // Regression (issue #153). `last_synced_at` is a timestamp column, so drizzle
+  // hands back a `Date`, but `RefereeGameListItem` — the type web and native
+  // read the response through — declares `string | null`. The list builders
+  // asserted `as RefereeGameListItem`, so the compiler never saw the
+  // disagreement and every reader got a `Date` where the type promised a
+  // string. Assert the runtime type, not just a value that `toEqual` would
+  // accept from either shape.
+  it("emits lastSyncedAt as an ISO string, not a Date", async () => {
+    await seedGame({ apiMatchId: 5150, lastSyncedAt: new Date("2026-04-14T10:00:00Z") });
+
+    const fromList = (await getRefereeGames(PAGE)).items[0]!;
+    expect(typeof fromList.lastSyncedAt).toBe("string");
+    expect(fromList.lastSyncedAt).toBe("2026-04-14T10:00:00.000Z");
+
+    const byId = await getRefereeGameById(fromList.id);
+    expect(typeof byId?.lastSyncedAt).toBe("string");
+    expect(byId?.lastSyncedAt).toBe("2026-04-14T10:00:00.000Z");
+  });
+
+  it("keeps a null lastSyncedAt null rather than coercing it", async () => {
+    await seedGame({ apiMatchId: 5151, lastSyncedAt: null });
+
+    const item = (await getRefereeGames(PAGE)).items[0]!;
+    expect(item.lastSyncedAt).toBeNull();
   });
 });
 
