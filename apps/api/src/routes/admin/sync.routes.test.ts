@@ -7,6 +7,7 @@ import type { AppEnv } from "../../types";
 const mocks = vi.hoisted(() => ({
   triggerManualSync: vi.fn(),
   getJobStatus: vi.fn(),
+  retrySyncJob: vi.fn(),
   syncQueue: {
     getJobs: vi.fn(),
     getJob: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock("../../workers/queues", () => ({
 vi.mock("../../services/sync-jobs.service", () => ({
   triggerManualSync: mocks.triggerManualSync,
   getJobStatus: mocks.getJobStatus,
+  retrySyncJob: mocks.retrySyncJob,
 }));
 
 vi.mock("../../services/admin/sync-admin.service", () => ({
@@ -63,7 +65,9 @@ vi.mock("../../services/sync/sync-log-stream", () => ({
 
 import { syncRoutes } from "./sync.routes";
 import { errorHandler } from "../../middleware/error";
-import { SyncAlreadyQueuedError } from "../../services/sync-jobs.errors";
+// The real error classes: an `extends Error` double is not an AppError, so the
+// central handler would 500 while a status assertion still looked green.
+import { SyncAlreadyQueuedError, SyncJobNotFailedError } from "../../services/sync-jobs.errors";
 import { SYNC_STATUSES } from "@dragons/shared";
 
 // Test app without auth middleware — inject a fake user for routes that need it
@@ -135,6 +139,24 @@ describe("GET /sync/status", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(status);
+    expect(mocks.getSyncStatus).toHaveBeenCalledWith(undefined);
+  });
+
+  it("passes the validated syncType filter to the service", async () => {
+    mocks.getSyncStatus.mockResolvedValue({ lastSync: null, isRunning: false });
+
+    const res = await app.request("/sync/status?syncType=referee-games");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getSyncStatus).toHaveBeenCalledWith("referee-games");
+  });
+
+  it("returns 400 for a repeated syncType instead of silently taking the first", async () => {
+    const res = await app.request("/sync/status?syncType=full&syncType=referee-games");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mocks.getSyncStatus).not.toHaveBeenCalled();
   });
 });
 
@@ -147,6 +169,7 @@ describe("GET /sync/status/:jobId", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(jobStatus);
+    expect(mocks.getJobStatus).toHaveBeenCalledWith("1");
   });
 
   it("returns 404 for unknown job", async () => {
@@ -225,21 +248,17 @@ describe("GET /sync/jobs", () => {
 
 describe("POST /sync/jobs/:jobId/retry", () => {
   it("retries a failed job", async () => {
-    const mockJob = {
-      getState: vi.fn().mockResolvedValue("failed"),
-      retry: vi.fn().mockResolvedValue(undefined),
-    };
-    mocks.syncQueue.getJob.mockResolvedValue(mockJob);
+    mocks.retrySyncJob.mockResolvedValue({ status: "retried" });
 
     const res = await app.request("/sync/jobs/1/retry", { method: "POST" });
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ status: "retried" });
-    expect(mockJob.retry).toHaveBeenCalled();
+    expect(mocks.retrySyncJob).toHaveBeenCalledWith("1");
   });
 
   it("returns 404 for unknown job", async () => {
-    mocks.syncQueue.getJob.mockResolvedValue(null);
+    mocks.retrySyncJob.mockResolvedValue(null);
 
     const res = await app.request("/sync/jobs/unknown/retry", { method: "POST" });
 
@@ -247,15 +266,16 @@ describe("POST /sync/jobs/:jobId/retry", () => {
     expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
   });
 
-  it("rejects retrying non-failed job", async () => {
-    mocks.syncQueue.getJob.mockResolvedValue({
-      getState: vi.fn().mockResolvedValue("completed"),
-    });
+  it("maps SyncJobNotFailedError to 400 through the central error handler", async () => {
+    mocks.retrySyncJob.mockRejectedValue(new SyncJobNotFailedError("completed"));
 
     const res = await app.request("/sync/jobs/1/retry", { method: "POST" });
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "INVALID_STATE" });
+    expect(await json(res)).toEqual({
+      error: "Job is not in failed state (current: completed)",
+      code: "INVALID_STATE",
+    });
   });
 });
 
@@ -268,6 +288,7 @@ describe("DELETE /sync/jobs/:jobId", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ status: "removed" });
+    expect(mocks.syncQueue.getJob).toHaveBeenCalledWith("1");
     expect(mockJob.remove).toHaveBeenCalled();
   });
 
@@ -296,6 +317,7 @@ describe("GET /sync/jobs/:jobId/logs", () => {
       logs: ["Step 1 done", "Step 2 done"],
       count: 2,
     });
+    expect(mocks.syncQueue.getJobLogs).toHaveBeenCalledWith("1");
   });
 
   it("returns 404 for unknown job", async () => {
@@ -548,6 +570,24 @@ describe("GET /sync/schedule", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(schedule);
+    expect(mocks.getSchedule).toHaveBeenCalledWith("full");
+  });
+
+  it("passes the validated syncType to the service", async () => {
+    mocks.getSchedule.mockResolvedValue({ id: 2, syncType: "referee-games" });
+
+    const res = await app.request("/sync/schedule?syncType=referee-games");
+
+    expect(res.status).toBe(200);
+    expect(mocks.getSchedule).toHaveBeenCalledWith("referee-games");
+  });
+
+  it("returns 400 for a repeated syncType instead of silently taking the first", async () => {
+    const res = await app.request("/sync/schedule?syncType=full&syncType=referee-games");
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mocks.getSchedule).not.toHaveBeenCalled();
   });
 });
 

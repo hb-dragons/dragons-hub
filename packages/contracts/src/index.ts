@@ -124,6 +124,8 @@ export {
   syncEntriesQuerySchema,
   syncStreamParamSchema,
   syncJobStatusesQuerySchema,
+  syncJobIdParamSchema,
+  syncTypeQuerySchema,
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
   SYNC_JOB_STATUSES,

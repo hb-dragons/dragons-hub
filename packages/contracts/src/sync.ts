@@ -16,6 +16,21 @@ export const syncLogsQuerySchema = syncPaginationSchema.extend({
 
 export type SyncLogsQuery = z.infer<typeof syncLogsQuerySchema>;
 
+/**
+ * The `syncType` filter on `GET /admin/sync/status` and `GET /admin/sync/schedule`.
+ *
+ * Free string, not an enum, and deliberately so: `PUT /admin/sync/schedule`
+ * takes an arbitrary `syncType` in its body and `upsertSchedule` writes it to
+ * `sync_schedule.sync_type` (a varchar), so the set of readable types is open at
+ * runtime even though the pipeline itself only ever writes `full` and
+ * `referee-games`. Enumerating it here would reject types the sibling write
+ * endpoint happily creates. `syncLogsQuerySchema.syncType` is free for the same
+ * reason.
+ */
+export const syncTypeQuerySchema = z.object({
+  syncType: z.string().optional(),
+});
+
 export const syncEntryIdParamSchema = idParamSchema;
 
 const entityTypeEnum = z.enum(ENTITY_TYPES);
@@ -54,6 +69,15 @@ export const syncJobStatusesQuerySchema = z.object({
         );
     }),
   limit: z.coerce.number().int().positive().max(500).default(100),
+});
+
+/**
+ * The `:jobId` path parameter of the queue-job routes. BullMQ job ids are opaque
+ * strings (`manual-sync`, `referee-games-sync-42`, or a generated counter), so
+ * there is nothing to coerce — only a non-empty string to insist on.
+ */
+export const syncJobIdParamSchema = z.object({
+  jobId: z.string().min(1),
 });
 
 export const syncUpdateScheduleBodySchema = z.strictObject({

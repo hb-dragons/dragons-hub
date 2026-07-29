@@ -8,6 +8,8 @@ import {
   syncJobStatusesQuerySchema,
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
+  syncTypeQuerySchema,
+  syncJobIdParamSchema,
 } from "./sync";
 import { SYNC_STATUSES } from "@dragons/shared";
 
@@ -212,6 +214,53 @@ describe("syncUpdateScheduleBodySchema", () => {
     for (const cronExpression of expressions) {
       expect(syncUpdateScheduleBodySchema.parse({ cronExpression }).cronExpression).toBe(cronExpression);
     }
+  });
+});
+
+describe("syncTypeQuerySchema", () => {
+  it("accepts the two sync types the pipeline writes", () => {
+    expect(syncTypeQuerySchema.parse({ syncType: "full" }).syncType).toBe("full");
+    expect(syncTypeQuerySchema.parse({ syncType: "referee-games" }).syncType).toBe("referee-games");
+  });
+
+  it("allows omitting syncType", () => {
+    expect(syncTypeQuerySchema.parse({}).syncType).toBeUndefined();
+  });
+
+  // Deliberately not an enum: PUT /admin/sync/schedule takes an arbitrary
+  // syncType in its body and upsertSchedule writes it, so the readable set is
+  // open at runtime. Matches syncLogsQuerySchema.syncType, which is also free.
+  it("accepts a syncType outside the two the pipeline writes", () => {
+    expect(syncTypeQuerySchema.parse({ syncType: "some-future-type" }).syncType).toBe(
+      "some-future-type",
+    );
+  });
+
+  it("keeps an empty syncType as the empty string (the service reads it as no filter)", () => {
+    expect(syncTypeQuerySchema.parse({ syncType: "" }).syncType).toBe("");
+  });
+
+  it("rejects a repeated syncType query param", () => {
+    expect(syncTypeQuerySchema.safeParse({ syncType: ["full", "referee-games"] }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("syncJobIdParamSchema", () => {
+  it("accepts the opaque BullMQ job ids the queue hands out", () => {
+    expect(syncJobIdParamSchema.parse({ jobId: "manual-sync" })).toEqual({ jobId: "manual-sync" });
+    expect(syncJobIdParamSchema.parse({ jobId: "referee-games-sync-42" })).toEqual({
+      jobId: "referee-games-sync-42",
+    });
+  });
+
+  it("rejects an empty job id", () => {
+    expect(() => syncJobIdParamSchema.parse({ jobId: "" })).toThrow();
+  });
+
+  it("rejects a missing job id", () => {
+    expect(() => syncJobIdParamSchema.parse({})).toThrow();
   });
 });
 

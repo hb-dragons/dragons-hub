@@ -101,11 +101,12 @@ import {
   triggerManualSync,
   triggerRefereeGamesSync,
   getJobStatus,
+  retrySyncJob,
   updateSyncSchedule,
   updateRefereeSyncSchedule,
   initTaskReminders,
 } from "./sync-jobs.service";
-import { SyncAlreadyQueuedError } from "./sync-jobs.errors";
+import { SyncAlreadyQueuedError, SyncJobNotFailedError } from "./sync-jobs.errors";
 import { runWithLogContext } from "../config/log-context";
 
 beforeEach(() => {
@@ -435,6 +436,52 @@ describe("getJobStatus", () => {
       result: null,
       error: null,
     });
+  });
+});
+
+describe("retrySyncJob", () => {
+  it("returns null for unknown job", async () => {
+    mockGetJob.mockResolvedValue(null);
+
+    expect(await retrySyncJob("unknown")).toBeNull();
+  });
+
+  it("retries a failed job", async () => {
+    const retry = vi.fn().mockResolvedValue(undefined);
+    mockGetJob.mockResolvedValue({
+      getState: vi.fn().mockResolvedValue("failed"),
+      retry,
+    });
+
+    expect(await retrySyncJob("job-1")).toEqual({ status: "retried" });
+    expect(retry).toHaveBeenCalled();
+  });
+
+  // The "only a failed job may be retried" rule lives here, not in the route:
+  // the error carries its own 400 to the central handler.
+  it.each(["active", "waiting", "delayed", "completed"])(
+    "refuses to retry a job in state %s",
+    async (state) => {
+      const retry = vi.fn();
+      mockGetJob.mockResolvedValue({
+        getState: vi.fn().mockResolvedValue(state),
+        retry,
+      });
+
+      await expect(retrySyncJob("job-1")).rejects.toThrow(SyncJobNotFailedError);
+      expect(retry).not.toHaveBeenCalled();
+    },
+  );
+
+  it("names the blocking state in the error", async () => {
+    mockGetJob.mockResolvedValue({
+      getState: vi.fn().mockResolvedValue("completed"),
+      retry: vi.fn(),
+    });
+
+    await expect(retrySyncJob("job-1")).rejects.toThrow(
+      "Job is not in failed state (current: completed)",
+    );
   });
 });
 
