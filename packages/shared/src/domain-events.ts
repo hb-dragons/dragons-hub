@@ -1,6 +1,13 @@
 // ── Event metadata types ─────────────────────────────────────────────────────
 
-export type EventSource = "sync" | "manual" | "reconciliation";
+/**
+ * Where an event came from. Single source of truth — the admin listing's
+ * `source` filter derives its enum from this array rather than restating the
+ * literals, which is what let it accept any string and silently return nothing.
+ * `publishSystemEvent` writes `"manual"`, so system events need no extra member.
+ */
+export const EVENT_SOURCES = ["sync", "manual", "reconciliation"] as const;
+export type EventSource = (typeof EVENT_SOURCES)[number];
 /**
  * Delivery urgency. Single source of truth — both the manual-trigger contract
  * and the watch-rule `urgencyOverride` derive their enum from this array rather
@@ -77,6 +84,53 @@ export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
  */
 export const EVENT_TYPE_VALUES = Object.values(EVENT_TYPES) as readonly EventType[];
 
+// ── System event constants ───────────────────────────────────────────────────
+
+/**
+ * Types that exist only to anchor rows the schema requires an event for, never
+ * to notify anyone.
+ *
+ * Deliberately **not** part of `EVENT_TYPES`: `notification_log` has a foreign
+ * key to `domain_events`, so the admin test-push route needs a row to point at,
+ * but the type must stay out of the public vocabulary or an admin could aim a
+ * watch rule at it or fire one from the manual trigger. Watch rules and
+ * `triggerEventSchema` validate against `EVENT_TYPE_VALUES`, which is why that
+ * array stays domain-only — see `STORED_EVENT_TYPE_VALUES` for the wider set
+ * that describes what the table can actually hold.
+ */
+export const SYSTEM_EVENT_TYPES = ["admin.test_push"] as const;
+export type SystemEventType = (typeof SYSTEM_EVENT_TYPES)[number];
+
+/**
+ * Entity types only system events use. A system event is about an account
+ * action rather than one of the tracked entities in `EVENT_ENTITY_TYPES`.
+ */
+export const SYSTEM_EVENT_ENTITY_TYPES = ["user"] as const;
+export type SystemEventEntityType = (typeof SYSTEM_EVENT_ENTITY_TYPES)[number];
+
+/**
+ * What a persisted `domain_events` row can actually hold, domain and system
+ * events together — the type of the columns and of anything that reads them
+ * back out, such as the admin event listing.
+ *
+ * Kept separate from `EventType` / `EventEntityType` on purpose. Those two are
+ * the *publishable* vocabulary and are what write-side contracts validate
+ * against; these two are the *readable* one. Collapsing them would let an admin
+ * trigger `admin.test_push` by hand, which is the thing the split prevents.
+ */
+export type StoredEventType = EventType | SystemEventType;
+export type StoredEventEntityType = EventEntityType | SystemEventEntityType;
+
+/** Runtime counterparts, for filters that must accept any stored value. */
+export const STORED_EVENT_TYPE_VALUES = [
+  ...EVENT_TYPE_VALUES,
+  ...SYSTEM_EVENT_TYPES,
+] as readonly StoredEventType[];
+export const STORED_EVENT_ENTITY_TYPES = [
+  ...EVENT_ENTITY_TYPES,
+  ...SYSTEM_EVENT_ENTITY_TYPES,
+] as readonly StoredEventEntityType[];
+
 // ── Payload types ────────────────────────────────────────────────────────────
 //
 // The contract for every event payload lives in `domain-event-schemas.ts` (zod),
@@ -87,15 +141,23 @@ export const EVENT_TYPE_VALUES = Object.values(EVENT_TYPES) as readonly EventTyp
 
 // ── API response types ───────────────────────────────────────────────────────
 
+/**
+ * One row of the admin event listing.
+ *
+ * `type` and `entityType` are the **stored** unions, not the publishable ones:
+ * `listDomainEvents` returns system-event rows too, and declaring the narrower
+ * union here told consumers a `switch` was exhaustive when live rows fell
+ * outside it (#154).
+ */
 export interface DomainEventItem {
   id: string;
-  type: EventType;
+  type: StoredEventType;
   source: EventSource;
   urgency: EventUrgency;
   occurredAt: string;
   actor: string | null;
   syncRunId: number | null;
-  entityType: EventEntityType;
+  entityType: StoredEventEntityType;
   entityId: number;
   entityName: string;
   deepLinkPath: string;

@@ -2,7 +2,12 @@ import { ulid } from "ulid";
 import { getDb } from "../../config/database";
 import { domainEvents } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
-import type { EventSource, EventEntityType, EventType } from "@dragons/shared";
+import type {
+  EventSource,
+  EventEntityType,
+  EventType,
+  SystemEventType,
+} from "@dragons/shared";
 import { validateEventPayload } from "@dragons/shared";
 import { classifyUrgency } from "./event-types";
 import { domainEventsQueue } from "../../workers/queues";
@@ -108,14 +113,13 @@ async function insertEventRow(
  * An event that exists only to anchor rows the schema requires an event for,
  * never to notify anyone.
  *
- * `admin.test_push` is deliberately **not** in `EVENT_TYPES`: `notification_log`
- * has a foreign key to `domain_events`, so the admin test-push route needs a row
- * to point at, but the type must stay out of the public vocabulary or an admin
- * could aim a watch rule at it or fire one from the manual trigger. The
- * pipeline finds no rule and no role default for it and does nothing, which is
- * the intent — the push itself was already sent directly by the route.
+ * The type itself now lives in `@dragons/shared` alongside the domain
+ * vocabulary, because the admin listing's response type has to name it (#154).
+ * It remains deliberately outside `EVENT_TYPES`: the pipeline finds no rule and
+ * no role default for it and does nothing, which is the intent — the push
+ * itself was already sent directly by the route.
  */
-export type SystemEventType = "admin.test_push";
+export type { SystemEventType };
 
 export interface PublishSystemEventParams {
   /** Caller-chosen id. The route encodes its own scoping prefix into it. */

@@ -1343,7 +1343,8 @@
       "match": "match",
       "booking": "booking",
       "referee": "referee",
-      "task": "task"
+      "task": "task",
+      "user": "user"
     },
     "urgencyLabels": {
       "immediate": "immediate",
@@ -1376,8 +1377,7 @@
     "entityNamePlaceholder": "Dragons vs. Tigers",
     "deepLinkPathPlaceholder": "/admin/matches/123",
     "urgencyDefaultPlaceholder": "Default",
-    "payloadPlaceholder": "'{\"field\": \"value\"}'",
-    "typeFilterPlaceholder": "match.*"
+    "payloadPlaceholder": "'{\"field\": \"value\"}'"
   },
   "refereeHub": {
     "title": "Referees",

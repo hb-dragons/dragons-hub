@@ -55,6 +55,13 @@ function lastKey() {
   return String(swrKeys[swrKeys.length - 1]);
 }
 
+// Picked by accessible name, not by position. These used to be indexed out of
+// `getAllByRole("combobox")`, which broke the moment #155 added a fourth filter
+// select ahead of them.
+const typeFilter = () => screen.getByRole("combobox", { name: "Type" });
+const entityFilter = () => screen.getByRole("combobox", { name: "Entity" });
+const sourceFilter = () => screen.getByRole("combobox", { name: "Source" });
+
 /** Drives a Radix Select purely by keyboard: open, walk to the option, pick. */
 async function pickOption(trigger: HTMLElement, label: string) {
   fireEvent.keyDown(trigger, { key: "Enter", code: "Enter" });
@@ -75,33 +82,76 @@ describe("EventBrowser entity-type filter", () => {
 
   it("filters by the chosen entity type", async () => {
     renderBrowser();
-    const [entityTrigger] = screen.getAllByRole("combobox");
-    await pickOption(entityTrigger!, "match");
+    await pickOption(entityFilter(), "match");
     await waitFor(() => expect(lastKey()).toContain("entityType=match"));
   });
 
   it("clears the filter when All is chosen instead of sending entityType=all", async () => {
     renderBrowser();
-    const [entityTrigger] = screen.getAllByRole("combobox");
 
-    await pickOption(entityTrigger!, "match");
+    await pickOption(entityFilter(), "match");
     await waitFor(() => expect(lastKey()).toContain("entityType=match"));
 
-    await pickOption(entityTrigger!, "All");
-    // `entityType=all` is accepted by the contract as a free string and matches
-    // zero rows, permanently emptying the table with no way back.
+    await pickOption(entityFilter(), "All");
+    // `entityType=all` used to be accepted by the contract as a free string and
+    // matched zero rows, permanently emptying the table with no way back.
     await waitFor(() => expect(lastKey()).not.toContain("entityType"));
   });
 
   it("clears the source filter when All is chosen", async () => {
     renderBrowser();
-    const sourceTrigger = screen.getAllByRole("combobox")[1];
 
-    await pickOption(sourceTrigger!, "Sync");
+    await pickOption(sourceFilter(), "Sync");
     await waitFor(() => expect(lastKey()).toContain("source=sync"));
 
-    await pickOption(sourceTrigger!, "All");
+    await pickOption(sourceFilter(), "All");
     await waitFor(() => expect(lastKey()).not.toContain("source="));
+  });
+
+  // `task` events are the most frequent kind the reminder worker emits, and the
+  // filter simply had no option for them until #155.
+  it("offers every stored entity type, including task and user", async () => {
+    renderBrowser();
+    fireEvent.keyDown(entityFilter(), { key: "Enter", code: "Enter" });
+
+    for (const label of ["match", "booking", "referee", "task", "user"]) {
+      expect(await screen.findByRole("option", { name: label })).toBeInTheDocument();
+    }
+  });
+});
+
+describe("EventBrowser type filter", () => {
+  beforeEach(() => {
+    swrKeys.length = 0;
+  });
+  afterEach(cleanup);
+
+  it("filters by the chosen event type", async () => {
+    renderBrowser();
+    await pickOption(typeFilter(), "match.schedule.changed");
+    await waitFor(() => expect(lastKey()).toContain("type=match.schedule.changed"));
+  });
+
+  it("clears the type filter when All is chosen", async () => {
+    renderBrowser();
+
+    await pickOption(typeFilter(), "match.schedule.changed");
+    await waitFor(() => expect(lastKey()).toContain("type=match.schedule.changed"));
+
+    await pickOption(typeFilter(), "All");
+    await waitFor(() => expect(lastKey()).not.toContain("type="));
+  });
+
+  // It is a select rather than a free-text box precisely so this cannot be
+  // typed by hand: since #155 the API 400s an unrecognised type, and before
+  // that it returned a silently empty page.
+  it("offers the system event type so its rows stay reachable", async () => {
+    renderBrowser();
+    fireEvent.keyDown(typeFilter(), { key: "Enter", code: "Enter" });
+
+    expect(
+      await screen.findByRole("option", { name: "admin.test_push" }),
+    ).toBeInTheDocument();
   });
 });
 

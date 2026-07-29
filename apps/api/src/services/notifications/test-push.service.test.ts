@@ -422,7 +422,7 @@ describe("listRecentTestPushes", () => {
     const channelId = await seedPushChannel();
     await ctx.db.insert(domainEvents).values({
       id: "match_update_01",
-      type: "match.updated",
+      type: "match.created",
       source: "sync",
       urgency: "routine",
       occurredAt: new Date(),
