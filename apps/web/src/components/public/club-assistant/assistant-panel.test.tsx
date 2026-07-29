@@ -4,13 +4,17 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 
+const setMessages = vi.fn();
+const clearError = vi.fn();
 const chatMock = vi.fn(() => ({
   messages: [] as unknown[],
   sendMessage: vi.fn(),
   status: "ready",
-  error: undefined,
+  error: undefined as Error | undefined,
   stop: vi.fn(),
   regenerate: vi.fn(),
+  setMessages,
+  clearError,
 }));
 vi.mock("@ai-sdk/react", () => ({ useChat: () => chatMock() }));
 vi.mock("ai", () => ({ DefaultChatTransport: class { constructor(_o: unknown) {} } }));
@@ -30,6 +34,7 @@ const messages = {
     placeholder: "p",
     send: "Send",
     stop: "Stop",
+    newChat: "Start a new chat",
   },
 };
 
@@ -105,5 +110,59 @@ describe("<AssistantPanel> dialog semantics", () => {
     unmount();
     expect(document.activeElement).toBe(trigger);
     trigger.remove();
+  });
+});
+
+// Issue #148: a rejected message stays in `messages`, and DefaultChatTransport
+// re-sends the whole list every turn, so a single 400 dead-ended the chat until
+// the page was reloaded. `setMessages([])` alone is not enough — AI SDK v6 parks
+// `status` at "error" and keeps `error` set, so the banner would survive the
+// reset; `clearError()` is what returns the chat to "ready".
+describe("<AssistantPanel> recovery from a rejected message", () => {
+  afterEach(() => {
+    cleanup();
+    setMessages.mockClear();
+    clearError.mockClear();
+    chatMock.mockReturnValue({
+      messages: [],
+      sendMessage: vi.fn(),
+      status: "ready",
+      error: undefined,
+      stop: vi.fn(),
+      regenerate: vi.fn(),
+      setMessages,
+      clearError,
+    });
+  });
+
+  function renderInError() {
+    chatMock.mockReturnValue({
+      messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
+      sendMessage: vi.fn(),
+      status: "error",
+      error: new Error("400"),
+      stop: vi.fn(),
+      regenerate: vi.fn(),
+      setMessages,
+      clearError,
+    });
+    render(wrap(<AssistantPanel onClose={vi.fn()} />));
+  }
+
+  it("offers a new-chat control while the chat is in an error state", () => {
+    renderInError();
+    expect(screen.getByRole("button", { name: "Start a new chat" })).toBeInTheDocument();
+  });
+
+  it("clears the transcript and the error state when it is used", () => {
+    renderInError();
+    fireEvent.click(screen.getByRole("button", { name: "Start a new chat" }));
+    expect(setMessages).toHaveBeenCalledWith([]);
+    expect(clearError).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer the control when there is no error to recover from", () => {
+    render(wrap(<AssistantPanel onClose={vi.fn()} />));
+    expect(screen.queryByRole("button", { name: "Start a new chat" })).not.toBeInTheDocument();
   });
 });

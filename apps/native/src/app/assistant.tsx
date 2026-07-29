@@ -21,6 +21,7 @@ import {
   countUserMessages,
   NEAR_BOTTOM,
 } from "@/lib/assistant/scroll";
+import { resetChat, shouldOfferReset } from "@/lib/assistant/reset";
 import { AssistantMarkdown } from "@/components/assistant/AssistantMarkdown";
 import { ActivityChip } from "@/components/assistant/ActivityChip";
 import { ChatComposer } from "@/components/assistant/ChatComposer";
@@ -139,9 +140,8 @@ export default function AssistantScreen() {
     [],
   );
 
-  const { messages, sendMessage, status, error, stop, regenerate } = useChat({
-    transport,
-  });
+  const { messages, sendMessage, status, error, stop, regenerate, setMessages, clearError } =
+    useChat({ transport });
 
   const scrollToBottom = (animated: boolean) => {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated }));
@@ -220,17 +220,27 @@ export default function AssistantScreen() {
       />
       <KeyboardStickyView style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}>
         <View onLayout={(e: LayoutChangeEvent) => setComposerH(e.nativeEvent.layout.height)}>
-          {error ? (
-            <Text
+          {shouldOfferReset({ hasError: Boolean(error) }) ? (
+            <View
               style={{
-                color: colors.destructive,
-                textAlign: "center",
+                alignItems: "center",
+                gap: spacing.xs,
                 paddingHorizontal: spacing.lg,
                 paddingBottom: spacing.xs,
               }}
             >
-              {i18n.t("assistant.error")}
-            </Text>
+              <Text style={{ color: colors.destructive, textAlign: "center" }}>
+                {i18n.t("assistant.error")}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => resetChat({ setMessages, clearError })}
+              >
+                <Text style={{ color: colors.mutedForeground, textDecorationLine: "underline" }}>
+                  {i18n.t("assistant.newChat")}
+                </Text>
+              </Pressable>
+            </View>
           ) : null}
           <ChatComposer
             value={input}
