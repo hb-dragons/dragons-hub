@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { describeRoute, validator } from "hono-openapi";
 import type { UIMessage } from "ai";
 import type { AppEnv } from "../types";
@@ -21,11 +22,21 @@ qaRoutes.post(
   },
   requireAuth,
   rateLimit({ limit: 20, windowSeconds: 60, keyPrefix: "qa-chat" }),
+  // The contract's per-message bounds still admit ~9.6 MB (60 messages x 30
+  // parts x 8000 chars), so this is the route's real size gate. Same 512 KB as
+  // the reschedule copilot.
+  bodyLimit({ maxSize: 512 * 1024 }),
   validator("json", qaChatBodySchema, validationHook),
   describeRoute({
     description: "Stream the members-only club Q&A assistant (AI SDK UI message stream).",
     tags: ["assistant"],
-    responses: { 200: { description: "UI message stream" }, 503: { description: "Chatbot disabled" } },
+    responses: {
+      200: { description: "UI message stream" },
+      400: { description: "Bad request" },
+      413: { description: "Body too large" },
+      429: { description: "Rate limited" },
+      503: { description: "Chatbot disabled" },
+    },
   }),
   async (c) => {
     const { messages, locale } = c.req.valid("json");

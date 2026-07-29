@@ -39,7 +39,7 @@ describe("qaChatBodySchema", () => {
   });
 
   it("rejects an unbounded parts array", () => {
-    const parts = Array.from({ length: 21 }, () => ({ type: "text", text: "x" }));
+    const parts = Array.from({ length: 31 }, () => ({ type: "text", text: "x" }));
     expect(qaChatBodySchema.safeParse({ messages: [{ ...message(), parts }] }).success).toBe(
       false,
     );
