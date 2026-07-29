@@ -118,7 +118,7 @@ Write direct, specific prose. Avoid filler words and vague adjectives. Add `ai-s
 - UI components imported from `@dragons/ui`
 - API calls via `apps/web/src/lib/api.ts`
 - Every route sits under a `[locale]` segment (next-intl); admin pages live in `app/[locale]/admin/`
-- Dates and times go through `apps/web/src/lib/tz.ts` — never `toISOString().slice(0, 10)` or `new Date(day + "T00:00:00")`. Tests that touch them must force a non-Berlin `TZ`
+- Dates and times go through `packages/shared/src/kickoff.ts` (`@dragons/shared`) — never `toISOString().slice(0, 10)` or `new Date(day + "T00:00:00")`. Tests that touch them must force a non-Berlin `TZ`
 - **Design System:** Read `packages/ui/DESIGN-SYSTEM.md` before building any UI
 
 ### SDK Types

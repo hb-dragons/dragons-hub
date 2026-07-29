@@ -963,25 +963,27 @@ Types come from one place each: request body/query types from `@dragons/contract
 
 To add an endpoint: add an `xEndpoints` factory plus a `.contract.test.ts` in `@dragons/api-client`, register the factory in `create-api.ts`, then consume it as `api.<group>`. The contract test parses the client's request body/query against the `@dragons/contracts` schema so client/server drift fails the build.
 
-### Dates and times (web)
+### Dates and times
 
-`apps/web/src/lib/tz.ts` is the only place the web app converts between Berlin
-calendar days / wall-clock times and `Date` instants (issue #114). The API
-stores and returns Berlin-local `YYYY-MM-DD` and `HH:MM:SS` strings, and
-`i18n/request.ts` pins every `useFormatter()` output to `Europe/Berlin`, so a
-`Date` built without an explicit zone is read in the *runtime's* zone — UTC in
-the SSR container, the admin's own zone in the browser — and the same value
-renders differently in the two places.
+`packages/shared/src/kickoff.ts`, exported from `@dragons/shared`, is the only
+place the codebase converts between club-zone (`CLUB_TIME_ZONE`,
+`Europe/Berlin`) calendar days / wall-clock times and `Date` instants (issue
+#114). Web is the heaviest consumer, but api and native import the same
+helpers. The API stores and returns Berlin-local `YYYY-MM-DD` and `HH:MM:SS`
+strings, and `i18n/request.ts` pins every `useFormatter()` output to
+`Europe/Berlin`, so a `Date` built without an explicit zone is read in the
+*runtime's* zone — UTC in the SSR container or Cloud Run, the admin's own zone
+in the browser — and the same value renders differently in the two places.
 
-Two rules, both of which `tz.ts` exists to enforce:
+Two rules, both of which `kickoff.ts` exists to enforce:
 
 - Never `toISOString().slice(0, 10)` a `Date` to get a day. Use
-  `toBerlinDateString()` for an instant, `calendarDayString()` for a day the
-  user picked in a date widget. Also available: `todayInBerlin()`,
-  `plusDaysInBerlin()`.
+  `toClubDateString()` for an instant, `calendarDayString()` for a day the
+  user picked in a date widget. Also available: `todayInClubZone()`,
+  `plusDaysInClubZone()`.
 - Never `new Date(day + "T00:00:00")` or `new Date("1970-01-01T" + time)`. Use
-  `berlinDayAnchor()` / `berlinTimeAnchor()`. `lib/format-kickoff.ts` calls
-  `berlinDayAnchor` rather than anchoring itself.
+  `clubDayAnchor()` / `clubTimeAnchor()`. `apps/web/src/lib/format-kickoff.ts`
+  calls `clubDayAnchor` rather than anchoring itself.
 
 Anything testing this must force a non-Berlin `TZ` — a developer machine set to
 `Europe/Berlin` makes every one of these bugs invisible.
