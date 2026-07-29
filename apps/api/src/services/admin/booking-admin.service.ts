@@ -30,7 +30,7 @@ async function getVenueName(venueId: number): Promise<string> {
 }
 
 export interface BookingListFilters {
-  status?: string;
+  status?: BookingStatus;
   dateFrom?: string;
   dateTo?: string;
 }
@@ -40,7 +40,7 @@ export async function listBookings(
 ): Promise<BookingListItem[]> {
   const conditions = [];
   if (filters?.status) {
-    conditions.push(eq(venueBookings.status, filters.status as BookingStatus));
+    conditions.push(eq(venueBookings.status, filters.status));
   }
   if (filters?.dateFrom) {
     conditions.push(gte(venueBookings.date, filters.dateFrom));
@@ -94,7 +94,7 @@ export async function listBookings(
     overrideEndTime: row.overrideEndTime,
     effectiveStartTime: row.overrideStartTime ?? row.calculatedStartTime,
     effectiveEndTime: row.overrideEndTime ?? row.calculatedEndTime,
-    status: row.status as BookingStatus,
+    status: row.status,
     needsReconfirmation: row.needsReconfirmation,
     notes: row.notes,
     matchCount: Number(row.matchCount),
@@ -184,7 +184,7 @@ export async function getBookingDetail(
     effectiveStartTime:
       booking.overrideStartTime ?? booking.calculatedStartTime,
     effectiveEndTime: booking.overrideEndTime ?? booking.calculatedEndTime,
-    status: booking.status as BookingStatus,
+    status: booking.status,
     needsReconfirmation: booking.needsReconfirmation,
     notes: booking.notes,
     confirmedBy: booking.confirmedBy,
@@ -309,7 +309,7 @@ export async function updateBooking(
     effectiveStartTime:
       updated.overrideStartTime ?? updated.calculatedStartTime,
     effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-    status: updated.status as BookingStatus,
+    status: updated.status,
     needsReconfirmation: updated.needsReconfirmation,
     notes: updated.notes,
     matchCount: Number(matchCountResult[0]!.count),
@@ -318,9 +318,9 @@ export async function updateBooking(
 
 export async function updateBookingStatus(
   id: number,
-  status: string,
+  status: BookingStatus,
 ): Promise<BookingListItem | null> {
-  const base = { status: status as BookingStatus, updatedAt: new Date() };
+  const base = { status, updatedAt: new Date() };
   const set =
     status === "confirmed"
       ? { ...base, confirmedAt: new Date(), needsReconfirmation: false }
@@ -389,7 +389,7 @@ export async function updateBookingStatus(
     effectiveStartTime:
       updated.overrideStartTime ?? updated.calculatedStartTime,
     effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-    status: updated.status as BookingStatus,
+    status: updated.status,
     needsReconfirmation: updated.needsReconfirmation,
     notes: updated.notes,
     matchCount: Number(matchCountResult[0]!.count),

@@ -48,7 +48,7 @@ import {
   listFailedNotifications,
 } from "./event-admin.service";
 import { channelConfigs, domainEvents, notificationLog } from "@dragons/db/schema";
-import type { ChannelConfig } from "@dragons/shared";
+import type { ChannelConfig, EventUrgency } from "@dragons/shared";
 import { eq } from "drizzle-orm";
 import {
   setupTestDb,
@@ -79,7 +79,7 @@ interface EventSeed {
   id: string;
   type?: string;
   source?: string;
-  urgency?: string;
+  urgency?: EventUrgency;
   occurredAt?: string;
   entityType?: string;
   entityName?: string;

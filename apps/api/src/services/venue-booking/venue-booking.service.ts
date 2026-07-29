@@ -15,7 +15,6 @@ import type {
   ReconcilePreview,
   ReconcilePreviewMatch,
   ReconcileResult,
-  BookingStatus,
 } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import { publishDomainEvent } from "../events/event-publisher";
@@ -250,7 +249,7 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
       bookingId: u.bookingId,
       venueName: nameOf(u.venueId),
       date: u.date,
-      status: u.status as BookingStatus,
+      status: u.status,
       currentStartTime: u.currentStartTime,
       currentEndTime: u.currentEndTime,
       newStartTime: u.newStartTime,
@@ -264,7 +263,7 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
       bookingId: r.bookingId,
       venueName: nameOf(r.venueId),
       date: r.date,
-      status: r.status as BookingStatus,
+      status: r.status,
       reason: r.reason,
       matches: displayOf(r.displayMatchIds),
     });

@@ -60,12 +60,19 @@ export async function listDomainEvents(params: {
     .limit(limit)
     .offset(offset);
 
+  // `type`, `source` and `entityType` stay hand-narrowed, unlike `urgency`.
+  // `domain_events.type` really does hold values outside `EventType` —
+  // `publishSystemEvent` writes `type: "admin.test_push"` with
+  // `entity_type: "user"`, neither of which is in the union this response
+  // declares. And the `type`/`entityType`/`source` filters above take whatever
+  // `eventListQuerySchema` accepts, which is a bare `z.string()`. Both need a
+  // decision about the response contract, not a wider signature. See #151.
   return {
     events: rows.map((r) => ({
       id: r.id,
       type: r.type as DomainEventListResult["events"][number]["type"],
       source: r.source as DomainEventListResult["events"][number]["source"],
-      urgency: r.urgency as DomainEventListResult["events"][number]["urgency"],
+      urgency: r.urgency,
       occurredAt: r.occurredAt.toISOString(),
       actor: r.actor,
       syncRunId: r.syncRunId,

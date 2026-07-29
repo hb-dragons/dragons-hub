@@ -211,10 +211,10 @@ export async function updateMatchLocal(
       const value = field in updateValues ? updateValues[field] : locked[field];
       return value == null ? null : String(value);
     };
-    const emitEvent = async (eventType: string, extraPayload: Record<string, unknown>) => {
+    const emitEvent = async (eventType: EventType, extraPayload: Record<string, unknown>) => {
       try {
         await publishDomainEvent({
-          type: eventType as EventType,
+          type: eventType,
           source: "manual",
           actor: changedBy,
           entityType: "match",
@@ -424,7 +424,7 @@ export async function releaseOverride(
     if (isScheduleField && currentStr !== remoteStr) {
       try {
         await publishDomainEvent({
-          type: EVENT_TYPES.MATCH_SCHEDULE_CHANGED as EventType,
+          type: EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
           source: "manual",
           actor: changedBy,
           entityType: "match",
@@ -446,7 +446,7 @@ export async function releaseOverride(
     if (isVenueField && currentStr !== remoteStr) {
       try {
         await publishDomainEvent({
-          type: EVENT_TYPES.MATCH_VENUE_CHANGED as EventType,
+          type: EVENT_TYPES.MATCH_VENUE_CHANGED,
           source: "manual",
           actor: changedBy,
           entityType: "match",

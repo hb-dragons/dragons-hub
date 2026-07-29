@@ -1,4 +1,4 @@
-import { EVENT_TYPES } from "@dragons/shared";
+import { EVENT_TYPES, type EventType } from "@dragons/shared";
 
 type FieldValue = string | number | boolean | null | undefined;
 
@@ -37,8 +37,8 @@ export function computeEffectiveChanges<E extends Record<string, FieldValue>>(
   return changes;
 }
 
-export function classifyMatchChanges(effectiveChanges: FieldChange[]): string[] {
-  const eventTypes: string[] = [];
+export function classifyMatchChanges(effectiveChanges: FieldChange[]): EventType[] {
+  const eventTypes: EventType[] = [];
   const changedFields = new Set(effectiveChanges.map((c) => c.fieldName));
 
   if (changedFields.has("isCancelled")) {
