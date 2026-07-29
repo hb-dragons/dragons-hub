@@ -46,7 +46,7 @@ describe("notification request bodies satisfy @dragons/contracts schemas", () =>
   it("updatePreferences body parses against notificationPreferencesBodySchema", async () => {
     const { api, calls } = recordingClient();
     await api.updatePreferences({
-      mutedEventTypes: ["match.scheduled"],
+      mutedEventTypes: ["task.assigned"],
       locale: "en",
     });
     const parsed = notificationPreferencesBodySchema.safeParse(calls[0]!.body);

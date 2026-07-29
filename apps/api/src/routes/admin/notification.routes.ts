@@ -160,16 +160,9 @@ notificationRoutes.patch(
   async (c) => {
     const userId = c.get("user").id;
     const body = c.req.valid("json");
-    try {
-      const prefs: NotificationPreferences =
-        await updateUserNotificationPreferences(userId, body);
-      return c.json(prefs);
-    } catch (err) {
-      if (err instanceof Error && /unknown event type/i.test(err.message)) {
-        return c.json({ error: err.message, code: "INVALID_EVENT_TYPE" }, 400);
-      }
-      throw err;
-    }
+    const prefs: NotificationPreferences =
+      await updateUserNotificationPreferences(userId, body);
+    return c.json(prefs);
   },
 );
 

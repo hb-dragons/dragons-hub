@@ -140,7 +140,7 @@ async function seedEvent(id: string, opts: {
      VALUES ($1, $2, 'sync', $3, $4, 'match', 1, $5, $6, $7::jsonb)`,
     [
       id,
-      opts.type ?? "match.scheduled",
+      opts.type ?? "match.schedule.changed",
       opts.urgency ?? "routine",
       opts.occurredAt ?? new Date("2026-03-15T10:00:00Z"),
       opts.entityName ?? "Team A vs Team B",
@@ -191,9 +191,9 @@ async function seedTwoEventDigest(configOpts: Parameters<typeof seedChannelConfi
   const channelConfigId = await seedChannelConfig(configOpts);
   const otherConfigId = await seedChannelConfig({ name: "Other", type: "in_app" });
 
-  await seedEvent("evt-a", { type: "match.scheduled", entityName: "Team A vs Team B" });
+  await seedEvent("evt-a", { type: "match.schedule.changed", entityName: "Team A vs Team B" });
   await seedEvent("evt-b", {
-    type: "match.updated",
+    type: "match.result_changed",
     entityName: "Team C vs Team D",
     deepLinkPath: "/matches/2",
     occurredAt: new Date("2026-03-15T11:00:00Z"),
@@ -299,13 +299,13 @@ describe("digest worker processor", () => {
       expect(renderDigestMessage).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
-            eventType: "match.scheduled",
+            eventType: "match.schedule.changed",
             entityName: "Team A vs Team B",
             deepLinkPath: "/matches/1",
             payload: { matchId: 1 },
           }),
           expect.objectContaining({
-            eventType: "match.updated",
+            eventType: "match.result_changed",
             entityName: "Team C vs Team D",
             deepLinkPath: "/matches/2",
             payload: { matchId: 2 },
