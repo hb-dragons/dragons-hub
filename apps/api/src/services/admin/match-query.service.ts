@@ -19,7 +19,6 @@ import { eq, sql, and, or, inArray, gte, lte, asc, desc, isNull, isNotNull } fro
 import { alias } from "drizzle-orm/pg-core";
 import { computeDiffs } from "./match-diff.service";
 import type {
-  BookingStatus,
   OverrideInfo,
   MatchListItem,
   MatchDetail,
@@ -354,7 +353,7 @@ export async function buildDetailResponse(
     .limit(1);
 
   const booking = bookingLink
-    ? { id: bookingLink.bookingId, status: bookingLink.bookingStatus as BookingStatus, needsReconfirmation: bookingLink.needsReconfirmation }
+    ? { id: bookingLink.bookingId, status: bookingLink.bookingStatus, needsReconfirmation: bookingLink.needsReconfirmation }
     : null;
 
   // Load referee assignments for this match
@@ -557,7 +556,7 @@ export async function getOwnClubMatches(params: MatchListParams) {
   const bookingByMatch = new Map(
     bookingLinks.map((b) => [b.matchId, {
       id: b.bookingId,
-      status: b.bookingStatus as BookingStatus,
+      status: b.bookingStatus,
       needsReconfirmation: b.needsReconfirmation,
     }]),
   );

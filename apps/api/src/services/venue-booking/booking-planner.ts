@@ -1,3 +1,4 @@
+import type { BookingStatus } from "@dragons/shared";
 import { calculateTimeWindow, type BookingConfig } from "./booking-calculator";
 
 // ── Inputs ─────────────────────────────────────────────────────────────────
@@ -16,7 +17,7 @@ export interface PlannerExistingBooking {
   id: number;
   venueId: number;
   date: string;
-  status: string;
+  status: BookingStatus;
   calculatedStartTime: string;
   calculatedEndTime: string;
 }
@@ -45,7 +46,7 @@ interface PlanUpdate {
   bookingId: number;
   venueId: number;
   date: string;
-  status: string;
+  status: BookingStatus;
   currentStartTime: string;
   currentEndTime: string;
   newStartTime: string;
@@ -62,7 +63,7 @@ interface PlanRemoval {
   bookingId: number;
   venueId: number;
   date: string;
-  status: string;
+  status: BookingStatus;
   reason: RemovalReason;
   /** Matches to show in a preview's removal list. */
   displayMatchIds: number[];
