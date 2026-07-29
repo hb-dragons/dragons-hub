@@ -68,9 +68,25 @@ const ENUM_COLUMNS: readonly EnumColumn[] = [
   { table: "sync_run_entries", column: "action", constant: "ENTRY_ACTIONS" },
   { table: "tasks", column: "priority", constant: "TASK_PRIORITIES" },
   { table: "venue_bookings", column: "status", constant: "BOOKING_STATUSES" },
-  { table: "domain_events", column: "type", constant: "EVENT_TYPE_VALUES" },
+  {
+    table: "domain_events",
+    column: "type",
+    constant: "STORED_EVENT_TYPE_VALUES",
+    note: "the stored vocabulary, wider than the publishable EVENT_TYPE_VALUES: publishSystemEvent writes admin.test_push (#154)",
+  },
   { table: "domain_events", column: "urgency", constant: "EVENT_URGENCIES" },
-  { table: "domain_events", column: "entity_type", constant: "EVENT_ENTITY_TYPES" },
+  {
+    table: "domain_events",
+    column: "entity_type",
+    constant: "STORED_EVENT_ENTITY_TYPES",
+    note: "likewise wider than EVENT_ENTITY_TYPES: a system event is about an account, so it stores 'user'",
+  },
+  {
+    table: "domain_events",
+    column: "source",
+    constant: "EVENT_SOURCES",
+    note: "only guardable since #155 gave EventSource a const array; it was a bare type union before",
+  },
   {
     table: "watch_rules",
     column: "urgency_override",
@@ -108,6 +124,12 @@ const ENUM_COLUMNS: readonly EnumColumn[] = [
 const NOT_PERSISTED: Readonly<Record<string, string>> = {
   SURFACE_GROUP_ORDER: "navigation shell ordering; never written to the database",
   COLOR_PRESET_KEYS: "team colour presets are stored as the resolved hex values, not the key",
+  EVENT_ENTITY_TYPES:
+    "the *publishable* entity types, which triggerEventSchema validates against; domain_events.entity_type is governed by the wider STORED_EVENT_ENTITY_TYPES above",
+  SYSTEM_EVENT_TYPES:
+    "a component of STORED_EVENT_TYPE_VALUES, which is what guards the column; kept separate so the manual trigger and watch rules cannot name admin.test_push",
+  SYSTEM_EVENT_ENTITY_TYPES:
+    "likewise a component of STORED_EVENT_ENTITY_TYPES rather than a column's governing array in its own right",
 };
 
 /** Every export of `@dragons/shared` that is an array of strings. */

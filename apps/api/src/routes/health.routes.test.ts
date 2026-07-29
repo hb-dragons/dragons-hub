@@ -118,7 +118,7 @@ async function seedEvent(
 ): Promise<void> {
   await ctx.db.insert(domainEvents).values({
     id,
-    type: "match.updated",
+    type: "match.created",
     source: "sync",
     urgency: "routine",
     occurredAt: createdAt,

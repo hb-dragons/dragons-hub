@@ -49,6 +49,18 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+// Runtime value, so it comes straight from the package rather than `./types`,
+// which is type-only re-exports.
+import {
+  EVENT_SOURCES,
+  STORED_EVENT_ENTITY_TYPES,
+  STORED_EVENT_TYPE_VALUES,
+} from "@dragons/shared";
+import type {
+  EventSource,
+  StoredEventEntityType,
+  StoredEventType,
+} from "@dragons/shared";
 import type {
   DomainEventItem,
   TriggerEventBody,
@@ -107,6 +119,7 @@ function entityTypeLabel(entityType: string, t: TranslateFunc): string {
     case "booking": return t("entityTypes.booking" as never);
     case "referee": return t("entityTypes.referee" as never);
     case "task": return t("entityTypes.task" as never);
+    case "user": return t("entityTypes.user" as never);
     default: return entityType;
   }
 }
@@ -124,9 +137,9 @@ function urgencyLabel(urgency: string, t: TranslateFunc): string {
 // ---------------------------------------------------------------------------
 
 interface Filters {
-  type: string;
-  entityType: string;
-  source: string;
+  type: StoredEventType | "";
+  entityType: StoredEventEntityType | "";
+  source: EventSource | "";
   from: string;
   to: string;
   search: string;
@@ -144,12 +157,21 @@ const EMPTY_FILTERS: Filters = {
 const PAGE_SIZES = [25, 50, 100];
 
 // Radix rejects an empty-string SelectItem value, so "no filter" needs a
-// sentinel. It must never reach the query: the API treats an unknown
-// entityType/source as a literal to match and returns zero rows, which left
-// the browser permanently empty with no way to clear the filter.
+// sentinel. It must never reach the query: since #155 the API rejects an
+// unknown type/entityType/source outright, and before that it matched them as
+// literals and returned zero rows, which left the browser permanently empty
+// with no way to clear the filter.
 const ALL = "__all__";
 
-const fromSelect = (value: string) => (value === ALL ? "" : value);
+/**
+ * Radix hands `onValueChange` a bare `string`. Re-narrow it against the list the
+ * options were built from, so the sentinel — or a stale option — resolves to "no
+ * filter" rather than being asserted into the query type and 400ing the request.
+ */
+function fromSelect<T extends string>(value: string, allowed: readonly T[]): T | "" {
+  return allowed.find((candidate) => candidate === value) ?? "";
+}
+
 const toSelect = (value: string) => (value === "" ? ALL : value);
 
 // ---------------------------------------------------------------------------
@@ -193,8 +215,11 @@ export function EventBrowser() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  // Generic over the key so each filter keeps its own narrowed value type — a
+  // plain `value: string` here would silently re-widen `type`/`entityType`/
+  // `source` and undo the point of narrowing them.
   const updateFilter = useCallback(
-    (key: keyof Filters, value: string) => {
+    <K extends keyof Filters>(key: K, value: Filters[K]) => {
       setFilters((prev) => ({ ...prev, [key]: value }));
       setPage(1);
     },
@@ -392,12 +417,26 @@ export function EventBrowser() {
             <Label className="text-xs text-muted-foreground">
               {t("columns.type")}
             </Label>
-            <Input
-              className="h-8 w-44"
-              placeholder={t("typeFilterPlaceholder")}
-              value={filters.type}
-              onChange={(e) => updateFilter("type", e.target.value)}
-            />
+            {/* A select, not a text input (#155). The API matches `type`
+                exactly, so the old free-text box could only ever produce a
+                valid filter or a silent empty page — and its `match.*`
+                placeholder advertised a glob the server never supported. */}
+            <Select
+              value={toSelect(filters.type)}
+              onValueChange={(v) => updateFilter("type", fromSelect(v, STORED_EVENT_TYPE_VALUES))}
+            >
+              <SelectTrigger className="h-8 w-56" aria-label={t("columns.type")}>
+                <SelectValue placeholder={t("allFilter")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>{t("allFilter")}</SelectItem>
+                {STORED_EVENT_TYPE_VALUES.map((eventType) => (
+                  <SelectItem key={eventType} value={eventType}>
+                    {eventType}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-1.5">
             <Label className="text-xs text-muted-foreground">
@@ -405,9 +444,9 @@ export function EventBrowser() {
             </Label>
             <Select
               value={toSelect(filters.entityType)}
-              onValueChange={(v) => updateFilter("entityType", fromSelect(v))}
+              onValueChange={(v) => updateFilter("entityType", fromSelect(v, STORED_EVENT_ENTITY_TYPES))}
             >
-              <SelectTrigger className="h-8 w-32">
+              <SelectTrigger className="h-8 w-32" aria-label={t("columns.entity")}>
                 <SelectValue placeholder={t("allFilter")} />
               </SelectTrigger>
               <SelectContent>
@@ -415,6 +454,11 @@ export function EventBrowser() {
                 <SelectItem value="match">{t("entityTypes.match")}</SelectItem>
                 <SelectItem value="booking">{t("entityTypes.booking")}</SelectItem>
                 <SelectItem value="referee">{t("entityTypes.referee")}</SelectItem>
+                {/* `task` was missing, so task events — the most frequent kind
+                    the reminder worker emits — could not be filtered at all.
+                    `user` is what publishSystemEvent writes (#154). */}
+                <SelectItem value="task">{t("entityTypes.task")}</SelectItem>
+                <SelectItem value="user">{t("entityTypes.user")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -424,9 +468,9 @@ export function EventBrowser() {
             </Label>
             <Select
               value={toSelect(filters.source)}
-              onValueChange={(v) => updateFilter("source", fromSelect(v))}
+              onValueChange={(v) => updateFilter("source", fromSelect(v, EVENT_SOURCES))}
             >
-              <SelectTrigger className="h-8 w-36">
+              <SelectTrigger className="h-8 w-36" aria-label={t("columns.source")}>
                 <SelectValue placeholder={t("allFilter")} />
               </SelectTrigger>
               <SelectContent>

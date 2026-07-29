@@ -47,8 +47,16 @@ import {
   triggerManualEvent,
   listFailedNotifications,
 } from "./event-admin.service";
+import { publishSystemEvent } from "../events/event-publisher";
 import { channelConfigs, domainEvents, notificationLog } from "@dragons/db/schema";
-import type { ChannelConfig, EventUrgency } from "@dragons/shared";
+import type {
+  ChannelConfig,
+  DomainEventItem,
+  EventSource,
+  EventUrgency,
+  StoredEventEntityType,
+  StoredEventType,
+} from "@dragons/shared";
 import { eq } from "drizzle-orm";
 import {
   setupTestDb,
@@ -77,11 +85,11 @@ afterAll(async () => {
 
 interface EventSeed {
   id: string;
-  type?: string;
-  source?: string;
+  type?: StoredEventType;
+  source?: EventSource;
   urgency?: EventUrgency;
   occurredAt?: string;
-  entityType?: string;
+  entityType?: StoredEventEntityType;
   entityName?: string;
   entityId?: number;
   actor?: string | null;
@@ -149,6 +157,49 @@ async function seedNotification(opts: {
 }
 
 // --- Tests ---
+
+/**
+ * `publishSystemEvent` writes rows that the four `EVENT_ENTITY_TYPES` and
+ * `EVENT_TYPES` do not cover, and `listDomainEvents` returns them. Before #154
+ * the response type claimed otherwise, so an exhaustive `switch` on
+ * `DomainEventItem["type"]` compiled while being wrong at runtime.
+ */
+describe("system events in the listing", () => {
+  it("returns a publishSystemEvent row with its real type and entityType", async () => {
+    await publishSystemEvent({
+      id: "sys-test-push-1",
+      type: "admin.test_push",
+      occurredAt: new Date("2025-06-01T12:00:00.000Z"),
+      actor: "admin-1",
+      entityName: "admin test",
+      deepLinkPath: "/",
+      payload: { isTest: true },
+    });
+
+    const { events, total } = await listDomainEvents({});
+
+    expect(total).toBe(1);
+    // Not remapped, not dropped: the row an admin needs in order to confirm a
+    // test push fired comes back exactly as written.
+    expect(events[0]).toMatchObject({
+      type: "admin.test_push",
+      entityType: "user",
+      source: "manual",
+      urgency: "immediate",
+    });
+  });
+
+  it("declares unions wide enough for the rows publishSystemEvent writes", () => {
+    // Compile-time guard, not a runtime one — the assignments below are the
+    // assertion. Narrowing either union back to its domain-only form makes
+    // `tsc --noEmit` fail here rather than letting a consumer write an
+    // exhaustive switch the data falsifies.
+    const type: DomainEventItem["type"] = "admin.test_push";
+    const entityType: DomainEventItem["entityType"] = "user";
+
+    expect({ type, entityType }).toEqual({ type: "admin.test_push", entityType: "user" });
+  });
+});
 
 describe("listDomainEvents", () => {
   it("returns an empty list when there is nothing stored", async () => {

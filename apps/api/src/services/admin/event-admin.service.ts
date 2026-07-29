@@ -1,7 +1,14 @@
 import { getDb } from "../../config/database";
 import { domainEvents, notificationLog } from "@dragons/db/schema";
 import { and, desc, eq, gte, lte, ilike, count } from "drizzle-orm";
-import type { DomainEventListResult, EventType, EventEntityType } from "@dragons/shared";
+import type {
+  DomainEventListResult,
+  EventType,
+  EventEntityType,
+  EventSource,
+  StoredEventEntityType,
+  StoredEventType,
+} from "@dragons/shared";
 import {
   buildDomainEvent,
   insertDomainEvent,
@@ -14,9 +21,9 @@ import { escapeLikePattern } from "../utils/sql";
 export async function listDomainEvents(params: {
   page?: number;
   limit?: number;
-  type?: string;
-  entityType?: string;
-  source?: string;
+  type?: StoredEventType;
+  entityType?: StoredEventEntityType;
+  source?: EventSource;
   from?: string;
   to?: string;
   search?: string;
@@ -60,23 +67,20 @@ export async function listDomainEvents(params: {
     .limit(limit)
     .offset(offset);
 
-  // `type`, `source` and `entityType` stay hand-narrowed, unlike `urgency`.
-  // `domain_events.type` really does hold values outside `EventType` —
-  // `publishSystemEvent` writes `type: "admin.test_push"` with
-  // `entity_type: "user"`, neither of which is in the union this response
-  // declares. And the `type`/`entityType`/`source` filters above take whatever
-  // `eventListQuerySchema` accepts, which is a bare `z.string()`. Both need a
-  // decision about the response contract, not a wider signature. See #151.
+  // No hand-narrowing left here. The three columns carry their stored unions
+  // from the schema (#154): `domain_events.type` really does hold values outside
+  // `EventType` — `publishSystemEvent` writes `type: "admin.test_push"` with
+  // `entity_type: "user"` — and `DomainEventItem` now says so.
   return {
     events: rows.map((r) => ({
       id: r.id,
-      type: r.type as DomainEventListResult["events"][number]["type"],
-      source: r.source as DomainEventListResult["events"][number]["source"],
+      type: r.type,
+      source: r.source,
       urgency: r.urgency,
       occurredAt: r.occurredAt.toISOString(),
       actor: r.actor,
       syncRunId: r.syncRunId,
-      entityType: r.entityType as DomainEventListResult["events"][number]["entityType"],
+      entityType: r.entityType,
       entityId: r.entityId,
       entityName: r.entityName,
       deepLinkPath: r.deepLinkPath,
