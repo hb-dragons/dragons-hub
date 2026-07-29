@@ -136,6 +136,7 @@ import { processEvent, DISPATCHABLE_CHANNEL_TYPES } from "./notification-pipelin
 import { logger } from "../../config/logger";
 import { domainEvents, type DomainEventRow } from "@dragons/db/schema";
 import { CHANNEL_TYPES } from "@dragons/shared";
+import type { EventUrgency } from "@dragons/shared";
 import {
   setupTestDb,
   resetTestDb,
@@ -196,7 +197,7 @@ function useFakeRedisStore(): Map<string, string> {
 interface EventInput {
   id?: string;
   type?: string;
-  urgency?: string;
+  urgency?: EventUrgency;
   payload?: Record<string, unknown>;
   source?: string;
   entityName?: string;

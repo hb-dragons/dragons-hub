@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import type { EventUrgency } from "@dragons/shared";
 import { syncRuns } from "./sync-runs";
 
 // NOTE: A partial outbox index exists (migration 0040) but cannot be expressed in Drizzle schema.
@@ -17,7 +18,7 @@ export const domainEvents = pgTable(
     id: text("id").primaryKey(), // ULID
     type: text("type").notNull(),
     source: text("source").notNull(), // "sync" | "manual" | "reconciliation"
-    urgency: text("urgency").notNull(), // "immediate" | "routine"
+    urgency: text("urgency").notNull().$type<EventUrgency>(),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     actor: text("actor"),
     syncRunId: integer("sync_run_id").references(() => syncRuns.id),
