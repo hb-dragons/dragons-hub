@@ -2,6 +2,21 @@ packages:
   - apps/*
   - packages/*
 overrides:
+  # Capped at 1.6.23: better-auth 1.6.24 regressed the client-plugin generics, so
+  # any plugin declaring `getActions` stops being assignable to
+  # `BetterAuthClientPlugin`. One bad plugin collapses inference for the whole
+  # array, so native's `expoClient()` + `adminClient()` lose their `getCookie` and
+  # `admin` actions and apps/native no longer typechecks. Bisected 1.6.23 ok ->
+  # 1.6.24 broken; 1.6.25 and 1.7.0-rc.2 still broken. Ours: issue #138, upstream:
+  # better-auth/better-auth#10515 (open, no fix released).
+  # The documented upstream workaround (`as BetterAuthClientPlugin`) does not suit
+  # us: it erases the asserted plugin's own actions, and we call `getCookie()` in
+  # apps/native/src/lib/api.ts and src/app/assistant.tsx.
+  # These pin every copy, including the one `@daveyplate/better-auth-ui` pulls in,
+  # so the four workspaces depending on better-auth stay coherent. Lift once
+  # upstream ships a fix — that also unblocks workspace-wide `pnpm update -r`.
+  better-auth: 1.6.23
+  '@better-auth/expo': 1.6.23
   replace>minimatch: 3.1.5
   '@prisma/dev>hono': '>=4.12.18'
   '@prisma/dev>@hono/node-server': '>=1.19.13'
