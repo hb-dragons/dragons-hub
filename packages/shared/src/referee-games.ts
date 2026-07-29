@@ -1,3 +1,5 @@
+import type { RefereeSlotStatus } from "./constants";
+
 export interface RefereeGameListItem {
   id: number;
   apiMatchId: number;
@@ -18,8 +20,8 @@ export interface RefereeGameListItem {
   sr2Name: string | null;
   sr1RefereeApiId: number | null;
   sr2RefereeApiId: number | null;
-  sr1Status: "open" | "offered" | "assigned";
-  sr2Status: "open" | "offered" | "assigned";
+  sr1Status: RefereeSlotStatus;
+  sr2Status: RefereeSlotStatus;
   isCancelled: boolean;
   isForfeited: boolean;
   isTrackedLeague: boolean;

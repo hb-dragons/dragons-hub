@@ -9,6 +9,7 @@ import {
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
+import type { RefereeSlotStatus } from "@dragons/shared";
 import { matches } from "./matches";
 import { teams } from "./teams";
 
@@ -36,8 +37,10 @@ export const refereeGames = pgTable(
     sr2Name: varchar("sr2_name", { length: 150 }),
     sr1RefereeApiId: integer("sr1_referee_api_id"),
     sr2RefereeApiId: integer("sr2_referee_api_id"),
-    sr1Status: varchar("sr1_status", { length: 20 }).notNull().default("open"),
-    sr2Status: varchar("sr2_status", { length: 20 }).notNull().default("open"),
+    sr1Status: varchar("sr1_status", { length: 20 }).notNull().default("open")
+      .$type<RefereeSlotStatus>(),
+    sr2Status: varchar("sr2_status", { length: 20 }).notNull().default("open")
+      .$type<RefereeSlotStatus>(),
     isCancelled: boolean("is_cancelled").notNull().default(false),
     isForfeited: boolean("is_forfeited").notNull().default(false),
     homeClubId: integer("home_club_id"),

@@ -129,8 +129,8 @@ export async function assignReferee(
 
   const slotUpdate =
     slotNumber === 1
-      ? { sr1Name: refereeName, sr1RefereeApiId: refereeApiId, sr1Status: "assigned" }
-      : { sr2Name: refereeName, sr2RefereeApiId: refereeApiId, sr2Status: "assigned" };
+      ? { sr1Name: refereeName, sr1RefereeApiId: refereeApiId, sr1Status: "assigned" as const }
+      : { sr2Name: refereeName, sr2RefereeApiId: refereeApiId, sr2Status: "assigned" as const };
 
   // 6. Win the slot locally BEFORE submitting to the federation. The federation
   // has no compare-and-set (submitRefereeAssignment is an unconditional set), so
@@ -192,8 +192,8 @@ export async function assignReferee(
   const rollbackClaim = async () => {
     const slotClear =
       slotNumber === 1
-        ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" }
-        : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" };
+        ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" as const }
+        : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" as const };
     await getDb()
       .update(refereeGames)
       .set(slotClear)
@@ -414,8 +414,8 @@ export async function unassignReferee(
   // concurrent caller made while the federation call above was in flight.
   const slotClear =
     slotNumber === 1
-      ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" }
-      : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" };
+      ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" as const }
+      : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" as const };
 
   const slotRefereeApiIdColumn =
     slotNumber === 1 ? refereeGames.sr1RefereeApiId : refereeGames.sr2RefereeApiId;

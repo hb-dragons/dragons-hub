@@ -80,7 +80,9 @@ async function seedReferees() {
   ]);
 }
 
-function baseGame(overrides: Partial<typeof refereeGames.$inferInsert> = {}) {
+function baseGame(
+  overrides: Partial<typeof refereeGames.$inferInsert> = {},
+): typeof refereeGames.$inferInsert {
   return {
     apiMatchId: Math.floor(Math.random() * 1_000_000),
     matchNo: 1,
@@ -90,8 +92,8 @@ function baseGame(overrides: Partial<typeof refereeGames.$inferInsert> = {}) {
     guestTeamName: "Bears",
     sr1OurClub: true,
     sr2OurClub: true,
-    sr1Status: "filled",
-    sr2Status: "filled",
+    sr1Status: "assigned",
+    sr2Status: "assigned",
     sr1RefereeApiId: 100,
     sr2RefereeApiId: 101,
     sr1Name: "Own, Anna",
