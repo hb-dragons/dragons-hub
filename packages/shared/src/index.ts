@@ -134,7 +134,12 @@ export type {
   SocialBackground,
   SocialActionResponse,
 } from "./social";
-export { USER_TOGGLEABLE_EVENTS, isUserToggleableEventType } from "./notification-events";
+export {
+  USER_TOGGLEABLE_EVENTS,
+  USER_TOGGLEABLE_EVENT_TYPES,
+  isUserToggleableEventType,
+} from "./notification-events";
+export type { UserToggleableEventType } from "./notification-events";
 export type {
   ClubConfig,
   BookingSettings,

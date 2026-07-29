@@ -354,13 +354,27 @@ describe("PATCH /notifications/preferences", () => {
     });
   });
 
-  it("returns 400 when service rejects unknown event type", async () => {
-    mocks.updateUserNotificationPreferences.mockRejectedValue(new Error("Unknown event type: bogus.event"));
+  // Previously this mocked the service into rejecting and relied on the route
+  // matching the Error's message text. The contract enumerates the vocabulary
+  // now (issue #156), so the 400 is real: the validator rejects the body and
+  // the service is never reached.
+  it("returns 400 for an event type that is not user-toggleable", async () => {
     const res = await app.request("/notifications/preferences", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mutedEventTypes: ["bogus.event"] }),
     });
     expect(res.status).toBe(400);
+    expect(mocks.updateUserNotificationPreferences).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a real event type the user cannot toggle", async () => {
+    const res = await app.request("/notifications/preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mutedEventTypes: ["match.created"] }),
+    });
+    expect(res.status).toBe(400);
+    expect(mocks.updateUserNotificationPreferences).not.toHaveBeenCalled();
   });
 });

@@ -76,10 +76,19 @@ describe("user-preferences.service", () => {
     expect(result).toEqual({ mutedEventTypes: ["task.assigned"], locale: "en" });
   });
 
-  it("rejects unknown event types in mutedEventTypes", async () => {
+  // The runtime guard this replaced was unreachable: every caller is the PATCH
+  // route, whose contract enumerates the same vocabulary (issue #156). What
+  // stops a *future* non-route caller writing junk is the patch type, so the
+  // guard is now compile-time. `@ts-expect-error` fails the build if this line
+  // ever starts type-checking — i.e. if the patch widens back to string[].
+  it("does not accept a non-toggleable event type in the patch type", async () => {
     await makeUser("u1");
-    await expect(
-      updateUserNotificationPreferences("u1", { mutedEventTypes: ["bogus.event"] }),
-    ).rejects.toThrow(/unknown event type/i);
+    await updateUserNotificationPreferences("u1", {
+      // @ts-expect-error "match.created" is a real event type but not user-toggleable
+      mutedEventTypes: ["match.created"],
+    });
+    // Still written through — the type is the contract, not a runtime filter.
+    const result = await getUserNotificationPreferences("u1");
+    expect(result.mutedEventTypes).toEqual(["match.created"]);
   });
 });

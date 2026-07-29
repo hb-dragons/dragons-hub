@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { idParamSchema } from "./common";
+import { USER_TOGGLEABLE_EVENT_TYPES } from "@dragons/shared";
 
 export const notificationIdParamSchema = idParamSchema;
 
@@ -15,8 +16,14 @@ export const notificationListQuerySchema = z.object({
 
 export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
 
+// Enumerated rather than a bare string array (issue #156). Muting a type the
+// user cannot toggle silences nothing, so it is always a typo. This was
+// previously caught two layers down, in `updateUserNotificationPreferences`,
+// and turned into a 400 by matching the thrown Error's *message* in the route
+// — a coupling nothing checked. Validating here makes the rejection the same
+// central 400 every other endpoint emits.
 export const notificationPreferencesBodySchema = z.strictObject({
-  mutedEventTypes: z.array(z.string()).optional(),
+  mutedEventTypes: z.array(z.enum(USER_TOGGLEABLE_EVENT_TYPES)).optional(),
   locale: z.enum(["de", "en"]).optional(),
 });
 

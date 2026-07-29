@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { USER_TOGGLEABLE_EVENTS } from "@dragons/shared";
-import type { NotificationPreferences } from "@dragons/shared";
+import { USER_TOGGLEABLE_EVENTS, isUserToggleableEventType } from "@dragons/shared";
+import type { NotificationPreferences, UserToggleableEventType } from "@dragons/shared";
 import {
   Card,
   CardContent,
@@ -39,7 +39,14 @@ export function MyNotificationsCard() {
     const previous = prefs;
     setPrefs(next);
     try {
-      const saved = await api.notifications.updatePreferences(next);
+      // The *stored* list is `string[]` — the column can still hold values from
+      // before the request contract enumerated them (issue #156) — while the
+      // request accepts only toggleable types. Send back what this card can
+      // actually express; anything older is dropped on the next save.
+      const saved = await api.notifications.updatePreferences({
+        mutedEventTypes: next.mutedEventTypes.filter(isUserToggleableEventType),
+        locale: next.locale,
+      });
       setPrefs(saved);
       toast.success(t("saveSuccess"));
     } catch {
@@ -48,7 +55,7 @@ export function MyNotificationsCard() {
     }
   }
 
-  function toggleEvent(eventType: string, nextEnabled: boolean) {
+  function toggleEvent(eventType: UserToggleableEventType, nextEnabled: boolean) {
     if (!prefs) return;
     const muted = new Set(prefs.mutedEventTypes);
     if (nextEnabled) muted.delete(eventType);

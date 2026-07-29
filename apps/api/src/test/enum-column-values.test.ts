@@ -103,8 +103,11 @@ const ENUM_COLUMNS: readonly EnumColumn[] = [
   {
     table: "user_notification_preferences",
     column: "muted_event_types",
-    constant: "EVENT_TYPE_VALUES",
+    constant: "USER_TOGGLEABLE_EVENT_TYPES",
     storage: { kind: "array" },
+    // Was registered against EVENT_TYPE_VALUES (issue #156), which is seven
+    // times wider than what this column accepts: muting is only offered for
+    // the four task events addressed to a person.
     note: "muting an unknown type silences nothing",
   },
   {

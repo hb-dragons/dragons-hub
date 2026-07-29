@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { USER_TOGGLEABLE_EVENT_TYPES } from "@dragons/shared";
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
@@ -79,9 +80,31 @@ describe("notificationPreferencesBodySchema", () => {
   it("accepts mutedEventTypes array", () => {
     expect(
       notificationPreferencesBodySchema.parse({
-        mutedEventTypes: ["task.assigned", "match.updated"],
+        mutedEventTypes: ["task.assigned", "task.due.reminder"],
       }),
-    ).toEqual({ mutedEventTypes: ["task.assigned", "match.updated"] });
+    ).toEqual({ mutedEventTypes: ["task.assigned", "task.due.reminder"] });
+  });
+
+  it.each(USER_TOGGLEABLE_EVENT_TYPES)("accepts the toggleable type %s", (eventType) => {
+    const result = notificationPreferencesBodySchema.safeParse({
+      mutedEventTypes: [eventType],
+    });
+    expect(result.error?.issues ?? []).toEqual([]);
+  });
+
+  // Muting a type the user cannot toggle silences nothing, so it is a typo
+  // rather than an intent. Enumerated here rather than in the service, so the
+  // rejection is the central 400 and not a message-matched catch in the route.
+  it("rejects an event type that is not user-toggleable", () => {
+    expect(() =>
+      notificationPreferencesBodySchema.parse({ mutedEventTypes: ["match.created"] }),
+    ).toThrow();
+  });
+
+  it("rejects an event type that is in no registry at all", () => {
+    expect(() =>
+      notificationPreferencesBodySchema.parse({ mutedEventTypes: ["bogus.event"] }),
+    ).toThrow();
   });
 
   it("accepts empty mutedEventTypes array", () => {
