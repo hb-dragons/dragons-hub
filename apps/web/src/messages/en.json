@@ -272,6 +272,7 @@
       "placeholder": "e.g. next 3 weeks, prefer Saturday evenings, keep our gym",
       "stop": "Stop",
       "retry": "Retry",
+      "newChat": "Start a new chat",
       "error": "Something went wrong. Please try again.",
       "send": "Send"
     }
@@ -1555,6 +1556,7 @@
     "placeholder": "e.g. who plays this weekend? what place is Herren 1 in?",
     "send": "Send",
     "stop": "Stop",
+    "newChat": "Start a new chat",
     "regenerate": "Regenerate",
     "copy": "Copy",
     "copied": "Copied",

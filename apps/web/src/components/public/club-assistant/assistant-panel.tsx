@@ -20,7 +20,7 @@ interface AssistantPanelProps {
 export function AssistantPanel({ onClose }: AssistantPanelProps) {
   const t = useTranslations("qa");
   const locale = useLocale();
-  const { messages, sendMessage, status, error, stop, regenerate } = useChat({
+  const { messages, sendMessage, status, error, stop, regenerate, setMessages, clearError } = useChat({
     transport: new DefaultChatTransport({
       api: `${API_BASE}/qa/chat`,
       credentials: "include",
@@ -83,6 +83,16 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
 
   const send = (text: string) => void sendMessage({ text });
 
+  // Issue #148: a rejected message stays in `messages` and the transport
+  // re-sends the whole list every turn, so one 400 dead-ends the chat. Dropping
+  // the transcript is the escape hatch. `clearError()` is required alongside it
+  // — AI SDK v6 parks `status` at "error" and leaves `error` set, so the banner
+  // would otherwise outlive the messages that caused it.
+  const startNewChat = () => {
+    setMessages([]);
+    clearError();
+  };
+
   return (
     <div
       ref={dialogRef}
@@ -116,7 +126,18 @@ export function AssistantPanel({ onClose }: AssistantPanelProps) {
         {status === "submitted" ? <p className="text-sm text-muted-foreground">…</p> : null}
       </div>
 
-      {error ? <p className="px-4 py-1 text-sm text-destructive">{t("error")}</p> : null}
+      {error ? (
+        <div className="flex items-center justify-between gap-2 px-4 py-1">
+          <p className="text-sm text-destructive">{t("error")}</p>
+          <button
+            type="button"
+            onClick={startNewChat}
+            className="shrink-0 text-sm text-muted-foreground underline hover:text-foreground"
+          >
+            {t("newChat")}
+          </button>
+        </div>
+      ) : null}
 
       <div className="px-4 py-3">
         <AssistantComposer status={status} onSend={send} onStop={() => void stop()} />

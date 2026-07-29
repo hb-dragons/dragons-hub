@@ -272,6 +272,7 @@
       "placeholder": "z. B. nächste 3 Wochen, lieber Samstagabend, gleiche Halle",
       "stop": "Stopp",
       "retry": "Erneut versuchen",
+      "newChat": "Neuen Chat starten",
       "error": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
       "send": "Senden"
     }
@@ -1555,6 +1556,7 @@
     "placeholder": "z. B. wer spielt am Wochenende? auf welchem Platz steht Herren 1?",
     "send": "Senden",
     "stop": "Stopp",
+    "newChat": "Neuen Chat starten",
     "regenerate": "Neu generieren",
     "copy": "Kopieren",
     "copied": "Kopiert",

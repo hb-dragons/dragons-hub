@@ -9,6 +9,8 @@ type ChatStatus = "ready" | "submitted" | "streaming" | "error";
 const sendMessage = vi.fn();
 const stop = vi.fn();
 const regenerate = vi.fn();
+const setMessages = vi.fn();
+const clearError = vi.fn();
 let chatState: {
   status: ChatStatus;
   error?: Error;
@@ -23,6 +25,8 @@ vi.mock("@ai-sdk/react", () => ({
     error: chatState.error,
     stop,
     regenerate,
+    setMessages,
+    clearError,
   }),
 }));
 
@@ -45,6 +49,7 @@ const messages = {
       send: "Send",
       stop: "Stop",
       retry: "Retry",
+      newChat: "Start a new chat",
       error: "Something went wrong. Please try again.",
     },
   },
@@ -68,6 +73,8 @@ describe("RescheduleChatSheet", () => {
     sendMessage.mockClear();
     stop.mockClear();
     regenerate.mockClear();
+    setMessages.mockClear();
+    clearError.mockClear();
   });
   afterEach(cleanup);
 
@@ -120,5 +127,24 @@ describe("RescheduleChatSheet", () => {
       fireEvent.click(send);
       expect(sendMessage).toHaveBeenCalledWith({ text: "try again next week" });
     });
+
+    // Issue #148: Retry calls `regenerate()`, which re-sends the same message
+    // list — useless when the list itself is what the server rejected. Dropping
+    // the transcript is the only client-side escape from that, and `clearError`
+    // must go with it or the chat stays parked in `status: "error"`.
+    it("offers a new chat as the escape from a body the server will keep rejecting", () => {
+      open();
+      fireEvent.click(screen.getByRole("button", { name: "Start a new chat" }));
+      expect(setMessages).toHaveBeenCalledWith([]);
+      expect(clearError).toHaveBeenCalledTimes(1);
+      expect(regenerate).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not offer the new-chat control when there is no error", () => {
+    open();
+    expect(
+      screen.queryByRole("button", { name: "Start a new chat" }),
+    ).not.toBeInTheDocument();
   });
 });
