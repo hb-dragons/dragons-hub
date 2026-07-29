@@ -63,9 +63,9 @@ describe("chatBodySchema", () => {
  * fact that they differ.
  */
 describe("per-route part bounds stay separate", () => {
-  it("holds the Q&A chat to 20 parts per message", () => {
-    expect(qaChatBodySchema.safeParse({ messages: [message(20)] }).success).toBe(true);
-    expect(qaChatBodySchema.safeParse({ messages: [message(21)] }).success).toBe(false);
+  it("holds the Q&A chat to 30 parts per message", () => {
+    expect(qaChatBodySchema.safeParse({ messages: [message(30)] }).success).toBe(true);
+    expect(qaChatBodySchema.safeParse({ messages: [message(31)] }).success).toBe(false);
   });
 
   it("gives the reschedule copilot 80 parts per message", () => {
@@ -78,10 +78,10 @@ describe("per-route part bounds stay separate", () => {
   });
 
   it("does not apply one route's bound to the other", () => {
-    // 21 parts: over the Q&A bound, comfortably inside the copilot's.
-    expect(qaChatBodySchema.safeParse({ messages: [message(21)] }).success).toBe(false);
+    // 31 parts: over the Q&A bound, comfortably inside the copilot's.
+    expect(qaChatBodySchema.safeParse({ messages: [message(31)] }).success).toBe(false);
     expect(
-      assistantRescheduleChatBodySchema.safeParse({ messages: [message(21)] }).success,
+      assistantRescheduleChatBodySchema.safeParse({ messages: [message(31)] }).success,
     ).toBe(true);
   });
 });
