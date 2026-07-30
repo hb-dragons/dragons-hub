@@ -7,9 +7,17 @@ Stramatel basketball console. Captures serial frames and POSTs raw hex to
 ## Hardware
 
 - Raspberry Pi (3 B+ or 4 B), 5.1 V / 3 A PSU, microSD ≥ 16 GB.
-- USB to RS-485 adapter (FTDI, CH340 or CP2102 chipset).
+- USB serial tap into the console's data line. `Panel2Net.py` opens
+  `/dev/ttyACM0` and nothing else, so the adapter must enumerate as CDC-ACM —
+  the one that carried live games does. An FTDI, CH340 or CP2102 adapter
+  enumerates as `/dev/ttyUSB0` instead and would never be opened; do not
+  substitute one on game day.
+- Plugging the adapter in after boot is fine: the service retries the port
+  every 5 s until it opens.
 - Cable tapping the data line between the Stramatel console and its LED panel.
 - `pyserial` is the only Python dependency.
+- `scripts/baud-scan.py` and `scripts/baud-scan-parity.py` are on-site
+  scanners for when the panel stops decoding and the framing is in doubt.
 
 ## Install
 

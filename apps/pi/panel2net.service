@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/pi/Panel2Net
-ExecStart=/usr/bin/python3 /home/pi/Panel2Net/Panel2Net.py
+WorkingDirectory=/home/hb/Panel2Net
+ExecStart=/home/hb/Panel2Net/.venv/bin/python3 /home/hb/Panel2Net/Panel2Net.py
 Restart=always
 RestartSec=10
-User=pi
+User=hb
 
 [Install]
 WantedBy=multi-user.target
