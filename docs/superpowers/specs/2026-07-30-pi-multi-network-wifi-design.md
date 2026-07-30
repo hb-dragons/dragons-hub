@@ -1,7 +1,7 @@
 # Pi multi-network wifi — design
 
 Date: 2026-07-30
-Status: approved, not yet implemented
+Status: implemented and verified on the device, 2026-07-30
 
 ## Problem
 
@@ -71,9 +71,16 @@ NLan|50|<psk>|no
 ```
 
 **Hotspots take the highest priority deliberately.** A hotspot only exists
-while someone toggles it on, so enabling it becomes the manual override: the Pi
-leaves the venue wifi and joins the phone. Venue and home wifi sit lower as the
-standing fallback.
+while someone toggles it on, so enabling it becomes the manual override. Venue
+and home wifi sit lower as the standing fallback.
+
+Corrected after testing on the device: the override runs through the watchdog,
+not through NetworkManager. NM evaluates `autoconnect-priority` when a device is
+disconnected and choosing a candidate; it does not preempt a healthy connection
+because a better-ranked one has appeared. Switching the hotspot on while the Pi
+is happily associated moves nothing — verified over three minutes. The path that
+does work is the demotion rung: the current network stops passing probes, gets
+demoted, and the hotspot wins the reselection.
 
 ### `setup_network.py`
 
@@ -113,7 +120,12 @@ NetworkManager.
 
 A `oneshot` unit on a 60 s timer. Two-tier probe, and the order is the point:
 
-1. generic internet — `HEAD http://connectivity-check.gstatic.com/generate_204`
+1. generic internet — `HEAD` against two `generate_204` endpoints run by
+   different operators, counted as a failure only when neither answers. The
+   single endpoint this originally named, `connectivity-check.gstatic.com`, does
+   not resolve at all; Google's live name is `connectivitycheck.gstatic.com`. A
+   probe host that silently stops existing would otherwise drive the ladder
+   forever.
 2. the API — `GET https://api.app.hbdragons.de/health`
 
 **Internet reachable but API down means log and change nothing.** An API
@@ -127,7 +139,7 @@ Escalation runs on consecutive *internet* failures. State in
 | --- | --- |
 | 1–2 | log only |
 | 3 | `nmcli dev wifi rescan`, log visible SSIDs — catches a hotspot the moment it is switched on |
-| 5 | demote the current SSID (`autoconnect no` plus a penalty timestamp), then `nmcli dev connect wlan0` so NM picks the next priority. Penalty expires after 10 min. |
+| 5 | demote the current SSID (`autoconnect no` plus a penalty timestamp), then activate the highest-priority remaining profile that comes up. Penalty expires after 10 min. |
 | 10 | `nmcli radio wifi off`, wait 5 s, `on` |
 | 20 | `systemctl restart NetworkManager` |
 
@@ -146,6 +158,19 @@ straight back to it and flap.
 The demotion step is what makes a **captive-portal venue wifi** survivable: the
 Pi associates, gets a lease, has no usable uplink, and would otherwise sit there
 indefinitely because NM considers it connected.
+
+Two things about that step only showed up on the device, and both made the rung
+useless or harmful before they were fixed:
+
+- `nmcli device connect` deliberately considers profiles whose autoconnect is
+  off, so demoting a profile and then calling it re-selected the profile just
+  demoted. The watchdog names its replacement instead.
+- Ranking candidates by priority alone assumes the best-ranked network is in
+  range. It usually is not — the first attempt went to a venue SSID that was not
+  there, failed, and left the Pi associated with nothing. The watchdog now walks
+  the ranking until one activates. Filtering the list by scan visibility was
+  rejected: a hidden network never appears in scan results, which would rule out
+  the hotspot permanently.
 
 `net_policy.decide(consecutive_failures, internet_ok, api_ok, current_ssid,
 penalties, now)` returns an ordered action list and performs no I/O — that is
