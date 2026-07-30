@@ -16,7 +16,7 @@
 - **Python 3.12 in CI, 3.14 on the Pi.** Code must run on both. No syntax newer than 3.12.
 - **CI runs `pytest` from `apps/pi`** with `pytest.ini` (`testpaths = tests`, `pythonpath = .`), so test modules import the modules under test directly: `import net_policy`.
 - **Tests live in `apps/pi/tests/`**, named `test_<module>.py`. This differs from the monorepo's co-located TS convention — follow the existing Python layout.
-- **`pnpm check:ai-slop` scans `.md` files.** Banned in prose: "delve into", "game-changer", "in today's fast-paced", "leverage", "seamless"/"seamlessly", "unlock the power of", "cutting-edge", "robust", "in conclusion", "at the end of the day".
+- **`pnpm check:ai-slop` scans `.md` files.** The banned-phrase list is in `CLAUDE.md` under "Writing Style Rules" — read it there rather than reproducing it, since quoting the list verbatim in a `.md` file fails the check.
 - **`pnpm check:skipped-tests` also walks `apps/pi` pytest files.** Any skip needs an issue reference.
 - **Never print or log a PSK.** Redaction is required in `--dry-run` output and in every log line.
 - **No `Co-Authored-By` or AI-credit trailers in commits.**
