@@ -109,6 +109,32 @@ def test_going_online_does_not_lift_an_unexpired_penalty():
     assert decision.next_failures == 0
 
 
+def test_next_profile_picks_the_highest_priority():
+    profiles = [('NLan', 50), ('10001', 100), ('Y800Z_DA89', 80)]
+    assert net_policy.next_profile(profiles, {}, None) == '10001'
+
+
+def test_next_profile_skips_the_profile_being_left():
+    # nmcli dev connect would re-pick the demoted profile, because it considers
+    # connections that are not set to autoconnect. The replacement is named here
+    # instead of being left to NetworkManager.
+    profiles = [('NLan', 50), ('10001', 100)]
+    assert net_policy.next_profile(profiles, {}, '10001') == 'NLan'
+
+
+def test_next_profile_skips_an_already_penalised_profile():
+    profiles = [('NLan', 50), ('10001', 100)]
+    assert net_policy.next_profile(profiles, {'10001': NOW}, None) == 'NLan'
+
+
+def test_next_profile_returns_none_when_every_candidate_is_out():
+    assert net_policy.next_profile([('NLan', 50)], {'NLan': NOW}, None) is None
+
+
+def test_next_profile_breaks_a_priority_tie_by_name():
+    assert net_policy.next_profile([('Zulu', 50), ('Alpha', 50)], {}, None) == 'Alpha'
+
+
 def test_expired_penalties_are_sorted_for_a_stable_log_line():
     penalties = {'Zulu': NOW - 700, 'Alpha': NOW - 700}
     assert net_policy.expired_penalties(penalties, NOW) == ['Alpha', 'Zulu']

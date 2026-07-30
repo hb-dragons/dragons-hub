@@ -81,10 +81,15 @@ and counts a failure only when neither answers. One name being blocked or
 retired must not be enough to make the ladder tear down a working network.
 
 On consecutive internet failures: 3 rescans, 5 demotes the current network for
-10 minutes and lets NetworkManager pick the next priority, 10 cycles the radio,
-20 restarts NetworkManager. Past that the ladder repeats. It never reboots. The
-demotion rung is what recovers from a venue wifi with a captive portal, where
-the Pi holds a lease but has no usable uplink.
+10 minutes and activates the highest-priority profile that is left, 10 cycles
+the radio, 20 restarts NetworkManager. Past that the ladder repeats. It never
+reboots. The demotion rung is what recovers from a venue wifi with a captive
+portal, where the Pi holds a lease but has no usable uplink.
+
+The replacement profile is named explicitly rather than handed to `nmcli device
+connect`. That command considers profiles whose autoconnect is off, so it
+re-selects the network just demoted and the rung does nothing — confirmed on the
+Pi before this was fixed.
 
 State lives in `/var/lib/panel2net/net-watchdog.json`. A dry run shows what it
 would do and changes nothing:

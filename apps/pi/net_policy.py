@@ -57,6 +57,26 @@ def expired_penalties(penalties, now):
                   if now - since >= PENALTY_SECONDS)
 
 
+def next_profile(profiles, penalties, leaving):
+    """The profile to activate after demoting one, or None if there is none.
+
+    The watchdog has to name its replacement. `nmcli device connect` picks a
+    profile itself, but it deliberately considers connections that are not set
+    to autoconnect, so it re-selects the profile just demoted and the rung
+    becomes a no-op — which is exactly what the first on-device run did.
+
+    profiles is an iterable of (name, priority). Ties break by name so the same
+    inventory always yields the same choice.
+    """
+    ranked = sorted(
+        (name, priority) for name, priority in profiles
+        if name != leaving and name not in penalties
+    )
+    if not ranked:
+        return None
+    return max(ranked, key=lambda entry: entry[1])[0]
+
+
 def _strongest(failures):
     """The single heaviest rung due at this failure count, or None.
 

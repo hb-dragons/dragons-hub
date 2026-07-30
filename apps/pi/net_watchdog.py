@@ -133,6 +133,24 @@ def active_wifi_profile(device):
     return None
 
 
+def wifi_profiles():
+    """Saved wifi profiles as (connection id, autoconnect priority) pairs."""
+    profiles = []
+    for line in _nmcli_lines(['nmcli', '-t', '-f',
+                              'NAME,TYPE,AUTOCONNECT-PRIORITY', 'con', 'show']):
+        parts = line.rsplit(':', 2)
+        if len(parts) != 3:
+            continue
+        name, kind, priority = parts
+        if kind != '802-11-wireless':
+            continue
+        try:
+            profiles.append((name, int(priority)))
+        except ValueError:
+            continue
+    return profiles
+
+
 def log_visible_ssids():
     """Record what the radio can see, so the journal explains a failed switch."""
     seen = _nmcli_lines(['nmcli', '-t', '-f', 'SSID,SIGNAL', 'dev', 'wifi',
@@ -140,8 +158,8 @@ def log_visible_ssids():
     log.info('visible networks: %s', ', '.join(seen) if seen else 'none')
 
 
-def apply(decision, dry_run):
-    """Execute a Decision."""
+def apply(decision, penalties, dry_run):
+    """Execute a Decision. `penalties` is the state as it stood before this run."""
     for ssid in decision.unpenalise:
         log.info('penalty expired for %s, allowing autoconnect again', ssid)
         run(['nmcli', 'con', 'mod', ssid, 'connection.autoconnect', 'yes'], dry_run)
@@ -157,7 +175,16 @@ def apply(decision, dry_run):
                         ssid, net_policy.PENALTY_SECONDS)
             run(['nmcli', 'con', 'mod', ssid, 'connection.autoconnect', 'no'], dry_run)
             run(['nmcli', 'con', 'down', ssid], dry_run)
-            run(['nmcli', 'dev', 'connect', WIFI_DEVICE], dry_run)
+            # Name the replacement rather than letting nmcli choose: `dev
+            # connect` considers profiles with autoconnect off and would come
+            # straight back to the one just demoted.
+            target = net_policy.next_profile(wifi_profiles(), penalties, ssid)
+            if target:
+                log.info('switching to %s', target)
+                run(['nmcli', 'con', 'up', target], dry_run)
+            else:
+                log.warning('no other profile to switch to, letting NetworkManager retry')
+                run(['nmcli', 'dev', 'connect', WIFI_DEVICE], dry_run)
         elif action == net_policy.RADIO_CYCLE:
             log.warning('cycling the wifi radio')
             run(['nmcli', 'radio', 'wifi', 'off'], dry_run)
@@ -189,7 +216,7 @@ def main(argv=None):
     decision = net_policy.decide(failures, internet_ok, api_ok, current,
                                  penalties, now)
     log.info('%s (profile=%s)', decision.reason, current or 'none')
-    apply(decision, args.dry_run)
+    apply(decision, penalties, args.dry_run)
 
     if args.dry_run:
         return 0
