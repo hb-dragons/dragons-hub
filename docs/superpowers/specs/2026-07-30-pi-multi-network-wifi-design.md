@@ -144,17 +144,32 @@ where the tests concentrate. `net_watchdog.py` only executes what it is handed.
 ### Access
 
 Tailscale is already configured on both ends and needs no scripting, only
-documentation. One change is on the operator's machine, not the Pi:
-`~/.ssh/config` currently pins `dragonspi` to `HostName 10.168.100.32`, which
-breaks the moment the Pi roams. Repoint it at `dragonspi` (MagicDNS) or
-`100.125.219.119`.
+documentation. Access is deliberately split across two ssh aliases on the
+operator's machine:
+
+| Alias | HostName | Use |
+| --- | --- | --- |
+| `dragonspi` | `10.168.100.32` | the home wifi only, kept as the low-latency local path |
+| `dragonstail` | `dragonspi.tail5a9cb.ts.net` | every other network the Pi roams to |
+
+`dragonstail` uses the MagicDNS FQDN rather than the bare host name, because
+the tailnet reports no search domains and the bare name only resolves while
+Tailscale owns the resolver. It sets `StrictHostKeyChecking accept-new` —
+Tailscale SSH presents its own host key, distinct from the Pi's sshd key — and
+`ServerAliveInterval 30` so a session dies rather than hanging when the Pi
+changes network. The `IdentityFile` is a fallback; with `RunSSH: true` the
+tailnet ACL performs the authentication.
+
+Added 2026-07-30 and verified: `100.116.52.103` → `100.125.219.119`.
 
 ## Cutover order
 
 Wifi must leave netplan's ownership, and the profile being replaced is the one
 currently carrying the ssh session. Sequenced so no step can strand the box:
 
-1. Confirm `ssh hb@100.125.219.119` over the tailnet (done 2026-07-30).
+1. Confirm `ssh dragonstail` over the tailnet (done 2026-07-30). Every later
+   step is performed over that alias, never over `dragonspi`, because the
+   profile being replaced is the one carrying the LAN session.
 2. Write `networks.conf`, run `setup_network.py --dry-run`, read the commands.
 3. Apply. This creates an `NLan` keyfile profile at priority 50 alongside the
    netplan one.
