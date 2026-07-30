@@ -1,0 +1,10 @@
+[Unit]
+Description=Panel2Net connectivity watchdog
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+StateDirectory=panel2net
+WorkingDirectory=/home/hb/Panel2Net
+ExecStart=/home/hb/Panel2Net/.venv/bin/python3 /home/hb/Panel2Net/net_watchdog.py

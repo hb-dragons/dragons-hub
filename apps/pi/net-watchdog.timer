@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Panel2Net connectivity watchdog every minute
+
+[Timer]
+Unit=net-watchdog.service
+OnBootSec=2min
+OnUnitActiveSec=60s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

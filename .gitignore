@@ -37,5 +37,8 @@ apps/api/src/test/fixtures/seed.json
 # curated fixtures to apps/api/src/services/scoreboard/__fixtures__/ instead)
 apps/pi/research/
 
+# Real wifi keys for the roaming Pi (mode 0600 on the box; see networks.conf.example)
+apps/pi/networks.conf
+
 # Local database dumps (never commit; contains federation PII)
 backups/
