@@ -109,30 +109,41 @@ def test_going_online_does_not_lift_an_unexpired_penalty():
     assert decision.next_failures == 0
 
 
-def test_next_profile_picks_the_highest_priority():
+def test_candidates_are_ranked_by_descending_priority():
     profiles = [('NLan', 50), ('10001', 100), ('Y800Z_DA89', 80)]
-    assert net_policy.next_profile(profiles, {}, None) == '10001'
+    assert net_policy.ranked_profiles(profiles, {}, None) == \
+        ['10001', 'Y800Z_DA89', 'NLan']
 
 
-def test_next_profile_skips_the_profile_being_left():
+def test_the_whole_list_is_returned_so_an_absent_network_can_be_skipped():
+    # A higher-priority profile may simply not be in range. The watchdog works
+    # down the list until one activates, so the list cannot stop at the head:
+    # ranking by priority alone once left the Pi on no network at all.
+    profiles = [('NLan', 50), ('10001', 100), ('Y800Z_DA89', 80)]
+    assert net_policy.ranked_profiles(profiles, {}, '10001') == \
+        ['Y800Z_DA89', 'NLan']
+
+
+def test_the_profile_being_left_is_not_a_candidate():
     # nmcli dev connect would re-pick the demoted profile, because it considers
-    # connections that are not set to autoconnect. The replacement is named here
-    # instead of being left to NetworkManager.
+    # connections that are not set to autoconnect. The replacements are named
+    # here instead of being left to NetworkManager.
     profiles = [('NLan', 50), ('10001', 100)]
-    assert net_policy.next_profile(profiles, {}, '10001') == 'NLan'
+    assert net_policy.ranked_profiles(profiles, {}, '10001') == ['NLan']
 
 
-def test_next_profile_skips_an_already_penalised_profile():
+def test_a_penalised_profile_is_not_a_candidate():
     profiles = [('NLan', 50), ('10001', 100)]
-    assert net_policy.next_profile(profiles, {'10001': NOW}, None) == 'NLan'
+    assert net_policy.ranked_profiles(profiles, {'10001': NOW}, None) == ['NLan']
 
 
-def test_next_profile_returns_none_when_every_candidate_is_out():
-    assert net_policy.next_profile([('NLan', 50)], {'NLan': NOW}, None) is None
+def test_no_candidates_when_every_profile_is_out():
+    assert net_policy.ranked_profiles([('NLan', 50)], {'NLan': NOW}, None) == []
 
 
-def test_next_profile_breaks_a_priority_tie_by_name():
-    assert net_policy.next_profile([('Zulu', 50), ('Alpha', 50)], {}, None) == 'Alpha'
+def test_a_priority_tie_breaks_by_name():
+    assert net_policy.ranked_profiles([('Zulu', 50), ('Alpha', 50)], {}, None) == \
+        ['Alpha', 'Zulu']
 
 
 def test_expired_penalties_are_sorted_for_a_stable_log_line():

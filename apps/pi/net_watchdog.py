@@ -38,6 +38,9 @@ WIFI_DEVICE = os.environ.get('WATCHDOG_WIFI_DEVICE', 'wlan0')
 PROBE_TIMEOUT = 8
 COMMAND_TIMEOUT = 60
 RADIO_CYCLE_PAUSE = 5
+# Each failed activation costs a NetworkManager timeout, and the timer fires
+# again in 60 s, so the walk down the candidate list is bounded.
+MAX_SWITCH_ATTEMPTS = 3
 
 log = logging.getLogger('net-watchdog')
 
@@ -177,13 +180,22 @@ def apply(decision, penalties, dry_run):
             run(['nmcli', 'con', 'down', ssid], dry_run)
             # Name the replacement rather than letting nmcli choose: `dev
             # connect` considers profiles with autoconnect off and would come
-            # straight back to the one just demoted.
-            target = net_policy.next_profile(wifi_profiles(), penalties, ssid)
-            if target:
-                log.info('switching to %s', target)
-                run(['nmcli', 'con', 'up', target], dry_run)
-            else:
-                log.warning('no other profile to switch to, letting NetworkManager retry')
+            # straight back to the one just demoted. Work down the ranking,
+            # because the best-ranked profile is often simply not in range.
+            candidates = net_policy.ranked_profiles(wifi_profiles(), penalties, ssid)
+            log.info('candidates in order: %s',
+                     ', '.join(candidates) if candidates else 'none')
+            switched = False
+            for target in candidates[:MAX_SWITCH_ATTEMPTS]:
+                log.info('trying %s', target)
+                if run(['nmcli', 'con', 'up', target], dry_run):
+                    switched = True
+                    break
+            if not switched:
+                # Nothing took. Hand it back to NetworkManager, which may still
+                # manage something; being on the demoted network beats being on
+                # none, and the penalty expires on its own timer regardless.
+                log.warning('no candidate activated, letting NetworkManager retry')
                 run(['nmcli', 'dev', 'connect', WIFI_DEVICE], dry_run)
         elif action == net_policy.RADIO_CYCLE:
             log.warning('cycling the wifi radio')

@@ -91,6 +91,13 @@ connect`. That command considers profiles whose autoconnect is off, so it
 re-selects the network just demoted and the rung does nothing — confirmed on the
 Pi before this was fixed.
 
+The watchdog then works down the remaining profiles by priority until one
+activates, rather than trying only the best-ranked one. Priority says nothing
+about whether a network is in range, and the top-ranked profile is usually a
+hotspot or a venue that is not there. Filtering the list by what a scan can see
+is not an option either: a hidden network never appears in scan results, which
+would rule out the hotspot permanently.
+
 State lives in `/var/lib/panel2net/net-watchdog.json`. A dry run shows what it
 would do and changes nothing:
 

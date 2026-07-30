@@ -57,24 +57,26 @@ def expired_penalties(penalties, now):
                   if now - since >= PENALTY_SECONDS)
 
 
-def next_profile(profiles, penalties, leaving):
-    """The profile to activate after demoting one, or None if there is none.
+def ranked_profiles(profiles, penalties, leaving):
+    """Profiles to try after demoting one, best first.
 
-    The watchdog has to name its replacement. `nmcli device connect` picks a
-    profile itself, but it deliberately considers connections that are not set
-    to autoconnect, so it re-selects the profile just demoted and the rung
-    becomes a no-op — which is exactly what the first on-device run did.
+    The watchdog has to name its replacement. `nmcli device connect` picks one
+    itself, but it deliberately considers connections whose autoconnect is off,
+    so it re-selects the profile just demoted and the rung becomes a no-op.
+
+    The whole ranking is returned rather than just the winner, because priority
+    says nothing about whether a network is in range: the highest-priority
+    profile is often a venue or hotspot that is not there, and its activation
+    fails. The caller works down the list. Returning only the head once left the
+    Pi associated with nothing at all.
 
     profiles is an iterable of (name, priority). Ties break by name so the same
-    inventory always yields the same choice.
+    inventory always yields the same order.
     """
-    ranked = sorted(
-        (name, priority) for name, priority in profiles
-        if name != leaving and name not in penalties
-    )
-    if not ranked:
-        return None
-    return max(ranked, key=lambda entry: entry[1])[0]
+    eligible = [(name, priority) for name, priority in profiles
+                if name != leaving and name not in penalties]
+    eligible.sort(key=lambda entry: (-entry[1], entry[0]))
+    return [name for name, _ in eligible]
 
 
 def _strongest(failures):
