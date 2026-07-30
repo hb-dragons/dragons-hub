@@ -1,0 +1,114 @@
+"""Tests for the connectivity watchdog's decision ladder.
+
+The ladder is pure, so every rung is asserted directly instead of being inferred
+from a Pi's behaviour. The clock is passed in, so penalty expiry is tested
+without waiting ten minutes.
+"""
+
+import pytest
+
+import net_policy
+
+NOW = 1_000_000.0
+
+
+def offline(previous_failures, current_ssid='Gym', penalties=None, now=NOW):
+    return net_policy.decide(previous_failures, False, False, current_ssid,
+                             penalties if penalties is not None else {}, now)
+
+
+def test_online_resets_the_counter_and_does_nothing():
+    decision = net_policy.decide(7, True, True, 'Gym', {}, NOW)
+    assert decision.next_failures == 0
+    assert decision.actions == []
+    assert decision.demote_ssid is None
+
+
+def test_internet_up_but_api_down_is_not_treated_as_a_wifi_fault():
+    decision = net_policy.decide(7, True, False, 'Gym', {}, NOW)
+    assert decision.next_failures == 0
+    assert decision.actions == []
+    assert 'API' in decision.reason
+
+
+@pytest.mark.parametrize('previous', [0, 1])
+def test_the_first_two_failures_only_count(previous):
+    decision = offline(previous)
+    assert decision.next_failures == previous + 1
+    assert decision.actions == []
+
+
+@pytest.mark.parametrize('previous', [2, 3])
+def test_a_rescan_starts_at_three_failures(previous):
+    decision = offline(previous)
+    assert decision.actions == [net_policy.RESCAN]
+
+
+def test_five_failures_demote_the_current_network():
+    decision = offline(4)
+    assert decision.next_failures == 5
+    assert decision.actions == [net_policy.RESCAN, net_policy.DEMOTE]
+    assert decision.demote_ssid == 'Gym'
+
+
+def test_ten_failures_cycle_the_radio_and_do_not_also_demote():
+    decision = offline(9)
+    assert decision.actions == [net_policy.RESCAN, net_policy.RADIO_CYCLE]
+    assert decision.demote_ssid is None
+
+
+def test_twenty_failures_restart_networkmanager():
+    decision = offline(19)
+    assert decision.actions == [net_policy.RESCAN, net_policy.RESTART_NM]
+
+
+@pytest.mark.parametrize('previous, expected', [
+    (14, net_policy.DEMOTE),        # 15
+    (24, net_policy.DEMOTE),        # 25
+    (29, net_policy.RADIO_CYCLE),   # 30
+    (39, net_policy.RESTART_NM),    # 40
+])
+def test_the_ladder_repeats_with_one_action_per_rung(previous, expected):
+    decision = offline(previous)
+    assert decision.actions == [net_policy.RESCAN, expected]
+
+
+@pytest.mark.parametrize('previous', [5, 6, 7])
+def test_failures_between_rungs_only_rescan(previous):
+    decision = offline(previous)
+    assert decision.actions == [net_policy.RESCAN]
+
+
+def test_nothing_is_demoted_when_no_profile_is_active():
+    decision = offline(4, current_ssid=None)
+    assert decision.actions == [net_policy.RESCAN]
+    assert decision.demote_ssid is None
+
+
+def test_an_already_penalised_network_is_not_demoted_again():
+    decision = offline(4, penalties={'Gym': NOW - 10})
+    assert decision.actions == [net_policy.RESCAN]
+    assert decision.demote_ssid is None
+
+
+def test_an_expired_penalty_is_lifted():
+    decision = offline(1, penalties={'Gym': NOW - net_policy.PENALTY_SECONDS})
+    assert decision.unpenalise == ['Gym']
+
+
+def test_a_fresh_penalty_is_left_alone():
+    decision = offline(1, penalties={'Gym': NOW - 1})
+    assert decision.unpenalise == []
+
+
+def test_going_online_does_not_lift_an_unexpired_penalty():
+    # Re-admitting a network the Pi just proved broken would flap straight back
+    # to it if it outranked the one that works. Penalties expire on their timer.
+    decision = net_policy.decide(9, True, True, 'JN-iPhone', {'Gym': NOW - 5}, NOW)
+    assert decision.unpenalise == []
+    assert decision.next_failures == 0
+
+
+def test_expired_penalties_are_sorted_for_a_stable_log_line():
+    penalties = {'Zulu': NOW - 700, 'Alpha': NOW - 700}
+    assert net_policy.expired_penalties(penalties, NOW) == ['Alpha', 'Zulu']
