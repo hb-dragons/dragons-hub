@@ -9,6 +9,7 @@
 # docs/superpowers/specs/2026-07-30-pi-multi-network-wifi-design.md.
 
 RESCAN = 'rescan'
+CONNECT = 'connect'
 DEMOTE = 'demote'
 RADIO_CYCLE = 'radio_cycle'
 RESTART_NM = 'restart_nm'
@@ -114,6 +115,20 @@ def decide(previous_failures, internet_ok, api_ok, current_ssid, penalties, now)
     if failures >= RESCAN_AT:
         # Cheap, and it is what catches a phone hotspot the moment it appears.
         actions.append(RESCAN)
+
+    if not current_ssid and failures >= RESCAN_AT:
+        # Associated with nothing. NetworkManager's own autoconnect normally
+        # handles this - measured at 3 s to join a hidden, top-priority hotspot
+        # from a cold radio. What it does not handle is a device whose
+        # autoconnect it has blocked, which is what an explicit `nmcli con down`
+        # leaves behind; without this rung that state waits for the restart at
+        # 20 failures.
+        #
+        # Gated at the rescan threshold rather than the first failure: wlan0
+        # reads as "no profile" for a second or two while it is coming back from
+        # a radio cycle, and acting on that just logs failed activations against
+        # a device that is not there yet.
+        actions.append(CONNECT)
 
     demote_ssid = None
     strongest = _strongest(failures)

@@ -82,6 +82,16 @@ is happily associated moves nothing — verified over three minutes. The path th
 does work is the demotion rung: the current network stops passing probes, gets
 demoted, and the hotspot wins the reselection.
 
+Where NM does honour priority is a cold start with nothing associated, which is
+the arriving-at-a-venue case. With home wifi out of the candidate set it joined
+the hidden hotspot 3 s after the radio came back. Two caveats measured alongside
+that: when home wifi *is* also in range it wins, because it broadcasts and a
+hidden SSID needs a directed probe that has not completed when NM commits about
+2.5 s in; and an explicit `nmcli con down` leaves the device's autoconnect
+blocked, so NM sits idle until something clears it. The first is harmless — a
+working network is a working network, and the watchdog moves off it if it stops
+passing probes. The second is what the connect rung covers.
+
 ### `setup_network.py`
 
 Reads the list and converges NetworkManager to match. Idempotent — matches
@@ -138,7 +148,7 @@ Escalation runs on consecutive *internet* failures. State in
 | Consecutive failures | Action |
 | --- | --- |
 | 1–2 | log only |
-| 3 | `nmcli dev wifi rescan`, log visible SSIDs — catches a hotspot the moment it is switched on |
+| 3 | `nmcli dev wifi rescan`, log visible SSIDs — catches a hotspot the moment it is switched on. Also, if no profile is active at all, activate the best available one |
 | 5 | demote the current SSID (`autoconnect no` plus a penalty timestamp), then activate the highest-priority remaining profile that comes up. Penalty expires after 10 min. |
 | 10 | `nmcli radio wifi off`, wait 5 s, `on` |
 | 20 | `systemctl restart NetworkManager` |

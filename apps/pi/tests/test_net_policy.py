@@ -81,8 +81,36 @@ def test_failures_between_rungs_only_rescan(previous):
 
 def test_nothing_is_demoted_when_no_profile_is_active():
     decision = offline(4, current_ssid=None)
-    assert decision.actions == [net_policy.RESCAN]
+    assert net_policy.DEMOTE not in decision.actions
     assert decision.demote_ssid is None
+
+
+def test_a_brief_gap_with_no_profile_is_not_acted_on():
+    # wlan0 reads as "no profile" for a second or two while it comes back from a
+    # radio cycle. Connecting then just logs failed activations against a device
+    # that does not exist yet, which is what the first version did on the Pi.
+    assert offline(0, current_ssid=None).actions == []
+    assert offline(1, current_ssid=None).actions == []
+
+
+def test_connecting_starts_at_the_rescan_threshold():
+    decision = offline(2, current_ssid=None)
+    assert decision.actions == [net_policy.RESCAN, net_policy.CONNECT]
+
+
+def test_a_pi_holding_no_profile_still_escalates():
+    decision = offline(9, current_ssid=None)
+    assert decision.actions == [net_policy.RESCAN, net_policy.CONNECT,
+                                net_policy.RADIO_CYCLE]
+
+
+def test_an_associated_pi_is_not_told_to_connect():
+    assert net_policy.CONNECT not in offline(4, current_ssid='Gym').actions
+
+
+def test_an_online_pi_is_never_told_to_connect():
+    decision = net_policy.decide(0, True, True, None, {}, NOW)
+    assert decision.actions == []
 
 
 def test_an_already_penalised_network_is_not_demoted_again():

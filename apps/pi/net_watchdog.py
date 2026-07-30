@@ -161,6 +161,23 @@ def log_visible_ssids():
     log.info('visible networks: %s', ', '.join(seen) if seen else 'none')
 
 
+def activate_best(penalties, leaving, dry_run):
+    """Bring up the best profile that is not penalised, walking down the ranking.
+
+    Shared by the connect and demote rungs. The ranking is by autoconnect
+    priority, which says nothing about whether a network is in range, so a
+    failed activation moves to the next candidate rather than giving up.
+    """
+    candidates = net_policy.ranked_profiles(wifi_profiles(), penalties, leaving)
+    log.info('candidates in order: %s',
+             ', '.join(candidates) if candidates else 'none')
+    for target in candidates[:MAX_SWITCH_ATTEMPTS]:
+        log.info('trying %s', target)
+        if run(['nmcli', 'con', 'up', target], dry_run):
+            return True
+    return False
+
+
 def apply(decision, penalties, dry_run):
     """Execute a Decision. `penalties` is the state as it stood before this run."""
     for ssid in decision.unpenalise:
@@ -172,6 +189,14 @@ def apply(decision, penalties, dry_run):
             run(['nmcli', 'dev', 'wifi', 'rescan'], dry_run)
             if not dry_run:
                 log_visible_ssids()
+        elif action == net_policy.CONNECT:
+            log.warning('holding no profile, connecting')
+            if not activate_best(penalties, None, dry_run):
+                # `dev connect` also clears the autoconnect block NetworkManager
+                # sets on a device after an explicit disconnect, which is one of
+                # the ways the Pi ends up here.
+                log.warning('no candidate activated, asking NetworkManager')
+                run(['nmcli', 'dev', 'connect', WIFI_DEVICE], dry_run)
         elif action == net_policy.DEMOTE:
             ssid = decision.demote_ssid
             log.warning('demoting %s for %d s and re-running autoconnect',
@@ -180,18 +205,8 @@ def apply(decision, penalties, dry_run):
             run(['nmcli', 'con', 'down', ssid], dry_run)
             # Name the replacement rather than letting nmcli choose: `dev
             # connect` considers profiles with autoconnect off and would come
-            # straight back to the one just demoted. Work down the ranking,
-            # because the best-ranked profile is often simply not in range.
-            candidates = net_policy.ranked_profiles(wifi_profiles(), penalties, ssid)
-            log.info('candidates in order: %s',
-                     ', '.join(candidates) if candidates else 'none')
-            switched = False
-            for target in candidates[:MAX_SWITCH_ATTEMPTS]:
-                log.info('trying %s', target)
-                if run(['nmcli', 'con', 'up', target], dry_run):
-                    switched = True
-                    break
-            if not switched:
+            # straight back to the one just demoted.
+            if not activate_best(penalties, ssid, dry_run):
                 # Nothing took. Hand it back to NetworkManager, which may still
                 # manage something; being on the demoted network beats being on
                 # none, and the penalty expires on its own timer regardless.

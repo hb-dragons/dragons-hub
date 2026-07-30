@@ -80,6 +80,13 @@ The internet probe asks two `generate_204` endpoints run by different operators
 and counts a failure only when neither answers. One name being blocked or
 retired must not be enough to make the ladder tear down a working network.
 
+Arriving somewhere new, the Pi normally needs no help: NetworkManager's own
+autoconnect joined a hidden, top-priority hotspot 3 s after a cold radio when
+nothing else was reachable. The one state it does not recover from is a device
+whose autoconnect NM has blocked, which is what an explicit `nmcli con down`
+leaves behind. So from 3 failures onward, a Pi holding no profile at all is told
+to activate the best available one rather than waiting for the NM restart at 20.
+
 On consecutive internet failures: 3 rescans, 5 demotes the current network for
 10 minutes and activates the highest-priority profile that is left, 10 cycles
 the radio, 20 restarts NetworkManager. Past that the ladder repeats. It never
