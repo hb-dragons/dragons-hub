@@ -2,19 +2,21 @@
 #
 #   ssid|priority|psk|hidden
 #
-# Higher priority wins when several are in range. Hotspots sit above venue wifi
-# on purpose: a hotspot only exists while someone switches it on, so switching
-# it on becomes the manual override that pulls the Pi off the venue network.
+# Higher priority wins when several are in range. The phone hotspot sits above
+# venue wifi on purpose: a hotspot only exists while someone switches it on, so
+# switching it on becomes the manual override that pulls the Pi off the venue
+# network.
 #
-# hidden must be yes for a network that does not broadcast its SSID — 10001 is
-# one. NetworkManager only probes for those when the flag is set.
+# hidden must be yes for a network that does not broadcast its SSID. 10001 is
+# the iPhone hotspot and is one of those — iOS stops beaconing it once nothing
+# is attached, and NetworkManager only probes for a hidden network when the flag
+# is set.
 #
 # Copy to networks.conf next to setup_network.py, fill in the real keys, then:
 #   sudo chmod 0600 networks.conf
 #   sudo /home/hb/Panel2Net/.venv/bin/python3 setup_network.py --dry-run
 #   sudo /home/hb/Panel2Net/.venv/bin/python3 setup_network.py
 
-JN-iPhone|100|replace-me|no
-10001|90|replace-me|yes
+10001|100|replace-me|yes
 Y800Z_DA89|80|replace-me|no
 NLan|50|replace-me|no
