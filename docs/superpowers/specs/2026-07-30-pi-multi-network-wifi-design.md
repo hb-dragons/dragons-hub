@@ -52,8 +52,8 @@ apps/pi/net_policy.py              pure: state -> list of actions, no I/O
 apps/pi/net_watchdog.py            I/O: probes, nmcli, state file
 apps/pi/setup_network.py           idempotent provisioner, --dry-run
 apps/pi/networks.conf.example      network list template
-apps/pi/net-watchdog.service       Type=oneshot
-apps/pi/net-watchdog.timer         every 60 s, Persistent=true
+apps/pi/net-watchdog.service       Type=oneshot, StateDirectory=panel2net
+apps/pi/net-watchdog.timer         OnUnitActiveSec=60s (monotonic)
 apps/pi/tests/test_net_policy.py
 apps/pi/tests/test_setup_network.py
 ```
@@ -131,7 +131,17 @@ Escalation runs on consecutive *internet* failures. State in
 | 10 | `nmcli radio wifi off`, wait 5 s, `on` |
 | 20 | `systemctl restart NetworkManager` |
 
-No reboot at any step. A success clears the counter and every penalty.
+No reboot at any step. Beyond the table the ladder repeats on multiples, and
+each rung fires the strongest single action rather than several at once: 15
+demotes again, 25 demotes, 30 cycles the radio, 40 restarts NetworkManager. A
+rescan runs on every failure from 3 onward, since it costs nothing and is what
+catches a hotspot the moment it appears.
+
+A success clears the failure counter. It deliberately does **not** clear
+outstanding penalties — those expire on their own 10 minute timer. Lifting a
+penalty the instant something else works would re-admit a network the Pi just
+proved broken, and if that network outranked the working one NM would jump
+straight back to it and flap.
 
 The demotion step is what makes a **captive-portal venue wifi** survivable: the
 Pi associates, gets a lease, has no usable uplink, and would otherwise sit there
