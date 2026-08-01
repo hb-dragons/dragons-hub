@@ -56,6 +56,6 @@ export const strings = {
     gamesCount: "Spiele",
     loadError: "Der Spielplan konnte nicht geladen werden. Bitte versuche es später erneut.",
     noGame: "Kein Spiel gefunden",
-    mapAriaLabel: "Map",
+    mapAriaLabel: "Karte",
   },
 } as const;

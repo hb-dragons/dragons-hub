@@ -1,4 +1,5 @@
 import type { MatchListItem } from "@dragons/shared";
+import { API_BASE } from "../../lib/api";
 import { formatGameDate, formatGameTime } from "../../lib/game-format";
 import { strings } from "../../lib/strings";
 import { TeamBadge, teamSlug } from "../spielplan/TeamBadge";
@@ -37,10 +38,6 @@ export type GameCardMatch = Pick<
   | "venueCity"
   | "venueNameOverride"
 >;
-
-const API_BASE =
-  (import.meta.env.PUBLIC_API_URL as string | undefined) ??
-  "https://api.app.hbdragons.de";
 
 /* CardZone.vue — the six-meter box and free-throw arc on each card end. */
 function CardZone({ isAway = false }: { isAway?: boolean }) {
@@ -99,7 +96,7 @@ function CardTeam({ game, isAway = false }: { game: GameCardMatch; isAway?: bool
 
         <a
           href={isOwn ? `/teams/${teamSlug(badgeName)}/` : "/probetraining/"}
-          aria-label={`${badgeName} Team`}
+          aria-label={`${federationName} Team`}
           className="h-full"
         >
           {isOwn ? (
@@ -126,7 +123,7 @@ function CardTeam({ game, isAway = false }: { game: GameCardMatch; isAway?: bool
           teamName={badgeName}
           isDragonsTeam={isOwn}
           badgeColor={badgeColor}
-          className="w-fit h-auto text-xs md:text-sm lg:text-base xl:text-base md:px-2"
+          className="w-fit h-auto text-xs md:text-sm lg:text-base xl:text-base col-span-5 md:px-2"
         />
       </div>
     </div>

@@ -1,9 +1,19 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   buildSpielplanRows,
   exportSpielplanXlsx,
   type SpielplanExportGame,
 } from "./XlsxExport";
+
+// Datum and the filename day are club-zone pinned; prove it off-Berlin
+// (CLAUDE.md date rule).
+beforeEach(() => {
+  vi.stubEnv("TZ", "America/New_York");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const utils = {
   book_new: vi.fn(() => ({ sheets: [] })),

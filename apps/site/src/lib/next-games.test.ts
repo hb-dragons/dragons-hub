@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { nextGames } from "./next-games";
 
 /**
@@ -6,8 +6,18 @@ import { nextGames } from "./next-games";
  * games whose kickoff falls within the next seven club-zone days; if that
  * window is empty, the Monday–Sunday week of the next upcoming game. The
  * legacy endpoint ran on a Berlin-localtime server — these tables pin the
- * same behavior to Europe/Berlin regardless of the runtime's zone.
+ * same behavior to Europe/Berlin regardless of the runtime's zone, so the
+ * whole suite runs under a forced non-Berlin TZ (CLAUDE.md date rule; a
+ * Berlin dev box would otherwise hide exactly the bugs under test).
  */
+
+beforeEach(() => {
+  vi.stubEnv("TZ", "America/New_York");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 interface TestGame {
   id: number;
@@ -136,6 +146,16 @@ describe("nextGames", () => {
 
   test.each(cases)("$name", ({ now, games, expected }) => {
     expect(ids(nextGames(games, new Date(now)))).toEqual(expected);
+  });
+
+  test("is independent of the device timezone", () => {
+    const boundary = cases[0]!;
+    for (const tz of ["UTC", "Pacific/Kiritimati", "Pacific/Honolulu", "Europe/Berlin"]) {
+      vi.stubEnv("TZ", tz);
+      expect(ids(nextGames(boundary.games, new Date(boundary.now)))).toEqual(
+        boundary.expected,
+      );
+    }
   });
 
   test("defaults to the real clock and handles an empty list", () => {

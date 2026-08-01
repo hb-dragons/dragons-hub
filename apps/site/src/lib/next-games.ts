@@ -1,4 +1,9 @@
-import { todayInClubZone } from "@dragons/shared";
+import {
+  CLUB_TIME_ZONE,
+  clubDayAnchor,
+  toClubDateString,
+  todayInClubZone,
+} from "@dragons/shared";
 
 /**
  * Pure reimplementation of the legacy `server/api/games/next.get.ts`
@@ -11,10 +16,8 @@ import { todayInClubZone } from "@dragons/shared";
  *    this branch uncapped; plan Task C5 caps the util's result overall).
  * 3. No upcoming games at all: empty.
  *
- * "Today" is resolved in the club zone via the shared kickoff helpers, so a
- * UTC build server and a fan's phone in any timezone agree on the same list.
- * Week arithmetic never touches the runtime zone: `YYYY-MM-DD` strings are
- * mapped onto UTC-midnight `Date`s used purely as civil-day containers.
+ * All calendar work goes through the shared kickoff helpers, so a UTC build
+ * server and a fan's phone in any timezone agree on the same list.
  */
 
 const MAX_GAMES = 6;
@@ -33,20 +36,34 @@ function byKickoff(a: KickoffLike, b: KickoffLike): number {
 }
 
 /**
- * Civil-day arithmetic on `YYYY-MM-DD` strings. The intermediate `Date` is a
- * UTC-midnight stand-in for the calendar day — never an instant — so
- * `toISOString` reads the same day back out and no timezone (or DST hour)
- * can shift the result.
+ * Civil-day arithmetic through the kickoff helpers: anchor the day at
+ * club-zone noon, shift by whole days, read the club calendar day back out.
+ * The noon anchor leaves ~12h of slack on either side, so a DST hour can
+ * never move the result onto a neighboring day.
  */
 function addDays(day: string, days: number): string {
-  const at = new Date(`${day}T00:00:00Z`);
-  return new Date(at.getTime() + days * DAY_MS).toISOString().slice(0, 10);
+  return toClubDateString(new Date(clubDayAnchor(day).getTime() + days * DAY_MS));
 }
 
-/** Monday of the week containing the given calendar day. */
+const CLUB_WEEKDAY_FMT = new Intl.DateTimeFormat("en-US", {
+  timeZone: CLUB_TIME_ZONE,
+  weekday: "short",
+});
+
+const DAYS_SINCE_MONDAY: Record<string, number> = {
+  Mon: 0,
+  Tue: 1,
+  Wed: 2,
+  Thu: 3,
+  Fri: 4,
+  Sat: 5,
+  Sun: 6,
+};
+
+/** Monday of the week containing the given club calendar day. */
 function mondayOf(day: string): string {
-  const weekday = new Date(`${day}T00:00:00Z`).getUTCDay();
-  return addDays(day, -((weekday + 6) % 7));
+  const weekday = CLUB_WEEKDAY_FMT.format(clubDayAnchor(day));
+  return addDays(day, -DAYS_SINCE_MONDAY[weekday]!);
 }
 
 /**

@@ -1,11 +1,21 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { formatGameDate, formatGameTime } from "./game-format";
 
 /**
  * Ports of dragons-app `app/utils/format.ts`, which formatted on a
  * Berlin-localtime server. Pinned to Europe/Berlin here so a UTC build or a
- * traveling fan's phone renders the same card labels.
+ * traveling fan's phone renders the same card labels — proven by running the
+ * suite under a forced non-Berlin TZ (CLAUDE.md date rule).
  */
+
+beforeEach(() => {
+  vi.stubEnv("TZ", "Pacific/Honolulu");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("formatGameDate", () => {
   test("renders the long weekday with two-digit day, month and year", () => {
     expect(formatGameDate("2026-04-25")).toBe("Samstag, 25.04.26");

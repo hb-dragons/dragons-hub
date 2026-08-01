@@ -7,7 +7,6 @@
  * card equivalent.
  */
 import { useEffect, useMemo, useState } from "react";
-import { ApiClient, createApi } from "@dragons/api-client";
 import type { MatchListItem } from "@dragons/shared";
 import { Button } from "@dragons/ui";
 import {
@@ -19,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@dragons/ui/components/dropdown-menu";
 import { Skeleton } from "@dragons/ui/components/skeleton";
+import { api } from "../../lib/api";
 import {
   fetchFullPlan,
   filterGames,
@@ -30,12 +30,6 @@ import { strings } from "../../lib/strings";
 import { GameCard, GameDate } from "../game/GameCard";
 import { TeamBadge } from "./TeamBadge";
 import { exportSpielplanXlsx } from "./XlsxExport";
-
-const API_BASE =
-  (import.meta.env.PUBLIC_API_URL as string | undefined) ??
-  "https://api.app.hbdragons.de";
-
-const api = createApi(new ApiClient({ baseUrl: API_BASE }));
 
 function ChevronDownIcon() {
   return (
@@ -107,6 +101,7 @@ export default function SpielplanIsland() {
   return (
     <div className="flex flex-col">
       <div className="flex justify-between items-center h-[50px]">
+        {/* Both dropdowns anchor to the trigger's end edge, like legacy. */}
         <div className="flex gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -115,7 +110,7 @@ export default function SpielplanIsland() {
                 <ChevronDownIcon />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="end">
               {(Object.keys(LOCATION_LABELS) as GameLocationFilter[]).map((value) => (
                 <DropdownMenuCheckboxItem
                   key={value}
@@ -135,7 +130,7 @@ export default function SpielplanIsland() {
                 <ChevronDownIcon />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onSelect={(event) => {
                   event.preventDefault();
