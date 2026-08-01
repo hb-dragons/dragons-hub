@@ -30,11 +30,8 @@ const SKIP_DIRS = new Set([
  * vitest harness scoped to that hand-written behaviour.
  */
 const UNTESTED_PACKAGE_EXEMPTIONS = {
-  "@dragons/site":
-    "Prototype promotion (2026-08-01, issue #170): static Astro shell — pages, " +
-    "theme wiring, one ported island slated for replacement in the sports-island " +
-    "port. The first pure logic (week-window util, public-site migration plan " +
-    "Task C5) arrives test-first and removes this entry.",
+  // @dragons/site came off the list on 2026-08-01 (issue #172): the payload
+  // content loader landed test-first, giving the package a vitest harness.
 };
 
 function walk(dir, visit) {
