@@ -29,13 +29,7 @@ const SKIP_DIRS = new Set([
  * combobox/date-picker/time-picker are local compositions). It now has a
  * vitest harness scoped to that hand-written behaviour.
  */
-const UNTESTED_PACKAGE_EXEMPTIONS = {
-  "@dragons/cms":
-    "Scaffold only (2026-08-01, issue #160): declarative Payload config plus " +
-    "Payload-generated Next catch-all files; no hand-written runtime logic yet. " +
-    "The first logic (blurhash hook, issue #161) arrives with a vitest harness " +
-    "and removes this entry.",
-};
+const UNTESTED_PACKAGE_EXEMPTIONS = {};
 
 function walk(dir, visit) {
   for (const entry of readdirSync(dir)) {
