@@ -28,6 +28,7 @@ export const strings = {
   home: {
     title: "HB Dragons e.V. — Startseite",
     scrollHint: "Scroll",
+    newsHeading: "News",
   },
   nextGames: {
     heading: "Nächste Spiele",

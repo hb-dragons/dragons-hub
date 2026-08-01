@@ -1,12 +1,26 @@
 ---
 // Hero ported 1:1 from dragons-app HomeStart.vue + HomeVideoBackground.vue.
 // motion-v letter stagger replaced by server-rendered spans + CSS delays → zero JS.
+import { getCollection } from "astro:content";
+
 import Layout from "../layouts/Layout.astro";
 import NextGamesIsland from "../components/NextGamesIsland";
 import { strings } from "../lib/strings";
 
 const firstPart = strings.site.claim.courtPart;
 const secondPart = strings.site.claim.culturesPart;
+
+// The build user's API key sees drafts (publishedOrAuthed) — filter them out.
+// Empty on env-less shell builds (see src/lib/payload.ts); the section only
+// renders when there is content.
+const newsTeasers = (await getCollection("posts", ({ data }) => data._status === "published"))
+  .sort((a, b) => b.data.publishedDate.valueOf() - a.data.publishedDate.valueOf())
+  .slice(0, 3);
+// Explicit zone: the build machine's TZ must not shift the rendered day.
+const newsDate = new Intl.DateTimeFormat("de-DE", {
+  dateStyle: "long",
+  timeZone: "Europe/Berlin",
+});
 ---
 
 <Layout title={strings.home.title}>
@@ -64,6 +78,30 @@ const secondPart = strings.site.claim.culturesPart;
   </div>
 
   <NextGamesIsland client:load />
+
+  {
+    newsTeasers.length > 0 && (
+      <section class="mx-auto w-full max-w-5xl px-4 py-16">
+        <h2 class="text-3xl font-bold text-foreground">{strings.home.newsHeading}</h2>
+        <ul class="mt-8 grid gap-6 md:grid-cols-3">
+          {newsTeasers.map((post) => (
+            <li class="rounded-lg border border-border bg-card p-6">
+              <time
+                datetime={post.data.publishedDate.toISOString()}
+                class="text-sm text-muted-foreground"
+              >
+                {newsDate.format(post.data.publishedDate)}
+              </time>
+              <h3 class="mt-2 text-xl font-semibold text-card-foreground">{post.data.title}</h3>
+              {post.data.seoDescription && (
+                <p class="mt-2 text-muted-foreground">{post.data.seoDescription}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
 </Layout>
 
 <style>
