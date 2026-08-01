@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import { ApiClient, createApi } from "@dragons/api-client";
 import { formatKickoffLong } from "@dragons/shared";
 import type { MatchListItem } from "@dragons/shared";
-import { Button } from "@dragons/ui";
 import { Badge } from "@dragons/ui/components/badge";
 import { Skeleton } from "@dragons/ui/components/skeleton";
 import { strings } from "../lib/strings";
@@ -234,9 +233,27 @@ export default function NextGamesIsland() {
 
       {games && games.length > 0 && (
         <div className="text-center mt-4">
-          <Button variant="secondary" size="lg" asChild>
-            <a href="/spielplan/">{strings.nextGames.allGames}</a>
-          </Button>
+          {/* Nuxt UI soft button, classes lifted from prod hbdragons.de */}
+          <a
+            href="/spielplan/"
+            className="rounded-md font-medium inline-flex items-center transition-colors px-3 py-2 text-base gap-2 text-primary bg-primary/10 hover:bg-primary/15"
+          >
+            {strings.nextGames.allGames}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-5"
+              aria-hidden="true"
+            >
+              <path d="M5 12h14" />
+              <path d="m12 5 7 7-7 7" />
+            </svg>
+          </a>
         </div>
       )}
     </section>

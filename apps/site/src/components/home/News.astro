@@ -1,0 +1,64 @@
+---
+/**
+ * News teasers, ported from dragons-app HomeNews + NewsCard (size xs) +
+ * UiImageTextOverlay. Renders only when the CMS delivered posts (env-less
+ * shell builds keep the section absent).
+ */
+import { getCollection } from "astro:content";
+
+import BlurImage from "../BlurImage.astro";
+import PageContainer from "../PageContainer.astro";
+import { mediaUrl } from "../../lib/media";
+import { strings } from "../../lib/strings";
+
+const cmsBase = (import.meta.env.CMS_URL as string | undefined) ?? process.env.CMS_URL;
+
+// The build user's API key sees drafts (publishedOrAuthed) — filter them out.
+const posts = (await getCollection("posts", ({ data }) => data._status === "published"))
+  .map((entry) => entry.data)
+  .sort((a, b) => b.publishedDate.valueOf() - a.publishedDate.valueOf())
+  .slice(0, 3);
+---
+
+{
+  posts.length > 0 && (
+    <PageContainer class="!pb-10 md:!pb-10 lg:!pb-12 xl:!pb-14 !py-0">
+      <h2 class="text-2xl md:text-4xl font-bold text-center mb-4 md:mb-8">
+        {strings.home.newsHeading}
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {posts.map((post) => (
+          <a
+            href={`/news/${post.slug}/`}
+            aria-label={post.slug}
+            class="relative overflow-hidden rounded-lg border border-border shadow-md group block h-[150px] md:h-[150px] lg:h-[150px] xl:h-[200px] 2xl:h-[250px]"
+          >
+            {post.headerImage?.url != null && (
+              <BlurImage
+                src={mediaUrl(post.headerImage.url, cmsBase)!}
+                blurhash={post.headerImage.blurhash}
+                alt={post.headerImage.alt ?? post.title}
+                class="w-full h-full"
+                imgClass="object-cover group-hover:md:scale-105 transition-transform duration-300"
+              />
+            )}
+            <div class="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-6 md:px-6 md:pb-4 md:pt-8 bg-gradient-to-t from-black/80 via-black/20 to-transparent @container">
+              <h3 class="text-xl @md:text-2xl @lg:text-3xl font-bold mb-0 @md:mb-2 drop-shadow-lg text-white">
+                {post.title}
+              </h3>
+            </div>
+          </a>
+        ))}
+      </div>
+      <div class="flex justify-center items-center">
+        <a
+          href="/news/"
+          class="rounded-md font-medium inline-flex items-center transition-colors px-3 py-2 text-base gap-2 text-primary bg-primary/10 hover:bg-primary/15"
+        >
+          {strings.home.allNews}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+        </a>
+      </div>
+    </PageContainer>
+  )
+}
