@@ -38,7 +38,10 @@ const hasStats = memberCount !== null && teamCount !== null && years !== null;
               <div class="space-y-2">
                 <span class="inline-block text-primary italic">
                   {memberCount}
-                  <span class="ml-[0.1em] font-normal text-muted-foreground">+</span>
+                  {/* Legacy styled this via `color: var(--muted)` which never
+                      resolved (no such var in Nuxt UI), so prod renders it in
+                      the inherited primary green — match that. */}
+                  <span class="ml-[0.1em] font-normal">+</span>
                 </span>
                 <p class="text-sm md:text-lg xl:text-2xl font-black font-sans">
                   {strings.home.statsMembers}
