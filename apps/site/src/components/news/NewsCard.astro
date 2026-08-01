@@ -1,0 +1,39 @@
+---
+/**
+ * News teaser card (size md), ported from dragons-app NewsCard +
+ * UiImageTextOverlay. The home page renders its own xs variant inline
+ * (home/News.astro); the news index is the only md consumer.
+ */
+import type { CollectionEntry } from "astro:content";
+
+import { cmsBaseUrl } from "../../lib/media";
+import { toSiteImage } from "../../lib/site-image";
+import BlurImage from "../BlurImage.astro";
+import ImageTextOverlay from "../ImageTextOverlay.astro";
+
+interface Props {
+  post: CollectionEntry<"posts">["data"];
+}
+
+const { post } = Astro.props;
+const image = toSiteImage(post.headerImage, cmsBaseUrl());
+---
+
+<a
+  href={`/news/${post.slug}/`}
+  aria-label={post.slug}
+  class="relative overflow-hidden rounded-lg border border-border shadow-md group block h-[150px] md:h-[200px] lg:h-[250px] xl:h-[300px] 2xl:h-[350px]"
+>
+  {
+    image && (
+      <BlurImage
+        src={image.url}
+        blurhash={image.blurhash}
+        alt={image.alt ?? post.title}
+        class="w-full h-full"
+        imgClass="object-cover group-hover:md:scale-105 transition-transform duration-300"
+      />
+    )
+  }
+  <ImageTextOverlay title={post.title} />
+</a>

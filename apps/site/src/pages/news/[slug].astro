@@ -1,0 +1,70 @@
+---
+// Port of dragons-app app/pages/news/[slug].vue: header from the post, date
+// badge, Lexical content rendered to HTML at build, gallery + lightbox as the
+// page's single island. Posts without a gallery ship zero JS.
+import { getCollection } from "astro:content";
+
+import PostGallery, { type GalleryImage } from "../../components/news/PostGallery";
+import NewsRichText from "../../components/news/RichText.astro";
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import Layout from "../../layouts/Layout.astro";
+import { blurhashToDataUri } from "../../lib/blurhash";
+import { formatDateDe } from "../../lib/format";
+import { cmsBaseUrl, mediaUrl } from "../../lib/media";
+import { toSiteImage } from "../../lib/site-image";
+import { strings } from "../../lib/strings";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("posts", ({ data }) => data._status === "published");
+  return posts.map((entry) => ({
+    params: { slug: entry.data.slug },
+    props: { post: entry.data },
+  }));
+}
+
+type Props = Awaited<ReturnType<typeof getStaticPaths>>[number]["props"];
+
+const { post } = Astro.props;
+const cmsBase = cmsBaseUrl();
+
+// Precompute lightbox images at build: absolute URLs + blurhash placeholders
+// (the decoder needs Node's Buffer, so it cannot run inside the island).
+const gallery: GalleryImage[] = (post.gallery ?? []).flatMap((media) => {
+  const src = mediaUrl(media.url, cmsBase);
+  if (src == null) return [];
+  return [
+    {
+      src,
+      placeholder: media.blurhash ? blurhashToDataUri(media.blurhash) : null,
+      alt: media.alt ?? null,
+      width: media.width ?? null,
+      height: media.height ?? null,
+    },
+  ];
+});
+---
+
+<Layout title={`${post.title}${strings.news.titleSuffix}`}>
+  <PageHeader title={post.title} image={toSiteImage(post.headerImage, cmsBase)} />
+
+  <PageContainer class="max-w-7xl !px-4">
+    <div class="flex justify-between items-center">
+      <span
+        class="inline-flex items-center px-2 py-1 gap-1 rounded-md text-foreground bg-card text-sm @md:text-base @lg:text-lg @xl:text-xl font-semibold"
+      >
+        {formatDateDe(post.publishedDate)}
+      </span>
+    </div>
+
+    <NewsRichText content={post.content} />
+
+    {
+      gallery.length > 0 && (
+        <div class="mt-8">
+          <PostGallery client:visible images={gallery} />
+        </div>
+      )
+    }
+  </PageContainer>
+</Layout>
