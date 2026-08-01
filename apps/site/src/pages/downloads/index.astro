@@ -1,0 +1,51 @@
+---
+// Port of dragons-app app/pages/downloads/index.vue: CMS page header
+// (slug=downloads) over the download card grid, newest first (loader sort).
+// Fully static — no islands.
+import { getCollection } from "astro:content";
+
+import DownloadCard from "../../components/downloads/DownloadCard.astro";
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import Layout from "../../layouts/Layout.astro";
+import { cmsBaseUrl } from "../../lib/media";
+import { toSiteImage } from "../../lib/site-image";
+import { strings } from "../../lib/strings";
+
+const cmsBase = cmsBaseUrl();
+
+const pageEntries = await getCollection(
+  "pages",
+  ({ data }) => data._status === "published" && data.slug === "downloads",
+);
+const page = pageEntries[0]?.data ?? null;
+
+const downloads = (await getCollection("downloads")).map((entry) => entry.data);
+---
+
+<Layout title={strings.downloads.pageTitle}>
+  <PageHeader
+    title={page?.header?.title ?? strings.downloads.fallbackHeading}
+    image={toSiteImage(page?.header?.image, cmsBase)}
+  />
+
+  <PageContainer>
+    <div class="max-w-7xl mx-auto">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {downloads.map((download) => <DownloadCard download={download} />)}
+      </div>
+
+      {
+        downloads.length === 0 && (
+          <div class="text-center py-12">
+            <div class="text-6xl mb-4">📁</div>
+            <h3 class="text-xl font-semibold text-foreground mb-2">
+              {strings.downloads.emptyTitle}
+            </h3>
+            <p class="text-muted-foreground">{strings.downloads.emptyText}</p>
+          </div>
+        )
+      }
+    </div>
+  </PageContainer>
+</Layout>

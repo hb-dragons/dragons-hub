@@ -157,12 +157,16 @@ export const collections = {
     }),
   }),
   downloads: defineCollection({
-    loader: payloadLoader("downloads"),
+    // Newest first, like the legacy downloads page. Payload has no dedicated
+    // date field here; createdAt (always present) stands in for the Strapi
+    // publishedAt the legacy cards rendered.
+    loader: payloadLoader("downloads", { sort: "-createdAt" }),
     schema: z.object({
       id: z.number(),
       title: z.string(),
       file: media.nullish(),
       category: z.string().nullish(),
+      createdAt: z.coerce.date(),
     }),
   }),
   shopItems: defineCollection({
@@ -177,7 +181,9 @@ export const collections = {
     }),
   }),
   timelineItems: defineCollection({
-    loader: payloadLoader("timeline-items"),
+    // Newest era first, like the legacy story timeline (which sorted its
+    // Strapi `date` desc — the Payload surface keeps only the year text).
+    loader: payloadLoader("timeline-items", { sort: "-year" }),
     schema: z.object({
       id: z.number(),
       year: z.string().nullish(),
