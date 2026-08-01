@@ -9,6 +9,8 @@
     "start": "next start -p 3002",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "generate:types": "payload generate:types",
     "generate:importmap": "payload generate:importmap"
   },
@@ -16,6 +18,8 @@
     "@payloadcms/db-postgres": "3.87.0",
     "@payloadcms/next": "3.87.0",
     "@payloadcms/richtext-lexical": "3.87.0",
+    "@payloadcms/storage-gcs": "3.87.0",
+    "blurhash": "^2.0.5",
     "next": "16.2.6",
     "payload": "3.87.0",
     "react": "19.2.6",
@@ -26,8 +30,10 @@
     "@types/node": "^25.8.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.1.6",
     "eslint": "^9.28.0",
     "eslint-config-next": "16.2.6",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
   }
 }
