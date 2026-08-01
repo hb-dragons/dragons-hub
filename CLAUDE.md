@@ -189,6 +189,7 @@ SMTP_PORT=<SMTP relay port; 465 uses implicit TLS, anything else STARTTLS>
 SMTP_USER=<SMTP username>
 SMTP_PASSWORD=<SMTP password>
 SMTP_FROM=<From header, e.g. "Dragons <noreply@example.de>">
+PROBETRAINING_NOTIFY_TO=<club inbox for public Probetraining submissions; without it (or without SMTP) submissions are stored but the notification mail is skipped>
 REFEREE_SDK_USERNAME=<separate federation account for referee assignment>
 REFEREE_SDK_PASSWORD=<separate federation account for referee assignment>
 EXPO_ACCESS_TOKEN=<enables the authenticated Expo Push send tier: higher rate limits + better receipt SLA>
