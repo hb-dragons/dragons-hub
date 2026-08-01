@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 
+import { anyone } from "../lib/access";
 import { encodeBlurhash } from "../lib/blurhash";
 
 // Every image-bearing collection relates to this one; the site's BlurImage
@@ -8,7 +9,7 @@ import { encodeBlurhash } from "../lib/blurhash";
 export const Media: CollectionConfig = {
   slug: "media",
   upload: { mimeTypes: ["image/*", "video/*", "application/pdf"] },
-  access: { read: () => true },
+  access: { read: anyone },
   fields: [
     { name: "alt", type: "text" },
     { name: "blurhash", type: "text", admin: { readOnly: true } },
