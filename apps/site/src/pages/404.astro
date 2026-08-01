@@ -1,0 +1,23 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { strings } from "../lib/strings";
+---
+
+<Layout title={strings.notFound.title}>
+  <main class="min-h-svh flex flex-col items-center justify-center gap-6 px-4 text-center">
+    <img src="/img/logo.svg" alt={strings.site.logoAlt} class="h-24 md:h-32 opacity-90" />
+    <p class="font-mono font-black text-7xl md:text-8xl tracking-tight" aria-hidden="true">
+      <span class="text-primary">4</span><span class="text-heat">0</span><span class="text-primary">4</span>
+    </p>
+    <h1 class="text-2xl md:text-4xl font-bold">{strings.notFound.heading}</h1>
+    <p class="max-w-md text-muted-foreground text-base md:text-lg">
+      {strings.notFound.message}
+    </p>
+    <a
+      href="/"
+      class="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground px-6 py-3 font-semibold transition-colors hover:bg-primary/90"
+    >
+      {strings.notFound.backHome}
+    </a>
+  </main>
+</Layout>

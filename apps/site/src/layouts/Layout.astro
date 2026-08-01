@@ -1,7 +1,5 @@
 ---
-// PROTOTYPE (throwaway) — ticket 16, unify-dragons-platform.
-// Feasibility spike, single variant: design is fixed (1:1 port of hbdragons.de),
-// question is stack plumbing + site.css theming of @dragons/ui.
+import { Font } from "astro:assets";
 import "../styles/global.css";
 
 interface Props {
@@ -15,12 +13,9 @@ const { title } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <Font cssVariable="--font-archivo" preload />
+    <Font cssVariable="--font-jetbrains-mono" />
+    <slot name="head" />
   </head>
   <body>
     <slot />

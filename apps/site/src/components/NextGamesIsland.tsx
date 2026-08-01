@@ -1,16 +1,17 @@
 /**
- * PROTOTYPE (throwaway) — ticket 16, unify-dragons-platform.
- * React island port of dragons-app HomeNextGames.vue + GameCard family.
- * Proves: @dragons/ui primitives restyled by site.css, @dragons/api-client
- * raw-TS consumption, /public/home/dashboard fetch (falls back to fixture
- * data when CORS blocks — known TRUSTED_ORIGINS gap).
+ * React island port of dragons-app HomeNextGames.vue + GameCard family:
+ * @dragons/ui primitives restyled by site.css, @dragons/api-client raw-TS
+ * consumption, /public/home/dashboard fetch (falls back to fixture data
+ * when CORS blocks — TRUSTED_ORIGINS gap closes with plan Task B1).
  */
 import { useEffect, useState } from "react";
 import { ApiClient, createApi } from "@dragons/api-client";
+import { formatKickoffLong } from "@dragons/shared";
 import type { MatchListItem } from "@dragons/shared";
 import { Button } from "@dragons/ui";
 import { Badge } from "@dragons/ui/components/badge";
 import { Skeleton } from "@dragons/ui/components/skeleton";
+import { strings } from "../lib/strings";
 
 const API_BASE =
   (import.meta.env.PUBLIC_API_URL as string | undefined) ??
@@ -37,7 +38,7 @@ type GameLite = Pick<
   | "guestScore"
 >;
 
-/* PROTOTYPE fixture — used only when the live fetch fails (CORS gap). */
+/* Fixture — used only when the live fetch fails (CORS gap until Task B1). */
 const FIXTURE: GameLite[] = [
   {
     id: 1,
@@ -91,15 +92,6 @@ const FIXTURE: GameLite[] = [
     guestScore: null,
   },
 ];
-
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString("de-DE", {
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
-}
 
 function formatTime(timeString: string) {
   return timeString.split(":").slice(0, 2).join(":");
@@ -167,7 +159,7 @@ function GameCard({ game }: { game: GameLite }) {
             <div className="text-md md:text-xl lg:text-2xl font-black font-mono h-full">
               {formatTime(game.kickoffTime)}
             </div>
-            <div className="text-lg flex-1 md:text-2xl font-mono font-bold">VS</div>
+            <div className="text-lg flex-1 md:text-2xl font-mono font-bold">{strings.nextGames.versus}</div>
             <div className="h-full" />
           </div>
         </div>
@@ -182,7 +174,6 @@ function GameCard({ game }: { game: GameLite }) {
 
 export default function NextGamesIsland() {
   const [games, setGames] = useState<GameLite[] | null>(null);
-  const [source, setSource] = useState<"live" | "fixture">("live");
 
   useEffect(() => {
     api.public
@@ -190,7 +181,6 @@ export default function NextGamesIsland() {
       .then((d) => setGames(d.upcomingGames))
       .catch(() => {
         setGames(FIXTURE);
-        setSource("fixture");
       });
   }, []);
 
@@ -202,7 +192,7 @@ export default function NextGamesIsland() {
   return (
     <section className="max-w-7xl mx-auto px-4 pt-8 md:pt-10 lg:pt-12 xl:pt-14 pb-10 lg:pb-12 xl:pb-14">
       <h2 className="text-2xl md:text-4xl font-bold text-center mb-4 md:mb-8">
-        Nächste Spiele
+        {strings.nextGames.heading}
       </h2>
 
       {games === null && (
@@ -219,7 +209,7 @@ export default function NextGamesIsland() {
       {games?.length === 0 && (
         <div className="text-center py-8">
           <div className="text-lg mb-2">🏀</div>
-          <p className="text-muted-foreground">Aktuell keine anstehenden Spiele.</p>
+          <p className="text-muted-foreground">{strings.nextGames.empty}</p>
         </div>
       )}
 
@@ -229,7 +219,7 @@ export default function NextGamesIsland() {
             <div key={date} className="space-y-2">
               <div className="flex justify-center z-20">
                 <h3 className="text-sm md:text-base min-w-32 lg:text-lg uppercase font-semibold text-center bg-muted px-2 py-0.5 md:py-1 rounded-lg border">
-                  {formatDate(date)}
+                  {formatKickoffLong(date, "de")}
                 </h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 w-full gap-4 items-center justify-center">
@@ -245,14 +235,10 @@ export default function NextGamesIsland() {
       {games && games.length > 0 && (
         <div className="text-center mt-4">
           <Button variant="secondary" size="lg" asChild>
-            <a href="/spielplan">Alle Spiele →</a>
+            <a href="/spielplan/">{strings.nextGames.allGames}</a>
           </Button>
         </div>
       )}
-
-      <p className="text-center text-xs text-muted-foreground mt-6">
-        PROTOTYPE — Daten: {source === "live" ? `live von ${API_BASE}` : "Fixture (CORS blockt Browser-Fetch, bekannter TRUSTED_ORIGINS-Gap)"}
-      </p>
     </section>
   );
 }

@@ -21,6 +21,19 @@
         "dist/**"
       ]
     },
+    "@dragons/site#build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ],
+      "env": [
+        "CMS_URL",
+        "CMS_API_TOKEN",
+        "PUBLIC_API_URL"
+      ]
+    },
     "lint": {},
     "typecheck": {},
     "test": {

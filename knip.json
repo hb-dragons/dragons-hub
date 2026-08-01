@@ -28,6 +28,14 @@
         "src/**/*.{ts,tsx}"
       ]
     },
+    "apps/site": {
+      "project": [
+        "src/**/*.{ts,tsx,astro}"
+      ],
+      "ignoreDependencies": [
+        "tailwindcss"
+      ]
+    },
     "apps/web": {
       "project": [
         "src/**/*.{ts,tsx}"

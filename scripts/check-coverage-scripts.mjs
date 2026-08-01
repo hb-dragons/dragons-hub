@@ -35,6 +35,11 @@ const UNTESTED_PACKAGE_EXEMPTIONS = {
     "Payload-generated Next catch-all files; no hand-written runtime logic yet. " +
     "The first logic (blurhash hook, issue #161) arrives with a vitest harness " +
     "and removes this entry.",
+  "@dragons/site":
+    "Prototype promotion (2026-08-01, issue #170): static Astro shell — pages, " +
+    "theme wiring, one ported island slated for replacement in the sports-island " +
+    "port. The first pure logic (week-window util, public-site migration plan " +
+    "Task C5) arrives test-first and removes this entry.",
 };
 
 function walk(dir, visit) {

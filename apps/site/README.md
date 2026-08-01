@@ -1,11 +1,28 @@
-# @dragons/site — PROTOTYPE, THROWAWAY
+# @dragons/site
 
-Astro skeleton spike for ticket 16 (unify-dragons-platform map, `.scratch/` in dragons-cms).
-**Not production code.** Feasibility spike, single variant — design fixed (1:1 port of hbdragons.de),
-question is: Astro 7 as pnpm/Turborepo workspace member, React 19 island reusing @dragons/ui +
-@dragons/api-client (raw TS), site.css theme (`packages/ui/src/styles/site.css`) reproducing the
-current site look on Dragon's Lair token names.
+Public site (hbdragons.de): static Astro build with React islands, deployed as
+plain files behind Apache (trailing-slash directory URLs). Reuses @dragons/ui
+primitives themed by `packages/ui/src/styles/site.css` and talks to the API via
+@dragons/api-client.
 
-Run: `pnpm --filter @dragons/site dev` (or `build` / `preview`).
+- Fonts: self-hosted via the Astro Fonts API (Archivo, JetBrains Mono) — no
+  Google Fonts requests.
+- Content/strings: German only, every UI literal lives in `src/lib/strings.ts`
+  (no i18n layer).
+- SEO: `@astrojs/sitemap` emits `sitemap-index.xml`; `public/robots.txt` points
+  at it.
 
-Lives only on branch `prototype/astro-site`. Delete freely.
+## Env
+
+See `.env.example`: `CMS_URL` + `CMS_API_TOKEN` are build-time secrets for CMS
+content reads; `PUBLIC_API_URL` is client-exposed for browser islands.
+
+## Commands
+
+```sh
+pnpm --filter @dragons/site dev       # dev server on :4321
+pnpm --filter @dragons/site build     # static build to dist/
+pnpm --filter @dragons/site preview   # serve the built dist/
+```
+
+Plan: `docs/plans/2026-08-01-public-site-migration.md` (Phase C).
