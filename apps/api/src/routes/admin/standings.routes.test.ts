@@ -74,6 +74,7 @@ describe("GET /standings", () => {
             pointsAgainst: 700,
             pointsDiff: 100,
             leaguePoints: 16,
+            verzicht: false,
           },
         ],
       },
