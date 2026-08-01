@@ -75,6 +75,15 @@ vi.mock("./channels/email", () => ({
   },
 }));
 
+const mockWebhookSend = vi.fn().mockResolvedValue({ success: true });
+vi.mock("./channels/webhook", () => ({
+  WebhookChannelAdapter: class {
+    send(...args: unknown[]) {
+      return mockWebhookSend(...args);
+    }
+  },
+}));
+
 vi.mock("./expo-push.client", () => ({
   ExpoPushClient: class {
     constructor() {}
@@ -1362,6 +1371,63 @@ describe("processEvent", () => {
       const result = await processEvent(await seedEvent());
 
       expect(mockEmailSend).toHaveBeenCalledTimes(1);
+      expect(result.dispatched).toBe(0);
+    });
+  });
+
+  describe("webhook channel dispatch", () => {
+    const webhookConfig = {
+      kind: "github_repository_dispatch",
+      owner: "hb-dragons",
+      repo: "dragons-hub",
+      eventType: "sync-completed",
+    };
+
+    async function setupWebhook(configOverrides: Record<string, unknown> = {}) {
+      await seedRule({ channels: [{ channel: "webhook", targetId: "10" }] });
+      await seedConfig({
+        id: 10,
+        type: "webhook",
+        config: { ...webhookConfig, ...configOverrides },
+      });
+      ruleMatches([{ channel: "webhook", targetId: "10" }], "immediate");
+    }
+
+    it("dispatches via the webhook adapter with the parsed config", async () => {
+      await setupWebhook();
+
+      const result = await processEvent(await seedEvent());
+
+      expect(mockWebhookSend).toHaveBeenCalledTimes(1);
+      expect(mockWebhookSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventId: "evt-1",
+          channelConfigId: 10,
+          // Delivered to an external system, not an inbox — like
+          // whatsapp_group, the target gets a non-user label.
+          recipientId: "channel:10",
+        }),
+        webhookConfig,
+      );
+      expect(result.dispatched).toBe(1);
+    });
+
+    it("skips dispatch when the config is not a valid webhook config", async () => {
+      await setupWebhook({ owner: "" });
+
+      const result = await processEvent(await seedEvent());
+
+      expect(mockWebhookSend).not.toHaveBeenCalled();
+      expect(result.dispatched).toBe(0);
+    });
+
+    it("counts a failed webhook send as not dispatched", async () => {
+      await setupWebhook();
+      mockWebhookSend.mockResolvedValueOnce({ success: false, error: "GitHub dispatch error 422" });
+
+      const result = await processEvent(await seedEvent());
+
+      expect(mockWebhookSend).toHaveBeenCalledTimes(1);
       expect(result.dispatched).toBe(0);
     });
   });

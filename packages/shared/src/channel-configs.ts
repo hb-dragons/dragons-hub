@@ -19,6 +19,7 @@ export const CHANNEL_TYPES = [
   "whatsapp_group",
   "push",
   "email",
+  "webhook",
 ] as const;
 export type ChannelType = (typeof CHANNEL_TYPES)[number];
 /**
@@ -63,11 +64,24 @@ interface EmailConfig {
   locale: "de" | "en";
 }
 
+/**
+ * Outbound webhook. The only kind so far is a GitHub `repository_dispatch` —
+ * `kind` is the discriminant future webhook kinds extend, so a persisted
+ * config always says what protocol its remaining fields configure.
+ */
+export interface WebhookConfig {
+  kind: "github_repository_dispatch";
+  owner: string;
+  repo: string;
+  eventType: string;
+}
+
 export type ChannelConfig =
   | InAppConfig
   | WhatsAppGroupConfig
   | PushConfig
-  | EmailConfig;
+  | EmailConfig
+  | WebhookConfig;
 
 // ── API response types ───────────────────────────────────────────────────────
 

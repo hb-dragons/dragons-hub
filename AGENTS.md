@@ -1089,9 +1089,9 @@ Sample API responses: `packages/sdk/src/samples/` — `getLigaList.json`, `getSp
 Channel adapters live in `apps/api/src/services/notifications/channels/` and are dispatched by the notification pipeline per user preference + channel config.
 
 `CHANNEL_TYPES` in `packages/shared/src/channel-configs.ts` is the single source
-of truth for the four channel types, and `DISPATCHABLE_CHANNEL_TYPES` in
+of truth for the five channel types, and `DISPATCHABLE_CHANNEL_TYPES` in
 `notification-pipeline.ts` is an exhaustive `Record<ChannelType, true>`, so a
-type listed without an adapter is a compile error. All four have adapters:
+type listed without an adapter is a compile error. All five have adapters:
 
 - **in_app** — Writes to `notification_log` for in-app inbox rendering. Adapter: `channels/in-app.ts`.
 - **whatsapp_group** — Posts to a WhatsApp group via configured provider. Adapter: `channels/whatsapp-group.ts`.
@@ -1127,6 +1127,17 @@ type listed without an adapter is a compile error. All four have adapters:
   plain SMTP gives no callback, so it needs either a return-path inbox with a
   poller or a transport with a webhook, and that decision is deferred to a
   separate issue.
+
+- **webhook** — Outbound machine-to-machine dispatch; delivers to an external
+  system rather than an inbox, so like whatsapp_group it ignores the recipient
+  key. The only kind so far is `github_repository_dispatch`: one `POST
+  /repos/{owner}/{repo}/dispatches` per event, authenticated with the
+  fine-grained PAT in `GH_DISPATCH_TOKEN` (without it the type is not offered
+  in the admin UI and every send is a logged skip). The config
+  `{kind, owner, repo, eventType}` is a discriminated union on `kind` for
+  future webhook kinds. The adapter never throws — any GitHub or network error
+  is logged and the `notification_log` claim released, so a broken dispatch
+  cannot poison the pipeline. Adapter: `channels/webhook.ts`.
 
 ### Workers
 
