@@ -137,6 +137,24 @@ describe("getStandings", () => {
     expect(result[0]!.leagueName).toBe("Tracked League");
   });
 
+  it("marks withdrawn teams with verzicht true and others false", async () => {
+    const leagueId = await insertLeague();
+    await insertTeam({ api_team_permanent_id: 1000, name: "Withdrawn Team", verzicht: true });
+    await insertTeam({ api_team_permanent_id: 2000, name: "Active Team", season_team_id: 2, team_competition_id: 2 });
+    // Explicit NULL exercises the `?? false` fallback (column is nullable).
+    await insertTeam({ api_team_permanent_id: 3000, name: "Other Team", verzicht: null, season_team_id: 3, team_competition_id: 3 });
+    await insertStanding(leagueId, 1000, { position: 1 });
+    await insertStanding(leagueId, 2000, { position: 2 });
+    await insertStanding(leagueId, 3000, { position: 3 });
+
+    const result = await getStandings();
+
+    const byName = new Map(result[0]!.standings.map((s) => [s.teamName, s.verzicht]));
+    expect(byName.get("Withdrawn Team")).toBe(true);
+    expect(byName.get("Active Team")).toBe(false);
+    expect(byName.get("Other Team")).toBe(false);
+  });
+
   it("includes isOwnClub flag from teams", async () => {
     const leagueId = await insertLeague();
     await insertTeam({ api_team_permanent_id: 1000, name: "Dragons", is_own_club: true });
