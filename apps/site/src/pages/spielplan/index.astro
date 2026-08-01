@@ -1,0 +1,17 @@
+---
+// Port of dragons-app app/pages/spielplan/index.vue: PageHeader band + page
+// container + the full-plan island. No CMS collections on this route — all
+// data is live sports data fetched client-side by the island.
+import Layout from "../../layouts/Layout.astro";
+import SpielplanHeader from "../../components/spielplan/SpielplanHeader.astro";
+import SpielplanIsland from "../../components/spielplan/SpielplanIsland";
+import { strings } from "../../lib/strings";
+---
+
+<Layout title={strings.spielplan.pageTitle}>
+  <SpielplanHeader />
+  <!-- Legacy UiPageContainer -->
+  <div class="container mx-auto space-y-4 py-8 px-2 md:px-2 xl:px-0">
+    <SpielplanIsland client:idle />
+  </div>
+</Layout>
