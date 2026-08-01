@@ -6,6 +6,7 @@ Detailed technical reference for AI agents working in this codebase. For guideli
 
 ```
 @dragons/web        ──> @dragons/ui, @dragons/shared, @dragons/api-client
+@dragons/cms        ──> (no workspace deps — Payload 3 on Next, own database)
 @dragons/native     ──> @dragons/shared, @dragons/api-client
 @dragons/api        ──> @dragons/sdk, @dragons/db, @dragons/shared, @dragons/contracts
 @dragons/api-client ──> @dragons/contracts, @dragons/shared
