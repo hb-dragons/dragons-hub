@@ -69,6 +69,18 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    posts: Post;
+    pages: Page;
+    teams: Team;
+    people: Person;
+    vorstand: Vorstand;
+    positions: Position;
+    trainers: Trainer;
+    partners: Partner;
+    projects: Project;
+    downloads: Download;
+    'shop-items': ShopItem;
+    'timeline-items': TimelineItem;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,6 +90,18 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    posts: PostsSelect<false> | PostsSelect<true>;
+    pages: PagesSelect<false> | PagesSelect<true>;
+    teams: TeamsSelect<false> | TeamsSelect<true>;
+    people: PeopleSelect<false> | PeopleSelect<true>;
+    vorstand: VorstandSelect<false> | VorstandSelect<true>;
+    positions: PositionsSelect<false> | PositionsSelect<true>;
+    trainers: TrainersSelect<false> | TrainersSelect<true>;
+    partners: PartnersSelect<false> | PartnersSelect<true>;
+    projects: ProjectsSelect<false> | ProjectsSelect<true>;
+    downloads: DownloadsSelect<false> | DownloadsSelect<true>;
+    'shop-items': ShopItemsSelect<false> | ShopItemsSelect<true>;
+    'timeline-items': TimelineItemsSelect<false> | TimelineItemsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -87,8 +111,16 @@ export interface Config {
     defaultIDType: number;
   };
   fallbackLocale: null;
-  globals: {};
-  globalsSelect: {};
+  globals: {
+    'site-settings': SiteSetting;
+    'team-background': TeamBackground;
+    'background-video': BackgroundVideo;
+  };
+  globalsSelect: {
+    'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
+    'team-background': TeamBackgroundSelect<false> | TeamBackgroundSelect<true>;
+    'background-video': BackgroundVideoSelect<false> | BackgroundVideoSelect<true>;
+  };
   locale: null;
   widgets: {
     collections: CollectionsWidget;
@@ -167,6 +199,243 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts".
+ */
+export interface Post {
+  id: number;
+  title: string;
+  slug: string;
+  publishedDate: string;
+  headerImage?: (number | null) | Media;
+  content?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  gallery?: (number | Media)[] | null;
+  /**
+   * Überschreibt die automatisch erzeugte Meta-Description
+   */
+  seoDescription?: string | null;
+  ogImage?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages".
+ */
+export interface Page {
+  id: number;
+  slug: string;
+  header?: {
+    title?: string | null;
+    image?: (number | null) | Media;
+  };
+  layout?:
+    | (
+        | {
+            teams?: (number | Team)[] | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'teamList';
+          }
+        | {
+            vorstand?: (number | Vorstand)[] | null;
+            positions?: (number | Position)[] | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'contact';
+          }
+        | {
+            posts?: (number | Post)[] | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'newsList';
+          }
+        | {
+            downloads?: (number | Download)[] | null;
+            id?: string | null;
+            blockName?: string | null;
+            blockType: 'downloadList';
+          }
+      )[]
+    | null;
+  /**
+   * Überschreibt die automatisch erzeugte Meta-Description
+   */
+  seoDescription?: string | null;
+  ogImage?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "teams".
+ */
+export interface Team {
+  id: number;
+  name: string;
+  slug: string;
+  orderIndex: number;
+  teamImage?: (number | null) | Media;
+  /**
+   * Join-Key zu /public/teams (Sync-Daten)
+   */
+  apiTeamPermanentId?: number | null;
+  trainers?: (number | Trainer)[] | null;
+  trainingTimes?:
+    | {
+        day: string;
+        startTime: string;
+        endTime?: string | null;
+        gym: string;
+        gymMapsUrl?: string | null;
+        info?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Überschreibt die automatisch erzeugte Meta-Description
+   */
+  seoDescription?: string | null;
+  ogImage?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trainers".
+ */
+export interface Trainer {
+  id: number;
+  person?: (number | null) | Person;
+  licence?: string | null;
+  email?: string | null;
+  image?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "people".
+ */
+export interface Person {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  image?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "vorstand".
+ */
+export interface Vorstand {
+  id: number;
+  role: string;
+  tasks?: string | null;
+  person?: (number | null) | Person;
+  orderIndex: number;
+  image?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "positions".
+ */
+export interface Position {
+  id: number;
+  name: string;
+  tasks?: string | null;
+  people?: (number | Person)[] | null;
+  orderIndex: number;
+  email?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "downloads".
+ */
+export interface Download {
+  id: number;
+  title: string;
+  file?: (number | null) | Media;
+  category?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "partners".
+ */
+export interface Partner {
+  id: number;
+  name: string;
+  logo?: (number | null) | Media;
+  url?: string | null;
+  orderIndex?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "projects".
+ */
+export interface Project {
+  id: number;
+  title: string;
+  description?: string | null;
+  image?: (number | null) | Media;
+  link?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "shop-items".
+ */
+export interface ShopItem {
+  id: number;
+  name: string;
+  image?: (number | null) | Media;
+  price?: string | null;
+  link?: string | null;
+  description?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "timeline-items".
+ */
+export interface TimelineItem {
+  id: number;
+  year?: string | null;
+  title: string;
+  description?: string | null;
+  image?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -196,6 +465,54 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'posts';
+        value: number | Post;
+      } | null)
+    | ({
+        relationTo: 'pages';
+        value: number | Page;
+      } | null)
+    | ({
+        relationTo: 'teams';
+        value: number | Team;
+      } | null)
+    | ({
+        relationTo: 'people';
+        value: number | Person;
+      } | null)
+    | ({
+        relationTo: 'vorstand';
+        value: number | Vorstand;
+      } | null)
+    | ({
+        relationTo: 'positions';
+        value: number | Position;
+      } | null)
+    | ({
+        relationTo: 'trainers';
+        value: number | Trainer;
+      } | null)
+    | ({
+        relationTo: 'partners';
+        value: number | Partner;
+      } | null)
+    | ({
+        relationTo: 'projects';
+        value: number | Project;
+      } | null)
+    | ({
+        relationTo: 'downloads';
+        value: number | Download;
+      } | null)
+    | ({
+        relationTo: 'shop-items';
+        value: number | ShopItem;
+      } | null)
+    | ({
+        relationTo: 'timeline-items';
+        value: number | TimelineItem;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -285,6 +602,211 @@ export interface MediaSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts_select".
+ */
+export interface PostsSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  publishedDate?: T;
+  headerImage?: T;
+  content?: T;
+  gallery?: T;
+  seoDescription?: T;
+  ogImage?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages_select".
+ */
+export interface PagesSelect<T extends boolean = true> {
+  slug?: T;
+  header?:
+    | T
+    | {
+        title?: T;
+        image?: T;
+      };
+  layout?:
+    | T
+    | {
+        teamList?:
+          | T
+          | {
+              teams?: T;
+              id?: T;
+              blockName?: T;
+            };
+        contact?:
+          | T
+          | {
+              vorstand?: T;
+              positions?: T;
+              id?: T;
+              blockName?: T;
+            };
+        newsList?:
+          | T
+          | {
+              posts?: T;
+              id?: T;
+              blockName?: T;
+            };
+        downloadList?:
+          | T
+          | {
+              downloads?: T;
+              id?: T;
+              blockName?: T;
+            };
+      };
+  seoDescription?: T;
+  ogImage?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "teams_select".
+ */
+export interface TeamsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  orderIndex?: T;
+  teamImage?: T;
+  apiTeamPermanentId?: T;
+  trainers?: T;
+  trainingTimes?:
+    | T
+    | {
+        day?: T;
+        startTime?: T;
+        endTime?: T;
+        gym?: T;
+        gymMapsUrl?: T;
+        info?: T;
+        id?: T;
+      };
+  seoDescription?: T;
+  ogImage?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "people_select".
+ */
+export interface PeopleSelect<T extends boolean = true> {
+  name?: T;
+  email?: T;
+  phone?: T;
+  image?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "vorstand_select".
+ */
+export interface VorstandSelect<T extends boolean = true> {
+  role?: T;
+  tasks?: T;
+  person?: T;
+  orderIndex?: T;
+  image?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "positions_select".
+ */
+export interface PositionsSelect<T extends boolean = true> {
+  name?: T;
+  tasks?: T;
+  people?: T;
+  orderIndex?: T;
+  email?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "trainers_select".
+ */
+export interface TrainersSelect<T extends boolean = true> {
+  person?: T;
+  licence?: T;
+  email?: T;
+  image?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "partners_select".
+ */
+export interface PartnersSelect<T extends boolean = true> {
+  name?: T;
+  logo?: T;
+  url?: T;
+  orderIndex?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "projects_select".
+ */
+export interface ProjectsSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  image?: T;
+  link?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "downloads_select".
+ */
+export interface DownloadsSelect<T extends boolean = true> {
+  title?: T;
+  file?: T;
+  category?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "shop-items_select".
+ */
+export interface ShopItemsSelect<T extends boolean = true> {
+  name?: T;
+  image?: T;
+  price?: T;
+  link?: T;
+  description?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "timeline-items_select".
+ */
+export interface TimelineItemsSelect<T extends boolean = true> {
+  year?: T;
+  title?: T;
+  description?: T;
+  image?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
@@ -322,6 +844,68 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
   batch?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings".
+ */
+export interface SiteSetting {
+  id: number;
+  memberCount?: number | null;
+  foundingYear?: number | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "team-background".
+ */
+export interface TeamBackground {
+  id: number;
+  image?: (number | null) | Media;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "background-video".
+ */
+export interface BackgroundVideo {
+  id: number;
+  video?: (number | null) | Media;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "site-settings_select".
+ */
+export interface SiteSettingsSelect<T extends boolean = true> {
+  memberCount?: T;
+  foundingYear?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "team-background_select".
+ */
+export interface TeamBackgroundSelect<T extends boolean = true> {
+  image?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "background-video_select".
+ */
+export interface BackgroundVideoSelect<T extends boolean = true> {
+  video?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

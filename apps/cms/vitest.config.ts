@@ -16,14 +16,14 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
       thresholds: {
-        // Measured floor 2026-08-01 (issue #161, first tests): blurhash helper,
-        // media hook and access rule are covered; the uncovered remainder is
-        // declarative payload.config/users config. Ratchet up as tests grow;
-        // never lower.
-        branches: 50,
+        // Ratcheted 2026-08-01 (issue #162, content collections + contract
+        // tests): measured 97.0/66.6/100/96.9. The uncovered remainder is
+        // the declarative payload.config. Ratchet up as tests grow; never
+        // lower.
+        branches: 66,
         functions: 100,
-        lines: 86,
-        statements: 86,
+        lines: 96,
+        statements: 96,
       },
     },
   },
