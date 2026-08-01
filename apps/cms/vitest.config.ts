@@ -16,14 +16,13 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
       thresholds: {
-        // Ratcheted 2026-08-01 (issue #162, content collections + contract
-        // tests): measured 97.0/66.6/100/96.9. The uncovered remainder is
-        // the declarative payload.config. Ratchet up as tests grow; never
-        // lower.
-        branches: 66,
+        // Ratcheted 2026-08-01 (issue #163, rebuild dispatch hooks): measured
+        // 98.3/91.3/100/98.1. The uncovered remainder is the declarative
+        // payload.config. Ratchet up as tests grow; never lower.
+        branches: 91,
         functions: 100,
-        lines: 96,
-        statements: 96,
+        lines: 98,
+        statements: 98,
       },
     },
   },

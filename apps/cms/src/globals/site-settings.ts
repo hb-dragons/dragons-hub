@@ -1,5 +1,6 @@
 import type { GlobalConfig } from "payload";
 
+import { dispatchGlobalOnChange } from "../hooks/dispatch-rebuild";
 import { anyone } from "../lib/access";
 
 // Club age is computed at build time from foundingYear; teamCount comes from
@@ -11,4 +12,5 @@ export const SiteSettings: GlobalConfig = {
     { name: "memberCount", type: "number" },
     { name: "foundingYear", type: "number" },
   ],
+  hooks: { afterChange: [dispatchGlobalOnChange] },
 };

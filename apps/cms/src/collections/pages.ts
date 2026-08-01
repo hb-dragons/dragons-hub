@@ -1,6 +1,7 @@
 import type { CollectionConfig } from "payload";
 
 import { seoFields } from "../fields/seo";
+import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
 import { publishedOrAuthed } from "../lib/access";
 
 export const Pages: CollectionConfig = {
@@ -52,4 +53,5 @@ export const Pages: CollectionConfig = {
     },
     ...seoFields,
   ],
+  hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnDelete] },
 };

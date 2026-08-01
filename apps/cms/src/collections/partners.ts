@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 
+import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
 import { anyone } from "../lib/access";
 
 export const Partners: CollectionConfig = {
@@ -14,4 +15,5 @@ export const Partners: CollectionConfig = {
     // Strapi partners carry no order value for the migration to backfill.
     { name: "orderIndex", type: "number" },
   ],
+  hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnDelete] },
 };

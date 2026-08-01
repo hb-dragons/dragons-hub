@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 
+import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
 import { anyone } from "../lib/access";
 
 export const TimelineItems: CollectionConfig = {
@@ -12,4 +13,5 @@ export const TimelineItems: CollectionConfig = {
     { name: "description", type: "textarea" },
     { name: "image", type: "upload", relationTo: "media" },
   ],
+  hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnDelete] },
 };
