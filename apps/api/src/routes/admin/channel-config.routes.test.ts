@@ -337,7 +337,19 @@ describe("GET /channel-configs/providers", () => {
       whatsapp_group: { configured: true },
       push: { configured: true },
       email: { configured: false },
+      webhook: { configured: false },
     });
+  });
+
+  it("reports webhook as configured once GH_DISPATCH_TOKEN is set", async () => {
+    mocks.env.GH_DISPATCH_TOKEN = "ghp_test";
+    try {
+      const res = await app.request("/channel-configs/providers");
+
+      expect((await json(res)).webhook).toEqual({ configured: true });
+    } finally {
+      delete mocks.env.GH_DISPATCH_TOKEN;
+    }
   });
 
   it("reports email as configured once every SMTP var is set", async () => {

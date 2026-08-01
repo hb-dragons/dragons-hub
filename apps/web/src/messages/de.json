@@ -1310,12 +1310,17 @@
     },
     "groupId": "WhatsApp Gruppen-ID",
     "groupIdHelp": "Gruppen-Chat-ID aus dem Meta Business Dashboard",
+    "webhookOwner": "GitHub-Besitzer",
+    "webhookRepo": "GitHub-Repository",
+    "webhookEventType": "Event-Typ",
+    "webhookEventTypeHelp": "event_type des repository_dispatch, den der Kanal auslöst",
     "providerNotConfigured": "Anbieter nicht konfiguriert — Umgebungsvariablen setzen",
     "typeLabels": {
       "in_app": "In-App",
       "whatsapp_group": "WhatsApp-Gruppe",
       "push": "Push-Benachrichtigung",
-      "email": "E-Mail"
+      "email": "E-Mail",
+      "webhook": "Webhook"
     },
     "typeImmutable": "Der Typ kann nach dem Anlegen nicht mehr geändert werden."
   },

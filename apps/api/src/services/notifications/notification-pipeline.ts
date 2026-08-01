@@ -16,12 +16,13 @@ import { InAppChannelAdapter } from "./channels/in-app";
 import { WhatsAppGroupAdapter } from "./channels/whatsapp-group";
 import { PushChannelAdapter } from "./channels/push";
 import { EmailChannelAdapter } from "./channels/email";
+import { WebhookChannelAdapter } from "./channels/webhook";
 import { ExpoPushClient } from "./expo-push.client";
 import { resolveRecipientUserIds } from "./recipient-resolver";
 import { renderRefereeSlotsWhatsApp } from "./templates/referee-slots";
 import { env } from "../../config/env";
 import type { ChannelType, RefereeSlotsPayload } from "@dragons/shared";
-import { parseWhatsAppGroupConfig, readLocale } from "./channel-config-parsers";
+import { parseWebhookConfig, parseWhatsAppGroupConfig, readLocale } from "./channel-config-parsers";
 import { logger } from "../../config/logger";
 
 // ── Config type alias ────────────────────────────────────────────────────────
@@ -160,6 +161,7 @@ export const DISPATCHABLE_CHANNEL_TYPES: Record<ChannelType, true> = {
   whatsapp_group: true,
   push: true,
   email: true,
+  webhook: true,
 };
 
 const inAppAdapter = new InAppChannelAdapter();
@@ -167,6 +169,7 @@ const whatsAppGroupAdapter = new WhatsAppGroupAdapter();
 const expoPushClient = new ExpoPushClient({ accessToken: env.EXPO_ACCESS_TOKEN });
 const pushAdapter = new PushChannelAdapter(expoPushClient);
 const emailAdapter = new EmailChannelAdapter();
+const webhookAdapter = new WebhookChannelAdapter();
 
 /**
  * Step 1: Load watch rules and channel configs from DB.
@@ -444,6 +447,29 @@ export async function dispatchImmediate(params: {
       locale,
       link: event.deepLinkPath ? `${publicUrl}${event.deepLinkPath}` : undefined,
     });
+    return sendResult.success;
+  }
+
+  if (channelType === "webhook") {
+    // Delivers to an external system, not an inbox — like whatsapp_group, the
+    // recipient key is ignored and one dispatch covers the whole target.
+    const channelCfg = parseWebhookConfig(config.config);
+    if (!channelCfg) {
+      logger.warn({ channelConfigId: config.id }, "Webhook config invalid, skipping dispatch");
+      return false;
+    }
+    const sendResult = await webhookAdapter.send(
+      {
+        eventId: event.id,
+        watchRuleId,
+        channelConfigId: config.id,
+        recipientId,
+        title: message.title,
+        body: message.body,
+        locale,
+      },
+      channelCfg,
+    );
     return sendResult.success;
   }
 

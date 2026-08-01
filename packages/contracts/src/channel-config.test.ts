@@ -22,6 +22,12 @@ const VALID_CONFIG_BY_CHANNEL_TYPE: Record<
   whatsapp_group: { groupId: "4915100000000@g.us", locale: "de" },
   push: { provider: "expo" },
   email: { locale: "de" },
+  webhook: {
+    kind: "github_repository_dispatch",
+    owner: "hb-dragons",
+    repo: "dragons-hub",
+    eventType: "sync-completed",
+  },
 };
 
 describe("createChannelConfigSchema", () => {

@@ -41,6 +41,10 @@ function isProviderConfigured(type: string): boolean {
       // same rule, so the endpoint never advertises a relay the adapter would
       // then refuse to use.
       return readSmtpSettings() !== null;
+    case "webhook":
+      // Same rule as the adapter: without the dispatch PAT every send is a
+      // logged skip, so the channel is not offered for creation.
+      return !!env.GH_DISPATCH_TOKEN;
     default:
       return false;
   }

@@ -49,6 +49,9 @@ interface ChannelFormState {
   audienceRole: "admin" | "referee";
   locale: "de" | "en";
   groupId: string;
+  webhookOwner: string;
+  webhookRepo: string;
+  webhookEventType: string;
 }
 
 function emptyForm(): ChannelFormState {
@@ -61,6 +64,9 @@ function emptyForm(): ChannelFormState {
     audienceRole: "admin",
     locale: "de",
     groupId: "",
+    webhookOwner: "",
+    webhookRepo: "",
+    webhookEventType: "",
   };
 }
 
@@ -73,8 +79,11 @@ function channelToForm(ch: ChannelConfigItem): ChannelFormState {
     digestCron: ch.digestCron ?? "",
     digestTimezone: ch.digestTimezone,
     audienceRole: "audienceRole" in config ? config.audienceRole : "admin",
-    locale: config.locale ?? "de",
+    locale: "locale" in config ? (config.locale ?? "de") : "de",
     groupId: "groupId" in config ? config.groupId : "",
+    webhookOwner: "owner" in config ? config.owner : "",
+    webhookRepo: "repo" in config ? config.repo : "",
+    webhookEventType: "eventType" in config ? config.eventType : "",
   };
 }
 
@@ -88,6 +97,14 @@ function buildConfig(form: ChannelFormState): Record<string, unknown> {
       return { provider: "expo", locale: form.locale };
     case "email":
       return { locale: form.locale };
+    case "webhook":
+      // No locale: the dispatch payload is machine-consumed.
+      return {
+        kind: "github_repository_dispatch",
+        owner: form.webhookOwner,
+        repo: form.webhookRepo,
+        eventType: form.webhookEventType,
+      };
   }
 }
 
@@ -108,6 +125,7 @@ function channelTypeLabel(type: string, t: TranslateFunc): string {
     case "whatsapp_group": return t("typeLabels.whatsapp_group" as never);
     case "push": return t("typeLabels.push" as never);
     case "email": return t("typeLabels.email" as never);
+    case "webhook": return t("typeLabels.webhook" as never);
     // A row persisted under a type that is not offerable falls through to the
     // raw type string rather than a friendly label it does not have.
     default: return type;
@@ -430,7 +448,52 @@ export function ChannelConfigsList() {
               </div>
             )}
 
-            {/* Locale (shown for all types) */}
+            {form.type === "webhook" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="channel-webhook-owner">{t("webhookOwner" as never)}</Label>
+                  <Input
+                    id="channel-webhook-owner"
+                    value={form.webhookOwner}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, webhookOwner: e.target.value }))
+                    }
+                    placeholder="hb-dragons"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="channel-webhook-repo">{t("webhookRepo" as never)}</Label>
+                  <Input
+                    id="channel-webhook-repo"
+                    value={form.webhookRepo}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, webhookRepo: e.target.value }))
+                    }
+                    placeholder="dragons-hub"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="channel-webhook-event-type">{t("webhookEventType" as never)}</Label>
+                  <Input
+                    id="channel-webhook-event-type"
+                    value={form.webhookEventType}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, webhookEventType: e.target.value }))
+                    }
+                    placeholder="sync-completed"
+                    className="font-mono"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">{t("webhookEventTypeHelp" as never)}</p>
+                </div>
+              </>
+            )}
+
+            {/* Locale — every type except webhook renders a message in a
+                language; a repository_dispatch payload has no reader. */}
+            {form.type !== "webhook" && (
             <div className="space-y-2">
               <Label>{t("locale" as never)}</Label>
               <Select
@@ -448,6 +511,7 @@ export function ChannelConfigsList() {
                 </SelectContent>
               </Select>
             </div>
+            )}
 
             <DialogFooter>
               <Button

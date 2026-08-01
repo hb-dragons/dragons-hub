@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { WhatsAppGroupConfig } from "@dragons/shared";
+import type { WebhookConfig, WhatsAppGroupConfig } from "@dragons/shared";
 
 const localeSchema = z.enum(["de", "en"]);
 
@@ -10,6 +10,18 @@ const whatsappGroupConfigSchema = z.object({
 
 export function parseWhatsAppGroupConfig(input: unknown): WhatsAppGroupConfig | null {
   const result = whatsappGroupConfigSchema.safeParse(input);
+  return result.success ? result.data : null;
+}
+
+const webhookConfigSchema = z.object({
+  kind: z.literal("github_repository_dispatch"),
+  owner: z.string().min(1),
+  repo: z.string().min(1),
+  eventType: z.string().min(1),
+});
+
+export function parseWebhookConfig(input: unknown): WebhookConfig | null {
+  const result = webhookConfigSchema.safeParse(input);
   return result.success ? result.data : null;
 }
 

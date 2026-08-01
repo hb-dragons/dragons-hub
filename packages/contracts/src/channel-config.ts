@@ -44,6 +44,17 @@ const emailConfigSchema = z.object({
   locale: localeSchema,
 });
 
+// Outbound webhook. `kind` is the discriminant future webhook kinds extend;
+// the only kind so far is a GitHub repository_dispatch, whose adapter POSTs
+// to /repos/{owner}/{repo}/dispatches with the configured event type. No
+// locale: the payload is machine-consumed, nothing is rendered for a reader.
+const webhookConfigSchema = z.object({
+  kind: z.literal("github_repository_dispatch"),
+  owner: z.string().min(1),
+  repo: z.string().min(1),
+  eventType: z.string().min(1),
+});
+
 /**
  * Exhaustive over ChannelType — a channel type added to CHANNEL_TYPES is a
  * compile error here until it is given a config shape.
@@ -53,6 +64,7 @@ const configSchemaByType: Record<ChannelType, z.ZodType> = {
   whatsapp_group: whatsappGroupConfigSchema,
   push: pushConfigSchema,
   email: emailConfigSchema,
+  webhook: webhookConfigSchema,
 };
 
 // ── Create schema ───────────────────────────────────────────────────────────
