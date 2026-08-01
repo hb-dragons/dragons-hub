@@ -22,16 +22,20 @@ const SKIP_DIRS = new Set([
  * all* check only; none of them is exempt from being tested later, and each has
  * a follow-up noted in the issue.
  *
- * Currently empty. @dragons/ui was the last entry and came off the list on
- * 2026-07-27 (issue #131): its exemption claimed the package was vendored
- * shadcn/Radix re-exported unmodified, which the git history contradicts —
- * sidebar.tsx carries cookie persistence, a Cmd/Ctrl+B shortcut and a split
- * mobile/desktop state, and combobox/date-picker/time-picker are local
- * compositions. It now has a vitest harness scoped to that hand-written
- * behaviour. The list itself stays: the next package to ship source without
- * tests needs somewhere to record why.
+ * Precedent: @dragons/ui came off the list on 2026-07-27 (issue #131) — its
+ * exemption claimed the package was vendored shadcn/Radix re-exported
+ * unmodified, which the git history contradicts (sidebar.tsx carries cookie
+ * persistence, a Cmd/Ctrl+B shortcut and a split mobile/desktop state, and
+ * combobox/date-picker/time-picker are local compositions). It now has a
+ * vitest harness scoped to that hand-written behaviour.
  */
-const UNTESTED_PACKAGE_EXEMPTIONS = {};
+const UNTESTED_PACKAGE_EXEMPTIONS = {
+  "@dragons/cms":
+    "Scaffold only (2026-08-01, issue #160): declarative Payload config plus " +
+    "Payload-generated Next catch-all files; no hand-written runtime logic yet. " +
+    "The first logic (blurhash hook, issue #161) arrives with a vitest harness " +
+    "and removes this entry.",
+};
 
 function walk(dir, visit) {
   for (const entry of readdirSync(dir)) {

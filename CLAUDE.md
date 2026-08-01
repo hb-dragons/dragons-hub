@@ -9,6 +9,7 @@ Basketball club management monorepo for the Dragons. Syncs data from the German 
 ```
 apps/web          @dragons/web      Next.js 16 frontend (port 3000)
 apps/api          @dragons/api      Hono REST API (port 3001)
+apps/cms          @dragons/cms      Payload 3 CMS in a thin Next app (port 3002, own dragons_cms db)
 apps/native       @dragons/native   Expo / React Native app (ships via EAS)
 apps/pi           —                 Python payload for the Raspberry Pi scoreboard tap (not a pnpm workspace package; pytest + a CI job)
 packages/ui       @dragons/ui       Shared shadcn/Radix UI components
@@ -39,6 +40,7 @@ pnpm check:skipped-tests          # Fail on a skipped/todo test with no issue re
 # Package-specific
 pnpm --filter @dragons/api dev    # API only
 pnpm --filter @dragons/web dev    # Web only
+pnpm --filter @dragons/cms dev    # Payload CMS only (port 3002; needs apps/cms/.env)
 pnpm --filter @dragons/api test   # API tests only
 pnpm --filter @dragons/native test  # Native (Expo) tests only
 (cd apps/pi && pytest)            # Raspberry Pi payload tests (Python, not pnpm)

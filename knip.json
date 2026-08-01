@@ -23,6 +23,11 @@
         "pino-pretty"
       ]
     },
+    "apps/cms": {
+      "project": [
+        "src/**/*.{ts,tsx}"
+      ]
+    },
     "apps/web": {
       "project": [
         "src/**/*.{ts,tsx}"

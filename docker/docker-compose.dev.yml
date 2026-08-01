@@ -8,6 +8,9 @@ services:
       POSTGRES_PASSWORD: dragons
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # First-init only: creates the dragons_cms database (apps/cms). On an
+      # existing pgdata volume run the createdb command in the script by hand.
+      - ./postgres-init:/docker-entrypoint-initdb.d
 
   redis:
     image: redis:7-alpine
