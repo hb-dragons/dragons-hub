@@ -156,7 +156,7 @@ function GameCard({ game }: { game: GameLite }) {
         <TeamSide game={game} />
         <div className="absolute z-20 flex items-start left-1/2 h-full -translate-x-1/2 justify-center">
           <div className="flex flex-col items-center justify-center absolute z-10 h-full">
-            <div className="text-md md:text-xl lg:text-2xl font-black font-mono h-full">
+            <div className="text-base md:text-xl lg:text-2xl font-black font-mono h-full">
               {formatTime(game.kickoffTime)}
             </div>
             <div className="text-lg flex-1 md:text-2xl font-mono font-bold">{strings.nextGames.versus}</div>

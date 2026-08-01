@@ -10,7 +10,11 @@ interface NativeColorEntry {
   light: NativeTeamColor;
 }
 
-const NATIVE_COLORS: Record<string, NativeColorEntry> = {
+/**
+ * Exported so the key-parity test can assert this map never drifts from
+ * COLOR_PRESET_KEYS — a preset key missing here silently falls back.
+ */
+export const NATIVE_COLORS: Record<string, NativeColorEntry> = {
   blue: {
     dark: { name: "#60a5fa", muted: "#3b82f6" },
     light: { name: "#1d4ed8", muted: "#2563eb" },

@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { getNativeTeamColor } from "./native-team-colors";
+import { NATIVE_COLORS, getNativeTeamColor } from "./native-team-colors";
+import { COLOR_PRESET_KEYS } from "./team-colors";
+
+describe("NATIVE_COLORS key parity", () => {
+  it("defines exactly the COLOR_PRESET_KEYS — a preset without a native entry silently falls back", () => {
+    expect(Object.keys(NATIVE_COLORS).sort()).toEqual([...COLOR_PRESET_KEYS].sort());
+  });
+});
 
 describe("getNativeTeamColor", () => {
   it("returns correct hex for known badgeColor in dark mode", () => {
