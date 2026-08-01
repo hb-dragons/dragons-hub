@@ -1,0 +1,12 @@
+---
+/** Ported from dragons-app UiPageContainer. */
+interface Props {
+  class?: string;
+}
+
+const { class: className = "" } = Astro.props;
+---
+
+<div class:list={["container mx-auto space-y-4 py-8 px-2 md:px-2 xl:px-0", className]}>
+  <slot />
+</div>

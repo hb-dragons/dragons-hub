@@ -1,0 +1,73 @@
+---
+/**
+ * Site footer, ported 1:1 from dragons-app PageFooter (+ UiSafeMail /
+ * UiGrayHeadline). The e-mail keeps the legacy spam trap: a decoy "example"
+ * span hidden with CSS so scrapers reading raw text get a bogus address.
+ */
+import { SOCIAL_LINKS } from "../lib/site-assets";
+import { strings } from "../lib/strings";
+
+const [emailPrefix, emailDomain] = strings.footer.email.split("@") as [string, string];
+const [domainName, domainTld] = emailDomain.split(".") as [string, string];
+
+const socials = [
+  { label: strings.footer.instagram, href: SOCIAL_LINKS.instagram },
+  { label: strings.footer.facebook, href: SOCIAL_LINKS.facebook },
+  { label: strings.footer.youtube, href: SOCIAL_LINKS.youtube },
+  { label: strings.footer.linkedin, href: SOCIAL_LINKS.linkedin },
+];
+---
+
+<footer class="bg-muted px-6 py-12">
+  <div class="container mx-auto grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-between">
+    <div class="flex gap-6 col-span-2 md:col-span-1">
+      <img src="/img/logo.svg" alt={strings.site.logoAlt} class="w-32 lg:w-40 h-32 lg:h-40" />
+      <div class="flex flex-col items-start justify-start">
+        <div>
+          <p class="text-base md:text-lg font-semibold mb-1 lg:mb-4">{strings.footer.clubName}</p>
+        </div>
+        <div class="safe-mail text-sm md:text-lg">
+          {emailPrefix}@<span>{domainName}</span>.<span>example</span><span>{domainTld}</span>
+        </div>
+      </div>
+    </div>
+    <div class="flex flex-col text-sm md:text-lg items-center text-center md:text-left">
+      <div class="w-full md:w-auto">
+        <p class="font-semibold text-muted-foreground mb-4 uppercase">
+          {strings.footer.contactHeading}
+        </p>
+        <p class="w-full">
+          <a href="/datenschutz/" aria-label={strings.footer.datenschutzerklaerung}>
+            {strings.footer.datenschutzerklaerung}
+          </a>
+        </p>
+        <p class="w-full">
+          <a href="/impressum/" aria-label={strings.footer.impressum}>{strings.footer.impressum}</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="flex flex-col text-sm md:text-lg items-center text-center md:text-left">
+      <div class="w-full md:w-auto">
+        <p class="font-semibold text-muted-foreground mb-4 uppercase">
+          {strings.footer.followHeading}
+        </p>
+        {
+          socials.map((social) => (
+            <p class="w-full">
+              <a href={social.href} target="_blank" rel="noopener" aria-label={social.label}>
+                {social.label}
+              </a>
+            </p>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .safe-mail > span:nth-child(2) {
+    display: none;
+  }
+</style>

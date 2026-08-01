@@ -1,26 +1,35 @@
 ---
-// Hero ported 1:1 from dragons-app HomeStart.vue + HomeVideoBackground.vue.
-// motion-v letter stagger replaced by server-rendered spans + CSS delays → zero JS.
-import { getCollection } from "astro:content";
-
+// Home, ported 1:1 from dragons-app index.vue: Start (hero) → Join → NextGames
+// → News → FollowUs. Hero comes from HomeStart.vue + HomeVideoBackground.vue —
+// the motion-v letter stagger is server-rendered spans + CSS delays (zero JS).
 import Layout from "../layouts/Layout.astro";
 import NextGamesIsland from "../components/NextGamesIsland";
+import HomeFollowUs from "../components/home/FollowUs.astro";
+import HomeJoin from "../components/home/Join.astro";
+import HomeNews from "../components/home/News.astro";
+import { apiBase } from "../lib/api-base";
+import { fetchTeamCount, yearsSinceFounding } from "../lib/home-stats";
+import { getSiteSettings } from "../lib/payload";
 import { strings } from "../lib/strings";
 
 const firstPart = strings.site.claim.courtPart;
 const secondPart = strings.site.claim.culturesPart;
 
-// The build user's API key sees drafts (publishedOrAuthed) — filter them out.
-// Empty on env-less shell builds (see src/lib/payload.ts); the section only
-// renders when there is content.
-const newsTeasers = (await getCollection("posts", ({ data }) => data._status === "published"))
-  .sort((a, b) => b.data.publishedDate.valueOf() - a.data.publishedDate.valueOf())
-  .slice(0, 3);
-// Explicit zone: the build machine's TZ must not shift the rendered day.
-const newsDate = new Intl.DateTimeFormat("de-DE", {
-  dateStyle: "long",
-  timeZone: "Europe/Berlin",
-});
+// Club stats: memberCount/foundingYear from the site-settings global, live
+// teamCount from the API dashboard. On content builds every input is required
+// and any failure throws — the loaders' failure model (a broken CMS/API must
+// never silently drop the band prod always shows); env-less shell builds skip
+// the fetch and hide the row.
+const settings = await getSiteSettings();
+if (settings !== null && (settings.memberCount == null || settings.foundingYear == null)) {
+  throw new Error(
+    "site-settings: memberCount and foundingYear must both be set — the home stats band renders them",
+  );
+}
+const teamCount = settings === null ? null : await fetchTeamCount(apiBase());
+const memberCount = settings?.memberCount ?? null;
+const years =
+  settings?.foundingYear != null ? yearsSinceFounding(settings.foundingYear, new Date()) : null;
 ---
 
 <Layout title={strings.home.title}>
@@ -47,7 +56,7 @@ const newsDate = new Intl.DateTimeFormat("de-DE", {
                       class="inline-block text-primary hero-letter"
                       style={`animation-delay: ${0.5 + i * 0.01}s`}
                     >
-                      {char === " " ? " " : char}
+                      {char === " " ? "\u00A0" : char}
                     </span>
                   ))
                 }
@@ -57,7 +66,7 @@ const newsDate = new Intl.DateTimeFormat("de-DE", {
                       class="inline-block text-heat hero-letter"
                       style={`animation-delay: ${0.5 + (firstPart.length + i) * 0.01}s`}
                     >
-                      {char === " " ? " " : char}
+                      {char === " " ? "\u00A0" : char}
                     </span>
                   ))
                 }
@@ -77,31 +86,13 @@ const newsDate = new Intl.DateTimeFormat("de-DE", {
     </div>
   </div>
 
+  <HomeJoin {memberCount} {teamCount} {years} />
+
   <NextGamesIsland client:load />
 
-  {
-    newsTeasers.length > 0 && (
-      <section class="mx-auto w-full max-w-5xl px-4 py-16">
-        <h2 class="text-3xl font-bold text-foreground">{strings.home.newsHeading}</h2>
-        <ul class="mt-8 grid gap-6 md:grid-cols-3">
-          {newsTeasers.map((post) => (
-            <li class="rounded-lg border border-border bg-card p-6">
-              <time
-                datetime={post.data.publishedDate.toISOString()}
-                class="text-sm text-muted-foreground"
-              >
-                {newsDate.format(post.data.publishedDate)}
-              </time>
-              <h3 class="mt-2 text-xl font-semibold text-card-foreground">{post.data.title}</h3>
-              {post.data.seoDescription && (
-                <p class="mt-2 text-muted-foreground">{post.data.seoDescription}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-    )
-  }
+  <HomeNews />
+
+  <HomeFollowUs />
 </Layout>
 
 <style>
@@ -118,6 +109,12 @@ const newsDate = new Intl.DateTimeFormat("de-DE", {
   }
   .hero-scroll {
     animation: fade-in 0.5s ease-out 2s both;
+  }
+  /* Legacy hides the scroll hint once scrolled (AnimatePresence exit). */
+  :global(html[data-scrolled]) .hero-scroll {
+    animation: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
   .hero-scroll-dot {
     animation: scroll-bounce 2s ease-in-out infinite;
