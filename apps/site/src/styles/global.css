@@ -1,0 +1,2 @@
+/* PROTOTYPE — the app only pulls the shared theme; vocabulary lives in @dragons/ui */
+@import "@dragons/ui/site.css";
