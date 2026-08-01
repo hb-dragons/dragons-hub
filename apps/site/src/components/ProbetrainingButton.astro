@@ -1,0 +1,45 @@
+---
+/**
+ * Floating Probetraining CTA, ported from dragons-app ProbetrainingButton.
+ * Legacy rules: on the home page it appears once scrolled; on every other
+ * page it is always visible; on /probetraining it does not render at all.
+ * Scroll state comes from the NavBar's `data-scrolled` attribute on <html>.
+ */
+import { strings } from "../lib/strings";
+
+const path = Astro.url.pathname;
+const isHome = path === "/";
+const isProbetraining = path.includes("/probetraining");
+---
+
+{
+  !isProbetraining && (
+    <div class:list={["pt-button fixed bottom-4 right-4 z-50", isHome && "pt-button-home"]}>
+      <a
+        href="/probetraining/"
+        class="rounded-md font-medium inline-flex items-center transition-colors px-2.5 py-1.5 text-sm gap-1.5 text-primary-foreground bg-primary hover:bg-primary/75"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 size-5" aria-hidden="true"><path d="M2 21a8 8 0 0 1 13.292-6"></path><circle cx="10" cy="8" r="5"></circle><path d="M19 16v6"></path><path d="M22 19h-6"></path></svg>
+        {strings.nav.probetraining}
+      </a>
+    </div>
+  )
+}
+
+<style>
+  .pt-button {
+    transition:
+      opacity 0.3s ease,
+      transform 0.3s ease;
+  }
+  .pt-button-home {
+    opacity: 0;
+    transform: scale(0);
+    pointer-events: none;
+  }
+  :global(html[data-scrolled]) .pt-button-home {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+</style>

@@ -1,0 +1,76 @@
+---
+/**
+ * Magnetic hover wrapper, ported from dragons-app UiMagnet. The inner element
+ * is pulled toward the cursor inside a padded hit area; a shared vanilla
+ * script (no framework hydration) drives the transform.
+ */
+interface Props {
+  padding?: number;
+  disabled?: boolean;
+  magnetStrength?: number;
+  activeTransition?: string;
+  inactiveTransition?: string;
+  wrapperClass?: string;
+  innerClass?: string;
+}
+
+const {
+  padding = 100,
+  disabled = false,
+  magnetStrength = 2,
+  activeTransition = "transform 0.3s ease-out",
+  inactiveTransition = "transform 0.5s ease-in-out",
+  wrapperClass = "",
+  innerClass = "",
+} = Astro.props;
+---
+
+<div
+  class={wrapperClass}
+  data-magnet={disabled ? undefined : ""}
+  data-magnet-padding={padding}
+  data-magnet-strength={magnetStrength}
+  data-magnet-active-transition={activeTransition}
+  data-magnet-inactive-transition={inactiveTransition}
+  style="position: relative; display: inline-block;"
+>
+  <div
+    class={innerClass}
+    data-magnet-inner
+    style={`transform: translate3d(0, 0, 0); transition: ${inactiveTransition}; will-change: transform;`}
+  >
+    <slot />
+  </div>
+</div>
+
+<script>
+  const magnets = document.querySelectorAll<HTMLElement>("[data-magnet]");
+  if (magnets.length > 0) {
+    window.addEventListener(
+      "mousemove",
+      (event) => {
+        for (const magnet of magnets) {
+          const inner = magnet.querySelector<HTMLElement>("[data-magnet-inner]");
+          if (!inner) continue;
+          const { left, top, width, height } = magnet.getBoundingClientRect();
+          const centerX = left + width / 2;
+          const centerY = top + height / 2;
+          const padding = Number(magnet.dataset.magnetPadding ?? 100);
+          const strength = Number(magnet.dataset.magnetStrength ?? 2);
+          const distX = Math.abs(centerX - event.clientX);
+          const distY = Math.abs(centerY - event.clientY);
+          if (distX < width / 2 + padding && distY < height / 2 + padding) {
+            inner.style.transition = magnet.dataset.magnetActiveTransition ?? "";
+            const offsetX = (event.clientX - centerX) / strength;
+            const offsetY = (event.clientY - centerY) / strength;
+            inner.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0)`;
+          } else {
+            inner.style.transition = magnet.dataset.magnetInactiveTransition ?? "";
+            inner.style.transform = "translate3d(0, 0, 0)";
+          }
+        }
+      },
+      { passive: true },
+    );
+  }
+</script>

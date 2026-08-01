@@ -1,0 +1,84 @@
+---
+/**
+ * "Werde Teil unserer Familie" band, ported from dragons-app HomeJoin +
+ * HomeStats. The NumberFlow count-up animation is replaced by static end
+ * values (zero JS); the Dither backdrop hydrates lazily via Dither.astro.
+ */
+import Dither from "../Dither.astro";
+import { strings } from "../../lib/strings";
+
+interface Props {
+  memberCount: number | null;
+  teamCount: number | null;
+  years: number | null;
+}
+
+const { memberCount, teamCount, years } = Astro.props;
+const hasStats = memberCount !== null && teamCount !== null && years !== null;
+---
+
+<div class="relative w-full h-[300px] md:h-[500px] overflow-hidden">
+  <Dither
+    waveSpeed={0.2}
+    waveFrequency={5}
+    waveAmplitude={0.1}
+    waveColor={[1, 0.65, 0]}
+    colorNum={6}
+    pixelSize={3}
+    disableAnimation={false}
+    enableMouseInteraction={false}
+    mouseRadius={1}
+  />
+  <div>
+    <div class="absolute inset-0 flex flex-col items-center justify-evenly z-1 bg-background/50">
+      {
+        hasStats && (
+          <div class="text-3xl md:text-5xl xl:text-6xl font-bold text-center z-20 relative w-full flex items-center justify-center">
+            <div class="grid grid-cols-3 gap-2 md:gap-12 text-center justify-center w-full px-4 font-mono">
+              <div class="space-y-2">
+                <span class="inline-block text-primary italic">
+                  {memberCount}
+                  {/* Legacy styled this via `color: var(--muted)` which never
+                      resolved (no such var in Nuxt UI), so prod renders it in
+                      the inherited primary green — match that. */}
+                  <span class="ml-[0.1em] font-normal">+</span>
+                </span>
+                <p class="text-sm md:text-lg xl:text-2xl font-black font-sans">
+                  {strings.home.statsMembers}
+                </p>
+              </div>
+              <div class="space-y-2">
+                <span class="inline-block text-primary italic">{teamCount}</span>
+                <p class="text-sm md:text-lg xl:text-2xl font-black font-sans">
+                  {strings.home.statsTeams}
+                </p>
+              </div>
+              <div class="space-y-2">
+                <span class="inline-block text-primary italic">{years}</span>
+                <p class="text-sm md:text-lg xl:text-2xl font-black font-sans">
+                  {strings.home.statsYears}
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      }
+      <div>
+        <div class="text-center">
+          <h3 class="text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-black mb-4 md:mb-12">
+            {strings.home.joinTitle}
+          </h3>
+        </div>
+        <div class="flex items-center justify-center">
+          <a
+            href="/probetraining/"
+            class="flex items-center gap-2 font-black uppercase text-base md:text-2xl backdrop-blur-xl bg-primary/40 hover:bg-primary/60 transition-all duration-300 py-1 md:py-2 px-4 md:px-6 rounded-lg border-2 border-primary/30"
+          >
+            {strings.home.joinCta}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path d="M4,11V13H16L10.5,18.5L11.92,19.92L19.84,12L11.92,4.08L10.5,5.5L16,11H4Z"></path></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
