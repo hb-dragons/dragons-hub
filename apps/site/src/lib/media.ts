@@ -1,4 +1,9 @@
-/** Populated media shape the site renders (subset of the CMS media doc). */
+/**
+ * Populated media shape the site renders (subset of the CMS media doc).
+ * Consumed from .astro frontmatter (PageHeader), which knip's ignore list
+ * hides from the reference graph.
+ * @public
+ */
 export interface SiteImage {
   url: string;
   blurhash?: string | null | undefined;

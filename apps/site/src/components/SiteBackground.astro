@@ -25,7 +25,7 @@ const balls = Array.from({ length: 10 }, (_, id) => {
   {
     balls.map((ball) => (
       <div
-        class="bg-ball opacity-5 fixed"
+        class="deco-ball opacity-5 fixed"
         style={`--ball-x: ${ball.x}vw; --ball-y: ${ball.y}vh; --ball-scale: ${ball.scale}; --ball-scale-mobile: ${ball.mobileScale}; --ball-rotation: ${ball.rotation}deg;`}
       >
         <img src="/img/basketball.svg" alt="" class="w-full h-full" loading="lazy" />
@@ -35,14 +35,14 @@ const balls = Array.from({ length: 10 }, (_, id) => {
 </div>
 
 <style>
-  .bg-ball {
+  .deco-ball {
     width: 100px;
     height: 100px;
     transform: translate(var(--ball-x), var(--ball-y)) scale(var(--ball-scale-mobile))
       rotate(var(--ball-rotation));
   }
   @media (min-width: 768px) {
-    .bg-ball {
+    .deco-ball {
       transform: translate(var(--ball-x), var(--ball-y)) scale(var(--ball-scale))
         rotate(var(--ball-rotation));
     }
