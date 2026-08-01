@@ -29,7 +29,13 @@ const SKIP_DIRS = new Set([
  * combobox/date-picker/time-picker are local compositions). It now has a
  * vitest harness scoped to that hand-written behaviour.
  */
-const UNTESTED_PACKAGE_EXEMPTIONS = {};
+const UNTESTED_PACKAGE_EXEMPTIONS = {
+  "@dragons/site":
+    "Prototype promotion (2026-08-01, issue #170): static Astro shell — pages, " +
+    "theme wiring, one ported island slated for replacement in the sports-island " +
+    "port. The first pure logic (week-window util, public-site migration plan " +
+    "Task C5) arrives test-first and removes this entry.",
+};
 
 function walk(dir, visit) {
   for (const entry of readdirSync(dir)) {

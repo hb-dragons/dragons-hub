@@ -1,0 +1,134 @@
+---
+// Hero ported 1:1 from dragons-app HomeStart.vue + HomeVideoBackground.vue.
+// motion-v letter stagger replaced by server-rendered spans + CSS delays → zero JS.
+import Layout from "../layouts/Layout.astro";
+import NextGamesIsland from "../components/NextGamesIsland";
+import { strings } from "../lib/strings";
+
+const firstPart = strings.site.claim.courtPart;
+const secondPart = strings.site.claim.culturesPart;
+---
+
+<Layout title={strings.home.title}>
+  <div class="relative">
+    <div class="w-full h-svh">
+      <video autoplay muted loop playsinline class="w-full h-full object-cover">
+        <source src="/img/video.webm" type="video/webm" />
+      </video>
+      <div class="absolute inset-0 bg-black/80"></div>
+      <div class="absolute inset-0 flex justify-center items-center">
+        <div class="relative h-full w-full flex justify-center items-center z-10">
+          <div class="flex flex-col lg:flex-row items-center gap-6 lg:gap-16 h-full">
+            <div class="h-3/7 flex justify-center lg:items-center items-end">
+              <img src="/img/logo.svg" alt={strings.site.logoAlt} class="h-3/5 hero-logo" />
+            </div>
+            <div>
+              <div class="text-4xl md:text-6xl xl:text-7xl font-bold text-white hero-title">
+                {strings.site.name}
+              </div>
+              <div class="rounded-md text-[1.35rem] md:text-[2.26rem] lg:text-[2.27rem] xl:text-[2.7rem] text-white mt-2">
+                {
+                  [...firstPart].map((char, i) => (
+                    <span
+                      class="inline-block text-primary hero-letter"
+                      style={`animation-delay: ${0.5 + i * 0.01}s`}
+                    >
+                      {char === " " ? " " : char}
+                    </span>
+                  ))
+                }
+                {
+                  [...secondPart].map((char, i) => (
+                    <span
+                      class="inline-block text-heat hero-letter"
+                      style={`animation-delay: ${0.5 + (firstPart.length + i) * 0.01}s`}
+                    >
+                      {char === " " ? " " : char}
+                    </span>
+                  ))
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 hero-scroll">
+          <div class="flex flex-col items-center space-y-2">
+            <span class="text-white/60 text-sm font-medium">{strings.home.scrollHint}</span>
+            <div class="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
+              <div class="w-1 h-3 bg-white/60 rounded-full mt-2 hero-scroll-dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <NextGamesIsland client:load />
+</Layout>
+
+<style>
+  .hero-logo {
+    animation: logo-in 0.5s ease-out both;
+  }
+  .hero-title {
+    animation: fade-up 0.5s ease-out both;
+  }
+  .hero-letter {
+    opacity: 0;
+    animation: letter-in 0.3s ease-out both;
+    /* per-letter delay set inline */
+  }
+  .hero-scroll {
+    animation: fade-in 0.5s ease-out 2s both;
+  }
+  .hero-scroll-dot {
+    animation: scroll-bounce 2s ease-in-out infinite;
+  }
+  @keyframes logo-in {
+    from {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes letter-in {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes scroll-bounce {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(8px);
+    }
+  }
+</style>

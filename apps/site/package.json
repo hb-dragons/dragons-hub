@@ -1,0 +1,33 @@
+{
+  "name": "@dragons/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Public site (hbdragons.de) — static Astro build with React islands",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "lint": "eslint .",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/react": "^6.0.2",
+    "@astrojs/sitemap": "^3.7.0",
+    "@dragons/api-client": "workspace:*",
+    "@dragons/shared": "workspace:*",
+    "@dragons/ui": "workspace:*",
+    "astro": "^7.1.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.6",
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.28.0",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3"
+  }
+}

@@ -11,6 +11,7 @@ apps/web          @dragons/web      Next.js 16 frontend (port 3000)
 apps/api          @dragons/api      Hono REST API (port 3001)
 apps/cms          @dragons/cms      Payload 3 CMS in a thin Next app (port 3002, own dragons_cms db)
 apps/native       @dragons/native   Expo / React Native app (ships via EAS)
+apps/site         @dragons/site     Public site (hbdragons.de) — static Astro build with React islands (port 4321)
 apps/pi           —                 Python payload for the Raspberry Pi scoreboard tap (not a pnpm workspace package; pytest + a CI job)
 packages/ui       @dragons/ui       Shared shadcn/Radix UI components
 packages/sdk      @dragons/sdk      Basketball-Bund SDK type definitions
@@ -220,6 +221,12 @@ NEXT_PUBLIC_ASSISTANT_ENABLED=false # web: show the reschedule copilot entry poi
 NEXT_PUBLIC_CHATBOT_ENABLED=false # web: mount the club assistant widget on public pages
 EXPO_PUBLIC_CHATBOT_ENABLED=false # native: show the club assistant entry point
 ```
+
+`apps/site` has its own env contract (see `apps/site/.env.example`, not the
+root `.env.example`, which is drift-locked to `apps/api`): `CMS_URL` +
+`CMS_API_TOKEN` are build-time secrets for CMS content reads during
+`astro build`; `PUBLIC_API_URL` is inlined into browser islands (Astro's
+`PUBLIC_` prefix, same rebuild-to-change rule as above).
 
 ### Production deployment plumbing
 
