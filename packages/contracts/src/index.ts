@@ -268,3 +268,8 @@ export {
   unsubscribeQuerySchema,
   type UnsubscribeQuery,
 } from "./unsubscribe";
+
+export {
+  probetrainingRequestSchema,
+  type ProbetrainingRequest,
+} from "./probetraining";

@@ -101,6 +101,12 @@ export const envSchema = z
     SMTP_PASSWORD: z.string().min(1).optional(),
     SMTP_FROM: z.string().min(1).optional(),
 
+    // Club inbox for public Probetraining submissions (POST
+    // /public/probetraining). Optional: when unset (or when SMTP is not
+    // configured) the endpoint still stores every submission and only skips
+    // the notification mail.
+    PROBETRAINING_NOTIFY_TO: z.string().min(1).optional(),
+
     SCOREBOARD_INGEST_KEY: z.string().min(32),
     SCOREBOARD_DEVICE_ID: z.string().min(1),
 

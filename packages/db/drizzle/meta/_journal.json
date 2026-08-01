@@ -316,6 +316,13 @@
       "when": 1785165406303,
       "tag": "0044_quick_umar",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1785614409144,
+      "tag": "0045_slow_jackpot",
+      "breakpoints": true
     }
   ]
 }
