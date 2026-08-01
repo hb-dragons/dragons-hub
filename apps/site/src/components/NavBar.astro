@@ -11,13 +11,12 @@
 import { getCollection } from "astro:content";
 
 import { groupTeamsForNav } from "../lib/nav-teams";
-import { mediaUrl } from "../lib/media";
+import { cmsBaseUrl, mediaUrl } from "../lib/media";
+import { BANNER_IMAGE } from "../lib/site-assets";
 import { strings } from "../lib/strings";
 import BlurImage from "./BlurImage.astro";
 
-const cmsBase = (import.meta.env.CMS_URL as string | undefined) ?? process.env.CMS_URL;
-
-const BANNER = { url: "/img/banner.webp", blurhash: "UBBgG39Z0K_4~WD%D%%M56xa-UIoIUt7n+Rj" };
+const cmsBase = cmsBaseUrl();
 
 const teams = (await getCollection("teams"))
   .map((entry) => entry.data)
@@ -65,7 +64,7 @@ const itemClasses = (active: boolean, hasChildren: boolean) => [
   hasChildren && "hover:underline",
 ];
 
-const teamTile = (slug: string) => path.includes(slug);
+const isActiveTeam = (slug: string) => path.includes(slug);
 ---
 
 <nav id="site-nav" class="site-nav fixed w-full top-0 z-50 transition-all duration-150 ease-in-out bg-transparent border-transparent text-white">
@@ -111,8 +110,8 @@ const teamTile = (slug: string) => path.includes(slug);
                           >
                             <div class="flex items-center justify-center h-24 relative group overflow-hidden">
                               <BlurImage
-                                src={mediaUrl(team.teamImage?.url, cmsBase) ?? BANNER.url}
-                                blurhash={team.teamImage?.blurhash ?? BANNER.blurhash}
+                                src={mediaUrl(team.teamImage?.url, cmsBase) ?? BANNER_IMAGE.url}
+                                blurhash={team.teamImage?.blurhash ?? BANNER_IMAGE.blurhash}
                                 alt={team.teamImage?.alt ?? team.name}
                                 class="absolute inset-0 w-full h-full"
                                 imgClass="object-cover"
@@ -120,14 +119,14 @@ const teamTile = (slug: string) => path.includes(slug);
                               <div
                                 class:list={[
                                   "absolute top-0 left-0 w-full h-full group-hover:!bg-black/80 transition-all duration-300",
-                                  teamTile(team.slug) ? "!bg-black/80" : "!bg-black/70",
+                                  isActiveTeam(team.slug) ? "!bg-black/80" : "!bg-black/70",
                                 ]}
                               >
                               </div>
                               <p
                                 class:list={[
                                   "font-black z-10 relative text-center w-full text-3xl group-hover:text-primary transition-colors duration-300",
-                                  teamTile(team.slug) && "text-primary",
+                                  isActiveTeam(team.slug) && "text-primary",
                                 ]}
                               >
                                 {team.name}
@@ -194,9 +193,11 @@ const teamTile = (slug: string) => path.includes(slug);
       <details>
         <summary class="py-2 text-xl font-medium cursor-pointer list-none">{strings.nav.teams}</summary>
         <div class="flex flex-col pl-4">
-          <a href="/teams/" class="py-2 text-lg">{strings.nav.teams}</a>
           {teams.map((team) => (
-            <a href={`/teams/${team.slug}/`} class="py-2 text-lg">{team.name}</a>
+            <a
+              href={`/teams/${team.slug}/`}
+              class:list={["py-2 text-lg", isActiveTeam(team.slug) && "text-primary"]}
+            >{team.name}</a>
           ))}
         </div>
       </details>
@@ -204,7 +205,10 @@ const teamTile = (slug: string) => path.includes(slug);
         <summary class="py-2 text-xl font-medium cursor-pointer list-none">{strings.nav.uberUns}</summary>
         <div class="flex flex-col pl-4">
           {aboutChildren.map((child) => (
-            <a href={child.href} class="py-2 text-lg">{child.label}</a>
+            <a
+              href={child.href}
+              class:list={["py-2 text-lg", path.includes(child.href) && "text-primary"]}
+            >{child.label}</a>
           ))}
         </div>
       </details>

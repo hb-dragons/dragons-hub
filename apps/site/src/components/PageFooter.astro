@@ -4,19 +4,17 @@
  * UiGrayHeadline). The e-mail keeps the legacy spam trap: a decoy "example"
  * span hidden with CSS so scrapers reading raw text get a bogus address.
  */
+import { SOCIAL_LINKS } from "../lib/site-assets";
 import { strings } from "../lib/strings";
 
 const [emailPrefix, emailDomain] = strings.footer.email.split("@") as [string, string];
 const [domainName, domainTld] = emailDomain.split(".") as [string, string];
 
 const socials = [
-  { label: strings.footer.instagram, href: "https://www.instagram.com/hb_dragons/" },
-  { label: strings.footer.facebook, href: "https://www.facebook.com/hbdragonsev/" },
-  { label: strings.footer.youtube, href: "https://www.youtube.com/@HanoverBasketballDragons" },
-  {
-    label: strings.footer.linkedin,
-    href: "https://www.linkedin.com/company/hanover-basketball-dragons-e-v",
-  },
+  { label: strings.footer.instagram, href: SOCIAL_LINKS.instagram },
+  { label: strings.footer.facebook, href: SOCIAL_LINKS.facebook },
+  { label: strings.footer.youtube, href: SOCIAL_LINKS.youtube },
+  { label: strings.footer.linkedin, href: SOCIAL_LINKS.linkedin },
 ];
 ---
 

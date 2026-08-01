@@ -10,11 +10,12 @@ import { formatKickoffLong } from "@dragons/shared";
 import type { MatchListItem } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 import { Skeleton } from "@dragons/ui/components/skeleton";
+import { DEFAULT_API_BASE } from "../lib/api-base";
+import { SOFT_BUTTON_CLASSES } from "../lib/site-assets";
 import { strings } from "../lib/strings";
 
 const API_BASE =
-  (import.meta.env.PUBLIC_API_URL as string | undefined) ??
-  "https://api.app.hbdragons.de";
+  (import.meta.env.PUBLIC_API_URL as string | undefined) ?? DEFAULT_API_BASE;
 
 const api = createApi(new ApiClient({ baseUrl: API_BASE }));
 
@@ -233,11 +234,7 @@ export default function NextGamesIsland() {
 
       {games && games.length > 0 && (
         <div className="text-center mt-4">
-          {/* Nuxt UI soft button, classes lifted from prod hbdragons.de */}
-          <a
-            href="/spielplan/"
-            className="rounded-md font-medium inline-flex items-center transition-colors px-3 py-2 text-base gap-2 text-primary bg-primary/10 hover:bg-primary/15"
-          >
+          <a href="/spielplan/" className={SOFT_BUTTON_CLASSES}>
             {strings.nextGames.allGames}
             <svg
               xmlns="http://www.w3.org/2000/svg"

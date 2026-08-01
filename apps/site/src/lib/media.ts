@@ -1,3 +1,19 @@
+/** Populated media shape the site renders (subset of the CMS media doc). */
+export interface SiteImage {
+  url: string;
+  blurhash?: string | null | undefined;
+  alt?: string | null | undefined;
+}
+
+/**
+ * CMS base URL for resolving relative media paths at build time. Blank counts
+ * as unset — the same rule as the loaders' readEnv (src/lib/payload.ts).
+ */
+export function cmsBaseUrl(): string | undefined {
+  const value = (import.meta.env?.CMS_URL as string | undefined) ?? process.env.CMS_URL;
+  return value == null || value === "" ? undefined : value;
+}
+
 /**
  * Resolves a Payload media `url` to something the browser can fetch.
  *

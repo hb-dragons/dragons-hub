@@ -7,6 +7,7 @@ import NextGamesIsland from "../components/NextGamesIsland";
 import HomeFollowUs from "../components/home/FollowUs.astro";
 import HomeJoin from "../components/home/Join.astro";
 import HomeNews from "../components/home/News.astro";
+import { apiBase } from "../lib/api-base";
 import { fetchTeamCount, yearsSinceFounding } from "../lib/home-stats";
 import { getSiteSettings } from "../lib/payload";
 import { strings } from "../lib/strings";
@@ -15,13 +16,17 @@ const firstPart = strings.site.claim.courtPart;
 const secondPart = strings.site.claim.culturesPart;
 
 // Club stats: memberCount/foundingYear from the site-settings global, live
-// teamCount from the API dashboard. The dashboard fetch runs only on content
-// builds (site-settings present) and then fails loudly, mirroring the
-// loaders' failure model; env-less shell builds skip it and hide the row.
+// teamCount from the API dashboard. On content builds every input is required
+// and any failure throws — the loaders' failure model (a broken CMS/API must
+// never silently drop the band prod always shows); env-less shell builds skip
+// the fetch and hide the row.
 const settings = await getSiteSettings();
-const apiBase =
-  (import.meta.env.PUBLIC_API_URL as string | undefined) ?? "https://api.app.hbdragons.de";
-const teamCount = settings === null ? null : await fetchTeamCount(apiBase);
+if (settings !== null && (settings.memberCount == null || settings.foundingYear == null)) {
+  throw new Error(
+    "site-settings: memberCount and foundingYear must both be set — the home stats band renders them",
+  );
+}
+const teamCount = settings === null ? null : await fetchTeamCount(apiBase());
 const memberCount = settings?.memberCount ?? null;
 const years =
   settings?.foundingYear != null ? yearsSinceFounding(settings.foundingYear, new Date()) : null;

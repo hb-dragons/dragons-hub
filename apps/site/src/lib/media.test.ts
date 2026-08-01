@@ -1,6 +1,32 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { mediaUrl } from "./media";
+import { cmsBaseUrl, mediaUrl } from "./media";
+
+// Vitest's vite config exposes no CMS_URL on import.meta.env, so cmsBaseUrl()
+// reads process.env here.
+const originalCmsUrl = process.env.CMS_URL;
+
+afterEach(() => {
+  if (originalCmsUrl === undefined) delete process.env.CMS_URL;
+  else process.env.CMS_URL = originalCmsUrl;
+});
+
+describe("cmsBaseUrl", () => {
+  it("returns the configured CMS_URL", () => {
+    process.env.CMS_URL = "http://localhost:3011";
+    expect(cmsBaseUrl()).toBe("http://localhost:3011");
+  });
+
+  it("is undefined when CMS_URL is unset", () => {
+    delete process.env.CMS_URL;
+    expect(cmsBaseUrl()).toBeUndefined();
+  });
+
+  it("treats a blank CMS_URL as unset (mirrors the loaders' readEnv)", () => {
+    process.env.CMS_URL = "";
+    expect(cmsBaseUrl()).toBeUndefined();
+  });
+});
 
 describe("mediaUrl", () => {
   it("returns null for null and undefined", () => {

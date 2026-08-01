@@ -7,6 +7,7 @@
 import BlurImage from "../BlurImage.astro";
 import PageContainer from "../PageContainer.astro";
 import SpotlightLinkCard from "../SpotlightLinkCard.astro";
+import { BANNER_IMAGE, SOCIAL_LINKS } from "../../lib/site-assets";
 import { strings } from "../../lib/strings";
 
 const iconClass = "size-8 md:size-15";
@@ -19,7 +20,7 @@ const iconClass = "size-8 md:size-15";
 
   <div class="grid grid-cols-3 grid-rows-12 gap-2 md:gap-4 h-[300px] md:h-[700px]">
     <SpotlightLinkCard
-      href="https://www.instagram.com/hb_dragons/"
+      href={SOCIAL_LINKS.instagram}
       linkClass="col-span-3 row-span-4"
       cardClass="h-full"
     >
@@ -33,7 +34,7 @@ const iconClass = "size-8 md:size-15";
     </SpotlightLinkCard>
 
     <SpotlightLinkCard
-      href="https://www.facebook.com/hbdragonsev/"
+      href={SOCIAL_LINKS.facebook}
       cardClass="h-full"
       linkClass="row-span-8"
     >
@@ -47,7 +48,7 @@ const iconClass = "size-8 md:size-15";
     </SpotlightLinkCard>
 
     <SpotlightLinkCard
-      href="https://www.linkedin.com/company/hanover-basketball-dragons-e-v"
+      href={SOCIAL_LINKS.linkedin}
       linkClass="col-span-1 row-span-4"
       cardClass="h-full"
     >
@@ -63,8 +64,8 @@ const iconClass = "size-8 md:size-15";
     <SpotlightLinkCard href="/shop/" linkClass="col-span-1 row-span-8" cardClass="h-full" target="_self">
       <BlurImage
         slot="image"
-        src="/img/banner.webp"
-        blurhash="UBBgG39Z0K_4~WD%D%%M56xa-UIoIUt7n+Rj"
+        src={BANNER_IMAGE.url}
+        blurhash={BANNER_IMAGE.blurhash}
         class="w-full h-full"
       />
       <div slot="icon" class="flex flex-col items-center justify-center">
@@ -73,7 +74,7 @@ const iconClass = "size-8 md:size-15";
     </SpotlightLinkCard>
 
     <SpotlightLinkCard
-      href="https://www.youtube.com/@HanoverBasketballDragons"
+      href={SOCIAL_LINKS.youtube}
       linkClass="col-span-1 row-span-4"
       cardClass="h-full"
     >

@@ -8,10 +8,11 @@ import { getCollection } from "astro:content";
 
 import BlurImage from "../BlurImage.astro";
 import PageContainer from "../PageContainer.astro";
-import { mediaUrl } from "../../lib/media";
+import { cmsBaseUrl, mediaUrl } from "../../lib/media";
+import { SOFT_BUTTON_CLASSES } from "../../lib/site-assets";
 import { strings } from "../../lib/strings";
 
-const cmsBase = (import.meta.env.CMS_URL as string | undefined) ?? process.env.CMS_URL;
+const cmsBase = cmsBaseUrl();
 
 // The build user's API key sees drafts (publishedOrAuthed) — filter them out.
 const posts = (await getCollection("posts", ({ data }) => data._status === "published"))
@@ -51,10 +52,7 @@ const posts = (await getCollection("posts", ({ data }) => data._status === "publ
         ))}
       </div>
       <div class="flex justify-center items-center">
-        <a
-          href="/news/"
-          class="rounded-md font-medium inline-flex items-center transition-colors px-3 py-2 text-base gap-2 text-primary bg-primary/10 hover:bg-primary/15"
-        >
+        <a href="/news/" class={SOFT_BUTTON_CLASSES}>
           {strings.home.allNews}
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
         </a>

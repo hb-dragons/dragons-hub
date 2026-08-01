@@ -1,17 +1,21 @@
 ---
 /**
  * Faint basketball backdrop behind every page, ported from dragons-app
- * UiBackground. The legacy component randomized pixel positions on every
- * page load; here placement is randomized once per build in viewport units —
- * at opacity 5% the distribution is indistinguishable.
+ * UiBackground. Deviations from the JS original, invisible at opacity 5%:
+ * placement is randomized once per build in viewport units (legacy
+ * re-randomized pixel positions each page load) and the min-distance
+ * spacing pass is dropped. The legacy mobile scale range (0.3–1 under
+ * 768px vs 1–2.5 desktop) is kept via a media query on two CSS variables.
  */
 const balls = Array.from({ length: 10 }, (_, id) => {
   const left = Math.random() < 0.5;
+  const magnitude = Math.random();
   return {
     id,
     x: left ? Math.random() * 33 : 67 + Math.random() * 28,
     y: Math.random() * 100,
-    scale: 1 + Math.random() * 1.5,
+    scale: 1 + magnitude * 1.5,
+    mobileScale: 0.3 + magnitude * 0.7,
     rotation: Math.random() * 360,
   };
 });
@@ -21,11 +25,26 @@ const balls = Array.from({ length: 10 }, (_, id) => {
   {
     balls.map((ball) => (
       <div
-        class="opacity-5 fixed"
-        style={`transform: translate(${ball.x}vw, ${ball.y}vh) scale(${ball.scale}) rotate(${ball.rotation}deg); width: 100px; height: 100px;`}
+        class="bg-ball opacity-5 fixed"
+        style={`--ball-x: ${ball.x}vw; --ball-y: ${ball.y}vh; --ball-scale: ${ball.scale}; --ball-scale-mobile: ${ball.mobileScale}; --ball-rotation: ${ball.rotation}deg;`}
       >
         <img src="/img/basketball.svg" alt="" class="w-full h-full" loading="lazy" />
       </div>
     ))
   }
 </div>
+
+<style>
+  .bg-ball {
+    width: 100px;
+    height: 100px;
+    transform: translate(var(--ball-x), var(--ball-y)) scale(var(--ball-scale-mobile))
+      rotate(var(--ball-rotation));
+  }
+  @media (min-width: 768px) {
+    .bg-ball {
+      transform: translate(var(--ball-x), var(--ball-y)) scale(var(--ball-scale))
+        rotate(var(--ball-rotation));
+    }
+  }
+</style>
