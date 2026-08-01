@@ -1,0 +1,46 @@
+---
+/**
+ * Banner-title band above every subpage, ported from dragons-app PageHeader
+ * (+ UiBannerImage/UiOverlay). Defaults to the club banner; pages with their
+ * own header image pass it in.
+ */
+import BlurImage from "./BlurImage.astro";
+
+interface Props {
+  title: string;
+  image?: {
+    url: string;
+    blurhash?: string | null | undefined;
+    alt?: string | null | undefined;
+  } | null;
+}
+
+const BANNER = {
+  url: "/img/banner.webp",
+  blurhash: "UBBgG39Z0K_4~WD%D%%M56xa-UIoIUt7n+Rj",
+  alt: "",
+};
+
+const { title, image = null } = Astro.props;
+const img = image ?? BANNER;
+---
+
+<div class="h-[200px] md:h-[400px] relative z-0 overflow-hidden">
+  <div class="w-full h-full">
+    <div class="absolute top-0 left-0 w-full h-full">
+      <BlurImage
+        src={img.url}
+        blurhash={img.blurhash}
+        alt={img.alt ?? ""}
+        class="w-full h-full"
+        imgClass="object-cover"
+        loading="eager"
+      />
+      <div class="absolute top-0 left-0 w-full h-full dark:bg-black/70 bg-white/70"></div>
+    </div>
+
+    <div class="absolute top-0 left-0 w-full h-full flex items-center justify-center">
+      <h1 class="text-4xl md:text-7xl font-bold text-foreground text-center">{title}</h1>
+    </div>
+  </div>
+</div>

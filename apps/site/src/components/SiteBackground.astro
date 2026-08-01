@@ -1,0 +1,31 @@
+---
+/**
+ * Faint basketball backdrop behind every page, ported from dragons-app
+ * UiBackground. The legacy component randomized pixel positions on every
+ * page load; here placement is randomized once per build in viewport units —
+ * at opacity 5% the distribution is indistinguishable.
+ */
+const balls = Array.from({ length: 10 }, (_, id) => {
+  const left = Math.random() < 0.5;
+  return {
+    id,
+    x: left ? Math.random() * 33 : 67 + Math.random() * 28,
+    y: Math.random() * 100,
+    scale: 1 + Math.random() * 1.5,
+    rotation: Math.random() * 360,
+  };
+});
+---
+
+<div class="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-10">
+  {
+    balls.map((ball) => (
+      <div
+        class="opacity-5 fixed"
+        style={`transform: translate(${ball.x}vw, ${ball.y}vh) scale(${ball.scale}) rotate(${ball.rotation}deg); width: 100px; height: 100px;`}
+      >
+        <img src="/img/basketball.svg" alt="" class="w-full h-full" loading="lazy" />
+      </div>
+    ))
+  }
+</div>

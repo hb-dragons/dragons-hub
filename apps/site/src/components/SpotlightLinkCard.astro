@@ -1,0 +1,46 @@
+---
+/**
+ * Linked spotlight card with image background + icon overlay, ported from
+ * dragons-app UiSpotlightLinkCard (the Social Wall tiles).
+ */
+import SpotlightCard from "./SpotlightCard.astro";
+
+interface Props {
+  href: string;
+  spotlightColor?: string;
+  linkClass?: string;
+  cardClass?: string;
+  target?: string;
+  ariaLabel?: string;
+}
+
+const {
+  href,
+  spotlightColor = "rgba(255, 255, 255, 0.25)",
+  linkClass = "",
+  cardClass = "",
+  target = "_blank",
+  ariaLabel,
+} = Astro.props;
+---
+
+<a
+  href={href}
+  target={target}
+  rel={target === "_blank" ? "noopener" : undefined}
+  aria-label={ariaLabel ?? href}
+  class:list={["block", linkClass]}
+>
+  <SpotlightCard
+    class={`border-border !p-0 group !rounded-md md:!rounded-lg ${cardClass}`}
+    spotlightColor={spotlightColor}
+  >
+    <div class="absolute inset-0 -z-10 group-hover:scale-103 transition-all duration-300">
+      <slot name="image" />
+      <div class="absolute top-0 left-0 w-full h-full dark:bg-black/60 bg-white/70"></div>
+    </div>
+    <div class="absolute inset-0 flex items-center justify-center">
+      <slot name="icon" />
+    </div>
+  </SpotlightCard>
+</a>

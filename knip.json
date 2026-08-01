@@ -32,6 +32,10 @@
       "project": [
         "src/**/*.{ts,tsx,astro}"
       ],
+      "ignore": [
+        "src/components/Magnet.astro",
+        "src/components/PageHeader.astro"
+      ],
       "ignoreDependencies": [
         "tailwindcss"
       ]

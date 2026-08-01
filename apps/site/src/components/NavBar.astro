@@ -1,0 +1,276 @@
+---
+/**
+ * Fixed top navigation, ported from dragons-app NavBar + UiNavElement +
+ * UiChildNavLink + TeamsNavLinks/TeamsNavLink.
+ *
+ * Interactivity budget: dropdowns are pure CSS (:hover/:focus-within); the
+ * scroll state and the mobile drawer are a few lines of vanilla script — no
+ * framework hydration. The scrolled look (blur bar, logo → letters swap) is
+ * driven by a `data-scrolled` attribute the script keeps on <html>.
+ */
+import { getCollection } from "astro:content";
+
+import { groupTeamsForNav } from "../lib/nav-teams";
+import { mediaUrl } from "../lib/media";
+import { strings } from "../lib/strings";
+import BlurImage from "./BlurImage.astro";
+
+const cmsBase = (import.meta.env.CMS_URL as string | undefined) ?? process.env.CMS_URL;
+
+const BANNER = { url: "/img/banner.webp", blurhash: "UBBgG39Z0K_4~WD%D%%M56xa-UIoIUt7n+Rj" };
+
+const teams = (await getCollection("teams"))
+  .map((entry) => entry.data)
+  .sort((a, b) => a.orderIndex - b.orderIndex);
+const teamGroups = groupTeamsForNav(teams);
+const teamRows = [teamGroups.damen, teamGroups.herren, teamGroups.jugend].filter(
+  (row) => row.length > 0,
+);
+
+const path = Astro.url.pathname;
+
+const aboutChildren = [
+  { label: strings.nav.team, href: "/dragons/team/" },
+  { label: strings.nav.story, href: "/dragons/story/" },
+  { label: strings.nav.philosophie, href: "/dragons/philosophie/" },
+  { label: strings.nav.projekte, href: "/dragons/projekte/" },
+  { label: strings.nav.spielplan, href: "/spielplan/" },
+  { label: strings.nav.shop, href: "/shop/" },
+];
+
+// Active rules ported from UiNavElement: home exact, About via /dragons/,
+// everything else by substring.
+const links = [
+  { label: strings.nav.home, href: "/", active: path === "/" },
+  { label: strings.nav.news, href: "/news/", active: path.includes("/news") },
+  {
+    label: strings.nav.teams,
+    href: "/teams/",
+    active: path.includes("/teams"),
+    slot: "teams" as const,
+  },
+  {
+    label: strings.nav.uberUns,
+    href: null,
+    active: path.includes("dragons"),
+    slot: "about" as const,
+  },
+  { label: strings.nav.supporter, href: "/supporter/", active: path.includes("/supporter") },
+  { label: strings.nav.downloads, href: "/downloads/", active: path.includes("/downloads") },
+];
+
+const itemClasses = (active: boolean, hasChildren: boolean) => [
+  "relative group py-4 px-6 lg:px-8 text-white hover:text-black hover:bg-green-500 transition-all duration-300 ease-in-out flex items-center justify-between gap-3",
+  active ? "bg-green-500 !text-black" : "text-white",
+  hasChildren && "hover:underline",
+];
+
+const teamTile = (slug: string) => path.includes(slug);
+---
+
+<nav id="site-nav" class="site-nav fixed w-full top-0 z-50 transition-all duration-150 ease-in-out bg-transparent border-transparent text-white">
+  <div class="lg:container mx-auto w-full">
+    <a href="/" class="fixed top-2 xl:left-auto left-2" aria-label={strings.nav.home}>
+      <div class="nav-logo hidden md:block relative w-14 md:w-24 md:h-24 lg:w-34 lg:h-34">
+        <img src="/img/logo.svg" alt={strings.site.logoAlt} class="w-full h-full" />
+      </div>
+      <div class="nav-letters absolute top-0.5 md:top-1 lg:top-0 left-0 w-24 md:w-24 lg:w-34">
+        <img src="/img/dragons_schriftzug.svg" alt={strings.site.logoAlt} class="w-full h-full" />
+      </div>
+    </a>
+
+    <div class="nav-menu hidden md:flex w-full items-center justify-end lg:justify-center relative">
+      <ul class="flex items-center">
+        {
+          links.map((link) => (
+            <li class="nav-item">
+              {link.href !== null ? (
+                <a href={link.href} aria-label={link.label}>
+                  <div class:list={itemClasses(link.active, link.slot !== undefined)}>
+                    <p class="relative z-10 font-black uppercase">{link.label}</p>
+                  </div>
+                </a>
+              ) : (
+                <button type="button" class="cursor-pointer">
+                  <div class:list={itemClasses(link.active, false)}>
+                    <p class="relative z-10 font-black uppercase">{link.label}</p>
+                  </div>
+                </button>
+              )}
+
+              {link.slot === "teams" && teamRows.length > 0 && (
+                <div class="nav-panel absolute left-0 right-0 top-full hidden bg-background border border-border rounded-md shadow-lg overflow-hidden">
+                  <div class="flex flex-col gap-2 p-2">
+                    {teamRows.map((row) => (
+                      <div class="flex gap-2">
+                        {row.map((team) => (
+                          <a
+                            href={`/teams/${team.slug}/`}
+                            aria-label={team.slug}
+                            class="w-full"
+                          >
+                            <div class="flex items-center justify-center h-24 relative group overflow-hidden">
+                              <BlurImage
+                                src={mediaUrl(team.teamImage?.url, cmsBase) ?? BANNER.url}
+                                blurhash={team.teamImage?.blurhash ?? BANNER.blurhash}
+                                alt={team.teamImage?.alt ?? team.name}
+                                class="absolute inset-0 w-full h-full"
+                                imgClass="object-cover"
+                              />
+                              <div
+                                class:list={[
+                                  "absolute top-0 left-0 w-full h-full group-hover:!bg-black/80 transition-all duration-300",
+                                  teamTile(team.slug) ? "!bg-black/80" : "!bg-black/70",
+                                ]}
+                              >
+                              </div>
+                              <p
+                                class:list={[
+                                  "font-black z-10 relative text-center w-full text-3xl group-hover:text-primary transition-colors duration-300",
+                                  teamTile(team.slug) && "text-primary",
+                                ]}
+                              >
+                                {team.name}
+                              </p>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {link.slot === "about" && (
+                <div class="nav-panel absolute left-0 right-0 top-full hidden bg-background border border-border rounded-md shadow-lg overflow-hidden">
+                  <div class="grid">
+                    {aboutChildren.map((child) => (
+                      <a href={child.href} aria-label={child.label}>
+                        <div class="flex items-center justify-center h-12 relative group">
+                          <p
+                            class:list={[
+                              "font-black z-10 relative text-center w-full text-xl group-hover:text-primary transition-colors duration-300",
+                              path.includes(child.href) && "text-primary",
+                            ]}
+                          >
+                            {child.label}
+                          </p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    <div class="md:hidden flex justify-end items-center">
+      <button
+        type="button"
+        id="nav-open"
+        class="p-3 text-white cursor-pointer"
+        aria-label={strings.nav.openMenu}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg>
+      </button>
+    </div>
+  </div>
+
+  <div
+    id="nav-drawer"
+    class="nav-drawer fixed top-1 right-1 bottom-1 left-1 z-50 rounded-lg bg-background border border-border overflow-y-auto md:hidden"
+  >
+    <div class="absolute top-0 right-0 flex justify-end items-center p-4">
+      <button type="button" id="nav-close" class="p-2 cursor-pointer" aria-label={strings.nav.closeMenu}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+      </button>
+    </div>
+    <div class="mt-6 p-4 flex flex-col gap-1">
+      <a href="/" class:list={["py-2 text-xl font-medium", path === "/" && "text-primary"]}>{strings.nav.home}</a>
+      <a href="/news/" class:list={["py-2 text-xl font-medium", path.includes("/news") && "text-primary"]}>{strings.nav.news}</a>
+      <details>
+        <summary class="py-2 text-xl font-medium cursor-pointer list-none">{strings.nav.teams}</summary>
+        <div class="flex flex-col pl-4">
+          <a href="/teams/" class="py-2 text-lg">{strings.nav.teams}</a>
+          {teams.map((team) => (
+            <a href={`/teams/${team.slug}/`} class="py-2 text-lg">{team.name}</a>
+          ))}
+        </div>
+      </details>
+      <details>
+        <summary class="py-2 text-xl font-medium cursor-pointer list-none">{strings.nav.uberUns}</summary>
+        <div class="flex flex-col pl-4">
+          {aboutChildren.map((child) => (
+            <a href={child.href} class="py-2 text-lg">{child.label}</a>
+          ))}
+        </div>
+      </details>
+      <a href="/supporter/" class:list={["py-2 text-xl font-medium", path.includes("/supporter") && "text-primary"]}>{strings.nav.supporter}</a>
+      <a href="/downloads/" class:list={["py-2 text-xl font-medium", path.includes("/downloads") && "text-primary"]}>{strings.nav.downloads}</a>
+    </div>
+  </div>
+</nav>
+
+<style>
+  /* Scrolled bar look ported from dragons-app NavBar: 20% background tint,
+     24px backdrop blur, muted border, foreground text. */
+  :global(html[data-scrolled]) .site-nav {
+    background-color: color-mix(in oklab, var(--background) 20%, transparent);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    border-color: var(--muted);
+    color: var(--foreground);
+  }
+
+  /* Logo ↔ letters crossfade (motion-v spring approximated with CSS). */
+  .nav-logo,
+  .nav-letters {
+    transition:
+      opacity 0.4s ease,
+      transform 0.4s ease;
+  }
+  .nav-letters {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  :global(html[data-scrolled]) .nav-logo {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  :global(html[data-scrolled]) .nav-letters {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .nav-item:hover .nav-panel,
+  .nav-item:focus-within .nav-panel {
+    display: block;
+  }
+
+  .nav-drawer {
+    transform: translateX(103%);
+    transition: transform 0.3s ease;
+  }
+  :global(#site-nav[data-menu-open]) .nav-drawer {
+    transform: translateX(0);
+  }
+</style>
+
+<script>
+  const setScrolled = () => {
+    document.documentElement.toggleAttribute("data-scrolled", window.scrollY > 10);
+  };
+  setScrolled();
+  window.addEventListener("scroll", setScrolled, { passive: true });
+
+  const nav = document.getElementById("site-nav");
+  document.getElementById("nav-open")?.addEventListener("click", () => {
+    nav?.setAttribute("data-menu-open", "");
+  });
+  document.getElementById("nav-close")?.addEventListener("click", () => {
+    nav?.removeAttribute("data-menu-open");
+  });
+</script>
