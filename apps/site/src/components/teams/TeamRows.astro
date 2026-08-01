@@ -3,10 +3,10 @@
  * Alternating team banner rows on the teams index, ported from dragons-app
  * TeamsRows (components/teams/Rows.vue): angled team photo, gray halftone
  * background from the team-background global, name + league, and the
- * magnetic "Zum Team" button. Legacy token notes: `text-hightlited` was a
- * typo'd (nonexistent) class — the heading inherits the body color, kept
- * here without a color utility; `text-md`→`text-base`,
- * `text-toned`/`text-muted`→`text-muted-foreground`.
+ * magnetic "Zum Team" button. Legacy token notes: the heading carried a
+ * typo'd (nonexistent) color class and so inherited the body color — kept
+ * here without a color utility; the md text size maps to base, the legacy
+ * toned/muted text colors to the muted foreground token.
  */
 import type { SiteImage } from "../../lib/media";
 import { BANNER_IMAGE } from "../../lib/site-assets";
