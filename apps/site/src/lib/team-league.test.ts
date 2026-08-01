@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fetchTeamLeagueNames } from "./team-league";
+import { fetchTeamLeagueNames, leagueNameFor } from "./team-league";
 
 const STANDINGS = [
   {
@@ -56,5 +56,22 @@ describe("fetchTeamLeagueNames", () => {
     await expect(
       fetchTeamLeagueNames("https://api.example", fetchReturning(200, { nope: true })),
     ).rejects.toThrow();
+  });
+});
+
+describe("leagueNameFor", () => {
+  const names = new Map([[160402, "Landesliga Herren 2"]]);
+
+  it("resolves a team's league name by its api id", () => {
+    expect(leagueNameFor(names, 160402)).toBe("Landesliga Herren 2");
+  });
+
+  it("returns null for an unknown team", () => {
+    expect(leagueNameFor(names, 999999)).toBeNull();
+  });
+
+  it("returns null when the team has no api id", () => {
+    expect(leagueNameFor(names, null)).toBeNull();
+    expect(leagueNameFor(names, undefined)).toBeNull();
   });
 });

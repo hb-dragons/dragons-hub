@@ -49,22 +49,21 @@ export default function NextPrevGame({ teamApiId }: { teamApiId: number | null }
     if (teamApiId == null) return;
     let cancelled = false;
     const today = todayInClubZone();
-    api.public
-      .getMatches(prevGameParams(teamApiId, today))
-      .then((page) => {
-        if (!cancelled) setPrevGame(page.items[0] ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setPrevGame(null);
-      });
-    api.public
-      .getMatches(nextGameParams(teamApiId, today))
-      .then((page) => {
-        if (!cancelled) setNextGame(page.items[0] ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setNextGame(null);
-      });
+    const loadSlot = (
+      params: ReturnType<typeof prevGameParams>,
+      setSlot: (game: SlotState) => void,
+    ) => {
+      api.public
+        .getMatches(params)
+        .then((page) => {
+          if (!cancelled) setSlot(page.items[0] ?? null);
+        })
+        .catch(() => {
+          if (!cancelled) setSlot(null);
+        });
+    };
+    loadSlot(prevGameParams(teamApiId, today), setPrevGame);
+    loadSlot(nextGameParams(teamApiId, today), setNextGame);
     return () => {
       cancelled = true;
     };

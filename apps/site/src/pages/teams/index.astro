@@ -14,7 +14,7 @@ import { cmsBaseUrl } from "../../lib/media";
 import { strings } from "../../lib/strings";
 import { fetchTeamBackground } from "../../lib/team-background";
 import { toSiteImage } from "../../lib/team-detail";
-import { fetchTeamLeagueNames } from "../../lib/team-league";
+import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
 
 const cmsBase = cmsBaseUrl();
 
@@ -39,8 +39,7 @@ const backgroundImage =
 const rows: RowTeam[] = teams.map(({ data }) => ({
   name: data.name,
   slug: data.slug,
-  leagueName:
-    data.apiTeamPermanentId == null ? null : (leagueNames.get(data.apiTeamPermanentId) ?? null),
+  leagueName: leagueNameFor(leagueNames, data.apiTeamPermanentId),
   image: toSiteImage(data.teamImage, cmsBase),
 }));
 

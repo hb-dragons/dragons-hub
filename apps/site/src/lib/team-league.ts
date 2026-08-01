@@ -18,6 +18,15 @@ const standingsSchema = z.array(
   }),
 );
 
+/** A team's league name from the lookup — null without a key or a match. */
+export function leagueNameFor(
+  names: ReadonlyMap<number, string>,
+  apiTeamPermanentId: number | null | undefined,
+): string | null {
+  if (apiTeamPermanentId == null) return null;
+  return names.get(apiTeamPermanentId) ?? null;
+}
+
 /** Maps every standings row's `teamApiId` to its league's display name. */
 export async function fetchTeamLeagueNames(
   baseUrl: string,

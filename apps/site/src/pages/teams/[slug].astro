@@ -16,7 +16,7 @@ import { apiBase } from "../../lib/api-base";
 import { cmsBaseUrl } from "../../lib/media";
 import { strings } from "../../lib/strings";
 import { primaryTrainer, toSiteImage } from "../../lib/team-detail";
-import { fetchTeamLeagueNames } from "../../lib/team-league";
+import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
 
 export async function getStaticPaths() {
   const teams = await getCollection("teams");
@@ -28,10 +28,7 @@ export async function getStaticPaths() {
     params: { slug: data.slug },
     props: {
       team: data,
-      leagueName:
-        data.apiTeamPermanentId == null
-          ? null
-          : (leagueNames.get(data.apiTeamPermanentId) ?? null),
+      leagueName: leagueNameFor(leagueNames, data.apiTeamPermanentId),
     },
   }));
 }

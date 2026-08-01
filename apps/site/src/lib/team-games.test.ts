@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   formatTableDate,
@@ -28,6 +28,16 @@ function game(overrides: Partial<TeamTableGame> = {}): TeamTableGame {
     ...overrides,
   };
 }
+
+// Table labels must not depend on the runtime's zone (CLAUDE.md date rule) —
+// the whole suite runs under a forced non-Berlin TZ.
+beforeEach(() => {
+  vi.stubEnv("TZ", "Pacific/Honolulu");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("formatTableDate", () => {
   it("formats a kickoff date as the legacy short table label", () => {
