@@ -15,16 +15,25 @@ import { pathToFileURL } from "node:url";
 
 const rootDir = process.cwd();
 
-/** Stylesheet that defines the design system's `@theme` tokens. */
+/**
+ * Stylesheet that defines the design system's `@theme` tokens. The site theme
+ * (site.css) is not loaded separately: site-css-parity.test.ts pins its token
+ * vocabulary to globals.css name-for-name, so resolving every surface against
+ * globals.css is exact.
+ */
 const themeEntry = path.join(rootDir, "packages/ui/src/styles/globals.css");
 
 /** Trees whose class names must resolve against the design system. */
 const scannedDirs = [
+  path.join(rootDir, "apps/site/src"),
   path.join(rootDir, "apps/web/src"),
   path.join(rootDir, "packages/ui/src"),
 ];
 
-const sourceExtensions = new Set([".ts", ".tsx"]);
+// `.astro` templates carry class attributes exactly like `.tsx` does, and the
+// colour-utility-root restriction below keeps frontmatter/`<style>` noise out
+// of the candidate set, so they scan with the same rules.
+const sourceExtensions = new Set([".astro", ".ts", ".tsx"]);
 const ignoredDirs = new Set([".next", ".turbo", "coverage", "dist", "node_modules"]);
 
 /**
