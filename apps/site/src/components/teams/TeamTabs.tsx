@@ -11,18 +11,20 @@ import { strings } from "../../lib/strings";
 import GamesIsland from "./GamesIsland";
 import StandingsIsland from "./StandingsIsland";
 
+// Legacy UTabs link/xl trigger recipe (classes lifted from prod markup);
+// h-auto frees the trigger from the primitive's h-8 list so the xl padding
+// renders, and the active underline recolors to primary on the list border.
 const TRIGGER_CLASSES =
-  "flex-none group relative inline-flex items-center min-w-0 font-medium rounded-md justify-center px-3 py-2 text-base gap-2 " +
+  "flex-none h-auto group relative inline-flex items-center min-w-0 font-medium rounded-md justify-center px-3 py-2 text-base gap-2 " +
   "text-muted-foreground hover:text-foreground data-[state=active]:text-primary dark:data-[state=active]:text-primary " +
-  "data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent " +
-  "after:bg-primary group-data-[orientation=horizontal]/tabs:after:bottom-0";
+  "data-[state=active]:bg-transparent dark:data-[state=active]:bg-transparent after:bg-primary";
 
 export default function TeamTabs({ teamApiId }: { teamApiId: number | null }) {
   return (
     <Tabs defaultValue="games" className="w-full items-center gap-2">
       <TabsList
         variant="line"
-        className="relative flex h-auto w-full justify-start rounded-none border-b p-1 -mb-px"
+        className="relative flex w-full justify-start rounded-none border-b p-1 -mb-px group-data-[orientation=horizontal]/tabs:h-auto"
       >
         <TabsTrigger value="games" className={TRIGGER_CLASSES}>
           {strings.teams.tabGames}
