@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 
+import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
 import { anyone } from "../lib/access";
 import { encodeBlurhash } from "../lib/blurhash";
 
@@ -28,5 +29,10 @@ export const Media: CollectionConfig = {
         return data;
       },
     ],
+    // Media is Task A2, not in the plan's A3 hook list — included deliberately:
+    // the site renders alt text, blurhash and file URLs, so a media edit
+    // changes built output just like any content change.
+    afterChange: [dispatchOnPublish],
+    afterDelete: [dispatchOnDelete],
   },
 };

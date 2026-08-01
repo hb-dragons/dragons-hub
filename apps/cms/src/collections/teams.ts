@@ -1,6 +1,7 @@
 import type { CollectionConfig } from "payload";
 
 import { seoFields } from "../fields/seo";
+import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
 import { anyone } from "../lib/access";
 
 export const Teams: CollectionConfig = {
@@ -34,4 +35,5 @@ export const Teams: CollectionConfig = {
     },
     ...seoFields,
   ],
+  hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnDelete] },
 };

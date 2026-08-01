@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 
+import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
 import { anyone } from "../lib/access";
 
 // No admin.useAsTitle: a trainer has no own name field — the name lives on the
@@ -14,4 +15,5 @@ export const Trainers: CollectionConfig = {
     // Optional trainer-specific photo; the site falls back to person.image.
     { name: "image", type: "upload", relationTo: "media" },
   ],
+  hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnDelete] },
 };

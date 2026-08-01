@@ -1,5 +1,6 @@
 import type { CollectionConfig } from "payload";
 
+import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
 import { anyone } from "../lib/access";
 
 // Was Strapi `ehrenamtliche` — the shared person pool vorstand, positions and
@@ -14,4 +15,5 @@ export const People: CollectionConfig = {
     { name: "phone", type: "text" },
     { name: "image", type: "upload", relationTo: "media" },
   ],
+  hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnDelete] },
 };
