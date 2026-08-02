@@ -35,6 +35,12 @@ variable "api_domain" {
   type        = string
 }
 
+variable "cms_domains" {
+  description = "Custom domains for the CMS service, routed via the load balancer (Cloud Run domain-mappings are unavailable in europe-west3). Empty list = no cms cert/host-rule; the run.app URL still works. Set to [\"cms.testing.hbdragons.de\"] now; the prod domain cms.hbdragons.de is appended only at cutover — it still points at Strapi. In CI: vars.CMS_DOMAINS."
+  type        = list(string)
+  default     = []
+}
+
 variable "image_tag" {
   description = "Container image tag for initial deployment"
   type        = string
