@@ -43,7 +43,7 @@ no rsync, no symlinks over SFTP — symlinks are created exclusively by
 ## Testing subdomain (browsable staging pre-cutover)
 
 `site.testing.hbdragons.de` serves the staged release directly — docroot
-`public_html/releases/current`.
+`public_html/current` (the symlink swap.php maintains next to itself).
 
 Sequencing hazard: the panel may refuse a not-yet-existing docroot, or
 pre-create `current/` as a **real directory**, which breaks `swap.php`'s
@@ -52,7 +52,7 @@ pre-create `current/` as a **real directory**, which breaks `swap.php`'s
 1. Run one deploy + swap first (isolated test above, or the D2 workflow) so
    `current` exists as a symlink.
 2. In konsoleH create subdomain `site.testing.hbdragons.de`, docroot
-   `public_html/releases/current`, Let's Encrypt cert (+ DNS record if not
+   `public_html/current`, Let's Encrypt cert (+ DNS record if not
    auto-created). If the panel already created an empty `current/` directory,
    delete it via SFTP *before* the first swap.
 3. Verify:

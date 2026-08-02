@@ -18,7 +18,7 @@ RewriteRule ^swap\.php$ - [L]
 
 # everything else through the current release — host-guarded: Apache's
 # parent-dir .htaccess walk applies this file to site.testing.* requests too
-# (their docroot is releases/current); rewriting those would double-prefix
+# (their docroot is public_html/current); rewriting those would double-prefix
 RewriteCond %{HTTP_HOST} ^(www\.)?hbdragons\.de$ [NC]
 RewriteCond %{REQUEST_URI} !^/current/
 RewriteRule ^(.*)$ current/$1 [L]

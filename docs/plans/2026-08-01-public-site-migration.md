@@ -702,7 +702,7 @@ Port table — source of truth for markup/behavior is the legacy Vue page; keep 
 
 ## Phase D — Deploy pipeline
 
-> **Testing-domain strategy (added 2026-08-02):** before cutover the whole stack is browsable on testing subdomains — `site.testing.hbdragons.de` (Hetzner subdomain whose docroot is `public_html/releases/current`, i.e. the staged release the workflow already produces) and `cms.testing.hbdragons.de` (LB host rule → cms Cloud Run, A5 step 2d). A6 content is verified on these domains before Phase E touches live traffic. Cutover then reduces to: rename `.htaccess.new`, add the prod cms domain, flip the `SITE_URL`/`CMS_URL` vars.
+> **Testing-domain strategy (added 2026-08-02):** before cutover the whole stack is browsable on testing subdomains — `site.testing.hbdragons.de` (Hetzner subdomain whose docroot is `public_html/current`, i.e. the staged release the workflow already produces) and `cms.testing.hbdragons.de` (LB host rule → cms Cloud Run, A5 step 2d). A6 content is verified on these domains before Phase E touches live traffic. Cutover then reduces to: rename `.htaccess.new`, add the prod cms domain, flip the `SITE_URL`/`CMS_URL` vars.
 
 ### Task D1: Hetzner docroot infra files
 
@@ -735,7 +735,7 @@ RewriteRule ^swap\.php$ - [L]
 
 # everything else through the current release — host-guarded: Apache's
 # parent-dir .htaccess walk applies this file to site.testing.* requests too
-# (their docroot is releases/current); rewriting those would double-prefix
+# (their docroot is public_html/current); rewriting those would double-prefix
 RewriteCond %{HTTP_HOST} ^(www\.)?hbdragons\.de$ [NC]
 RewriteCond %{REQUEST_URI} !^/current/
 RewriteRule ^(.*)$ current/$1 [L]
@@ -789,7 +789,7 @@ foreach (array_slice($releases, 5) as $old) {
 echo "ok $sha";
 ```
 
-- [ ] **Step 3 (HITL): one-time host setup via SFTP** — README checklist: upload `.htaccess` + `swap.php` to `public_html/`; upload `.deploy_secret` (`openssl rand -hex 32`) to home (`/` in the jail — lands in `/usr/home/hbdrag/`); `mkdir public_html/releases`. **Never create symlinks via SFTP** — the first `current` symlink is created by the first swap.php call. Note: old `public_html` content keeps serving until the `.htaccess` upload; sequence the very first activation inside Phase E, not here — until cutover, keep the new `.htaccess` uploaded as `.htaccess.new` and the go-live step renames it. **Testing subdomain (addendum 2026-08-02):** in konsoleH create `site.testing.hbdragons.de` with docroot `public_html/releases/current` + Let's Encrypt cert (+ DNS record if not auto-created). Sequencing hazard: the panel may refuse a not-yet-existing docroot, or pre-create `current/` as a real directory — which would make swap.php's `rename()` fail. So: run the first deploy+swap FIRST; if the panel already created an empty `current/` dir, delete it via SFTP before that swap; only then set the docroot. Verify afterwards: `curl -s https://site.testing.hbdragons.de/` serves the staged release, `curl -sI …` shows `X-Robots-Tag: noindex`, and the legacy `public_html/.htaccess` doesn't mangle subdomain requests (Apache parent-dir walk) — if it does, wrap its rules in a `RewriteCond %{HTTP_HOST}` guard.
+- [ ] **Step 3 (HITL): one-time host setup via SFTP** — README checklist: upload `.htaccess` + `swap.php` to `public_html/`; upload `.deploy_secret` (`openssl rand -hex 32`) to home (`/` in the jail — lands in `/usr/home/hbdrag/`); `mkdir public_html/releases`. **Never create symlinks via SFTP** — the first `current` symlink is created by the first swap.php call. Note: old `public_html` content keeps serving until the `.htaccess` upload; sequence the very first activation inside Phase E, not here — until cutover, keep the new `.htaccess` uploaded as `.htaccess.new` and the go-live step renames it. **Testing subdomain (addendum 2026-08-02):** in konsoleH create `site.testing.hbdragons.de` with docroot `public_html/current` + Let's Encrypt cert (+ DNS record if not auto-created). Sequencing hazard: the panel may refuse a not-yet-existing docroot, or pre-create `current/` as a real directory — which would make swap.php's `rename()` fail. So: run the first deploy+swap FIRST; if the panel already created an empty `current/` dir, delete it via SFTP before that swap; only then set the docroot. Verify afterwards: `curl -s https://site.testing.hbdragons.de/` serves the staged release, `curl -sI …` shows `X-Robots-Tag: noindex`, and the legacy `public_html/.htaccess` doesn't mangle subdomain requests (Apache parent-dir walk) — if it does, wrap its rules in a `RewriteCond %{HTTP_HOST}` guard.
 - [ ] **Step 4: Commit** `feat(site): hetzner deploy endpoint + htaccess`
 
 ### Task D2: `deploy-site.yml` workflow
@@ -877,7 +877,7 @@ jobs:
 
 Pin action shas per repo convention (mirror ci.yml). `.htaccess` is deliberately NOT uploaded per-deploy (it's the live-traffic switch; managed by D1/Phase E — swap.php is safe to re-upload).
 
-- [ ] **Step 2: Pre-cutover safety (testing-domain addendum 2026-08-02):** until Phase E flips `.htaccess`, live traffic never routes through `current/` — but the staged release IS browsable at `https://site.testing.hbdragons.de` (subdomain docroot = `releases/current`, D1 step 3). Smoke tests run against repo var `SITE_URL` (= the testing URL now, `https://hbdragons.de` after Phase E) — no gating; every deploy is verified end-to-end from day one.
+- [ ] **Step 2: Pre-cutover safety (testing-domain addendum 2026-08-02):** until Phase E flips `.htaccess`, live traffic never routes through `current/` — but the staged release IS browsable at `https://site.testing.hbdragons.de` (subdomain docroot = `public_html/current`, D1 step 3). Smoke tests run against repo var `SITE_URL` (= the testing URL now, `https://hbdragons.de` after Phase E) — no gating; every deploy is verified end-to-end from day one.
 - [ ] **Step 3:** Run once via `workflow_dispatch` (build path), verify release lands under `releases/`, swap returns `ok`, prune keeps ≤5. **Commit** `ci: deploy-site workflow`
 
 ### Task D3: Secrets + tokens (HITL checklist)
