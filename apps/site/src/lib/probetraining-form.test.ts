@@ -40,12 +40,23 @@ describe("option lists", () => {
     expect(GENDERS).toEqual(["männlich", "weiblich", "divers"]);
   });
 
-  it("offers 100 birth years, newest first, starting 5 years back (legacy BaseYear)", () => {
+  it("offers birth years newest first, starting 5 years back (legacy BaseYear)", () => {
     const years = yearOptions(2026);
-    expect(years).toHaveLength(YEAR_COUNT);
     expect(years[0]).toBe(2026 - YEAR_OFFSET);
     expect(years[1]).toBe(2026 - YEAR_OFFSET - 1);
-    expect(years[years.length - 1]).toBe(2026 - YEAR_OFFSET - (YEAR_COUNT - 1));
+  });
+
+  it("never offers a year below the contract minimum (legacy went to 1922 — dead submits)", () => {
+    const years = yearOptions(2026);
+    expect(years[years.length - 1]).toBe(1930);
+    expect(years).toHaveLength(2026 - YEAR_OFFSET - 1930 + 1);
+    for (const year of years) {
+      expect(probetrainingRequestSchema.shape.year.safeParse(year).success).toBe(true);
+    }
+  });
+
+  it("caps the list at the legacy 100 entries even far in the future", () => {
+    expect(yearOptions(2200)).toHaveLength(YEAR_COUNT);
   });
 
   it("defaults the year options to the current year", () => {

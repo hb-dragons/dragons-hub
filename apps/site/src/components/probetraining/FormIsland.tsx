@@ -286,8 +286,14 @@ export default function FormIsland() {
     setStepTwoErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    // Both steps validated against the contract, so this cannot fail; the
+    // toast is the safety net against a silent dead submit button if it ever
+    // does.
     const body = buildRequestBody(form);
-    if (body === null) return;
+    if (body === null) {
+      setToast("error");
+      return;
+    }
 
     setSubmitting(true);
     setToast(null);

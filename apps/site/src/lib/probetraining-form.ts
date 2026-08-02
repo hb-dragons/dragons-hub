@@ -33,11 +33,18 @@ export type DidPlay = "0" | "1";
 /** Legacy `BaseYear`: the newest selectable birth year is 5 years back. */
 export const YEAR_OFFSET = 5;
 
-/** Legacy list length: 100 birth years, newest first. */
+/** Legacy list length cap: at most 100 birth years, newest first. */
 export const YEAR_COUNT = 100;
 
+// The oldest year the contract accepts. The legacy list ran 100 years deep
+// regardless (into the 1920s), but the endpoint rejects anything below this —
+// offering it would only manufacture a doomed submission.
+const YEAR_MIN = probetrainingRequestSchema.shape.year.minValue ?? 1930;
+
 export function yearOptions(currentYear = new Date().getFullYear()): number[] {
-  return Array.from({ length: YEAR_COUNT }, (_, i) => currentYear - YEAR_OFFSET - i);
+  const newest = currentYear - YEAR_OFFSET;
+  const length = Math.min(YEAR_COUNT, newest - YEAR_MIN + 1);
+  return Array.from({ length }, (_, i) => newest - i);
 }
 
 export interface ProbetrainingFormState {
@@ -95,17 +102,30 @@ const stepTwoSchema = probetrainingRequestSchema.pick({
 });
 
 /**
+ * The form state translated to the contract's wire fields (`email`→`mail`,
+ * tab value→boolean, untouched message dropped). Both step validators and
+ * the request body parse this one shape; the schemas strip what they don't
+ * pick.
+ */
+function wireFields(state: ProbetrainingFormState) {
+  return {
+    month: state.month,
+    year: state.year,
+    didPlay: state.didPlay === "1",
+    gender: state.gender ?? undefined,
+    mail: state.email,
+    ...(state.message === "" ? {} : { message: state.message }),
+    acceptedPrivacy: state.acceptedPrivacy,
+  };
+}
+
+/**
  * Step 1 (month/year/didPlay/gender). Month, year and didPlay come from
  * selects with valid defaults, so — like the legacy schemaFirst — only the
  * initially-empty gender can actually fail.
  */
 export function validateStepOne(state: ProbetrainingFormState): StepOneErrors {
-  const result = stepOneSchema.safeParse({
-    month: state.month,
-    year: state.year,
-    didPlay: state.didPlay === "1",
-    gender: state.gender ?? undefined,
-  });
+  const result = stepOneSchema.safeParse(wireFields(state));
   if (result.success) return {};
 
   const errors: StepOneErrors = {};
@@ -117,11 +137,7 @@ export function validateStepOne(state: ProbetrainingFormState): StepOneErrors {
 
 /** Step 2 (email/message/privacy consent), with the legacy German messages. */
 export function validateStepTwo(state: ProbetrainingFormState): StepTwoErrors {
-  const result = stepTwoSchema.safeParse({
-    mail: state.email,
-    ...(state.message === "" ? {} : { message: state.message }),
-    acceptedPrivacy: state.acceptedPrivacy,
-  });
+  const result = stepTwoSchema.safeParse(wireFields(state));
   if (result.success) return {};
 
   const errors: StepTwoErrors = {};
@@ -147,15 +163,7 @@ const clientSchema = probetrainingRequestSchema.omit({ website: true });
  * (`email`→`mail`, tab value→boolean) and drops an untouched message.
  */
 export function buildRequestBody(state: ProbetrainingFormState): ProbetrainingRequest | null {
-  const parsed = clientSchema.safeParse({
-    month: state.month,
-    year: state.year,
-    didPlay: state.didPlay === "1",
-    gender: state.gender ?? undefined,
-    mail: state.email,
-    ...(state.message === "" ? {} : { message: state.message }),
-    acceptedPrivacy: state.acceptedPrivacy,
-  });
+  const parsed = clientSchema.safeParse(wireFields(state));
   if (!parsed.success) return null;
   return { ...parsed.data, website: state.website };
 }
