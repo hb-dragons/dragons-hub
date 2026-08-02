@@ -13,6 +13,12 @@ github_repo = "dragons-hub"
 web_domain = "app.dragons.example.com"
 api_domain = "api.dragons.example.com"
 
+# CMS domains routed via the load balancer (list — Phase E appends the prod
+# domain at cutover; until then it stays off this list because it still points
+# at the legacy Strapi host). Empty list = no cms cert/host-rule, run.app URL
+# only. In CI: vars.CMS_DOMAINS.
+cms_domains = ["cms.testing.dragons.example.com"]
+
 # Basketball-Bund SDK credentials
 sdk_username = "your-sdk-username"
 sdk_password = "your-sdk-password"

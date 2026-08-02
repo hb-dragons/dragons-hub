@@ -24,6 +24,8 @@ import { Vorstand } from "./collections/vorstand";
 import { BackgroundVideo } from "./globals/background-video";
 import { SiteSettings } from "./globals/site-settings";
 import { TeamBackground } from "./globals/team-background";
+import { publicUrlSettings } from "./lib/public-url";
+import { migrations } from "./migrations";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -33,8 +35,16 @@ export default buildConfig({
   // connects). Eager validation here would fail that build; Payload/pg reject
   // missing values at first real use instead.
   secret: process.env.PAYLOAD_SECRET!,
+  // serverURL/cors/csrf come from CMS_PUBLIC_URL so the testing→prod domain
+  // switch at cutover is env-only. Unset (dev, CI) = relative URLs.
+  ...publicUrlSettings(process.env.CMS_PUBLIC_URL),
   db: postgresAdapter({
     pool: { connectionString: process.env.DATABASE_URL_CMS! },
+    // Dev manages the schema in push mode; prod runs the committed migrations
+    // at boot (NODE_ENV=production only — src/instrumentation.ts forces the
+    // init). Generated with `payload migrate:create` against a fresh local db.
+    migrationDir: path.resolve(dirname, "migrations"),
+    prodMigrations: migrations,
   }),
   editor: lexicalEditor(),
   collections: [
@@ -59,7 +69,14 @@ export default buildConfig({
   plugins: process.env.GCS_MEDIA_BUCKET
     ? [
         gcsStorage({
-          collections: { media: true },
+          // disablePayloadAccessControl makes `doc.url` the absolute
+          // https://storage.googleapis.com/<bucket>/… URL (the adapter's
+          // generateURL → File.publicUrl()) instead of a relative
+          // /api/media/file/… path proxied by this scale-to-zero service.
+          // The site bakes these URLs into built HTML, so media must come
+          // straight from GCS; the bucket grants allUsers objectViewer in
+          // tofu, matching the collection's public read access.
+          collections: { media: { disablePayloadAccessControl: true } },
           bucket: process.env.GCS_MEDIA_BUCKET,
           options: {},
         }),
