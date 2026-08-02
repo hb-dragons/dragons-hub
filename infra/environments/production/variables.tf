@@ -36,9 +36,15 @@ variable "api_domain" {
 }
 
 variable "cms_domains" {
-  description = "Custom domains for the CMS service, routed via the load balancer (Cloud Run domain-mappings are unavailable in europe-west3). Empty list = no cms cert/host-rule; the run.app URL still works. Set to [\"cms.testing.hbdragons.de\"] now; the prod domain cms.hbdragons.de is appended only at cutover — it still points at Strapi. In CI: vars.CMS_DOMAINS."
+  description = "Custom domains for the CMS service, routed via the load balancer (Cloud Run domain-mappings are unavailable in europe-west3). The service has LB-only ingress, so with an empty list it is unreachable. Set to [\"cms.testing.hbdragons.de\"] now; the prod domain cms.hbdragons.de is appended only at cutover — it still points at Strapi. In CI: vars.CMS_DOMAINS."
   type        = list(string)
   default     = []
+}
+
+variable "cms_media_public" {
+  description = "Grant allUsers read on the CMS media bucket so Payload emits direct https://storage.googleapis.com/… media URLs instead of proxying every image through the scale-to-zero cms service. Requires a project-level exception to constraints/iam.allowedPolicyMemberDomains — without one the apply fails with 'users named in the policy do not belong to a permitted customer'. In CI: vars.CMS_MEDIA_PUBLIC."
+  type        = bool
+  default     = false
 }
 
 variable "image_tag" {

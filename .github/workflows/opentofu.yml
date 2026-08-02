@@ -69,6 +69,7 @@ jobs:
       # HCL list, e.g. ["cms.testing.hbdragons.de"]. The `|| '[]'` fallback:
       # an unset repo variable renders "", which is not a valid list value.
       TF_VAR_cms_domains: ${{ vars.CMS_DOMAINS || '[]' }}
+      TF_VAR_cms_media_public: ${{ vars.CMS_MEDIA_PUBLIC || 'false' }}
       TF_VAR_sdk_username: ${{ secrets.SDK_USERNAME }}
       TF_VAR_sdk_password: ${{ secrets.SDK_PASSWORD }}
       TF_VAR_referee_sdk_username: ${{ secrets.REFEREE_SDK_USERNAME }}
