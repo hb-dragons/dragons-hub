@@ -24,6 +24,7 @@ import { Vorstand } from "./collections/vorstand";
 import { BackgroundVideo } from "./globals/background-video";
 import { SiteSettings } from "./globals/site-settings";
 import { TeamBackground } from "./globals/team-background";
+import { mediaStorageOptions } from "./lib/media-storage";
 import { publicUrlSettings } from "./lib/public-url";
 import { migrations } from "./migrations";
 
@@ -69,22 +70,7 @@ export default buildConfig({
   plugins: process.env.GCS_MEDIA_BUCKET
     ? [
         gcsStorage({
-          // disablePayloadAccessControl makes `doc.url` the absolute
-          // https://storage.googleapis.com/<bucket>/… URL (the adapter's
-          // generateURL → File.publicUrl()) instead of a relative
-          // /api/media/file/… path proxied by this scale-to-zero service.
-          // It is only correct when the bucket actually grants public read,
-          // so it tracks the same tofu var (GCS_MEDIA_PUBLIC) that adds the
-          // allUsers grant — otherwise every image 403s. Off by default: the
-          // org's domain-restricted-sharing constraint rejects allUsers.
-          // The flag is typed `true | undefined`, so the private case omits it
-          // rather than passing false.
-          collections: {
-            media:
-              process.env.GCS_MEDIA_PUBLIC === "true"
-                ? { disablePayloadAccessControl: true }
-                : true,
-          },
+          collections: { media: mediaStorageOptions(process.env.GCS_MEDIA_PUBLIC) },
           bucket: process.env.GCS_MEDIA_BUCKET,
           options: {},
         }),
