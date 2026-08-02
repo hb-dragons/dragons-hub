@@ -17,14 +17,13 @@ export default defineConfig({
         "src/content.config.ts",
       ],
       thresholds: {
-        // Measured floor 2026-08-01 (issue #172, first test suite in this
-        // package): 96.55 branches / 100 functions / 97.36 lines / 97.77
-        // statements — src/lib/payload.ts fully exercised, src/lib/strings.ts
-        // is a literal map. Ratchet up over time; never lower.
-        branches: 96,
+        // Measured 2026-08-02 (issue #200 cleanup sweep): 97.25 branches /
+        // 100 functions / 99.76 lines / 99.41 statements. Ratchet up over
+        // time; never lower.
+        branches: 97,
         functions: 100,
-        lines: 97,
-        statements: 97,
+        lines: 99,
+        statements: 99,
       },
     },
   },
