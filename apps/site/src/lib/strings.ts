@@ -262,5 +262,7 @@ export const strings = {
       "Datenschutzerklärung der HB Dragons e.V.: Informationen zur Verarbeitung personenbezogener Daten auf dieser Website.",
     notFound:
       "Diese Seite gibt es bei den HB Dragons nicht (mehr). Zurück zur Startseite des Basketballvereins aus Hannover.",
+    probetraining:
+      "Probetraining bei den HB Dragons vereinbaren: Komm vorbei und lerne unsere Teams in Hannover kennen – kostenlos und unverbindlich.",
   },
 } as const;
