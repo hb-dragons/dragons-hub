@@ -8,16 +8,14 @@ import PageContainer from "../../components/PageContainer.astro";
 import PageHeader from "../../components/PageHeader.astro";
 import Layout from "../../layouts/Layout.astro";
 import { cmsBaseUrl } from "../../lib/media";
+import { publishedPage } from "../../lib/pages";
 import { toSiteImage } from "../../lib/site-image";
 import { strings } from "../../lib/strings";
 
 const cmsBase = cmsBaseUrl();
 
-const pageEntries = await getCollection(
-  "pages",
-  ({ data }) => data._status === "published" && data.slug === "supporter",
-);
-const page = pageEntries[0]?.data ?? null;
+// "partner" is the legacy Strapi slug — accepted until A6 pins the mapping.
+const page = publishedPage(await getCollection("pages"), "supporter", "partner");
 
 // Loader sorts by orderIndex; partners carry no description in the pruned
 // Payload surface (see ItemRows docs).

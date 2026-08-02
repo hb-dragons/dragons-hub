@@ -10,8 +10,7 @@ import { getCollection, type CollectionEntry } from "astro:content";
 import { cmsBaseUrl } from "../../lib/media";
 import { resolveRefs } from "../../lib/page-blocks";
 import { toSiteImage } from "../../lib/site-image";
-import BlurImage from "../BlurImage.astro";
-import ImageTextOverlay from "../ImageTextOverlay.astro";
+import LinkedImageCard from "../LinkedImageCard.astro";
 
 type Layout = NonNullable<CollectionEntry<"pages">["data"]["layout"]>;
 
@@ -29,27 +28,14 @@ const teams = resolveRefs(block.teams, allTeams);
 {
   teams.length > 0 && (
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {teams.map((team) => {
-        const image = toSiteImage(team.teamImage, cmsBase);
-        return (
-          <a
-            href={`/teams/${team.slug}/`}
-            aria-label={team.name}
-            class="relative overflow-hidden rounded-lg border border-border shadow-md group block h-[150px] md:h-[200px] lg:h-[250px] xl:h-[300px] 2xl:h-[350px]"
-          >
-            {image && (
-              <BlurImage
-                src={image.url}
-                blurhash={image.blurhash}
-                alt={image.alt ?? team.name}
-                class="w-full h-full"
-                imgClass="object-cover group-hover:md:scale-105 transition-transform duration-300"
-              />
-            )}
-            <ImageTextOverlay title={team.name} />
-          </a>
-        );
-      })}
+      {teams.map((team) => (
+        <LinkedImageCard
+          href={`/teams/${team.slug}/`}
+          title={team.name}
+          image={toSiteImage(team.teamImage, cmsBase)}
+          ariaLabel={team.name}
+        />
+      ))}
     </div>
   )
 }

@@ -12,16 +12,15 @@ import PageContainer from "../../../components/PageContainer.astro";
 import PageHeader from "../../../components/PageHeader.astro";
 import Layout from "../../../layouts/Layout.astro";
 import { cmsBaseUrl } from "../../../lib/media";
+import { publishedPage } from "../../../lib/pages";
 import { toSiteImage } from "../../../lib/site-image";
 import { strings } from "../../../lib/strings";
 
 const cmsBase = cmsBaseUrl();
 
-const pageEntries = await getCollection(
-  "pages",
-  ({ data }) => data._status === "published" && data.slug === "team",
-);
-const page = pageEntries[0]?.data ?? null;
+// "kontakt" is the legacy Strapi slug — accepted until A6 pins the mapping,
+// so the contact block never silently vanishes on a slug mismatch.
+const page = publishedPage(await getCollection("pages"), "team", "kontakt");
 
 const trainers = (await getCollection("trainers")).map((entry) => entry.data);
 ---

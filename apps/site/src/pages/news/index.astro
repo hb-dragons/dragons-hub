@@ -8,17 +8,13 @@ import PageContainer from "../../components/PageContainer.astro";
 import PageHeader from "../../components/PageHeader.astro";
 import Layout from "../../layouts/Layout.astro";
 import { cmsBaseUrl } from "../../lib/media";
+import { publishedPage } from "../../lib/pages";
 import { toSiteImage } from "../../lib/site-image";
 import { strings } from "../../lib/strings";
 
 const cmsBase = cmsBaseUrl();
 
-// The build user's API key sees drafts (publishedOrAuthed) — filter them out.
-const pageEntries = await getCollection(
-  "pages",
-  ({ data }) => data._status === "published" && data.slug === "news",
-);
-const page = pageEntries[0]?.data ?? null;
+const page = publishedPage(await getCollection("pages"), "news");
 
 const posts = (await getCollection("posts", ({ data }) => data._status === "published"))
   .map((entry) => entry.data)

@@ -58,6 +58,9 @@ const html = lexicalToHtml(Astro.props.content, cmsBaseUrl());
     font-size: 1rem;
     line-height: 1.5rem;
   }
+  /* Legacy links were Tailwind blue-400/300 in dark mode; the site theme has
+     no blue token (same mapping as DownloadCard's badge), so the resolved
+     values are pinned here. */
   .rich-text a {
     color: #51a2ff;
     text-decoration: underline;
