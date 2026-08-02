@@ -3,6 +3,7 @@
 // → News → FollowUs. Hero comes from HomeStart.vue + HomeVideoBackground.vue —
 // the motion-v letter stagger is server-rendered spans + CSS delays (zero JS).
 import Layout from "../layouts/Layout.astro";
+import ScoreboardIsland from "../components/live/ScoreboardIsland";
 import NextGamesIsland from "../components/NextGamesIsland";
 import HomeFollowUs from "../components/home/FollowUs.astro";
 import HomeJoin from "../components/home/Join.astro";
@@ -98,6 +99,12 @@ const years =
       </div>
     </div>
   </div>
+
+  {/* Live scoreboard (Task C6): renders nothing unless a game is live, so it
+      adds no layout when hidden. client:idle, not client:visible — the island
+      mounts empty (zero-size), so a viewport trigger might never fire, and it
+      must connect early to know whether there is anything to show at all. */}
+  <ScoreboardIsland client:idle />
 
   <HomeJoin {memberCount} {teamCount} {years} />
 

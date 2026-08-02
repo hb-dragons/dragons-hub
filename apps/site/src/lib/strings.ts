@@ -211,6 +211,14 @@ export const strings = {
     teamsCount: "Teams",
     standingsError: "Fehler beim Laden",
   },
+  scoreboard: {
+    sectionLabel: "Live-Spielstand",
+    liveBadge: "Live",
+    home: "Heim",
+    guest: "Gast",
+    // Period prefix, same abbreviation the web scoreboard uses ("Q2").
+    periodPrefix: "Q",
+  },
   seo: {
     // Meta descriptions (Task C8). Per-doc CMS overrides win; these are the
     // hand-written fallbacks per route, kept inside the ~155-char budget.
