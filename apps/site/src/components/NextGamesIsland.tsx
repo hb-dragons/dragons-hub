@@ -2,7 +2,8 @@
  * React island port of dragons-app HomeNextGames.vue + GameCard family:
  * @dragons/ui primitives restyled by site.css, @dragons/api-client raw-TS
  * consumption, /public/home/dashboard fetch (falls back to fixture data
- * when CORS blocks — TRUSTED_ORIGINS gap closes with plan Task B1).
+ * when CORS blocks — TRUSTED_ORIGINS gap closes with plan Task B1). The
+ * fetched games are narrowed to the legacy week window by lib/next-games.
  */
 import { useEffect, useState } from "react";
 import { ApiClient, createApi } from "@dragons/api-client";
@@ -11,6 +12,7 @@ import type { MatchListItem } from "@dragons/shared";
 import { Badge } from "@dragons/ui/components/badge";
 import { Skeleton } from "@dragons/ui/components/skeleton";
 import { DEFAULT_API_BASE } from "../lib/api-base";
+import { nextGames } from "../lib/next-games";
 import { SOFT_BUTTON_CLASSES } from "../lib/site-assets";
 import { strings } from "../lib/strings";
 
@@ -178,8 +180,10 @@ export default function NextGamesIsland() {
   useEffect(() => {
     api.public
       .getHomeDashboard()
-      .then((d) => setGames(d.upcomingGames))
+      .then((d) => setGames(nextGames(d.upcomingGames)))
       .catch(() => {
+        // Fixture stays unwindowed on purpose: its static dates would age out
+        // of the week window and blank the fallback.
         setGames(FIXTURE);
       });
   }, []);
