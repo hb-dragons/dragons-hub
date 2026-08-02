@@ -1,0 +1,26 @@
+Options +FollowSymLinks
+RewriteEngine On
+
+# canonical host: www → apex
+RewriteCond %{HTTP_HOST} ^www\. [NC]
+RewriteRule ^(.*)$ https://hbdragons.de/$1 [R=301,L]
+
+# legacy sitemap name Google knows
+RewriteRule ^sitemap_index\.xml$ /sitemap-index.xml [R=301,L]
+
+# stale v1 URLs still indexed (extend from the GSC indexed-pages list at go-live)
+RewriteRule ^teams/damen/?$ /teams/damen-1/ [R=301,L]
+RewriteRule ^teams/herren/?$ /teams/herren-1/ [R=301,L]
+RewriteRule ^media/?$ /news/ [R=301,L]
+
+# deploy endpoint served directly
+RewriteRule ^swap\.php$ - [L]
+
+# everything else through the current release — host-guarded: Apache's
+# parent-dir .htaccess walk applies this file to site.testing.* requests too
+# (their docroot is public_html/current); rewriting those would double-prefix
+RewriteCond %{HTTP_HOST} ^(www\.)?hbdragons\.de$ [NC]
+RewriteCond %{REQUEST_URI} !^/current/
+RewriteRule ^(.*)$ current/$1 [L]
+
+ErrorDocument 404 /404.html
