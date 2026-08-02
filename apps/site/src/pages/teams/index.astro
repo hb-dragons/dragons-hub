@@ -1,0 +1,56 @@
+---
+// Port of dragons-app app/pages/teams/index.vue: PageHeader band from the
+// CMS "teams" page entry, then the alternating team rows. League names are
+// not CMS data anymore — they join in from /public/standings at build time
+// via the apiTeamPermanentId key (the legacy CMS stored leagueName per team).
+import { getCollection } from "astro:content";
+
+import Layout from "../../layouts/Layout.astro";
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import TeamRows, { type RowTeam } from "../../components/teams/TeamRows.astro";
+import { apiBase } from "../../lib/api-base";
+import { cmsBaseUrl } from "../../lib/media";
+import { strings } from "../../lib/strings";
+import { fetchTeamBackground } from "../../lib/team-background";
+import { toSiteImage } from "../../lib/team-detail";
+import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
+
+const cmsBase = cmsBaseUrl();
+
+// Loader-sorted by orderIndex (src/content.config.ts) — the legacy page
+// sorted client-side.
+const teams = await getCollection("teams");
+
+const pages = await getCollection("pages");
+const teamsPage =
+  pages.find((page) => page.data.slug === "teams" && page.data._status !== "draft")?.data ?? null;
+
+// Content build (CMS env present): the standings join and the background
+// global are required — failures throw and fail the build loudly, per the
+// loaders' failure model. Env-less shell builds skip both and stay green.
+const leagueNames =
+  cmsBase !== undefined && teams.length > 0
+    ? await fetchTeamLeagueNames(apiBase())
+    : new Map<number, string>();
+const backgroundImage =
+  cmsBase !== undefined ? toSiteImage(await fetchTeamBackground(cmsBase), cmsBase) : null;
+
+const rows: RowTeam[] = teams.map(({ data }) => ({
+  name: data.name,
+  slug: data.slug,
+  leagueName: leagueNameFor(leagueNames, data.apiTeamPermanentId),
+  image: toSiteImage(data.teamImage, cmsBase),
+}));
+
+const headerTitle = teamsPage?.header?.title ?? strings.teams.heading;
+const headerImage = toSiteImage(teamsPage?.header?.image, cmsBase);
+---
+
+<Layout title={strings.teams.pageTitle}>
+  <PageHeader title={headerTitle} image={headerImage} />
+
+  <PageContainer>
+    <TeamRows teams={rows} backgroundImage={backgroundImage} />
+  </PageContainer>
+</Layout>
