@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { probetrainingRequestSchema } from "../../../../packages/contracts/src/probetraining";
+import { probetrainingRequestSchema } from "@dragons/contracts";
 import {
   buildRequestBody,
   didPlayLabel,

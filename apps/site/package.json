@@ -17,6 +17,7 @@
     "@astrojs/react": "^6.0.2",
     "@astrojs/sitemap": "^3.7.0",
     "@dragons/api-client": "workspace:*",
+    "@dragons/contracts": "workspace:*",
     "@dragons/shared": "workspace:*",
     "@dragons/ui": "workspace:*",
     "@payloadcms/richtext-lexical": "3.87.0",

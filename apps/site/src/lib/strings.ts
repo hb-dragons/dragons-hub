@@ -26,9 +26,6 @@ export const strings = {
     shop: "Shop",
     supporter: "Supporter",
     downloads: "Downloads",
-    dragons: "Dragons",
-    impressum: "Impressum",
-    datenschutz: "Datenschutz",
     openMenu: "Menü öffnen",
     closeMenu: "Menü schließen",
   },
@@ -45,7 +42,6 @@ export const strings = {
     linkedin: "LinkedIn",
   },
   home: {
-    title: "HB Dragons e.V. — Startseite",
     scrollHint: "Scroll",
     newsHeading: "Aktuelle News",
     allNews: "Alle News",
@@ -63,14 +59,11 @@ export const strings = {
     versus: "VS",
   },
   notFound: {
-    title: "Seite nicht gefunden — HB Dragons e.V.",
-    code: "404",
     heading: "Seite nicht gefunden",
     message: "Diese Seite gibt es nicht (mehr) — vielleicht ein Tippfehler im Link, oder die Seite ist umgezogen.",
     backHome: "Zur Startseite",
   },
   spielplan: {
-    pageTitle: "Spielplan — HB Dragons e.V.",
     heading: "Spielplan",
     filterAll: "Alle Spiele",
     filterHome: "Heimspiele",
@@ -85,9 +78,7 @@ export const strings = {
     mapAriaLabel: "Karte",
   },
   news: {
-    pageTitle: "News — HB Dragons e.V.",
     fallbackHeading: "News",
-    titleSuffix: " — HB Dragons e.V.",
     lightboxLabel: "Bild-Lightbox",
     lightboxClose: "Lightbox schließen",
     lightboxPrevious: "Vorheriges Bild",
@@ -95,7 +86,6 @@ export const strings = {
     lightboxOpen: "Bild im Lightbox ansehen",
   },
   shop: {
-    pageTitle: "Shop — HB Dragons e.V.",
     heading: "Shop",
     buy: "Jetzt kaufen",
     buyAriaSuffix: "kaufen - öffnet in neuem Tab",
@@ -104,7 +94,6 @@ export const strings = {
     emptyText: "Derzeit sind keine Produkte im Shop verfügbar.",
   },
   supporter: {
-    pageTitle: "Supporter — HB Dragons e.V.",
     fallbackHeading: "Supporter",
     heroTitle: "Werde Supporter unseres Vereins!",
     heroDescription:
@@ -117,7 +106,6 @@ export const strings = {
     contactAria: "Kontakt per E-Mail aufnehmen",
   },
   downloads: {
-    pageTitle: "Downloads — HB Dragons e.V.",
     fallbackHeading: "Downloads",
     download: "Download",
     emptyTitle: "Keine Downloads verfügbar",
@@ -125,11 +113,9 @@ export const strings = {
   },
   dragons: {
     philosophie: {
-      pageTitle: "Philosophie — HB Dragons e.V.",
       heading: "Dragons Philosophie",
     },
     projekte: {
-      pageTitle: "Projekte — HB Dragons e.V.",
       heading: "Projekte",
       heroTitle: "Unsere Projekte",
       heroDescription:
@@ -138,11 +124,9 @@ export const strings = {
       buttonLabel: "Zum Projektpartner",
     },
     story: {
-      pageTitle: "Story — HB Dragons e.V.",
       heading: "Dragons Story",
     },
     team: {
-      pageTitle: "Kontakt — HB Dragons e.V.",
       heading: "Kontakt",
       vorstandHeading: "Unser Vorstand",
       positionsHeading: "Unsere Ehrenamtlichen",
@@ -156,15 +140,12 @@ export const strings = {
     backHome: "Zur Startseite",
   },
   impressum: {
-    pageTitle: "Impressum — HB Dragons e.V.",
     heading: "Impressum",
   },
   datenschutz: {
-    pageTitle: "Datenschutzerklärung — HB Dragons e.V.",
     heading: "Datenschutzerklärung",
   },
   probetraining: {
-    pageTitle: "Probetraining — HB Dragons e.V.",
     fallbackHeading: "Probetraining",
     stepOneIntro:
       "Wir brauchen ein paar Informationen von dir, um das perfekte Probetraining für Dich zu organisieren",
@@ -205,9 +186,7 @@ export const strings = {
     },
   },
   teams: {
-    pageTitle: "Teams — HB Dragons e.V.",
     heading: "Teams",
-    titleSuffix: " — HB Dragons e.V.",
     goToTeam: "Zum Team",
     overlayTeam: "Team",
     coach: "Coach",

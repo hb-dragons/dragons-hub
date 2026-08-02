@@ -6,16 +6,8 @@
  * client can never drift from what `POST /public/probetraining` accepts; this
  * module only maps the schema's issues onto the German messages the legacy
  * form showed. Kept `.tsx`-free so the whole seam is unit-testable.
- *
- * The contract lives in `packages/contracts`; the site consumes it via a
- * relative import because `apps/site` deliberately declares no dependency on
- * `@dragons/contracts` yet (astro.config already lists it under
- * `ssr.noExternal` for the day it does).
  */
-import {
-  probetrainingRequestSchema,
-  type ProbetrainingRequest,
-} from "../../../../packages/contracts/src/probetraining";
+import { probetrainingRequestSchema, type ProbetrainingRequest } from "@dragons/contracts";
 import { strings } from "./strings";
 
 /** Month names, straight from the contract enum — single source. */
