@@ -64,13 +64,17 @@ export function tableVenue(game: TeamTableGame): string {
   return game.venueNameOverride ?? game.venueName ?? "-";
 }
 
-/**
- * Legacy hardcoded local rivals whose games render the derby gradient (same
- * list the Excel export's Kommentar column uses).
- */
+/** Legacy hardcoded local rivals whose games count as derbies. */
 const DERBY_TEAMS = ["Ahlem", "Linden Dudes"];
 
-function isDerbyGame(game: TeamTableGame): boolean {
+/**
+ * Whether either side is a local rival — drives the derby gradient on the
+ * team tables here and the "Derby" Kommentar in the Spielplan Excel export.
+ */
+export function isDerbyGame(game: {
+  homeTeamName: string;
+  guestTeamName: string;
+}): boolean {
   return DERBY_TEAMS.some(
     (team) => game.homeTeamName.includes(team) || game.guestTeamName.includes(team),
   );

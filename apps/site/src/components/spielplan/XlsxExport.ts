@@ -1,6 +1,7 @@
 import { CLUB_TIME_ZONE, clubDayAnchor, todayInClubZone } from "@dragons/shared";
 import { formatGameTime } from "../../lib/game-format";
 import { dragonsTeamName, type SpielplanGame } from "../../lib/spielplan";
+import { isDerbyGame } from "../../lib/team-games";
 
 /**
  * Client-side Excel export — the port of `handleExportToExcel` in dragons-app
@@ -48,15 +49,6 @@ const EXPORT_DATE_FMT = new Intl.DateTimeFormat("de-DE", {
 function exportDate(date: string): string {
   const anchor = clubDayAnchor(date);
   return Number.isNaN(anchor.getTime()) ? date : EXPORT_DATE_FMT.format(anchor);
-}
-
-/** Legacy hardcoded local rivals whose games get the "Derby" comment. */
-const DERBY_TEAMS = ["Ahlem", "Linden Dudes"];
-
-function isDerbyGame(game: SpielplanExportGame): boolean {
-  return DERBY_TEAMS.some(
-    (team) => game.homeTeamName.includes(team) || game.guestTeamName.includes(team),
-  );
 }
 
 function comment(game: SpielplanExportGame): string {
