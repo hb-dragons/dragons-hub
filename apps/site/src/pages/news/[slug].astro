@@ -11,7 +11,10 @@ import PageHeader from "../../components/PageHeader.astro";
 import Layout from "../../layouts/Layout.astro";
 import { blurhashToDataUri } from "../../lib/blurhash";
 import { formatDateDe } from "../../lib/format";
+import { newsArticle } from "../../lib/jsonld";
+import { lexicalToPlainText } from "../../lib/lexical-text";
 import { cmsBaseUrl, mediaUrl } from "../../lib/media";
+import { absoluteUrl, canonicalUrl, DEFAULT_OG_IMAGE, metaDescription } from "../../lib/seo";
 import { toSiteImage } from "../../lib/site-image";
 import { strings } from "../../lib/strings";
 
@@ -43,9 +46,33 @@ const gallery: GalleryImage[] = (post.gallery ?? []).flatMap((media) => {
     },
   ];
 });
+
+// SEO (Task C8): CMS override ?? text derived from the post body; the header
+// image doubles as the OG card unless a dedicated one is set.
+const description = metaDescription(
+  post.seoDescription,
+  lexicalToPlainText(post.content),
+  strings.seo.news,
+);
+const ogImage = toSiteImage(post.ogImage ?? post.headerImage, cmsBase)?.url ?? null;
+const jsonLd = newsArticle({
+  headline: post.title,
+  datePublished: post.publishedDate,
+  url: canonicalUrl(Astro.site, Astro.url.pathname),
+  // Article rich results want an image, so mirror the OG fallback chain all
+  // the way down to the default club photo.
+  image: absoluteUrl(ogImage ?? DEFAULT_OG_IMAGE, Astro.site),
+  description,
+});
 ---
 
-<Layout title={`${post.title}${strings.news.titleSuffix}`}>
+<Layout
+  title={post.title}
+  description={description}
+  image={ogImage}
+  jsonLd={jsonLd}
+  ogType="article"
+>
   <PageHeader title={post.title} image={toSiteImage(post.headerImage, cmsBase)} />
 
   <PageContainer class="max-w-7xl !px-4">

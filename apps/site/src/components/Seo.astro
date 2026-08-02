@@ -1,0 +1,62 @@
+---
+/**
+ * All SEO head tags for a route (plan Task C8) — rendered once per page by
+ * Layout.astro, so every route carries exactly one title, description,
+ * canonical, OG/Twitter card and (optionally) one JSON-LD script.
+ */
+import { type JsonLd, serializeJsonLd } from "../lib/jsonld";
+import {
+  absoluteUrl,
+  canonicalUrl,
+  DEFAULT_OG_IMAGE,
+  truncateAtWord,
+  withTitleSuffix,
+} from "../lib/seo";
+import { strings } from "../lib/strings";
+
+interface Props {
+  /** Page part of the title; the club suffix template is applied here. */
+  title: string;
+  /** Meta description; truncated to the ~155-char budget centrally. */
+  description: string;
+  /** OG/Twitter image — absolute URL or public/ path. Default: club photo. */
+  image?: string | null | undefined;
+  /** JSON-LD for the route; an array shares one script tag. */
+  jsonLd?: JsonLd | JsonLd[] | undefined;
+  /** Error pages: keep crawlers out without touching the sitemap build. */
+  noindex?: boolean | undefined;
+  ogType?: "website" | "article" | undefined;
+}
+
+const { title, description, image = null, jsonLd, noindex = false, ogType = "website" } =
+  Astro.props;
+
+const fullTitle = withTitleSuffix(title);
+const metaDesc = truncateAtWord(description);
+const canonical = canonicalUrl(Astro.site, Astro.url.pathname);
+const ogImage = absoluteUrl(image ?? DEFAULT_OG_IMAGE, Astro.site);
+---
+
+<title>{fullTitle}</title>
+<meta name="description" content={metaDesc} />
+<link rel="canonical" href={canonical} />
+{noindex && <meta name="robots" content="noindex" />}
+
+<meta property="og:type" content={ogType} />
+<meta property="og:site_name" content={strings.site.name} />
+<meta property="og:locale" content="de_DE" />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={metaDesc} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={ogImage} />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={metaDesc} />
+<meta name="twitter:image" content={ogImage} />
+
+{
+  jsonLd !== undefined && (
+    <script is:inline type="application/ld+json" set:html={serializeJsonLd(jsonLd)} />
+  )
+}

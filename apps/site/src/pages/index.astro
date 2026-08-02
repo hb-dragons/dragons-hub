@@ -9,11 +9,20 @@ import HomeJoin from "../components/home/Join.astro";
 import HomeNews from "../components/home/News.astro";
 import { apiBase } from "../lib/api-base";
 import { fetchTeamCount, yearsSinceFounding } from "../lib/home-stats";
+import { sportsOrganization } from "../lib/jsonld";
 import { getSiteSettings } from "../lib/payload";
+import { absoluteUrl } from "../lib/seo";
 import { strings } from "../lib/strings";
 
 const firstPart = strings.site.claim.courtPart;
 const secondPart = strings.site.claim.culturesPart;
+
+// SEO (Task C8): the claim as the unique home title part, the club as
+// schema.org SportsOrganization.
+const jsonLd = sportsOrganization({
+  url: absoluteUrl("/", Astro.site),
+  logo: absoluteUrl("/img/logo.svg", Astro.site),
+});
 
 // Club stats: memberCount/foundingYear from the site-settings global, live
 // teamCount from the API dashboard. On content builds every input is required
@@ -32,7 +41,11 @@ const years =
   settings?.foundingYear != null ? yearsSinceFounding(settings.foundingYear, new Date()) : null;
 ---
 
-<Layout title={strings.home.title}>
+<Layout
+  title={`${firstPart}${secondPart}`}
+  description={strings.seo.defaultDescription}
+  jsonLd={jsonLd}
+>
   <div class="relative">
     <div class="w-full h-svh">
       <video autoplay muted loop playsinline class="w-full h-full object-cover">
