@@ -358,10 +358,13 @@ Attach via `hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnD
 - Modify: `.github/workflows/deploy.yml` (cms image build+deploy after green CI, alongside web/api)
 
 **Interfaces:**
-- Produces: Payload admin live at the Cloud Run URL (custom domain `cms.hbdragons.de` is mapped **later, at Phase-0 go-live** — the subdomain currently points at Strapi and the migration script reads Strapi via LAN, not DNS).
+- Produces: Payload admin live at `https://cms.testing.hbdragons.de` (LB host rule; the bare Cloud Run URL works too). Prod domain `cms.hbdragons.de` is added **later, at Phase-0 go-live** — it currently points at Strapi and the migration script reads Strapi via LAN, not DNS.
 
 - [ ] **Step 1:** Dockerfile + tofu resources copied from the web service pattern (min instances 0 — scale-to-zero is fine for a CMS; cold start acceptable).
 - [ ] **Step 2:** Create `dragons_cms` database on the Cloud SQL instance (tofu or one-off `gcloud sql databases create`), media bucket `dragons-cms-media` + service-account binding.
+- [ ] **Step 2b (testing-domain addendum 2026-08-02): direct-GCS media URLs.** Set `disablePayloadAccessControl: true` in the `gcsStorage` options (payload.config.ts) and grant `allUsers` `roles/storage.objectViewer` on the media bucket (tofu). Without it, media docs carry relative `/api/media/file/…` URLs → the site bakes `CMS_URL` into built HTML and every image is served by the scale-to-zero CMS container. With it, `doc.url` is absolute `https://storage.googleapis.com/<bucket>/…` — matching `apps/site/src/lib/media.ts` and astro.config `image.domains`; the CMS domain never appears in built output. Verify the plugin emits the absolute URL for the pinned 3.87.0 (check @payloadcms/storage-gcs docs).
+- [ ] **Step 2c:** Make Payload's `serverURL`/`cors`/`csrf` env-driven (`CMS_PUBLIC_URL`) so the testing→prod domain switch at cutover is an env change + redeploy, not a code change.
+- [ ] **Step 2d: LB + CORS.** Extend `modules/load-balancer` with a cms backend (serverless NEG → cms service; managed cert + host rule from a `cms_domains` list var = `["cms.testing.hbdragons.de"]` now, Phase E appends `cms.hbdragons.de`). Cloud Run domain-mappings are unavailable in europe-west3 — the LB is the already-proven path. Append `https://site.testing.hbdragons.de` to `TRUSTED_ORIGINS` on api + worker (web_domain stays FIRST — notification-pipeline reads `[0]`). HITL after apply: DNS A record `cms.testing.hbdragons.de` → LB IP.
 - [ ] **Step 3:** Extend deploy.yml; deploy; run Payload's migration on boot (Payload manages its own schema in dev push-mode — for prod use `payload migrate` in the entrypoint per Payload postgres docs).
 - [ ] **Step 4 (HITL):** Create the production admin user + a `build` user, generate its API key → GH Actions secret `CMS_API_TOKEN` (Task D3 records all secrets). Smoke: `curl -H "Authorization: users API-Key <key>" https://<run-url>/api/pages` → 200.
 - [ ] **Step 5: Commit** `feat(infra): dragons-cms cloud run service`
@@ -699,10 +702,12 @@ Port table — source of truth for markup/behavior is the legacy Vue page; keep 
 
 ## Phase D — Deploy pipeline
 
+> **Testing-domain strategy (added 2026-08-02):** before cutover the whole stack is browsable on testing subdomains — `site.testing.hbdragons.de` (Hetzner subdomain whose docroot is `public_html/releases/current`, i.e. the staged release the workflow already produces) and `cms.testing.hbdragons.de` (LB host rule → cms Cloud Run, A5 step 2d). A6 content is verified on these domains before Phase E touches live traffic. Cutover then reduces to: rename `.htaccess.new`, add the prod cms domain, flip the `SITE_URL`/`CMS_URL` vars.
+
 ### Task D1: Hetzner docroot infra files
 
 **Files:**
-- Create: `apps/site/deploy/htaccess` (uploaded as `public_html/.htaccess`), `apps/site/deploy/swap.php`, `apps/site/deploy/README.md`
+- Create: `apps/site/deploy/htaccess` (uploaded as `public_html/.htaccess`), `apps/site/deploy/htaccess-release` (uploaded per-deploy as `releases/<sha>/.htaccess` — the testing subdomain's docroot file), `apps/site/deploy/swap.php`, `apps/site/deploy/README.md`
 
 **Interfaces:**
 - Produces: docroot layout `public_html/{.htaccess,swap.php,releases/<sha>/,current -> releases/<sha>}`. Consumed by D2. Swap auth: header `X-Deploy-Token` vs `/usr/home/hbdrag/.deploy_secret` (outside docroot).
@@ -728,9 +733,22 @@ RewriteRule ^media/?$ /news/ [R=301,L]
 # deploy endpoint served directly
 RewriteRule ^swap\.php$ - [L]
 
-# everything else through the current release
+# everything else through the current release — host-guarded: Apache's
+# parent-dir .htaccess walk applies this file to site.testing.* requests too
+# (their docroot is releases/current); rewriting those would double-prefix
+RewriteCond %{HTTP_HOST} ^(www\.)?hbdragons\.de$ [NC]
 RewriteCond %{REQUEST_URI} !^/current/
 RewriteRule ^(.*)$ current/$1 [L]
+
+ErrorDocument 404 /404.html
+```
+
+- [ ] **Step 1b: `htaccess-release`** (testing-domain addendum 2026-08-02) — uploaded by D2 into every release as `releases/<sha>/.htaccess`; it is the docroot file for `site.testing.hbdragons.de` and also applies on live via `current/`, so the noindex header is host-gated:
+
+```apache
+# keep search engines off the testing host; env never set on live hosts
+SetEnvIf Host ^site\.testing\. TESTING_HOST
+Header set X-Robots-Tag "noindex, nofollow" env=TESTING_HOST
 
 ErrorDocument 404 /404.html
 ```
@@ -771,7 +789,7 @@ foreach (array_slice($releases, 5) as $old) {
 echo "ok $sha";
 ```
 
-- [ ] **Step 3 (HITL): one-time host setup via SFTP** — README checklist: upload `.htaccess` + `swap.php` to `public_html/`; upload `.deploy_secret` (`openssl rand -hex 32`) to home (`/` in the jail — lands in `/usr/home/hbdrag/`); `mkdir public_html/releases`. **Never create symlinks via SFTP** — the first `current` symlink is created by the first swap.php call. Note: old `public_html` content keeps serving until the `.htaccess` upload; sequence the very first activation inside Phase E, not here — until cutover, keep the new `.htaccess` uploaded as `.htaccess.new` and the go-live step renames it.
+- [ ] **Step 3 (HITL): one-time host setup via SFTP** — README checklist: upload `.htaccess` + `swap.php` to `public_html/`; upload `.deploy_secret` (`openssl rand -hex 32`) to home (`/` in the jail — lands in `/usr/home/hbdrag/`); `mkdir public_html/releases`. **Never create symlinks via SFTP** — the first `current` symlink is created by the first swap.php call. Note: old `public_html` content keeps serving until the `.htaccess` upload; sequence the very first activation inside Phase E, not here — until cutover, keep the new `.htaccess` uploaded as `.htaccess.new` and the go-live step renames it. **Testing subdomain (addendum 2026-08-02):** in konsoleH create `site.testing.hbdragons.de` with docroot `public_html/releases/current` + Let's Encrypt cert (+ DNS record if not auto-created). Sequencing hazard: the panel may refuse a not-yet-existing docroot, or pre-create `current/` as a real directory — which would make swap.php's `rename()` fail. So: run the first deploy+swap FIRST; if the panel already created an empty `current/` dir, delete it via SFTP before that swap; only then set the docroot. Verify afterwards: `curl -s https://site.testing.hbdragons.de/` serves the staged release, `curl -sI …` shows `X-Robots-Tag: noindex`, and the legacy `public_html/.htaccess` doesn't mangle subdomain requests (Apache parent-dir walk) — if it does, wrap its rules in a `RewriteCond %{HTTP_HOST}` guard.
 - [ ] **Step 4: Commit** `feat(site): hetzner deploy endpoint + htaccess`
 
 ### Task D2: `deploy-site.yml` workflow
@@ -842,6 +860,7 @@ jobs:
             set sftp:connect-program 'ssh -a -x -i ~/deploy_key -o StrictHostKeyChecking=accept-new';
             open sftp://${{ vars.HETZNER_USER }}@${{ vars.HETZNER_HOST }};
             mirror -R --parallel=4 apps/site/dist public_html/releases/${GITHUB_SHA};
+            put -O public_html/releases/${GITHUB_SHA} apps/site/deploy/htaccess-release -o .htaccess;
             put -O public_html apps/site/deploy/swap.php;
             bye"
       - name: Swap
@@ -852,13 +871,13 @@ jobs:
             --data "sha=${GITHUB_SHA}"
       - name: Smoke test
         run: |
-          curl -fsS https://hbdragons.de/ | grep -qi dragons
-          test "$(curl -s -o /dev/null -w '%{http_code}' https://hbdragons.de/definitely-not-a-page/)" = 404
+          curl -fsS "${{ vars.SITE_URL }}/" | grep -qi dragons
+          test "$(curl -s -o /dev/null -w '%{http_code}' "${{ vars.SITE_URL }}/definitely-not-a-page/")" = 404
 ```
 
 Pin action shas per repo convention (mirror ci.yml). `.htaccess` is deliberately NOT uploaded per-deploy (it's the live-traffic switch; managed by D1/Phase E — swap.php is safe to re-upload).
 
-- [ ] **Step 2: Pre-cutover safety:** until Phase E flips `.htaccess`, the workflow may run fully (staged releases don't serve; `swap.php` flips a symlink nobody routes through). The Smoke-test step will fail until go-live — gate it: `if: vars.SITE_LIVE == 'true'` on the smoke step; set the repo variable at Phase E go-live.
+- [ ] **Step 2: Pre-cutover safety (testing-domain addendum 2026-08-02):** until Phase E flips `.htaccess`, live traffic never routes through `current/` — but the staged release IS browsable at `https://site.testing.hbdragons.de` (subdomain docroot = `releases/current`, D1 step 3). Smoke tests run against repo var `SITE_URL` (= the testing URL now, `https://hbdragons.de` after Phase E) — no gating; every deploy is verified end-to-end from day one.
 - [ ] **Step 3:** Run once via `workflow_dispatch` (build path), verify release lands under `releases/`, swap returns `ok`, prune keeps ≤5. **Commit** `ci: deploy-site workflow`
 
 ### Task D3: Secrets + tokens (HITL checklist)
@@ -867,7 +886,8 @@ Pin action shas per repo convention (mirror ci.yml). `.htaccess` is deliberately
 
 - [ ] `HETZNER_SFTP_KEY` (GH secret): dedicated deploy-only keypair; public key installed for the webspace user (key auth verified working on this host); private key → secret. Vars `HETZNER_USER=hbdrag`, `HETZNER_HOST=www376.your-server.de`.
 - [ ] `HETZNER_DEPLOY_TOKEN` (GH secret) = contents of `.deploy_secret` from D1 step 3.
-- [ ] `CMS_API_TOKEN` (GH secret) = the Payload build user's API key (A5); `CMS_URL` (GH var) = Cloud Run URL now, `https://cms.hbdragons.de` after go-live.
+- [ ] `CMS_API_TOKEN` (GH secret) = the Payload build user's API key (A5); `CMS_URL` (GH var) = `https://cms.testing.hbdragons.de` now, `https://cms.hbdragons.de` after go-live.
+- [ ] `SITE_URL` (GH var) = `https://site.testing.hbdragons.de` now, `https://hbdragons.de` at Phase E go-live (smoke-test base, D2).
 - [ ] `GH_DISPATCH_TOKEN`: **fine-grained PAT**, repo access = hb-dragons/dragons-hub only, permission Contents: read+write (repository_dispatch requires it), max allowed expiry + calendar reminder to rotate. Stored in Secret Manager → injected into the cms Cloud Run service (A4) and the api worker (B4). GitHub App rejected (single-tenant overhead).
 - [ ] Document all of the above in the repo's env/secret docs (AGENTS.md pattern).
 
@@ -879,8 +899,8 @@ Runbook confirmed in the wayfinder effort (ticket: cutover + decommission sequen
 
 **Phase 0 — gates (before any swap):**
 - [ ] Payload live on Cloud Run; Strapi **content freeze** → run A6 migration → editors verified working in Payload
-- [ ] `cms.hbdragons.de` DNS repointed to the Payload Cloud Run service (Payload go-live; migration already done via LAN)
-- [ ] Astro CI green; D2 pipeline proven end-to-end (staged release + swap on the live host)
+- [ ] `cms.hbdragons.de` go-live: append it to the LB `cms_domains` var (A5 step 2d; cert reprovisions) + DNS A record → LB IP; update GH var `CMS_URL` and the cms service's `CMS_PUBLIC_URL` env; trigger a site rebuild (media URLs are direct-GCS, so this is belt-and-braces). Migration already done via LAN.
+- [ ] Astro CI green; D2 pipeline proven end-to-end (staged release + swap on the live host); content verified browsably on `site.testing.hbdragons.de`
 - [ ] TRUSTED_ORIGINS widened (B1) — live islands verified from a staged page
 - [ ] **GATE:** `POST /public/probetraining` delivers mail to the club inbox (B3, tested against prod) — before dragons-mail may retire
 - [ ] Flag from the archive ticket: holidays/Kampfgericht history lives only in the 15432 spielplan DB — user re-affirmed **no dump**; nothing to do, recorded here so the loss at any future sherlock failure is a known decision
@@ -888,7 +908,7 @@ Runbook confirmed in the wayfinder effort (ticket: cutover + decommission sequen
 **Phase 1 — go-live:**
 - [ ] Deploy current main → `releases/<sha>` staged
 - [ ] Activate: SFTP-rename `.htaccess.new` → `.htaccess` (docroot now routes through `current/`), call swap.php with the release sha
-- [ ] Set repo var `SITE_LIVE=true` (enables smoke tests)
+- [ ] Flip repo var `SITE_URL` → `https://hbdragons.de` (smoke tests now hit live)
 - [ ] Smoke: home, spielplan, a team page, a news page, probetraining submit, 404 status, `www.` 301, sitemap reachable
 - [ ] GSC: submit `https://hbdragons.de/sitemap-index.xml`; extend the `.htaccess` 301 map once from the GSC indexed-URL list
 - [ ] Apex DNS untouched throughout
@@ -902,6 +922,7 @@ Runbook confirmed in the wayfinder effort (ticket: cutover + decommission sequen
 - [ ] DNS: remove `mail.hbdragons.de`
 - [ ] Revoke the Instagram token + delete the Meta app
 - [ ] GitHub: archive JamesNeumann/dragons-app (tombstone; preserves `en.json` retrievably)
+- [ ] Testing domains: keep `site.testing`/`cms.testing` as permanent staging (default), or remove the subdomain + LB entry — user's call.
 - [ ] **Nothing else.** sherlock is the user's home server: Strapi, its docker Postgres, and the 15432 spielplan DB keep running indefinitely — no dumps, no decommission, no ssh-alias cleanup. Local dragons-cms tree stays on disk.
 
 ---
