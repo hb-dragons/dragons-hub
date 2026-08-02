@@ -73,10 +73,18 @@ export default buildConfig({
           // https://storage.googleapis.com/<bucket>/… URL (the adapter's
           // generateURL → File.publicUrl()) instead of a relative
           // /api/media/file/… path proxied by this scale-to-zero service.
-          // The site bakes these URLs into built HTML, so media must come
-          // straight from GCS; the bucket grants allUsers objectViewer in
-          // tofu, matching the collection's public read access.
-          collections: { media: { disablePayloadAccessControl: true } },
+          // It is only correct when the bucket actually grants public read,
+          // so it tracks the same tofu var (GCS_MEDIA_PUBLIC) that adds the
+          // allUsers grant — otherwise every image 403s. Off by default: the
+          // org's domain-restricted-sharing constraint rejects allUsers.
+          // The flag is typed `true | undefined`, so the private case omits it
+          // rather than passing false.
+          collections: {
+            media:
+              process.env.GCS_MEDIA_PUBLIC === "true"
+                ? { disablePayloadAccessControl: true }
+                : true,
+          },
           bucket: process.env.GCS_MEDIA_BUCKET,
           options: {},
         }),

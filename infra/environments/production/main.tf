@@ -172,12 +172,12 @@ locals {
   } : {}
 
   # Payload's public origins (CMS_PUBLIC_URL): first entry becomes serverURL,
-  # all entries are trusted for CORS/CSRF. The deterministic run.app URL is
-  # always included so the admin panel works before DNS exists and keeps
-  # working beside the LB domain. Domain changes at cutover are a var change +
-  # redeploy — no code involved.
+  # all entries are trusted for CORS/CSRF. Domain changes at cutover are a var
+  # change + redeploy — no code involved. The run.app URL is the fallback for
+  # an empty cms_domains only: with LB-only ingress it is not reachable, but
+  # serverURL must never be empty.
   cms_run_url        = "https://dragons-cms-production-${var.project_number}.${var.region}.run.app"
-  cms_public_origins = concat([for domain in var.cms_domains : "https://${domain}"], [local.cms_run_url])
+  cms_public_origins = length(var.cms_domains) > 0 ? [for domain in var.cms_domains : "https://${domain}"] : [local.cms_run_url]
 }
 
 # Network
@@ -521,13 +521,23 @@ module "web" {
   depends_on = [module.api, google_project_service.apis]
 }
 
-# CMS media — GCS bucket for Payload's media collection. Publicly readable by
-# design: `disablePayloadAccessControl` in payload.config.ts rewrites media
-# URLs to point straight at storage.googleapis.com, so the static site never
-# proxies images through the scale-to-zero cms service. Hence no
-# `public_access_prevention = "enforced"` (unlike social_assets) and an
-# allUsers objectViewer grant — this bucket must never hold anything that is
-# not public site content.
+# CMS media — GCS bucket for Payload's media collection.
+#
+# Direct-GCS media URLs (`cms_media_public = true`) are the better shape: the
+# static site links straight at storage.googleapis.com instead of proxying
+# every image through the scale-to-zero cms service. It needs an allUsers
+# read grant, which the kviz.me org rejects under
+# `constraints/iam.allowedPolicyMemberDomains` (domain-restricted sharing) —
+# so the default is false and Payload serves media itself.
+#
+# To switch: add a project-level exception for that constraint, then set the
+# GH var CMS_MEDIA_PUBLIC=true. `GCS_MEDIA_PUBLIC` on the service flips
+# Payload's `disablePayloadAccessControl` to match; media URLs are computed on
+# read, so a site rebuild is all that's needed — no data migration.
+#
+# `public_access_prevention` stays "inherited" (not "enforced" like
+# social_assets) so that switch stays possible. This bucket must never hold
+# anything that is not public site content.
 resource "google_storage_bucket" "cms_media" {
   name                        = "${var.project_id}-cms-media"
   location                    = var.region
@@ -545,6 +555,8 @@ resource "google_storage_bucket_iam_member" "cms_media_cms" {
 }
 
 resource "google_storage_bucket_iam_member" "cms_media_public_read" {
+  count = var.cms_media_public ? 1 : 0
+
   bucket = google_storage_bucket.cms_media.name
   role   = "roles/storage.objectViewer"
   member = "allUsers"
@@ -659,6 +671,7 @@ module "cms" {
   env_vars = {
     NODE_ENV         = "production"
     GCS_MEDIA_BUCKET = google_storage_bucket.cms_media.name
+    GCS_MEDIA_PUBLIC = tostring(var.cms_media_public)
     CMS_PUBLIC_URL   = join(",", local.cms_public_origins)
   }
 
@@ -679,11 +692,13 @@ module "cms" {
 
   cloudsql_instances = [module.database.connection_name]
 
-  # Reachable on the bare run.app URL (the admin must work before DNS and the
-  # LB cert exist) and through the LB host rule. Auth is Payload's own: admin
-  # sessions and API keys.
-  ingress               = "INGRESS_TRAFFIC_ALL"
-  allow_unauthenticated = true
+  # Same shape as web/api: reachable only through the load balancer, which
+  # makes the module disable the invoker IAM check (see cloud-run/main.tf).
+  # `allow_unauthenticated` would grant allUsers roles/run.invoker, which the
+  # org's domain-restricted-sharing constraint rejects. Consequence: the bare
+  # run.app URL is not reachable — the admin lives on the cms_domains host once
+  # its managed cert provisions. Auth is Payload's own: sessions and API keys.
+  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
 
   depends_on = [
     google_project_service.apis,

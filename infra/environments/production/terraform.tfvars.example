@@ -15,9 +15,14 @@ api_domain = "api.dragons.example.com"
 
 # CMS domains routed via the load balancer (list — Phase E appends the prod
 # domain at cutover; until then it stays off this list because it still points
-# at the legacy Strapi host). Empty list = no cms cert/host-rule, run.app URL
-# only. In CI: vars.CMS_DOMAINS.
+# at the legacy Strapi host). The service has LB-only ingress, so an empty list
+# leaves it unreachable. In CI: vars.CMS_DOMAINS.
 cms_domains = ["cms.testing.dragons.example.com"]
+
+# Direct-GCS media URLs. Needs a project-level exception to
+# constraints/iam.allowedPolicyMemberDomains (allUsers read on the media
+# bucket); false means Payload proxies media itself. In CI: vars.CMS_MEDIA_PUBLIC.
+cms_media_public = false
 
 # Basketball-Bund SDK credentials
 sdk_username = "your-sdk-username"
