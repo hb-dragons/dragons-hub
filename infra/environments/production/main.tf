@@ -279,7 +279,8 @@ module "api" {
     NODE_ENV        = "production"
     RUN_MODE        = "api"
     BETTER_AUTH_URL = "https://${var.api_domain}"
-    TRUSTED_ORIGINS = "https://${var.web_domain}"
+    # First origin doubles as the public URL in notification links (TRUSTED_ORIGINS[0]) — keep web_domain first.
+    TRUSTED_ORIGINS = "https://${var.web_domain},https://hbdragons.de,https://www.hbdragons.de"
     LOG_LEVEL       = "info"
     GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
     GCS_PROJECT_ID  = var.project_id
@@ -384,7 +385,8 @@ module "worker" {
     NODE_ENV        = "production"
     RUN_MODE        = "worker"
     BETTER_AUTH_URL = "https://${var.api_domain}"
-    TRUSTED_ORIGINS = "https://${var.web_domain}"
+    # First origin doubles as the public URL in notification links (TRUSTED_ORIGINS[0]) — keep web_domain first.
+    TRUSTED_ORIGINS = "https://${var.web_domain},https://hbdragons.de,https://www.hbdragons.de"
     LOG_LEVEL       = "info"
     GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
     GCS_PROJECT_ID  = var.project_id
