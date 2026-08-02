@@ -1,0 +1,32 @@
+---
+/**
+ * newsList block: the curated post selection as the news-index card grid.
+ */
+import { getCollection, type CollectionEntry } from "astro:content";
+
+import { resolveRefs } from "../../lib/page-blocks";
+import NewsCard from "../news/NewsCard.astro";
+
+type Layout = NonNullable<CollectionEntry<"pages">["data"]["layout"]>;
+
+interface Props {
+  block: Extract<Layout[number], { blockType: "newsList" }>;
+}
+
+const { block } = Astro.props;
+
+const allPosts = (
+  await getCollection("posts", ({ data }) => data._status === "published")
+).map((entry) => entry.data);
+const posts = resolveRefs(block.posts, allPosts);
+---
+
+{
+  posts.length > 0 && (
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {posts.map((post) => (
+        <NewsCard post={post} />
+      ))}
+    </div>
+  )
+}

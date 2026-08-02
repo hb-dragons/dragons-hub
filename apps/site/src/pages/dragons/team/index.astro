@@ -1,0 +1,71 @@
+---
+// Port of dragons-app app/pages/dragons/team/index.vue. Vorstand +
+// Ehrenamtliche come from the CMS page's contact block (slug=team →
+// PageBlocks); the Coaches band renders the trainers collection directly,
+// like the legacy page. The legacy Refs band is gone with the pruned CMS
+// surface (no schiedsrichter type). Fully static — no islands.
+import { getCollection } from "astro:content";
+
+import PersonCard from "../../../components/kontakt/PersonCard.astro";
+import PageBlocks from "../../../components/page-blocks/PageBlocks.astro";
+import PageContainer from "../../../components/PageContainer.astro";
+import PageHeader from "../../../components/PageHeader.astro";
+import Layout from "../../../layouts/Layout.astro";
+import { cmsBaseUrl } from "../../../lib/media";
+import { publishedPage } from "../../../lib/pages";
+import { toSiteImage } from "../../../lib/site-image";
+import { strings } from "../../../lib/strings";
+
+const cmsBase = cmsBaseUrl();
+
+// "kontakt" is the legacy Strapi slug — accepted until A6 pins the mapping,
+// so the contact block never silently vanishes on a slug mismatch.
+const page = publishedPage(await getCollection("pages"), "team", "kontakt");
+
+const trainers = (await getCollection("trainers")).map((entry) => entry.data);
+---
+
+<Layout title={strings.dragons.team.pageTitle}>
+  <PageHeader
+    title={page?.header?.title ?? strings.dragons.team.heading}
+    image={toSiteImage(page?.header?.image, cmsBase)}
+  />
+
+  <PageContainer>
+    <PageBlocks layout={page?.layout} />
+
+    {
+      trainers.length > 0 && (
+        <div>
+          <h2 class="text-3xl font-bold text-foreground mt-8 mb-8 text-center">
+            {strings.dragons.team.coachesHeading}
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 md:gap-4 md:-space-x-12">
+            {trainers.map((trainer) => (
+              <div class="w-full overflow-hidden rounded-md">
+                <PersonCard
+                  name={trainer.person?.name}
+                  email={trainer.person?.email}
+                  image={toSiteImage(trainer.image ?? trainer.person?.image, cmsBase)}
+                  clipDirection="none"
+                  showEmail={false}
+                >
+                  {
+                    trainer.licence && (
+                      <span
+                        slot="subTitle"
+                        class="inline-flex items-center px-2.5 py-1.5 gap-1.5 rounded-md text-foreground bg-card text-base font-semibold uppercase"
+                      >
+                        {trainer.licence}
+                      </span>
+                    )
+                  }
+                </PersonCard>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+  </PageContainer>
+</Layout>

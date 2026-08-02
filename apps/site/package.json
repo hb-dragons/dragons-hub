@@ -19,6 +19,7 @@
     "@dragons/api-client": "workspace:*",
     "@dragons/shared": "workspace:*",
     "@dragons/ui": "workspace:*",
+    "@payloadcms/richtext-lexical": "3.87.0",
     "astro": "^7.1.6",
     "blurhash": "^2.0.5",
     "ogl": "^1.0.11",

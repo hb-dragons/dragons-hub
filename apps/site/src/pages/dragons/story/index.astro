@@ -1,0 +1,56 @@
+---
+// Port of dragons-app app/pages/dragons/story/index.vue: vertical timeline
+// from the timeline-items collection (UTimeline → static markup with the
+// legacy ui overrides). Payload keeps only the year text of the old Strapi
+// dates; the loader sorts newest first. Fully static — no islands.
+import { getCollection } from "astro:content";
+
+import PageBlocks from "../../../components/page-blocks/PageBlocks.astro";
+import PageContainer from "../../../components/PageContainer.astro";
+import PageHeader from "../../../components/PageHeader.astro";
+import Layout from "../../../layouts/Layout.astro";
+import { cmsBaseUrl } from "../../../lib/media";
+import { publishedPage } from "../../../lib/pages";
+import { toSiteImage } from "../../../lib/site-image";
+import { strings } from "../../../lib/strings";
+
+const page = publishedPage(await getCollection("pages"), "story");
+
+const items = (await getCollection("timelineItems")).map((entry) => entry.data);
+---
+
+<Layout title={strings.dragons.story.pageTitle}>
+  <PageHeader
+    title={page?.header?.title ?? strings.dragons.story.heading}
+    image={toSiteImage(page?.header?.image, cmsBaseUrl())}
+  />
+
+  <PageContainer>
+    <div class="max-w-3xl mx-auto">
+      {
+        items.map((item, index) => (
+          <div class="flex gap-4">
+            <div class="flex flex-col items-center">
+              <span class="mt-1 size-3 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+              {index < items.length - 1 && (
+                <span class="w-px flex-1 bg-primary/40" aria-hidden="true" />
+              )}
+            </div>
+            <div class="flex-1">
+              <div class="bg-card rounded-xl p-5 shadow-sm ring ring-border mb-6">
+                {item.year && (
+                  <p class="text-sm font-semibold text-primary mb-1">{item.year}</p>
+                )}
+                <h3 class="text-xl font-bold text-foreground">{item.title}</h3>
+                {item.description && (
+                  <p class="text-base text-muted-foreground mt-2">{item.description}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+    <PageBlocks layout={page?.layout} />
+  </PageContainer>
+</Layout>

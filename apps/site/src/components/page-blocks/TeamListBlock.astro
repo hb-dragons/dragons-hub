@@ -1,0 +1,41 @@
+---
+/**
+ * teamList block: image cards linking to the team pages. The legacy Nuxt
+ * site never rendered the Strapi team zone on a page, so the cards reuse the
+ * news-card look (photo + gradient title overlay) — consistent with how the
+ * site presents linked content elsewhere.
+ */
+import { getCollection, type CollectionEntry } from "astro:content";
+
+import { cmsBaseUrl } from "../../lib/media";
+import { resolveRefs } from "../../lib/page-blocks";
+import { toSiteImage } from "../../lib/site-image";
+import LinkedImageCard from "../LinkedImageCard.astro";
+
+type Layout = NonNullable<CollectionEntry<"pages">["data"]["layout"]>;
+
+interface Props {
+  block: Extract<Layout[number], { blockType: "teamList" }>;
+}
+
+const { block } = Astro.props;
+const cmsBase = cmsBaseUrl();
+
+const allTeams = (await getCollection("teams")).map((entry) => entry.data);
+const teams = resolveRefs(block.teams, allTeams);
+---
+
+{
+  teams.length > 0 && (
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {teams.map((team) => (
+        <LinkedImageCard
+          href={`/teams/${team.slug}/`}
+          title={team.name}
+          image={toSiteImage(team.teamImage, cmsBase)}
+          ariaLabel={team.name}
+        />
+      ))}
+    </div>
+  )
+}

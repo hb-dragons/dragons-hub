@@ -1,0 +1,133 @@
+---
+/**
+ * Hero band + item rows, ported from dragons-app SharedItemRows (the
+ * supporter and projekte lists). The Dither hero hydrates lazily like the
+ * home Join band; rows are fully static. Partners arrive without a
+ * description (the pruned Payload surface carries none) — the paragraph
+ * renders only when one exists (projects do).
+ */
+import type { SiteImage } from "../lib/media";
+import { strings } from "../lib/strings";
+import Dither from "./Dither.astro";
+import BlurImage from "./BlurImage.astro";
+
+export interface RowItem {
+  name: string;
+  description?: string | null | undefined;
+  logo: SiteImage | null;
+  link?: string | null | undefined;
+}
+
+interface Props {
+  items: RowItem[];
+  heroTitle: string;
+  heroDescription: string;
+  listTitle: string;
+  buttonLabel: string;
+  contactEmail?: string;
+}
+
+const {
+  items,
+  heroTitle,
+  heroDescription,
+  listTitle,
+  buttonLabel,
+  contactEmail = strings.footer.email,
+} = Astro.props;
+
+/** Nuxt UI subtle primary button — classes from prod markup ("Zum Partner"). */
+const SUBTLE_BUTTON_CLASSES =
+  "rounded-md font-medium inline-flex items-center transition-colors px-2.5 py-1.5 gap-1.5 text-primary ring ring-inset ring-primary/25 bg-primary/10 hover:bg-primary/15 text-base mt-4";
+---
+
+<div>
+  <div class="relative w-full h-[380px] md:h-[300px] overflow-hidden rounded-lg mb-6 md:mb-12">
+    <Dither
+      waveSpeed={0.2}
+      waveFrequency={5}
+      waveAmplitude={0.1}
+      waveColor={[1, 0.65, 0]}
+      colorNum={6}
+      pixelSize={3}
+      disableAnimation={false}
+      enableMouseInteraction={false}
+      mouseRadius={1}
+    />
+    <div class="absolute top-0 left-0 w-full h-full bg-background/50"></div>
+    <div
+      class="relative z-10 p-2 md:p-4 lg:p-8 text-center flex flex-col justify-evenly items-stretch h-full gap-4"
+    >
+      <h2 class="text-2xl md:text-4xl font-bold">{heroTitle}</h2>
+      <p class="text-base md:text-xl">{heroDescription}</p>
+      <div class="flex items-center justify-center">
+        <a
+          href={`mailto:${contactEmail}`}
+          class="flex items-center gap-2 font-black uppercase text-base lg:text-2xl backdrop-blur-xl bg-primary/40 hover:bg-primary/60 transition-all duration-300 py-1 lg:py-2 px-4 lg:px-6 rounded-lg border-2 border-primary/30"
+          aria-label={strings.itemRows.contactAria}
+        >
+          {strings.itemRows.contactCta}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="w-4 h-4"
+            aria-hidden="true"
+          >
+            <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="text-2xl md:text-4xl font-bold text-center mb-4 md:mb-8">{listTitle}</h2>
+
+  <div class="grid grid-cols-1 gap-4">
+    {
+      items.map((item) => (
+        <div class="flex flex-col md:flex-row border border-border rounded-md shadow-sm p-4 bg-muted gap-4">
+          {item.logo && (
+            <div class="w-full md:w-[300px] shrink-0">
+              <BlurImage
+                src={item.logo.url}
+                blurhash={item.logo.blurhash}
+                alt={item.logo.alt ?? item.name}
+                class="w-full h-full"
+                imgClass="object-contain"
+              />
+            </div>
+          )}
+          <div class="w-full">
+            <h3 class="text-3xl md:text-4xl font-bold mb-2">{item.name}</h3>
+            {item.description && <p class="text-base md:text-lg w-full">{item.description}</p>}
+            {item.link && (
+              <a href={item.link} target="_blank" rel="noopener noreferrer" class={SUBTLE_BUTTON_CLASSES}>
+                {buttonLabel}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="size-5"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </a>
+            )}
+          </div>
+        </div>
+      ))
+    }
+  </div>
+</div>

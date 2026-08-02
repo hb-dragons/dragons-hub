@@ -1,0 +1,37 @@
+---
+/**
+ * Image card with gradient title overlay linking somewhere — the legacy
+ * NewsCard look (md size), shared by the news grids and the teamList block.
+ */
+import type { SiteImage } from "../lib/media";
+import BlurImage from "./BlurImage.astro";
+import ImageTextOverlay from "./ImageTextOverlay.astro";
+
+interface Props {
+  href: string;
+  title: string;
+  image: SiteImage | null;
+  ariaLabel: string;
+}
+
+const { href, title, image, ariaLabel } = Astro.props;
+---
+
+<a
+  href={href}
+  aria-label={ariaLabel}
+  class="relative overflow-hidden rounded-lg border border-border shadow-md group block h-[150px] md:h-[200px] lg:h-[250px] xl:h-[300px] 2xl:h-[350px]"
+>
+  {
+    image && (
+      <BlurImage
+        src={image.url}
+        blurhash={image.blurhash}
+        alt={image.alt ?? title}
+        class="w-full h-full"
+        imgClass="object-cover group-hover:md:scale-105 transition-transform duration-300"
+      />
+    )
+  }
+  <ImageTextOverlay title={title} />
+</a>

@@ -1,0 +1,35 @@
+---
+// Port of dragons-app app/pages/news/index.vue: CMS page header (slug=news)
+// over the post grid, newest first. Fully static — no islands.
+import { getCollection } from "astro:content";
+
+import NewsCard from "../../components/news/NewsCard.astro";
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import Layout from "../../layouts/Layout.astro";
+import { cmsBaseUrl } from "../../lib/media";
+import { publishedPage } from "../../lib/pages";
+import { toSiteImage } from "../../lib/site-image";
+import { strings } from "../../lib/strings";
+
+const cmsBase = cmsBaseUrl();
+
+const page = publishedPage(await getCollection("pages"), "news");
+
+const posts = (await getCollection("posts", ({ data }) => data._status === "published"))
+  .map((entry) => entry.data)
+  .sort((a, b) => b.publishedDate.valueOf() - a.publishedDate.valueOf());
+---
+
+<Layout title={strings.news.pageTitle}>
+  <PageHeader
+    title={page?.header?.title ?? strings.news.fallbackHeading}
+    image={toSiteImage(page?.header?.image, cmsBase)}
+  />
+
+  <PageContainer>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {posts.map((post) => <NewsCard post={post} />)}
+    </div>
+  </PageContainer>
+</Layout>

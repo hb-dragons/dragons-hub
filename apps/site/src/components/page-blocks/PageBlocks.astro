@@ -1,0 +1,35 @@
+---
+/**
+ * Renderer for the pages.layout blocks dynamic zone — the Payload mirror of
+ * the Strapi zone (team.team / contact.contact / news.news /
+ * download.download). Block relations arrive shallow (ids + display fields),
+ * so each section joins the fully populated Astro collection by id
+ * (lib/page-blocks.ts).
+ */
+import type { CollectionEntry } from "astro:content";
+
+import ContactBlock from "./ContactBlock.astro";
+import DownloadListBlock from "./DownloadListBlock.astro";
+import NewsListBlock from "./NewsListBlock.astro";
+import TeamListBlock from "./TeamListBlock.astro";
+
+interface Props {
+  layout: CollectionEntry<"pages">["data"]["layout"];
+}
+
+const { layout } = Astro.props;
+---
+
+{
+  (layout ?? []).map((block) =>
+    block.blockType === "teamList" ? (
+      <TeamListBlock block={block} />
+    ) : block.blockType === "contact" ? (
+      <ContactBlock block={block} />
+    ) : block.blockType === "newsList" ? (
+      <NewsListBlock block={block} />
+    ) : (
+      <DownloadListBlock block={block} />
+    ),
+  )
+}

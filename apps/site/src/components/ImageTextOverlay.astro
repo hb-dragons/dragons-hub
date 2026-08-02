@@ -1,0 +1,43 @@
+---
+/**
+ * Bottom gradient overlay with title/subtitle/email, ported from dragons-app
+ * UiImageTextOverlay (used by news cards and the Kontakt person cards).
+ */
+import SafeMail from "./SafeMail.astro";
+
+interface Props {
+  title?: string | null | undefined;
+  subTitle?: string | null | undefined;
+  email?: string | null | undefined;
+  showEmail?: boolean;
+}
+
+const { title, subTitle, email, showEmail = false } = Astro.props;
+const hasSubTitle = Boolean(subTitle) || Astro.slots.has("subTitle");
+---
+
+<div
+  class="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 pt-6 md:px-6 md:pb-4 md:pt-8 bg-gradient-to-t from-black/80 via-black/20 to-transparent @container"
+>
+  <slot name="title">
+    {
+      title && (
+        <h3 class="text-xl @md:text-2xl @lg:text-3xl font-bold mb-0 @md:mb-2 drop-shadow-lg text-white">
+          {title}
+        </h3>
+      )
+    }
+  </slot>
+  {
+    hasSubTitle && (
+      <h3 class="text-base md:text-xl drop-shadow-lg text-neutral-100">
+        <slot name="subTitle">{subTitle}</slot>
+      </h3>
+    )
+  }
+  {
+    showEmail && email && (
+      <SafeMail class="text-sm md:text-sm lg:text-base drop-shadow-sm text-neutral-300" email={email} />
+    )
+  }
+</div>

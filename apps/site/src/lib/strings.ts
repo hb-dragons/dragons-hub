@@ -84,6 +84,85 @@ export const strings = {
     noGame: "Kein Spiel gefunden",
     mapAriaLabel: "Karte",
   },
+  news: {
+    pageTitle: "News — HB Dragons e.V.",
+    fallbackHeading: "News",
+    titleSuffix: " — HB Dragons e.V.",
+    lightboxLabel: "Bild-Lightbox",
+    lightboxClose: "Lightbox schließen",
+    lightboxPrevious: "Vorheriges Bild",
+    lightboxNext: "Nächstes Bild",
+    lightboxOpen: "Bild im Lightbox ansehen",
+  },
+  shop: {
+    pageTitle: "Shop — HB Dragons e.V.",
+    heading: "Shop",
+    buy: "Jetzt kaufen",
+    buyAriaSuffix: "kaufen - öffnet in neuem Tab",
+    noImage: "Kein Bild verfügbar",
+    emptyTitle: "Keine Produkte verfügbar",
+    emptyText: "Derzeit sind keine Produkte im Shop verfügbar.",
+  },
+  supporter: {
+    pageTitle: "Supporter — HB Dragons e.V.",
+    fallbackHeading: "Supporter",
+    heroTitle: "Werde Supporter unseres Vereins!",
+    heroDescription:
+      "Unser Verein steht für Integration, Zusammenhalt und soziales Miteinander - mit Basketball als Herzstück. Wir machen den Sport für alle zugänglich, bauen Barrieren ab und fördern Teilhabe. Um diese Arbeit fortzuführen und weiter auszubauen, sind starke Suppoerter an unserer Seite unverzichtbar.",
+    listTitle: "Unsere Supporter",
+    buttonLabel: "Zum Partner",
+  },
+  itemRows: {
+    contactCta: "Kontaktiere uns",
+    contactAria: "Kontakt per E-Mail aufnehmen",
+  },
+  downloads: {
+    pageTitle: "Downloads — HB Dragons e.V.",
+    fallbackHeading: "Downloads",
+    download: "Download",
+    emptyTitle: "Keine Downloads verfügbar",
+    emptyText: "Derzeit sind keine Dateien zum Download verfügbar.",
+  },
+  dragons: {
+    philosophie: {
+      pageTitle: "Philosophie — HB Dragons e.V.",
+      heading: "Dragons Philosophie",
+    },
+    projekte: {
+      pageTitle: "Projekte — HB Dragons e.V.",
+      heading: "Projekte",
+      heroTitle: "Unsere Projekte",
+      heroDescription:
+        "Wir engagieren uns in verschiedenen Projekten, die über den Sport hinausgehen. Unsere Initiativen fördern Integration, Bildung und soziales Engagement in der Gemeinschaft. Entdecken Sie unsere aktuellen Projekte und werden Sie Teil unserer Mission.",
+      listTitle: "Aktuelle Projekte",
+      buttonLabel: "Zum Projektpartner",
+    },
+    story: {
+      pageTitle: "Story — HB Dragons e.V.",
+      heading: "Dragons Story",
+    },
+    team: {
+      pageTitle: "Kontakt — HB Dragons e.V.",
+      heading: "Kontakt",
+      vorstandHeading: "Unser Vorstand",
+      positionsHeading: "Unsere Ehrenamtlichen",
+      coachesHeading: "Unsere Coaches",
+    },
+  },
+  comingSoon: {
+    title: "Coming soon",
+    description:
+      "Wir sind noch dabei, diese Seite zu erstellen. Bitte schauen Sie später noch einmal vorbei.",
+    backHome: "Zur Startseite",
+  },
+  impressum: {
+    pageTitle: "Impressum — HB Dragons e.V.",
+    heading: "Impressum",
+  },
+  datenschutz: {
+    pageTitle: "Datenschutzerklärung — HB Dragons e.V.",
+    heading: "Datenschutzerklärung",
+  },
   teams: {
     pageTitle: "Teams — HB Dragons e.V.",
     heading: "Teams",

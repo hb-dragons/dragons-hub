@@ -1,0 +1,67 @@
+---
+/**
+ * Kontakt person card, ported from dragons-app KontaktPersonCard: full-bleed
+ * photo (club banner fallback), angled md+ clip for the Vorstand band, and
+ * the gradient overlay with role/name/email. The legacy `tasks` prop was
+ * dead (never rendered) and is dropped.
+ */
+import type { SiteImage } from "../../lib/media";
+import { BANNER_IMAGE } from "../../lib/site-assets";
+import BlurImage from "../BlurImage.astro";
+import ImageTextOverlay from "../ImageTextOverlay.astro";
+
+interface Props {
+  name?: string | null | undefined;
+  personName?: string | null | undefined;
+  email?: string | null | undefined;
+  image: SiteImage | null;
+  clipDirection?: "left" | "right" | "both" | "none";
+  showEmail?: boolean;
+}
+
+const { name, personName, email, image, clipDirection = "none", showEmail = true } = Astro.props;
+
+const clipPathClasses = {
+  left: "md:[clip-path:polygon(10%_0%,100%_0%,100%_100%,0%_100%)]",
+  right: "md:[clip-path:polygon(0%_0%,100%_0%,90%_100%,0%_100%)]",
+  both: "md:[clip-path:polygon(10%_0%,100%_0%,90%_100%,0%_100%)]",
+  none: "",
+} as const;
+
+const roundedClasses = {
+  left: "md:rounded-r-lg rounded-md md:rounded-none",
+  right: "md:rounded-l-lg rounded-md md:rounded-none",
+  both: "md:rounded-none rounded-md",
+  none: "rounded-md md:rounded-none",
+} as const;
+
+const img = image ?? BANNER_IMAGE;
+const alt = "alt" in img ? (img.alt ?? "") : "";
+---
+
+<div
+  class:list={[
+    "h-[400px] md:h-[400px] lg:h-[500px] overflow-hidden relative border border-border md:border-none shadow-sm",
+    clipPathClasses[clipDirection],
+    roundedClasses[clipDirection],
+  ]}
+>
+  <div class="absolute inset-0">
+    <BlurImage
+      src={img.url}
+      blurhash={img.blurhash}
+      alt={alt}
+      class="w-full h-full"
+      imgClass="object-cover select-none pointer-events-none"
+    />
+  </div>
+
+  <ImageTextOverlay email={email} showEmail={showEmail}>
+    <h3 slot="title" class="text-3xl @md:text-4xl @lg:text-4xl font-bold mb-0 md:mb-2 text-white">
+      {name}
+    </h3>
+    <slot name="subTitle" slot="subTitle">
+      <h3 class="text-2xl @md:text-2xl @lg:text-2xl text-neutral-100">{personName}</h3>
+    </slot>
+  </ImageTextOverlay>
+</div>

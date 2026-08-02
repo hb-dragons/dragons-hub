@@ -1,0 +1,31 @@
+---
+/**
+ * downloadList block: the curated download selection as the downloads-page
+ * card grid.
+ */
+import { getCollection, type CollectionEntry } from "astro:content";
+
+import { resolveRefs } from "../../lib/page-blocks";
+import DownloadCard from "../downloads/DownloadCard.astro";
+
+type Layout = NonNullable<CollectionEntry<"pages">["data"]["layout"]>;
+
+interface Props {
+  block: Extract<Layout[number], { blockType: "downloadList" }>;
+}
+
+const { block } = Astro.props;
+
+const allDownloads = (await getCollection("downloads")).map((entry) => entry.data);
+const downloads = resolveRefs(block.downloads, allDownloads);
+---
+
+{
+  downloads.length > 0 && (
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {downloads.map((download) => (
+        <DownloadCard download={download} />
+      ))}
+    </div>
+  )
+}
