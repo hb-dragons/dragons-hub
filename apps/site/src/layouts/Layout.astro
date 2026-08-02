@@ -5,19 +5,37 @@ import "../styles/global.css";
 import NavBar from "../components/NavBar.astro";
 import PageFooter from "../components/PageFooter.astro";
 import ProbetrainingButton from "../components/ProbetrainingButton.astro";
+import Seo from "../components/Seo.astro";
 import SiteBackground from "../components/SiteBackground.astro";
+import type { JsonLd } from "../lib/jsonld";
+import { strings } from "../lib/strings";
 
 interface Props {
+  /** Page part of the title (Seo.astro appends the club suffix). */
   title: string;
+  /** Meta description; pages not yet migrated fall back to the site-wide one. */
+  description?: string | undefined;
+  /** OG/Twitter image URL or public/ path (see Seo.astro). */
+  image?: string | null | undefined;
+  jsonLd?: JsonLd | JsonLd[] | undefined;
+  noindex?: boolean | undefined;
+  ogType?: "website" | "article" | undefined;
 }
-const { title } = Astro.props;
+const {
+  title,
+  description = strings.seo.defaultDescription,
+  image = null,
+  jsonLd,
+  noindex = false,
+  ogType = "website",
+} = Astro.props;
 ---
 
 <html lang="de" class="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title}</title>
+    <Seo {title} {description} {image} {jsonLd} {noindex} {ogType} />
     <Font cssVariable="--font-archivo" preload />
     <Font cssVariable="--font-jetbrains-mono" />
     <slot name="head" />

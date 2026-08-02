@@ -11,6 +11,7 @@ import PageHeader from "../../components/PageHeader.astro";
 import TeamRows, { type RowTeam } from "../../components/teams/TeamRows.astro";
 import { apiBase } from "../../lib/api-base";
 import { cmsBaseUrl } from "../../lib/media";
+import { pageSeo } from "../../lib/seo";
 import { strings } from "../../lib/strings";
 import { fetchTeamBackground } from "../../lib/team-background";
 import { toSiteImage } from "../../lib/team-detail";
@@ -45,9 +46,10 @@ const rows: RowTeam[] = teams.map(({ data }) => ({
 
 const headerTitle = teamsPage?.header?.title ?? strings.teams.heading;
 const headerImage = toSiteImage(teamsPage?.header?.image, cmsBase);
+const seo = pageSeo(teamsPage, cmsBase, strings.seo.teams);
 ---
 
-<Layout title={strings.teams.pageTitle}>
+<Layout title={headerTitle} description={seo.description} image={seo.image}>
   <PageHeader title={headerTitle} image={headerImage} />
 
   <PageContainer>

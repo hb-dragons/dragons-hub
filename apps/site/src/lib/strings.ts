@@ -232,4 +232,37 @@ export const strings = {
     teamsCount: "Teams",
     standingsError: "Fehler beim Laden",
   },
+  seo: {
+    // Meta descriptions (Task C8). Per-doc CMS overrides win; these are the
+    // hand-written fallbacks per route, kept inside the ~155-char budget.
+    defaultDescription:
+      "HB Dragons e.V. – Basketballverein aus Hannover. One Court, United Cultures: Teams für Damen, Herren und Jugend, News, Spielplan und Probetraining.",
+    news: "Aktuelle News der HB Dragons: Spielberichte, Neuigkeiten und Geschichten aus dem Verein – Basketball in Hannover.",
+    teams:
+      "Alle Teams der HB Dragons im Überblick: Damen-, Herren- und Jugendmannschaften des Basketballvereins aus Hannover.",
+    teamDescriptionTail:
+      " bei den HB Dragons: Trainingszeiten, Trainer, Spielplan und Tabelle – Basketball in Hannover.",
+    spielplan:
+      "Der komplette Spielplan der HB Dragons: alle Heim- und Auswärtsspiele unserer Teams mit Terminen, Hallen und Ergebnissen.",
+    shop: "Der offizielle Fanshop der HB Dragons: Trikots, Hoodies und mehr im Dragons-Design.",
+    supporter:
+      "Die Supporter der HB Dragons: Partner und Förderer, die Basketball und Integration in Hannover möglich machen.",
+    downloads:
+      "Downloads der HB Dragons: Formulare, Anträge und Dokumente rund um den Verein auf einen Blick.",
+    philosophie:
+      "Die Philosophie der HB Dragons: Integration, Zusammenhalt und Entwicklung durch Basketball – ein Verein für alle.",
+    projekte:
+      "Die Projekte der HB Dragons: Initiativen für Integration, Bildung und soziales Engagement in Hannover.",
+    story:
+      "Die Geschichte der HB Dragons: von der Gründung bis heute – alle Meilensteine unseres Vereins im Zeitstrahl.",
+    kontakt:
+      "Kontakt zu den HB Dragons: Vorstand, Ansprechpartner und Coaches des Basketballvereins aus Hannover.",
+    impressum: "Impressum der HB Dragons e.V. mit allen Anbieterangaben gemäß § 5 TMG.",
+    datenschutz:
+      "Datenschutzerklärung der HB Dragons e.V.: Informationen zur Verarbeitung personenbezogener Daten auf dieser Website.",
+    notFound:
+      "Diese Seite gibt es bei den HB Dragons nicht (mehr). Zurück zur Startseite des Basketballvereins aus Hannover.",
+    probetraining:
+      "Probetraining bei den HB Dragons vereinbaren: Komm vorbei und lerne unsere Teams in Hannover kennen – kostenlos und unverbindlich.",
+  },
 } as const;

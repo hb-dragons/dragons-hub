@@ -11,19 +11,20 @@ import FormIsland from "../../components/probetraining/FormIsland";
 import Layout from "../../layouts/Layout.astro";
 import { cmsBaseUrl } from "../../lib/media";
 import { publishedPage } from "../../lib/pages";
+import { pageSeo } from "../../lib/seo";
 import { toSiteImage } from "../../lib/site-image";
 import { strings } from "../../lib/strings";
 
 const cmsBase = cmsBaseUrl();
 
 const page = publishedPage(await getCollection("pages"), "probetraining");
+
+const headerTitle = page?.header?.title ?? strings.probetraining.fallbackHeading;
+const seo = pageSeo(page, cmsBase, strings.seo.probetraining);
 ---
 
-<Layout title={strings.probetraining.pageTitle}>
-  <PageHeader
-    title={page?.header?.title ?? strings.probetraining.fallbackHeading}
-    image={toSiteImage(page?.header?.image, cmsBase)}
-  />
+<Layout title={headerTitle} description={seo.description} image={seo.image}>
+  <PageHeader title={headerTitle} image={toSiteImage(page?.header?.image, cmsBase)} />
 
   <PageContainer>
     <FormIsland client:visible />

@@ -13,7 +13,9 @@ import NextPrevGame from "../../components/teams/NextPrevGame";
 import TeamTabs from "../../components/teams/TeamTabs";
 import TeamTrainer from "../../components/teams/TeamTrainer.astro";
 import { apiBase } from "../../lib/api-base";
+import { sportsTeam } from "../../lib/jsonld";
 import { cmsBaseUrl } from "../../lib/media";
+import { absoluteUrl, canonicalUrl, metaDescription } from "../../lib/seo";
 import { strings } from "../../lib/strings";
 import { primaryTrainer, toSiteImage } from "../../lib/team-detail";
 import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
@@ -43,9 +45,23 @@ const trainer =
     ? null
     : { name: trainerData.name, image: toSiteImage(trainerData.image, cmsBase) };
 const teamApiId = team.apiTeamPermanentId ?? null;
+
+// SEO (Task C8): CMS override ?? a derived one-liner; the team photo is the
+// OG card unless a dedicated image is set.
+const description = metaDescription(
+  team.seoDescription,
+  `${team.name}${strings.seo.teamDescriptionTail}`,
+);
+const ogImage = toSiteImage(team.ogImage ?? team.teamImage, cmsBase)?.url ?? null;
+const jsonLd = sportsTeam({
+  name: team.name,
+  url: canonicalUrl(Astro.site, Astro.url.pathname),
+  image: ogImage === null ? null : absoluteUrl(ogImage, Astro.site),
+  coachName: trainer?.name ?? null,
+});
 ---
 
-<Layout title={`${team.name}${strings.teams.titleSuffix}`}>
+<Layout title={team.name} description={description} image={ogImage} jsonLd={jsonLd}>
   <PageHeader title={team.name} image={teamImage} />
 
   <PageContainer class="space-y-4 md:space-y-8 lg:space-y-12">

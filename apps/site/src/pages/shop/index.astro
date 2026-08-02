@@ -12,7 +12,7 @@ import { strings } from "../../lib/strings";
 const items = (await getCollection("shopItems")).map((entry) => entry.data);
 ---
 
-<Layout title={strings.shop.pageTitle}>
+<Layout title={strings.shop.heading} description={strings.seo.shop}>
   <PageHeader title={strings.shop.heading} />
 
   <PageContainer class="h-full flex flex-col lg:py-24">
