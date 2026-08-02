@@ -12,6 +12,8 @@ export default defineConfig({
         // Payload-generated artifacts and Next catch-all glue — no hand-written logic.
         "src/payload-types.ts",
         "src/app/**",
+        // `payload migrate:create` output (issue #164) — generated SQL, not code.
+        "src/migrations/**",
       ],
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
