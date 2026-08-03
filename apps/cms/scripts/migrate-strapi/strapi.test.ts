@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildStrapiUrl, mergePages } from "./strapi";
+import { buildStrapiUrl, isLastPage, mergePages } from "./strapi";
 
 describe("buildStrapiUrl", () => {
   it("asks for published documents by default and a full page", () => {
@@ -32,5 +32,30 @@ describe("mergePages", () => {
       { id: 2 },
       { id: 3 },
     ]);
+  });
+});
+
+describe("isLastPage", () => {
+  it("is false while the current page trails pageCount", () => {
+    expect(isLastPage("posts", 1, 3)).toBe(false);
+  });
+
+  it("is true once the current page reaches pageCount", () => {
+    expect(isLastPage("posts", 3, 3)).toBe(true);
+  });
+
+  it("throws instead of looping forever when pageCount is missing", () => {
+    expect(() => isLastPage("posts", 1, undefined)).toThrow(
+      "strapi: posts page 1 has a non-numeric pageCount (undefined)",
+    );
+  });
+
+  it("throws when pageCount is present but not a number", () => {
+    expect(() => isLastPage("teams", 2, "3")).toThrow(/non-numeric pageCount \("3"\)/);
+  });
+
+  it("throws on a non-finite pageCount (NaN, Infinity)", () => {
+    expect(() => isLastPage("teams", 1, Number.NaN)).toThrow(/non-numeric pageCount/);
+    expect(() => isLastPage("teams", 1, Number.POSITIVE_INFINITY)).toThrow(/non-numeric pageCount/);
   });
 });

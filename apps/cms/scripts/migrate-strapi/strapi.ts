@@ -49,6 +49,22 @@ export function mergePages<T>(pages: T[][]): T[] {
   return pages.flat();
 }
 
+/**
+ * Exported for tests: the terminate-or-continue decision for fetchAll's
+ * pagination loop. A malformed or proxy-cached response can carry
+ * meta.pagination without a numeric pageCount — `page >= undefined` is
+ * always false, so an unguarded loop would hammer the API forever. Failing
+ * loudly beats spinning.
+ */
+export function isLastPage(type: string, page: number, pageCount: unknown): boolean {
+  if (typeof pageCount !== "number" || !Number.isFinite(pageCount)) {
+    throw new Error(
+      `strapi: ${type} page ${page} has a non-numeric pageCount (${JSON.stringify(pageCount)})`,
+    );
+  }
+  return page >= pageCount;
+}
+
 function env(name: "STRAPI_URL" | "STRAPI_TOKEN"): string {
   const value = process.env[name];
   if (value === undefined || value === "") throw new Error(`${name} is not set`);
@@ -69,10 +85,10 @@ export async function fetchAll(
   for (let page = 1; ; page += 1) {
     const body = (await getJson(buildStrapiUrl(env("STRAPI_URL"), type, page, overrides))) as {
       data: StrapiDoc[];
-      meta: { pagination: { pageCount: number } };
+      meta: { pagination: { pageCount: unknown } };
     };
     pages.push(body.data);
-    if (page >= body.meta.pagination.pageCount) break;
+    if (isLastPage(type, page, body.meta.pagination.pageCount)) break;
   }
   return mergePages(pages);
 }
