@@ -1,0 +1,45 @@
+---
+// apps/site/src/components/kontakt/VorstandGrid.astro
+/**
+ * Vorstand band (angled cards). Takes already-resolved, already-sorted entries
+ * so both ContactBlock (a page-layout block) and the contact page can render
+ * the same markup.
+ */
+import type { CollectionEntry } from "astro:content";
+
+import { cmsBaseUrl } from "../../lib/media";
+import { vorstandClipDirection } from "../../lib/page-blocks";
+import { toSiteImage } from "../../lib/site-image";
+import { strings } from "../../lib/strings";
+import PersonCard from "./PersonCard.astro";
+
+interface Props {
+  entries: CollectionEntry<"vorstand">["data"][];
+}
+
+const { entries } = Astro.props;
+const cmsBase = cmsBaseUrl();
+---
+
+{
+  entries.length > 0 && (
+    <div>
+      <h2 class="text-3xl font-bold text-foreground mb-8 text-center">
+        {strings.dragons.team.vorstandHeading}
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-0 md:-space-x-4 lg:-space-x-6 xl:-space-x-8">
+        {entries.map((entry, index) => (
+          <div class="relative flex-1">
+            <PersonCard
+              name={entry.role}
+              personName={entry.person?.name}
+              email={entry.person?.email}
+              image={toSiteImage(entry.image ?? entry.person?.image, cmsBase)}
+              clipDirection={vorstandClipDirection(index, entries.length)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

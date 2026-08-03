@@ -15,13 +15,14 @@ import TeamTrainer from "../../components/teams/TeamTrainer.astro";
 import { apiBase } from "../../lib/api-base";
 import { sportsTeam } from "../../lib/jsonld";
 import { cmsBaseUrl } from "../../lib/media";
+import { publishedOnly } from "../../lib/published";
 import { absoluteUrl, canonicalUrl, metaDescription } from "../../lib/seo";
 import { strings } from "../../lib/strings";
 import { primaryTrainer, toSiteImage } from "../../lib/team-detail";
 import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
 
 export async function getStaticPaths() {
-  const teams = await getCollection("teams");
+  const teams = await getCollection("teams", publishedOnly);
   // One standings fetch for every team page (content builds only — the
   // collection is empty on env-less shell builds, so this never runs there).
   const leagueNames =

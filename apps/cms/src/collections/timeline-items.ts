@@ -1,11 +1,12 @@
 import type { CollectionConfig } from "payload";
 
 import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
-import { anyone } from "../lib/access";
+import { publishedOrAuthed } from "../lib/access";
 
 export const TimelineItems: CollectionConfig = {
   slug: "timeline-items",
-  access: { read: anyone },
+  versions: { drafts: true },
+  access: { read: publishedOrAuthed },
   admin: { useAsTitle: "title" },
   fields: [
     { name: "year", type: "text" },

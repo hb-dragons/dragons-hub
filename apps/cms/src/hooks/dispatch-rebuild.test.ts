@@ -9,6 +9,7 @@ import { People } from "../collections/people";
 import { Positions } from "../collections/positions";
 import { Posts } from "../collections/posts";
 import { Projects } from "../collections/projects";
+import { Referees } from "../collections/referees";
 import { ShopItems } from "../collections/shop-items";
 import { Teams } from "../collections/teams";
 import { TimelineItems } from "../collections/timeline-items";
@@ -18,7 +19,12 @@ import { Vorstand } from "../collections/vorstand";
 import { BackgroundVideo } from "../globals/background-video";
 import { SiteSettings } from "../globals/site-settings";
 import { TeamBackground } from "../globals/team-background";
-import { dispatchGlobalOnChange, dispatchOnDelete, dispatchOnPublish } from "./dispatch-rebuild";
+import {
+  dispatchGlobalOnChange,
+  dispatchOnDelete,
+  dispatchOnPublish,
+  shouldSkipRebuild,
+} from "./dispatch-rebuild";
 
 const DISPATCH_URL = "https://api.github.com/repos/hb-dragons/dragons-hub/dispatches";
 
@@ -28,36 +34,48 @@ type GlobalArgs = Parameters<typeof dispatchGlobalOnChange>[0];
 
 const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
 
+function skipRebuildSearchParams(skipRebuildParam?: string) {
+  return new URLSearchParams(skipRebuildParam === undefined ? {} : { skipRebuild: skipRebuildParam });
+}
+
 function changeArgs({
   status,
   previousStatus,
   skipRebuild = false,
+  skipRebuildParam,
 }: {
   status?: string;
   previousStatus?: string;
   skipRebuild?: boolean;
+  skipRebuildParam?: string;
 } = {}) {
   return {
     doc: { id: 1, _status: status },
     previousDoc: { id: 1, _status: previousStatus },
-    req: { context: skipRebuild ? { skipRebuild: true } : {} },
+    req: { context: skipRebuild ? { skipRebuild: true } : {}, searchParams: skipRebuildSearchParams(skipRebuildParam) },
     collection: { slug: "posts" },
   } as unknown as ChangeArgs;
 }
 
-function deleteArgs({ skipRebuild = false } = {}) {
+function deleteArgs({
+  skipRebuild = false,
+  skipRebuildParam,
+}: { skipRebuild?: boolean; skipRebuildParam?: string } = {}) {
   return {
     doc: { id: 1 },
-    req: { context: skipRebuild ? { skipRebuild: true } : {} },
+    req: { context: skipRebuild ? { skipRebuild: true } : {}, searchParams: skipRebuildSearchParams(skipRebuildParam) },
     collection: { slug: "posts" },
   } as unknown as DeleteArgs;
 }
 
-function globalArgs({ skipRebuild = false } = {}) {
+function globalArgs({
+  skipRebuild = false,
+  skipRebuildParam,
+}: { skipRebuild?: boolean; skipRebuildParam?: string } = {}) {
   return {
     doc: { memberCount: 300 },
     previousDoc: { memberCount: 200 },
-    req: { context: skipRebuild ? { skipRebuild: true } : {} },
+    req: { context: skipRebuild ? { skipRebuild: true } : {}, searchParams: skipRebuildSearchParams(skipRebuildParam) },
     global: { slug: "site-settings" },
   } as unknown as GlobalArgs;
 }
@@ -73,6 +91,24 @@ afterEach(() => {
   vi.restoreAllMocks();
   fetchMock.mockClear();
   fetchMock.mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })));
+});
+
+describe("shouldSkipRebuild", () => {
+  it("is true when the query string carries ?skipRebuild=true", () => {
+    expect(
+      shouldSkipRebuild({ searchParams: new URLSearchParams({ skipRebuild: "true" }) }),
+    ).toBe(true);
+  });
+
+  it("is case-sensitive: ?skipRebuild=TRUE does not skip", () => {
+    expect(
+      shouldSkipRebuild({ searchParams: new URLSearchParams({ skipRebuild: "TRUE" }) }),
+    ).toBe(false);
+  });
+
+  it("is true when context.skipRebuild is set (bulk migration writes)", () => {
+    expect(shouldSkipRebuild({ context: { skipRebuild: true } })).toBe(true);
+  });
 });
 
 describe("dispatchOnPublish", () => {
@@ -127,6 +163,33 @@ describe("dispatchOnPublish", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("does not dispatch when the request carries ?skipRebuild=true", async () => {
+    await dispatchOnPublish(changeArgs({ status: "published", skipRebuildParam: "true" }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still dispatches when the parameter is absent", async () => {
+    await dispatchOnPublish(changeArgs({ status: "published" }));
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a skipRebuild parameter that is not exactly "true"', async () => {
+    await dispatchOnPublish(changeArgs({ status: "published", skipRebuildParam: "1" }));
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("tolerates a request with no searchParams at all", async () => {
+    const args = { ...changeArgs({ status: "published" }) } as ChangeArgs;
+    (args.req as unknown as { searchParams?: URLSearchParams }).searchParams = undefined;
+
+    await dispatchOnPublish(args);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("stays silent without GH_DISPATCH_TOKEN (dev no-op)", async () => {
     vi.stubEnv("GH_DISPATCH_TOKEN", "");
 
@@ -173,6 +236,12 @@ describe("dispatchOnDelete", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("does not dispatch when the request carries ?skipRebuild=true", async () => {
+    await dispatchOnDelete(deleteArgs({ skipRebuildParam: "true" }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("hook attachment", () => {
@@ -187,6 +256,7 @@ describe("hook attachment", () => {
     { slug: "positions", collection: Positions },
     { slug: "posts", collection: Posts },
     { slug: "projects", collection: Projects },
+    { slug: "referees", collection: Referees },
     { slug: "shop-items", collection: ShopItems },
     { slug: "teams", collection: Teams },
     { slug: "timeline-items", collection: TimelineItems },
@@ -234,6 +304,12 @@ describe("dispatchGlobalOnChange", () => {
 
   it("stays silent when context.skipRebuild is set", async () => {
     await dispatchGlobalOnChange(globalArgs({ skipRebuild: true }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch when the request carries ?skipRebuild=true", async () => {
+    await dispatchGlobalOnChange(globalArgs({ skipRebuildParam: "true" }));
 
     expect(fetchMock).not.toHaveBeenCalled();
   });

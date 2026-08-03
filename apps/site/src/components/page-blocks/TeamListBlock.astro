@@ -9,6 +9,7 @@ import { getCollection, type CollectionEntry } from "astro:content";
 
 import { cmsBaseUrl } from "../../lib/media";
 import { resolveRefs } from "../../lib/page-blocks";
+import { publishedOnly } from "../../lib/published";
 import { toSiteImage } from "../../lib/site-image";
 import LinkedImageCard from "../LinkedImageCard.astro";
 
@@ -21,7 +22,7 @@ interface Props {
 const { block } = Astro.props;
 const cmsBase = cmsBaseUrl();
 
-const allTeams = (await getCollection("teams")).map((entry) => entry.data);
+const allTeams = (await getCollection("teams", publishedOnly)).map((entry) => entry.data);
 const teams = resolveRefs(block.teams, allTeams);
 ---
 

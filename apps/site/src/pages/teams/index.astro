@@ -11,6 +11,8 @@ import PageHeader from "../../components/PageHeader.astro";
 import TeamRows, { type RowTeam } from "../../components/teams/TeamRows.astro";
 import { apiBase } from "../../lib/api-base";
 import { cmsBaseUrl } from "../../lib/media";
+import { publishedPage } from "../../lib/pages";
+import { publishedOnly } from "../../lib/published";
 import { pageSeo } from "../../lib/seo";
 import { strings } from "../../lib/strings";
 import { fetchTeamBackground } from "../../lib/team-background";
@@ -21,11 +23,10 @@ const cmsBase = cmsBaseUrl();
 
 // Loader-sorted by orderIndex (src/content.config.ts) — the legacy page
 // sorted client-side.
-const teams = await getCollection("teams");
+const teams = await getCollection("teams", publishedOnly);
 
 const pages = await getCollection("pages");
-const teamsPage =
-  pages.find((page) => page.data.slug === "teams" && page.data._status !== "draft")?.data ?? null;
+const teamsPage = publishedPage(pages, "teams");
 
 // Content build (CMS env present): the standings join and the background
 // global are required — failures throw and fail the build loudly, per the

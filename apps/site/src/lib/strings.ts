@@ -131,6 +131,7 @@ export const strings = {
       vorstandHeading: "Unser Vorstand",
       positionsHeading: "Unsere Ehrenamtlichen",
       coachesHeading: "Unsere Coaches",
+      refereesHeading: "Unsere Refs",
     },
   },
   comingSoon: {

@@ -1,0 +1,135 @@
+/** A Strapi 5 document. Flat — v5 dropped v4's `attributes` wrapper. */
+export interface StrapiDoc {
+  id: number;
+  documentId: string;
+  publishedAt: string | null;
+  [key: string]: unknown;
+}
+
+export interface StrapiFile {
+  id: number;
+  name: string;
+  url: string;
+  mime: string;
+  size: number;
+  alternativeText: string | null;
+}
+
+const PAGE_SIZE = 100;
+
+/** Exported for tests: the exact query Strapi 5 needs. */
+export function buildStrapiUrl(
+  base: string,
+  type: string,
+  page: number,
+  overrides: Record<string, string>,
+): string {
+  const url = new URL(`${base.replace(/\/$/, "")}/api/${type}`);
+  // Strapi 5's populate=* only populates one level deep — it does not reach a
+  // relation or media field nested inside a component (e.g. page-header's
+  // `image`, or team.training's `gym`). A caller that needs that depth passes
+  // its own `populate[...]=...` key(s) via overrides. Emitting both the
+  // blanket `populate=*` and a caller's deep-populate key does not compose —
+  // Strapi treats populate as a single spec, not something to merge — so the
+  // default is left out entirely whenever overrides supplies any populate key.
+  const hasCustomPopulate = Object.keys(overrides).some((key) => key.startsWith("populate"));
+  const params = new URLSearchParams({
+    "pagination[page]": String(page),
+    "pagination[pageSize]": String(PAGE_SIZE),
+    ...(hasCustomPopulate ? {} : { populate: "*" }),
+    // Strapi 5 replaced v4's publicationState=preview with status.
+    status: "published",
+    // No `locale` parameter on purpose: Strapi returns the default locale (de),
+    // and the en translations are deliberately not migrated (spec D5) because
+    // Payload has no localization configured. The English text stays in Strapi.
+    ...overrides,
+  });
+  // No params.sort(): URLSearchParams.sort() orders by raw key string, so the
+  // "]" that closes "pagination[page]" (0x5D) sorts after the "S" of
+  // "pagination[pageSize]" (0x53) — it would put pageSize before page. Object
+  // insertion order above already gives a stable, sensible order and Strapi's
+  // API does not care about query param order at all.
+  url.search = params.toString();
+  return url.toString();
+}
+
+export function mergePages<T>(pages: T[][]): T[] {
+  return pages.flat();
+}
+
+/**
+ * Exported for tests: the terminate-or-continue decision for fetchAll's
+ * pagination loop. A malformed or proxy-cached response can carry
+ * meta.pagination without a numeric pageCount — `page >= undefined` is
+ * always false, so an unguarded loop would hammer the API forever. Failing
+ * loudly beats spinning.
+ */
+export function isLastPage(type: string, page: number, pageCount: unknown): boolean {
+  if (typeof pageCount !== "number" || !Number.isFinite(pageCount)) {
+    throw new Error(
+      `strapi: ${type} page ${page} has a non-numeric pageCount (${JSON.stringify(pageCount)})`,
+    );
+  }
+  return page >= pageCount;
+}
+
+function env(name: "STRAPI_URL" | "STRAPI_TOKEN"): string {
+  const value = process.env[name];
+  if (value === undefined || value === "") throw new Error(`${name} is not set`);
+  return value;
+}
+
+async function getJson(url: string): Promise<unknown> {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${env("STRAPI_TOKEN")}` } });
+  if (!res.ok) throw new Error(`strapi: HTTP ${res.status} for ${url}`);
+  return res.json();
+}
+
+export async function fetchAll(
+  type: string,
+  overrides: Record<string, string> = {},
+): Promise<StrapiDoc[]> {
+  const pages: StrapiDoc[][] = [];
+  for (let page = 1; ; page += 1) {
+    const body = (await getJson(buildStrapiUrl(env("STRAPI_URL"), type, page, overrides))) as {
+      data: StrapiDoc[];
+      meta: { pagination: { pageCount: unknown } };
+    };
+    pages.push(body.data);
+    if (isLastPage(type, page, body.meta.pagination.pageCount)) break;
+  }
+  return mergePages(pages);
+}
+
+export async function fetchSingle(type: string): Promise<StrapiDoc | null> {
+  const url = new URL(`${env("STRAPI_URL").replace(/\/$/, "")}/api/${type}`);
+  url.searchParams.set("populate", "*");
+  const body = (await getJson(url.toString())) as { data: StrapiDoc | null };
+  return body.data;
+}
+
+/**
+ * Unlike fetchAll, this does not paginate — `/api/upload/files` returns all
+ * 73 media in one response today, with no `pagination[pageSize]` cap applied
+ * by default. If Strapi's upload plugin ever defaults that endpoint to a
+ * page size in the future, both this and index.ts's media count check (which
+ * re-reads the same endpoint) would truncate identically and the run would
+ * still print a matching count — this is a known, currently-safe assumption,
+ * not a guarantee.
+ */
+export async function fetchUploads(): Promise<StrapiFile[]> {
+  const url = `${env("STRAPI_URL").replace(/\/$/, "")}/api/upload/files`;
+  const body = (await getJson(url)) as StrapiFile[] | { results: StrapiFile[] };
+  return Array.isArray(body) ? body : body.results;
+}
+
+export async function downloadFile(fileUrl: string): Promise<Blob> {
+  const absolute = fileUrl.startsWith("http")
+    ? fileUrl
+    : `${env("STRAPI_URL").replace(/\/$/, "")}${fileUrl}`;
+  const res = await fetch(absolute, {
+    headers: { Authorization: `Bearer ${env("STRAPI_TOKEN")}` },
+  });
+  if (!res.ok) throw new Error(`strapi download: HTTP ${res.status} for ${absolute}`);
+  return res.blob();
+}

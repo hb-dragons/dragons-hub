@@ -3,17 +3,17 @@ import type { CollectionConfig } from "payload";
 import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
 import { publishedOrAuthed } from "../lib/access";
 
-export const Vorstand: CollectionConfig = {
-  slug: "vorstand",
+// Was Strapi `schiedsrichter` — the club's referees, rendered on the contact
+// page. Like trainers, no admin.useAsTitle: a referee has no own name field
+// (the name lives on the related person) and useAsTitle cannot follow a
+// relationship.
+export const Referees: CollectionConfig = {
+  slug: "referees",
   versions: { drafts: true },
   access: { read: publishedOrAuthed },
-  admin: { useAsTitle: "role" },
   fields: [
-    { name: "role", type: "text", required: true }, // was Strapi vorstand.name (e.g. "1. Vorsitzende")
-    { name: "tasks", type: "textarea" },
     { name: "person", type: "relationship", relationTo: "people" },
-    { name: "orderIndex", type: "number", required: true },
-    // Optional role-specific photo; the site falls back to person.image.
+    { name: "licence", type: "text" }, // was Strapi schiedsrichter.lizenz
     { name: "image", type: "upload", relationTo: "media" },
   ],
   hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnDelete] },

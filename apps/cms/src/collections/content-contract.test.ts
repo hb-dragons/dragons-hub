@@ -9,12 +9,14 @@ import { BackgroundVideo } from "../globals/background-video";
 import { SiteSettings } from "../globals/site-settings";
 import { TeamBackground } from "../globals/team-background";
 import { Downloads } from "./downloads";
+import { Media } from "./media";
 import { Pages } from "./pages";
 import { Partners } from "./partners";
 import { People } from "./people";
 import { Positions } from "./positions";
 import { Posts } from "./posts";
 import { Projects } from "./projects";
+import { Referees } from "./referees";
 import { ShopItems } from "./shop-items";
 import { Teams } from "./teams";
 import { TimelineItems } from "./timeline-items";
@@ -26,14 +28,55 @@ const fieldNames = (fields: Field[]): string[] =>
 
 const SEO_FIELDS = ["seoDescription", "ogImage"];
 
-describe("drafted collections (posts, pages)", () => {
+describe("drafted collections", () => {
   it.each([
     { slug: "posts", collection: Posts },
     { slug: "pages", collection: Pages },
+    { slug: "teams", collection: Teams },
+    { slug: "downloads", collection: Downloads },
+    { slug: "shop-items", collection: ShopItems },
+    { slug: "projects", collection: Projects },
+    { slug: "timeline-items", collection: TimelineItems },
+    { slug: "vorstand", collection: Vorstand },
+    { slug: "positions", collection: Positions },
+    { slug: "partners", collection: Partners },
+    { slug: "referees", collection: Referees },
   ])("$slug has drafts on and publishedOrAuthed read access", ({ collection }) => {
     expect(collection.versions).toEqual({ drafts: true });
     expect(collection.access?.read).toBe(publishedOrAuthed);
   });
+
+  // people, trainers and media are reached through relations from published
+  // parents (people → vorstand/positions/trainers at depth 2, trainers → teams
+  // at depth 3, media → everything). The site filters _status only on the
+  // collection it loads, and the build user's API key sees drafts, so a draft
+  // here would render live. Drafting them needs relation-level filtering first.
+  it.each([
+    { slug: "people", collection: People },
+    { slug: "trainers", collection: Trainers },
+    { slug: "media", collection: Media },
+  ])("$slug deliberately has no drafts", ({ collection }) => {
+    expect(collection.versions).toBeUndefined();
+    expect(collection.access?.read).toBe(anyone);
+  });
+
+  const draftedFieldContracts: { slug: string; collection: CollectionConfig; fields: string[] }[] = [
+    { slug: "vorstand", collection: Vorstand, fields: ["role", "tasks", "person", "orderIndex", "image"] },
+    { slug: "positions", collection: Positions, fields: ["name", "tasks", "people", "orderIndex", "email"] },
+    { slug: "partners", collection: Partners, fields: ["name", "description", "logo", "url", "orderIndex"] },
+    { slug: "projects", collection: Projects, fields: ["title", "description", "image", "link"] },
+    { slug: "downloads", collection: Downloads, fields: ["title", "file", "category"] },
+    { slug: "shop-items", collection: ShopItems, fields: ["name", "images", "price", "link", "description"] },
+    { slug: "timeline-items", collection: TimelineItems, fields: ["year", "title", "description", "image"] },
+  ];
+
+  it.each(draftedFieldContracts)(
+    "$slug has the contracted field names",
+    ({ collection, slug, fields }) => {
+      expect(collection.slug).toBe(slug);
+      expect(fieldNames(collection.fields)).toEqual(fields);
+    },
+  );
 
   it("posts carries the contracted fields", () => {
     expect(Posts.slug).toBe("posts");
@@ -73,14 +116,14 @@ describe("drafted collections (posts, pages)", () => {
 describe("teams", () => {
   it("carries the contracted fields incl. the apiTeamPermanentId join key", () => {
     expect(Teams.slug).toBe("teams");
-    expect(Teams.versions).toBeUndefined();
-    expect(Teams.access?.read).toBe(anyone);
     expect(fieldNames(Teams.fields)).toEqual([
       "name",
       "slug",
       "orderIndex",
       "teamImage",
       "apiTeamPermanentId",
+      "leagueName",
+      "leagueId",
       "trainers",
       "trainingTimes",
       ...SEO_FIELDS,
@@ -105,14 +148,7 @@ describe("teams", () => {
 describe("people graph and flat collections", () => {
   const contracts: { slug: string; collection: CollectionConfig; fields: string[] }[] = [
     { slug: "people", collection: People, fields: ["name", "email", "phone", "image"] },
-    { slug: "vorstand", collection: Vorstand, fields: ["role", "tasks", "person", "orderIndex", "image"] },
-    { slug: "positions", collection: Positions, fields: ["name", "tasks", "people", "orderIndex", "email"] },
     { slug: "trainers", collection: Trainers, fields: ["person", "licence", "email", "image"] },
-    { slug: "partners", collection: Partners, fields: ["name", "logo", "url", "orderIndex"] },
-    { slug: "projects", collection: Projects, fields: ["title", "description", "image", "link"] },
-    { slug: "downloads", collection: Downloads, fields: ["title", "file", "category"] },
-    { slug: "shop-items", collection: ShopItems, fields: ["name", "image", "price", "link", "description"] },
-    { slug: "timeline-items", collection: TimelineItems, fields: ["year", "title", "description", "image"] },
   ];
 
   it.each(contracts)(
@@ -124,6 +160,23 @@ describe("people graph and flat collections", () => {
       expect(fieldNames(collection.fields)).toEqual(fields);
     },
   );
+
+  it("shop item price is a number, not text", () => {
+    const price = ShopItems.fields.find((field) => "name" in field && field.name === "price");
+    expect(price).toMatchObject({ type: "number" });
+  });
+
+  it("shop item images is a hasMany upload", () => {
+    const images = ShopItems.fields.find((field) => "name" in field && field.name === "images");
+    expect(images).toMatchObject({ type: "upload", relationTo: "media", hasMany: true });
+  });
+});
+
+describe("referees", () => {
+  it("carries the contracted fields", () => {
+    expect(Referees.slug).toBe("referees");
+    expect(fieldNames(Referees.fields)).toEqual(["person", "licence", "image"]);
+  });
 });
 
 describe("globals", () => {

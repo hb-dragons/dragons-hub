@@ -121,6 +121,7 @@ const team = z.object({
   trainingTimes: z.array(trainingTime).nullish(),
   seoDescription: z.string().nullish(),
   ogImage: media.nullish(),
+  _status: status,
 });
 
 export const collections = {
@@ -141,9 +142,11 @@ export const collections = {
     schema: z.object({
       id: z.number(),
       name: z.string(),
+      description: z.string().nullish(),
       logo: media.nullish(),
       url: z.string().nullish(),
       orderIndex: z.number().nullish(),
+      _status: status,
     }),
   }),
   projects: defineCollection({
@@ -154,6 +157,7 @@ export const collections = {
       description: z.string().nullish(),
       image: media.nullish(),
       link: z.string().nullish(),
+      _status: status,
     }),
   }),
   downloads: defineCollection({
@@ -167,6 +171,7 @@ export const collections = {
       file: media.nullish(),
       category: z.string().nullish(),
       createdAt: z.coerce.date(),
+      _status: status,
     }),
   }),
   shopItems: defineCollection({
@@ -174,10 +179,11 @@ export const collections = {
     schema: z.object({
       id: z.number(),
       name: z.string(),
-      image: media.nullish(),
-      price: z.string().nullish(),
+      images: z.array(media).nullish(),
+      price: z.number().nullish(),
       link: z.string().nullish(),
       description: z.string().nullish(),
+      _status: status,
     }),
   }),
   timelineItems: defineCollection({
@@ -190,6 +196,7 @@ export const collections = {
       title: z.string(),
       description: z.string().nullish(),
       image: media.nullish(),
+      _status: status,
     }),
   }),
   people: defineCollection({
@@ -206,6 +213,7 @@ export const collections = {
       person: person.nullish(),
       orderIndex: z.number(),
       image: media.nullish(),
+      _status: status,
     }),
   }),
   positions: defineCollection({
@@ -218,11 +226,23 @@ export const collections = {
       people: z.array(person).nullish(),
       orderIndex: z.number(),
       email: z.string().nullish(),
+      _status: status,
     }),
   }),
   trainers: defineCollection({
     // depth 2: trainers → person → person.image populated.
     loader: payloadLoader("trainers", { depth: 2 }),
     schema: trainer,
+  }),
+  referees: defineCollection({
+    // depth 2: referees → person → person.image populated.
+    loader: payloadLoader("referees", { depth: 2 }),
+    schema: z.object({
+      id: z.number(),
+      person: person.nullish(),
+      licence: z.string().nullish(),
+      image: media.nullish(),
+      _status: status,
+    }),
   }),
 };

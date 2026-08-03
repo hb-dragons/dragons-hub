@@ -7,9 +7,10 @@ import PageContainer from "../../components/PageContainer.astro";
 import PageHeader from "../../components/PageHeader.astro";
 import ProductCard from "../../components/shop/ProductCard.astro";
 import Layout from "../../layouts/Layout.astro";
+import { publishedOnly } from "../../lib/published";
 import { strings } from "../../lib/strings";
 
-const items = (await getCollection("shopItems")).map((entry) => entry.data);
+const items = (await getCollection("shopItems", publishedOnly)).map((entry) => entry.data);
 ---
 
 <Layout title={strings.shop.heading} description={strings.seo.shop}>

@@ -3,15 +3,15 @@
  * contact block: Vorstand band (angled cards) + Ehrenamtliche grid, ported
  * from dragons-app dragons/team/index.vue. Entries resolve against the fully
  * populated vorstand/positions collections and keep the legacy orderIndex
- * ordering; a position with several people renders one card per person.
+ * ordering; rendering itself lives in VorstandGrid/PositionsGrid, shared with
+ * the contact page.
  */
 import { getCollection, type CollectionEntry } from "astro:content";
 
-import { cmsBaseUrl } from "../../lib/media";
-import { resolveRefs, vorstandClipDirection } from "../../lib/page-blocks";
-import { toSiteImage } from "../../lib/site-image";
-import { strings } from "../../lib/strings";
-import PersonCard from "../kontakt/PersonCard.astro";
+import { resolveRefs } from "../../lib/page-blocks";
+import { publishedOnly } from "../../lib/published";
+import PositionsGrid from "../kontakt/PositionsGrid.astro";
+import VorstandGrid from "../kontakt/VorstandGrid.astro";
 
 type Layout = NonNullable<CollectionEntry<"pages">["data"]["layout"]>;
 
@@ -20,10 +20,9 @@ interface Props {
 }
 
 const { block } = Astro.props;
-const cmsBase = cmsBaseUrl();
 
-const allVorstand = (await getCollection("vorstand")).map((entry) => entry.data);
-const allPositions = (await getCollection("positions")).map((entry) => entry.data);
+const allVorstand = (await getCollection("vorstand", publishedOnly)).map((entry) => entry.data);
+const allPositions = (await getCollection("positions", publishedOnly)).map((entry) => entry.data);
 
 const vorstand = resolveRefs(block.vorstand, allVorstand).sort(
   (a, b) => a.orderIndex - b.orderIndex,
@@ -31,63 +30,7 @@ const vorstand = resolveRefs(block.vorstand, allVorstand).sort(
 const positions = resolveRefs(block.positions, allPositions).sort(
   (a, b) => a.orderIndex - b.orderIndex,
 );
-
-// Legacy Strapi positions carried one ehrenamtliche each; Payload allows
-// several people per position — one card per person, position name repeated.
-type PositionEntry = (typeof positions)[number];
-type PersonEntry = NonNullable<PositionEntry["people"]>[number];
-const positionCards = positions.flatMap(
-  (position): { position: PositionEntry; person: PersonEntry | null }[] => {
-    const people = position.people ?? [];
-    if (people.length === 0) return [{ position, person: null }];
-    return people.map((person) => ({ position, person }));
-  },
-);
 ---
 
-{
-  vorstand.length > 0 && (
-    <div>
-      <h2 class="text-3xl font-bold text-foreground mb-8 text-center">
-        {strings.dragons.team.vorstandHeading}
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-0 md:-space-x-4 lg:-space-x-6 xl:-space-x-8">
-        {vorstand.map((entry, index) => (
-          <div class="relative flex-1">
-            <PersonCard
-              name={entry.role}
-              personName={entry.person?.name}
-              email={entry.person?.email}
-              image={toSiteImage(entry.image ?? entry.person?.image, cmsBase)}
-              clipDirection={vorstandClipDirection(index, vorstand.length)}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-{
-  positionCards.length > 0 && (
-    <div>
-      <h2 class="text-3xl font-bold text-foreground mt-8 mb-8 text-center">
-        {strings.dragons.team.positionsHeading}
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 md:gap-4 md:-space-x-12">
-        {positionCards.map(({ position, person }) => (
-          <div class="w-full overflow-hidden rounded-md">
-            <PersonCard
-              name={position.name}
-              personName={person?.name}
-              email={position.email}
-              image={toSiteImage(person?.image, cmsBase)}
-              clipDirection="none"
-              showEmail={true}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+<VorstandGrid entries={vorstand} />
+<PositionsGrid entries={positions} />
