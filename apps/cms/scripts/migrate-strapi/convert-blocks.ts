@@ -76,6 +76,16 @@ function renderNode(node: StrapiBlock, mediaMap: Map<number, number>): string {
       const payloadId = node.image === undefined ? undefined : mediaMap.get(node.image.id);
       // A dangling image is dropped rather than emitted broken; index.ts logs it.
       if (payloadId === undefined) return "";
+      // Payload 3.87.0's Lexical HTML importer has no converter for a plain
+      // <img> (let alone one keyed on this custom data-media-id attribute),
+      // so this mapping is lost the moment strapiBlocksToLexical runs the
+      // HTML through convertHTMLToLexical — verified empirically, it comes
+      // out as an empty "pending" upload node with no reference to either
+      // id. Warn loudly so an operator running the migration knows which
+      // post needs the image re-attached by hand.
+      console.warn(
+        `convert-blocks: image (strapi file ${node.image?.id} -> payload media ${payloadId}) has no Lexical upload converter — re-attach manually after migration`,
+      );
       return `<img data-media-id="${payloadId}" alt="${escapeHtml(node.image?.alternativeText ?? "")}" />`;
     }
     default:

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import fixtures from "./fixtures/posts.json" with { type: "json" };
 import { strapiBlocksToHtml, strapiBlocksToLexical, type StrapiBlock } from "./convert-blocks";
@@ -117,6 +117,27 @@ describe("strapiBlocksToHtml", () => {
       { type: "mystery", children: [{ type: "text", text: "trotzdem" }] },
     ] as unknown as StrapiBlock[];
     expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe("<p>trotzdem</p>");
+  });
+});
+
+describe("strapiBlocksToLexical", () => {
+  it("warns that a migrated image cannot become a real Lexical upload node", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const blocks = [
+      { type: "image", image: { id: 7, alternativeText: "Banner" }, children: [] },
+    ] as StrapiBlock[];
+
+    const lexical = await strapiBlocksToLexical(blocks, new Map([[7, 42]]));
+
+    expect(warn).toHaveBeenCalledWith(
+      "convert-blocks: image (strapi file 7 -> payload media 42) has no Lexical upload converter — re-attach manually after migration",
+    );
+    // Payload 3.87.0's HTML importer has no converter for a generic <img>, so
+    // the mapped media id never reaches the Lexical tree — it becomes an
+    // empty "pending" upload node instead. Pin that gap so a future Payload
+    // upgrade that fixes it doesn't silently un-fix it without anyone
+    // noticing this test needs to change too.
+    expect(JSON.stringify(lexical)).not.toContain("42");
   });
 });
 
