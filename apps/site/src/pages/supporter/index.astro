@@ -22,10 +22,12 @@ const page = publishedPage(await getCollection("pages"), "supporter", "partner")
 const headerTitle = page?.header?.title ?? strings.supporter.fallbackHeading;
 const seo = pageSeo(page, cmsBase, strings.seo.supporter);
 
-// Loader sorts by orderIndex; partners carry no description in the pruned
-// Payload surface (see ItemRows docs).
+// Loader sorts by orderIndex. The legacy supporter page shows each partner's
+// prose (verified live against https://hbdragons.de/supporter/ 2026-08-03),
+// so it carries over the same way projects' description does.
 const partners: RowItem[] = (await getCollection("partners", publishedOnly)).map(({ data }) => ({
   name: data.name,
+  description: data.description,
   logo: toSiteImage(data.logo, cmsBase),
   link: data.url,
 }));
