@@ -2630,6 +2630,13 @@ Not a code task — the runbook the spec's verification section describes.
    - `/dragons/team` matches the legacy page's four sections
    - `/supporter` does **not** show SportCheck
    - posts render rich text and galleries; teams show league names and training times
+   - `/supporter` shows each partner's description prose, matching the legacy page
+   - **check the two globals by hand in the Payload admin** — `team-background` has an
+     image and `background-video` has a video. The script's verification row for these
+     derives what it expects from the same read that writes them, so a `fetchSingle`
+     returning `null` (which is what happens if a single type is left unpublished in
+     Strapi) reports a matching row rather than a mismatch. Known and accepted: both
+     single types are published today, and re-running after republishing fixes it.
 6. **Revoke the Strapi API token.**
 
 ## Notes for the implementer
