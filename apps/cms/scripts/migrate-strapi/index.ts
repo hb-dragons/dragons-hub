@@ -119,11 +119,28 @@ async function main(): Promise<void> {
   await run("referees", await fetchAll("schiedsrichters"), (doc) => mapReferee(doc, ids));
   await run("teams", strapiTeams, (doc) => mapTeam(doc, ids));
 
-  // Partners are the one collection with an unpublished document, so they are
-  // read with status=draft — Strapi 5 returns the draft version of every
-  // document, which for published ones is identical.
-  await run("partners", await fetchAll("partners", { status: "draft" }), (doc, index) =>
-    mapPartner(doc, ids, index),
+  // Partners are the one collection with an unpublished document
+  // (SportCheck), so they are read with status=draft to see it too. Strapi 5
+  // does return the draft version of every document on that fetch, and the
+  // *content* of a published one is identical either way — but publishedAt is
+  // not: status=draft sets it to null on every document, published ones
+  // included. mapPartner can't derive _status from a field the fetch itself
+  // blanks out, so reconcile against a second, status=published fetch
+  // instead. documentId is the join key — id is not stable across the two
+  // (Strapi rewrites it per status; verified live 2026-08-03, e.g. Menbun is
+  // id 16 published and id 15 draft) — and the reconciled status is passed
+  // into mapPartner explicitly.
+  const strapiPartnersDraft = await fetchAll("partners", { status: "draft" });
+  const publishedPartnerDocumentIds = new Set(
+    (await fetchAll("partners")).map((doc) => doc.documentId),
+  );
+  await run("partners", strapiPartnersDraft, (doc, index) =>
+    mapPartner(
+      doc,
+      ids,
+      index,
+      publishedPartnerDocumentIds.has(doc.documentId) ? "published" : "draft",
+    ),
   );
 
   await run("projects", await fetchAll("projects"), (doc) => mapProject(doc, ids));

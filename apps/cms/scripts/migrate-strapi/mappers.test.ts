@@ -395,6 +395,7 @@ describe("mapPartner", () => {
         },
         { media: new Map([[5, 500]]) },
         0,
+        "published",
       ),
     ).toMatchObject({
       name: "Menbun",
@@ -406,12 +407,37 @@ describe("mapPartner", () => {
     });
   });
 
-  it("maps the unpublished partner to a draft", () => {
+  // index.ts fetches partners with status=draft (to see SportCheck), and on
+  // that fetch Strapi 5 sets publishedAt: null on every document — published
+  // ones included. Both fixtures below carry publishedAt: null to match that
+  // real shape (verified live 2026-08-03) and prove _status comes from the
+  // explicit argument, not from doc.publishedAt the way every other mapper's
+  // does.
+  it("takes _status from the status argument when the partner is published", () => {
+    // The real shape of the published Menbun document under index.ts's
+    // status=draft fetch: publishedAt is null even though Strapi's separate
+    // status=published fetch (which index.ts reconciles by documentId) says
+    // this one is live. This is the case that was silently wrong before the
+    // fix: publishedStatus(doc) would have called it draft.
     expect(
       mapPartner(
-        { id: 13, documentId: "w", publishedAt: null, name: "SportCheck", logo: null },
+        { id: 15, documentId: "buplg6pho7gk6v00tfc9auw7", publishedAt: null, name: "Menbun", logo: null },
+        ids,
+        0,
+        "published",
+      )._status,
+    ).toBe("published");
+  });
+
+  it("takes _status from the status argument when the partner is a draft", () => {
+    // SportCheck: genuinely unpublished in Strapi, so status=draft is the
+    // only fetch that returns it at all.
+    expect(
+      mapPartner(
+        { id: 13, documentId: "oi9lj9wopeocywkm8g350js7", publishedAt: null, name: "SportCheck", logo: null },
         ids,
         1,
+        "draft",
       )._status,
     ).toBe("draft");
   });

@@ -207,7 +207,20 @@ export function mapTeam(doc: StrapiDoc, ids: IdMaps) {
   };
 }
 
-export function mapPartner(doc: StrapiDoc, ids: IdMaps, orderIndex: number) {
+export function mapPartner(
+  doc: StrapiDoc,
+  ids: IdMaps,
+  orderIndex: number,
+  // Passed in rather than derived from doc.publishedAt like every other
+  // mapper's _status: partners are fetched with status=draft (to see the one
+  // unpublished partner), and on that fetch Strapi 5 sets publishedAt: null
+  // on *every* document, published ones included. publishedStatus(doc) would
+  // therefore call all of them draft. index.ts reconciles the real status by
+  // documentId against a separate status=published fetch and passes the
+  // answer in — this mapper has no way to know it otherwise, and reaching
+  // back out to Strapi from inside a mapper would break the "pure" rule.
+  status: "draft" | "published",
+) {
   return {
     name: doc.name as string,
     description: (doc.beschreibung as string | null) ?? null,
@@ -216,7 +229,7 @@ export function mapPartner(doc: StrapiDoc, ids: IdMaps, orderIndex: number) {
     // No Strapi source; assigned by id ascending so the site's
     // sort: "orderIndex" is deterministic and editable afterwards.
     orderIndex,
-    _status: publishedStatus(doc),
+    _status: status,
   };
 }
 
