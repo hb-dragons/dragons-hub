@@ -108,6 +108,15 @@ export async function fetchSingle(type: string): Promise<StrapiDoc | null> {
   return body.data;
 }
 
+/**
+ * Unlike fetchAll, this does not paginate — `/api/upload/files` returns all
+ * 73 media in one response today, with no `pagination[pageSize]` cap applied
+ * by default. If Strapi's upload plugin ever defaults that endpoint to a
+ * page size in the future, both this and index.ts's media count check (which
+ * re-reads the same endpoint) would truncate identically and the run would
+ * still print a matching count — this is a known, currently-safe assumption,
+ * not a guarantee.
+ */
 export async function fetchUploads(): Promise<StrapiFile[]> {
   const url = `${env("STRAPI_URL").replace(/\/$/, "")}/api/upload/files`;
   const body = (await getJson(url)) as StrapiFile[] | { results: StrapiFile[] };

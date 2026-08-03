@@ -262,7 +262,12 @@ async function main(): Promise<void> {
     console.log(`  ${collection.padEnd(16)} strapi=${String(want).padEnd(4)} payload=${got}${got === want ? "" : "   MISMATCH"}`);
   }
 
-  const slugsWritten = Object.values(PAGE_SLUGS);
+  // What was actually written: strapiPages run through the same slug mapping
+  // mapPage uses, not the static PAGE_SLUGS table — a production run where
+  // Strapi returned fewer pages than the table lists would otherwise print
+  // all six regardless, which is exactly the output an operator reads to
+  // sanity-check the run.
+  const slugsWritten = strapiPages.map((doc) => PAGE_SLUGS[doc.slug as string] ?? (doc.slug as string));
   console.log(`  page slugs: ${slugsWritten.join(", ")}, ${SEEDED_PAGES.map((p) => p.slug).join(", ")}`);
 
   if (failed) {

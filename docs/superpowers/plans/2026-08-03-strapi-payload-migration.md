@@ -2621,6 +2621,10 @@ Not a code task — the runbook the spec's verification section describes.
    export CMS_API_TOKEN=<the build user's key>
    pnpm --filter @dragons/cms migrate:strapi
    ```
+   **If the script fails partway through, re-run it and do not trigger a site rebuild in
+   between.** The script wipes its target collections before reading any content, so a
+   mid-run failure leaves production's Payload empty until the next successful run —
+   rebuilding the site against that state would ship an empty site.
 4. Confirm no `repository_dispatch` fired: check dragons-hub's Actions tab for `cms-publish` events during the run window.
 5. Trigger a site rebuild, then browse `https://site.testing.hbdragons.de`:
    - `/dragons/team` matches the legacy page's four sections

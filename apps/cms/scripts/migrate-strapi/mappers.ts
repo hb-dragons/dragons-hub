@@ -297,15 +297,17 @@ export function mapShopItem(doc: StrapiDoc, ids: IdMaps) {
   };
 }
 
-export function mapTimelineItem(doc: StrapiDoc, ids: IdMaps) {
+export function mapTimelineItem(doc: StrapiDoc, _ids: IdMaps) {
   const raw = doc.date as string | null;
   const parsed = raw === null ? Number.NaN : new Date(raw).getFullYear();
   return {
     title: doc.headline as string,
     description: (doc.description as string | null) ?? null,
     year: Number.isNaN(parsed) ? raw : String(parsed),
-    // No Strapi source.
-    image: rel(doc.image, ids.media),
+    // No Strapi source: the legacy timeline-item schema has no media field
+    // at all (unlike e.g. mapDownload's file), so there is nothing to read —
+    // new in Payload, editors set it by hand after migration.
+    image: null,
     _status: publishedStatus(doc),
   };
 }
