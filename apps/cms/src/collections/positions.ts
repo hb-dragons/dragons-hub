@@ -1,11 +1,12 @@
 import type { CollectionConfig } from "payload";
 
 import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
-import { anyone } from "../lib/access";
+import { publishedOrAuthed } from "../lib/access";
 
 export const Positions: CollectionConfig = {
   slug: "positions",
-  access: { read: anyone },
+  versions: { drafts: true },
+  access: { read: publishedOrAuthed },
   admin: { useAsTitle: "name" },
   fields: [
     { name: "name", type: "text", required: true },
