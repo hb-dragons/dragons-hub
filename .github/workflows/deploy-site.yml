@@ -167,10 +167,17 @@ jobs:
           install -m 600 /dev/null "$HOME/deploy_key"
           printf '%s\n' "$SFTP_KEY" > "$HOME/deploy_key"
 
-          lftp -c "
+          # The password is a placeholder and is never used: ssh authenticates
+          # with the key in connect-program. It has to be there anyway — given
+          # a user but no password, lftp calls GetPass(), which cannot prompt
+          # on a runner, so it gives up and retries as anonymous:
+          #   open: GetPass() failed -- assume anonymous login
+          #   mirror: Login failed: Password required
+          # BatchMode=yes keeps a rejected key failing fast instead of letting
+          # ssh wait on a password prompt nobody can answer.
+          lftp -u "$SFTP_USER,placeholder-unused" "sftp://$SFTP_HOST" -e "
             set cmd:fail-exit true;
-            set sftp:connect-program 'ssh -a -x -i $HOME/deploy_key -o StrictHostKeyChecking=accept-new';
-            open sftp://$SFTP_USER@$SFTP_HOST;
+            set sftp:connect-program 'ssh -a -x -i $HOME/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new';
             mirror -R --parallel=4 --delete --exclude-glob .htaccess apps/site/dist public_html/releases/$RELEASE_SHA;
             put -O public_html/releases/$RELEASE_SHA apps/site/deploy/htaccess-release -o .htaccess;
             put -O public_html apps/site/deploy/swap.php;
