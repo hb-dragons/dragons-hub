@@ -82,6 +82,8 @@ describe("teams", () => {
       "orderIndex",
       "teamImage",
       "apiTeamPermanentId",
+      "leagueName",
+      "leagueId",
       "trainers",
       "trainingTimes",
       ...SEO_FIELDS,
@@ -109,10 +111,10 @@ describe("people graph and flat collections", () => {
     { slug: "vorstand", collection: Vorstand, fields: ["role", "tasks", "person", "orderIndex", "image"] },
     { slug: "positions", collection: Positions, fields: ["name", "tasks", "people", "orderIndex", "email"] },
     { slug: "trainers", collection: Trainers, fields: ["person", "licence", "email", "image"] },
-    { slug: "partners", collection: Partners, fields: ["name", "logo", "url", "orderIndex"] },
+    { slug: "partners", collection: Partners, fields: ["name", "description", "logo", "url", "orderIndex"] },
     { slug: "projects", collection: Projects, fields: ["title", "description", "image", "link"] },
     { slug: "downloads", collection: Downloads, fields: ["title", "file", "category"] },
-    { slug: "shop-items", collection: ShopItems, fields: ["name", "image", "price", "link", "description"] },
+    { slug: "shop-items", collection: ShopItems, fields: ["name", "images", "price", "link", "description"] },
     { slug: "timeline-items", collection: TimelineItems, fields: ["year", "title", "description", "image"] },
   ];
 
@@ -125,6 +127,16 @@ describe("people graph and flat collections", () => {
       expect(fieldNames(collection.fields)).toEqual(fields);
     },
   );
+
+  it("shop item price is a number, not text", () => {
+    const price = ShopItems.fields.find((field) => "name" in field && field.name === "price");
+    expect(price).toMatchObject({ type: "number" });
+  });
+
+  it("shop item images is a hasMany upload", () => {
+    const images = ShopItems.fields.find((field) => "name" in field && field.name === "images");
+    expect(images).toMatchObject({ type: "upload", relationTo: "media", hasMany: true });
+  });
 });
 
 describe("referees", () => {

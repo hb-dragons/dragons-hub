@@ -9,6 +9,8 @@ export const Partners: CollectionConfig = {
   admin: { useAsTitle: "name" },
   fields: [
     { name: "name", type: "text", required: true },
+    // Strapi partner.beschreibung — long prose the legacy supporter page shows.
+    { name: "description", type: "textarea" },
     { name: "logo", type: "upload", relationTo: "media" },
     { name: "url", type: "text" },
     // Optional (unlike teams/vorstand/positions): new in Payload — legacy

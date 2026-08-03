@@ -9,8 +9,10 @@ export const ShopItems: CollectionConfig = {
   admin: { useAsTitle: "name" },
   fields: [
     { name: "name", type: "text", required: true },
-    { name: "image", type: "upload", relationTo: "media" },
-    { name: "price", type: "text" },
+    // Strapi shop-item.images is an array; the site renders the first.
+    { name: "images", type: "upload", relationTo: "media", hasMany: true },
+    // Number, not text: Strapi stores 38.34 numerically and the site formats it.
+    { name: "price", type: "number" },
     { name: "link", type: "text" },
     { name: "description", type: "textarea" },
   ],

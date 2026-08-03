@@ -19,6 +19,11 @@ export const Teams: CollectionConfig = {
       unique: true,
       admin: { description: "Join-Key zu /public/teams (Sync-Daten)" },
     },
+    // Strapi team.leagueName / team.leagueId. Text, not number: leagueId
+    // identifies the *league* on basketball-bund.net, not the team — it is not
+    // interchangeable with apiTeamPermanentId above.
+    { name: "leagueName", type: "text" },
+    { name: "leagueId", type: "text" },
     { name: "trainers", type: "relationship", relationTo: "trainers", hasMany: true },
     {
       name: "trainingTimes",
