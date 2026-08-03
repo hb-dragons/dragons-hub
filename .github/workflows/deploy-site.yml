@@ -1,0 +1,243 @@
+name: Deploy Site
+
+# Public site (hbdragons.de / site.testing.hbdragons.de) — static Astro build
+# mirrored over SFTP into a sha-named release dir on the Hetzner webspace, then
+# activated by swap.php. See docs/plans/2026-08-01-public-site-migration.md (D1–D3)
+# and apps/site/deploy/README.md for the docroot layout.
+#
+# Deliberately NOT gated on the CI workflow (unlike deploy.yml): the site build
+# is its own gate — if `turbo build` fails nothing is uploaded, and the smoke
+# test fails the run after a bad swap. Gating on CI would also make content-only
+# CMS publishes hostage to unrelated test failures (and to issue #136, where the
+# Dependency Audit job times out and CI concludes "cancelled").
+
+on:
+  push:
+    branches: [main]
+    # Native path filters, not .github/scripts/change-patterns.sh: that file
+    # exists because deploy.yml runs on `workflow_run`, where GitHub's own path
+    # filtering is unavailable and the job has to diff by hand. This workflow
+    # triggers on `push` directly, so `paths:` is the cheaper, un-drift-able
+    # equivalent — no shell pattern to keep in sync.
+    paths:
+      - "apps/site/**"
+      - "packages/ui/**"
+      - "packages/shared/**"
+      - "packages/api-client/**"
+      - "packages/contracts/**"
+      - "pnpm-lock.yaml"
+      - "turbo.json"
+      - ".github/workflows/deploy-site.yml"
+  repository_dispatch:
+    # cms-publish: Payload publish/unpublish/delete hook (plan task A4).
+    # sync-completed: api webhook notification channel (plan task B4).
+    types: [cms-publish, sync-completed]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Existing release sha to swap to (rollback — swap only, no build). Empty = build HEAD."
+        required: false
+        type: string
+  schedule:
+    # 03:30 UTC = 04:30 Berlin (winter) / 05:30 (summer) — always after the
+    # 04:00 Berlin full sync. Safety net for dropped dispatches.
+    - cron: "30 3 * * *"
+
+# Coalescing without a debounce service: one group for every trigger, and
+# cancel-in-progress: false. GitHub allows at most one running plus one pending
+# run per group — a third arrival replaces the pending one. So a burst of N
+# dispatches collapses to <= 2 builds, and the last build always sees the
+# newest CMS state (nothing is lost, only redundant middles are dropped).
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & Deploy Site
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # `github.event.inputs.sha` is null for push/schedule/repository_dispatch,
+      # so this resolves to the build path for every non-manual trigger. The
+      # value is read from env (never interpolated into the script body) and
+      # validated against swap.php's own regex before it reaches a curl.
+      - name: Resolve deploy mode
+        id: mode
+        env:
+          ROLLBACK_SHA: ${{ github.event.inputs.sha }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ROLLBACK_SHA:-}" ]; then
+            if [[ ! "$ROLLBACK_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+              echo "::error::rollback sha must match ^[0-9a-f]{7,40}\$ (got '$ROLLBACK_SHA')"
+              exit 1
+            fi
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "sha=$ROLLBACK_SHA" >> "$GITHUB_OUTPUT"
+            echo "Rollback: swapping to existing release $ROLLBACK_SHA (no build)"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            echo "Build: $GITHUB_SHA (trigger: $GITHUB_EVENT_NAME)"
+          fi
+
+      # Fail before touching the host, not halfway through it. The CMS pair
+      # matters most: apps/site/src/lib/payload.ts treats *both* vars missing as
+      # an "env-less shell build" and only warns, which would publish a site
+      # with every collection empty (issue #172).
+      - name: Check required configuration
+        env:
+          BUILD: ${{ steps.mode.outputs.build }}
+          CMS_URL: ${{ vars.CMS_URL }}
+          CMS_API_TOKEN: ${{ secrets.CMS_API_TOKEN }}
+          HETZNER_USER: ${{ vars.HETZNER_USER }}
+          HETZNER_HOST: ${{ vars.HETZNER_HOST }}
+          HETZNER_SFTP_KEY: ${{ secrets.HETZNER_SFTP_KEY }}
+          HETZNER_DEPLOY_TOKEN: ${{ secrets.HETZNER_DEPLOY_TOKEN }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          set -euo pipefail
+          missing=()
+          require() { [ -n "${!1:-}" ] || missing+=("$1"); }
+
+          require HETZNER_DEPLOY_TOKEN
+          require SITE_URL
+          if [ "$BUILD" = "true" ]; then
+            require CMS_URL
+            require CMS_API_TOKEN
+            require HETZNER_USER
+            require HETZNER_HOST
+            require HETZNER_SFTP_KEY
+          fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::missing repo secrets/variables: ${missing[*]}"
+            exit 1
+          fi
+          echo "config ok"
+
+      - name: Checkout repository
+        if: steps.mode.outputs.build == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      # Composite action pins pnpm/action-setup + actions/setup-node and runs
+      # `pnpm install --frozen-lockfile`. Turbo remote cache stays OFF on
+      # purpose: CMS content is not part of turbo's hash inputs, so a cache hit
+      # would republish stale content on a cms-publish dispatch.
+      - name: Setup
+        if: steps.mode.outputs.build == 'true'
+        uses: ./.github/actions/setup
+
+      - name: Build site
+        if: steps.mode.outputs.build == 'true'
+        env:
+          CMS_URL: ${{ vars.CMS_URL }}
+          CMS_API_TOKEN: ${{ secrets.CMS_API_TOKEN }}
+          PUBLIC_API_URL: https://api.app.hbdragons.de
+        run: pnpm turbo build --filter @dragons/site
+
+      - name: Verify build output
+        if: steps.mode.outputs.build == 'true'
+        run: |
+          set -euo pipefail
+          test -f apps/site/dist/index.html
+          test -f apps/site/dist/404.html
+          echo "dist: $(find apps/site/dist -type f | wc -l) files"
+
+      # SFTP only — this webspace has no ssh, no rsync, and no way to create a
+      # symlink remotely (swap.php owns `current`). The docroot `.htaccess` is
+      # deliberately NOT uploaded: it is the live-traffic switch, staged as
+      # `.htaccess.new` and renamed by the Phase E cutover.
+      - name: Upload release over SFTP
+        if: steps.mode.outputs.build == 'true'
+        env:
+          SFTP_KEY: ${{ secrets.HETZNER_SFTP_KEY }}
+          SFTP_USER: ${{ vars.HETZNER_USER }}
+          SFTP_HOST: ${{ vars.HETZNER_HOST }}
+          RELEASE_SHA: ${{ steps.mode.outputs.sha }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+          install -m 600 /dev/null "$HOME/deploy_key"
+          printf '%s\n' "$SFTP_KEY" > "$HOME/deploy_key"
+
+          lftp -c "
+            set cmd:fail-exit true;
+            set sftp:connect-program 'ssh -a -x -i $HOME/deploy_key -o StrictHostKeyChecking=accept-new';
+            open sftp://$SFTP_USER@$SFTP_HOST;
+            mirror -R --parallel=4 --delete --exclude-glob .htaccess apps/site/dist public_html/releases/$RELEASE_SHA;
+            put -O public_html/releases/$RELEASE_SHA apps/site/deploy/htaccess-release -o .htaccess;
+            put -O public_html apps/site/deploy/swap.php;
+            bye"
+
+          rm -f "$HOME/deploy_key"
+
+      # Always run — this single step is the whole rollback fast path.
+      # The apex serves swap.php directly; never call it on the testing subdomain.
+      - name: Swap current -> release
+        env:
+          DEPLOY_TOKEN: ${{ secrets.HETZNER_DEPLOY_TOKEN }}
+          RELEASE_SHA: ${{ steps.mode.outputs.sha }}
+        run: |
+          set -euo pipefail
+          RESPONSE=$(curl -fsS -X POST "https://hbdragons.de/swap.php" \
+            -H "X-Deploy-Token: $DEPLOY_TOKEN" \
+            --data-urlencode "sha=$RELEASE_SHA")
+          echo "swap.php: $RESPONSE"
+          if [ "$RESPONSE" != "ok $RELEASE_SHA" ]; then
+            echo "::error::swap.php did not confirm the release (expected 'ok $RELEASE_SHA')"
+            exit 1
+          fi
+
+      # Runs on every deploy from day one: the staged release is already
+      # browsable at SITE_URL (site.testing.hbdragons.de's docroot is
+      # public_html/current), so there is nothing to gate on.
+      - name: Smoke test
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          set -euo pipefail
+          # Body captured, not piped: `curl | grep -q` makes grep exit on the
+          # first match, curl die of SIGPIPE, and `pipefail` fail a green smoke.
+          HOMEPAGE=$(curl -fsS --retry 3 --retry-delay 5 --retry-connrefused "$SITE_URL/")
+          if ! grep -qi dragons <<<"$HOMEPAGE"; then
+            echo "::error::homepage at $SITE_URL/ does not look like the site"
+            exit 1
+          fi
+          # Real 404, not a soft 200 — .htaccess ErrorDocument must be in place.
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$SITE_URL/definitely-not-a-page/")
+          if [ "$STATUS" != "404" ]; then
+            echo "::error::expected HTTP 404 for an unknown path, got $STATUS"
+            exit 1
+          fi
+          echo "smoke ok: homepage serves, unknown path returns a real 404"
+
+      - name: Summary
+        if: always()
+        env:
+          RELEASE_SHA: ${{ steps.mode.outputs.sha }}
+          BUILT: ${{ steps.mode.outputs.build }}
+        run: |
+          if [ -z "${RELEASE_SHA:-}" ]; then
+            RELEASE_SHA="(unresolved)"
+            MODE="(failed before mode resolution)"
+          elif [ "${BUILT:-}" = "true" ]; then
+            MODE="build + swap"
+          else
+            MODE="rollback (swap only, no build)"
+          fi
+          {
+            echo "## Site deploy"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Release | \`$RELEASE_SHA\` |"
+            echo "| Mode | $MODE |"
+            echo "| Trigger | \`$GITHUB_EVENT_NAME\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
