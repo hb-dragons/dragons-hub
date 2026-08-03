@@ -165,6 +165,10 @@ describe("real post fixtures", () => {
       )) as { root: { children: unknown[] } };
       expect(lexical.root).toBeDefined();
       expect(Array.isArray(lexical.root.children)).toBe(true);
+      // Every real post has content; `[]` would satisfy both assertions above
+      // and hide total content loss (the exact silent-corruption shape this
+      // suite exists to catch), so the corpus needs a non-empty check too.
+      expect(lexical.root.children.length).toBeGreaterThan(0);
     },
   );
 

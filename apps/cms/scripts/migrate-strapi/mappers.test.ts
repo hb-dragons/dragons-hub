@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   PAGE_SLUGS,
@@ -22,6 +22,13 @@ import {
 } from "./mappers";
 
 const ids = { media: new Map<number, number>(), trainers: new Map<number, number>() };
+
+// A failing assertion between vi.spyOn(console, "warn") and its mockRestore()
+// below (mapTeam's it.each) would otherwise leave console.warn mocked for
+// every test that runs after it in this file.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("slugify", () => {
   it("lowercases, strips punctuation and joins on hyphens", () => {
@@ -377,7 +384,6 @@ describe("mapTeam", () => {
       },
     ]);
     expect(warnSpy).toHaveBeenCalledExactlyOnceWith(warning);
-    warnSpy.mockRestore();
   });
 });
 
@@ -615,7 +621,10 @@ describe("page slugs", () => {
     ]);
   });
 
-  it("maps a page through the slug table", () => {
+  it("maps a page through the slug table and resolves the header image via the media map", () => {
+    // Populated, not null: all six live pages have a header image (verified
+    // 2026-08-03), and this is the exact field dry run #1 lost silently —
+    // an all-null fixture can't catch a regression in that resolution.
     expect(
       mapPage(
         {
@@ -623,11 +632,11 @@ describe("page slugs", () => {
           documentId: "p",
           publishedAt: "2025-01-01T00:00:00.000Z",
           slug: "partner",
-          header: { title: "Supporter", image: null },
+          header: { title: "Supporter", image: { id: 22 } },
         },
-        ids,
+        { media: new Map([[22, 2200]]) },
       ),
-    ).toMatchObject({ slug: "supporter", header: { title: "Supporter", image: null }, layout: [] });
+    ).toMatchObject({ slug: "supporter", header: { title: "Supporter", image: 2200 }, layout: [] });
   });
 
   it("passes an unmapped slug through unchanged rather than dropping the page", () => {
