@@ -19,7 +19,12 @@ import { Vorstand } from "../collections/vorstand";
 import { BackgroundVideo } from "../globals/background-video";
 import { SiteSettings } from "../globals/site-settings";
 import { TeamBackground } from "../globals/team-background";
-import { dispatchGlobalOnChange, dispatchOnDelete, dispatchOnPublish } from "./dispatch-rebuild";
+import {
+  dispatchGlobalOnChange,
+  dispatchOnDelete,
+  dispatchOnPublish,
+  shouldSkipRebuild,
+} from "./dispatch-rebuild";
 
 const DISPATCH_URL = "https://api.github.com/repos/hb-dragons/dragons-hub/dispatches";
 
@@ -86,6 +91,24 @@ afterEach(() => {
   vi.restoreAllMocks();
   fetchMock.mockClear();
   fetchMock.mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })));
+});
+
+describe("shouldSkipRebuild", () => {
+  it("is true when the query string carries ?skipRebuild=true", () => {
+    expect(
+      shouldSkipRebuild({ searchParams: new URLSearchParams({ skipRebuild: "true" }) }),
+    ).toBe(true);
+  });
+
+  it("is case-sensitive: ?skipRebuild=TRUE does not skip", () => {
+    expect(
+      shouldSkipRebuild({ searchParams: new URLSearchParams({ skipRebuild: "TRUE" }) }),
+    ).toBe(false);
+  });
+
+  it("is true when context.skipRebuild is set (bulk migration writes)", () => {
+    expect(shouldSkipRebuild({ context: { skipRebuild: true } })).toBe(true);
+  });
 });
 
 describe("dispatchOnPublish", () => {
