@@ -10,6 +10,7 @@ import PageHeader from "../../components/PageHeader.astro";
 import Layout from "../../layouts/Layout.astro";
 import { cmsBaseUrl } from "../../lib/media";
 import { publishedPage } from "../../lib/pages";
+import { publishedOnly } from "../../lib/published";
 import { pageSeo } from "../../lib/seo";
 import { toSiteImage } from "../../lib/site-image";
 import { strings } from "../../lib/strings";
@@ -18,7 +19,7 @@ const cmsBase = cmsBaseUrl();
 
 const page = publishedPage(await getCollection("pages"), "downloads");
 
-const downloads = (await getCollection("downloads")).map((entry) => entry.data);
+const downloads = (await getCollection("downloads", publishedOnly)).map((entry) => entry.data);
 
 const headerTitle = page?.header?.title ?? strings.downloads.fallbackHeading;
 const seo = pageSeo(page, cmsBase, strings.seo.downloads);

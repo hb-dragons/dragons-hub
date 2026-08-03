@@ -6,6 +6,7 @@
 import { getCollection, type CollectionEntry } from "astro:content";
 
 import { resolveRefs } from "../../lib/page-blocks";
+import { publishedOnly } from "../../lib/published";
 import DownloadCard from "../downloads/DownloadCard.astro";
 
 type Layout = NonNullable<CollectionEntry<"pages">["data"]["layout"]>;
@@ -16,7 +17,7 @@ interface Props {
 
 const { block } = Astro.props;
 
-const allDownloads = (await getCollection("downloads")).map((entry) => entry.data);
+const allDownloads = (await getCollection("downloads", publishedOnly)).map((entry) => entry.data);
 const downloads = resolveRefs(block.downloads, allDownloads);
 ---
 

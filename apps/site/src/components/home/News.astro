@@ -9,13 +9,13 @@ import { getCollection } from "astro:content";
 import BlurImage from "../BlurImage.astro";
 import PageContainer from "../PageContainer.astro";
 import { cmsBaseUrl, mediaUrl } from "../../lib/media";
+import { publishedOnly } from "../../lib/published";
 import { SOFT_BUTTON_CLASSES } from "../../lib/site-assets";
 import { strings } from "../../lib/strings";
 
 const cmsBase = cmsBaseUrl();
 
-// The build user's API key sees drafts (publishedOrAuthed) — filter them out.
-const posts = (await getCollection("posts", ({ data }) => data._status === "published"))
+const posts = (await getCollection("posts", publishedOnly))
   .map((entry) => entry.data)
   .sort((a, b) => b.publishedDate.valueOf() - a.publishedDate.valueOf())
   .slice(0, 3);

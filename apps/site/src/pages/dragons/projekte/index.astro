@@ -11,6 +11,7 @@ import PageHeader from "../../../components/PageHeader.astro";
 import Layout from "../../../layouts/Layout.astro";
 import { cmsBaseUrl } from "../../../lib/media";
 import { publishedPage } from "../../../lib/pages";
+import { publishedOnly } from "../../../lib/published";
 import { pageSeo } from "../../../lib/seo";
 import { toSiteImage } from "../../../lib/site-image";
 import { strings } from "../../../lib/strings";
@@ -22,7 +23,7 @@ const page = publishedPage(await getCollection("pages"), "projekte");
 const headerTitle = page?.header?.title ?? strings.dragons.projekte.heading;
 const seo = pageSeo(page, cmsBase, strings.seo.projekte);
 
-const projects: RowItem[] = (await getCollection("projects")).map(({ data }) => ({
+const projects: RowItem[] = (await getCollection("projects", publishedOnly)).map(({ data }) => ({
   name: data.title,
   description: data.description,
   logo: toSiteImage(data.image, cmsBase),

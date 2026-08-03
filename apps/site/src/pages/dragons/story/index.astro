@@ -11,6 +11,7 @@ import PageHeader from "../../../components/PageHeader.astro";
 import Layout from "../../../layouts/Layout.astro";
 import { cmsBaseUrl } from "../../../lib/media";
 import { publishedPage } from "../../../lib/pages";
+import { publishedOnly } from "../../../lib/published";
 import { pageSeo } from "../../../lib/seo";
 import { toSiteImage } from "../../../lib/site-image";
 import { strings } from "../../../lib/strings";
@@ -19,7 +20,7 @@ const cmsBase = cmsBaseUrl();
 
 const page = publishedPage(await getCollection("pages"), "story");
 
-const items = (await getCollection("timelineItems")).map((entry) => entry.data);
+const items = (await getCollection("timelineItems", publishedOnly)).map((entry) => entry.data);
 
 const headerTitle = page?.header?.title ?? strings.dragons.story.heading;
 const seo = pageSeo(page, cmsBase, strings.seo.story);

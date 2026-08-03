@@ -11,6 +11,7 @@ import PageHeader from "../../components/PageHeader.astro";
 import TeamRows, { type RowTeam } from "../../components/teams/TeamRows.astro";
 import { apiBase } from "../../lib/api-base";
 import { cmsBaseUrl } from "../../lib/media";
+import { publishedOnly } from "../../lib/published";
 import { pageSeo } from "../../lib/seo";
 import { strings } from "../../lib/strings";
 import { fetchTeamBackground } from "../../lib/team-background";
@@ -21,7 +22,7 @@ const cmsBase = cmsBaseUrl();
 
 // Loader-sorted by orderIndex (src/content.config.ts) — the legacy page
 // sorted client-side.
-const teams = await getCollection("teams");
+const teams = await getCollection("teams", publishedOnly);
 
 const pages = await getCollection("pages");
 const teamsPage =

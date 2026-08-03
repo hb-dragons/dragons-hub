@@ -9,6 +9,7 @@ import PageHeader from "../../components/PageHeader.astro";
 import Layout from "../../layouts/Layout.astro";
 import { cmsBaseUrl } from "../../lib/media";
 import { publishedPage } from "../../lib/pages";
+import { publishedOnly } from "../../lib/published";
 import { pageSeo } from "../../lib/seo";
 import { toSiteImage } from "../../lib/site-image";
 import { strings } from "../../lib/strings";
@@ -23,7 +24,7 @@ const seo = pageSeo(page, cmsBase, strings.seo.supporter);
 
 // Loader sorts by orderIndex; partners carry no description in the pruned
 // Payload surface (see ItemRows docs).
-const partners: RowItem[] = (await getCollection("partners")).map(({ data }) => ({
+const partners: RowItem[] = (await getCollection("partners", publishedOnly)).map(({ data }) => ({
   name: data.name,
   logo: toSiteImage(data.logo, cmsBase),
   link: data.url,

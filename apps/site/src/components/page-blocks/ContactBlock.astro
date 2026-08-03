@@ -9,6 +9,7 @@ import { getCollection, type CollectionEntry } from "astro:content";
 
 import { cmsBaseUrl } from "../../lib/media";
 import { resolveRefs, vorstandClipDirection } from "../../lib/page-blocks";
+import { publishedOnly } from "../../lib/published";
 import { toSiteImage } from "../../lib/site-image";
 import { strings } from "../../lib/strings";
 import PersonCard from "../kontakt/PersonCard.astro";
@@ -22,8 +23,8 @@ interface Props {
 const { block } = Astro.props;
 const cmsBase = cmsBaseUrl();
 
-const allVorstand = (await getCollection("vorstand")).map((entry) => entry.data);
-const allPositions = (await getCollection("positions")).map((entry) => entry.data);
+const allVorstand = (await getCollection("vorstand", publishedOnly)).map((entry) => entry.data);
+const allPositions = (await getCollection("positions", publishedOnly)).map((entry) => entry.data);
 
 const vorstand = resolveRefs(block.vorstand, allVorstand).sort(
   (a, b) => a.orderIndex - b.orderIndex,
