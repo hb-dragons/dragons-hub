@@ -15,6 +15,7 @@ import { People } from "./people";
 import { Positions } from "./positions";
 import { Posts } from "./posts";
 import { Projects } from "./projects";
+import { Referees } from "./referees";
 import { ShopItems } from "./shop-items";
 import { Teams } from "./teams";
 import { TimelineItems } from "./timeline-items";
@@ -124,6 +125,13 @@ describe("people graph and flat collections", () => {
       expect(fieldNames(collection.fields)).toEqual(fields);
     },
   );
+});
+
+describe("referees", () => {
+  it("carries the contracted fields", () => {
+    expect(Referees.slug).toBe("referees");
+    expect(fieldNames(Referees.fields)).toEqual(["person", "licence", "image"]);
+  });
 });
 
 describe("globals", () => {
