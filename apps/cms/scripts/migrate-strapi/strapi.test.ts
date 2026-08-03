@@ -23,6 +23,19 @@ describe("buildStrapiUrl", () => {
     const url = buildStrapiUrl("https://cms.example.de", "partners", 1, { status: "draft" });
     expect(url).toContain("status=draft");
   });
+
+  it("replaces the blanket populate=* with a deep-populate override rather than appending it", () => {
+    const url = buildStrapiUrl("https://cms.example.de", "teams", 1, {
+      "populate[training][populate]": "*",
+      "populate[teamImage]": "true",
+    });
+    // The deep-populate keys are present...
+    expect(url).toContain("populate%5Btraining%5D%5Bpopulate%5D=*");
+    expect(url).toContain("populate%5BteamImage%5D=true");
+    // ...and the blanket populate=* this would otherwise carry is gone, not
+    // merely joined by an "&" alongside it.
+    expect(url).not.toContain("populate=*");
+  });
 });
 
 describe("mergePages", () => {

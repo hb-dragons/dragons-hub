@@ -25,10 +25,18 @@ export function buildStrapiUrl(
   overrides: Record<string, string>,
 ): string {
   const url = new URL(`${base.replace(/\/$/, "")}/api/${type}`);
+  // Strapi 5's populate=* only populates one level deep — it does not reach a
+  // relation or media field nested inside a component (e.g. page-header's
+  // `image`, or team.training's `gym`). A caller that needs that depth passes
+  // its own `populate[...]=...` key(s) via overrides. Emitting both the
+  // blanket `populate=*` and a caller's deep-populate key does not compose —
+  // Strapi treats populate as a single spec, not something to merge — so the
+  // default is left out entirely whenever overrides supplies any populate key.
+  const hasCustomPopulate = Object.keys(overrides).some((key) => key.startsWith("populate"));
   const params = new URLSearchParams({
     "pagination[page]": String(page),
     "pagination[pageSize]": String(PAGE_SIZE),
-    populate: "*",
+    ...(hasCustomPopulate ? {} : { populate: "*" }),
     // Strapi 5 replaced v4's publicationState=preview with status.
     status: "published",
     // No `locale` parameter on purpose: Strapi returns the default locale (de),
