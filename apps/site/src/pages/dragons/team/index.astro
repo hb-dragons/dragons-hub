@@ -1,18 +1,24 @@
 ---
 // Port of dragons-app app/pages/dragons/team/index.vue. Vorstand +
-// Ehrenamtliche come from the CMS page's contact block (slug=team →
-// PageBlocks); the Coaches band renders the trainers collection directly,
-// like the legacy page. The legacy Refs band is gone with the pruned CMS
-// surface (no schiedsrichter type). Fully static — no islands.
+// Ehrenamtliche render both from the CMS page's contact block (slug=team →
+// PageBlocks, when a layout asks for it) and directly here, so the sections
+// show even though every Strapi-migrated dynamic zone is empty. The Coaches
+// band renders the trainers collection directly, like the legacy page, and
+// Refs mirrors it from the new referees collection. Fully static — no
+// islands.
 import { getCollection } from "astro:content";
 
 import PersonCard from "../../../components/kontakt/PersonCard.astro";
+import PositionsGrid from "../../../components/kontakt/PositionsGrid.astro";
+import RefereesGrid from "../../../components/kontakt/RefereesGrid.astro";
+import VorstandGrid from "../../../components/kontakt/VorstandGrid.astro";
 import PageBlocks from "../../../components/page-blocks/PageBlocks.astro";
 import PageContainer from "../../../components/PageContainer.astro";
 import PageHeader from "../../../components/PageHeader.astro";
 import Layout from "../../../layouts/Layout.astro";
 import { cmsBaseUrl } from "../../../lib/media";
 import { publishedPage } from "../../../lib/pages";
+import { publishedOnly } from "../../../lib/published";
 import { pageSeo } from "../../../lib/seo";
 import { toSiteImage } from "../../../lib/site-image";
 import { strings } from "../../../lib/strings";
@@ -24,6 +30,13 @@ const cmsBase = cmsBaseUrl();
 const page = publishedPage(await getCollection("pages"), "team", "kontakt");
 
 const trainers = (await getCollection("trainers")).map((entry) => entry.data);
+const vorstand = (await getCollection("vorstand", publishedOnly))
+  .map((entry) => entry.data)
+  .sort((a, b) => a.orderIndex - b.orderIndex);
+const positions = (await getCollection("positions", publishedOnly))
+  .map((entry) => entry.data)
+  .sort((a, b) => a.orderIndex - b.orderIndex);
+const referees = (await getCollection("referees", publishedOnly)).map((entry) => entry.data);
 
 const headerTitle = page?.header?.title ?? strings.dragons.team.heading;
 const seo = pageSeo(page, cmsBase, strings.seo.kontakt);
@@ -34,6 +47,9 @@ const seo = pageSeo(page, cmsBase, strings.seo.kontakt);
 
   <PageContainer>
     <PageBlocks layout={page?.layout} />
+
+    <VorstandGrid entries={vorstand} />
+    <PositionsGrid entries={positions} />
 
     {
       trainers.length > 0 && (
@@ -68,5 +84,7 @@ const seo = pageSeo(page, cmsBase, strings.seo.kontakt);
         </div>
       )
     }
+
+    <RefereesGrid entries={referees} />
   </PageContainer>
 </Layout>

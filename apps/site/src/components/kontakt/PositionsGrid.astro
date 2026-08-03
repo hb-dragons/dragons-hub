@@ -1,0 +1,55 @@
+---
+// apps/site/src/components/kontakt/PositionsGrid.astro
+/**
+ * Ehrenamtliche grid. Legacy Strapi positions carried one person each; Payload
+ * allows several per position — one card per person, position name repeated.
+ */
+import type { CollectionEntry } from "astro:content";
+
+import { cmsBaseUrl } from "../../lib/media";
+import { toSiteImage } from "../../lib/site-image";
+import { strings } from "../../lib/strings";
+import PersonCard from "./PersonCard.astro";
+
+type PositionEntry = CollectionEntry<"positions">["data"];
+type PersonEntry = NonNullable<PositionEntry["people"]>[number];
+
+interface Props {
+  entries: PositionEntry[];
+}
+
+const { entries } = Astro.props;
+const cmsBase = cmsBaseUrl();
+
+const cards = entries.flatMap(
+  (position): { position: PositionEntry; person: PersonEntry | null }[] => {
+    const people = position.people ?? [];
+    if (people.length === 0) return [{ position, person: null }];
+    return people.map((person) => ({ position, person }));
+  },
+);
+---
+
+{
+  cards.length > 0 && (
+    <div>
+      <h2 class="text-3xl font-bold text-foreground mt-8 mb-8 text-center">
+        {strings.dragons.team.positionsHeading}
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 md:gap-4 md:-space-x-12">
+        {cards.map(({ position, person }) => (
+          <div class="w-full overflow-hidden rounded-md">
+            <PersonCard
+              name={position.name}
+              personName={person?.name}
+              email={position.email}
+              image={toSiteImage(person?.image, cmsBase)}
+              clipDirection="none"
+              showEmail={true}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

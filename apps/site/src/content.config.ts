@@ -233,4 +233,15 @@ export const collections = {
     loader: payloadLoader("trainers", { depth: 2 }),
     schema: trainer,
   }),
+  referees: defineCollection({
+    // depth 2: referees → person → person.image populated.
+    loader: payloadLoader("referees", { depth: 2 }),
+    schema: z.object({
+      id: z.number(),
+      person: person.nullish(),
+      licence: z.string().nullish(),
+      image: media.nullish(),
+      _status: status,
+    }),
+  }),
 };
