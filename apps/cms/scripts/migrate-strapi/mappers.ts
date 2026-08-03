@@ -154,7 +154,10 @@ export function mapTeam(doc: StrapiDoc, ids: IdMaps) {
     apiTeamPermanentId: TEAM_PERMANENT_IDS[slug] ?? null,
     leagueName: (doc.leagueName as string | null) ?? null,
     leagueId: (doc.leagueId as string | null) ?? null,
-    trainers: rels(doc.trainer, ids.trainers),
+    // Strapi team.trainer is oneToOne (schema.json), so it arrives as a single
+    // object or null — never an array — same shape as position.ehrenamtliche
+    // below. Wrap it before rels() so a real team with a coach doesn't crash.
+    trainers: rels(doc.trainer == null ? [] : [doc.trainer], ids.trainers),
     trainingTimes: ((doc.training ?? []) as StrapiTraining[]).map((time) => ({
       day: time.day,
       startTime: time.startTime,

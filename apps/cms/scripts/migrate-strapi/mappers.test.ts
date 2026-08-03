@@ -6,10 +6,16 @@ import {
   mapDownload,
   mapPage,
   mapPartner,
+  mapPerson,
+  mapPosition,
   mapPost,
+  mapProject,
+  mapReferee,
   mapShopItem,
   mapTeam,
   mapTimelineItem,
+  mapTrainer,
+  mapVorstand,
   publishedStatus,
   slugify,
 } from "./mappers";
@@ -36,6 +42,196 @@ describe("publishedStatus", () => {
   });
 });
 
+describe("mapPerson", () => {
+  it("carries contact fields and resolves the image via the media map", () => {
+    expect(
+      mapPerson(
+        {
+          id: 4,
+          documentId: "per1",
+          publishedAt: "2025-01-01T00:00:00.000Z",
+          name: "Jane Doe",
+          email: "jane@example.com",
+          phone: "0123456789",
+          image: { id: 9 },
+        },
+        { media: new Map([[9, 900]]) },
+      ),
+    ).toMatchObject({
+      name: "Jane Doe",
+      email: "jane@example.com",
+      phone: "0123456789",
+      image: 900,
+    });
+  });
+
+  it("leaves image null when the person has none", () => {
+    expect(
+      mapPerson(
+        {
+          id: 5,
+          documentId: "per2",
+          publishedAt: "2025-01-01T00:00:00.000Z",
+          name: "No Photo",
+          image: null,
+        },
+        ids,
+      ).image,
+    ).toBeNull();
+  });
+});
+
+describe("mapPosition", () => {
+  it("wraps the single ehrenamtliche relation and resolves it through the people map", () => {
+    expect(
+      mapPosition(
+        {
+          id: 21,
+          documentId: "pos1",
+          publishedAt: "2025-01-01T00:00:00.000Z",
+          name: "Kassenwart",
+          tasks: "Finanzen",
+          email: "kasse@example.com",
+          orderIndex: 2,
+          // Strapi position.ehrenamtliche is oneToOne — a single object, not an array.
+          ehrenamtliche: { id: 6 },
+        },
+        { people: new Map([[6, 600]]) },
+      ),
+    ).toMatchObject({
+      name: "Kassenwart",
+      tasks: "Finanzen",
+      email: "kasse@example.com",
+      orderIndex: 2,
+      people: [600],
+      _status: "published",
+    });
+  });
+
+  it("maps to an empty people array when ehrenamtliche is null", () => {
+    expect(
+      mapPosition(
+        {
+          id: 22,
+          documentId: "pos2",
+          publishedAt: null,
+          name: "Beisitzer",
+          ehrenamtliche: null,
+        },
+        ids,
+      ),
+    ).toMatchObject({ people: [], _status: "draft" });
+  });
+});
+
+describe("mapVorstand", () => {
+  it("reads the role title from name and resolves person and image", () => {
+    expect(
+      mapVorstand(
+        {
+          id: 40,
+          documentId: "v1",
+          publishedAt: "2025-01-01T00:00:00.000Z",
+          name: "1. Vorsitzende",
+          tasks: "Vereinsleitung",
+          orderIndex: 0,
+          ehrenamtliche: { id: 6 },
+          image: { id: 9 },
+        },
+        { people: new Map([[6, 600]]), media: new Map([[9, 900]]) },
+      ),
+    ).toMatchObject({
+      role: "1. Vorsitzende",
+      tasks: "Vereinsleitung",
+      orderIndex: 0,
+      person: 600,
+      image: 900,
+      _status: "published",
+    });
+  });
+
+  it("leaves person and image null when Strapi has neither", () => {
+    expect(
+      mapVorstand(
+        {
+          id: 41,
+          documentId: "v2",
+          publishedAt: null,
+          name: "Schriftführer",
+          ehrenamtliche: null,
+          image: null,
+        },
+        ids,
+      ),
+    ).toMatchObject({ person: null, image: null, _status: "draft" });
+  });
+});
+
+describe("mapTrainer", () => {
+  it("renames lizenz to licence and resolves person and image", () => {
+    expect(
+      mapTrainer(
+        {
+          id: 8,
+          documentId: "tr1",
+          publishedAt: "2025-01-01T00:00:00.000Z",
+          ehrenamtliche: { id: 6 },
+          lizenz: "B-Lizenz",
+          email: "trainer@example.com",
+          image: { id: 9 },
+        },
+        { people: new Map([[6, 600]]), media: new Map([[9, 900]]) },
+      ),
+    ).toMatchObject({
+      person: 600,
+      licence: "B-Lizenz",
+      email: "trainer@example.com",
+      image: 900,
+    });
+  });
+
+  it("leaves person null when the trainer has no ehrenamtliche relation", () => {
+    expect(
+      mapTrainer(
+        {
+          id: 9,
+          documentId: "tr2",
+          publishedAt: "2025-01-01T00:00:00.000Z",
+          ehrenamtliche: null,
+        },
+        ids,
+      ).person,
+    ).toBeNull();
+  });
+});
+
+describe("mapReferee", () => {
+  it("renames lizenz to licence and resolves person and image", () => {
+    expect(
+      mapReferee(
+        {
+          id: 12,
+          documentId: "ref1",
+          publishedAt: "2025-01-01T00:00:00.000Z",
+          ehrenamtliche: { id: 6 },
+          lizenz: "Landesliga",
+          image: { id: 9 },
+        },
+        { people: new Map([[6, 600]]), media: new Map([[9, 900]]) },
+      ),
+    ).toMatchObject({ person: 600, licence: "Landesliga", image: 900, _status: "published" });
+  });
+
+  it("maps the unpublished referee to a draft", () => {
+    expect(
+      mapReferee(
+        { id: 13, documentId: "ref2", publishedAt: null, ehrenamtliche: null },
+        ids,
+      )._status,
+    ).toBe("draft");
+  });
+});
+
 describe("mapTeam", () => {
   it("carries league fields and joins the permanent id by slug", () => {
     const doc = {
@@ -48,7 +244,8 @@ describe("mapTeam", () => {
       leagueName: "2. Regionalliga Damen West",
       leagueId: "48668",
       teamImage: { id: 3 },
-      trainer: [{ id: 8 }],
+      // Strapi team.trainer is oneToOne — a single object, never an array.
+      trainer: { id: 8 },
       training: [
         { day: "Montag", startTime: "20:00", endTime: "22:00", gym: "IGS Linden", info: null },
       ],
@@ -91,7 +288,8 @@ describe("mapTeam", () => {
       slug: "damen-2",
       orderIndex: 2,
       teamImage: null,
-      trainer: [],
+      // A team with no coach: Strapi's oneToOne relation is null, not [].
+      trainer: null,
       training: null,
     };
     expect(mapTeam(doc, ids).teamImage).toBeNull();
@@ -133,6 +331,40 @@ describe("mapPartner", () => {
         1,
       )._status,
     ).toBe("draft");
+  });
+});
+
+describe("mapProject", () => {
+  it("renames name to title and logo to image", () => {
+    expect(
+      mapProject(
+        {
+          id: 50,
+          documentId: "proj1",
+          publishedAt: "2025-01-01T00:00:00.000Z",
+          name: "Jugendförderung",
+          beschreibung: "Text",
+          logo: { id: 9 },
+          link: "https://example.com",
+        },
+        { media: new Map([[9, 900]]) },
+      ),
+    ).toMatchObject({
+      title: "Jugendförderung",
+      description: "Text",
+      image: 900,
+      link: "https://example.com",
+      _status: "published",
+    });
+  });
+
+  it("leaves image null when the project has no logo", () => {
+    expect(
+      mapProject(
+        { id: 51, documentId: "proj2", publishedAt: null, name: "Ohne Logo", logo: null },
+        ids,
+      ).image,
+    ).toBeNull();
   });
 });
 
