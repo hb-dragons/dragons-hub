@@ -17,6 +17,7 @@ import {
   mapTrainer,
   mapVorstand,
   publishedStatus,
+  reconcilePartnerStatuses,
   slugify,
 } from "./mappers";
 
@@ -377,6 +378,49 @@ describe("mapTeam", () => {
     ]);
     expect(warnSpy).toHaveBeenCalledExactlyOnceWith(warning);
     warnSpy.mockRestore();
+  });
+});
+
+describe("reconcilePartnerStatuses", () => {
+  it("joins draft and published fetches on documentId, not id", () => {
+    // The real trap (verified live 2026-08-03): Strapi rewrites the numeric
+    // id per status for the same document — Menbun is id 16 on the
+    // status=published fetch and id 15 on the status=draft fetch. A join on
+    // id instead of documentId would put Menbun's draft row in the "draft"
+    // bucket instead of "published" — wrong output, not an error, which is
+    // exactly why this needs a test rather than trust.
+    const draftDocs = [
+      {
+        id: 15,
+        documentId: "buplg6pho7gk6v00tfc9auw7",
+        publishedAt: null,
+        name: "Menbun",
+      },
+      // SportCheck: genuinely unpublished, present only in the draft fetch.
+      {
+        id: 13,
+        documentId: "oi9lj9wopeocywkm8g350js7",
+        publishedAt: null,
+        name: "SportCheck",
+      },
+    ];
+    const publishedDocs = [
+      {
+        id: 16,
+        documentId: "buplg6pho7gk6v00tfc9auw7",
+        publishedAt: "2025-10-30T00:36:56.639Z",
+        name: "Menbun",
+      },
+    ];
+
+    const statuses = reconcilePartnerStatuses(draftDocs, publishedDocs);
+
+    // Menbun's draft-fetch id (15) resolves to "published" despite never
+    // appearing as 15 in publishedDocs — only reachable by matching
+    // documentId, not id.
+    expect(statuses.get(15)).toBe("published");
+    // SportCheck has no counterpart in publishedDocs at all.
+    expect(statuses.get(13)).toBe("draft");
   });
 });
 

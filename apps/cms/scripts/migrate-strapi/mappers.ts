@@ -207,6 +207,36 @@ export function mapTeam(doc: StrapiDoc, ids: IdMaps) {
   };
 }
 
+/**
+ * Partners are fetched with status=draft (to see SportCheck, the one
+ * genuinely unpublished partner), and on that fetch Strapi 5 sets
+ * publishedAt: null on *every* document, published ones included — so the
+ * real status has to be reconciled against a second, status=published
+ * fetch rather than read off either document.
+ *
+ * documentId is the join key. id is NOT: Strapi rewrites the numeric id per
+ * status for the same document (verified live 2026-08-03 — Menbun is id 16
+ * on the published fetch, id 15 on the draft fetch), so joining on id would
+ * silently produce the wrong status instead of erroring — exactly the trap
+ * the covering test exercises.
+ *
+ * Returns every draft document's id mapped to its real status, so a caller
+ * iterating the draft fetch (as index.ts does — it's the one with
+ * SportCheck) can look each one up by the id it already has in hand.
+ */
+export function reconcilePartnerStatuses(
+  draftDocs: StrapiDoc[],
+  publishedDocs: StrapiDoc[],
+): Map<number, "draft" | "published"> {
+  const publishedDocumentIds = new Set(publishedDocs.map((doc) => doc.documentId));
+  return new Map(
+    draftDocs.map((doc) => [
+      doc.id,
+      publishedDocumentIds.has(doc.documentId) ? "published" : ("draft" as const),
+    ]),
+  );
+}
+
 export function mapPartner(
   doc: StrapiDoc,
   ids: IdMaps,
@@ -215,10 +245,10 @@ export function mapPartner(
   // mapper's _status: partners are fetched with status=draft (to see the one
   // unpublished partner), and on that fetch Strapi 5 sets publishedAt: null
   // on *every* document, published ones included. publishedStatus(doc) would
-  // therefore call all of them draft. index.ts reconciles the real status by
-  // documentId against a separate status=published fetch and passes the
-  // answer in — this mapper has no way to know it otherwise, and reaching
-  // back out to Strapi from inside a mapper would break the "pure" rule.
+  // therefore call all of them draft. index.ts reconciles the real status
+  // with reconcilePartnerStatuses (above) and passes the answer in — this
+  // mapper has no way to know it otherwise, and reaching back out to Strapi
+  // from inside a mapper would break the "pure" rule.
   status: "draft" | "published",
 ) {
   return {

@@ -16,6 +16,7 @@ import {
   mapTimelineItem,
   mapTrainer,
   mapVorstand,
+  reconcilePartnerStatuses,
   type IdMaps,
 } from "./mappers";
 import { migrateMedia } from "./media";
@@ -125,22 +126,15 @@ async function main(): Promise<void> {
   // *content* of a published one is identical either way — but publishedAt is
   // not: status=draft sets it to null on every document, published ones
   // included. mapPartner can't derive _status from a field the fetch itself
-  // blanks out, so reconcile against a second, status=published fetch
-  // instead. documentId is the join key — id is not stable across the two
-  // (Strapi rewrites it per status; verified live 2026-08-03, e.g. Menbun is
-  // id 16 published and id 15 draft) — and the reconciled status is passed
-  // into mapPartner explicitly.
+  // blanks out, so reconcile against a second, status=published fetch via
+  // reconcilePartnerStatuses (mappers.ts) instead of deriving it here.
   const strapiPartnersDraft = await fetchAll("partners", { status: "draft" });
-  const publishedPartnerDocumentIds = new Set(
-    (await fetchAll("partners")).map((doc) => doc.documentId),
+  const partnerStatuses = reconcilePartnerStatuses(
+    strapiPartnersDraft,
+    await fetchAll("partners"),
   );
   await run("partners", strapiPartnersDraft, (doc, index) =>
-    mapPartner(
-      doc,
-      ids,
-      index,
-      publishedPartnerDocumentIds.has(doc.documentId) ? "published" : "draft",
-    ),
+    mapPartner(doc, ids, index, partnerStatuses.get(doc.id) ?? "draft"),
   );
 
   await run("projects", await fetchAll("projects"), (doc) => mapProject(doc, ids));
