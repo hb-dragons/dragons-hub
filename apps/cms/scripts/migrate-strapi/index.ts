@@ -122,14 +122,20 @@ async function main(): Promise<void> {
   console.log("globals");
   const teamBackground = await fetchSingle("team-background");
   if (teamBackground !== null) {
+    // The document can exist with its image field cleared — an editor
+    // unsetting it is not an error, and must not abort a run that has
+    // already wiped and refilled all fourteen collections.
+    const image = teamBackground.image as { id: number } | null;
     await updateGlobal("team-background", {
-      image: media.get((teamBackground.image as { id: number }).id) ?? null,
+      image: image === null ? null : (media.get(image.id) ?? null),
     });
   }
   const backgroundVideo = await fetchSingle("background-video");
   if (backgroundVideo !== null) {
+    // Same as above: a cleared video field is not an error.
+    const video = backgroundVideo.video as { id: number } | null;
     await updateGlobal("background-video", {
-      video: media.get((backgroundVideo.video as { id: number }).id) ?? null,
+      video: video === null ? null : (media.get(video.id) ?? null),
     });
   }
   // site-settings is deliberately untouched: Strapi has no source for it and
