@@ -20,7 +20,7 @@ import {
   type IdMaps,
 } from "./mappers";
 import { migrateMedia } from "./media";
-import { countDocs, createDoc, deleteAll, updateGlobal } from "./payload-client";
+import { countDocs, createDoc, deleteAll, getGlobal, updateGlobal } from "./payload-client";
 import { fetchAll, fetchSingle, fetchUploads, type StrapiDoc } from "./strapi";
 
 /** Wiped and refilled on every run, in dependency order. */
@@ -55,6 +55,25 @@ async function run<T extends Record<string, unknown>>(
   }
   console.log(`  ${collection}: ${ids.size}`);
   return ids;
+}
+
+/**
+ * The two globals (team-background.image, background-video.video) are
+ * write-only below — every wiped-and-refilled collection gets a Strapi-count
+ * vs Payload-count row for free (deleteAll then countDocs), but a global is
+ * never wiped, so nothing naturally proves the media id it holds survived
+ * the trip. Read it back at depth=0 (a populated relation arrives as a bare
+ * id, not an object) and report presence, not the id itself: a Strapi
+ * upload id and a Payload upload id are different numbering spaces, so
+ * asserting they're "equal" would be meaningless — but "Payload has one
+ * whenever Strapi did" is exactly the invariant a media.get() miss, a
+ * quietly-skipped write (fetchSingle returning null), or an unreported
+ * Strapi-side clear would otherwise break without a trace.
+ */
+async function globalMediaPresence(slug: string, field: string): Promise<number> {
+  const doc = await getGlobal(slug);
+  const value = doc[field] as number | { id: number } | null | undefined;
+  return value === null || value === undefined ? 0 : 1;
 }
 
 // team.training is a component holding a `gym` relation (see mappers.ts's
@@ -163,21 +182,24 @@ async function main(): Promise<void> {
 
   console.log("globals");
   const teamBackground = await fetchSingle("team-background");
+  // Kept outside the `if` below (unlike `image` itself) because the
+  // verification step needs to know whether Strapi had one even when the
+  // document is missing entirely and the write is skipped.
+  const teamBackgroundImage = (teamBackground?.image as { id: number } | null) ?? null;
   if (teamBackground !== null) {
     // The document can exist with its image field cleared — an editor
     // unsetting it is not an error, and must not abort a run that has
     // already wiped and refilled all fourteen collections.
-    const image = teamBackground.image as { id: number } | null;
     await updateGlobal("team-background", {
-      image: image === null ? null : (media.get(image.id) ?? null),
+      image: teamBackgroundImage === null ? null : (media.get(teamBackgroundImage.id) ?? null),
     });
   }
   const backgroundVideo = await fetchSingle("background-video");
+  const backgroundVideoVideo = (backgroundVideo?.video as { id: number } | null) ?? null;
   if (backgroundVideo !== null) {
     // Same as above: a cleared video field is not an error.
-    const video = backgroundVideo.video as { id: number } | null;
     await updateGlobal("background-video", {
-      video: video === null ? null : (media.get(video.id) ?? null),
+      video: backgroundVideoVideo === null ? null : (media.get(backgroundVideoVideo.id) ?? null),
     });
   }
   // site-settings is deliberately untouched: Strapi has no source for it and
@@ -212,6 +234,20 @@ async function main(): Promise<void> {
   for (const [collection, want] of Object.entries(strapiCounts)) {
     const got = await countDocs(collection);
     counts.push([collection, want, got]);
+    if (got !== want) failed = true;
+  }
+
+  // want/got below are presence flags (1/0), not counts — see
+  // globalMediaPresence's doc comment for why a global can't be compared the
+  // same way a collection count is.
+  const globalMediaChecks: [slug: string, field: string, strapiHadOne: boolean][] = [
+    ["team-background", "image", teamBackgroundImage !== null],
+    ["background-video", "video", backgroundVideoVideo !== null],
+  ];
+  for (const [slug, field, strapiHadOne] of globalMediaChecks) {
+    const want = strapiHadOne ? 1 : 0;
+    const got = await globalMediaPresence(slug, field);
+    counts.push([slug, want, got]);
     if (got !== want) failed = true;
   }
 

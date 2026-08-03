@@ -74,6 +74,15 @@ export async function deleteAll(collection: string): Promise<number> {
   return body.docs.length;
 }
 
+/** Read a global back at depth=0, so a populated relation field arrives as a
+ * bare id rather than an object — cheap and sufficient for verification. */
+export async function getGlobal(slug: string): Promise<Record<string, unknown>> {
+  const url = new URL(`${env("CMS_URL").replace(/\/$/, "")}/api/globals/${slug}`);
+  url.searchParams.set("depth", "0");
+  const res = await fetch(url.toString(), { headers: headers() });
+  return (await expectOk(res, `global ${slug}`)) as Record<string, unknown>;
+}
+
 export async function countDocs(collection: string): Promise<number> {
   const url = new URL(`${env("CMS_URL").replace(/\/$/, "")}/api/${collection}`);
   url.searchParams.set("limit", "0");
