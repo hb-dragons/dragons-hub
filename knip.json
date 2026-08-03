@@ -24,8 +24,12 @@
       ]
     },
     "apps/cms": {
+      "entry": [
+        "scripts/migrate-strapi/index.ts"
+      ],
       "project": [
-        "src/**/*.{ts,tsx}"
+        "src/**/*.{ts,tsx}",
+        "scripts/**/*.ts"
       ]
     },
     "apps/site": {
