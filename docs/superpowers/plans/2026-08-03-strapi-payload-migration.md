@@ -2605,7 +2605,14 @@ git commit -m "feat(site): render vorstand, ehrenamtliche and refs on the contac
 Not a code task — the runbook the spec's verification section describes.
 
 1. **Declare the content freeze** on Strapi.
-2. Deploy `apps/cms` so the new schema and the `?skipRebuild=true` hook are live. The boot migration runs automatically via `src/instrumentation.ts`. Note issue #136: main CI concludes "cancelled" when Dependency Audit times out, which silently skips `deploy.yml` — use `gh workflow run deploy.yml --ref main -f services=cms` to bypass.
+2. Deploy `apps/cms` so the new schema and the `?skipRebuild=true` hook are live.
+   Step 3 must follow promptly. The migration adds `_status DEFAULT 'draft'` to the
+   eight newly drafted tables, and Postgres writes that default into any row already
+   there; with `publishedOrAuthed` read access, such a row reads as unpublished until
+   step 3's script deletes and recreates it with an explicit `_status`. Those
+   collections are empty, so this should be a no-op — but if the window stretches,
+   `site.testing.hbdragons.de` is where it would show. The live legacy site is
+   unaffected either way. The boot migration runs automatically via `src/instrumentation.ts`. Note issue #136: main CI concludes "cancelled" when Dependency Audit times out, which silently skips `deploy.yml` — use `gh workflow run deploy.yml --ref main -f services=cms` to bypass.
 3. Run against production:
    ```bash
    export STRAPI_URL=https://cms.hbdragons.de
