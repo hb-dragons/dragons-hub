@@ -43,7 +43,7 @@ Revised estimate: well under a day, against the plan's 3–5 days.
 
 ## Live inventory
 
-Counts verified anonymously on 2026-08-03.
+All counts verified against the live Strapi on 2026-08-03.
 
 | Strapi type | count | target |
 | --- | --- | --- |
@@ -55,21 +55,31 @@ Counts verified anonymously on 2026-08-03.
 | `position` | 8 | `positions` |
 | `trainer` | 6 | `trainers` |
 | `schiedsrichter` | 16 | `referees` (new) |
-| `partner` | 3 | `partners` |
+| `partner` | 4 (3 published + 1 draft) | `partners` |
 | `download` | 3 | `downloads` |
 | `shop-item` | 5 | `shop-items` |
-| `project` | unknown (403) | `projects` |
-| `timeline-item` | unknown (403) | `timeline-items` |
+| `project` | **0** | `projects` |
+| `timeline-item` | **0** | `timeline-items` |
 | `team-background` | 1 | `team-background` global |
 | `background-video` | 1 | `background-video` global |
-| upload library | ≥54 (403) | `media` |
+| upload library | **73 files, 61.5 MB** | `media` |
 | `gym` | 3 | dropped |
-| `probetraining` | unknown (403) | dropped |
+| `probetraining` | ≥100 | dropped |
 
-`projects`, `timeline-items`, `probetrainings` and `/api/upload/files` all return 403 to anonymous
-readers, so their sizes are unmeasured until the Strapi API token exists. 52 distinct media URLs are
-reachable by walking populated relations, plus `kreis.webp` and `trailer-new.webm` from the two
-singletons — so the library is at least 54 files.
+Measured with a full-access Strapi API token on 2026-08-03, after the anonymous 403s were lifted.
+
+**`projects` and `timeline-items` are genuinely empty**, not merely unreadable. Confirmed against the
+live legacy site: `/dragons/projekte` renders "Aktuelle Projekte" with no items and `/dragons/story`
+is a bare heading. Their mappers are still written (they define the field contract and the
+collections exist in Payload), but they will migrate zero documents.
+
+Media notes: the largest file is `trailer.webm` at 11.4 MB, well under Cloud Run's 32 MB request
+limit. Filenames are safe — Strapi hashes them on upload (`Beitragssaetze_01_08_2025_c18a389de6.pdf`
+for a source file named `Beitragssätze_01_08_2025.pdf`), so no spaces, parentheses or umlauts ever
+reach a URL, even though several display names contain them. Two pairs share a *display* name
+(`IMG_1769.webp`,
+`IMG_3989 (1).webp`) but are distinct files with distinct hashes and distinct referrers; both
+migrate. Every document in every collection has a published version except the one partner below.
 
 ## Decisions
 
@@ -85,6 +95,8 @@ All taken by the user on 2026-08-03.
 | D6 | **Drop probetraining submissions outright**, no CSV snapshot | Personal data with no ongoing purpose; new submissions already go to `apps/api`. Recoverable from Strapi if ever needed. |
 | D7 | Suppress rebuilds via a **`?skipRebuild=true` query parameter** honoured by the existing hook | See "Rebuild suppression". |
 | D8 | Page slugs: rename `partner`→`supporter` and `projekt`→`projekte`; keep `kontakt` verbatim | `projekte` is the only slug genuinely broken today. Renaming `kontakt`→`team` would sit one letter from the `teams` page. |
+| D9 | **Enable drafts on `partners`** | One partner ("SportCheck", `beschreibung: "tbd"`, no logo) is unpublished in Strapi. Payload's `partners` had no draft support, so it would have gone live on cutover. Drafts carry the unpublished state faithfully. |
+| D10 | The one `.docx` upload was **deleted in Strapi by the user** | Payload's `media.mimeTypes` allows only `image/*`, `video/*` and `application/pdf`. Removing the file at source keeps `mimeTypes` unchanged and makes the count check exact at 73. |
 
 ## Scope
 
@@ -99,6 +111,7 @@ Three parts, in order. This is not a script-only ticket.
 | `shopItems.image` → `images` (upload, `hasMany: true`) | `shop-item.images` is an array |
 | `shopItems.price` text → number | `shop-item.price` is a number |
 | New `referees` collection | `{ person: relationship→people, licence: text, image: upload→media }`, mirroring `trainers` |
+| `partners` gains `versions: { drafts: true }` and `access.read: publishedOrAuthed` | D9 — one unpublished partner |
 
 `leagueId` is text, not number, to match the Strapi type and to avoid implying it is the same join
 key as `apiTeamPermanentId` — it is not; it identifies the league, not the team.
@@ -106,9 +119,17 @@ key as `apiTeamPermanentId` — it is not; it identifies the league, not the tea
 The new collection and both `shopItems` changes require `payload migrate:create` plus
 `generate:types`. Production applies migrations on boot through `src/instrumentation.ts`.
 
-`shopItems.price` becoming a number forces three edits in `apps/site`:
-`src/content.config.ts:178` (`z.string().nullish()` → number), `src/lib/format.ts` `formatPrice`
-signature and body, and `src/components/shop/ProductCard.astro`. Their tests move with them.
+Two of these ripple into `apps/site`:
+
+- `shopItems.price` as a number forces `src/content.config.ts:178` (`z.string().nullish()` → number),
+  `src/lib/format.ts` `formatPrice` signature and body, and `src/components/shop/ProductCard.astro`.
+- `partners` gaining drafts means the build user's API key now sees the draft partner, exactly as it
+  already does for `posts` and `pages`. So `src/content.config.ts` adds `_status: status` to the
+  partners schema, and `src/pages/supporter/index.astro:26` filters
+  `getCollection("partners", ({ data }) => data._status === "published")` — the pattern
+  `News.astro`, `news/index.astro` and `pages.ts` already use.
+
+Their tests move with them.
 
 ### Part 2 — Rebuild suppression
 
@@ -160,6 +181,10 @@ The contract. Everything not listed is dropped deliberately.
 through. `blurhash` regenerates via the A2 `beforeChange` hook. Strapi's derived `formats`
 (thumbnail/small/medium) are **not** migrated — Payload and the site generate their own.
 
+73 files, 61.5 MB total. Uploads run sequentially rather than concurrently: the CMS is a
+scale-to-zero Cloud Run container with 1 GiB for sharp, and 73 files is small enough that
+parallelism buys nothing worth the risk of memory pressure during blurhash encoding.
+
 Result: `mediaMap: Map<strapiFileId, payloadMediaId>`, consumed by every later run.
 
 ### people ← ehrenamtliche
@@ -200,12 +225,18 @@ training entries (`u12`, `u14`, `u16`, `u18`); the five senior teams have none.
 ### partners ← partner
 
 `name`, `beschreibung` → `description`, `logo` → `logo`, `link` → `url`.
-`orderIndex` has no Strapi source — assigned from Strapi id ascending, so the admin ordering is
-stable and editable afterwards.
+`orderIndex` has no Strapi source — assigned from Strapi id ascending. The collection comment says
+Strapi carries no order value, which is why the field is optional; assigning it anyway matters
+because the site loads partners with `sort: "orderIndex"` and null ordering is not deterministic.
+
+Publication state carries over (D9): the 3 published partners are written published, "SportCheck" is
+written as a draft.
 
 ### projects ← project
 
-`name` → `title`, `beschreibung` → `description`, `logo` → `image`, `link` → `link`.
+**Zero documents to migrate.** The mapper is written anyway, so the contract is recorded and the
+first project an editor creates behaves correctly: `name` → `title`, `beschreibung` → `description`,
+`logo` → `image`, `link` → `link`.
 
 ### downloads ← download
 
@@ -220,10 +251,10 @@ stable and editable afterwards.
 
 ### timelineItems ← timeline-item
 
-`headline` → `title`, `description` → `description`, `date` → `year`.
-`image` has no Strapi source and stays empty. `date` → `year` parses the Strapi date and writes its
-four-digit year as text. If a value fails to parse, the raw string is written through unchanged and
-logged at warning level — `year` is a text field, so nothing is lost either way.
+**Zero documents to migrate.** Mapper written for the contract only:
+`headline` → `title`, `description` → `description`, `date` → `year` (four-digit year of the parsed
+date, raw string passed through with a warning if it fails to parse — `year` is a text field, so
+nothing is lost either way). `image` has no Strapi source.
 
 ### pages ← page
 
@@ -290,7 +321,17 @@ The script deletes every document in its target collections before writing, so r
 a failed run leaves no partial state to reconcile by hand. Deletes carry `?skipRebuild=true` too.
 
 It ends by printing a per-collection table of Strapi count versus Payload count and **exits non-zero
-on any mismatch**, per the issue's acceptance criteria.
+on any mismatch**, per the issue's acceptance criteria. Expected targets as of 2026-08-03:
+
+```
+media 73   people 25   positions 8   vorstand 3   trainers 6   referees 16
+teams 9    partners 4 (3 published + 1 draft)     downloads 3  shop-items 5
+projects 0 timeline-items 0                       pages 9 (6 migrated + 3 seeded)
+posts 4    globals 2 (team-background, background-video)
+```
+
+`pages` is the one collection where the Payload count deliberately exceeds Strapi's (9 vs 6), so the
+check compares against `strapiCount + seededCount` there rather than a bare equality.
 
 Verification beyond counts, in order:
 
@@ -316,11 +357,16 @@ Each step holds a `Map<strapiId, payloadId>` in memory for the next.
 
 ## Human-in-the-loop
 
-- **Blocking now:** create a full-access Strapi API token (Strapi admin → Settings → API Tokens).
-  Needed for `/api/upload/files`, `projects` and `timeline-items`, all 403 to anonymous readers.
-  Never committed.
+- ~~Create a full-access Strapi API token~~ — **done 2026-08-03.** Read from `STRAPI_TOKEN`, never
+  committed. It was pasted into a chat transcript, so **revoke it in Strapi → Settings → API Tokens
+  once the migration lands** rather than waiting for its 7-day expiry.
+- ~~Remove the `.docx` upload~~ — **done 2026-08-03** (D10), library now 73 files.
 - Declare the content freeze on Strapi before the real run.
 - Review the migrated content in the Payload admin, then browse `site.testing.hbdragons.de`.
+
+A note on how the admin was recovered, since it will matter again at cutover: `config/plugins.ts`
+configures no email provider, so Strapi's admin password-reset mail can never send. Recovery is
+`strapi admin:reset-user-password` (or `admin:create-user`) run inside the container.
 
 ## Out of scope
 
