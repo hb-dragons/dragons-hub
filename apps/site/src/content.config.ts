@@ -178,8 +178,8 @@ export const collections = {
     schema: z.object({
       id: z.number(),
       name: z.string(),
-      image: media.nullish(),
-      price: z.string().nullish(),
+      images: z.array(media).nullish(),
+      price: z.number().nullish(),
       link: z.string().nullish(),
       description: z.string().nullish(),
       _status: status,

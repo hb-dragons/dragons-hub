@@ -39,17 +39,13 @@ export function formatDateDe(date: Date): string {
   return date.toLocaleDateString("de-DE", { year: "numeric", month: "long", day: "numeric" });
 }
 
-const NUMERIC_PRICE = /^\d+(?:[.,]\d+)?$/;
-
 /**
- * Shop price text. The CMS stores price as free text; purely numeric values
- * are formatted like the legacy `Intl.NumberFormat` EUR output ("38,34 €"),
- * anything else ("ab 20 €") passes through as the editor wrote it.
+ * Shop price, formatted like the legacy `Intl.NumberFormat` EUR output
+ * ("38,34 €"). The CMS stores price as a number (issue #165, D3) — Strapi
+ * stored it numerically and the previous free-text field could not be sorted
+ * or compared.
  */
-export function formatPrice(price: string | null | undefined): string | null {
-  const trimmed = price?.trim();
-  if (trimmed == null || trimmed === "") return null;
-  if (!NUMERIC_PRICE.test(trimmed)) return trimmed;
-  const value = Number(trimmed.replace(",", "."));
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(value);
+export function formatPrice(price: number | null | undefined): string | null {
+  if (price == null || Number.isNaN(price)) return null;
+  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(price);
 }

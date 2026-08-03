@@ -66,25 +66,20 @@ describe("formatDateDe", () => {
 });
 
 describe("formatPrice", () => {
-  it("returns null for nullish or blank prices", () => {
+  it("formats a number as EUR the way the legacy site did", () => {
+    expect(formatPrice(38.34)).toBe("38,34 €");
+  });
+
+  it("formats a whole number with cents", () => {
+    expect(formatPrice(20)).toBe("20,00 €");
+  });
+
+  it("returns null when there is no price", () => {
     expect(formatPrice(null)).toBeNull();
     expect(formatPrice(undefined)).toBeNull();
-    expect(formatPrice("  ")).toBeNull();
   });
 
-  it("formats dot-decimal numeric strings as German EUR", () => {
-    expect(formatPrice("38.34")).toBe("38,34 €");
-  });
-
-  it("formats comma-decimal numeric strings as German EUR", () => {
-    expect(formatPrice("21,74")).toBe("21,74 €");
-  });
-
-  it("formats integer strings as German EUR", () => {
-    expect(formatPrice("24")).toBe("24,00 €");
-  });
-
-  it("passes non-numeric prices through untouched", () => {
-    expect(formatPrice("ab 20 €")).toBe("ab 20 €");
+  it("formats zero rather than treating it as missing", () => {
+    expect(formatPrice(0)).toBe("0,00 €");
   });
 });

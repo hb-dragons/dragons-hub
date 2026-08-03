@@ -1,8 +1,7 @@
 ---
 /**
- * Shop product card, ported from dragons-app ShopProductCard. The Payload
- * shop item carries a single image (the legacy Strapi carousel/lightbox had
- * an images array), so the card renders one static picture — no island.
+ * Shop product card, ported from dragons-app ShopProductCard. Renders the
+ * first image from the shop item's images array as a static picture — no island.
  */
 import type { CollectionEntry } from "astro:content";
 
@@ -17,7 +16,7 @@ interface Props {
 }
 
 const { item } = Astro.props;
-const image = toSiteImage(item.image, cmsBaseUrl());
+const image = toSiteImage(item.images?.[0] ?? null, cmsBaseUrl());
 const price = formatPrice(item.price);
 
 /** Nuxt UI soft primary button, block size lg — classes from prod markup. */
