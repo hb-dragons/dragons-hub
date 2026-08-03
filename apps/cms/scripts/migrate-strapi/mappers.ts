@@ -137,8 +137,12 @@ export function mapReferee(doc: StrapiDoc, ids: IdMaps) {
 }
 
 interface StrapiTraining {
-  day: string;
-  startTime: string;
+  // None of day/startTime/gym is `required: true` on Strapi's
+  // team.training component (components/team/training.json), even though
+  // Payload's teams.trainingTimes requires all three — hence string | null
+  // rather than string below, and the drop-and-warn guard in mapTeam.
+  day: string | null;
+  startTime: string | null;
   endTime: string | null;
   // Strapi team.training.gym is a relation (components/team/training.json),
   // not a string — it arrives as the related gym object, or null when an
@@ -152,21 +156,28 @@ export function mapTeam(doc: StrapiDoc, ids: IdMaps) {
   const slug = doc.slug as string;
   const trainingTimes = ((doc.training ?? []) as StrapiTraining[]).flatMap((time) => {
     const gymName = time.gym?.name;
-    if (gymName === undefined) {
-      // Payload's trainingTimes[].gym is required, so a row with no resolvable
-      // gym cannot be written — drop it and warn rather than aborting the
-      // whole run. Every row in today's data has a gym (verified against the
-      // live API 2026-08-03), so this is expected to be dead code today; it
-      // exists for the editor who clears a gym before the next run.
+    const { day, startTime } = time;
+    const missing = [
+      day == null ? "day" : null,
+      startTime == null ? "startTime" : null,
+      gymName === undefined ? "gym" : null,
+    ].filter((field): field is string => field !== null);
+    if (missing.length > 0) {
+      // Payload's trainingTimes[].day, .startTime and .gym are all required,
+      // so a row missing any one of them cannot be written — drop it and warn
+      // rather than aborting the whole run. Every row in today's data has all
+      // three (verified against the live API 2026-08-03), so this is expected
+      // to be dead code today; it exists for the editor who clears one of
+      // them before the next run.
       console.warn(
-        `mapTeam: team "${slug}" — training row "${time.day}" has no gym, dropping it`,
+        `mapTeam: team "${slug}" — training row (day="${day ?? "null"}") missing ${missing.join(", ")}, dropping it`,
       );
       return [];
     }
     return [
       {
-        day: time.day,
-        startTime: time.startTime,
+        day,
+        startTime,
         endTime: time.endTime ?? null,
         gym: gymName,
         // No Strapi source for a maps URL — editors fill it in Payload. The

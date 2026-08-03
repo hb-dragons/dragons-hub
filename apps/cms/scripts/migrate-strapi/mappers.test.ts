@@ -316,7 +316,42 @@ describe("mapTeam", () => {
     expect(mapTeam(doc, ids).trainingTimes).toEqual([]);
   });
 
-  it("drops a training row whose gym is null and warns, keeping the other rows", () => {
+  // Payload's trainingTimes requires day, startTime and gym, but none of the
+  // three is `required: true` on Strapi's team.training component — any one
+  // of them can arrive unset. A row missing any one is dropped and warned
+  // about rather than aborting the whole run the way an untranslated gym
+  // relation used to.
+  it.each([
+    [
+      "gym",
+      { id: 90, day: "Montag", startTime: "18:00:00", endTime: "20:00:00", info: null, gym: null },
+      'mapTeam: team "u18" — training row (day="Montag") missing gym, dropping it',
+    ],
+    [
+      "day",
+      {
+        id: 91,
+        day: null,
+        startTime: "18:00:00",
+        endTime: "20:00:00",
+        info: null,
+        gym: goetheschuleRow.gym,
+      },
+      'mapTeam: team "u18" — training row (day="null") missing day, dropping it',
+    ],
+    [
+      "startTime",
+      {
+        id: 92,
+        day: "Montag",
+        startTime: null,
+        endTime: "20:00:00",
+        info: null,
+        gym: goetheschuleRow.gym,
+      },
+      'mapTeam: team "u18" — training row (day="Montag") missing startTime, dropping it',
+    ],
+  ])("drops a training row missing %s and warns, keeping the other rows", (_field, badRow, warning) => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const doc = {
       id: 109,
@@ -327,10 +362,7 @@ describe("mapTeam", () => {
       orderIndex: 8,
       teamImage: null,
       trainer: null,
-      training: [
-        { id: 90, day: "Montag", startTime: "18:00:00", endTime: "20:00:00", info: null, gym: null },
-        goetheschuleRow,
-      ],
+      training: [badRow, goetheschuleRow],
     };
     const mapped = mapTeam(doc, ids);
     expect(mapped.trainingTimes).toEqual([
@@ -343,9 +375,7 @@ describe("mapTeam", () => {
         info: "Segment 2",
       },
     ]);
-    expect(warnSpy).toHaveBeenCalledExactlyOnceWith(
-      'mapTeam: team "u18" — training row "Montag" has no gym, dropping it',
-    );
+    expect(warnSpy).toHaveBeenCalledExactlyOnceWith(warning);
     warnSpy.mockRestore();
   });
 });

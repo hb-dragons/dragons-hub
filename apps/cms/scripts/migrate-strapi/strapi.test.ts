@@ -22,6 +22,12 @@ describe("buildStrapiUrl", () => {
   it("lets a caller override status to read drafts", () => {
     const url = buildStrapiUrl("https://cms.example.de", "partners", 1, { status: "draft" });
     expect(url).toContain("status=draft");
+    // A non-populate override must not suppress the default populate=* — only
+    // an override that itself supplies a populate key should do that (see the
+    // "replaces the blanket populate=*" case below). A guard narrowed to
+    // "any override at all" would pass every other case in this file while
+    // silently nulling every partner logo.
+    expect(url).toContain("populate=*");
   });
 
   it("replaces the blanket populate=* with a deep-populate override rather than appending it", () => {
