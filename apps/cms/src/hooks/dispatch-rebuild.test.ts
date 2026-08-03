@@ -29,36 +29,48 @@ type GlobalArgs = Parameters<typeof dispatchGlobalOnChange>[0];
 
 const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 204 })));
 
+function skipRebuildSearchParams(skipRebuildParam?: string) {
+  return new URLSearchParams(skipRebuildParam === undefined ? {} : { skipRebuild: skipRebuildParam });
+}
+
 function changeArgs({
   status,
   previousStatus,
   skipRebuild = false,
+  skipRebuildParam,
 }: {
   status?: string;
   previousStatus?: string;
   skipRebuild?: boolean;
+  skipRebuildParam?: string;
 } = {}) {
   return {
     doc: { id: 1, _status: status },
     previousDoc: { id: 1, _status: previousStatus },
-    req: { context: skipRebuild ? { skipRebuild: true } : {} },
+    req: { context: skipRebuild ? { skipRebuild: true } : {}, searchParams: skipRebuildSearchParams(skipRebuildParam) },
     collection: { slug: "posts" },
   } as unknown as ChangeArgs;
 }
 
-function deleteArgs({ skipRebuild = false } = {}) {
+function deleteArgs({
+  skipRebuild = false,
+  skipRebuildParam,
+}: { skipRebuild?: boolean; skipRebuildParam?: string } = {}) {
   return {
     doc: { id: 1 },
-    req: { context: skipRebuild ? { skipRebuild: true } : {} },
+    req: { context: skipRebuild ? { skipRebuild: true } : {}, searchParams: skipRebuildSearchParams(skipRebuildParam) },
     collection: { slug: "posts" },
   } as unknown as DeleteArgs;
 }
 
-function globalArgs({ skipRebuild = false } = {}) {
+function globalArgs({
+  skipRebuild = false,
+  skipRebuildParam,
+}: { skipRebuild?: boolean; skipRebuildParam?: string } = {}) {
   return {
     doc: { memberCount: 300 },
     previousDoc: { memberCount: 200 },
-    req: { context: skipRebuild ? { skipRebuild: true } : {} },
+    req: { context: skipRebuild ? { skipRebuild: true } : {}, searchParams: skipRebuildSearchParams(skipRebuildParam) },
     global: { slug: "site-settings" },
   } as unknown as GlobalArgs;
 }
@@ -128,6 +140,33 @@ describe("dispatchOnPublish", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("does not dispatch when the request carries ?skipRebuild=true", async () => {
+    await dispatchOnPublish(changeArgs({ status: "published", skipRebuildParam: "true" }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still dispatches when the parameter is absent", async () => {
+    await dispatchOnPublish(changeArgs({ status: "published" }));
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a skipRebuild parameter that is not exactly "true"', async () => {
+    await dispatchOnPublish(changeArgs({ status: "published", skipRebuildParam: "1" }));
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("tolerates a request with no searchParams at all", async () => {
+    const args = { ...changeArgs({ status: "published" }) } as ChangeArgs;
+    (args.req as unknown as { searchParams?: URLSearchParams }).searchParams = undefined;
+
+    await dispatchOnPublish(args);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it("stays silent without GH_DISPATCH_TOKEN (dev no-op)", async () => {
     vi.stubEnv("GH_DISPATCH_TOKEN", "");
 
@@ -171,6 +210,12 @@ describe("dispatchOnDelete", () => {
 
   it("stays silent when context.skipRebuild is set", async () => {
     await dispatchOnDelete(deleteArgs({ skipRebuild: true }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch when the request carries ?skipRebuild=true", async () => {
+    await dispatchOnDelete(deleteArgs({ skipRebuildParam: "true" }));
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -236,6 +281,12 @@ describe("dispatchGlobalOnChange", () => {
 
   it("stays silent when context.skipRebuild is set", async () => {
     await dispatchGlobalOnChange(globalArgs({ skipRebuild: true }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch when the request carries ?skipRebuild=true", async () => {
+    await dispatchGlobalOnChange(globalArgs({ skipRebuildParam: "true" }));
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
