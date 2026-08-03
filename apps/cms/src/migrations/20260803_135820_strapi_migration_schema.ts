@@ -422,7 +422,9 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   DROP TABLE "_shop_items_v" CASCADE;
   DROP TABLE "_shop_items_v_rels" CASCADE;
   DROP TABLE "_timeline_items_v" CASCADE;
-  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT "payload_locked_documents_rels_referees_fk";
+  -- DROP TABLE "referees" CASCADE above already drops this FK constraint; the
+  -- explicit drop is redundant and errors without IF EXISTS (issue #165, D3).
+  ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_referees_fk";
   
   DROP INDEX "teams__status_idx";
   DROP INDEX "vorstand__status_idx";
