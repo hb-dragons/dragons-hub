@@ -147,7 +147,14 @@ async function main(): Promise<void> {
   // included. mapPartner can't derive _status from a field the fetch itself
   // blanks out, so reconcile against a second, status=published fetch via
   // reconcilePartnerStatuses (mappers.ts) instead of deriving it here.
-  const strapiPartnersDraft = await fetchAll("partners", { status: "draft" });
+  // Sorted by id ascending so the orderIndex mapPartner assigns (run()'s loop
+  // counter) is deterministic across runs, matching mapPartner's own comment
+  // on orderIndex — fetchAll sends no `sort`, and the live API does not
+  // return partners in id order (verified 2026-08-03: the draft fetch
+  // returned ids 13, 15, 10, 1 in that order).
+  const strapiPartnersDraft = (await fetchAll("partners", { status: "draft" })).sort(
+    (a, b) => a.id - b.id,
+  );
   const partnerStatuses = reconcilePartnerStatuses(
     strapiPartnersDraft,
     await fetchAll("partners"),
