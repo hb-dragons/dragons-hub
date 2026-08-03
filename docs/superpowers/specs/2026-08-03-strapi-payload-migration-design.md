@@ -97,10 +97,12 @@ All taken by the user on 2026-08-03.
 | D8 | Page slugs: rename `partner`→`supporter` and `projekt`→`projekte`; keep `kontakt` verbatim | `projekte` is the only slug genuinely broken today. Renaming `kontakt`→`team` would sit one letter from the `teams` page. |
 | D9 | **Enable drafts on `partners`** | One partner ("SportCheck", `beschreibung: "tbd"`, no logo) is unpublished in Strapi. Payload's `partners` had no draft support, so it would have gone live on cutover. Drafts carry the unpublished state faithfully. |
 | D10 | The one `.docx` upload was **deleted in Strapi by the user** | Payload's `media.mimeTypes` allows only `image/*`, `video/*` and `application/pdf`. Removing the file at source keeps `mimeTypes` unchanged and makes the count check exact at 73. |
+| D11 | **Drafts on 8 more collections**: `teams`, `downloads`, `shopItems`, `projects`, `timelineItems`, `vorstand`, `positions`, `referees` | Editors want staging generally. Restricted to collections nothing relates to — see "Why not every collection". Done now because enabling drafts later on populated collections needs a `_status` backfill. |
+| D12 | **Render Vorstand, Ehrenamtliche and Refs on the contact page** as part of this ticket | Without it, cutover loses three sections that the live legacy site shows today. See "Part 4". |
 
 ## Scope
 
-Three parts, in order. This is not a script-only ticket.
+Four parts, in order. This is not a script-only ticket.
 
 ### Part 1 — CMS schema changes (`apps/cms`)
 
@@ -112,6 +114,7 @@ Three parts, in order. This is not a script-only ticket.
 | `shopItems.price` text → number | `shop-item.price` is a number |
 | New `referees` collection | `{ person: relationship→people, licence: text, image: upload→media }`, mirroring `trainers` |
 | `partners` gains `versions: { drafts: true }` and `access.read: publishedOrAuthed` | D9 — one unpublished partner |
+| Same drafts treatment on `teams`, `downloads`, `shopItems`, `projects`, `timelineItems`, `vorstand`, `positions`, `referees` | D11 — editorial staging |
 
 `leagueId` is text, not number, to match the Strapi type and to avoid implying it is the same join
 key as `apiTeamPermanentId` — it is not; it identifies the league, not the team.
@@ -119,17 +122,35 @@ key as `apiTeamPermanentId` — it is not; it identifies the league, not the tea
 The new collection and both `shopItems` changes require `payload migrate:create` plus
 `generate:types`. Production applies migrations on boot through `src/instrumentation.ts`.
 
-Two of these ripple into `apps/site`:
+Every one of these ripples into `apps/site`; that work is gathered in Part 4.
 
-- `shopItems.price` as a number forces `src/content.config.ts:178` (`z.string().nullish()` → number),
-  `src/lib/format.ts` `formatPrice` signature and body, and `src/components/shop/ProductCard.astro`.
-- `partners` gaining drafts means the build user's API key now sees the draft partner, exactly as it
-  already does for `posts` and `pages`. So `src/content.config.ts` adds `_status: status` to the
-  partners schema, and `src/pages/supporter/index.astro:26` filters
-  `getCollection("partners", ({ data }) => data._status === "published")` — the pattern
-  `News.astro`, `news/index.astro` and `pages.ts` already use.
+### Why not every collection gets drafts
 
-Their tests move with them.
+`people`, `trainers` and `media` deliberately keep no drafts.
+
+The site filters `_status === "published"` on the collection it loads, but the build user's API key
+is authenticated, so `publishedOrAuthed` hands it drafts — and **a draft reached through a relation
+never passes that filter**. `people` is populated into `vorstand`, `positions` and `trainers` at
+depth 2; `trainers` into `teams` at depth 3; `media` into nearly everything. A drafted person would
+render live inside a published `vorstand` entry, silently: `trainer.person` and `team.trainers` are
+`.nullish()` in the zod schema, so nothing throws.
+
+Making those safe means relation-level `_status` filtering inside the loaders — real logic, not a
+one-line filter. Deferred. Conceptually it also fits: a person or an uploaded file has no publish
+moment of its own; the thing that references it does.
+
+The eight in D11 are safe because nothing relates to them. The `pages.layout` blocks nominally
+relate to `teams`, `downloads`, `vorstand` and `positions`, but every dynamic zone is empty
+(correction 3) and Part 4 renders those sections from the collections directly instead. If a block
+is ever populated, this reasoning needs revisiting.
+
+### Timing: why drafts must land during the migration
+
+Enabling drafts on a collection that already holds rows adds a `_status` column those rows do not
+populate, and the site's `=== "published"` filter would then hide **every existing document** until
+someone backfills. Today these collections are empty and the migration writes `_status` explicitly
+per document, so there is nothing to backfill. Deferring this turns a schema change into a data-fix
+ticket against a live site.
 
 ### Part 2 — Rebuild suppression
 
@@ -170,6 +191,46 @@ unit-testable without touching either CMS. `strapi.ts` and `media.ts` own all ne
 
 Environment: `STRAPI_URL`, `STRAPI_TOKEN`, `CMS_URL`, `CMS_API_TOKEN`. Never committed.
 
+### Part 4 — Site changes (`apps/site`)
+
+**Draft filters (D9, D11).** Each newly drafted collection adds `_status: status` to its zod schema
+in `src/content.config.ts`, and every call site filters published-only — the pattern `News.astro`,
+`news/index.astro` and `lib/pages.ts` already use. The complete list, from a sweep of
+`getCollection(` call sites:
+
+| collection | call sites |
+| --- | --- |
+| `teams` | `components/NavBar.astro:21`, `components/page-blocks/TeamListBlock.astro:24`, `pages/teams/index.astro:24`, `pages/teams/[slug].astro:24` |
+| `downloads` | `components/page-blocks/DownloadListBlock.astro:19`, `pages/downloads/index.astro:21` |
+| `vorstand`, `positions` | `components/page-blocks/ContactBlock.astro:25-26`, plus the new contact sections below |
+| `projects` | `pages/dragons/projekte/index.astro:25` |
+| `timelineItems` | `pages/dragons/story/index.astro:22` |
+| `shopItems` | `pages/shop/index.astro:12` |
+| `partners` | `pages/supporter/index.astro:26` |
+| `referees` | new — no existing call site |
+
+A missed filter leaks drafts to the live site silently, so each one carries a test.
+
+**`shopItems.price` as a number (D3).** `src/content.config.ts:178` (`z.string().nullish()` →
+number), `src/lib/format.ts` `formatPrice` signature and body, `src/components/shop/ProductCard.astro`.
+
+**Contact page sections (D12).** The live legacy `/dragons/team` renders four sections: *Unser
+Vorstand* (3), *Unsere Ehrenamtlichen* (8 positions), *Unsere Coaches* (6 trainers), *Unsere Refs*
+(16, each with a licence badge such as "2. REGIONALLIGA" or "REGION HANNOVER").
+
+The Astro page renders only Coaches. `vorstand` and `positions` appear nowhere except
+`ContactBlock.astro`, which renders through `<PageBlocks layout={page?.layout} />` — and `layout` is
+empty on every page (correction 3), so that component never runs. It is dead code in practice.
+Referees have no component at all.
+
+So `pages/dragons/team/index.astro` gains the three missing sections, loading `vorstand`,
+`positions` and `referees` directly and reusing the existing `ContactBlock` markup and `PersonCard`.
+The Refs section is new: a `PersonCard` grid with the licence rendered as a badge, mirroring how the
+Coaches section renders `trainer.licence`.
+
+`ContactBlock.astro` stays as-is — it is the renderer for a populated `contact` block, which remains
+a supported (if currently unused) authoring path.
+
 ## Field mapping
 
 The contract. Everything not listed is dropped deliberately.
@@ -208,7 +269,11 @@ German locale only (D5); `localizations` ignored.
 
 ### referees ← schiedsrichter (new collection)
 
-`ehrenamtliche` → `person`, `lizenz` → `licence`, `image` → `image`.
+`ehrenamtliche` → `person`, `lizenz` → `licence`, `image` → `image`. All 16 published.
+
+These are visible on the live legacy site today (the *Unsere Refs* section), not speculative future
+data — Part 4 restores that section on the Astro contact page. Some records are deliberate
+placeholders (`name: "tbd"` with a licence set) and migrate as-is; they render on the live site now.
 
 ### teams ← team
 
@@ -340,7 +405,11 @@ Verification beyond counts, in order:
 3. Manual pass in the Payload admin: the 4 posts (rich text and galleries), the 9 pages, team
    training times and league names, referee licences.
 4. Trigger a site rebuild, then browse `https://site.testing.hbdragons.de` — the browsable check
-   the testing domains exist for.
+   the testing domains exist for. Specifically compare `/dragons/team` against the live legacy
+   `https://hbdragons.de/dragons/team`: all four sections (Vorstand, Ehrenamtliche, Coaches, Refs)
+   must be present with the same people.
+5. Confirm the draft partner "SportCheck" does **not** appear on `/supporter`, and that no drafted
+   collection leaks — the one check that proves D9/D11's filters are wired.
 
 ## Run order
 
