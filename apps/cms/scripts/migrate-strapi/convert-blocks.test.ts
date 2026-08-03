@@ -127,17 +127,31 @@ describe("strapiBlocksToLexical", () => {
       { type: "image", image: { id: 7, alternativeText: "Banner" }, children: [] },
     ] as StrapiBlock[];
 
-    const lexical = await strapiBlocksToLexical(blocks, new Map([[7, 42]]));
+    const lexical = (await strapiBlocksToLexical(blocks, new Map([[7, 42]]))) as {
+      root: { children: Record<string, unknown>[] };
+    };
 
     expect(warn).toHaveBeenCalledWith(
       "convert-blocks: image (strapi file 7 -> payload media 42) has no Lexical upload converter — re-attach manually after migration",
     );
     // Payload 3.87.0's HTML importer has no converter for a generic <img>, so
-    // the mapped media id never reaches the Lexical tree — it becomes an
-    // empty "pending" upload node instead. Pin that gap so a future Payload
-    // upgrade that fixes it doesn't silently un-fix it without anyone
-    // noticing this test needs to change too.
-    expect(JSON.stringify(lexical)).not.toContain("42");
+    // the mapped media id never reaches the Lexical tree: it comes out as an
+    // empty "pending" upload node — one with no relationTo/value pair, which
+    // is the field shape a real upload-to-media relation would use — rather
+    // than one that actually relates to media doc 42. Asserted on the parsed
+    // structure, not a substring of the serialized JSON: Lexical assigns
+    // every node a random hex id/key, and "42" can land inside one by pure
+    // chance (observed ~1-in-6 runs), which made a
+    // JSON.stringify(lexical).includes("42") check flaky rather than a real
+    // pin. Pin the shape instead, so a future Payload upgrade that adds a
+    // real <img> converter breaks this test loudly instead of the gap
+    // silently closing (or reopening) unnoticed.
+    expect(lexical.root.children).toHaveLength(1);
+    const [imageNode] = lexical.root.children;
+    expect(imageNode?.type).toBe("upload");
+    expect(imageNode?.pending).toBeDefined();
+    expect(imageNode).not.toHaveProperty("relationTo");
+    expect(imageNode).not.toHaveProperty("value");
   });
 });
 
