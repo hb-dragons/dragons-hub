@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   PAGE_SLUGS,
@@ -233,6 +233,27 @@ describe("mapReferee", () => {
 });
 
 describe("mapTeam", () => {
+  // The real shape of a Strapi team.training row under a deep populate
+  // (verified against the live API 2026-08-03) — gym is the related gym
+  // object, not a string, and Strapi's time fields carry seconds.
+  const goetheschuleRow = {
+    id: 86,
+    day: "Mittwoch",
+    startTime: "20:00:00",
+    endTime: "22:00:00",
+    info: "Segment 2",
+    gym: {
+      id: 2,
+      documentId: "ca7d5y3ec33r1k6y61e0w18c",
+      name: "GY Goetheschule",
+      location: {
+        address: "Haltenhoffstraße 97, 30167 Hannover, Deutschland",
+        geohash: "u1qfhfhj4rtf",
+        coordinates: { lat: 52.3946978, lng: 9.706525200000002 },
+      },
+    },
+  };
+
   it("carries league fields and joins the permanent id by slug", () => {
     const doc = {
       id: 107,
@@ -246,9 +267,7 @@ describe("mapTeam", () => {
       teamImage: { id: 3 },
       // Strapi team.trainer is oneToOne — a single object, never an array.
       trainer: { id: 8 },
-      training: [
-        { day: "Montag", startTime: "20:00", endTime: "22:00", gym: "IGS Linden", info: null },
-      ],
+      training: [goetheschuleRow],
     };
     const mapped = mapTeam(doc, {
       media: new Map([[3, 300]]),
@@ -269,12 +288,13 @@ describe("mapTeam", () => {
     });
     expect(mapped.trainingTimes).toEqual([
       {
-        day: "Montag",
-        startTime: "20:00",
-        endTime: "22:00",
-        gym: "IGS Linden",
+        day: "Mittwoch",
+        startTime: "20:00:00",
+        endTime: "22:00:00",
+        // The gym relation's name, not the relation object itself.
+        gym: "GY Goetheschule",
         gymMapsUrl: null,
-        info: null,
+        info: "Segment 2",
       },
     ]);
   });
@@ -294,6 +314,39 @@ describe("mapTeam", () => {
     };
     expect(mapTeam(doc, ids).teamImage).toBeNull();
     expect(mapTeam(doc, ids).trainingTimes).toEqual([]);
+  });
+
+  it("drops a training row whose gym is null and warns, keeping the other rows", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const doc = {
+      id: 109,
+      documentId: "z",
+      publishedAt: "2025-01-01T00:00:00.000Z",
+      name: "U18",
+      slug: "u18",
+      orderIndex: 8,
+      teamImage: null,
+      trainer: null,
+      training: [
+        { id: 90, day: "Montag", startTime: "18:00:00", endTime: "20:00:00", info: null, gym: null },
+        goetheschuleRow,
+      ],
+    };
+    const mapped = mapTeam(doc, ids);
+    expect(mapped.trainingTimes).toEqual([
+      {
+        day: "Mittwoch",
+        startTime: "20:00:00",
+        endTime: "22:00:00",
+        gym: "GY Goetheschule",
+        gymMapsUrl: null,
+        info: "Segment 2",
+      },
+    ]);
+    expect(warnSpy).toHaveBeenCalledExactlyOnceWith(
+      'mapTeam: team "u18" — training row "Montag" has no gym, dropping it',
+    );
+    warnSpy.mockRestore();
   });
 });
 

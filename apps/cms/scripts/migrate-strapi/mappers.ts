@@ -140,12 +140,45 @@ interface StrapiTraining {
   day: string;
   startTime: string;
   endTime: string | null;
-  gym: string;
+  // Strapi team.training.gym is a relation (components/team/training.json),
+  // not a string — it arrives as the related gym object, or null when an
+  // editor has not (yet) assigned one. Requires the deep populate index.ts
+  // sends for teams; a shallow populate=* leaves this null for every row.
+  gym: { name: string } | null;
   info: string | null;
 }
 
 export function mapTeam(doc: StrapiDoc, ids: IdMaps) {
   const slug = doc.slug as string;
+  const trainingTimes = ((doc.training ?? []) as StrapiTraining[]).flatMap((time) => {
+    const gymName = time.gym?.name;
+    if (gymName === undefined) {
+      // Payload's trainingTimes[].gym is required, so a row with no resolvable
+      // gym cannot be written — drop it and warn rather than aborting the
+      // whole run. Every row in today's data has a gym (verified against the
+      // live API 2026-08-03), so this is expected to be dead code today; it
+      // exists for the editor who clears a gym before the next run.
+      console.warn(
+        `mapTeam: team "${slug}" — training row "${time.day}" has no gym, dropping it`,
+      );
+      return [];
+    }
+    return [
+      {
+        day: time.day,
+        startTime: time.startTime,
+        endTime: time.endTime ?? null,
+        gym: gymName,
+        // No Strapi source for a maps URL — editors fill it in Payload. The
+        // gym relation does carry location.address and location.coordinates
+        // (verified against the live API 2026-08-03), so a source now exists,
+        // but deriving a maps URL from them is a product decision the plan
+        // did not make; out of scope here.
+        gymMapsUrl: null,
+        info: time.info ?? null,
+      },
+    ];
+  });
   return {
     name: doc.name as string,
     slug,
@@ -158,15 +191,7 @@ export function mapTeam(doc: StrapiDoc, ids: IdMaps) {
     // object or null — never an array — same shape as position.ehrenamtliche
     // below. Wrap it before rels() so a real team with a coach doesn't crash.
     trainers: rels(doc.trainer == null ? [] : [doc.trainer], ids.trainers),
-    trainingTimes: ((doc.training ?? []) as StrapiTraining[]).map((time) => ({
-      day: time.day,
-      startTime: time.startTime,
-      endTime: time.endTime ?? null,
-      gym: time.gym,
-      // No Strapi source — editors fill it in Payload.
-      gymMapsUrl: null,
-      info: time.info ?? null,
-    })),
+    trainingTimes,
     _status: publishedStatus(doc),
   };
 }

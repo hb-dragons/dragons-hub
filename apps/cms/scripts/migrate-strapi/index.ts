@@ -56,10 +56,41 @@ async function run<T extends Record<string, unknown>>(
   return ids;
 }
 
+// team.training is a component holding a `gym` relation (see mappers.ts's
+// StrapiTraining); Strapi's populate=* does not reach a relation nested
+// inside a component, so training[].gym comes back null without this. The
+// two sibling top-level fields (teamImage, trainer) that populate=* would
+// otherwise cover have to be re-listed here too — a bare deep-populate
+// object replaces populate=* entirely rather than adding to it (see
+// buildStrapiUrl), and the /api/teams route runs Strapi's plain default
+// controller with no populate merging of its own to fall back on.
+const TEAMS_POPULATE = {
+  "populate[training][populate]": "*",
+  "populate[teamImage]": "true",
+  "populate[trainer]": "true",
+};
+
+// page-header (posts.header, pages.header) holds its `image` the same way —
+// nested inside a component, unreached by populate=*. Unlike teams, the
+// /api/posts route runs a custom controller that already force-populates
+// `gallery` by default whenever the request's populate is an object rather
+// than the bare string "*" (see dragons-cms/src/api/post/controllers/post.ts)
+// — verified live 2026-08-03 — but that default is undocumented from this
+// side of the fence, so gallery is asked for explicitly here rather than
+// relying on it.
+const POSTS_POPULATE = {
+  "populate[header][populate]": "*",
+  "populate[gallery]": "true",
+};
+
+const PAGES_POPULATE = {
+  "populate[header][populate]": "*",
+};
+
 async function main(): Promise<void> {
   // Preflight: a team added in Strapi since the map was written would migrate
   // with a null join key and silently lose its live standings. Fail instead.
-  const strapiTeams = await fetchAll("teams");
+  const strapiTeams = await fetchAll("teams", TEAMS_POPULATE);
   const unmapped = strapiTeams
     .map((team) => team.slug as string)
     .filter((slug) => TEAM_PERMANENT_IDS[slug] === undefined);
@@ -102,7 +133,7 @@ async function main(): Promise<void> {
     mapTimelineItem(doc, ids),
   );
 
-  const strapiPages = await fetchAll("pages");
+  const strapiPages = await fetchAll("pages", PAGES_POPULATE);
   await run("pages", strapiPages, (doc) => mapPage(doc, ids));
   for (const seeded of SEEDED_PAGES) {
     await createDoc("pages", {
@@ -114,7 +145,7 @@ async function main(): Promise<void> {
   }
   console.log(`  pages seeded: ${SEEDED_PAGES.length}`);
 
-  const strapiPosts = await fetchAll("posts");
+  const strapiPosts = await fetchAll("posts", POSTS_POPULATE);
   await run("posts", strapiPosts, async (doc) =>
     mapPost(doc, ids, await strapiBlocksToLexical((doc.content ?? []) as StrapiBlock[], media)),
   );
