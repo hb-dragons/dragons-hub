@@ -18,6 +18,7 @@ import {
   mapVorstand,
   publishedStatus,
   reconcilePartnerStatuses,
+  resolvePostSlug,
   slugify,
 } from "./mappers";
 
@@ -680,8 +681,9 @@ describe("mapPost", () => {
     });
   });
 
-  it("derives a slug from the title when Strapi left it null", () => {
+  it("derives a slug from the title when Strapi left it null, and warns", () => {
     // The real "Caritas Spendenspieltag" post; Payload requires a unique slug.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(
       mapPost(
         {
@@ -695,5 +697,58 @@ describe("mapPost", () => {
         { root: {} },
       ).slug,
     ).toBe("caritas-spendenspieltag");
+    // A slug is a public URL — an invented one has to be visible in the run
+    // output, or nobody knows the post moved.
+    expect(warn).toHaveBeenCalledWith(
+      'mappers: post 30 ("Caritas Spendenspieltag") has no slug — using "caritas-spendenspieltag" derived from its title',
+    );
+  });
+
+  it("does not warn when Strapi supplied a slug", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mapPost(
+      {
+        id: 17,
+        documentId: "a",
+        publishedAt: "2025-08-11T20:58:56.822Z",
+        slug: "neue-webseite",
+        header: { title: "Neue Webseite", image: null },
+      },
+      ids,
+      { root: {} },
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolvePostSlug", () => {
+  it("reports the Strapi slug as not substituted", () => {
+    expect(
+      resolvePostSlug({ id: 1, documentId: "a", publishedAt: null, slug: "vorhanden" }),
+    ).toEqual({ slug: "vorhanden", substituted: false });
+  });
+
+  it("reports a title-derived slug as substituted", () => {
+    expect(
+      resolvePostSlug({
+        id: 1,
+        documentId: "a",
+        publishedAt: null,
+        slug: null,
+        header: { title: "Ein Titel", image: null },
+      }),
+    ).toEqual({ slug: "ein-titel", substituted: true });
+  });
+
+  it("falls back to a placeholder title when the header has none", () => {
+    expect(
+      resolvePostSlug({ id: 1, documentId: "a", publishedAt: null, slug: null }),
+    ).toEqual({ slug: "ohne-titel", substituted: true });
+  });
+
+  it("stays silent, so reading it twice in a run cannot double-log", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    resolvePostSlug({ id: 1, documentId: "a", publishedAt: null, slug: null });
+    expect(warn).not.toHaveBeenCalled();
   });
 });

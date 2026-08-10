@@ -327,13 +327,36 @@ export function mapPage(doc: StrapiDoc, ids: IdMaps) {
   };
 }
 
+/**
+ * The slug a post will be written under. One real post has slug: null, and
+ * Payload requires a unique slug, so the title is slugified to stand in.
+ *
+ * Split out of mapPost because index.ts needs the same value *before* mapPost
+ * runs, to label the content converter's warnings (see strapiBlocksToLexical).
+ * Pure and silent: mapPost owns the warning, so reading the slug twice in one
+ * run does not log it twice.
+ */
+export function resolvePostSlug(doc: StrapiDoc): { slug: string; substituted: boolean } {
+  const header = (doc.header ?? null) as { title: string; image: unknown } | null;
+  const existing = doc.slug as string | null;
+  if (existing !== null && existing !== undefined) return { slug: existing, substituted: false };
+  return { slug: slugify(header?.title ?? "Ohne Titel"), substituted: true };
+}
+
 export function mapPost(doc: StrapiDoc, ids: IdMaps, content: unknown) {
   const header = (doc.header ?? null) as { title: string; image: unknown } | null;
   const title = header?.title ?? "Ohne Titel";
+  const { slug, substituted } = resolvePostSlug(doc);
+  if (substituted) {
+    // A slug is a public URL. Inventing one silently would leave the operator
+    // no way to know which post now lives at an address nobody chose.
+    console.warn(
+      `mappers: post ${doc.id} ("${title}") has no slug — using "${slug}" derived from its title`,
+    );
+  }
   return {
     title,
-    // One real post has slug: null; Payload requires a unique slug.
-    slug: (doc.slug as string | null) ?? slugify(title),
+    slug,
     publishedDate: doc.publishedAt,
     headerImage: rel(header?.image, ids.media),
     content,

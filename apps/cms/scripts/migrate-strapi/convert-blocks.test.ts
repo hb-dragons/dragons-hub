@@ -4,25 +4,27 @@ import fixtures from "./fixtures/posts.json" with { type: "json" };
 import { strapiBlocksToHtml, strapiBlocksToLexical, type StrapiBlock } from "./convert-blocks";
 
 const NO_MEDIA = new Map<number, number>();
+/** Stands in for the post slug the migration passes through for warning labels. */
+const POST = "test-post";
 
 describe("strapiBlocksToHtml", () => {
   it("renders a paragraph", () => {
     const blocks = [
       { type: "paragraph", children: [{ type: "text", text: "Hallo" }] },
     ] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe("<p>Hallo</p>");
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe("<p>Hallo</p>");
   });
 
   it("keeps an empty paragraph, because it is the author's spacing", () => {
     const blocks = [{ type: "paragraph", children: [{ type: "text", text: "" }] }] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe("<p></p>");
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe("<p></p>");
   });
 
   it("renders a heading at its level", () => {
     const blocks = [
       { type: "heading", level: 2, children: [{ type: "text", text: "Titel" }] },
     ] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe("<h2>Titel</h2>");
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe("<h2>Titel</h2>");
   });
 
   it("renders marks", () => {
@@ -38,7 +40,7 @@ describe("strapiBlocksToHtml", () => {
         ],
       },
     ] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe(
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe(
       "<p><strong>a</strong><em>b</em><u>c</u><s>d</s><code>e</code></p>",
     );
   });
@@ -56,7 +58,7 @@ describe("strapiBlocksToHtml", () => {
         ],
       },
     ] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe(
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe(
       '<p><a href="https://hbdragons.de">Dragons</a></p>',
     );
   });
@@ -74,7 +76,7 @@ describe("strapiBlocksToHtml", () => {
         children: [{ type: "list-item", children: [{ type: "text", text: "zwei" }] }],
       },
     ] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe(
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe(
       "<ul><li>eins</li></ul><ol><li>zwei</li></ol>",
     );
   });
@@ -84,74 +86,114 @@ describe("strapiBlocksToHtml", () => {
       { type: "quote", children: [{ type: "text", text: "zitat" }] },
       { type: "code", children: [{ type: "text", text: "x = 1" }] },
     ] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe(
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe(
       "<blockquote>zitat</blockquote><pre><code>x = 1</code></pre>",
     );
   });
 
-  it("maps an image to its migrated media id", () => {
+  it("maps an image to the attribute pair Payload's upload importer looks for", () => {
     const blocks = [
       { type: "image", image: { id: 7, alternativeText: "Banner" }, children: [] },
     ] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, new Map([[7, 42]]))).toBe(
-      '<img data-media-id="42" alt="Banner" />',
+    expect(strapiBlocksToHtml(blocks, new Map([[7, 42]]), POST)).toBe(
+      '<img data-lexical-upload-id="42" data-lexical-upload-relation-to="media" alt="Banner" />',
     );
   });
 
-  it("drops an image whose file was not migrated", () => {
+  it("drops an image whose file was not migrated, naming the post", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const blocks = [
       { type: "image", image: { id: 7, alternativeText: null }, children: [] },
     ] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe("");
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe("");
+    expect(warn).toHaveBeenCalledWith(
+      'convert-blocks: test-post: image (strapi file 7) has no migrated media — dropped',
+    );
+  });
+
+  it("drops an image node that carries no image at all", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const blocks = [{ type: "image", children: [] }] as unknown as StrapiBlock[];
+    expect(strapiBlocksToHtml(blocks, new Map([[7, 42]]), POST)).toBe("");
+    expect(warn).toHaveBeenCalledWith(
+      "convert-blocks: test-post: image (strapi file ?) has no migrated media — dropped",
+    );
+  });
+
+  it("emits an empty alt when the image has no alternative text", () => {
+    const blocks = [
+      { type: "image", image: { id: 7, alternativeText: null }, children: [] },
+    ] as StrapiBlock[];
+    expect(strapiBlocksToHtml(blocks, new Map([[7, 42]]), POST)).toBe(
+      '<img data-lexical-upload-id="42" data-lexical-upload-relation-to="media" alt="" />',
+    );
   });
 
   it("escapes HTML so editor text cannot inject markup", () => {
     const blocks = [
       { type: "paragraph", children: [{ type: "text", text: "a < b & \"c\"" }] },
     ] as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe("<p>a &lt; b &amp; &quot;c&quot;</p>");
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe("<p>a &lt; b &amp; &quot;c&quot;</p>");
   });
 
-  it("falls back to a paragraph for an unknown node type", () => {
+  it("falls back to a paragraph for an unknown node type, naming the post", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const blocks = [
       { type: "mystery", children: [{ type: "text", text: "trotzdem" }] },
     ] as unknown as StrapiBlock[];
-    expect(strapiBlocksToHtml(blocks, NO_MEDIA)).toBe("<p>trotzdem</p>");
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe("<p>trotzdem</p>");
+    expect(warn).toHaveBeenCalledWith(
+      'convert-blocks: test-post: unknown node type "mystery" — wrapped in a paragraph',
+    );
+  });
+
+  it("keeps the text of an unknown leaf node that has no children", () => {
+    // The whole point of the fallback: renderChildren alone returns "" here,
+    // so the text an editor wrote would vanish without a trace.
+    const blocks = [{ type: "mystery", text: "nicht verlieren" }] as unknown as StrapiBlock[];
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe("<p>nicht verlieren</p>");
+  });
+
+  it("yields an empty paragraph for an unknown leaf with neither text nor children", () => {
+    const blocks = [{ type: "mystery" }] as unknown as StrapiBlock[];
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe("<p></p>");
+  });
+
+  it("escapes the text of an unknown leaf node too", () => {
+    const blocks = [{ type: "mystery", text: "a < b" }] as unknown as StrapiBlock[];
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(strapiBlocksToHtml(blocks, NO_MEDIA, POST)).toBe("<p>a &lt; b</p>");
   });
 });
 
 describe("strapiBlocksToLexical", () => {
-  it("warns that a migrated image cannot become a real Lexical upload node", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("carries a migrated image through as a real Lexical upload node", async () => {
     const blocks = [
       { type: "image", image: { id: 7, alternativeText: "Banner" }, children: [] },
     ] as StrapiBlock[];
 
-    const lexical = (await strapiBlocksToLexical(blocks, new Map([[7, 42]]))) as {
+    const lexical = (await strapiBlocksToLexical(blocks, new Map([[7, 42]]), POST)) as {
       root: { children: Record<string, unknown>[] };
     };
 
-    expect(warn).toHaveBeenCalledWith(
-      "convert-blocks: image (strapi file 7 -> payload media 42) has no Lexical upload converter — re-attach manually after migration",
-    );
-    // Payload 3.87.0's HTML importer has no converter for a generic <img>, so
-    // the mapped media id never reaches the Lexical tree: it comes out as an
-    // empty "pending" upload node — one with no relationTo/value pair, which
-    // is the field shape a real upload-to-media relation would use — rather
-    // than one that actually relates to media doc 42. Asserted on the parsed
-    // structure, not a substring of the serialized JSON: Lexical assigns
-    // every node a random hex id/key, and "42" can land inside one by pure
-    // chance (observed ~1-in-6 runs), which made a
-    // JSON.stringify(lexical).includes("42") check flaky rather than a real
-    // pin. Pin the shape instead, so a future Payload upgrade that adds a
-    // real <img> converter breaks this test loudly instead of the gap
-    // silently closing (or reopening) unnoticed.
+    // UploadNode.importDOM claims every <img>, but $convertUploadElement only
+    // builds a node that references a real document when both
+    // data-lexical-upload-id and data-lexical-upload-relation-to are present —
+    // anything else becomes an empty "pending" node pointing at nothing. This
+    // pins the difference: relationTo/value present, `pending` absent. If a
+    // Payload upgrade changes the attribute contract, this breaks loudly
+    // rather than the migration silently writing imageless posts.
     expect(lexical.root.children).toHaveLength(1);
     const [imageNode] = lexical.root.children;
     expect(imageNode?.type).toBe("upload");
-    expect(imageNode?.pending).toBeDefined();
-    expect(imageNode).not.toHaveProperty("relationTo");
-    expect(imageNode).not.toHaveProperty("value");
+    expect(imageNode?.relationTo).toBe("media");
+    expect(imageNode?.pending).toBeUndefined();
+    // Read off an HTML attribute, so it arrives as a string; Payload coerces
+    // it on write. Compared loosely on purpose — the pin is "it is media 42",
+    // not which primitive type the importer happened to preserve.
+    expect(String(imageNode?.value)).toBe("42");
   });
 });
 
@@ -162,6 +204,7 @@ describe("real post fixtures", () => {
       const lexical = (await strapiBlocksToLexical(
         (post.content ?? []) as StrapiBlock[],
         NO_MEDIA,
+        post.slug ?? POST,
       )) as { root: { children: unknown[] } };
       expect(lexical.root).toBeDefined();
       expect(Array.isArray(lexical.root.children)).toBe(true);
@@ -174,7 +217,7 @@ describe("real post fixtures", () => {
 
   it("keeps the heading and both links from the real corpus", () => {
     const html = fixtures
-      .map((post) => strapiBlocksToHtml((post.content ?? []) as StrapiBlock[], NO_MEDIA))
+      .map((post) => strapiBlocksToHtml((post.content ?? []) as StrapiBlock[], NO_MEDIA, post.slug ?? POST))
       .join("");
     expect(html).toContain("<h");
     expect(html.match(/<a href=/g)).toHaveLength(2);

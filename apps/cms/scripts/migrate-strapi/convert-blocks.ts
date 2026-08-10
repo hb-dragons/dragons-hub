@@ -45,61 +45,77 @@ function renderText(node: StrapiBlock): string {
   return html;
 }
 
-function renderChildren(nodes: StrapiBlock[] | undefined, mediaMap: Map<number, number>): string {
-  return (nodes ?? []).map((node) => renderNode(node, mediaMap)).join("");
+function renderChildren(
+  nodes: StrapiBlock[] | undefined,
+  mediaMap: Map<number, number>,
+  postSlug: string,
+): string {
+  return (nodes ?? []).map((node) => renderNode(node, mediaMap, postSlug)).join("");
 }
 
-function renderNode(node: StrapiBlock, mediaMap: Map<number, number>): string {
+function renderNode(node: StrapiBlock, mediaMap: Map<number, number>, postSlug: string): string {
   switch (node.type) {
     case "text":
       return renderText(node);
     case "paragraph":
-      return `<p>${renderChildren(node.children, mediaMap)}</p>`;
+      return `<p>${renderChildren(node.children, mediaMap, postSlug)}</p>`;
     case "heading": {
       // Strapi allows 1-6; clamp so a bad value cannot emit <h9>.
       const level = Math.min(Math.max(node.level ?? 2, 1), 6);
-      return `<h${level}>${renderChildren(node.children, mediaMap)}</h${level}>`;
+      return `<h${level}>${renderChildren(node.children, mediaMap, postSlug)}</h${level}>`;
     }
     case "link":
-      return `<a href="${escapeHtml(node.url ?? "")}">${renderChildren(node.children, mediaMap)}</a>`;
+      return `<a href="${escapeHtml(node.url ?? "")}">${renderChildren(node.children, mediaMap, postSlug)}</a>`;
     case "list": {
       const tag = node.format === "ordered" ? "ol" : "ul";
-      return `<${tag}>${renderChildren(node.children, mediaMap)}</${tag}>`;
+      return `<${tag}>${renderChildren(node.children, mediaMap, postSlug)}</${tag}>`;
     }
     case "list-item":
-      return `<li>${renderChildren(node.children, mediaMap)}</li>`;
+      return `<li>${renderChildren(node.children, mediaMap, postSlug)}</li>`;
     case "quote":
-      return `<blockquote>${renderChildren(node.children, mediaMap)}</blockquote>`;
+      return `<blockquote>${renderChildren(node.children, mediaMap, postSlug)}</blockquote>`;
     case "code":
-      return `<pre><code>${renderChildren(node.children, mediaMap)}</code></pre>`;
+      return `<pre><code>${renderChildren(node.children, mediaMap, postSlug)}</code></pre>`;
     case "image": {
       const payloadId = node.image === undefined ? undefined : mediaMap.get(node.image.id);
-      // A dangling image is dropped rather than emitted broken; index.ts logs it.
-      if (payloadId === undefined) return "";
-      // Payload 3.87.0's Lexical HTML importer has no converter for a plain
-      // <img> (let alone one keyed on this custom data-media-id attribute),
-      // so this mapping is lost the moment strapiBlocksToLexical runs the
-      // HTML through convertHTMLToLexical — verified empirically, it comes
-      // out as an empty "pending" upload node with no reference to either
-      // id. Warn loudly so an operator running the migration knows which
-      // post needs the image re-attached by hand.
-      console.warn(
-        `convert-blocks: image (strapi file ${node.image?.id} -> payload media ${payloadId}) has no Lexical upload converter — re-attach manually after migration`,
-      );
-      return `<img data-media-id="${payloadId}" alt="${escapeHtml(node.image?.alternativeText ?? "")}" />`;
+      if (payloadId === undefined) {
+        // A dangling image is dropped rather than emitted broken. Nothing
+        // downstream can report it — the id is gone by the time the HTML
+        // reaches Lexical — so it is named here or nowhere.
+        console.warn(
+          `convert-blocks: ${postSlug}: image (strapi file ${node.image?.id ?? "?"}) has no migrated media — dropped`,
+        );
+        return "";
+      }
+      // UploadNode.importDOM claims every <img>, but $convertUploadElement
+      // (@payloadcms/richtext-lexical/features/upload/server/nodes/conversions)
+      // only builds a real upload node when BOTH data-lexical-upload-id and
+      // data-lexical-upload-relation-to are present; any other <img> falls
+      // through to an empty "pending" node that references neither id. These
+      // are exactly the two attributes UploadNode.exportDOM writes, so
+      // emitting them round-trips the media relation instead of losing it.
+      return `<img data-lexical-upload-id="${payloadId}" data-lexical-upload-relation-to="media" alt="${escapeHtml(node.image?.alternativeText ?? "")}" />`;
     }
-    default:
+    default: {
       // Nothing in the real corpus hits this. Keep the text rather than lose it.
-      console.warn(`convert-blocks: unknown node type "${node.type}" — wrapped in a paragraph`);
-      return `<p>${renderChildren(node.children, mediaMap)}</p>`;
+      console.warn(
+        `convert-blocks: ${postSlug}: unknown node type "${node.type}" — wrapped in a paragraph`,
+      );
+      // A leaf carrying `text` but no `children` is the whole reason this
+      // fallback exists; renderChildren alone would return "" and drop it.
+      const inner =
+        node.children === undefined ? renderText(node) : renderChildren(node.children, mediaMap, postSlug);
+      return `<p>${inner}</p>`;
+    }
   }
 }
 
 export function strapiBlocksToHtml(
   blocks: StrapiBlock[],
   mediaMap: Map<number, number>,
+  postSlug: string,
 ): string {
-  return blocks.map((block) => renderNode(block, mediaMap)).join("");
+  return blocks.map((block) => renderNode(block, mediaMap, postSlug)).join("");
 }
 
 /**
@@ -136,11 +152,13 @@ function getEditorConfig(): Promise<SanitizedServerEditorConfig> {
   return editorConfigPromise;
 }
 
+/** `postSlug` names the post in any warning this raises — see index.ts. */
 export async function strapiBlocksToLexical(
   blocks: StrapiBlock[],
   mediaMap: Map<number, number>,
+  postSlug: string,
 ): Promise<unknown> {
-  const html = strapiBlocksToHtml(blocks, mediaMap);
+  const html = strapiBlocksToHtml(blocks, mediaMap, postSlug);
   const editorConfig = await getEditorConfig();
   return convertHTMLToLexical({ html, editorConfig, JSDOM });
 }
