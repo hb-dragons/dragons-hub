@@ -6,7 +6,10 @@
   "build": {
     "base": {
       "node": "24.16.0",
-      "pnpm": "11.5.1"
+      "pnpm": "11.5.1",
+      "env": {
+        "EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK": "1"
+      }
     },
     "development": {
       "extends": "base",

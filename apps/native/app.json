@@ -42,10 +42,6 @@
         "android.permission.USE_FINGERPRINT"
       ]
     },
-    "notification": {
-      "icon": "./assets/notification-icon.png",
-      "color": "#004b23"
-    },
     "plugins": [
       "expo-router",
       "expo-font",

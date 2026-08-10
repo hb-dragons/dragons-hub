@@ -2,6 +2,19 @@ packages:
   - apps/*
   - packages/*
 overrides:
+  # Two copies of a native module fail `expo doctor`, which gates the EAS
+  # build. All three are satisfiable by a single version — nothing is being
+  # forced past a constraint it declares:
+  #   react: packages/shared declares react as a peer at ^19.0.0, which pnpm
+  #     auto-installs, resolving to 19.2.4 while every app pins 19.2.6.
+  #   react-native: apps/native pins 0.83.4, but the expo packages resolved a
+  #     second peer variant against 0.85.1, which forked most of the expo-*
+  #     tree into two copies of each module.
+  #   expo-glass-effect: expo-router asks for ^55.0.10 and apps/native pins
+  #     55.0.11, so one copy serves both.
+  react: 19.2.6
+  react-native: 0.83.4
+  expo-glass-effect: 55.0.11
   # Capped at 1.6.23: better-auth 1.6.24 regressed the client-plugin generics, so
   # any plugin declaring `getActions` stops being assignable to
   # `BetterAuthClientPlugin`. One bad plugin collapses inference for the whole
