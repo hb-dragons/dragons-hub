@@ -6,7 +6,7 @@
   "build": {
     "base": {
       "node": "24.16.0",
-      "pnpm": "11.21.0"
+      "pnpm": "11.5.1"
     },
     "development": {
       "extends": "base",
