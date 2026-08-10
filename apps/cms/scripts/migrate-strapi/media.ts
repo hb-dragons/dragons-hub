@@ -21,7 +21,10 @@ export async function migrateMedia(): Promise<Map<number, number>> {
     const blob = await downloadFile(file.url);
     // Strapi hashes filenames on upload, so file.url's basename is already
     // safe — no spaces, parentheses or umlauts, whatever the display name is.
-    const filename = file.url.split("/").pop() ?? file.name;
+    // `||`, not `??`: split().pop() on an empty url yields "" rather than
+    // undefined, so a nullish fallback would never fire and the upload would
+    // go out with an empty filename.
+    const filename = file.url.split("/").pop() || file.name;
     const doc = await createUpload("media", blob, filename, { alt: file.alternativeText });
     map.set(file.id, doc.id);
     console.log(`  media ${index}/${files.length}  ${filename} → ${doc.id}`);

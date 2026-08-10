@@ -1,6 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildStrapiUrl, isLastPage, mergePages } from "./strapi";
+import {
+  buildStrapiUrl,
+  downloadFile,
+  fetchAll,
+  fetchSingle,
+  fetchUploads,
+  isLastPage,
+  mergePages,
+} from "./strapi";
 
 describe("buildStrapiUrl", () => {
   it("asks for published documents by default and a full page", () => {
@@ -76,5 +84,131 @@ describe("isLastPage", () => {
   it("throws on a non-finite pageCount (NaN, Infinity)", () => {
     expect(() => isLastPage("teams", 1, Number.NaN)).toThrow(/non-numeric pageCount/);
     expect(() => isLastPage("teams", 1, Number.POSITIVE_INFINITY)).toThrow(/non-numeric pageCount/);
+  });
+});
+
+/**
+ * The network half. Stubbed fetch, because what matters is not that HTTP
+ * works but that the migration reads *every* page (a silently truncated read
+ * migrates a partial club), sends the bearer token, and fails loudly on a
+ * non-2xx instead of returning a short list that the count check would then
+ * compare against an equally short one.
+ */
+function stubJson(bodies: unknown[], ok = true, status = 200) {
+  const fetchMock = vi.fn();
+  for (const body of bodies) {
+    fetchMock.mockResolvedValueOnce({ ok, status, json: async () => body });
+  }
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function page(docs: unknown[], pageCount: number) {
+  return { data: docs, meta: { pagination: { pageCount } } };
+}
+
+describe("network reads", () => {
+  beforeEach(() => {
+    vi.stubEnv("STRAPI_URL", "http://192.168.1.50:1337");
+    vi.stubEnv("STRAPI_TOKEN", "tok");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it.each(["STRAPI_URL", "STRAPI_TOKEN"])("throws by name when %s is missing", async (name) => {
+    stubJson([page([], 1)]);
+    vi.stubEnv(name, "");
+    await expect(fetchAll("posts")).rejects.toThrow(`${name} is not set`);
+  });
+
+  describe("fetchAll", () => {
+    it("follows pagination to the last page and concatenates every document", async () => {
+      const fetchMock = stubJson([
+        page([{ id: 1 }, { id: 2 }], 3),
+        page([{ id: 3 }], 3),
+        page([{ id: 4 }], 3),
+      ]);
+
+      expect(await fetchAll("posts")).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(new URL(fetchMock.mock.calls[2]?.[0] as string).searchParams.get("pagination[page]"))
+        .toBe("3");
+    });
+
+    it("sends the token as a bearer header", async () => {
+      const fetchMock = stubJson([page([], 1)]);
+      await fetchAll("posts");
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tok");
+    });
+
+    it("passes overrides through to the query", async () => {
+      const fetchMock = stubJson([page([], 1)]);
+      await fetchAll("partners", { status: "draft" });
+      expect(new URL(fetchMock.mock.calls[0]?.[0] as string).searchParams.get("status")).toBe(
+        "draft",
+      );
+    });
+
+    it("throws on a non-2xx rather than returning a short list", async () => {
+      stubJson([page([], 1)], false, 502);
+      await expect(fetchAll("posts")).rejects.toThrow(/strapi: HTTP 502/);
+    });
+  });
+
+  describe("fetchSingle", () => {
+    it("returns the document with its relations populated", async () => {
+      const fetchMock = stubJson([{ data: { id: 1, image: { id: 7 } } }]);
+
+      expect(await fetchSingle("team-background")).toEqual({ id: 1, image: { id: 7 } });
+      expect(new URL(fetchMock.mock.calls[0]?.[0] as string).searchParams.get("populate")).toBe("*");
+    });
+
+    it("returns null when the single type has no document", async () => {
+      stubJson([{ data: null }]);
+      expect(await fetchSingle("background-video")).toBeNull();
+    });
+  });
+
+  describe("fetchUploads", () => {
+    it("reads a bare array", async () => {
+      stubJson([[{ id: 1, name: "a.png" }]]);
+      expect(await fetchUploads()).toEqual([{ id: 1, name: "a.png" }]);
+    });
+
+    it("reads the wrapped shape too, in case the upload plugin starts paging", async () => {
+      stubJson([{ results: [{ id: 1, name: "a.png" }] }]);
+      expect(await fetchUploads()).toEqual([{ id: 1, name: "a.png" }]);
+    });
+  });
+
+  describe("downloadFile", () => {
+    it("resolves a relative url against STRAPI_URL", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(["x"]) });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await downloadFile("/uploads/a_abc.png");
+
+      expect(fetchMock.mock.calls[0]?.[0]).toBe("http://192.168.1.50:1337/uploads/a_abc.png");
+    });
+
+    it("leaves an absolute url alone", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(["x"]) });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await downloadFile("https://cdn.example.de/a.png");
+
+      expect(fetchMock.mock.calls[0]?.[0]).toBe("https://cdn.example.de/a.png");
+    });
+
+    it("throws with the url when the download fails", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+      await expect(downloadFile("/uploads/gone.png")).rejects.toThrow(
+        /strapi download: HTTP 404 for http:\/\/192\.168\.1\.50:1337\/uploads\/gone\.png/,
+      );
+    });
   });
 });
