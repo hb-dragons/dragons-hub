@@ -2,11 +2,12 @@ import type { CollectionConfig } from "payload";
 
 import { seoFields } from "../fields/seo";
 import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
-import { anyone } from "../lib/access";
+import { publishedOrAuthed } from "../lib/access";
 
 export const Teams: CollectionConfig = {
   slug: "teams",
-  access: { read: anyone },
+  versions: { drafts: true },
+  access: { read: publishedOrAuthed },
   admin: { useAsTitle: "name" },
   fields: [
     { name: "name", type: "text", required: true },
@@ -19,6 +20,11 @@ export const Teams: CollectionConfig = {
       unique: true,
       admin: { description: "Join-Key zu /public/teams (Sync-Daten)" },
     },
+    // Strapi team.leagueName / team.leagueId. Text, not number: leagueId
+    // identifies the *league* on basketball-bund.net, not the team — it is not
+    // interchangeable with apiTeamPermanentId above.
+    { name: "leagueName", type: "text" },
+    { name: "leagueId", type: "text" },
     { name: "trainers", type: "relationship", relationTo: "trainers", hasMany: true },
     {
       name: "trainingTimes",

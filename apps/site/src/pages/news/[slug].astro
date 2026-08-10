@@ -14,12 +14,13 @@ import { formatDateDe } from "../../lib/format";
 import { newsArticle } from "../../lib/jsonld";
 import { lexicalToPlainText } from "../../lib/lexical-text";
 import { cmsBaseUrl, mediaUrl } from "../../lib/media";
+import { publishedOnly } from "../../lib/published";
 import { absoluteUrl, canonicalUrl, DEFAULT_OG_IMAGE, metaDescription } from "../../lib/seo";
 import { toSiteImage } from "../../lib/site-image";
 import { strings } from "../../lib/strings";
 
 export async function getStaticPaths() {
-  const posts = await getCollection("posts", ({ data }) => data._status === "published");
+  const posts = await getCollection("posts", publishedOnly);
   return posts.map((entry) => ({
     params: { slug: entry.data.slug },
     props: { post: entry.data },

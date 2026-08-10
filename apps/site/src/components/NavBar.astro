@@ -12,13 +12,14 @@ import { getCollection } from "astro:content";
 
 import { groupTeamsForNav } from "../lib/nav-teams";
 import { cmsBaseUrl, mediaUrl } from "../lib/media";
+import { publishedOnly } from "../lib/published";
 import { BANNER_IMAGE } from "../lib/site-assets";
 import { strings } from "../lib/strings";
 import BlurImage from "./BlurImage.astro";
 
 const cmsBase = cmsBaseUrl();
 
-const teams = (await getCollection("teams"))
+const teams = (await getCollection("teams", publishedOnly))
   .map((entry) => entry.data)
   .sort((a, b) => a.orderIndex - b.orderIndex);
 const teamGroups = groupTeamsForNav(teams);

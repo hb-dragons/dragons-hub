@@ -76,6 +76,7 @@ export interface Config {
     vorstand: Vorstand;
     positions: Position;
     trainers: Trainer;
+    referees: Referee;
     partners: Partner;
     projects: Project;
     downloads: Download;
@@ -97,6 +98,7 @@ export interface Config {
     vorstand: VorstandSelect<false> | VorstandSelect<true>;
     positions: PositionsSelect<false> | PositionsSelect<true>;
     trainers: TrainersSelect<false> | TrainersSelect<true>;
+    referees: RefereesSelect<false> | RefereesSelect<true>;
     partners: PartnersSelect<false> | PartnersSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     downloads: DownloadsSelect<false> | DownloadsSelect<true>;
@@ -295,6 +297,8 @@ export interface Team {
    * Join-Key zu /public/teams (Sync-Daten)
    */
   apiTeamPermanentId?: number | null;
+  leagueName?: string | null;
+  leagueId?: string | null;
   trainers?: (number | Trainer)[] | null;
   trainingTimes?:
     | {
@@ -314,6 +318,7 @@ export interface Team {
   ogImage?: (number | null) | Media;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -354,6 +359,7 @@ export interface Vorstand {
   image?: (number | null) | Media;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -368,6 +374,7 @@ export interface Position {
   email?: string | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -380,6 +387,20 @@ export interface Download {
   category?: string | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "referees".
+ */
+export interface Referee {
+  id: number;
+  person?: (number | null) | Person;
+  licence?: string | null;
+  image?: (number | null) | Media;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -388,11 +409,13 @@ export interface Download {
 export interface Partner {
   id: number;
   name: string;
+  description?: string | null;
   logo?: (number | null) | Media;
   url?: string | null;
   orderIndex?: number | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -406,6 +429,7 @@ export interface Project {
   link?: string | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -414,12 +438,13 @@ export interface Project {
 export interface ShopItem {
   id: number;
   name: string;
-  image?: (number | null) | Media;
-  price?: string | null;
+  images?: (number | Media)[] | null;
+  price?: number | null;
   link?: string | null;
   description?: string | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -433,6 +458,7 @@ export interface TimelineItem {
   image?: (number | null) | Media;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -493,6 +519,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'trainers';
         value: number | Trainer;
+      } | null)
+    | ({
+        relationTo: 'referees';
+        value: number | Referee;
       } | null)
     | ({
         relationTo: 'partners';
@@ -678,6 +708,8 @@ export interface TeamsSelect<T extends boolean = true> {
   orderIndex?: T;
   teamImage?: T;
   apiTeamPermanentId?: T;
+  leagueName?: T;
+  leagueId?: T;
   trainers?: T;
   trainingTimes?:
     | T
@@ -694,6 +726,7 @@ export interface TeamsSelect<T extends boolean = true> {
   ogImage?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -719,6 +752,7 @@ export interface VorstandSelect<T extends boolean = true> {
   image?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -732,6 +766,7 @@ export interface PositionsSelect<T extends boolean = true> {
   email?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -747,15 +782,29 @@ export interface TrainersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "referees_select".
+ */
+export interface RefereesSelect<T extends boolean = true> {
+  person?: T;
+  licence?: T;
+  image?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "partners_select".
  */
 export interface PartnersSelect<T extends boolean = true> {
   name?: T;
+  description?: T;
   logo?: T;
   url?: T;
   orderIndex?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -768,6 +817,7 @@ export interface ProjectsSelect<T extends boolean = true> {
   link?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -779,6 +829,7 @@ export interface DownloadsSelect<T extends boolean = true> {
   category?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -786,12 +837,13 @@ export interface DownloadsSelect<T extends boolean = true> {
  */
 export interface ShopItemsSelect<T extends boolean = true> {
   name?: T;
-  image?: T;
+  images?: T;
   price?: T;
   link?: T;
   description?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -804,6 +856,7 @@ export interface TimelineItemsSelect<T extends boolean = true> {
   image?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

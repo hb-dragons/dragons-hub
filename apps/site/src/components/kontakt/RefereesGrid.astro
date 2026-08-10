@@ -1,0 +1,52 @@
+---
+// apps/site/src/components/kontakt/RefereesGrid.astro
+/**
+ * Refs grid. Mirrors the Coaches grid: person photo with the licence
+ * ("2. REGIONALLIGA", "REGION HANNOVER") as a badge. Some entries are
+ * deliberate placeholders in the CMS and render as-is, matching the legacy site.
+ */
+import type { CollectionEntry } from "astro:content";
+
+import { cmsBaseUrl } from "../../lib/media";
+import { toSiteImage } from "../../lib/site-image";
+import { strings } from "../../lib/strings";
+import PersonCard from "./PersonCard.astro";
+
+interface Props {
+  entries: CollectionEntry<"referees">["data"][];
+}
+
+const { entries } = Astro.props;
+const cmsBase = cmsBaseUrl();
+---
+
+{
+  entries.length > 0 && (
+    <div>
+      <h2 class="text-3xl font-bold text-foreground mt-8 mb-8 text-center">
+        {strings.dragons.team.refereesHeading}
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 md:gap-4 md:-space-x-12">
+        {entries.map((referee) => (
+          <div class="w-full overflow-hidden rounded-md">
+            <PersonCard
+              name={referee.person?.name}
+              image={toSiteImage(referee.image ?? referee.person?.image, cmsBase)}
+              clipDirection="none"
+              showEmail={false}
+            >
+              {referee.licence && (
+                <span
+                  slot="subTitle"
+                  class="inline-flex items-center px-2.5 py-1.5 gap-1.5 rounded-md text-foreground bg-card text-base font-semibold uppercase"
+                >
+                  {referee.licence}
+                </span>
+              )}
+            </PersonCard>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

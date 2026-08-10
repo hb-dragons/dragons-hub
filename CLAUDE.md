@@ -228,6 +228,19 @@ root `.env.example`, which is drift-locked to `apps/api`): `CMS_URL` +
 `astro build`; `PUBLIC_API_URL` is inlined into browser islands (Astro's
 `PUBLIC_` prefix, same rebuild-to-change rule as above).
 
+`apps/cms` likewise has its own contract in `apps/cms/.env.example`
+(`DATABASE_URL_CMS`, `PAYLOAD_SECRET`, and the prod-only `GCS_MEDIA_*` /
+`CMS_PUBLIC_URL` / `GH_DISPATCH_TOKEN`). Four more are read *only* by the
+one-off Strapi importer (`pnpm --filter @dragons/cms migrate:strapi`, issue
+#165) and by nothing else in the app: `STRAPI_URL` + `STRAPI_TOKEN` are the
+legacy Strapi origin and its read token — the URL is a LAN address, since
+the migration deliberately does not depend on public DNS — and `CMS_URL` +
+`CMS_API_TOKEN` are the target Payload REST origin and an API-key user's
+token. Same names as the `apps/site` pair and the same values in practice,
+but a different job: the site *reads* content at build time, the importer
+*writes* it once. All four are unset in normal development; the script
+throws by name when one is missing.
+
 ### Production deployment plumbing
 
 `SCOREBOARD_DEVICE_ID` flows into two places that must stay in sync:

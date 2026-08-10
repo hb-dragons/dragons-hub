@@ -25,7 +25,8 @@
     },
     "apps/cms": {
       "project": [
-        "src/**/*.{ts,tsx}"
+        "src/**/*.{ts,tsx}",
+        "scripts/**/*.ts"
       ]
     },
     "apps/site": {

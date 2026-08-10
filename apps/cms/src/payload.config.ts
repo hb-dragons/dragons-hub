@@ -15,6 +15,7 @@ import { People } from "./collections/people";
 import { Positions } from "./collections/positions";
 import { Posts } from "./collections/posts";
 import { Projects } from "./collections/projects";
+import { Referees } from "./collections/referees";
 import { ShopItems } from "./collections/shop-items";
 import { Teams } from "./collections/teams";
 import { TimelineItems } from "./collections/timeline-items";
@@ -58,6 +59,7 @@ export default buildConfig({
     Vorstand,
     Positions,
     Trainers,
+    Referees,
     Partners,
     Projects,
     Downloads,
