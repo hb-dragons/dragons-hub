@@ -27,11 +27,7 @@ const { expo } = JSON.parse(readFileSync(APP_JSON, "utf8")) as {
 const SDK_57_MIN_IOS_DEPLOYMENT_TARGET = "16.4";
 
 describe("app.json iOS build config", () => {
-  it("pins the iOS deployment target explicitly", () => {
-    expect(expo.ios?.deploymentTarget).toMatch(/^\d+\.\d+$/);
-  });
-
-  it("pins it at the floor the installed SDK supports", () => {
+  it("pins the iOS deployment target at the floor the installed SDK supports", () => {
     expect(expo.ios?.deploymentTarget).toBe(SDK_57_MIN_IOS_DEPLOYMENT_TARGET);
   });
 });
