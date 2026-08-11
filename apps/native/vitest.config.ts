@@ -50,17 +50,23 @@ export default defineConfig({
         //
         // Ratcheted 2026-08-11 (#218): functions and lines 9 -> 10, on the
         // haptic-semantics and filter-pill a11y tests. Measured
-        // 10.36/8.02/10.85/10.26 — statements and branches hold. Superseded by
-        // #217's higher floors above, which this merge keeps.
+        // 10.36/8.02/10.85/10.26 — statements and branches hold.
         //
         // Ratcheted 2026-08-11 (#219): the board's utility sheets became
         // routes, and the logic they used to carry inline — param parsing,
         // result routing, move placement, local-date conversion — moved into
         // tested lib modules. Measured 12.56/9.07/12.87/12.29.
+        //
+        // Ratcheted 2026-08-11 (#216, #217, #218, #219 merged): statements
+        // 12 -> 14, functions 12 -> 17, lines 12 -> 14. Each figure above was
+        // measured on its own branch against the shared base; the four suites
+        // together cover more than any one of them did, so the floors are
+        // re-measured here rather than left at the highest single branch's.
+        // Measured 14.5/9.58/17.04/14.2 — branches holds at 9.
         branches: 9,
-        functions: 12,
-        lines: 12,
-        statements: 12,
+        functions: 17,
+        lines: 14,
+        statements: 14,
       },
     },
   },
