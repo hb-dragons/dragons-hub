@@ -29,7 +29,11 @@ import { colors as themeColors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { configureNotificationHandler } from "@/lib/push/handler";
-import { detailHeaderOptions, tabRootHeaderOptions } from "@/lib/nav/headers";
+import {
+  BACK_BUTTON_DISPLAY_MODE,
+  detailHeaderOptions,
+  tabRootHeaderOptions,
+} from "@/lib/nav/headers";
 import { installGlobalErrorHandler } from "@/lib/global-error-handler";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { ToastProvider } from "@/hooks/useToast";
@@ -84,7 +88,7 @@ function RootNavigator() {
             headerShown: true,
             headerTitle: i18n.t("profile.title"),
             headerTintColor: colors.foreground,
-            headerBackButtonDisplayMode: "minimal",
+            headerBackButtonDisplayMode: BACK_BUTTON_DISPLAY_MODE,
           }}
         />
         <Stack.Screen

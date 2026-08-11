@@ -16,8 +16,11 @@ import type { NativeStackNavigationOptions } from "expo-router";
  * system no longer gets to decide.
  */
 
-/** Back buttons everywhere: the chevron, never the previous screen's title. */
-const BACK_BUTTON_DISPLAY_MODE = "minimal" as const;
+/**
+ * Back buttons everywhere: the chevron, never the previous screen's title.
+ * Exported for the handful of screens whose header is neither shape below.
+ */
+export const BACK_BUTTON_DISPLAY_MODE = "minimal" as const;
 
 /**
  * A tab root: a large title that collapses into a standard header as the
