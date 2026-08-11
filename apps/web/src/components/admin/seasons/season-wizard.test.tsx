@@ -220,7 +220,7 @@ describe("SeasonWizard", () => {
   it("stays on the sync step when the stream completes before the run does", async () => {
     // The SSE 'complete' event can arrive before the job starts processing.
     syncLogs.mockResolvedValue({ items: [{ id: 77, status: "running" }] });
-    render(<SeasonWizard open onOpenChange={() => {}} />);
+    render(<SeasonWizard open onOpenChange={() => {}} pollIntervalMs={20} />);
     nameAndAdvance();
     await screen.findByText("Oberliga Herren Ost");
     fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
@@ -262,6 +262,10 @@ describe("SeasonWizard", () => {
     // No unassigned slots, so the explanatory line stays out of the way.
     expect(
       screen.queryByText("settings.seasons.wizard.reviewPlaceholderHint"),
+    ).not.toBeInTheDocument();
+    // The run went terminal, so the counts are final, not provisional.
+    expect(
+      screen.queryByText("settings.seasons.wizard.reviewProvisional"),
     ).not.toBeInTheDocument();
   });
 
@@ -314,23 +318,63 @@ describe("SeasonWizard", () => {
 
   it("recovers from a transient log-fetch failure instead of stranding on the log panel", async () => {
     // A single 500/network blip must be retried, not thrown as an unhandled
-    // rejection that leaves the wizard stuck on the log panel forever.
+    // rejection that leaves the wizard stuck on the log panel forever. The poll
+    // interval is shortened so the retry does not cost the suite real seconds.
     syncLogs
       .mockRejectedValueOnce(new Error("500"))
       .mockResolvedValue({ items: [{ id: 77, status: "completed" }] });
-    render(<SeasonWizard open onOpenChange={() => {}} />);
+    render(<SeasonWizard open onOpenChange={() => {}} pollIntervalMs={20} />);
     nameAndAdvance();
     await screen.findByText("Oberliga Herren Ost");
     fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
     fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
 
-    fireEvent.click(await screen.findByTestId("live-logs"));
-
-    await waitFor(
-      () => expect(screen.getByText("settings.seasons.wizard.close")).toBeInTheDocument(),
-      { timeout: 4000 },
-    );
+    await screen.findByText("settings.seasons.wizard.close");
     expect(summary).toHaveBeenCalledWith(9);
+  });
+
+  it("reaches the review even if the log stream never reports completion", async () => {
+    // The only completion trigger used to be SyncLiveLogs's onComplete, which
+    // fires on the SSE 'complete' event alone. A dropped stream (proxy timeout,
+    // connection reset) or a run that finished before the EventSource
+    // subscribed means it never arrives — and the component does not reconnect.
+    // The wizard must finish on its own rather than parking on the log panel.
+    render(<SeasonWizard open onOpenChange={() => {}} pollIntervalMs={20} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    // No click on the log stream stand-in: nothing ever fires onComplete.
+    await screen.findByText("settings.seasons.wizard.close");
+    expect(summary).toHaveBeenCalledWith(9);
+  });
+
+  it("marks the counts provisional when the run never reaches a terminal status", async () => {
+    // Giving up on the poll must not look like the run finishing: the counts
+    // are mid-sync and the review has to say so.
+    syncLogs.mockResolvedValue({ items: [{ id: 77, status: "running" }] });
+    render(
+      <SeasonWizard open onOpenChange={() => {}} pollIntervalMs={5} maxPollAttempts={2} />,
+    );
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    await screen.findByText("settings.seasons.wizard.reviewProvisional");
+    expect(screen.getByText("settings.seasons.wizard.reviewLeagues")).toBeInTheDocument();
+  });
+
+  it("marks the counts provisional when the run's status cannot be read at all", async () => {
+    syncLogs.mockRejectedValue(new Error("500"));
+    render(<SeasonWizard open onOpenChange={() => {}} pollIntervalMs={5} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    await screen.findByText("settings.seasons.wizard.reviewProvisional");
   });
 
   it("ignores a duplicate onComplete from the log stream", async () => {

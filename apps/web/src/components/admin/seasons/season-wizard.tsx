@@ -23,14 +23,49 @@ import { LeaguePicker } from "./league-picker";
 type Step = "name" | "select" | "syncing" | "done";
 
 const POLL_INTERVAL_MS = 2000;
-// ~5 minutes at POLL_INTERVAL_MS — a run that never appears in the tracked
-// page or never reaches a terminal status must not poll forever.
-const MAX_POLL_ATTEMPTS = 150;
+// ~30 minutes at POLL_INTERVAL_MS. The poll is the only thing that ends the
+// sync step, and a full federation sync runs for minutes, so the cap has to sit
+// well past a realistic run — it exists to stop an orphaned wizard polling
+// forever, not to time a normal sync out.
+const MAX_POLL_ATTEMPTS = 900;
 // A single 500/network blip must not strand the wizard; only give up after
 // several in a row.
 const MAX_CONSECUTIVE_POLL_FAILURES = 5;
 
-export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+/**
+ * How the wait for the sync run ended. The three non-terminal exits must stay
+ * distinguishable from `terminal`: the counts are only trustworthy once the run
+ * has actually finished, which is the entire reason the wizard waits at all.
+ */
+type RunOutcome = "terminal" | "timeout" | "unreadable" | "aborted";
+
+/**
+ * Sleeps between polls, but hands out a `wake` that cuts the wait short. The
+ * log stream's "complete" event uses it to make the next poll immediate.
+ */
+function sleepUntilNextPoll(ms: number, register: (wake: () => void) => void): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    register(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
+
+export function SeasonWizard({
+  open,
+  onOpenChange,
+  // Poll tuning, overridable so tests do not spend real seconds waiting. The
+  // app never passes either.
+  pollIntervalMs = POLL_INTERVAL_MS,
+  maxPollAttempts = MAX_POLL_ATTEMPTS,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  pollIntervalMs?: number;
+  maxPollAttempts?: number;
+}) {
   const t = useTranslations();
   const { mutate } = useSWRConfig();
   const [step, setStep] = useState<Step>("name");
@@ -54,6 +89,10 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
   // never kicked off (the trigger call failed) — the review still renders.
   const [syncRunId, setSyncRunId] = useState<number | null>(null);
   const [summary, setSummary] = useState<SeasonSummary | null>(null);
+  // True when the review is being shown without having seen the run finish, so
+  // the counts may be mid-sync. Rendered as a caveat rather than passed off as
+  // the final figures.
+  const [provisional, setProvisional] = useState(false);
   // Tracks the live `open` prop so async handlers can bail out of applying
   // state to a dialog the user has already closed mid-flight.
   const openRef = useRef(open);
@@ -86,6 +125,8 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
   // ever changes while still connected it reopens the stream and can fire
   // "complete" a second time.
   const completingRef = useRef(false);
+  // Set while the poll loop is waiting out an interval; calling it polls now.
+  const wakeRef = useRef<(() => void) | null>(null);
 
   function reset() {
     setStep("name");
@@ -99,6 +140,7 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     setCreatedId(null);
     setSyncRunId(null);
     setSummary(null);
+    setProvisional(false);
     completingRef.current = false;
   }
 
@@ -143,26 +185,37 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
   // throw out of the loop as an unhandled rejection and strand the wizard on
   // the log panel forever — it's swallowed and retried, up to
   // MAX_CONSECUTIVE_POLL_FAILURES in a row. The whole wait is also capped at
-  // MAX_POLL_ATTEMPTS in case the run never appears or never goes terminal.
-  const waitForRun = useCallback(async (runId: number) => {
-    let consecutiveFailures = 0;
-    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
-      if (!openRef.current || !mountedRef.current) return;
-      try {
-        const page = await api.sync.logs({ limit: 20, offset: 0 });
-        consecutiveFailures = 0;
-        const run = page.items.find((r) => r.id === runId);
-        if (run && run.status !== "running" && run.status !== "pending") return;
-      } catch {
-        consecutiveFailures += 1;
-        if (consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) return;
+  // maxPollAttempts in case the run never appears or never goes terminal.
+  // Every exit is reported, because giving up and finishing are different
+  // things to show the admin.
+  const waitForRun = useCallback(
+    async (runId: number): Promise<RunOutcome> => {
+      let consecutiveFailures = 0;
+      for (let attempt = 0; attempt < maxPollAttempts; attempt++) {
+        // Wait before the first poll too: the run has only just been queued,
+        // and the log stream's "complete" event can cut this short.
+        await sleepUntilNextPoll(pollIntervalMs, (wake) => {
+          wakeRef.current = wake;
+        });
+        wakeRef.current = null;
+        if (!openRef.current || !mountedRef.current) return "aborted";
+        try {
+          const page = await api.sync.logs({ limit: 20, offset: 0 });
+          consecutiveFailures = 0;
+          const run = page.items.find((r) => r.id === runId);
+          if (run && run.status !== "running" && run.status !== "pending") return "terminal";
+        } catch {
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) return "unreadable";
+        }
       }
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-    }
-  }, []);
+      return "timeout";
+    },
+    [pollIntervalMs, maxPollAttempts],
+  );
 
   const finishWithSummary = useCallback(
-    async (id: number) => {
+    async (id: number, options: { provisional: boolean }) => {
       try {
         const counts = await api.seasons.summary(id);
         if (!openRef.current || !mountedRef.current) return;
@@ -173,21 +226,16 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
         setSummary(null);
       }
       await mutate(SWR_KEYS.seasons);
-      if (openRef.current && mountedRef.current) setStep("done");
+      if (!openRef.current || !mountedRef.current) return;
+      setProvisional(options.provisional);
+      setStep("done");
     },
     [mutate],
   );
 
-  // Passed to SyncLiveLogs as `onComplete`. SyncLiveLogs's stream effect has
-  // `onComplete` in its deps, so this must stay referentially stable across
-  // renders — an inline arrow here would tear down and reopen the
-  // EventSource on every render (e.g. finishWithSummary's own setSummary
-  // triggers one while still on the syncing step). createdId/syncRunId are
-  // read from refs rather than closed-over state for the same reason. It's
-  // also non-async and stays synchronous so it can be passed directly to a
-  // prop typed `() => void`, and completingRef guards against the stream
-  // re-firing "complete" a second time.
-  const handleSyncStreamComplete = useCallback(() => {
+  // Waits for the tracked run and then shows the review. Idempotent: whichever
+  // of the two triggers below gets here first owns the flow.
+  const startCompletion = useCallback(() => {
     if (completingRef.current) return;
     const id = createdIdRef.current;
     const runId = syncRunIdRef.current;
@@ -195,14 +243,41 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     completingRef.current = true;
     void (async () => {
       try {
-        await waitForRun(runId);
+        const outcome = await waitForRun(runId);
+        if (outcome === "aborted") return;
         if (!openRef.current || !mountedRef.current) return;
-        await finishWithSummary(id);
+        // A timed-out or unreadable poll means we never saw the run finish, so
+        // the counts may be mid-sync. Show them, but say so.
+        await finishWithSummary(id, { provisional: outcome !== "terminal" });
       } finally {
         completingRef.current = false;
       }
     })();
   }, [waitForRun, finishWithSummary]);
+
+  // Trigger 1, and the one that must always fire: reaching the sync step with a
+  // run id. The stream's "complete" event cannot be the only way out — a
+  // dropped SSE connection (proxy timeout, connection reset) or a run that
+  // finished before the EventSource subscribed means it never arrives, and
+  // SyncLiveLogs does not reconnect. That parked the wizard on the log panel
+  // for good, with the seasons list behind it left stale.
+  useEffect(() => {
+    if (step !== "syncing" || syncRunId === null) return;
+    startCompletion();
+  }, [step, syncRunId, startCompletion]);
+
+  // Trigger 2, an accelerator only. Passed to SyncLiveLogs as `onComplete`:
+  // it wakes the poll loop so the next check is immediate instead of an
+  // interval away. SyncLiveLogs's stream effect has `onComplete` in its deps,
+  // so this must stay referentially stable across renders — an inline arrow
+  // would tear down and reopen the EventSource on every render (e.g.
+  // finishWithSummary's own setSummary triggers one while still on the syncing
+  // step). createdId/syncRunId are read from refs for the same reason. It also
+  // stays synchronous so it can be passed to a prop typed `() => void`.
+  const handleSyncStreamComplete = useCallback(() => {
+    wakeRef.current?.();
+    startCompletion();
+  }, [startCompletion]);
 
   // Final commit: create the season, persist the picked leagues, then sync.
   async function confirm() {
@@ -231,8 +306,9 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
         return;
       } catch {
         // The season and its leagues are saved; only the sync kick-off failed.
+        // Nothing is running, so the counts are final, not provisional.
         toast.error(t("settings.seasons.wizard.syncFailed"));
-        await finishWithSummary(id);
+        await finishWithSummary(id, { provisional: false });
       }
     } catch {
       toast.error(t("settings.seasons.wizard.createFailed"));
@@ -364,6 +440,13 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
             <h3 className="font-display text-sm font-semibold uppercase tracking-wide">
               {t("settings.seasons.wizard.reviewTitle")}
             </h3>
+            {/* We never saw the run finish, so these counts may be mid-sync.
+                Saying nothing would present them as the final figures. */}
+            {provisional && (
+              <p className="text-sm text-muted-foreground">
+                {t("settings.seasons.wizard.reviewProvisional")}
+              </p>
+            )}
             {summary === null ? (
               <p className="text-sm text-muted-foreground">
                 {t("settings.seasons.wizard.reviewUnavailable")}

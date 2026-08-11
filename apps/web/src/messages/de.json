@@ -1009,7 +1009,8 @@
         "reviewGames": "Spiele geladen",
         "reviewPlaceholders": "Offene Spielpaarungen",
         "reviewPlaceholderHint": "Der Verband hat für diese Spiele noch nicht beide Mannschaften benannt, daher werden sie noch nicht importiert. Sie kommen mit einem späteren Sync dazu.",
-        "reviewUnavailable": "Zahlen konnten nicht geladen werden. Die Saison und ihre Ligen sind gespeichert."
+        "reviewUnavailable": "Zahlen konnten nicht geladen werden. Die Saison und ihre Ligen sind gespeichert.",
+        "reviewProvisional": "Die Synchronisierung lief noch, als wir sie aus den Augen verloren haben. Diese Zahlen sind daher vorläufig — die endgültigen stehen im Sync-Log."
       },
       "subtitle": "Die Ligen der nächsten Saison im Hintergrund vorbereiten und dann live schalten.",
       "empty": "Noch keine Saisons. Lege eine an, um die Ligen einer Saison zu verfolgen.",
