@@ -223,7 +223,9 @@ export default function ScheduleScreen() {
   const controls = (
     <>
       <Segmented segments={segments} selected={segment} onSelect={setSegment} />
-      <View style={{ flexDirection: "row", marginBottom: spacing.md }}>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.md }}
+      >
         <FilterPill
           label={i18n.t("schedule.homeOnly")}
           active={locationFilter === "home"}

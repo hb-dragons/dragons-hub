@@ -88,8 +88,9 @@ describe("navigation architecture", () => {
   });
 
   it("has no numeric header offset left compensating for a header", () => {
-    // The native header insets its own content; `Screen` opts the scroll view
-    // into it with `edges={[]}` (see lib/ui/scroll-inset.ts).
+    // The native header insets its own content; `Screen`'s
+    // `UNDER_NATIVE_HEADER` edges opt the scroll view into that inset (see
+    // lib/ui/scroll-inset.ts) instead of padding past a guessed header height.
     expect(SOURCE_FILES.filter((f) => readFileSync(f, "utf8").includes("headerOffset")).map(rel))
       .toEqual([]);
   });
