@@ -218,7 +218,7 @@ stage "GitHub token for issue access"
 say "The agents read and comment on issues with a fine-grained PAT scoped to"
 say "this one repo. Nothing pushes code with it, so no contents scope."
 open_url "https://github.com/settings/personal-access-tokens/new"
-step "Token name: sandcastle-dragons-hub; pick an expiration you're comfortable with."
+step "Token name: sandcastle-dragons-hub; expiration: 366 days or less — the hb-dragons org rejects longer-lived fine-grained tokens (and only via GraphQL, so a bad one passes REST checks and fails later)."
 step "Resource owner: hb-dragons. Repository access: Only select repositories → hb-dragons/dragons-hub."
 step "Repository permissions: Issues → Read and write (Metadata → Read is added automatically)."
 step "Generate the token and copy it (starts github_pat_)."
@@ -234,10 +234,13 @@ say "Checking the token can see the repo…"
 if repo_name=$(GH_TOKEN="$GH_TOKEN" gh api repos/hb-dragons/dragons-hub --jq .full_name 2>/dev/null) \
    && [[ "$repo_name" == "hb-dragons/dragons-hub" ]]; then
   say "✓ token sees $repo_name"
-  if GH_TOKEN="$GH_TOKEN" gh api "repos/hb-dragons/dragons-hub/issues?per_page=1" >/dev/null 2>&1; then
-    say "✓ token can read issues"
+  # gh issue list goes through GraphQL — the same path the sandcastle planner
+  # uses, and the one org token-lifetime policies are enforced on. A REST-only
+  # check passes tokens that GraphQL later rejects.
+  if GH_TOKEN="$GH_TOKEN" gh issue list -R hb-dragons/dragons-hub --limit 1 >/dev/null 2>&1; then
+    say "✓ token can read issues (GraphQL)"
   else
-    warn "token cannot read issues — check the Issues permission on the PAT."
+    warn "token cannot read issues via GraphQL — check the Issues permission and that the token's lifetime is 366 days or less (org policy)."
   fi
 else
   warn "token check failed — verify the repository access and permissions, then re-run."
