@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { TAB_CONFIG } from "@/lib/nav/tabs";
@@ -158,6 +158,22 @@ describe("icon language", () => {
     }
   });
 
+  // A glyph hides just as well inside a translation as inside JSX: two labels
+  // read "+ Add card" and "+ New column" until #221, which is the same button
+  // with the same keyboard character, only spelled in a place a reviewer looks
+  // at less often. The symbol goes beside the label; the label is words.
+  it("puts no icon glyph in a translated label", () => {
+    const localeDir = resolveInPackage("src/i18n");
+    for (const file of readdirSync(localeDir).filter((name) => name.endsWith(".json"))) {
+      const strings = JSON.parse(readFileSync(path.join(localeDir, file), "utf8")) as object;
+      for (const [key, value] of flatten(strings)) {
+        const found = GLYPH_ICONS.filter((glyph) => value.includes(glyph));
+        expect(found, `${file}: ${key} draws an icon in a label`).toEqual([]);
+        expect(/^\+/.test(value), `${file}: ${key} draws an icon in a label`).toBe(false);
+      }
+    }
+  });
+
   // The brand assets are drawings, not icons: no symbol catalogue has the
   // Dragons logo. Everything else that used to be a hand-drawn path — the
   // send arrow, the task card's meta icons, the referee search field — is a
@@ -174,6 +190,15 @@ describe("icon language", () => {
     ]);
   });
 });
+
+/** Every `key.path -> string` pair in a nested translation file. */
+function flatten(node: object, prefix = ""): [string, string][] {
+  return Object.entries(node).flatMap(([key, value]) =>
+    typeof value === "object" && value !== null
+      ? flatten(value as object, `${prefix}${key}.`)
+      : [[`${prefix}${key}`, String(value)] as [string, string]],
+  );
+}
 
 /** Route files that render a screen, i.e. everything under `app/` bar the layouts. */
 const SCREEN_FILES = SOURCE_FILES.filter(
