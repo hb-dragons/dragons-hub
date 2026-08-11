@@ -1,9 +1,11 @@
 import type { SurfaceGroup } from "@dragons/shared";
+import type { RouteHref } from "@/lib/nav/href";
 
 export interface NativeSurface {
   id: string;
   group: SurfaceGroup;
-  route: string;
+  /** Typed href: a surface pointing at a screen the app lacks fails typecheck. */
+  route: RouteHref;
   labelKey: string;
 }
 

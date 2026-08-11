@@ -9,6 +9,7 @@ vi.mock("@/lib/i18n", () => ({
 
 import useSWR from "swr";
 import { clubProvider } from "@/lib/today/providers/club";
+import { resolveDeepLink } from "@/lib/nav/href";
 
 const user = { id: "u1" } as unknown as GateUser;
 
@@ -32,6 +33,7 @@ describe("clubProvider.useItems", () => {
     const items = clubProvider.useItems(user);
     expect(items).toHaveLength(1);
     expect(items[0]?.route).toBe("/game/7");
+    expect(resolveDeepLink(items[0]!.route)).toBe("/game/7");
     expect(items[0]?.urgency).toBe(40);
   });
 });

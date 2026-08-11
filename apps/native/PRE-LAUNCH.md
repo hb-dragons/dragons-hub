@@ -208,9 +208,20 @@ before launch:
 ## Testing — corrected (#118), corrected again (#213)
 
 This used to say "native has zero tests" and that `lint` was just
-`tsc --noEmit`. Both were stale: there are 36 `*.test.ts(x)` files under
+`tsc --noEmit`. Both were stale: there are 39 `*.test.ts(x)` files under
 `src/`, and `lint` runs real ESLint (`eslint .`) separate from
-`typecheck` (`tsc --noEmit`).
+`typecheck`.
+
+`typecheck` is the one package script in the repo that is not plain
+`tsc --noEmit`: it runs `expo customize tsconfig.json` first (#217). That
+is the CLI's no-dev-server path to regenerating
+`.expo/types/router.d.ts`, which is what turns expo-router's `Href` into
+the union of this app's routes. The file is gitignored — it is generated
+from the route tree, so committing it would just be a second copy to
+keep in sync — and without it every `router.push(...)` would be checked
+against `string` and pass. `lib/nav/href.ts` carries a type-level
+assertion that fails the build if the generation ever silently no-ops,
+so the enforcement cannot quietly disappear.
 
 The coverage paragraph then went stale in turn. It quoted 48% branches /
 27% functions / 49% lines / 48% statements and said coverage only

@@ -16,7 +16,8 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "check:doctor": "expo-doctor",
-    "typecheck": "tsc --noEmit",
+    "//typecheck": "`expo customize tsconfig.json` is the no-dev-server way to regenerate .expo/types/router.d.ts (the CLI names that path itself). Those declarations are what make expo-router's `Href` the union of this app's routes instead of `string`, and they are gitignored, so without this step CI would typecheck every route href against `string` and pass. `lib/nav/href.ts` fails the build if the step silently no-ops.",
+    "typecheck": "expo customize tsconfig.json && tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "coverage": "vitest run --coverage"

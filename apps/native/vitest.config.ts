@@ -38,10 +38,14 @@ export default defineConfig({
         // foundation's new tests (global error handler, nav architecture, app
         // config). Measured 10.08/8.01/9.59/9.96 — branches, functions and
         // lines have not yet cleared their next whole point.
+        //
+        // Ratcheted 2026-08-11 (#217): statements 10 -> 11, functions 9 -> 11,
+        // lines 9 -> 11, on the typed-href route table and its tests. Measured
+        // 11.44/8.52/11.67/11.25 — branches still short of 9.
         branches: 8,
-        functions: 9,
-        lines: 9,
-        statements: 10,
+        functions: 11,
+        lines: 11,
+        statements: 11,
       },
     },
   },
