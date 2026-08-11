@@ -5,6 +5,7 @@ import type {
   SetSeasonLeaguesResult,
   TrackedLeaguesResponse,
   LeagueTeamsResponse,
+  SeasonSummary,
 } from "@dragons/shared";
 import type {
   BrowseLeaguesQuery,
@@ -47,6 +48,10 @@ export function seasonsEndpoints(client: ApiClient) {
     },
     getLeagues(id: number): Promise<TrackedLeaguesResponse> {
       return client.get(`/admin/seasons/${id}/leagues`);
+    },
+    /** League, game and unassigned-slot counts, for the onboarding review. */
+    summary(id: number): Promise<SeasonSummary> {
+      return client.get(`/admin/seasons/${id}/summary`);
     },
     leagueTeams(ligaId: number): Promise<LeagueTeamsResponse> {
       return client.get(`/admin/leagues/${ligaId}/teams`);

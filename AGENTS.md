@@ -546,6 +546,7 @@ now picked per season through the endpoints below.
 | GET | `/admin/seasons/:id/discover` | Browse federation leagues, marking the ones this season already tracks |
 | GET | `/admin/seasons/:id/leagues` | Leagues tracked by a season |
 | PUT | `/admin/seasons/:id/leagues` | Replace a season's tracked league set |
+| GET | `/admin/seasons/:id/summary` | League, game and unassigned-slot counts for a season |
 
 ### Admin - Matches
 

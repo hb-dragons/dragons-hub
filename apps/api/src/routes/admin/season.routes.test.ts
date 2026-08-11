@@ -1,7 +1,8 @@
 // apps/api/src/routes/admin/season.routes.test.ts
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { Hono } from "hono";
 import type { AppEnv } from "../../types";
+import type * as SeasonServiceModule from "../../services/admin/season.service";
 
 const mocks = vi.hoisted(() => ({
   listSeasons: vi.fn(),
@@ -12,12 +13,22 @@ const mocks = vi.hoisted(() => ({
   setSeasonLeagues: vi.fn(),
   getTrackedLeagues: vi.fn(),
 }));
-vi.mock("../../services/admin/season.service", () => ({
-  listSeasons: mocks.listSeasons,
-  createSeason: mocks.createSeason,
-  activateSeason: mocks.activateSeason,
-  archiveSeason: mocks.archiveSeason,
-}));
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+
+// `getSeasonSummary` is left as the real implementation so it runs against
+// the PGlite database below (via the `dbHolder` proxy) instead of a mock —
+// its counting logic is exactly what the route's tests need to exercise.
+// Every other export stays a plain mock, as before.
+vi.mock("../../services/admin/season.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof SeasonServiceModule>();
+  return {
+    ...actual,
+    listSeasons: mocks.listSeasons,
+    createSeason: mocks.createSeason,
+    activateSeason: mocks.activateSeason,
+    archiveSeason: mocks.archiveSeason,
+  };
+});
 vi.mock("../../services/admin/league-discovery.service", () => ({
   browseLeagues: mocks.browseLeagues,
   setSeasonLeagues: mocks.setSeasonLeagues,
@@ -26,17 +37,48 @@ vi.mock("../../services/admin/league-discovery.service", () => ({
 vi.mock("../../middleware/rbac", () => ({
   requirePermission: vi.fn(() => async (_c: unknown, next: () => Promise<void>) => next()),
 }));
-vi.mock("../../config/logger", () => ({ logger: { error: vi.fn() } }));
+vi.mock("../../config/logger", () => ({
+  logger: { error: vi.fn(), child: vi.fn().mockReturnValue({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }) },
+}));
+vi.mock("../../config/database", () => ({
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
+}));
 
 import { seasonRoutes } from "./season.routes";
 import { SeasonNotFoundError } from "../../services/admin/season.errors";
 import { errorHandler } from "../../middleware/error";
+import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
+import { seedActiveSeason } from "../../test/seed-season";
+import { invalidateActiveSeasonCache } from "../../services/admin/season.service";
 
 const app = new Hono<AppEnv>();
 app.onError(errorHandler);
 app.route("/", seasonRoutes);
 const json = (r: Response) => r.json();
-beforeEach(() => vi.clearAllMocks());
+const request = (path: string, init?: RequestInit) => app.request(path, init);
+
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  invalidateActiveSeasonCache();
+  vi.clearAllMocks();
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
 describe("GET /seasons", () => {
   it("lists seasons", async () => {
@@ -190,5 +232,26 @@ describe("addressing a season that no longer exists", () => {
 
     expect(res.status).toBe(404);
     expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("GET /seasons/:id/summary", () => {
+  it("returns the season's counts", async () => {
+    const seasonId = await seedActiveSeason(ctx);
+
+    const res = await request(`/seasons/${seasonId}/summary`);
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      leagueCount: 0,
+      gameCount: 0,
+      placeholderSlots: 0,
+    });
+  });
+
+  it("rejects a non-numeric id", async () => {
+    const res = await request("/seasons/not-a-number/summary");
+
+    expect(res.status).toBe(400);
   });
 });

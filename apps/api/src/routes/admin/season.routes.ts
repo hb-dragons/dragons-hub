@@ -5,6 +5,7 @@ import {
   createSeason,
   activateSeason,
   archiveSeason,
+  getSeasonSummary,
 } from "../../services/admin/season.service";
 import {
   browseLeagues,
@@ -139,6 +140,18 @@ seasonRoutes.put(
     const { ligaIds } = c.req.valid("json");
     return c.json(await setSeasonLeagues(id, ligaIds));
   },
+);
+
+seasonRoutes.get(
+  "/seasons/:id/summary",
+  settingsUpdate,
+  validator("param", seasonIdParamSchema, validationHook),
+  describeRoute({
+    description: "League, game and unassigned-slot counts for a season",
+    tags: ["Seasons"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => c.json(await getSeasonSummary(c.req.valid("param").id)),
 );
 
 export { seasonRoutes };
