@@ -1,4 +1,4 @@
-import { memo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 import { Link } from "expo-router";
 import type { TaskCardData } from "@dragons/shared";
@@ -37,8 +37,12 @@ interface Props {
  * The trigger wrapper is a plain `View`, so the link's own press handler lands
  * on something that ignores it: the card inside keeps its `Pressable`, and the
  * task opens once rather than twice.
+ *
+ * Not memoised, unlike the card it wraps: `children` is a fresh element on
+ * every render of the column, so a shallow prop comparison could never hold.
+ * What it wraps is memoised, which is where the render cost was.
  */
-function TaskContextMenuImpl({ task, onAction, children }: Props) {
+export function TaskContextMenu({ task, onAction, children }: Props) {
   return (
     <Link href={taskDetailHref(task.boardId, task.id)} asChild>
       <Link.Trigger>
@@ -62,12 +66,6 @@ function TaskContextMenuImpl({ task, onAction, children }: Props) {
     </Link>
   );
 }
-
-/**
- * Memoised for the same reason `TaskCard` is: a column renders one per task,
- * and the board re-renders on every search keystroke and drag frame.
- */
-export const TaskContextMenu = memo(TaskContextMenuImpl);
 
 /**
  * The preferred size of the preview, in points.
