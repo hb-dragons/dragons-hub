@@ -38,23 +38,75 @@ there's nothing stripping the iOS `aps-environment` entitlement.
 
 Remaining, still-open:
 
-- [ ] Confirm the iOS Associated Domains entitlement and an Apple push
-      cert / Firebase config are set up via EAS for production push.
+- [ ] Confirm an Apple push cert / Firebase config are set up via EAS
+      for production push. (The Associated Domains entitlement this
+      item used to bundle in is a universal-links concern, not a push
+      one — it now has its own section below.)
 - [ ] Verify APNs / FCM credentials exist for the production EAS profile
       (`eas credentials`).
 
-### iOS universal links
+### iOS universal links — entitlement landed (#217), not yet active
 
-Android has an intent filter for `https://app.hbdragons.de`; iOS does
-not. Without the entitlement iOS silently opens the link in Safari.
-
-- [ ] Add to `app.json > ios`:
-  ```json
-  "associatedDomains": ["applinks:app.hbdragons.de"]
-  ```
+- [x] ~~Add `ios.associatedDomains` to `app.json`.~~ Resolved (#217):
+      `"associatedDomains": ["applinks:app.hbdragons.de"]`, the same
+      origin the Android intent filter has always auto-verified.
+      `lib/app-config.test.ts` compares the two lists and fails if a
+      host is claimed on one platform only.
 - [ ] Host `/.well-known/apple-app-site-association` on
-      `app.hbdragons.de` with the app's `TeamID.bundleId` and path
-      patterns.
+      `app.hbdragons.de`. **This is the activation step**, and it is a
+      web-property ticket, not this app's: until that file is live the
+      entitlement changes nothing user-visible, because iOS asks for the
+      file before it ever routes a link to the app. Landing the native
+      side first is deliberate — the entitlement is compiled into the
+      binary, so it has to be in a build *before* the web side goes
+      live, and it is inert until then.
+
+The file must contain the app's `TeamID.de.hbdragons.app` under
+`applinks.details[].appIDs` plus the path patterns to claim. Which paths
+is the companion ticket's call, but note how the two URL spaces line up:
+
+- The web app's default locale (`de`) carries **no** URL prefix
+  (`next-intl`, `localePrefix: "as-needed"`), so `/schedule`,
+  `/standings`, `/teams`, `/team/:id`, `/game/:id` and `/h2h/:id` are
+  the same path in the browser and in the app. Universal links to those
+  land on the matching screen with no mapping layer: expo-router strips
+  the origin off an `https://` launch URL and routes the rest of the
+  path as-is (`fork/extractPathFromURL.ts`).
+- `/en/...` is the same page in English and matches **no** app route —
+  it would open `+not-found`. Either leave `/en/*` out of the claimed
+  paths (it opens in Safari, which is correct today) or add
+  `app/+native-intent.ts` with a `redirectSystemPath` that strips the
+  locale segment. Decide it in the companion ticket; do not claim
+  `/en/*` without one of the two.
+- Session-gated web surfaces (`/admin/*`, `/profile`, …) are worth
+  excluding: the app can route them, but a signed-out tap only reaches
+  the sign-in screen.
+
+Verification once the file ships (none of this can be checked from this
+repo — it needs a device build and the live origin):
+
+```bash
+# 1. Served as JSON, HTTPS, 200, no redirect, no query string.
+curl -sSI https://app.hbdragons.de/.well-known/apple-app-site-association
+# 2. What Apple's CDN actually handed to devices (it caches; expect lag).
+curl -sS https://app-site-association.cdn-apple.com/a/v1/app.hbdragons.de
+```
+
+- Install a build made **after** this entitlement landed — an OTA update
+  cannot add an entitlement, so a pre-#217 binary will keep opening
+  Safari no matter what the AASA says.
+- On device: paste a claimed link into Notes/Messages and tap it, or
+  `xcrun simctl openurl booted https://app.hbdragons.de/game/1`. Typing
+  the URL into Safari deliberately does *not* trigger a universal link.
+- Settings → Developer → Universal Links → Diagnostics reports what iOS
+  resolved for the domain. To bypass Apple's CDN cache while iterating,
+  temporarily claim `applinks:app.hbdragons.de?mode=developer` and turn
+  on Associated Domains Development in the same menu.
+- EAS: the entitlement needs the Associated Domains capability on the
+  provisioning profile. `eas build` syncs capabilities from the
+  entitlement; if a build fails with a profile that does not include
+  `com.apple.developer.associated-domains`, regenerate it via
+  `eas credentials`.
 
 ### Unused Expo modules — resolved (#118), corrected (#213)
 
