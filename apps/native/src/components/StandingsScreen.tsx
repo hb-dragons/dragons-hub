@@ -10,7 +10,7 @@ import { StandingsTable } from "@/components/StandingsTable";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 
-/** Build a lookup map from team name / nameShort → team record */
+/** Build a lookup map from every name a standings row may use → team record */
 function buildTeamLookup(teams: PublicTeam[]): Map<string, PublicTeam> {
   const map = new Map<string, PublicTeam>();
   for (const team of teams) {
@@ -49,17 +49,17 @@ export function StandingsScreen({ headerOffset }: StandingsScreenProps) {
 
   const isLoading = standingsLoading || teamsLoading;
 
+  const teamLookup = useMemo(() => buildTeamLookup(teams ?? []), [teams]);
+
+  // Keyed off the same lookup, so a badge colour is always the colour of the
+  // team a tap on that row would open.
   const teamColorMap = useMemo(() => {
     const map: Record<string, string | null> = {};
-    for (const t of teams ?? []) {
-      map[t.name] = t.badgeColor;
-      if (t.nameShort) map[t.nameShort] = t.badgeColor;
-      if (t.customName) map[t.customName] = t.badgeColor;
+    for (const [name, team] of teamLookup) {
+      map[name] = team.badgeColor;
     }
     return map;
-  }, [teams]);
-
-  const teamLookup = useMemo(() => buildTeamLookup(teams ?? []), [teams]);
+  }, [teamLookup]);
 
   if (isLoading) {
     return (
