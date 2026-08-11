@@ -74,4 +74,16 @@ describe("ManageLeaguesDialog", () => {
     // Pending selection must survive the filter-toggle reload.
     expect(screen.getAllByRole("checkbox")[1]).toBeChecked();
   });
+
+  it("browses without the vorabliga filter on open and re-requests when it is switched on", async () => {
+    render(<ManageLeaguesDialog seasonId={9} open onOpenChange={() => {}} />);
+    await screen.findByText("Landesliga Herren 2");
+    // Mid-season the missing leagues are exactly the ones the federation no
+    // longer flags vorabliga, so the dialog must not filter by default.
+    expect(discover).toHaveBeenCalledWith(9, { vorabligaOnly: false, ownClubOnly: true });
+    fireEvent.click(screen.getByLabelText("settings.seasons.wizard.vorabligaOnly"));
+    await waitFor(() =>
+      expect(discover).toHaveBeenLastCalledWith(9, { vorabligaOnly: true, ownClubOnly: true }),
+    );
+  });
 });
