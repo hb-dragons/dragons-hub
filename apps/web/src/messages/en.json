@@ -10,6 +10,7 @@
     "referees": "Referees",
     "teams": "Teams",
     "sync": "Sync",
+    "seasons": "Seasons",
     "settings": "Settings",
     "standings": "Standings",
     "venues": "Venues",
@@ -956,6 +957,7 @@
     },
     "seasons": {
       "title": "Seasons",
+      "contextLabel": "Season",
       "activate": "Activate",
       "createSeason": "Create season",
       "confirmEmptyActivate": "This season has no leagues. Activating it will show an empty schedule on the public site. Continue?",

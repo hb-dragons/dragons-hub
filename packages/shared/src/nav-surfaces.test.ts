@@ -59,3 +59,17 @@ describe("visibleSurfaces", () => {
     }
   });
 });
+
+describe("seasons surface", () => {
+  it("is offered to admins", () => {
+    expect(visibleSurfaces(admin).map((s) => s.id)).toContain("seasons");
+  });
+
+  it("is hidden from roles that cannot write settings", () => {
+    // Every /admin/seasons route sits behind settings:update, so anyone below
+    // that would land on a 403.
+    for (const user of [venue, teamManager, coach, refereePlain, member]) {
+      expect(visibleSurfaces(user).map((s) => s.id)).not.toContain("seasons");
+    }
+  });
+});

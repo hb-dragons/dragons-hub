@@ -10,6 +10,7 @@
     "referees": "Schiedsrichter",
     "teams": "Teams",
     "sync": "Synchronisation",
+    "seasons": "Saisons",
     "settings": "Einstellungen",
     "standings": "Tabellen",
     "venues": "Hallen",
@@ -956,6 +957,7 @@
     },
     "seasons": {
       "title": "Saisons",
+      "contextLabel": "Saison",
       "activate": "Aktivieren",
       "createSeason": "Saison erstellen",
       "confirmEmptyActivate": "Diese Saison hat keine Ligen. Das Aktivieren zeigt einen leeren Spielplan auf der öffentlichen Seite. Fortfahren?",

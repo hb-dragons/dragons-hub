@@ -44,55 +44,10 @@ import {
   visibleSurfaces,
   type SurfaceGroup,
 } from "@dragons/shared";
-
-// next-intl's typed `t()` needs literal message keys (not `string`) to resolve
-// the parameterless overload, so the label keys are typed as literal unions.
-type GroupLabelKey =
-  | "nav.groupLeague"
-  | "nav.groupOperations"
-  | "nav.groupSocial"
-  | "nav.groupNotifications"
-  | "nav.groupSystem";
-
-type SurfaceLabelKey =
-  | "nav.matches"
-  | "nav.standings"
-  | "nav.teams"
-  | "nav.board"
-  | "nav.bookings"
-  | "nav.venues"
-  | "nav.broadcast"
-  | "nav.createPost"
-  | "nav.notificationCenter"
-  | "nav.watchRules"
-  | "nav.channels"
-  | "nav.domainEvents"
-  | "nav.pushTest"
-  | "nav.sync"
-  | "nav.settings"
-  | "nav.users";
-
-// id -> web presentation for the grouped surfaces. The `officiating` surface is
-// native-only and intentionally has no entry here; the Referees link below
-// stays a top-level item with its own gate (unchanged behavior).
-const SURFACE_META: Record<string, { href: string; labelKey: SurfaceLabelKey }> = {
-  matches: { href: "/admin/matches", labelKey: "nav.matches" },
-  standings: { href: "/admin/standings", labelKey: "nav.standings" },
-  teams: { href: "/admin/teams", labelKey: "nav.teams" },
-  boards: { href: "/admin/boards", labelKey: "nav.board" },
-  bookings: { href: "/admin/bookings", labelKey: "nav.bookings" },
-  venues: { href: "/admin/venues", labelKey: "nav.venues" },
-  broadcast: { href: "/admin/broadcast", labelKey: "nav.broadcast" },
-  createPost: { href: "/admin/social/create", labelKey: "nav.createPost" },
-  notifications: { href: "/admin/notifications", labelKey: "nav.notificationCenter" },
-  watchRules: { href: "/admin/notifications/rules", labelKey: "nav.watchRules" },
-  channels: { href: "/admin/notifications/channels", labelKey: "nav.channels" },
-  domainEvents: { href: "/admin/notifications/events", labelKey: "nav.domainEvents" },
-  pushTest: { href: "/admin/settings/notifications", labelKey: "nav.pushTest" },
-  sync: { href: "/admin/sync", labelKey: "nav.sync" },
-  settings: { href: "/admin/settings", labelKey: "nav.settings" },
-  users: { href: "/admin/users", labelKey: "nav.users" },
-};
+import {
+  SURFACE_META,
+  type GroupLabelKey,
+} from "./nav-meta";
 
 const GROUP_META: Record<
   SurfaceGroup,

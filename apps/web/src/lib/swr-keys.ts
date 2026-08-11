@@ -8,7 +8,12 @@ export const SWR_KEYS = {
   syncLogs: (limit: number, offset: number) =>
     `/admin/sync/logs?limit=${limit}&offset=${offset}`,
   syncSchedule: "/admin/sync/schedule",
-  matches: "/admin/matches",
+  // Season-scoped variant. The key stays the bare path when no season is named,
+  // so the server prefetch (which lets the API default to the active season)
+  // and the client's initial render share one cache entry instead of racing to
+  // fetch the same list twice.
+  matches: (seasonId?: number) =>
+    seasonId === undefined ? "/admin/matches" : `/admin/matches?seasonId=${seasonId}`,
   matchDetail: (id: number) => `/admin/matches/${id}`,
   matchHistory: (id: number, limit?: number, offset?: number) =>
     `/admin/matches/${id}/history?limit=${limit ?? 50}&offset=${offset ?? 0}`,

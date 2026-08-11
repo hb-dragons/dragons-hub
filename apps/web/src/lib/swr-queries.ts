@@ -52,7 +52,10 @@ export function makeQueries(api: Api) {
       fetcher: () => api.sync.schedule("referee-games"),
     }),
     // matches
-    matches: () => ({ key: SWR_KEYS.matches, fetcher: () => api.matches.list() }),
+    matches: (seasonId?: number) => ({
+      key: SWR_KEYS.matches(seasonId),
+      fetcher: () => api.matches.list(seasonId === undefined ? undefined : { seasonId }),
+    }),
     dashboardTodayMatches: (date: string) => ({
       key: SWR_KEYS.dashboardTodayMatches(date),
       fetcher: () => api.matches.list({ dateFrom: date, dateTo: date, limit: 20, offset: 0 }),
