@@ -74,16 +74,16 @@ export function FilterChips({
       }}
     >
       <Pressable
-        onPress={onToggleMine}
         {...filterPillA11y(i18n.t("board.filters.mine"), filters.mine)}
+        onPress={onToggleMine}
         style={chipStyle(filters.mine)}
       >
         <Text style={textStyle(filters.mine)}>{i18n.t("board.filters.mine")}</Text>
       </Pressable>
 
       <Pressable
-        onPress={onPressAssignees}
         {...filterPillA11y(i18n.t("board.filters.assignees"), assigneeActive)}
+        onPress={onPressAssignees}
         style={chipStyle(assigneeActive)}
       >
         <Text style={textStyle(assigneeActive)}>{i18n.t("board.filters.assignees")}</Text>
@@ -134,8 +134,8 @@ export function FilterChips({
       </Pressable>
 
       <Pressable
-        onPress={onPressPriority}
         {...filterPillA11y(i18n.t("board.filters.priority"), filters.priority != null)}
+        onPress={onPressPriority}
         style={chipStyle(filters.priority != null)}
       >
         <Text style={textStyle(filters.priority != null)}>
@@ -166,16 +166,16 @@ export function FilterChips({
       </Pressable>
 
       <Pressable
-        onPress={onToggleDueSoon}
         {...filterPillA11y(i18n.t("board.filters.dueSoon"), filters.dueSoon)}
+        onPress={onToggleDueSoon}
         style={chipStyle(filters.dueSoon)}
       >
         <Text style={textStyle(filters.dueSoon)}>{i18n.t("board.filters.dueSoon")}</Text>
       </Pressable>
 
       <Pressable
-        onPress={onToggleUnassigned}
         {...filterPillA11y(i18n.t("board.filters.unassigned"), filters.unassigned)}
+        onPress={onToggleUnassigned}
         style={chipStyle(filters.unassigned)}
       >
         <Text style={textStyle(filters.unassigned)}>{i18n.t("board.filters.unassigned")}</Text>

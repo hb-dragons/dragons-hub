@@ -14,7 +14,7 @@ const PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const SRC_DIR = path.join(PACKAGE_DIR, "src");
 
 /** Every non-test source file under `src/`, as absolute paths, sorted. */
-export function sourceFiles(dir: string = SRC_DIR): string[] {
+function sourceFiles(dir: string = SRC_DIR): string[] {
   const found: string[] = [];
   for (const entry of readdirSync(dir).sort()) {
     const full = path.join(dir, entry);
@@ -28,10 +28,10 @@ export function sourceFiles(dir: string = SRC_DIR): string[] {
   return found;
 }
 
-const SOURCE_FILES = sourceFiles();
+export const SOURCE_FILES = sourceFiles();
 
 /** Module specifiers a file imports, covering `import`, `export ... from` and `require`. */
-export function importsOf(file: string): string[] {
+function importsOf(file: string): string[] {
   const source = readFileSync(file, "utf8");
   const specifiers: string[] = [];
   const pattern = /(?:from|import|require)\s*\(?\s*["']([^"']+)["']/g;
@@ -53,5 +53,3 @@ export function importSites(module: string): string[] {
 /** Absolute path for a package-relative one, so callers can name files as they read. */
 export const resolveInPackage = (relativePath: string): string =>
   path.join(PACKAGE_DIR, relativePath);
-
-export { PACKAGE_DIR, SOURCE_FILES, SRC_DIR };
