@@ -143,6 +143,9 @@ export function ChecklistSection({ task, boardId }: Props) {
     opacity: glowSV.value * 0.5,
   }));
 
+  /** The add button is live only with a non-empty draft and no add in flight. */
+  const canAdd = draft.trim().length > 0 && !adding;
+
   const submit = async () => {
     const label = draft.trim();
     if (!label || adding) return;
@@ -293,21 +296,20 @@ export function ChecklistSection({ task, boardId }: Props) {
         />
         <Pressable
           onPress={() => { void submit(); }}
-          disabled={!draft.trim() || adding}
+          disabled={!canAdd}
           accessibilityRole="button"
           accessibilityLabel={i18n.t("board.checklist.add")}
           style={{
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.sm,
             borderRadius: radius.md,
-            backgroundColor:
-              draft.trim() && !adding ? colors.primary : colors.surfaceHigh,
+            backgroundColor: canAdd ? colors.primary : colors.surfaceHigh,
           }}
         >
           <Icon
             name="add"
             size={14}
-            color={draft.trim() && !adding ? colors.primaryForeground : colors.mutedForeground}
+            color={canAdd ? colors.primaryForeground : colors.mutedForeground}
           />
         </Pressable>
       </View>

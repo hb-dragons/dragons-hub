@@ -1,6 +1,15 @@
 import { SymbolView } from "expo-symbols";
 import { ICONS, type IconName } from "@/lib/ui/icons";
 
+export interface IconProps {
+  /** Which role the icon plays; the symbol for it lives in `lib/ui/icons.ts`. */
+  name: IconName;
+  /** Point size of the symbol. Matches the surrounding text size, not the tap target. */
+  size?: number;
+  /** Tint. Required: an untinted symbol falls back to the library's own blue. */
+  color: string;
+}
+
 /**
  * The app's chrome icon, and the only module allowed to render `SymbolView`
  * (#221; enforced by `lib/nav/architecture.test.ts`).
@@ -15,17 +24,7 @@ import { ICONS, type IconName } from "@/lib/ui/icons";
  * `accessibilityLabel`, or a row of text — and a second announcement of the
  * same thing is noise. VoiceOver merges the children of an accessible view,
  * and `SymbolView` contributes no text to merge.
- */
-export interface IconProps {
-  /** Which role the icon plays; the symbol for it lives in `lib/ui/icons.ts`. */
-  name: IconName;
-  /** Point size of the symbol. Matches the surrounding text size, not the tap target. */
-  size?: number;
-  /** Tint. Required: an untinted symbol falls back to the library's own blue. */
-  color: string;
-}
-
-/**
+ *
  * No `style` prop, deliberately: `SymbolView` sizes itself to a `size`-square
  * box, and every call site so far wants exactly that inside a container that
  * already positions it. Layout belongs to the container.
