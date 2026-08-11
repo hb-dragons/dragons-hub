@@ -65,13 +65,13 @@ export function importSites(module: string): string[] {
  * which is what that syntax means.
  */
 export function valueImportSites(module: string): string[] {
-  const pattern = new RegExp(
-    String.raw`(?:^|\n)\s*import\s+(type\s+)?[^;]*?from\s*["']${module}(?:/[^"']*)?["']`,
-    "g",
-  );
+  const importStatement = /(?:^|\n)\s*import\s+(type\s+)?[^;]*?from\s*["']([^"']+)["']/g;
   return SOURCE_FILES.filter((file) => {
     const source = readFileSync(file, "utf8");
-    return [...source.matchAll(pattern)].some((match) => match[1] === undefined);
+    return [...source.matchAll(importStatement)].some(
+      ([, typeOnly, spec]) =>
+        typeOnly === undefined && (spec === module || spec!.startsWith(`${module}/`)),
+    );
   }).map(rel);
 }
 
