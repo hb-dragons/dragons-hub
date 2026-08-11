@@ -13,18 +13,16 @@ import type { MaterialIcon, SFSymbolIcon } from "expo-router/unstable-native-tab
  */
 
 /** SF Symbol object form expected by `<NativeTabs.Trigger.Icon sf={...} />`. */
-export type AppTabSfIcon = Extract<NonNullable<SFSymbolIcon["sf"]>, object>;
-
-/** Material icon name used as the Android fallback (ADR 0001). */
-export type AppTabMaterialIcon = MaterialIcon["md"];
+type SfIcon = Extract<NonNullable<SFSymbolIcon["sf"]>, object>;
 
 export interface AppTab {
   /** expo-router route name within the `(tabs)` group. */
   name: string;
   /** Already-translated label. */
   label: string;
-  sf: AppTabSfIcon;
-  md: AppTabMaterialIcon;
+  sf: SfIcon;
+  /** Material icon name used as the Android fallback (ADR 0001). */
+  md: MaterialIcon["md"];
 }
 
 export interface AppTabsProps {
