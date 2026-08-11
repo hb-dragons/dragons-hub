@@ -4,7 +4,7 @@ import {
   useMemo,
   type ReactNode,
 } from "react";
-import { ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
+import { ThemeProvider as NavigationThemeProvider } from "expo-router";
 import { colors } from "@/theme/colors";
 import { textStyles } from "@/theme/typography";
 import { spacing, radius } from "@/theme/spacing";

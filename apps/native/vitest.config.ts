@@ -33,10 +33,15 @@ export default defineConfig({
         // the gate. `include` now covers all of `src/**`, and these are the
         // honest measured floors under that wider scope. Do not "restore" the
         // old values; ratchet these up as native tests grow.
+        //
+        // Ratcheted 2026-08-11 (#213): statements 9 -> 10, on the SDK 57
+        // foundation's new tests (global error handler, nav architecture, app
+        // config). Measured 10.08/8.01/9.59/9.96 — branches, functions and
+        // lines have not yet cleared their next whole point.
         branches: 8,
         functions: 9,
         lines: 9,
-        statements: 9,
+        statements: 10,
       },
     },
   },
