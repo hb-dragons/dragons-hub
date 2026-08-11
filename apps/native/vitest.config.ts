@@ -38,10 +38,15 @@ export default defineConfig({
         // foundation's new tests (global error handler, nav architecture, app
         // config). Measured 10.08/8.01/9.59/9.96 — branches, functions and
         // lines have not yet cleared their next whole point.
-        branches: 8,
-        functions: 9,
-        lines: 9,
-        statements: 10,
+        //
+        // Ratcheted 2026-08-11 (#219): the board's utility sheets became
+        // routes, and the logic they used to carry inline — param parsing,
+        // result routing, move placement, local-date conversion — moved into
+        // tested lib modules. Measured 12.56/9.07/12.87/12.29.
+        branches: 9,
+        functions: 12,
+        lines: 12,
+        statements: 12,
       },
     },
   },
