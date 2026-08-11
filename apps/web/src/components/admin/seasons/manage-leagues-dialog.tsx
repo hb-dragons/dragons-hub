@@ -33,6 +33,9 @@ export function ManageLeaguesDialog({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState("");
   const [ownClubOnly, setOwnClubOnly] = useState(true);
+  // Off by default: mid-season the leagues being added are committed ones,
+  // and the federation clears their `vorabliga` flag once they are.
+  const [vorabligaOnly, setVorabligaOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const openRef = useRef(open);
@@ -43,12 +46,12 @@ export function ManageLeaguesDialog({
   // Load the season's current leagues plus the browse candidates, then merge so
   // a currently-tracked league that the active filter would hide still appears
   // (checked) and can be removed.
-  async function load(clubOnly = ownClubOnly, seed = false) {
+  async function load(clubOnly = ownClubOnly, vorabOnly = vorabligaOnly, seed = false) {
     setLoading(true);
     try {
       const [tracked, candidates] = await Promise.all([
         api.seasons.getLeagues(seasonId),
-        api.seasons.discover(seasonId, { vorabligaOnly: true, ownClubOnly: clubOnly }),
+        api.seasons.discover(seasonId, { vorabligaOnly: vorabOnly, ownClubOnly: clubOnly }),
       ]);
       if (!openRef.current) return;
       const trackedIds = new Set(tracked.leagues.map((l) => l.apiLigaId));
@@ -84,7 +87,8 @@ export function ManageLeaguesDialog({
     if (open) {
       setFilter("");
       setOwnClubOnly(true);
-      void load(true, true);
+      setVorabligaOnly(false);
+      void load(true, false, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, seasonId]);
@@ -92,6 +96,11 @@ export function ManageLeaguesDialog({
   function toggleOwnClubOnly(v: boolean) {
     setOwnClubOnly(v);
     void load(v);
+  }
+
+  function toggleVorabligaOnly(v: boolean) {
+    setVorabligaOnly(v);
+    void load(ownClubOnly, v);
   }
 
   function toggle(ligaId: number, checked: boolean) {
@@ -145,6 +154,8 @@ export function ManageLeaguesDialog({
           onFilterChange={setFilter}
           ownClubOnly={ownClubOnly}
           onOwnClubOnlyChange={toggleOwnClubOnly}
+          vorabligaOnly={vorabligaOnly}
+          onVorabligaOnlyChange={toggleVorabligaOnly}
           loading={loading}
         />
         <DialogFooter>

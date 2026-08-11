@@ -26,6 +26,8 @@ function renderPicker(props: Partial<React.ComponentProps<typeof LeaguePicker>> 
       onFilterChange={() => {}}
       ownClubOnly
       onOwnClubOnlyChange={() => {}}
+      vorabligaOnly
+      onVorabligaOnlyChange={() => {}}
       loading={false}
       {...props}
     />,
@@ -57,5 +59,14 @@ describe("LeaguePicker", () => {
     fireEvent.click(screen.getAllByText("settings.seasons.wizard.showTeams")[0]!);
     expect(await screen.findByText("Hanover Dragons I")).toBeInTheDocument();
     expect(leagueTeams).toHaveBeenCalledWith(1);
+  });
+
+  it("renders the vorabliga switch and reports toggles", () => {
+    const onVorabligaOnlyChange = vi.fn();
+    renderPicker({ onVorabligaOnlyChange });
+    const sw = screen.getByLabelText("settings.seasons.wizard.vorabligaOnly");
+    expect(sw).toBeChecked();
+    fireEvent.click(sw);
+    expect(onVorabligaOnlyChange).toHaveBeenCalledWith(false);
   });
 });

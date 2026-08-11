@@ -987,6 +987,7 @@
         "selectDescription": "Select the preliminary (Vorabliga) leagues to track this season.",
         "searchPlaceholder": "Search leagues…",
         "ownClubOnly": "Only my club's leagues",
+        "vorabligaOnly": "Preliminary (Vorabliga) leagues only",
         "showTeams": "Show teams",
         "hideTeams": "Hide teams",
         "teamsLoading": "Loading teams…",

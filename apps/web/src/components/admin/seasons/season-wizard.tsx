@@ -78,6 +78,9 @@ export function SeasonWizard({
   // Default to our own club's leagues — onboarding almost always tracks the
   // club's own teams, and the unfiltered federation list runs to hundreds.
   const [ownClubOnly, setOwnClubOnly] = useState(true);
+  // Vorabliga-only matches onboarding: a new season's leagues are usually
+  // still preliminary. The switch widens the browse to committed leagues too.
+  const [vorabligaOnly, setVorabligaOnly] = useState(true);
   // The federation league fetch paginates ~hundreds of leagues, so both async
   // steps need visible progress; without it the dialog reads as frozen.
   const [loadingLeagues, setLoadingLeagues] = useState(false);
@@ -135,6 +138,7 @@ export function SeasonWizard({
     setSelected(new Set());
     setFilter("");
     setOwnClubOnly(true);
+    setVorabligaOnly(true);
     setLoadingLeagues(false);
     setSubmitting(false);
     setCreatedId(null);
@@ -149,14 +153,15 @@ export function SeasonWizard({
     onOpenChange(v);
   }
 
-  // Browse the upcoming season's leagues from the federation: the vorabligas
-  // plus the top tiers (Regionalliga) that are never flagged vorabliga. Nothing
-  // is persisted yet — the season does not exist until the user confirms.
-  async function loadLeagues(clubOnly = ownClubOnly) {
+  // Browse the upcoming season's leagues from the federation. By default only
+  // the vorabligas plus the top tiers (Regionalliga) that are never flagged
+  // vorabliga; the switch widens this to every league. Nothing is persisted
+  // yet — the season does not exist until the user confirms.
+  async function loadLeagues(clubOnly = ownClubOnly, vorabOnly = vorabligaOnly) {
     setStep("select");
     setLoadingLeagues(true);
     try {
-      const found = await api.seasons.browse({ vorabligaOnly: true, ownClubOnly: clubOnly });
+      const found = await api.seasons.browse({ vorabligaOnly: vorabOnly, ownClubOnly: clubOnly });
       if (!openRef.current) return; // closed mid-fetch — don't resurrect stale state
       setLeagues(found);
     } catch {
@@ -173,6 +178,11 @@ export function SeasonWizard({
   function toggleOwnClubOnly(v: boolean) {
     setOwnClubOnly(v);
     void loadLeagues(v);
+  }
+
+  function toggleVorabligaOnly(v: boolean) {
+    setVorabligaOnly(v);
+    void loadLeagues(ownClubOnly, v);
   }
 
   // The SSE "complete" event can fire before the job has started processing, so
@@ -408,6 +418,8 @@ export function SeasonWizard({
               onFilterChange={setFilter}
               ownClubOnly={ownClubOnly}
               onOwnClubOnlyChange={toggleOwnClubOnly}
+              vorabligaOnly={vorabligaOnly}
+              onVorabligaOnlyChange={toggleVorabligaOnly}
               loading={loadingLeagues}
             />
             {!loadingLeagues && leagues.length > 0 && (
