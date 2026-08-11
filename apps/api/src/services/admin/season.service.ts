@@ -1,9 +1,10 @@
 // apps/api/src/services/admin/season.service.ts
 import { getDb } from "../../config/database";
 import { seasons, leagues, matches } from "@dragons/db/schema";
-import { eq, sql } from "drizzle-orm";
-import type { Season, SeasonWithCounts } from "@dragons/shared";
+import { and, eq, sql } from "drizzle-orm";
+import type { Season, SeasonSummary, SeasonWithCounts } from "@dragons/shared";
 import { SeasonNotFoundError } from "./season.errors";
+import { sdkClient } from "../sync/sdk-client";
 
 function toDto(row: typeof seasons.$inferSelect): Season {
   return {
@@ -104,6 +105,56 @@ export async function activateSeason(id: number): Promise<Season> {
   });
   invalidateActiveSeasonCache();
   return toDto(result);
+}
+
+/**
+ * Counts for the wizard's review step.
+ *
+ * `leagueCount` / `gameCount` are database reads. `placeholderSlots` cannot be:
+ * a fixture whose teams the federation has not yet assigned arrives with
+ * `teamPermanentId: 0`, `data-fetcher` drops those teams, and `matches.sync`
+ * then skips the whole match because the team FKs are non-deferrable (#133).
+ * Neither table records the slot, so we re-read the schedule to count them —
+ * which is also what explains `gameCount` trailing the published schedule.
+ */
+export async function getSeasonSummary(seasonId: number): Promise<SeasonSummary> {
+  const [counts] = await getDb()
+    .select({
+      leagueCount: sql<number>`count(distinct ${leagues.id})::int`,
+      gameCount: sql<number>`count(distinct ${matches.id})::int`,
+    })
+    .from(seasons)
+    .leftJoin(leagues, eq(leagues.seasonRefId, seasons.id))
+    .leftJoin(matches, eq(matches.leagueId, leagues.id))
+    .where(eq(seasons.id, seasonId))
+    .groupBy(seasons.id);
+
+  const tracked = await getDb()
+    .select({ apiLigaId: leagues.apiLigaId })
+    .from(leagues)
+    .where(and(eq(leagues.seasonRefId, seasonId), eq(leagues.isTracked, true)));
+
+  let placeholderSlots: number | null = 0;
+  for (const league of tracked) {
+    try {
+      const schedule = await sdkClient.getSpielplan(league.apiLigaId);
+      for (const match of schedule) {
+        if (!match.homeTeam?.teamPermanentId) placeholderSlots += 1;
+        if (!match.guestTeam?.teamPermanentId) placeholderSlots += 1;
+      }
+    } catch {
+      // One unreadable league makes the whole count untrustworthy: a partial
+      // total reads as a confidently low one. Report nothing instead.
+      placeholderSlots = null;
+      break;
+    }
+  }
+
+  return {
+    leagueCount: counts?.leagueCount ?? 0,
+    gameCount: counts?.gameCount ?? 0,
+    placeholderSlots,
+  };
 }
 
 export async function archiveSeason(id: number): Promise<Season> {

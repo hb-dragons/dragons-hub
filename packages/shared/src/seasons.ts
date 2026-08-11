@@ -38,3 +38,14 @@ export interface SetSeasonLeaguesResult {
   tracked: number;
   untracked: number;
 }
+
+export interface SeasonSummary {
+  leagueCount: number;
+  gameCount: number;
+  /**
+   * Fixture slots the federation has not yet assigned a team to. `null` when
+   * the federation could not be read — a partial count is indistinguishable
+   * from a genuinely low one, so we report nothing rather than a wrong number.
+   */
+  placeholderSlots: number | null;
+}
