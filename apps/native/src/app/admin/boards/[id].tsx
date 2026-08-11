@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
 import { ActionSheetIOS, Platform, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
+// `useHeaderHeight` has no equivalent on expo-router's own surface yet, so it
+// stays on the forked React Navigation re-export the SDK 56 codemod points at.
+import { useHeaderHeight } from "expo-router/react-navigation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHeaderHeight } from "@react-navigation/elements";
 import { bottomSearchToolbarClearance } from "@/lib/ui/search-toolbar";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
