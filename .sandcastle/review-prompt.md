@@ -1,6 +1,9 @@
 # TASK
 
-Review the code changes on branch `{{BRANCH}}` and improve code clarity, consistency, and maintainability while preserving exact functionality.
+Review the code changes on branch `{{BRANCH}}` along two axes:
+
+- **Spec**: does the diff deliver what issue {{TASK_ID}} asked for? Pull it with `gh issue view {{TASK_ID}}` and walk its acceptance criteria against the diff. A machine-verifiable criterion the diff does not satisfy is the highest-priority finding there is — fix it if you can; if you cannot, leave a comment on the issue naming exactly which criterion is unmet.
+- **Standards**: improve code clarity, consistency, and maintainability while preserving exact functionality, against the standards below.
 
 # CONTEXT
 
