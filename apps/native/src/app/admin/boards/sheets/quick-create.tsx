@@ -11,6 +11,7 @@ import { useBoard } from "@/hooks/board/useBoard";
 import { useTheme } from "@/hooks/useTheme";
 import { useToast } from "@/hooks/useToast";
 import { adminBoardApi } from "@/lib/api";
+import { sortedColumns } from "@/lib/board/columns";
 import { buildCreateTaskInput } from "@/lib/board/create-task-input";
 import { parseNumericParam } from "@/lib/board/sheet-params";
 import { isBoardTasksKey } from "@/lib/board/task-keys";
@@ -39,10 +40,7 @@ export default function QuickCreateSheetRoute() {
   const boardId = parseNumericParam(params.boardId);
   const { data: board } = useBoard(boardId);
 
-  const columns = useMemo(
-    () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
-    [board],
-  );
+  const columns = useMemo(() => sortedColumns(board), [board]);
 
   const [columnId, setColumnId] = useState<number | null>(() =>
     parseNumericParam(params.columnId),

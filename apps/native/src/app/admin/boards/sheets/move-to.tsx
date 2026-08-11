@@ -5,6 +5,7 @@ import { SheetScreen } from "@/components/sheets/SheetScreen";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
 import { useMoveTask } from "@/hooks/board/useMoveTask";
+import { sortedColumns } from "@/lib/board/columns";
 import { moveTargetPosition } from "@/lib/board/move-position";
 import { parseNumericParam } from "@/lib/board/sheet-params";
 import { useTheme } from "@/hooks/useTheme";
@@ -25,10 +26,7 @@ export default function MoveToSheetRoute() {
   const { data: tasks } = useBoardTasks(boardId);
   const moveTask = useMoveTask(boardId ?? 0);
 
-  const columns = useMemo(
-    () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
-    [board],
-  );
+  const columns = useMemo(() => sortedColumns(board), [board]);
 
   // Counted over *all* the board's tasks, not the filtered view the board
   // screen happens to be showing: "bottom" means the bottom of the column.

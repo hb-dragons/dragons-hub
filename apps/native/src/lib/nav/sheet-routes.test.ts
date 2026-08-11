@@ -7,6 +7,7 @@ import {
   BOARD_SHEET_ROUTES,
   SHEET_ROUTE_PREFIX,
   SHEET_ROUTE_SEGMENT,
+  type SheetRouteSpec,
   formSheetOptions,
   sheetScreenName,
 } from "@/lib/nav/sheet-routes";
@@ -26,6 +27,13 @@ const SRC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.
 const APP_DIR = path.join(SRC_DIR, "app");
 const SHEET_DIR = path.join(APP_DIR, SHEET_ROUTE_SEGMENT);
 const ADMIN_LAYOUT = path.join(APP_DIR, "admin/_layout.tsx");
+
+/** One declared sheet by name — an undeclared name is a failure, not `undefined`. */
+function sheetRoute(name: string): SheetRouteSpec {
+  const spec = BOARD_SHEET_ROUTES.find((route) => route.name === name);
+  if (!spec) throw new Error(`no sheet route declared for "${name}"`);
+  return spec;
+}
 
 describe("board sheet routes", () => {
   it("declares every sheet the board opens", () => {
@@ -93,8 +101,7 @@ describe("board sheet routes", () => {
   // The due sheet is the one the ticket calls out by name: it used to be a
   // fixed 75% panel with the inline picker floating in it.
   it("sizes the due-date sheet to its inline picker", () => {
-    const due = BOARD_SHEET_ROUTES.find((route) => route.name === "due");
-    expect(due?.detents).toBe("fitToContents");
+    expect(sheetRoute("due").detents).toBe("fitToContents");
   });
 
   // #222. Task detail is a scrolling form — checklist and comments outgrow
@@ -102,19 +109,17 @@ describe("board sheet routes", () => {
   // medium and drags to large. Scrolling to the top edge hands the drag to the
   // sheet, which is how iOS grows a sheet the user is already reading in.
   it("opens task detail at half height and lets it grow to full", () => {
-    const detail = BOARD_SHEET_ROUTES.find((route) => route.name === "task-detail");
+    const detail = sheetRoute("task-detail");
 
-    expect(detail?.detents).toEqual([0.5, 1]);
-    expect(formSheetOptions(detail!).sheetExpandsWhenScrolledToEdge).toBe(true);
+    expect(detail.detents).toEqual([0.5, 1]);
+    expect(formSheetOptions(detail).sheetExpandsWhenScrolledToEdge).toBe(true);
   });
 
   // #222. Quick create focuses its title field on open, so the keyboard is up
   // for the sheet's whole life; anything shorter than full height would leave
   // the rest of the form underneath it.
   it("presents quick create at full height", () => {
-    const quickCreate = BOARD_SHEET_ROUTES.find((route) => route.name === "quick-create");
-
-    expect(quickCreate?.detents).toEqual([1]);
+    expect(sheetRoute("quick-create").detents).toEqual([1]);
   });
 
   it("opens every sheet at its smallest detent", () => {

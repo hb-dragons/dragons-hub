@@ -67,8 +67,8 @@ export default defineConfig({
         // Ratcheted 2026-08-11 (#222): statements 14 -> 15, branches 9 -> 10,
         // functions 17 -> 18, on the task-detail and quick-create sheet routes
         // and the logic they shed on the way (the create-task payload, the
-        // assignee diff, the board-tasks key matcher). Measured
-        // 15.25/10.15/18.37/14.91 — lines has not yet cleared 15.
+        // assignee diff, the board-tasks key matcher, the column ordering).
+        // Measured 15.27/10.28/18.55/14.92 — lines has not yet cleared 15.
         branches: 10,
         functions: 18,
         lines: 14,

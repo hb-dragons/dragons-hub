@@ -16,6 +16,7 @@ import { TaskContextMenu, type TaskContextMenuHandle, type TaskContextAction } f
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
 import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
+import { sortedColumns } from "@/lib/board/columns";
 import {
   openAddColumnSheet,
   openAssigneeFilterSheet,
@@ -152,10 +153,7 @@ function BoardDetailBody() {
   // Derived
   // ---------------------------------------------------------------------------
 
-  const columns = useMemo(
-    () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
-    [board],
-  );
+  const columns = useMemo(() => sortedColumns(board), [board]);
 
   const columnDrag = useColumnDrag(boardId, columns);
 

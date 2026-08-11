@@ -214,7 +214,7 @@ before launch:
 ## Testing — corrected (#118), corrected again (#213)
 
 This used to say "native has zero tests" and that `lint` was just
-`tsc --noEmit`. Both were stale: there are 51 `*.test.ts(x)` files under
+`tsc --noEmit`. Both were stale: there are 52 `*.test.ts(x)` files under
 `src/`, and `lint` runs real ESLint (`eslint .`) separate from
 `typecheck`.
 

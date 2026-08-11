@@ -39,6 +39,27 @@ function priorityBadge(
   }
 }
 
+/** Accessibility label for a save indicator; idle has nothing to announce. */
+function saveLabel(state: SaveState): string | undefined {
+  switch (state) {
+    case "saving":
+      return i18n.t("board.task.savingTitle");
+    case "saved":
+      return i18n.t("board.task.savedTitle");
+    default:
+      return undefined;
+  }
+}
+
+/** One assignee is named; several are counted. */
+function assigneeSummary(assignees: TaskDetail["assignees"]): string {
+  if (assignees.length === 0) return i18n.t("board.assignees.none");
+  if (assignees.length === 1) {
+    return assignees[0]?.name ?? i18n.t("board.task.unnamedUser");
+  }
+  return i18n.t("board.assignees.count", { count: assignees.length });
+}
+
 function dueState(iso: string | null): "overdue" | "soon" | "later" | null {
   if (!iso) return null;
   const due = new Date(iso).getTime();
@@ -184,16 +205,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
             multiline
           />
           <View style={{ paddingTop: 6 }}>
-            <SaveIndicator
-              state={titleSave}
-              label={
-                titleSave === "saving"
-                  ? i18n.t("board.task.savingTitle")
-                  : titleSave === "saved"
-                    ? i18n.t("board.task.savedTitle")
-                    : undefined
-              }
-            />
+            <SaveIndicator state={titleSave} label={saveLabel(titleSave)} />
           </View>
         </View>
         {title.length >= 270 ? (
@@ -230,16 +242,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
           pointerEvents="none"
           style={{ position: "absolute", top: 8, right: 8 }}
         >
-          <SaveIndicator
-            state={descriptionSave}
-            label={
-              descriptionSave === "saving"
-                ? i18n.t("board.task.savingTitle")
-                : descriptionSave === "saved"
-                  ? i18n.t("board.task.savedTitle")
-                  : undefined
-            }
-          />
+          <SaveIndicator state={descriptionSave} label={saveLabel(descriptionSave)} />
         </View>
       </View>
 
@@ -247,12 +250,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
         rows={[
           {
             label: i18n.t("board.assignees.title"),
-            value:
-              task.assignees.length === 0
-                ? i18n.t("board.assignees.none")
-                : task.assignees.length === 1
-                  ? task.assignees[0]?.name ?? i18n.t("board.task.unnamedUser")
-                  : i18n.t("board.assignees.count", { count: task.assignees.length }),
+            value: assigneeSummary(task.assignees),
             valueColor: task.assignees.length === 0 ? undefined : colors.foreground,
             onPress: () =>
               openAssigneePickerSheet(
