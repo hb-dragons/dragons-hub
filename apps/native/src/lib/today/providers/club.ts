@@ -1,12 +1,13 @@
 import useSWR from "swr";
-import type { GateUser, TodayItem } from "@dragons/shared";
+import type { GateUser } from "@dragons/shared";
+import type { NativeTodayItem } from "@/lib/today/types";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 
 export const clubProvider = {
   id: "club",
   visible: (_user: GateUser) => true,
-  useItems(user: GateUser): TodayItem[] {
+  useItems(user: GateUser): NativeTodayItem[] {
     const enabled = Boolean(user);
     const { data } = useSWR(enabled ? "today:club" : null, () =>
       publicApi.getHomeDashboard(),

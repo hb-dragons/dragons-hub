@@ -15,7 +15,15 @@ const APP_JSON = path.resolve(
 );
 
 const { expo } = JSON.parse(readFileSync(APP_JSON, "utf8")) as {
-  expo: { ios?: { deploymentTarget?: string } };
+  expo: {
+    ios?: { deploymentTarget?: string; associatedDomains?: string[] };
+    android?: {
+      intentFilters?: {
+        autoVerify?: boolean;
+        data?: { scheme?: string; host?: string }[];
+      }[];
+    };
+  };
 };
 
 /**
@@ -29,5 +37,37 @@ const SDK_57_MIN_IOS_DEPLOYMENT_TARGET = "16.4";
 describe("app.json iOS build config", () => {
   it("pins the iOS deployment target at the floor the installed SDK supports", () => {
     expect(expo.ios?.deploymentTarget).toBe(SDK_57_MIN_IOS_DEPLOYMENT_TARGET);
+  });
+});
+
+/**
+ * Universal links (#217). The entitlement is half of the handshake — the other
+ * half is `/.well-known/apple-app-site-association` on the same origin, served
+ * by the web property (companion ticket). Without the entitlement iOS never
+ * asks for that file and every club link opens in Safari instead of the app,
+ * and the mistake is invisible until someone taps a link on a device build.
+ */
+const APPLINKS_PREFIX = "applinks:";
+
+/** Hosts the Android manifest claims for `https` links, in declaration order. */
+const androidHttpsHosts = (expo.android?.intentFilters ?? []).flatMap((filter) =>
+  (filter.data ?? [])
+    .filter((entry) => entry.scheme === "https" && entry.host)
+    .map((entry) => entry.host!),
+);
+
+describe("app.json universal links", () => {
+  it("declares an associated-domains entitlement", () => {
+    expect(expo.ios?.associatedDomains ?? []).not.toHaveLength(0);
+  });
+
+  it("claims the same https hosts on iOS as Android already verifies", () => {
+    const iosHosts = (expo.ios?.associatedDomains ?? [])
+      .filter((domain) => domain.startsWith(APPLINKS_PREFIX))
+      .map((domain) => domain.slice(APPLINKS_PREFIX.length));
+    // One origin, declared twice because the two platforms spell it
+    // differently. A host added to one and not the other is a link that opens
+    // the app on one phone and the browser on the other.
+    expect([...iosHosts].sort()).toEqual([...androidHttpsHosts].sort());
   });
 });

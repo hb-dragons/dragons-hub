@@ -43,10 +43,14 @@ export default defineConfig({
         // tests (header options, tab-bar minimize behaviour, the widened nav
         // architecture suite). Measured 10.2/8.02/9.68/10.08 — statements,
         // branches and functions hold.
+        //
+        // Ratcheted 2026-08-11 (#217): statements 10 -> 11, functions 9 -> 11,
+        // lines 9 -> 11, on the typed-href route table and its tests. Measured
+        // 11.44/8.52/11.67/11.25 — branches still short of 9.
         branches: 8,
-        functions: 9,
-        lines: 10,
-        statements: 10,
+        functions: 11,
+        lines: 11,
+        statements: 11,
       },
     },
   },

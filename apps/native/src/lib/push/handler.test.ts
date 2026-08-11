@@ -17,6 +17,7 @@ import {
   setPushAuthState,
   subscribeToTaps,
 } from "@/lib/push/handler";
+import { NOT_FOUND_ROUTE } from "@/lib/nav/href";
 
 type Tap = Parameters<Parameters<typeof Notifications.addNotificationResponseReceivedListener>[0]>[0];
 
@@ -82,10 +83,28 @@ describe("followDeepLink while signed in", () => {
       expect(router.push).not.toHaveBeenCalled();
     },
   );
+
+  // A payload is remote input and may name a screen this build does not have
+  // (an older or newer app version, a typo). The router would land such a path
+  // on `+not-found` anyway; sending it there deliberately keeps that outcome
+  // while the push itself stays a route the type system knows.
+  it.each([["/nope"], ["/game"], ["/game/55/box-score"]])(
+    "lands the unroutable link %j on the not-found screen",
+    (link) => {
+      followDeepLink(link);
+      expect(router.push).toHaveBeenCalledWith(NOT_FOUND_ROUTE);
+    },
+  );
 });
 
 describe("followDeepLink while signed out", () => {
   beforeEach(() => setPushAuthState("signed-out"));
+
+  it("does not hold an unroutable link behind the sign-in screen", () => {
+    followDeepLink("/nope");
+    expect(router.push).toHaveBeenCalledWith(NOT_FOUND_ROUTE);
+    expect(router.push).not.toHaveBeenCalledWith(SIGNED_OUT_FALLBACK);
+  });
 
   it("does not navigate to a session-gated link", () => {
     followDeepLink("/referee-game/55");

@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from "react-native";
-import { useRouter, type Href } from "expo-router";
+import { useRouter } from "expo-router";
 import { visibleSurfaces } from "@dragons/shared";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -39,7 +39,7 @@ export default function TodayScreen() {
           {items.map((item) => (
             <Pressable
               key={`${item.providerId}:${item.id}`}
-              onPress={() => router.push(item.route as Href)}
+              onPress={() => router.push(item.route)}
             >
               <Card>
                 <Text style={[textStyles.cardTitle, { color: colors.foreground }]}>
@@ -61,7 +61,7 @@ export default function TodayScreen() {
         <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
           <SectionHeader title={i18n.t("tools.title")} />
           {tools.map((tool) => (
-            <Card key={tool.id} onPress={() => router.push(tool.route as Href)}>
+            <Card key={tool.id} onPress={() => router.push(tool.route)}>
               <Text style={[textStyles.cardTitle, { color: colors.foreground }]}>
                 {i18n.t(tool.labelKey)}
               </Text>

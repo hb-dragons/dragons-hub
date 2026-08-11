@@ -1,5 +1,5 @@
-import { orderTodayItems, type GateUser, type TodayItem } from "@dragons/shared";
-import type { TodayProvider } from "./types";
+import { orderTodayItems, type GateUser } from "@dragons/shared";
+import type { NativeTodayItem, TodayProvider } from "./types";
 import { refereeProvider } from "./providers/referee";
 import { clubProvider } from "./providers/club";
 
@@ -10,8 +10,8 @@ const TODAY_PROVIDERS: TodayProvider[] = [refereeProvider, clubProvider];
  * (rules of hooks); each provider gates its own fetch on visibility, so hidden
  * providers cost nothing beyond an inert hook call.
  */
-export function useTodayItems(user: GateUser): TodayItem[] {
-  const all: TodayItem[] = [];
+export function useTodayItems(user: GateUser): NativeTodayItem[] {
+  const all: NativeTodayItem[] = [];
   for (const provider of TODAY_PROVIDERS) {
     // Order is stable because TODAY_PROVIDERS is a static module-level array.
     const items = provider.useItems(user);

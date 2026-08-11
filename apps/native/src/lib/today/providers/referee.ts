@@ -1,5 +1,6 @@
 import useSWR from "swr";
-import { canViewOpenGames, type GateUser, type TodayItem } from "@dragons/shared";
+import { canViewOpenGames, type GateUser } from "@dragons/shared";
+import type { NativeTodayItem } from "@/lib/today/types";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
 import { kickoffToday } from "@/lib/format/kickoff";
@@ -7,14 +8,14 @@ import { kickoffToday } from "@/lib/format/kickoff";
 export const refereeProvider = {
   id: "referee",
   visible: (user: GateUser) => canViewOpenGames(user),
-  useItems(user: GateUser): TodayItem[] {
+  useItems(user: GateUser): NativeTodayItem[] {
     const enabled = canViewOpenGames(user);
     const { data } = useSWR(enabled ? "today:referee" : null, () =>
       refereeApi.getGames({ status: "active", limit: 500 }),
     );
     if (!data) return [];
     const today = kickoffToday();
-    const items: TodayItem[] = [];
+    const items: NativeTodayItem[] = [];
 
     const openCount = data.items.filter(
       (g) =>
