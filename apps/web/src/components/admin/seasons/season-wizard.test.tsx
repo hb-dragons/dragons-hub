@@ -90,6 +90,16 @@ describe("SeasonWizard", () => {
     );
   });
 
+  it("re-browses with the vorabliga filter off when its switch is flipped", async () => {
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("settings.seasons.wizard.vorabligaOnly"));
+    await waitFor(() =>
+      expect(browse).toHaveBeenLastCalledWith({ vorabligaOnly: false, ownClubOnly: true }),
+    );
+  });
+
   it("creates the season, saves the picked leagues and syncs only on confirm", async () => {
     render(<SeasonWizard open onOpenChange={() => {}} />);
     nameAndAdvance();
