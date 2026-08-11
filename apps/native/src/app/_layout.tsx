@@ -68,6 +68,7 @@ function RootNavigator() {
         <Stack.Screen name="game/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="referee-game/[id]" options={detailHeaderOptions} />
         <Stack.Screen name="h2h/[teamApiId]" options={detailHeaderOptions} />
+        <Stack.Screen name="league-tables" options={detailHeaderOptions} />
         <Stack.Screen
           name="(auth)"
           options={{
