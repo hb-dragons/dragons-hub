@@ -17,7 +17,7 @@ Automation for working the `ready-for-agent` ticket backlog AFK. [Sandcastle](ht
 ## Running a batch
 
 ```bash
-git checkout -b feat/native-modernization main   # or an existing integration branch
+git checkout -b feat/native-modernization main   # the base must already contain this setup
 pnpm sandcastle
 ```
 
