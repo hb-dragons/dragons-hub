@@ -10,7 +10,9 @@ import {
   openDuePickerSheet,
   openMoveToSheet,
   openPriorityPickerSheet,
+  openQuickCreateSheet,
   openSortSheet,
+  openTaskDetailSheet,
 } from "@/lib/nav/board-sheets";
 import {
   __resetSheetResultsForTests,
@@ -145,6 +147,24 @@ describe("board sheet navigation", () => {
       expect(params).toEqual({ boardId: 7, columnId: 3 });
     });
 
+    it("opens the task detail sheet with the board and task", () => {
+      openTaskDetailSheet(7, 42);
+
+      const { pathname, params } = pushed();
+      expect(pathname).toBe("/admin/boards/sheets/task-detail");
+      expect(params).toEqual({ boardId: 7, taskId: 42 });
+    });
+
+    // The column the user started from, not the whole column list: the sheet
+    // reads the board itself (scalar params only, per sheet-routes.ts).
+    it("opens quick create with the board and the starting column", () => {
+      openQuickCreateSheet(7, 3);
+
+      const { pathname, params } = pushed();
+      expect(pathname).toBe("/admin/boards/sheets/quick-create");
+      expect(params).toEqual({ boardId: 7, columnId: 3 });
+    });
+
     // These sheets apply their own change and close; a result token would be
     // registered and never delivered.
     it("registers no result handler", () => {
@@ -152,6 +172,8 @@ describe("board sheet navigation", () => {
       openBoardSettingsSheet(7);
       openColumnSettingsSheet(7, 3);
       openMoveToSheet(7, 42);
+      openTaskDetailSheet(7, 42);
+      openQuickCreateSheet(7, 3);
 
       expect(pendingSheetResultCount()).toBe(0);
     });

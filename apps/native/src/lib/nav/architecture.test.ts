@@ -82,6 +82,23 @@ describe("navigation architecture", () => {
     expect(offenders).toEqual([]);
   });
 
+  // ...nor in what a sheet route renders. #222 moved task detail and quick
+  // create onto routes, which means their bodies — and the checklist and
+  // comment composers inside them — are inside a *native* sheet: a
+  // `BottomSheetTextInput` there registers with a JS sheet that is not on
+  // screen, so it no longer knows to lift for the keyboard.
+  //
+  // The list is what is left of the JS sheet layer, and it shrinks to nothing:
+  // the task menu is #220's, the board-create sheet and the provider in the
+  // root layout go with the library in #225.
+  it("has the JS bottom sheet layer down to its last three sites", () => {
+    expect(importSites("@gorhom/bottom-sheet")).toEqual([
+      "src/app/_layout.tsx",
+      "src/components/board/CreateBoardSheet.tsx",
+      "src/components/board/TaskContextMenu.tsx",
+    ]);
+  });
+
   // Result tokens are only safe while every registration is paired with a
   // release. Both halves of that pairing live in these two modules; a third
   // caller would be a leak waiting to happen.

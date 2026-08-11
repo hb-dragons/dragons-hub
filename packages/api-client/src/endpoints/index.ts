@@ -14,6 +14,7 @@ export type {
   BoardUpdateBody,
   ColumnCreateBody,
   ColumnUpdateBody,
+  TaskCreateBody,
   TaskUpdateBody,
   TaskListQuery,
 } from "@dragons/contracts";

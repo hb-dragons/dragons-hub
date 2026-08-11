@@ -61,6 +61,9 @@ export const APP_ROUTES: Record<string, (...params: string[]) => RouteHref> = {
   "/admin/boards/sheets/column-settings": () => "/admin/boards/sheets/column-settings",
   "/admin/boards/sheets/assignees": () => "/admin/boards/sheets/assignees",
   "/admin/boards/sheets/assignee-filter": () => "/admin/boards/sheets/assignee-filter",
+  // The board's two complex sheets (#222).
+  "/admin/boards/sheets/task-detail": () => "/admin/boards/sheets/task-detail",
+  "/admin/boards/sheets/quick-create": () => "/admin/boards/sheets/quick-create",
   "/game/[id]": (id: string) => `/game/${id}`,
   "/team/[id]": (id: string) => `/team/${id}`,
   "/h2h/[teamApiId]": (teamApiId: string) => `/h2h/${teamApiId}`,

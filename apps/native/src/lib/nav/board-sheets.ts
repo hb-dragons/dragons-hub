@@ -103,6 +103,16 @@ export function openAssigneeFilterSheet(
 // Sheets that own their mutation
 // ---------------------------------------------------------------------------
 
+/** The task's own sheet: edits, checklist and comments (#222). */
+export function openTaskDetailSheet(boardId: number, taskId: number): void {
+  openSheet({ pathname: "/admin/boards/sheets/task-detail", params: { boardId, taskId } });
+}
+
+/** `columnId` is the column the new task lands in unless the user picks another. */
+export function openQuickCreateSheet(boardId: number, columnId: number): void {
+  openSheet({ pathname: "/admin/boards/sheets/quick-create", params: { boardId, columnId } });
+}
+
 export function openMoveToSheet(boardId: number, taskId: number): void {
   openSheet({ pathname: "/admin/boards/sheets/move-to", params: { boardId, taskId } });
 }

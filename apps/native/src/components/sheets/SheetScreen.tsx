@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -64,10 +65,19 @@ export function SheetScreen({ title, layout = "fit", footer, testID, children }:
   return (
     <View testID={testID} style={{ flex: 1, backgroundColor: colors.background }}>
       {layout === "scroll" ? (
-        <ScrollView contentContainerStyle={padding} keyboardShouldPersistTaps="handled">
+        // Keyboard-aware rather than a plain ScrollView: the sheets that
+        // scroll are the ones with fields far down the form — a comment
+        // composer under a thread, a description under a title (#222) — and
+        // nothing else here scrolls a focused field clear of the keyboard.
+        // `bottomOffset` is the gap left between the two.
+        <KeyboardAwareScrollView
+          contentContainerStyle={padding}
+          keyboardShouldPersistTaps="handled"
+          bottomOffset={spacing.lg}
+        >
           {heading}
           {children}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       ) : (
         <View style={{ flex: 1, ...padding }}>
           {heading}

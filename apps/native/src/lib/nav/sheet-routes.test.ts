@@ -12,7 +12,8 @@ import {
 } from "@/lib/nav/sheet-routes";
 
 /**
- * The route-tree seam for the board's utility sheets (issue #219).
+ * The route-tree seam for the board's sheets — the utility ones (issue #219)
+ * and the two complex ones, task detail and quick create (issue #222).
  *
  * `BOARD_SHEET_ROUTES` is the single declaration of which sheets exist and how
  * they present; `admin/_layout.tsx` renders its `<Stack.Screen>`s straight from
@@ -27,7 +28,7 @@ const SHEET_DIR = path.join(APP_DIR, SHEET_ROUTE_SEGMENT);
 const ADMIN_LAYOUT = path.join(APP_DIR, "admin/_layout.tsx");
 
 describe("board sheet routes", () => {
-  it("declares every sheet named by the ticket", () => {
+  it("declares every sheet the board opens", () => {
     expect(BOARD_SHEET_ROUTES.map((route) => route.name).sort()).toEqual(
       [
         "add-column",
@@ -38,7 +39,9 @@ describe("board sheet routes", () => {
         "due",
         "move-to",
         "priority",
+        "quick-create",
         "sort",
+        "task-detail",
       ].sort(),
     );
   });
@@ -92,6 +95,26 @@ describe("board sheet routes", () => {
   it("sizes the due-date sheet to its inline picker", () => {
     const due = BOARD_SHEET_ROUTES.find((route) => route.name === "due");
     expect(due?.detents).toBe("fitToContents");
+  });
+
+  // #222. Task detail is a scrolling form — checklist and comments outgrow
+  // half a screen as soon as a task has a few of either — so it opens at
+  // medium and drags to large. Scrolling to the top edge hands the drag to the
+  // sheet, which is how iOS grows a sheet the user is already reading in.
+  it("opens task detail at half height and lets it grow to full", () => {
+    const detail = BOARD_SHEET_ROUTES.find((route) => route.name === "task-detail");
+
+    expect(detail?.detents).toEqual([0.5, 1]);
+    expect(formSheetOptions(detail!).sheetExpandsWhenScrolledToEdge).toBe(true);
+  });
+
+  // #222. Quick create focuses its title field on open, so the keyboard is up
+  // for the sheet's whole life; anything shorter than full height would leave
+  // the rest of the form underneath it.
+  it("presents quick create at full height", () => {
+    const quickCreate = BOARD_SHEET_ROUTES.find((route) => route.name === "quick-create");
+
+    expect(quickCreate?.detents).toEqual([1]);
   });
 
   it("opens every sheet at its smallest detent", () => {
