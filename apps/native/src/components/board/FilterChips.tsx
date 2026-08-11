@@ -2,6 +2,7 @@ import { ScrollView, Pressable, Text, View } from "react-native";
 import type { TaskPriority } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { filterPillA11y } from "@/lib/ui/a11y";
 
 export interface BoardFilters {
   mine: boolean;
@@ -74,8 +75,7 @@ export function FilterChips({
     >
       <Pressable
         onPress={onToggleMine}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.mine")}
+        {...filterPillA11y(i18n.t("board.filters.mine"), filters.mine)}
         style={chipStyle(filters.mine)}
       >
         <Text style={textStyle(filters.mine)}>{i18n.t("board.filters.mine")}</Text>
@@ -83,8 +83,7 @@ export function FilterChips({
 
       <Pressable
         onPress={onPressAssignees}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.assignees")}
+        {...filterPillA11y(i18n.t("board.filters.assignees"), assigneeActive)}
         style={chipStyle(assigneeActive)}
       >
         <Text style={textStyle(assigneeActive)}>{i18n.t("board.filters.assignees")}</Text>
@@ -136,8 +135,7 @@ export function FilterChips({
 
       <Pressable
         onPress={onPressPriority}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.priority")}
+        {...filterPillA11y(i18n.t("board.filters.priority"), filters.priority != null)}
         style={chipStyle(filters.priority != null)}
       >
         <Text style={textStyle(filters.priority != null)}>
@@ -169,8 +167,7 @@ export function FilterChips({
 
       <Pressable
         onPress={onToggleDueSoon}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.dueSoon")}
+        {...filterPillA11y(i18n.t("board.filters.dueSoon"), filters.dueSoon)}
         style={chipStyle(filters.dueSoon)}
       >
         <Text style={textStyle(filters.dueSoon)}>{i18n.t("board.filters.dueSoon")}</Text>
@@ -178,8 +175,7 @@ export function FilterChips({
 
       <Pressable
         onPress={onToggleUnassigned}
-        accessibilityRole="button"
-        accessibilityLabel={i18n.t("board.filters.unassigned")}
+        {...filterPillA11y(i18n.t("board.filters.unassigned"), filters.unassigned)}
         style={chipStyle(filters.unassigned)}
       >
         <Text style={textStyle(filters.unassigned)}>{i18n.t("board.filters.unassigned")}</Text>

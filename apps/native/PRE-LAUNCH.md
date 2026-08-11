@@ -142,8 +142,14 @@ before launch:
 
 - [ ] All `Pressable`s get an `accessibilityRole` and
       `accessibilityLabel`.
-- [ ] Segment controls + filter pills expose
-      `accessibilityState={{ selected: boolean }}`.
+- [x] Segment controls + filter pills expose
+      `accessibilityState={{ selected: boolean }}`. Done in #218: both pill
+      families (`FilterPill`, board `FilterChips`) build their props with
+      `filterPillA11y` in `src/lib/ui/a11y.ts`, and a test fails the build
+      if either stops using it. Segment controls need nothing — `Segmented`
+      wraps the platform `SegmentedControl`, which carries its own traits.
+      Still open elsewhere: the board's column pills are a pager selector,
+      not a filter, and announce no selected state.
 - [ ] Score cards read something meaningful, not just digits (e.g.
       `"Dragons 75 vs Rhein Stars 62, final"`).
 - [ ] VoiceOver + TalkBack smoke test on the top 5 screens.

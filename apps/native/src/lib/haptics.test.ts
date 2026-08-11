@@ -27,7 +27,9 @@ vi.mock("expo-haptics", () => ({
 import { haptics } from "@/lib/haptics";
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  // Reset rather than clear: the rejection case below installs a failing
+  // implementation, and `mockReset` puts the resolving one back.
+  vi.resetAllMocks();
 });
 
 describe("haptics — notification category (outcome of a task)", () => {
@@ -89,14 +91,12 @@ describe("haptics — surface", () => {
 
   it("swallows a rejected native call so a haptic never breaks its caller", async () => {
     const boom = new Error("no taptic engine");
-    impactAsync.mockRejectedValueOnce(boom);
-    notificationAsync.mockRejectedValueOnce(boom);
-    selectionAsync.mockRejectedValueOnce(boom);
+    impactAsync.mockRejectedValue(boom);
+    notificationAsync.mockRejectedValue(boom);
+    selectionAsync.mockRejectedValue(boom);
 
     expect(() => {
-      haptics.lift();
-      haptics.error();
-      haptics.selection();
+      for (const play of Object.values(haptics)) play();
     }).not.toThrow();
 
     // Let the rejected promises settle; an unhandled rejection fails the run.

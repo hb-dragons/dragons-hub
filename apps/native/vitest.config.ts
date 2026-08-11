@@ -38,9 +38,13 @@ export default defineConfig({
         // foundation's new tests (global error handler, nav architecture, app
         // config). Measured 10.08/8.01/9.59/9.96 — branches, functions and
         // lines have not yet cleared their next whole point.
+        //
+        // Ratcheted 2026-08-11 (#218): functions and lines 9 -> 10, on the
+        // haptic-semantics and filter-pill a11y tests. Measured
+        // 10.36/8.02/10.85/10.26 — statements and branches hold.
         branches: 8,
-        functions: 9,
-        lines: 9,
+        functions: 10,
+        lines: 10,
         statements: 10,
       },
     },
