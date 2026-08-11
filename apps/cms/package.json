@@ -23,11 +23,11 @@
     "@payloadcms/richtext-lexical": "3.87.0",
     "@payloadcms/storage-gcs": "3.87.0",
     "blurhash": "^2.0.5",
-    "next": "16.2.6",
+    "next": "16.2.11",
     "payload": "3.87.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "sharp": "^0.34.0"
+    "sharp": "^0.35.0"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",

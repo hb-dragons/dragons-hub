@@ -41,14 +41,53 @@ overrides:
   effect: '>=3.20.0'
   lodash: '>=4.18.0'
   '@xmldom/xmldom': ^0.8.13
-  next: '>=16.2.6'
+  next: '>=16.2.11 <17'
   kysely: 0.28.17
   '@tootallnate/once': '>=3.0.1'
-  postcss: '>=8.5.10'
+  postcss: '>=8.5.18 <9'
+  # Security floors raised together with the pnpm bump in issue #136 — the
+  # audit job had timed out on every run since 2026-08-02, so none of these
+  # advisories had ever been reported. Each floor is the lowest patched
+  # version GitHub advisories names.
+  #
+  # `sharp` and `vite` are also declared directly (apps/api, apps/cms). The
+  # declared range is what a human reads, so it was raised too; these entries
+  # exist because the tree still carried older transitive copies that the
+  # declared range does not reach.
+  #
+  # Every floor is bounded on the right. An open-ended `>=x` is a trap here:
+  # pnpm resolves it to the newest release on npm, so `>=1.1.18` on a v1
+  # consumer silently dragged minimatch@3 onto brace-expansion@5. Where a
+  # package has two live major lines, the floor is scoped per line with a
+  # `@^N` selector so a v1 consumer is not dragged onto v5.
+  'brace-expansion@^1': '>=1.1.18 <2'
+  'brace-expansion@^5': '>=5.0.9 <6'
+  fast-uri: '>=3.1.5 <4'
+  'form-data@^2': '>=2.5.6 <3'
+  ip-address: '>=10.3.1 <11'
+  'js-yaml@^3': '>=3.15.1 <4'
+  'js-yaml@^4': '>=4.3.1 <5'
+  'nanoid@^3': '>=3.3.17 <4'
+  'nanoid@^5': '>=5.1.16 <6'
+  sharp: '>=0.35.0 <0.36'
+  shell-quote: '>=1.8.5 <2'
+  svgo: '>=3.3.4 <4'
+  vite: '>=8.0.16 <9'
+  'ws@^7': '>=7.5.11 <8'
+  'ws@^8': '>=8.21.0 <9'
   '@esbuild-kit/core-utils>esbuild': '>=0.25.0'
   '@instantdb/core>uuid': '>=11.1.1'
+auditConfig:
+  # `pnpm audit` has no fix for these: both are `<= 2.0.2` and GitHub reports
+  # `first_patched_version: null`, while npm's newest image-size is 2.0.2. The
+  # package is Metro's, i.e. bundler tooling that never ships, and reaching it
+  # needs a hostile ICNS/JXL/HEIF file already in the repo. Tracked in #211 —
+  # drop these two the moment upstream publishes a patch.
+  ignoreGhsas:
+    - GHSA-w3rx-r6r6-pgpr
+    - GHSA-5p2g-fcmc-qvqq
+
 allowBuilds:
-  basketball-bund-sdk: true
   esbuild: true
   '@swc/core': true
   '@parcel/watcher': true
@@ -56,3 +95,8 @@ allowBuilds:
   msgpackr-extract: false
   sharp: false
   unrs-resolver: false
+  # pnpm 11.21 keys git/tarball dependencies by their full spec, so the bare
+  # `basketball-bund-sdk: true` this replaces no longer matched anything and
+  # the SDK's build scripts were silently skipped. Same intent, spelled the
+  # way this pnpm reads it.
+  basketball-bund-sdk@https://codeload.github.com/dirkdrutschmann/basketball-bund-sdk/tar.gz/c72789068d9ec5910440f9e2b94f99b6e56d4800: true
