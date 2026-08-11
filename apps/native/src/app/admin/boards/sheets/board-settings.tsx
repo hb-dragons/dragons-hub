@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { SheetScreen } from "@/components/sheets/SheetScreen";
 import { multilineInput, singleLineInput } from "@/components/ui/inputStyles";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardMutations } from "@/hooks/board/useBoardMutations";
+import { useSeedOnce } from "@/hooks/useSeedOnce";
 import { parseNumericParam } from "@/lib/board/sheet-params";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
@@ -22,12 +23,11 @@ export default function BoardSettingsSheetRoute() {
   const { colors, spacing, radius } = theme;
 
   // The board comes from the SWR cache the board screen already filled, so in
-  // practice this seeds on the first render; the effect covers a cold open.
-  useEffect(() => {
-    if (!board) return;
-    setName(board.name);
-    setDescription(board.description ?? "");
-  }, [board]);
+  // practice this seeds on the first render; the hook covers a cold open.
+  useSeedOnce(board, (seed) => {
+    setName(seed.name);
+    setDescription(seed.description ?? "");
+  });
 
   const canSave = name.trim().length > 0 && !submitting && board != null;
 

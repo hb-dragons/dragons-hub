@@ -16,8 +16,11 @@ export default function MoveToSheetRoute() {
   const taskId = parseNumericParam(params.taskId);
 
   // The sheet loads the board itself rather than taking columns through route
-  // params (issue #219: scalars only). Both keys are already in SWR's cache,
-  // populated by the board screen underneath.
+  // params (issue #219: scalars only). The board key is the one the screen
+  // underneath already filled, so the column list renders straight away. The
+  // task list is deliberately the *unfiltered* key — a different key from the
+  // screen's, so it fetches once — because the counts below have to describe
+  // the whole column, not the filtered view.
   const { data: board } = useBoard(boardId);
   const { data: tasks } = useBoardTasks(boardId);
   const moveTask = useMoveTask(boardId ?? 0);

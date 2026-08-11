@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, TextInput } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { ColumnColorPicker } from "@/components/board/ColumnColorPicker";
 import { SheetScreen } from "@/components/sheets/SheetScreen";
 import { singleLineInput } from "@/components/ui/inputStyles";
 import { useColumnMutations } from "@/hooks/board/useColumnMutations";
-import { COLUMN_COLOR_PRESETS } from "@/lib/board/column-colors";
 import { parseNumericParam } from "@/lib/board/sheet-params";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
@@ -53,34 +53,7 @@ export default function AddColumnSheetRoute() {
         style={singleLineInput(theme, { fontSize: 16, fontWeight: "600" })}
       />
 
-      <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" }}>
-        {COLUMN_COLOR_PRESETS.map((preset, index) => {
-          const selected = preset === color;
-          return (
-            <Pressable
-              key={preset ?? `none-${index}`}
-              onPress={() => setColor(preset)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              hitSlop={6}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: preset ?? colors.surfaceHigh,
-                borderWidth: selected ? 3 : 1,
-                borderColor: selected ? colors.primary : colors.border,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {preset == null ? (
-                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>—</Text>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
+      <ColumnColorPicker value={color} onChange={setColor} />
 
       <Pressable
         onPress={() => {

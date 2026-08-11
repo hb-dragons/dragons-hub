@@ -17,7 +17,14 @@
  *    its token from a route unmount effect.
  */
 
-type SheetResultHandler = (value: never) => void;
+/**
+ * The value type is erased on the way into the table — a token is a string, so
+ * nothing at the delivery site knows what its handler expects. The one cast
+ * that erasure needs is in `createSheetResult`, where the caller's `T` is still
+ * in hand; `deliverSheetResult` is generic over the same `T` at its own call
+ * site, and the pairing is what `board-sheets.ts` exists to keep honest.
+ */
+type SheetResultHandler = (value: unknown) => void;
 
 const handlers = new Map<string, SheetResultHandler>();
 
@@ -46,7 +53,7 @@ export function deliverSheetResult<T>(token: string | undefined, value: T): bool
   const handler = handlers.get(token);
   if (!handler) return false;
   handlers.delete(token);
-  (handler as (v: T) => void)(value);
+  handler(value);
   return true;
 }
 

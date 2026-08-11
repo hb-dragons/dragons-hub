@@ -10,6 +10,6 @@ const tasksKey = (boardId: number, filters?: TaskListQuery) =>
 export function useBoardTasks(boardId: number | null, filters?: TaskListQuery) {
   return useSWR<TaskCardData[]>(
     boardId == null ? null : tasksKey(boardId, filters),
-    () => adminBoardApi.listTasks(boardId as number, filters),
+    boardId == null ? null : () => adminBoardApi.listTasks(boardId, filters),
   );
 }
