@@ -987,6 +987,7 @@
         "selectDescription": "Wähle die zu verfolgenden Vorabliga-Ligen für diese Saison aus.",
         "searchPlaceholder": "Ligen suchen…",
         "ownClubOnly": "Nur Ligen meines Vereins",
+        "vorabligaOnly": "Nur vorläufige Ligen (Vorabliga)",
         "showTeams": "Mannschaften anzeigen",
         "hideTeams": "Mannschaften ausblenden",
         "teamsLoading": "Mannschaften werden geladen…",

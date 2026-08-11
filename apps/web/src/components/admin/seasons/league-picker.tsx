@@ -17,6 +17,8 @@ export interface LeaguePickerProps {
   onFilterChange: (v: string) => void;
   ownClubOnly: boolean;
   onOwnClubOnlyChange: (v: boolean) => void;
+  vorabligaOnly: boolean;
+  onVorabligaOnlyChange: (v: boolean) => void;
   loading: boolean;
 }
 
@@ -28,6 +30,8 @@ export function LeaguePicker({
   onFilterChange,
   ownClubOnly,
   onOwnClubOnlyChange,
+  vorabligaOnly,
+  onVorabligaOnlyChange,
   loading,
 }: LeaguePickerProps) {
   const t = useTranslations();
@@ -42,16 +46,29 @@ export function LeaguePicker({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm">
-        <Switch
-          id="own-club-only"
-          checked={ownClubOnly}
-          disabled={loading}
-          onCheckedChange={onOwnClubOnlyChange}
-        />
-        <label htmlFor="own-club-only" className="cursor-pointer">
-          {t("settings.seasons.wizard.ownClubOnly")}
-        </label>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="own-club-only"
+            checked={ownClubOnly}
+            disabled={loading}
+            onCheckedChange={onOwnClubOnlyChange}
+          />
+          <label htmlFor="own-club-only" className="cursor-pointer">
+            {t("settings.seasons.wizard.ownClubOnly")}
+          </label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="vorabliga-only"
+            checked={vorabligaOnly}
+            disabled={loading}
+            onCheckedChange={onVorabligaOnlyChange}
+          />
+          <label htmlFor="vorabliga-only" className="cursor-pointer">
+            {t("settings.seasons.wizard.vorabligaOnly")}
+          </label>
+        </div>
       </div>
 
       {loading ? (

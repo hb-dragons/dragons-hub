@@ -408,6 +408,8 @@ export function SeasonWizard({
               onFilterChange={setFilter}
               ownClubOnly={ownClubOnly}
               onOwnClubOnlyChange={toggleOwnClubOnly}
+              vorabligaOnly
+              onVorabligaOnlyChange={() => {}}
               loading={loadingLeagues}
             />
             {!loadingLeagues && leagues.length > 0 && (

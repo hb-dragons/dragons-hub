@@ -145,6 +145,8 @@ export function ManageLeaguesDialog({
           onFilterChange={setFilter}
           ownClubOnly={ownClubOnly}
           onOwnClubOnlyChange={toggleOwnClubOnly}
+          vorabligaOnly
+          onVorabligaOnlyChange={() => {}}
           loading={loading}
         />
         <DialogFooter>
