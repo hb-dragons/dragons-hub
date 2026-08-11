@@ -57,12 +57,28 @@ export const APP_ROUTES: Record<string, (...params: string[]) => RouteHref> = {
 };
 
 /** Where an unmatched link lands — the screen expo-router would show anyway. */
-export const NOT_FOUND_ROUTE = "/+not-found";
+export const NOT_FOUND_ROUTE: RouteHref = "/+not-found";
 
 /** `(tabs)` and friends are grouping directories, not URL segments. */
 const isGroupSegment = (segment: string): boolean => /^\(.+\)$/.test(segment);
 
 const isDynamicSegment = (segment: string): boolean => /^\[.+\]$/.test(segment);
+
+/**
+ * The segments of an in-app path: query string and hash dropped, route-group
+ * directories transparent, empty segments collapsed.
+ *
+ * Exported so the deep-link auth gate (`push/handler.ts`) reads a path the
+ * same way the resolver does — a gate that disagreed with the resolver about
+ * where a path's first segment starts would gate the wrong screen.
+ */
+export function linkSegments(link: string): string[] {
+  return link
+    .split("?")[0]!
+    .split("#")[0]!
+    .split("/")
+    .filter((segment) => segment.length > 0 && !isGroupSegment(segment));
+}
 
 const PATTERNS = Object.entries(APP_ROUTES).map(([pattern, build]) => ({
   segments: pattern.split("/").filter((segment) => segment.length > 0),
@@ -97,10 +113,7 @@ function matchParams(pattern: string[], segments: string[]): string[] | null {
 export function resolveDeepLink(link: string): RouteHref | null {
   if (!link.startsWith("/")) return null;
 
-  const path = link.split("?")[0]!.split("#")[0]!;
-  const segments = path
-    .split("/")
-    .filter((segment) => segment.length > 0 && !isGroupSegment(segment));
+  const segments = linkSegments(link);
 
   for (const { segments: pattern, build } of PATTERNS) {
     const params = matchParams(pattern, segments);

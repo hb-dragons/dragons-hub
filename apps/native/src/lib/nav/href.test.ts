@@ -1,6 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { APP_ROUTES, NOT_FOUND_ROUTE, resolveDeepLink } from "@/lib/nav/href";
+import { APP_ROUTES, NOT_FOUND_ROUTE, linkSegments, resolveDeepLink } from "@/lib/nav/href";
+
+// The deep-link auth gate reads a path through this too, so the two agree by
+// construction about which segment is the first one — the segment the gate
+// decides on.
+describe("linkSegments", () => {
+  it.each([
+    ["/schedule", ["schedule"]],
+    ["/game/55/", ["game", "55"]],
+    ["/(tabs)/schedule", ["schedule"]],
+    ["/(auth)/sign-in", ["sign-in"]],
+    ["/game/55?from=push", ["game", "55"]],
+    ["/schedule#top", ["schedule"]],
+    ["/", []],
+  ])("splits %j", (link, expected) => {
+    expect(linkSegments(link)).toEqual(expected);
+  });
+});
 
 describe("resolveDeepLink", () => {
   it.each([

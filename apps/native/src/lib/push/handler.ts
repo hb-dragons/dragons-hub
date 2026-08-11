@@ -1,6 +1,6 @@
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
-import { NOT_FOUND_ROUTE, resolveDeepLink } from "@/lib/nav/href";
+import { NOT_FOUND_ROUTE, linkSegments, resolveDeepLink } from "@/lib/nav/href";
 
 /**
  * Install the foreground-presentation handler. Call ONCE at module scope
@@ -51,12 +51,7 @@ const PUBLIC_ROOT_SEGMENTS = new Set([
 ]);
 
 export function isPublicDeepLink(link: string): boolean {
-  const segments = link
-    .split("?")[0]!
-    .split("#")[0]!
-    .split("/")
-    .filter((s) => s.length > 0 && !/^\(.+\)$/.test(s));
-  return PUBLIC_ROOT_SEGMENTS.has(segments[0] ?? "");
+  return PUBLIC_ROOT_SEGMENTS.has(linkSegments(link)[0] ?? "");
 }
 
 let authState: PushAuthState = "unknown";
@@ -74,7 +69,9 @@ let coldStartProcessed = false;
  * app's route table (`nav/href.ts`) before it is followed: what reaches the
  * router is a route this build declares, never the raw string. A path no
  * screen backs goes straight to `+not-found` — the screen the router would
- * have landed on anyway, and not worth holding behind a sign-in.
+ * have landed on anyway, and not worth holding behind a sign-in. A payload
+ * that is not an absolute path at all is not a link into the app, so it is
+ * ignored outright rather than routed anywhere.
  */
 export function followDeepLink(link: string): void {
   if (typeof link !== "string" || !link.startsWith("/")) return;
