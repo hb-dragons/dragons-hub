@@ -1,4 +1,4 @@
-import type { TaskPriority } from "@dragons/shared";
+import type { TaskCardData, TaskPriority } from "@dragons/shared";
 import type { TaskCreateBody } from "@dragons/api-client";
 
 /** What the quick-create sheet holds while the user fills it in. */
@@ -34,5 +34,26 @@ export function buildCreateTaskInput(draft: TaskDraft): TaskCreateBody | null {
     ...(description ? { description } : {}),
     ...(draft.priority !== "normal" ? { priority: draft.priority } : {}),
     ...(draft.dueDate ? { dueDate: draft.dueDate } : {}),
+  };
+}
+
+/**
+ * The create body that puts a deleted task back — what the undo action on the
+ * delete toast sends (#220).
+ *
+ * The opposite convention to a draft: every field is stated, including the
+ * ones a draft omits, because undo has to hand back the task that was there
+ * rather than a task the server defaulted. Assignees come with it; the
+ * checklist and the comments cannot, since the create endpoint takes neither
+ * and the rows went with the task.
+ */
+export function restoreTaskInput(task: TaskCardData): TaskCreateBody {
+  return {
+    columnId: task.columnId,
+    title: task.title,
+    description: task.description,
+    priority: task.priority,
+    dueDate: task.dueDate,
+    assigneeIds: task.assignees.map((assignee) => assignee.userId),
   };
 }

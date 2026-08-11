@@ -40,7 +40,6 @@ export interface TaskDragCallbacks {
 interface TaskCardProps {
   task: TaskCardData;
   onPress: (task: TaskCardData) => void;
-  onLongPress?: (task: TaskCardData) => void;
   onDrag?: TaskDragCallbacks;
   isBeingDragged?: boolean;
   /** When true, fire a brief 1 → 1.05 → 1 pulse (consumes the flag once). */
@@ -51,6 +50,16 @@ interface TaskCardProps {
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * How long the finger has to stay down before a drag is allowed to start.
+ *
+ * Short enough that the pan wins over the column list's scroll, and shorter
+ * than the system's context-menu hold so a drag that has begun moving is
+ * already the gesture in progress when the menu would otherwise consider
+ * itself triggered.
+ */
+const LIFT_HOLD_MS = 300;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -280,7 +289,6 @@ function AvatarStack({
 function TaskCardImpl({
   task,
   onPress,
-  onLongPress,
   onDrag,
   isBeingDragged = false,
   recentlyDropped = false,
@@ -315,6 +323,19 @@ function TaskCardImpl({
   // a latent break rather than a hypothetical one.
   const cardRef = useAnimatedRef<ComponentRef<typeof AnimatedPressable>>();
 
+  /**
+   * Whether this touch has actually picked the card up.
+   *
+   * The card is now also the trigger for a native context menu (#220), and
+   * both gestures start with the same hold: the pan recogniser activates after
+   * `LIFT_HOLD_MS` whether the finger moved or not, while UIKit opens the menu
+   * at around half a second of holding *still*. Lifting on the first movement
+   * instead of on activation is what separates them — hold and drag gets the
+   * ghost, hold and wait gets the menu, and neither shows the other's
+   * animation first.
+   */
+  const lifted = useSharedValue(false);
+
   // Built once per (onDrag, task) rather than on every render: `Gesture.Pan()`
   // constructs a new gesture object and, when its identity changes,
   // GestureDetector tears down and re-attaches the native recogniser — which
@@ -323,33 +344,36 @@ function TaskCardImpl({
     if (!onDrag) return null;
     const { start: safeStart, move: safeMove, end: safeEnd } = onDrag;
     return Gesture.Pan()
-      .activateAfterLongPress(300)
+      .activateAfterLongPress(LIFT_HOLD_MS)
       .onStart(() => {
         "worklet";
-        const m = measure(cardRef);
-        if (!m) return;
-        runOnJS(safeStart)(task, {
-          x: m.pageX,
-          y: m.pageY,
-          width: m.width,
-          height: m.height,
-        });
+        lifted.value = false;
       })
       .onUpdate((e) => {
         "worklet";
+        if (!lifted.value) {
+          const m = measure(cardRef);
+          if (!m) return;
+          lifted.value = true;
+          runOnJS(safeStart)(task, {
+            x: m.pageX,
+            y: m.pageY,
+            width: m.width,
+            height: m.height,
+          });
+        }
         runOnJS(safeMove)(e.absoluteX, e.absoluteY);
       })
-      .onEnd(() => {
+      .onFinalize(() => {
         "worklet";
+        // One exit for every ending — released, cancelled by the menu opening,
+        // or failed. `end` on a card that never lifted would announce a
+        // cancelled drop to VoiceOver for an ordinary hold.
+        if (!lifted.value) return;
+        lifted.value = false;
         runOnJS(safeEnd)();
-      })
-      .onFinalize((_e, success) => {
-        "worklet";
-        if (!success) {
-          runOnJS(safeEnd)();
-        }
       });
-  }, [onDrag, task, cardRef]);
+  }, [onDrag, task, cardRef, lifted]);
 
   const handleLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -372,10 +396,8 @@ function TaskCardImpl({
     <AnimatedPressable
       ref={cardRef}
       onPress={() => onPress(task)}
-      onLongPress={onLongPress ? () => onLongPress(task) : undefined}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
-      delayLongPress={350}
       accessibilityRole="button"
       accessibilityLabel={task.title}
       accessibilityHint={i18n.t("a11y.doubleTapToOpen")}

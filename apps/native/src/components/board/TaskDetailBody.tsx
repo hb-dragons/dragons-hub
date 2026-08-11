@@ -1,14 +1,20 @@
-import { useEffect, useRef, useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, Text, TextInput, View } from "react-native";
+import { router } from "expo-router";
 import type { TaskDetail, TaskPriority } from "@dragons/shared";
 import { useAssigneeMutations } from "@/hooks/board/useAssigneeMutations";
+import { useBoard } from "@/hooks/board/useBoard";
+import { useDeleteTaskWithUndo } from "@/hooks/board/useDeleteTaskWithUndo";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { diffAssignees } from "@/lib/board/assignee-diff";
+import { taskAction } from "@/lib/board/task-actions";
+import { Icon } from "@/components/ui/Icon";
 import {
   openAssigneePickerSheet,
   openDuePickerSheet,
+  openMoveToSheet,
   openPriorityPickerSheet,
 } from "@/lib/nav/board-sheets";
 import { ChecklistSection } from "./ChecklistSection";
@@ -74,12 +80,27 @@ function dueState(iso: string | null): "overdue" | "soon" | "later" | null {
  * The body of the task-detail sheet route (`app/admin/boards/sheets/
  * task-detail.tsx`), which supplies the scroll container and the padding.
  * Sections here carry no horizontal padding of their own.
+ *
+ * This is also the visible half of the card's context menu (#220): every menu
+ * action has a control here — the column row moves, the priority and due rows
+ * pick, the button at the bottom deletes — because a menu that only opens on a
+ * long press is a menu some people never find.
  */
 export function TaskDetailBody({ task, boardId }: Props) {
   const theme = useTheme();
   const { colors, spacing, radius } = theme;
   const mutations = useTaskMutations(boardId);
   const assigneeMutations = useAssigneeMutations(boardId);
+  const deleteTask = useDeleteTaskWithUndo(boardId);
+  const deleteLabel = i18n.t(taskAction("delete").labelKey);
+  // The board is in the cache the screen underneath filled, so the column name
+  // is there on first render; `undefined` only while a deep link opens the
+  // sheet cold.
+  const { data: board } = useBoard(boardId);
+  const columnName = useMemo(
+    () => board?.columns.find((column) => column.id === task.columnId)?.name ?? null,
+    [board, task.columnId],
+  );
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -249,6 +270,12 @@ export function TaskDetailBody({ task, boardId }: Props) {
       <PropertyList
         rows={[
           {
+            label: i18n.t("board.task.column"),
+            value: columnName ?? i18n.t("board.task.noColumn"),
+            valueColor: columnName ? colors.foreground : undefined,
+            onPress: () => openMoveToSheet(boardId, task.id),
+          },
+          {
             label: i18n.t("board.assignees.title"),
             value: assigneeSummary(task.assignees),
             valueColor: task.assignees.length === 0 ? undefined : colors.foreground,
@@ -294,6 +321,31 @@ export function TaskDetailBody({ task, boardId }: Props) {
 
       <ChecklistSection task={task} boardId={boardId} />
       <CommentsSection task={task} />
+
+      {/* Last, and the only red thing on the sheet — the same placement the
+          menu gives it. Dismiss first: the toast that offers undo belongs over
+          the board, not under a sheet showing a task that no longer exists. */}
+      <Pressable
+        onPress={() => {
+          router.back();
+          deleteTask(task);
+        }}
+        accessibilityRole="button"
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: spacing.xs,
+          padding: spacing.md,
+          borderRadius: radius.md,
+          backgroundColor: `${colors.destructive}14`,
+        }}
+      >
+        <Icon name="delete" size={16} color={colors.destructive} />
+        <Text style={{ color: colors.destructive, fontSize: 15, fontWeight: "600" }}>
+          {deleteLabel}
+        </Text>
+      </Pressable>
     </>
   );
 }

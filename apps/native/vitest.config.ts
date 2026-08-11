@@ -83,9 +83,15 @@ export default defineConfig({
         // and the three suites together cover more than any one did. Measured
         // 16.44/10.95/20.09/15.96 — branches and lines hold at their current
         // floors, neither having cleared the next whole point.
+        //
+        // Ratcheted 2026-08-11 (#220): lines 15 -> 16, on the task action
+        // vocabulary and the undo payload that came out of the board screen
+        // when the two long-press sheets became one native context menu.
+        // Measured 16.69/10.95/20.53/16.24 — statements, branches and
+        // functions hold, none having cleared the next whole point.
         branches: 10,
         functions: 20,
-        lines: 15,
+        lines: 16,
         statements: 16,
       },
     },

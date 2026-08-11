@@ -51,6 +51,8 @@ export const ICONS = {
   check: { ios: "checkmark", android: "check" },
   /** Flags something the user should read before acting. */
   warning: { ios: "exclamationmark.triangle.fill", android: "warning" },
+  /** Destroys what it sits on: the delete button on the task sheet. */
+  delete: { ios: "trash", android: "delete" },
 } as const satisfies Record<string, IconSymbol>;
 
 /** A role in the vocabulary above, i.e. what `<Icon name>` accepts. */

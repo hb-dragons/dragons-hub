@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { TaskCardData } from "@dragons/shared";
 
-import { buildCreateTaskInput } from "@/lib/board/create-task-input";
+import { buildCreateTaskInput, restoreTaskInput } from "@/lib/board/create-task-input";
 
 /**
  * The quick-create sheet's submit gate and payload, as one function (#222).
@@ -66,5 +67,64 @@ describe("buildCreateTaskInput", () => {
   // deep link, or a board whose columns have not loaded yet.
   it("refuses a draft with no column", () => {
     expect(buildCreateTaskInput({ ...draft, columnId: null })).toBeNull();
+  });
+});
+
+/**
+ * Undo after a delete, which the board offers from the swipe action, the
+ * context menu and the task sheet (#220). The deleted row is gone, so undo
+ * creates a task again — and what it sends decides how much of the old one
+ * comes back.
+ */
+
+const deleted: TaskCardData = {
+  id: 42,
+  boardId: 7,
+  title: "Book the hall",
+  description: "Ask the caretaker",
+  assignees: [
+    { userId: "u1", name: "Ada", assignedAt: "2026-08-01T00:00:00.000Z" },
+    { userId: "u2", name: null, assignedAt: "2026-08-01T00:00:00.000Z" },
+  ],
+  priority: "urgent",
+  dueDate: "2026-08-20",
+  position: 3,
+  columnId: 5,
+  checklistTotal: 2,
+  checklistChecked: 1,
+};
+
+describe("restoreTaskInput", () => {
+  it("puts the task back in its column with everything it was carrying", () => {
+    expect(restoreTaskInput(deleted)).toEqual({
+      columnId: 5,
+      title: "Book the hall",
+      description: "Ask the caretaker",
+      priority: "urgent",
+      dueDate: "2026-08-20",
+      assigneeIds: ["u1", "u2"],
+    });
+  });
+
+  // Unlike a draft, a restore states every field: leaving one out would let
+  // the server default it, and undo would hand back a *different* task —
+  // silently dropping the description or resetting an urgent task to normal.
+  it("states the fields a draft would have left to the server's defaults", () => {
+    const body = restoreTaskInput({
+      ...deleted,
+      description: null,
+      priority: "normal",
+      dueDate: null,
+      assignees: [],
+    });
+
+    expect(body).toEqual({
+      columnId: 5,
+      title: "Book the hall",
+      description: null,
+      priority: "normal",
+      dueDate: null,
+      assigneeIds: [],
+    });
   });
 });

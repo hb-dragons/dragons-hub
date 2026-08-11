@@ -103,9 +103,20 @@ export function openAssigneeFilterSheet(
 // Sheets that own their mutation
 // ---------------------------------------------------------------------------
 
-/** The task's own sheet: edits, checklist and comments (#222). */
+/**
+ * The address of a task's own sheet: edits, checklist and comments (#222).
+ *
+ * The one sheet whose href is also handed out, because the task context menu
+ * (#220) is a `<Link>` and needs the target rather than a push. Everything
+ * else about it follows the rules above — a literal pathname, scalar params.
+ */
+export function taskDetailHref(boardId: number, taskId: number): Href {
+  return { pathname: "/admin/boards/sheets/task-detail", params: { boardId, taskId } };
+}
+
+/** Opens that sheet from a screen that is not drawing a link. */
 export function openTaskDetailSheet(boardId: number, taskId: number): void {
-  openSheet({ pathname: "/admin/boards/sheets/task-detail", params: { boardId, taskId } });
+  openSheet(taskDetailHref(boardId, taskId));
 }
 
 /** `columnId` is the column the new task lands in unless the user picks another. */

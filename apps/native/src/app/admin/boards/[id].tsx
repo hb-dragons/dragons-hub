@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ActionSheetIOS, Platform, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
+import { Platform, Pressable, Text, View, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 // `useHeaderHeight` has no equivalent on expo-router's own surface yet, so it
 // stays on the forked React Navigation re-export the SDK 56 codemod points at.
@@ -10,15 +10,16 @@ import { searchFieldOptions } from "@/lib/nav/search-bar";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
+import { useDeleteTaskWithUndo } from "@/hooks/board/useDeleteTaskWithUndo";
 import { useBoardDrag } from "@/hooks/board/useBoardDrag";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager";
-import { TaskContextMenu, type TaskContextMenuHandle, type TaskContextAction } from "@/components/board/TaskContextMenu";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
 import { Icon } from "@/components/ui/Icon";
 import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
 import { sortedColumns } from "@/lib/board/columns";
+import type { TaskActionKey } from "@/lib/board/task-actions";
 import {
   openAddColumnSheet,
   openAssigneeFilterSheet,
@@ -39,10 +40,7 @@ import type { BoardColumnData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { i18n } from "@/lib/i18n";
-import { haptics } from "@/lib/haptics";
 import { authClient } from "@/lib/auth-client";
-import { useToast } from "@/hooks/useToast";
-import { adminBoardApi } from "@/lib/api";
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
 import type { TaskListQuery } from "@dragons/api-client";
 
@@ -144,9 +142,7 @@ function BoardDetailBody() {
   const [activeIndex, setActiveIndex] = useState(0);
   const lastPriorityRef = useRef<TaskPriority>("normal");
   const pagerRef = useRef<BoardPagerHandle | null>(null);
-  const contextMenuRef = useRef<TaskContextMenuHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
-  const toast = useToast();
 
   // Per-column ScrollView handles for imperatively scrolling (autoscroll).
   const columnRefsMap = useRef<Map<number, BoardColumnHandle>>(new Map());
@@ -197,7 +193,7 @@ function BoardDetailBody() {
   });
 
   // ---------------------------------------------------------------------------
-  // Context menu / other interactions (unchanged)
+  // Task and column interactions
   // ---------------------------------------------------------------------------
 
   // BoardPager is memoised; inline arrow props would defeat that on every
@@ -218,98 +214,39 @@ function BoardDetailBody() {
     pagerRef.current?.scrollToIndex(i, true);
   }, []);
 
-  const handleTaskDelete = useCallback(
-    (task: TaskCardData) => {
-      haptics.warning();
-      const snapshotTitle = task.title;
-      const snapshotColumnId = task.columnId;
-      const snapshotDescription = task.description ?? null;
-      const snapshotPriority = task.priority;
-      const snapshotDueDate = task.dueDate;
+  const handleTaskDelete = useDeleteTaskWithUndo(boardId);
 
-      taskMutations
-        .deleteTask(task.id)
-        .then(() => {
-        toast.show({
-          title: i18n.t("toast.taskDeleted"),
-          action: {
-            label: i18n.t("toast.undo"),
-            onPress: () => {
-              void (async () => {
-                try {
-                  await adminBoardApi.createTask(boardId, {
-                    columnId: snapshotColumnId,
-                    title: snapshotTitle,
-                    description: snapshotDescription,
-                    priority: snapshotPriority,
-                    dueDate: snapshotDueDate,
-                  });
-                  await revalidateTasks();
-                } catch {
-                  toast.show({
-                    title: i18n.t("toast.saveFailed"),
-                    variant: "error",
-                  });
-                }
-              })();
-            },
-          },
-        });
-      })
-      .catch(() => {
-        // Delete failed: useTaskMutations.deleteTask already shows an error toast.
-      });
-    },
-    [boardId, taskMutations, toast, revalidateTasks],
-  );
-
-  const handleTaskLongPress = useCallback(
-    (task: TaskCardData) => {
-      const runAction = (action: TaskContextAction) => {
-        if (action === "move") {
+  /**
+   * What the card's context menu picked (#220).
+   *
+   * The menu itself is declared on the card — this only runs the action, and
+   * every branch is the same call the matching control on the task sheet
+   * makes. No haptic for opening the menu: UIKit plays its own, and revealing
+   * a menu is none of the three HIG feedback categories (#218).
+   */
+  const handleTaskAction = useCallback(
+    (task: TaskCardData, action: TaskActionKey) => {
+      // A switch rather than an if/else chain ending in `else`: a fifth action
+      // added to `TASK_ACTIONS` would have fallen into the delete branch.
+      switch (action) {
+        case "move":
           openMoveToSheet(boardId, task.id);
-        } else if (action === "priority") {
+          break;
+        case "priority":
           openPriorityPickerSheet(task.priority, (p) => {
             // Mutation hook surfaces failures via toast; swallow rejection.
             taskMutations.setPriority(task.id, p).catch(() => {});
           });
-        } else if (action === "due") {
+          break;
+        case "due":
           openDuePickerSheet(task.dueDate, (iso) => {
             taskMutations.setDueDate(task.id, iso).catch(() => {});
           });
-        } else if (action === "delete") {
+          break;
+        case "delete":
           handleTaskDelete(task);
-        }
-      };
-
-      // No haptic on the long press itself: revealing a menu is none of the
-      // three HIG categories (#218). The interim ActionSheetIOS path therefore
-      // goes silent; the first-party context menu that replaces it (#220)
-      // brings UIKit's own menu haptic, which is the feedback this imitated.
-      if (Platform.OS === "ios") {
-        const actions: TaskContextAction[] = ["move", "priority", "due", "delete"];
-        ActionSheetIOS.showActionSheetWithOptions(
-          {
-            title: task.title,
-            options: [
-              i18n.t("board.task.actions.moveTo"),
-              i18n.t("board.task.actions.setPriority"),
-              i18n.t("board.task.actions.setDue"),
-              i18n.t("board.task.actions.delete"),
-              i18n.t("common.cancel"),
-            ],
-            destructiveButtonIndex: 3,
-            cancelButtonIndex: 4,
-          },
-          (buttonIndex) => {
-            const action = actions[buttonIndex];
-            if (action) runAction(action);
-          },
-        );
-        return;
+          break;
       }
-
-      contextMenuRef.current?.open({ task, onAction: runAction });
     },
     [boardId, taskMutations, handleTaskDelete],
   );
@@ -554,7 +491,7 @@ function BoardDetailBody() {
                 tasks={tasks ?? []}
                 onActiveColumnChange={setActiveIndex}
                 onTaskPress={onTaskPress}
-                onTaskLongPress={handleTaskLongPress}
+                onTaskAction={handleTaskAction}
                 onTaskDelete={handleTaskDelete}
                 onColumnLongPress={onColumnLongPress}
                 onAddTask={openQuickCreate}
@@ -612,8 +549,6 @@ function BoardDetailBody() {
           cardHeight={dragState.cardHeight}
         />
       ) : null}
-
-      <TaskContextMenu ref={contextMenuRef} />
     </View>
   );
 }

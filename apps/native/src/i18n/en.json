@@ -266,6 +266,8 @@
       "idLabel": "#%{id}",
       "priority": "Priority",
       "due": "Due",
+      "column": "Column",
+      "noColumn": "No column",
       "noDue": "No due date",
       "dueOverdue": "Overdue",
       "dueToday": "Today",

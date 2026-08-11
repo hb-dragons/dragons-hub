@@ -8,7 +8,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import type { TaskCardData, BoardColumnData, TaskContentRect } from "@dragons/shared";
+import type { TaskActionKey } from "@/lib/board/task-actions";
 import { TaskCard, type TaskDragCallbacks } from "./TaskCard";
+import { TaskContextMenu } from "./TaskContextMenu";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { Icon } from "@/components/ui/Icon";
@@ -23,7 +25,8 @@ interface BoardColumnProps {
   tasks: TaskCardData[];
   width: number;
   onTaskPress: (task: TaskCardData) => void;
-  onTaskLongPress?: (task: TaskCardData) => void;
+  /** Runs an action picked from a card's context menu. */
+  onTaskAction: (task: TaskCardData, action: TaskActionKey) => void;
   onColumnLongPress?: (column: BoardColumnData) => void;
   onAddTask: (columnId: number) => void;
   /** ID of the task currently being dragged, used to fade out its placeholder. */
@@ -64,7 +67,7 @@ const BoardColumnImpl = forwardRef<BoardColumnHandle, BoardColumnProps>(
       tasks,
       width,
       onTaskPress,
-      onTaskLongPress,
+      onTaskAction,
       onColumnLongPress,
       onAddTask,
       draggingTaskId,
@@ -126,22 +129,26 @@ const BoardColumnImpl = forwardRef<BoardColumnHandle, BoardColumnProps>(
 
     const keyExtractor = useCallback((t: TaskCardData) => String(t.id), []);
 
+    // The card is wrapped rather than made a link itself: the menu belongs to
+    // the board's idea of a task's actions, and the card is also rendered by
+    // the drag ghost, where a link would have nothing to open.
     const renderTask = useCallback<ListRenderItem<TaskCardData>>(
       ({ item: t }) => (
-        <TaskCard
-          task={t}
-          onPress={onTaskPress}
-          onLongPress={onTaskLongPress}
-          isBeingDragged={t.id === draggingTaskId}
-          recentlyDropped={t.id === recentlyDroppedTaskId}
-          onDrag={onTaskDrag}
-          onTaskDelete={onTaskDelete}
-          onMeasure={onTaskMeasure}
-        />
+        <TaskContextMenu task={t} onAction={onTaskAction}>
+          <TaskCard
+            task={t}
+            onPress={onTaskPress}
+            isBeingDragged={t.id === draggingTaskId}
+            recentlyDropped={t.id === recentlyDroppedTaskId}
+            onDrag={onTaskDrag}
+            onTaskDelete={onTaskDelete}
+            onMeasure={onTaskMeasure}
+          />
+        </TaskContextMenu>
       ),
       [
         onTaskPress,
-        onTaskLongPress,
+        onTaskAction,
         draggingTaskId,
         recentlyDroppedTaskId,
         onTaskDrag,
