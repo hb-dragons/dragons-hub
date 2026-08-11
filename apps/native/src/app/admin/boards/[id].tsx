@@ -12,13 +12,12 @@ import { useTaskMutations } from "@/hooks/board/useTaskMutations";
 import { useBoardDrag } from "@/hooks/board/useBoardDrag";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager";
-import { TaskDetailSheet, type TaskDetailSheetHandle } from "@/components/board/TaskDetailSheet";
 import { TaskContextMenu, type TaskContextMenuHandle, type TaskContextAction } from "@/components/board/TaskContextMenu";
-import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
 import { Icon } from "@/components/ui/Icon";
 import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
+import { sortedColumns } from "@/lib/board/columns";
 import {
   openAddColumnSheet,
   openAssigneeFilterSheet,
@@ -27,7 +26,9 @@ import {
   openDuePickerSheet,
   openMoveToSheet,
   openPriorityPickerSheet,
+  openQuickCreateSheet,
   openSortSheet,
+  openTaskDetailSheet,
 } from "@/lib/nav/board-sheets";
 import { boardTaskComparator } from "@dragons/shared";
 import { useColumnDrag } from "@/hooks/board/useColumnDrag";
@@ -142,9 +143,7 @@ function BoardDetailBody() {
   const [activeIndex, setActiveIndex] = useState(0);
   const lastPriorityRef = useRef<TaskPriority>("normal");
   const pagerRef = useRef<BoardPagerHandle | null>(null);
-  const taskSheetRef = useRef<TaskDetailSheetHandle | null>(null);
   const contextMenuRef = useRef<TaskContextMenuHandle | null>(null);
-  const quickCreateRef = useRef<QuickCreateSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
   const toast = useToast();
 
@@ -155,10 +154,7 @@ function BoardDetailBody() {
   // Derived
   // ---------------------------------------------------------------------------
 
-  const columns = useMemo(
-    () => (board ? [...board.columns].sort((a, b) => a.position - b.position) : []),
-    [board],
-  );
+  const columns = useMemo(() => sortedColumns(board), [board]);
 
   const columnDrag = useColumnDrag(boardId, columns);
 
@@ -205,9 +201,12 @@ function BoardDetailBody() {
 
   // BoardPager is memoised; inline arrow props would defeat that on every
   // screen re-render (search, filters, refresh flag, drag frames).
-  const onTaskPress = useCallback((task: TaskCardData) => {
-    taskSheetRef.current?.open(task.id);
-  }, []);
+  const onTaskPress = useCallback(
+    (task: TaskCardData) => {
+      openTaskDetailSheet(boardId, task.id);
+    },
+    [boardId],
+  );
 
   const onRefreshPager = useCallback(() => {
     void onPullRefresh();
@@ -338,13 +337,9 @@ function BoardDetailBody() {
 
   const openQuickCreate = useCallback(
     (columnId: number) => {
-      quickCreateRef.current?.open({
-        boardId,
-        columns,
-        initialColumnId: columnId,
-      });
+      openQuickCreateSheet(boardId, columnId);
     },
-    [boardId, columns],
+    [boardId],
   );
 
   const onColumnLongPress = useCallback(
@@ -361,11 +356,7 @@ function BoardDetailBody() {
   const openQuickCreateFab = useCallback(() => {
     const active = columns[activeIndex] ?? columns[0];
     if (!active) return;
-    quickCreateRef.current?.open({
-      boardId,
-      columns,
-      initialColumnId: active.id,
-    });
+    openQuickCreateSheet(boardId, active.id);
   }, [activeIndex, boardId, columns]);
 
   // ---------------------------------------------------------------------------
@@ -625,9 +616,7 @@ function BoardDetailBody() {
         />
       ) : null}
 
-      <TaskDetailSheet ref={taskSheetRef} boardId={boardId} />
       <TaskContextMenu ref={contextMenuRef} />
-      <QuickCreateSheet ref={quickCreateRef} />
     </View>
   );
 }

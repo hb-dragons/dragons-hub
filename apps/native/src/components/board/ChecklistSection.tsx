@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import { Pressable, Text, TextInput, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -285,7 +284,7 @@ export function ChecklistSection({ task, boardId }: Props) {
           alignItems: "center",
         }}
       >
-        <BottomSheetTextInput
+        <TextInput
           value={draft}
           onChangeText={setDraft}
           onSubmitEditing={() => { void submit(); }}

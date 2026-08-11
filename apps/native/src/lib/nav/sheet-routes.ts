@@ -1,7 +1,8 @@
 import type { NativeStackNavigationOptions } from "expo-router";
 
 /**
- * The board's utility sheets, as routes (issue #219).
+ * The board's sheets, as routes: the utility ones (issue #219), then task
+ * detail and quick create (issue #222).
  *
  * ## Why routes at all
  *
@@ -27,8 +28,9 @@ import type { NativeStackNavigationOptions } from "expo-router";
  *
  * **Results.** A sheet either *owns a mutation* or *returns a value*, never
  * both:
- *  - Owning sheets (add column, board settings, column settings, move to) call
- *    the mutation hook themselves and close. No result param.
+ *  - Owning sheets (add column, board settings, column settings, move to, task
+ *    detail, quick create) call the mutation hook themselves and close. No
+ *    result param.
  *  - Returning sheets (sort, priority, due, assignees, assignee filter) get a
  *    `result` token from `lib/nav/sheet-result.ts`, deliver the picked value
  *    through it, and let the opening screen decide what to do. The token is
@@ -77,8 +79,14 @@ export const BOARD_SHEET_ROUTES: readonly SheetRouteSpec[] = [
   { name: "move-to", detents: HALF_THEN_FULL },
   { name: "board-settings", detents: HALF_THEN_FULL },
   { name: "column-settings", detents: HALF_THEN_FULL },
+  // A task's own screen-in-a-sheet (#222): opens at medium so the board stays
+  // visible behind it, drags to large for the checklist and the comments.
+  { name: "task-detail", detents: HALF_THEN_FULL },
   { name: "assignees", detents: FULL },
   { name: "assignee-filter", detents: FULL },
+  // Full height for the same reason as the assignee sheets: the keyboard is up
+  // from the moment it opens (#222).
+  { name: "quick-create", detents: FULL },
 ];
 
 /** The expo-router screen name for a sheet, as `admin/_layout.tsx` names it. */

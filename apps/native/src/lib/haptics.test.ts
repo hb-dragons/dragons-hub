@@ -134,7 +134,7 @@ const HAPTIC_CALL_SITES: Record<string, readonly HapticName[]> = {
   "src/app/admin/boards/[id].tsx": ["warning"],
   "src/components/board/ChecklistSection.tsx": ["success", "warning", "selection"],
   "src/components/board/CommentsSection.tsx": ["warning"],
-  "src/components/board/QuickCreateSheet.tsx": ["error"],
+  "src/app/admin/boards/sheets/quick-create.tsx": ["error"],
   "src/hooks/board/useBoardMutations.ts": ["success", "error"],
   "src/hooks/board/useChecklistMutations.ts": ["error"],
   "src/hooks/board/useColumnMutations.ts": ["success"],

@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
-import { BottomSheetTextInput } from "@gorhom/bottom-sheet";
+import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import type { TaskDetail } from "@dragons/shared";
 import { useCommentMutations } from "@/hooks/board/useCommentMutations";
 import { authClient } from "@/lib/auth-client";
@@ -140,7 +139,7 @@ export function CommentsSection({ task }: Props) {
             </Text>
             {isEditing ? (
               <>
-                <BottomSheetTextInput
+                <TextInput
                   value={editDraft}
                   onChangeText={setEditDraft}
                   multiline
@@ -179,7 +178,7 @@ export function CommentsSection({ task }: Props) {
       })}
 
       <View style={{ flexDirection: "row", gap: spacing.sm }}>
-        <BottomSheetTextInput
+        <TextInput
           value={draft}
           onChangeText={setDraft}
           placeholder={i18n.t("board.comments.addPlaceholder")}

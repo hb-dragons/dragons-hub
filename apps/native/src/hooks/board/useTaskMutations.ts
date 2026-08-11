@@ -5,9 +5,8 @@ import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import type { TaskDetail, TaskPriority } from "@dragons/shared";
 import type { TaskUpdateBody } from "@dragons/api-client";
+import { isBoardTasksKey } from "@/lib/board/task-keys";
 import { taskKey } from "./useTaskDetail";
-
-const tasksPrefix = (boardId: number) => `admin/boards/${boardId}/tasks`;
 
 export function useTaskMutations(boardId: number) {
   const { mutate } = useSWRConfig();
@@ -18,9 +17,7 @@ export function useTaskMutations(boardId: number) {
       const next = await adminBoardApi.updateTask(taskId, body);
       await Promise.all([
         mutate(taskKey(taskId), next, { revalidate: false }),
-        mutate(
-          (key) => Array.isArray(key) && key[0] === tasksPrefix(boardId),
-        ),
+        mutate(isBoardTasksKey(boardId)),
       ]);
       return next;
     } catch (error) {
@@ -35,9 +32,7 @@ export function useTaskMutations(boardId: number) {
       await adminBoardApi.deleteTask(id);
       await Promise.all([
         mutate(taskKey(id), undefined, { revalidate: false }),
-        mutate(
-          (key) => Array.isArray(key) && key[0] === tasksPrefix(boardId),
-        ),
+        mutate(isBoardTasksKey(boardId)),
       ]);
     } catch (error) {
       haptics.error();

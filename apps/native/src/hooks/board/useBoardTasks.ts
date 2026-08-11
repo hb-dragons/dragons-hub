@@ -2,9 +2,10 @@ import useSWR from "swr";
 import { adminBoardApi } from "@/lib/api";
 import type { TaskCardData } from "@dragons/shared";
 import type { TaskListQuery } from "@dragons/api-client";
+import { boardTasksKeyPrefix } from "@/lib/board/task-keys";
 
 const tasksKey = (boardId: number, filters?: TaskListQuery) =>
-  [`admin/boards/${boardId}/tasks`, filters ?? null] as const;
+  [boardTasksKeyPrefix(boardId), filters ?? null] as const;
 
 /** `null` skips the request — see the note on `useBoard`. */
 export function useBoardTasks(boardId: number | null, filters?: TaskListQuery) {
