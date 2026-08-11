@@ -16,6 +16,7 @@ import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 import { adminBoardApi } from "@/lib/api";
 import { singleLineInput } from "@/components/ui/inputStyles";
+import { Icon } from "@/components/ui/Icon";
 
 interface Props {
   task: TaskDetail;
@@ -86,11 +87,7 @@ function ChecklistRow({
           animStyle,
         ]}
       >
-        {isChecked ? (
-          <Text style={{ color: colors.primaryForeground, fontSize: 14, fontWeight: "700" }}>
-            ✓
-          </Text>
-        ) : null}
+        {isChecked ? <Icon name="check" size={14} color={colors.primaryForeground} /> : null}
       </Animated.View>
       <Text
         style={{
@@ -307,16 +304,11 @@ export function ChecklistSection({ task, boardId }: Props) {
               draft.trim() && !adding ? colors.primary : colors.surfaceHigh,
           }}
         >
-          <Text
-            style={{
-              color:
-                draft.trim() && !adding ? colors.primaryForeground : colors.mutedForeground,
-              fontSize: 14,
-              fontWeight: "700",
-            }}
-          >
-            +
-          </Text>
+          <Icon
+            name="add"
+            size={14}
+            color={draft.trim() && !adding ? colors.primaryForeground : colors.mutedForeground}
+          />
         </Pressable>
       </View>
     </View>

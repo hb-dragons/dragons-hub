@@ -15,6 +15,7 @@ import {
   type CreateBoardSheetHandle,
 } from "@/components/board/CreateBoardSheet";
 import { BoardListSkeleton } from "@/components/board/BoardListSkeleton";
+import { Icon } from "@/components/ui/Icon";
 
 export default function BoardListScreen() {
   const { colors, spacing, radius } = useTheme();
@@ -34,16 +35,7 @@ export default function BoardListScreen() {
       hitSlop={12}
       style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}
     >
-      <Text
-        style={{
-          color: colors.primary,
-          fontSize: 22,
-          fontWeight: "700",
-          lineHeight: 22,
-        }}
-      >
-        +
-      </Text>
+      <Icon name="add" size={22} color={colors.primary} />
     </Pressable>
   );
 

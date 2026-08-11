@@ -3,6 +3,7 @@ import type { TaskPriority } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { filterPillA11y } from "@/lib/ui/a11y";
+import { Icon } from "@/components/ui/Icon";
 
 export interface BoardFilters {
   mine: boolean;
@@ -128,7 +129,7 @@ export function FilterChips({
               justifyContent: "center",
             }}
           >
-            <Text style={{ ...textStyle(true), fontSize: 16, lineHeight: 16 }}>×</Text>
+            <Icon name="clear" size={16} color={colors.secondaryForeground} />
           </Pressable>
         ) : null}
       </Pressable>
@@ -160,7 +161,7 @@ export function FilterChips({
               justifyContent: "center",
             }}
           >
-            <Text style={{ ...textStyle(true), fontSize: 16, lineHeight: 16 }}>×</Text>
+            <Icon name="clear" size={16} color={colors.secondaryForeground} />
           </Pressable>
         ) : null}
       </Pressable>

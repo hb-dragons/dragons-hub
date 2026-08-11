@@ -11,11 +11,7 @@ vi.mock("react-native", () => ({
   Pressable: "Pressable",
   useWindowDimensions: () => ({ width: 390, height: 844 }),
 }));
-vi.mock("react-native-svg", () => ({
-  default: "Svg",
-  Path: "Path",
-  Rect: "Rect",
-}));
+vi.mock("expo-symbols", () => ({ SymbolView: "SymbolView" }));
 vi.mock("react-native-gesture-handler", () => ({
   Gesture: { Pan: () => ({ onBegin: () => ({}) }) },
   GestureDetector: "GestureDetector",

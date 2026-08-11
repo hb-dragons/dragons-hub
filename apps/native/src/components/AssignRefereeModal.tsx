@@ -11,7 +11,6 @@ import {
   Keyboard,
   Platform,
 } from "react-native";
-import Svg, { Path, Circle } from "react-native-svg";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import useSWR from "swr";
@@ -26,6 +25,7 @@ import { useTheme } from "../hooks/useTheme";
 import { refereeApi } from "../lib/api";
 import { i18n } from "../lib/i18n";
 import { fontFamilies } from "../theme/typography";
+import { Icon } from "./ui/Icon";
 
 type RefCandidate = CandidateSearchResponse["results"][number];
 type ThemeColors = ReturnType<typeof useTheme>["colors"];
@@ -79,52 +79,6 @@ function avatarPalette(
   const pick = options[Math.abs(hash) % options.length];
   // Non-null because options is non-empty and index is in range.
   return pick ?? options[0]!;
-}
-
-function SearchIcon({ color, size = 18 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
-      <Circle cx={8} cy={8} r={5.5} stroke={color} strokeWidth={1.8} />
-      <Path
-        d="m16 16-3.8-3.8"
-        stroke={color}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
-function CloseIcon({ color, size = 12 }: { color: string; size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 12 12" fill="none">
-      <Path
-        d="m3 3 6 6M9 3l-6 6"
-        stroke={color}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-}
-
-function ChevronIcon({ color, size = 14 }: { color: string; size?: number }) {
-  return (
-    <Svg
-      width={(size * 8) / 14}
-      height={size}
-      viewBox="0 0 8 14"
-      fill="none"
-    >
-      <Path
-        d="m1.5 1 5 6-5 6"
-        stroke={color}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
 }
 
 export function AssignRefereeModal({
@@ -303,7 +257,7 @@ export function AssignRefereeModal({
               opacity: pressed ? 0.7 : 1,
             })}
           >
-            <CloseIcon color={colors.mutedForeground} size={12} />
+            <Icon name="close" size={12} color={colors.mutedForeground} />
           </Pressable>
         </View>
 
@@ -549,17 +503,27 @@ export function AssignRefereeModal({
                       </View>
                     ) : null}
                     {item.warning.length > 0 ? (
-                      <Text
+                      <View
                         style={{
-                          fontFamily: fontFamilies.bodyMedium,
-                          fontSize: 11,
-                          color: colors.destructive,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 4,
                           marginTop: 3,
                         }}
-                        numberOfLines={1}
                       >
-                        ⚠  {item.warning[0]}
-                      </Text>
+                        <Icon name="warning" size={11} color={colors.destructive} />
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontFamily: fontFamilies.bodyMedium,
+                            fontSize: 11,
+                            color: colors.destructive,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {item.warning[0]}
+                        </Text>
+                      </View>
                     ) : null}
                   </View>
 
@@ -588,7 +552,7 @@ export function AssignRefereeModal({
                       color={colors.mutedForeground}
                     />
                   ) : (
-                    <ChevronIcon color={colors.mutedForeground} />
+                    <Icon name="disclosure" size={14} color={colors.mutedForeground} />
                   )}
                 </Pressable>
               );
@@ -638,7 +602,7 @@ export function AssignRefereeModal({
                 borderColor: colors.border,
               }}
             >
-              <SearchIcon color={colors.mutedForeground} />
+              <Icon name="search" size={18} color={colors.mutedForeground} />
               <TextInput
                 value={search}
                 onChangeText={setSearch}
@@ -682,7 +646,7 @@ export function AssignRefereeModal({
                   opacity: pressed ? 0.6 : 1,
                 })}
               >
-                <CloseIcon color={colors.mutedForeground} size={14} />
+                <Icon name="close" size={14} color={colors.mutedForeground} />
               </Pressable>
             ) : null}
           </View>

@@ -17,6 +17,7 @@ import { TaskContextMenu, type TaskContextMenuHandle, type TaskContextAction } f
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
+import { Icon } from "@/components/ui/Icon";
 import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
 import {
   openAddColumnSheet,
@@ -413,15 +414,11 @@ function BoardDetailBody() {
                   justifyContent: "center",
                 }}
               >
-                <Text
-                  style={{
-                    color: sort === "position" ? colors.foreground : colors.primary,
-                    fontSize: 18,
-                    fontWeight: "700",
-                  }}
-                >
-                  ⇅
-                </Text>
+                <Icon
+                  name="sort"
+                  size={20}
+                  color={sort === "position" ? colors.foreground : colors.primary}
+                />
               </Pressable>
               <Pressable
                 onPress={() => openBoardSettingsSheet(boardId)}
@@ -430,7 +427,7 @@ function BoardDetailBody() {
                 hitSlop={12}
                 style={{ paddingHorizontal: spacing.sm, paddingVertical: spacing.sm }}
               >
-                <Text style={{ color: colors.primary, fontSize: 18, fontWeight: "700" }}>⋯</Text>
+                <Icon name="more" size={20} color={colors.primary} />
               </Pressable>
             </View>
           ),
@@ -545,8 +542,12 @@ function BoardDetailBody() {
                     paddingVertical: spacing.md,
                     borderRadius: 8,
                     backgroundColor: colors.primary,
+                    flexDirection: "row",
+                    gap: spacing.xs,
+                    alignItems: "center",
                   }}
                 >
+                  <Icon name="add" size={15} color={colors.primaryForeground} />
                   <Text style={{ color: colors.primaryForeground, fontWeight: "700" }}>
                     {i18n.t("board.column.newColumn")}
                   </Text>
@@ -607,9 +608,7 @@ function BoardDetailBody() {
               elevation: 5,
             }}
           >
-            <Text style={{ color: colors.primaryForeground, fontSize: 28, fontWeight: "700", marginTop: -2 }}>
-              +
-            </Text>
+            <Icon name="add" size={28} color={colors.primaryForeground} />
           </Pressable>
         </View>
         )}

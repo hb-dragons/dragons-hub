@@ -16,6 +16,25 @@ describe("TAB_CONFIG", () => {
   it("maps home to the index route", () => {
     expect(TAB_CONFIG.home.name).toBe("index");
   });
+
+  // #221: the tab bar was already the app's one SF Symbol surface, and it is
+  // now the icon language's flagship. `NativeTabs.Trigger.Icon` types the
+  // *selected* symbol as required and the default one as optional, so a tab
+  // declared with only a selected symbol compiles and then draws nothing while
+  // the user is on another tab. The Material name is the Android tier (ADR
+  // 0001); without it that platform's tab has no icon at all.
+  it("gives every tab both SF Symbol states and a Material fallback", () => {
+    for (const [id, cfg] of Object.entries(TAB_CONFIG)) {
+      expect(cfg.sf.default, `${id}.sf.default`).toBeTruthy();
+      expect(cfg.sf.selected, `${id}.sf.selected`).toBeTruthy();
+      expect(cfg.md, `${id}.md`).toBeTruthy();
+    }
+  });
+
+  it("draws each tab with its own icon", () => {
+    const selected = Object.values(TAB_CONFIG).map((cfg) => cfg.sf.selected);
+    expect(new Set(selected).size, "two tabs share a symbol").toBe(selected.length);
+  });
 });
 
 describe("TAB_BAR_MINIMIZE_BEHAVIOR", () => {
