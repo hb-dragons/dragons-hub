@@ -226,19 +226,26 @@ function BoardDetailBody() {
    */
   const handleTaskAction = useCallback(
     (task: TaskCardData, action: TaskActionKey) => {
-      if (action === "move") {
-        openMoveToSheet(boardId, task.id);
-      } else if (action === "priority") {
-        openPriorityPickerSheet(task.priority, (p) => {
-          // Mutation hook surfaces failures via toast; swallow rejection.
-          taskMutations.setPriority(task.id, p).catch(() => {});
-        });
-      } else if (action === "due") {
-        openDuePickerSheet(task.dueDate, (iso) => {
-          taskMutations.setDueDate(task.id, iso).catch(() => {});
-        });
-      } else {
-        handleTaskDelete(task);
+      // A switch rather than an if/else chain ending in `else`: a fifth action
+      // added to `TASK_ACTIONS` would have fallen into the delete branch.
+      switch (action) {
+        case "move":
+          openMoveToSheet(boardId, task.id);
+          break;
+        case "priority":
+          openPriorityPickerSheet(task.priority, (p) => {
+            // Mutation hook surfaces failures via toast; swallow rejection.
+            taskMutations.setPriority(task.id, p).catch(() => {});
+          });
+          break;
+        case "due":
+          openDuePickerSheet(task.dueDate, (iso) => {
+            taskMutations.setDueDate(task.id, iso).catch(() => {});
+          });
+          break;
+        case "delete":
+          handleTaskDelete(task);
+          break;
       }
     },
     [boardId, taskMutations, handleTaskDelete],

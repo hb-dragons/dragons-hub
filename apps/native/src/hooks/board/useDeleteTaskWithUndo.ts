@@ -6,8 +6,8 @@ import { restoreTaskInput } from "@/lib/board/create-task-input";
 import { isBoardTasksKey } from "@/lib/board/task-keys";
 import { haptics } from "@/lib/haptics";
 import { i18n } from "@/lib/i18n";
-import { useTaskMutations } from "./useTaskMutations";
 import { useToast } from "@/hooks/useToast";
+import { useTaskMutations } from "./useTaskMutations";
 
 /**
  * Delete a task, and offer undo on the toast that says so.
@@ -33,6 +33,15 @@ export function useDeleteTaskWithUndo(boardId: number): (task: TaskCardData) => 
       // delete lands, and undo has to describe the task that was there.
       const restore = restoreTaskInput(task);
 
+      const undo = async () => {
+        try {
+          await adminBoardApi.createTask(boardId, restore);
+          await mutate(isBoardTasksKey(boardId));
+        } catch {
+          toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
+        }
+      };
+
       deleteTask(task.id)
         .then(() => {
           toast.show({
@@ -40,14 +49,7 @@ export function useDeleteTaskWithUndo(boardId: number): (task: TaskCardData) => 
             action: {
               label: i18n.t("toast.undo"),
               onPress: () => {
-                void (async () => {
-                  try {
-                    await adminBoardApi.createTask(boardId, restore);
-                    await mutate(isBoardTasksKey(boardId));
-                  } catch {
-                    toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
-                  }
-                })();
+                void undo();
               },
             },
           });

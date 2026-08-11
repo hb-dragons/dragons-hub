@@ -19,6 +19,15 @@ interface Props {
 }
 
 /**
+ * The preferred size of the preview, in points.
+ *
+ * A preview is a fixed box — the system asks for a content size up front — so
+ * `TaskPreview` below is built to fill it: a title clamped to two lines over a
+ * single meta row. Left unset, the preview takes the whole screen.
+ */
+const PREVIEW_SIZE = { width: 320, height: 128 } as const;
+
+/**
  * A task's actions as the system context menu, opened by holding the card
  * (issue #220, ADR 0002).
  *
@@ -66,15 +75,6 @@ export function TaskContextMenu({ task, onAction, children }: Props) {
     </Link>
   );
 }
-
-/**
- * The preferred size of the preview, in points.
- *
- * A preview is a fixed box — the system asks for a content size up front — so
- * `TaskPreview` below is built to fill it: a title clamped to two lines over a
- * single meta row. Left unset, the preview takes the whole screen.
- */
-const PREVIEW_SIZE = { width: 320, height: 128 } as const;
 
 /**
  * What the preview shows: the task, read-only.
