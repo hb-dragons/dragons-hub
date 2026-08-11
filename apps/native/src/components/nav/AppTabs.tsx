@@ -1,5 +1,9 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import type { MaterialIcon, SFSymbolIcon } from "expo-router/unstable-native-tabs";
+import type {
+  MaterialIcon,
+  NativeTabsProps,
+  SFSymbolIcon,
+} from "expo-router/unstable-native-tabs";
 
 /**
  * The app's tab bar, and the only module allowed to import
@@ -25,14 +29,21 @@ export interface AppTab {
   md: MaterialIcon["md"];
 }
 
+/**
+ * How the tab bar reacts to scrolling (iOS 26+). Re-exported from here so the
+ * registry can state the app's choice without importing the alpha module.
+ */
+export type AppTabsMinimizeBehavior = NonNullable<NativeTabsProps["minimizeBehavior"]>;
+
 export interface AppTabsProps {
   tabs: AppTab[];
   tintColor: string;
+  minimizeBehavior: AppTabsMinimizeBehavior;
 }
 
-export function AppTabs({ tabs, tintColor }: AppTabsProps) {
+export function AppTabs({ tabs, tintColor, minimizeBehavior }: AppTabsProps) {
   return (
-    <NativeTabs tintColor={tintColor}>
+    <NativeTabs tintColor={tintColor} minimizeBehavior={minimizeBehavior}>
       {tabs.map((tab) => (
         <NativeTabs.Trigger key={tab.name} name={tab.name}>
           <NativeTabs.Trigger.Label>{tab.label}</NativeTabs.Trigger.Label>
