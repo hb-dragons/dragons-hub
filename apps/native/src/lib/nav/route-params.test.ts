@@ -7,7 +7,7 @@ import {
   parseNumericParam,
   parsePriority,
   parseSortMode,
-} from "@/lib/board/sheet-params";
+} from "@/lib/nav/route-params";
 
 /**
  * Route params reach a sheet as strings (or as string arrays, when expo-router

@@ -7,7 +7,7 @@ import { useBoardTasks } from "@/hooks/board/useBoardTasks";
 import { useMoveTask } from "@/hooks/board/useMoveTask";
 import { sortedColumns } from "@/lib/board/columns";
 import { moveTargetPosition } from "@/lib/board/move-position";
-import { parseNumericParam } from "@/lib/board/sheet-params";
+import { parseNumericParam } from "@/lib/nav/route-params";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 

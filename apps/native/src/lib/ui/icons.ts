@@ -45,8 +45,6 @@ export const ICONS = {
   due: { ios: "calendar", android: "calendar_today" },
   /** Marks a task's checklist progress. */
   checklist: { ios: "checklist", android: "checklist" },
-  /** Searches within the current screen. */
-  search: { ios: "magnifyingglass", android: "search" },
   /** A row that leads somewhere when tapped. */
   disclosure: { ios: "chevron.right", android: "chevron_right" },
   /** Confirms: a ticked checkbox, a chosen row, a saved edit. */

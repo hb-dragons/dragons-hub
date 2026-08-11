@@ -18,8 +18,8 @@ describe("ICONS", () => {
   });
 
   // The two catalogues overlap on names that are legal in both — "checklist"
-  // and "search" exist as an SF Symbol *and* as a Material symbol — so the
-  // compiler cannot catch the two slots being filled from the wrong catalogue.
+  // exists as an SF Symbol *and* as a Material symbol — so the compiler
+  // cannot catch the two slots being filled from the wrong catalogue.
   // Their spelling conventions do differ: SF Symbols are dot-separated,
   // Material symbols are snake_case.
   it("spells each tier in its own catalogue's convention", () => {

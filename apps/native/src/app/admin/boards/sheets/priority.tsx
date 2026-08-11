@@ -4,7 +4,7 @@ import { TASK_PRIORITIES, type TaskPriority } from "@dragons/shared";
 import { SheetScreen } from "@/components/sheets/SheetScreen";
 import { priorityStripeColor } from "@/components/board/TaskCard";
 import { useSheetResult } from "@/hooks/useSheetResult";
-import { parsePriority } from "@/lib/board/sheet-params";
+import { parsePriority } from "@/lib/nav/route-params";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 

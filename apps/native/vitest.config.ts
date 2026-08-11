@@ -69,9 +69,16 @@ export default defineConfig({
         // and the logic they shed on the way (the create-task payload, the
         // assignee diff, the board-tasks key matcher, the column ordering).
         // Measured 15.27/10.28/18.55/14.92 — lines has not yet cleared 15.
+        //
+        // Ratcheted 2026-08-11 (#223): every floor up by one point. The
+        // referee-assignment modal — 693 untested lines — became a route
+        // sheet, and the logic it carried inline (distance brackets, candidate
+        // grouping, avatar swatches, slot params) moved into tested lib
+        // modules alongside the header search field's options. Measured
+        // 15.57/10.2/18.43/15.16.
         branches: 10,
         functions: 18,
-        lines: 14,
+        lines: 15,
         statements: 15,
       },
     },

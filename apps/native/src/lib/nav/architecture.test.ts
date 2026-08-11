@@ -100,6 +100,31 @@ describe("navigation architecture", () => {
     ]);
   });
 
+  // Issue #223: the referee-assignment picker was the app's last React Native
+  // `<Modal>` — a JS-drawn `pageSheet` that had to bring its own header, close
+  // button and keyboard handling. Every modal surface is a route with a native
+  // presentation now, so the system draws the sheet and nothing imitates it.
+  it("presents modal surfaces as routes, not through React Native's Modal", () => {
+    const offenders = SOURCE_FILES.filter((file) =>
+      reactNativeImports(readFileSync(file, "utf8")).includes("Modal"),
+    ).map(rel);
+    expect(offenders).toEqual([]);
+  });
+
+  // The same sheet translated its content by the keyboard height on every
+  // frame. A native header search field needs none of that, and the four
+  // sites left are content-layer components that legitimately do: the
+  // provider, a sign-in form, the assistant's composer, and the scrolling
+  // sheet body that lifts a focused field clear of the keyboard (#222).
+  it("leaves keyboard management to the system outside the content layer", () => {
+    expect(importSites("react-native-keyboard-controller")).toEqual([
+      "src/app/(auth)/sign-in.tsx",
+      "src/app/_layout.tsx",
+      "src/app/assistant.tsx",
+      "src/components/sheets/SheetScreen.tsx",
+    ]);
+  });
+
   // Result tokens are only safe while every registration is paired with a
   // release. Both halves of that pairing live in these two modules; a third
   // caller would be a leak waiting to happen.
@@ -214,6 +239,17 @@ function flatten(node: object, prefix = ""): [string, string][] {
     typeof value === "object" && value !== null
       ? flatten(value as object, `${prefix}${key}.`)
       : [[`${prefix}${key}`, String(value)] as [string, string]],
+  );
+}
+
+/** The names a file imports from `react-native`, across a multi-line import. */
+function reactNativeImports(source: string): string[] {
+  // `[^}]` rather than a lazy `[\s\S]`: the lazy form happily starts at an
+  // earlier import's brace and swallows everything up to this one's closer,
+  // which turns every name in between into one unsplittable blob.
+  const clauses = source.matchAll(/import\s*\{([^}]*)\}\s*from\s*["']react-native["']/g);
+  return [...clauses].flatMap((match) =>
+    match[1]!.split(",").map((name) => name.trim().split(/\s+as\s+/)[0]!.trim()),
   );
 }
 

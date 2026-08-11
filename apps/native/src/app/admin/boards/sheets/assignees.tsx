@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { AssigneeSelectSheet } from "@/components/board/AssigneeSelectSheet";
 import { useSheetResult } from "@/hooks/useSheetResult";
-import { parseIdSet } from "@/lib/board/sheet-params";
+import { parseIdSet } from "@/lib/nav/route-params";
 import { i18n } from "@/lib/i18n";
 
 /**

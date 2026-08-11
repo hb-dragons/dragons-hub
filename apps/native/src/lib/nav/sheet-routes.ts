@@ -1,8 +1,9 @@
 import type { NativeStackNavigationOptions } from "expo-router";
 
 /**
- * The board's sheets, as routes: the utility ones (issue #219), then task
- * detail and quick create (issue #222).
+ * How a sheet presents: the board's utility sheets (issue #219), then task
+ * detail and quick create (issue #222), and — since #223 — the
+ * referee-assignment sheet, the one that keeps a native header.
  *
  * ## Why routes at all
  *
@@ -21,10 +22,10 @@ import type { NativeStackNavigationOptions } from "expo-router";
  * where they compete with `/admin/boards/[id]` for the same shape of path.
  *
  * **Params.** Sheets take scalars only — ids and current values — because
- * route params are strings. Anything list-shaped that the sheet also needs
- * (a board's columns, its task counts, the user directory) the sheet fetches
- * for itself through the same SWR key the board screen uses, so the cache is
- * already warm.
+ * route params are strings. Anything else the sheet needs (a board's columns,
+ * its task counts, the user directory, the match a referee is being assigned
+ * to) the sheet fetches for itself, through the same SWR key the screen
+ * underneath uses wherever there is one.
  *
  * **Results.** A sheet either *owns a mutation* or *returns a value*, never
  * both:
@@ -95,22 +96,59 @@ export function sheetScreenName(spec: SheetRouteSpec): string {
 }
 
 /**
+ * What every sheet route shares, whatever it puts inside: the presentation,
+ * the grabber, and swipe-down dismiss. Every sheet is cancellable — the
+ * destructive paths behind them go through their own confirmation alert.
+ */
+function sheetPresentation(detents: SheetDetents): NativeStackNavigationOptions {
+  return {
+    presentation: "formSheet",
+    gestureEnabled: true,
+    sheetGrabberVisible: true,
+    sheetAllowedDetents: detents as NativeStackNavigationOptions["sheetAllowedDetents"],
+    sheetExpandsWhenScrolledToEdge: true,
+    sheetInitialDetentIndex: 0,
+  };
+}
+
+/**
  * Presentation for one sheet route. Shared verbatim across all of them apart
  * from the detents, so "is this sheet configured like the others" is a
  * question about one function rather than nine call sites.
  */
 export function formSheetOptions(spec: SheetRouteSpec): NativeStackNavigationOptions {
   return {
-    presentation: "formSheet",
+    ...sheetPresentation(spec.detents),
     // The sheets draw their own titles; a native header would eat the height
     // `fitToContents` exists to save, and would push the grabber off-screen.
     headerShown: false,
-    // Swipe-down dismiss. Every sheet here is cancellable — the destructive
-    // paths behind them go through their own confirmation alert.
-    gestureEnabled: true,
-    sheetGrabberVisible: true,
-    sheetAllowedDetents: spec.detents as NativeStackNavigationOptions["sheetAllowedDetents"],
-    sheetExpandsWhenScrolledToEdge: true,
-    sheetInitialDetentIndex: 0,
+  };
+}
+
+/**
+ * A form sheet that *keeps* its native header (issue #223).
+ *
+ * The referee-assignment sheet is the one sheet whose header earns its height:
+ * it holds the system search field (`lib/nav/search-bar.ts`), and with it the
+ * keyboard management, cancel animation and scroll behaviour that the deleted
+ * modal drew by hand. Everything else — presentation, grabber, swipe-dismiss —
+ * comes from the same `sheetPresentation` the board's sheets are built on, so
+ * the two sheet shapes cannot drift into different objects.
+ *
+ * The detents are `FULL` and not a parameter: a search field over a list has
+ * the keyboard up for most of its life, and no shorter detent survives that.
+ *
+ * There is no close button. Dismissal is the grabber and the swipe, exactly as
+ * for the board's sheets; a header button next to the search field's own
+ * Cancel would be two cancels in one bar.
+ */
+export function searchSheetOptions(opts: { tintColor: string }): NativeStackNavigationOptions {
+  return {
+    ...sheetPresentation(FULL),
+    // No title here: it names the slot being filled, which only the screen
+    // knows. The tint is passed in because the app's theme can be forced light
+    // or dark independently of the system appearance.
+    headerShown: true,
+    headerTintColor: opts.tintColor,
   };
 }
