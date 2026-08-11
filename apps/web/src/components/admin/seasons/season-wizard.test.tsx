@@ -248,6 +248,44 @@ describe("SeasonWizard", () => {
     expect(summary).toHaveBeenCalledWith(9);
   });
 
+  it("recovers from a transient log-fetch failure instead of stranding on the log panel", async () => {
+    // A single 500/network blip must be retried, not thrown as an unhandled
+    // rejection that leaves the wizard stuck on the log panel forever.
+    syncLogs
+      .mockRejectedValueOnce(new Error("500"))
+      .mockResolvedValue({ items: [{ id: 77, status: "completed" }] });
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    fireEvent.click(await screen.findByTestId("live-logs"));
+
+    await waitFor(
+      () => expect(screen.getByText("settings.seasons.wizard.close")).toBeInTheDocument(),
+      { timeout: 4000 },
+    );
+    expect(summary).toHaveBeenCalledWith(9);
+  });
+
+  it("ignores a duplicate onComplete from the log stream", async () => {
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    const logs = await screen.findByTestId("live-logs");
+    // The stream's "complete" event can fire more than once (e.g. if its
+    // effect ever reran); the completion flow must only run once.
+    fireEvent.click(logs);
+    fireEvent.click(logs);
+
+    await screen.findByText("settings.seasons.wizard.close");
+    expect(summary).toHaveBeenCalledTimes(1);
+  });
+
   it("still reaches the review when the sync could not be triggered", async () => {
     trigger.mockRejectedValue(new Error("queue down"));
     render(<SeasonWizard open onOpenChange={() => {}} />);

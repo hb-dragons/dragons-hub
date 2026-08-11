@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSWRConfig } from "swr";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
@@ -23,6 +23,12 @@ import { LeaguePicker } from "./league-picker";
 type Step = "name" | "select" | "syncing" | "done";
 
 const POLL_INTERVAL_MS = 2000;
+// ~5 minutes at POLL_INTERVAL_MS — a run that never appears in the tracked
+// page or never reaches a terminal status must not poll forever.
+const MAX_POLL_ATTEMPTS = 150;
+// A single 500/network blip must not strand the wizard; only give up after
+// several in a row.
+const MAX_CONSECUTIVE_POLL_FAILURES = 5;
 
 export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const t = useTranslations();
@@ -54,6 +60,32 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
   useEffect(() => {
     openRef.current = open;
   }, [open]);
+  // Tracks whether the component is still mounted. `openRef` only reacts to
+  // the `open` prop changing, so it stays `true` if the wizard is unmounted
+  // outright (e.g. the admin navigates away mid-sync) — the poll loop needs
+  // its own signal to stop in that case.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  // Mirror createdId/syncRunId into refs so the SyncLiveLogs onComplete
+  // handler can stay referentially stable (see handleSyncStreamComplete)
+  // without reading stale state from an earlier render's closure.
+  const createdIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    createdIdRef.current = createdId;
+  }, [createdId]);
+  const syncRunIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    syncRunIdRef.current = syncRunId;
+  }, [syncRunId]);
+  // Guards against a second, concurrent run of handleSyncStreamComplete —
+  // SyncLiveLogs's effect deps include `onComplete`, so if that identity
+  // ever changes while still connected it reopens the stream and can fire
+  // "complete" a second time.
+  const completingRef = useRef(false);
 
   function reset() {
     setStep("name");
@@ -67,6 +99,7 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     setCreatedId(null);
     setSyncRunId(null);
     setSummary(null);
+    completingRef.current = false;
   }
 
   function handleOpenChange(v: boolean) {
@@ -105,35 +138,71 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
   // SyncCompletionWatcher does — until its status is neither running nor
   // pending — before trusting any counts. The wizard lives outside
   // SyncRunProvider, so it cannot reuse that watcher.
-  async function waitForRun(runId: number) {
-    while (openRef.current) {
-      const page = await api.sync.logs({ limit: 20, offset: 0 });
-      const run = page.items.find((r) => r.id === runId);
-      if (run && run.status !== "running" && run.status !== "pending") return;
+  //
+  // A failed fetch (a 500/network blip during a multi-minute sync) must not
+  // throw out of the loop as an unhandled rejection and strand the wizard on
+  // the log panel forever — it's swallowed and retried, up to
+  // MAX_CONSECUTIVE_POLL_FAILURES in a row. The whole wait is also capped at
+  // MAX_POLL_ATTEMPTS in case the run never appears or never goes terminal.
+  const waitForRun = useCallback(async (runId: number) => {
+    let consecutiveFailures = 0;
+    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+      if (!openRef.current || !mountedRef.current) return;
+      try {
+        const page = await api.sync.logs({ limit: 20, offset: 0 });
+        consecutiveFailures = 0;
+        const run = page.items.find((r) => r.id === runId);
+        if (run && run.status !== "running" && run.status !== "pending") return;
+      } catch {
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) return;
+      }
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
-  }
+  }, []);
 
-  async function finishWithSummary(id: number) {
-    try {
-      const counts = await api.seasons.summary(id);
-      if (!openRef.current) return;
-      setSummary(counts);
-    } catch {
-      // Counts are the nice-to-have; the season exists either way.
-      if (!openRef.current) return;
-      setSummary(null);
-    }
-    await mutate(SWR_KEYS.seasons);
-    if (openRef.current) setStep("done");
-  }
+  const finishWithSummary = useCallback(
+    async (id: number) => {
+      try {
+        const counts = await api.seasons.summary(id);
+        if (!openRef.current || !mountedRef.current) return;
+        setSummary(counts);
+      } catch {
+        // Counts are the nice-to-have; the season exists either way.
+        if (!openRef.current || !mountedRef.current) return;
+        setSummary(null);
+      }
+      await mutate(SWR_KEYS.seasons);
+      if (openRef.current && mountedRef.current) setStep("done");
+    },
+    [mutate],
+  );
 
-  async function handleSyncStreamComplete() {
-    if (createdId === null || syncRunId === null) return;
-    await waitForRun(syncRunId);
-    if (!openRef.current) return;
-    await finishWithSummary(createdId);
-  }
+  // Passed to SyncLiveLogs as `onComplete`. SyncLiveLogs's stream effect has
+  // `onComplete` in its deps, so this must stay referentially stable across
+  // renders — an inline arrow here would tear down and reopen the
+  // EventSource on every render (e.g. finishWithSummary's own setSummary
+  // triggers one while still on the syncing step). createdId/syncRunId are
+  // read from refs rather than closed-over state for the same reason. It's
+  // also non-async and stays synchronous so it can be passed directly to a
+  // prop typed `() => void`, and completingRef guards against the stream
+  // re-firing "complete" a second time.
+  const handleSyncStreamComplete = useCallback(() => {
+    if (completingRef.current) return;
+    const id = createdIdRef.current;
+    const runId = syncRunIdRef.current;
+    if (id === null || runId === null) return;
+    completingRef.current = true;
+    void (async () => {
+      try {
+        await waitForRun(runId);
+        if (!openRef.current || !mountedRef.current) return;
+        await finishWithSummary(id);
+      } finally {
+        completingRef.current = false;
+      }
+    })();
+  }, [waitForRun, finishWithSummary]);
 
   // Final commit: create the season, persist the picked leagues, then sync.
   async function confirm() {
@@ -285,7 +354,7 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
           ) : (
             <SyncLiveLogs
               syncRunId={syncRunId}
-              onComplete={() => { void handleSyncStreamComplete(); }}
+              onComplete={handleSyncStreamComplete}
             />
           )
         )}
