@@ -76,10 +76,17 @@ export default defineConfig({
         // grouping, avatar swatches, slot params) moved into tested lib
         // modules alongside the header search field's options. Measured
         // 15.57/10.2/18.43/15.16.
+        //
+        // Ratcheted 2026-08-11 (#221, #222, #223 merged): statements 15 -> 16,
+        // functions 18 -> 20. Same reason as the four-branch re-measure above —
+        // each figure was measured on its own branch against the shared base,
+        // and the three suites together cover more than any one did. Measured
+        // 16.44/10.95/20.09/15.96 — branches and lines hold at their current
+        // floors, neither having cleared the next whole point.
         branches: 10,
-        functions: 18,
+        functions: 20,
         lines: 15,
-        statements: 15,
+        statements: 16,
       },
     },
   },
