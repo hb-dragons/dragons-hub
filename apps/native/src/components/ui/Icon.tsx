@@ -1,5 +1,4 @@
 import { SymbolView } from "expo-symbols";
-import type { StyleProp, ViewStyle } from "react-native";
 import { ICONS, type IconName } from "@/lib/ui/icons";
 
 /**
@@ -24,9 +23,13 @@ export interface IconProps {
   size?: number;
   /** Tint. Required: an untinted symbol falls back to the library's own blue. */
   color: string;
-  style?: StyleProp<ViewStyle>;
 }
 
-export function Icon({ name, size = 20, color, style }: IconProps) {
-  return <SymbolView name={ICONS[name]} size={size} tintColor={color} style={style} />;
+/**
+ * No `style` prop, deliberately: `SymbolView` sizes itself to a `size`-square
+ * box, and every call site so far wants exactly that inside a container that
+ * already positions it. Layout belongs to the container.
+ */
+export function Icon({ name, size = 20, color }: IconProps) {
+  return <SymbolView name={ICONS[name]} size={size} tintColor={color} />;
 }
