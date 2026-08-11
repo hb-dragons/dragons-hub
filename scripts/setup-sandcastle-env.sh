@@ -209,7 +209,11 @@ if [[ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]]; then
   exit 1
 fi
 if [[ "$CLAUDE_CODE_OAUTH_TOKEN" != sk-ant-* ]]; then
-  warn "that doesn't look like a Claude OAuth token (expected sk-ant-…) — saving it anyway."
+  warn "that doesn't look like a Claude OAuth token (expected sk-ant-oat…) — most likely a partial paste."
+  if ! confirm "Save it anyway?"; then
+    warn "not saved — re-run this wizard with the full token from 'claude setup-token'."
+    exit 1
+  fi
 fi
 write_env CLAUDE_CODE_OAUTH_TOKEN "$CLAUDE_CODE_OAUTH_TOKEN"
 
