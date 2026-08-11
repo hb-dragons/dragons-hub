@@ -3,7 +3,7 @@ import { useLocalSearchParams } from "expo-router";
 import { SheetScreen } from "@/components/sheets/SheetScreen";
 import { TaskDetailBody } from "@/components/board/TaskDetailBody";
 import { useTaskDetail } from "@/hooks/board/useTaskDetail";
-import { parseNumericParam } from "@/lib/board/sheet-params";
+import { parseNumericParam } from "@/lib/nav/route-params";
 import { useTheme } from "@/hooks/useTheme";
 
 /**

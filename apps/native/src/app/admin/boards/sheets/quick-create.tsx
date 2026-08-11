@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/useToast";
 import { adminBoardApi } from "@/lib/api";
 import { sortedColumns } from "@/lib/board/columns";
 import { buildCreateTaskInput } from "@/lib/board/create-task-input";
-import { parseNumericParam } from "@/lib/board/sheet-params";
+import { parseNumericParam } from "@/lib/nav/route-params";
 import { isBoardTasksKey } from "@/lib/board/task-keys";
 import { haptics } from "@/lib/haptics";
 import { i18n } from "@/lib/i18n";
