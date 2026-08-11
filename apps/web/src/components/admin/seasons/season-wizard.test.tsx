@@ -256,9 +256,31 @@ describe("SeasonWizard", () => {
     fireEvent.click(await screen.findByTestId("live-logs"));
 
     await screen.findByText("settings.seasons.wizard.reviewLeagues");
+    expect(screen.getByText("settings.seasons.wizard.reviewTitle")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
     // No unassigned slots, so the explanatory line stays out of the way.
+    expect(
+      screen.queryByText("settings.seasons.wizard.reviewPlaceholderHint"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows an unavailable placeholder count without the hint when only that count failed to read", async () => {
+    // Distinct from the whole-summary-null case: leagues/games are known, but
+    // placeholderSlots specifically could not be read. Must render "—", not
+    // "0", and must not show the hint (there is nothing to explain).
+    summary.mockResolvedValue({ leagueCount: 2, gameCount: 15, placeholderSlots: null });
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+    fireEvent.click(await screen.findByTestId("live-logs"));
+
+    await screen.findByText("settings.seasons.wizard.reviewLeagues");
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("15")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
     expect(
       screen.queryByText("settings.seasons.wizard.reviewPlaceholderHint"),
     ).not.toBeInTheDocument();
@@ -287,6 +309,7 @@ describe("SeasonWizard", () => {
     fireEvent.click(await screen.findByTestId("live-logs"));
 
     await screen.findByText("settings.seasons.wizard.reviewUnavailable");
+    expect(screen.getByText("settings.seasons.wizard.reviewTitle")).toBeInTheDocument();
   });
 
   it("recovers from a transient log-fetch failure instead of stranding on the log panel", async () => {

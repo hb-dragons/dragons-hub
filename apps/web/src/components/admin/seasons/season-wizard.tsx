@@ -361,6 +361,9 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
 
         {step === "done" && (
           <div className="space-y-4 py-2">
+            <h3 className="font-display text-sm font-semibold uppercase tracking-wide">
+              {t("settings.seasons.wizard.reviewTitle")}
+            </h3>
             {summary === null ? (
               <p className="text-sm text-muted-foreground">
                 {t("settings.seasons.wizard.reviewUnavailable")}
