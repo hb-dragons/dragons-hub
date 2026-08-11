@@ -4,9 +4,8 @@ import { haptics } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
 import { i18n } from "@/lib/i18n";
 import type { TaskDetail } from "@dragons/shared";
+import { isBoardTasksKey } from "@/lib/board/task-keys";
 import { taskKey } from "./useTaskDetail";
-
-const tasksPrefix = (boardId: number) => `admin/boards/${boardId}/tasks`;
 
 export function useChecklistMutations(boardId: number) {
   const { cache, mutate } = useSWRConfig();
@@ -15,7 +14,7 @@ export function useChecklistMutations(boardId: number) {
   async function refresh(taskId: number) {
     await Promise.all([
       mutate(taskKey(taskId)),
-      mutate((key) => Array.isArray(key) && key[0] === tasksPrefix(boardId)),
+      mutate(isBoardTasksKey(boardId)),
     ]);
   }
 

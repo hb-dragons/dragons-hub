@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/useToast";
 import { adminBoardApi } from "@/lib/api";
 import { buildCreateTaskInput } from "@/lib/board/create-task-input";
 import { parseNumericParam } from "@/lib/board/sheet-params";
+import { isBoardTasksKey } from "@/lib/board/task-keys";
 import { haptics } from "@/lib/haptics";
 import { i18n } from "@/lib/i18n";
 import {
@@ -76,9 +77,7 @@ export default function QuickCreateSheetRoute() {
           toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
         }
       }
-      await mutate(
-        (key) => Array.isArray(key) && key[0] === `admin/boards/${boardId}/tasks`,
-      );
+      await mutate(isBoardTasksKey(boardId));
       router.back();
     } catch {
       haptics.error();
