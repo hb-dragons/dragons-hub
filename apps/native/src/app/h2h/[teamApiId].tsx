@@ -3,7 +3,7 @@ import { View, Text, FlatList, ActivityIndicator, RefreshControl } from "react-n
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
-import { Screen } from "../../components/Screen";
+import { Screen, UNDER_NATIVE_HEADER } from "../../components/Screen";
 import { MatchCardFull } from "../../components/MatchCardFull";
 import { useTheme } from "../../hooks/useTheme";
 import { useRefresh } from "../../hooks/useRefresh";
@@ -60,27 +60,30 @@ export default function H2HScreen() {
             : "",
         }}
       />
-      <Screen scroll={false} headerOffset={44}>
-      {isLoading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
-      ) : (
-        <FlatList
-          data={data?.items ?? []}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <View style={{ marginBottom: spacing.sm }}>
-              <MatchCardFull match={item} onPress={openMatch} />
-            </View>
-          )}
-          contentContainerStyle={listContentStyle}
-          refreshControl={refreshControl}
-          ListEmptyComponent={
-            <Text style={{ ...textStyles.body, color: colors.mutedForeground, textAlign: "center", marginTop: spacing.xl }}>
-              {i18n.t("schedule.noMatches")}
-            </Text>
-          }
-        />
-      )}
+      <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
+        {isLoading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+        ) : (
+          <FlatList
+            data={data?.items ?? []}
+            keyExtractor={(item) => item.id.toString()}
+            // The screen's scroll view: it takes the content inset for the
+            // transparent header floating over it.
+            contentInsetAdjustmentBehavior="automatic"
+            renderItem={({ item }) => (
+              <View style={{ marginBottom: spacing.sm }}>
+                <MatchCardFull match={item} onPress={openMatch} />
+              </View>
+            )}
+            contentContainerStyle={listContentStyle}
+            refreshControl={refreshControl}
+            ListEmptyComponent={
+              <Text style={{ ...textStyles.body, color: colors.mutedForeground, textAlign: "center", marginTop: spacing.xl }}>
+                {i18n.t("schedule.noMatches")}
+              </Text>
+            }
+          />
+        )}
       </Screen>
     </>
   );

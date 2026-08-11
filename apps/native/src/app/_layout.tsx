@@ -29,6 +29,11 @@ import { colors as themeColors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { configureNotificationHandler } from "@/lib/push/handler";
+import {
+  BACK_BUTTON_DISPLAY_MODE,
+  detailHeaderOptions,
+  tabRootHeaderOptions,
+} from "@/lib/nav/headers";
 import { installGlobalErrorHandler } from "@/lib/global-error-handler";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { ToastProvider } from "@/hooks/useToast";
@@ -37,18 +42,14 @@ import { ToastHost } from "@/components/ui/ToastHost";
 void SplashScreen.preventAutoHideAsync();
 configureNotificationHandler();
 
-const detailHeaderOptions = {
-  headerShown: true,
-  headerTransparent: true,
-  headerTitle: "",
-  headerBackTitle: "",
-  headerShadowVisible: false,
-  headerBackTitleStyle: { fontSize: 0 },
-} as const;
-
 function RootNavigator() {
   usePushRegistration();
   const { colors, isDark } = useTheme();
+  // Every screen's header options are declared here, once, so that none of
+  // them is attached (or changed) after a push transition has begun. The
+  // exception is a title a screen can only know from its data; those screens
+  // declare that one option inline. See lib/nav/headers.ts.
+  const detail = detailHeaderOptions(colors.foreground);
 
   return (
     <>
@@ -56,19 +57,24 @@ function RootNavigator() {
       <Stack
         screenOptions={{
           headerShown: false,
-          headerTintColor: colors.foreground,
-          headerStyle: { backgroundColor: "transparent" },
-          headerShadowVisible: false,
+          // No headerStyle background here: an explicit colour is painted as a
+          // solid bar and then swapped for the system glass mid-transition,
+          // which flashes (same reasoning as app/admin/_layout.tsx).
           contentStyle: { backgroundColor: colors.background },
         }}
       >
         <Stack.Screen name="(tabs)" options={{ title: "" }} />
         <Stack.Screen name="admin" options={{ headerShown: false }} />
-        <Stack.Screen name="team/[id]" options={detailHeaderOptions} />
-        <Stack.Screen name="game/[id]" options={detailHeaderOptions} />
-        <Stack.Screen name="referee-game/[id]" options={detailHeaderOptions} />
-        <Stack.Screen name="h2h/[teamApiId]" options={detailHeaderOptions} />
-        <Stack.Screen name="league-tables" options={detailHeaderOptions} />
+        <Stack.Screen name="team/[id]" options={detail} />
+        <Stack.Screen name="game/[id]" options={detail} />
+        <Stack.Screen name="referee-game/[id]" options={detail} />
+        <Stack.Screen name="h2h/[teamApiId]" options={detail} />
+        <Stack.Screen name="+not-found" options={detail} />
+        {/* The Standings tab's content, pushed: same large title, plus a back button. */}
+        <Stack.Screen
+          name="league-tables"
+          options={tabRootHeaderOptions(i18n.t("standings.title"))}
+        />
         <Stack.Screen
           name="(auth)"
           options={{
@@ -81,8 +87,8 @@ function RootNavigator() {
           options={{
             headerShown: true,
             headerTitle: i18n.t("profile.title"),
-            headerStyle: { backgroundColor: colors.background },
-            headerShadowVisible: false,
+            headerTintColor: colors.foreground,
+            headerBackButtonDisplayMode: BACK_BUTTON_DISPLAY_MODE,
           }}
         />
         <Stack.Screen
@@ -91,7 +97,7 @@ function RootNavigator() {
             presentation: "modal",
             headerShown: true,
             headerTitle: i18n.t("assistant.title"),
-            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.foreground,
           }}
         />
       </Stack>

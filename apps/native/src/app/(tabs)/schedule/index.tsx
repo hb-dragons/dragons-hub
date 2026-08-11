@@ -4,7 +4,6 @@ import {
   View,
   Text,
   SectionList,
-  ScrollView,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
@@ -14,8 +13,7 @@ import { useRouter } from "expo-router";
 import useSWR from "swr";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
-import { Screen } from "@/components/Screen";
-import { SectionHeader } from "@/components/SectionHeader";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { FilterPill } from "@/components/FilterPill";
 import { MatchCardFull } from "@/components/MatchCardFull";
 import { publicApi } from "@/lib/api";
@@ -53,10 +51,17 @@ function MatchList({
   sections,
   isLoading,
   refreshControl,
+  controls,
 }: {
   sections: Section[];
   isLoading: boolean;
   refreshControl?: ReactElement<RefreshControlProps>;
+  /**
+   * Segment switcher and filters. They ride inside the list rather than
+   * sitting above it so the SectionList is the screen's first scroll view —
+   * which is the one the native large title tracks and insets.
+   */
+  controls: ReactElement;
 }) {
   const { colors, textStyles, spacing } = useTheme();
   const router = useRouter();
@@ -70,27 +75,26 @@ function MatchList({
     [router],
   );
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xl }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (sections.length === 0) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing["2xl"] }}>
-        <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
-          {i18n.t("schedule.noMatches")}
-        </Text>
-      </View>
-    );
-  }
-
   return (
     <SectionList
       sections={sections}
+      // This list is the screen's scroll view, so it is the one the native
+      // header insets and the large title collapses against.
+      contentInsetAdjustmentBehavior="automatic"
+      ListHeaderComponent={controls}
+      ListEmptyComponent={
+        isLoading ? (
+          <View style={{ alignItems: "center", paddingTop: spacing.xl }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <View style={{ alignItems: "center", paddingTop: spacing["2xl"] }}>
+            <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
+              {i18n.t("schedule.noMatches")}
+            </Text>
+          </View>
+        )
+      }
       keyExtractor={(item) => String(item.id)}
       renderSectionHeader={({ section }) => (
         <View
@@ -212,17 +216,15 @@ export default function ScheduleScreen() {
     { key: "results", label: i18n.t("schedule.results") },
   ];
 
-  return (
-    <Screen scroll={false}>
-      <SectionHeader title={i18n.t("schedule.title")} />
-
+  // Rendered inside the list, not above it — see `MatchList`. Two pills fit on
+  // any phone width, so they sit in a plain row: a horizontal ScrollView here
+  // would be the first scroll view the native header finds, and the large
+  // title would track the pills instead of the matches.
+  const controls = (
+    <>
       <Segmented segments={segments} selected={segment} onSelect={setSegment} />
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ alignItems: "center" }}
-        style={{ flexGrow: 0, flexShrink: 0, marginBottom: spacing.md, overflow: "visible" }}
+      <View
+        style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.md }}
       >
         <FilterPill
           label={i18n.t("schedule.homeOnly")}
@@ -234,19 +236,25 @@ export default function ScheduleScreen() {
           active={locationFilter === "away"}
           onPress={() => setLocationFilter(locationFilter === "away" ? "all" : "away")}
         />
-      </ScrollView>
+      </View>
+    </>
+  );
 
+  return (
+    <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
       {segment === "upcoming" ? (
         <MatchList
           sections={upcomingSections}
           isLoading={upcomingLoading}
           refreshControl={upcomingRefreshControl}
+          controls={controls}
         />
       ) : (
         <MatchList
           sections={resultsSections}
           isLoading={resultsLoading}
           refreshControl={resultsRefreshControl}
+          controls={controls}
         />
       )}
     </Screen>

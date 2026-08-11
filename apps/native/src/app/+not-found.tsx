@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useTheme } from "@/hooks/useTheme";
-import { Screen } from "@/components/Screen";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { i18n } from "@/lib/i18n";
 
 /**
@@ -25,51 +25,48 @@ export default function NotFoundScreen() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: true, headerTitle: "" }} />
-      <Screen edges={[]} scroll={false}>
-        <View
+    <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: spacing.md,
+          paddingHorizontal: spacing.lg,
+        }}
+      >
+        <Text
+          style={[
+            textStyles.screenTitle,
+            { color: colors.foreground, textAlign: "center" },
+          ]}
+        >
+          {i18n.t("notFound.title")}
+        </Text>
+        <Text
+          style={[
+            textStyles.body,
+            { color: colors.mutedForeground, textAlign: "center", maxWidth: 320 },
+          ]}
+        >
+          {i18n.t("notFound.body")}
+        </Text>
+        <Pressable
+          onPress={goHome}
+          accessibilityRole="button"
           style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            gap: spacing.md,
-            paddingHorizontal: spacing.lg,
+            backgroundColor: colors.primary,
+            paddingHorizontal: spacing.xl,
+            paddingVertical: spacing.md,
+            borderRadius: radius.md,
+            marginTop: spacing.sm,
           }}
         >
-          <Text
-            style={[
-              textStyles.screenTitle,
-              { color: colors.foreground, textAlign: "center" },
-            ]}
-          >
-            {i18n.t("notFound.title")}
+          <Text style={[textStyles.body, { color: colors.primaryForeground }]}>
+            {i18n.t("notFound.action")}
           </Text>
-          <Text
-            style={[
-              textStyles.body,
-              { color: colors.mutedForeground, textAlign: "center", maxWidth: 320 },
-            ]}
-          >
-            {i18n.t("notFound.body")}
-          </Text>
-          <Pressable
-            onPress={goHome}
-            accessibilityRole="button"
-            style={{
-              backgroundColor: colors.primary,
-              paddingHorizontal: spacing.xl,
-              paddingVertical: spacing.md,
-              borderRadius: radius.md,
-              marginTop: spacing.sm,
-            }}
-          >
-            <Text style={[textStyles.body, { color: colors.primaryForeground }]}>
-              {i18n.t("notFound.action")}
-            </Text>
-          </Pressable>
-        </View>
-      </Screen>
-    </>
+        </Pressable>
+      </View>
+    </Screen>
   );
 }

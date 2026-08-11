@@ -3,7 +3,7 @@ import { AppTabs } from "@/components/nav/AppTabs";
 import { useTheme } from "@/hooks/useTheme";
 import { useGateUser } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
-import { TAB_CONFIG } from "@/lib/nav/tabs";
+import { TAB_BAR_MINIMIZE_BEHAVIOR, TAB_CONFIG } from "@/lib/nav/tabs";
 
 export default function TabLayout() {
   const { colors } = useTheme();
@@ -15,5 +15,11 @@ export default function TabLayout() {
     return { ...tab, label: i18n.t(labelKey) };
   });
 
-  return <AppTabs tabs={tabs} tintColor={colors.primary} />;
+  return (
+    <AppTabs
+      tabs={tabs}
+      tintColor={colors.primary}
+      minimizeBehavior={TAB_BAR_MINIMIZE_BEHAVIOR}
+    />
+  );
 }

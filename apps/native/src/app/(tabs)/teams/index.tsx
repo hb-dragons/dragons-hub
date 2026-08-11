@@ -4,8 +4,7 @@ import { useRouter } from "expo-router";
 import useSWR from "swr";
 import type { PublicTeam } from "@dragons/api-client";
 import { useTheme } from "@/hooks/useTheme";
-import { Screen } from "@/components/Screen";
-import { SectionHeader } from "@/components/SectionHeader";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { TeamCard } from "@/components/TeamCard";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
@@ -34,7 +33,7 @@ export default function TeamsScreen() {
 
   if (isLoading) {
     return (
-      <Screen>
+      <Screen edges={UNDER_NATIVE_HEADER}>
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xl }}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -47,11 +46,16 @@ export default function TeamsScreen() {
   const youthTeams = allTeams.filter((t) => isYouthTeam(t));
 
   return (
-    <Screen onRefresh={() => mutate()}>
-      <SectionHeader
-        title={i18n.t("teams.title")}
-        subtitle={i18n.t("teams.subtitle")}
-      />
+    <Screen edges={UNDER_NATIVE_HEADER} onRefresh={() => mutate()}>
+      {/* The screen title is the stack's large title; only the subline is ours. */}
+      <Text
+        style={[
+          textStyles.caption,
+          { color: colors.mutedForeground, marginBottom: spacing.md },
+        ]}
+      >
+        {i18n.t("teams.subtitle")}
+      </Text>
 
       {/* Senior section */}
       {seniorTeams.length > 0 ? (

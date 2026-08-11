@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { getNativeTeamColor, isReferee } from "@dragons/shared";
 import { APIError } from "@dragons/api-client";
 import { useTheme } from "@/hooks/useTheme";
-import { Screen } from "@/components/Screen";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { QuarterTable } from "@/components/QuarterTable";
@@ -58,20 +58,32 @@ export default function GameDetailScreen() {
     ? (match.guestTeamCustomName ?? match.guestTeamNameShort ?? match.guestTeamName)
     : "";
 
+  // Built here, before the loading and error branches, and rendered by all
+  // three: attaching header options only once the match arrives reconfigures
+  // the native header mid push-transition, which flashes a header overlay.
+  const header = (
+    <Stack.Screen
+      options={{ headerTitle: match ? `${homeName} – ${guestName}` : "" }}
+    />
+  );
+
   if (matchLoading) {
     return (
-      <Screen headerOffset={44}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingTop: spacing.xl,
-          }}
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </Screen>
+      <>
+        {header}
+        <Screen edges={UNDER_NATIVE_HEADER}>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              paddingTop: spacing.xl,
+            }}
+          >
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </Screen>
+      </>
     );
   }
 
@@ -83,44 +95,47 @@ export default function GameDetailScreen() {
       ? i18n.t("gameDetail.notFound")
       : i18n.t("gameDetail.error");
     return (
-      <Screen headerOffset={44}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingHorizontal: spacing.xl,
-            paddingTop: spacing.xl,
-            gap: spacing.md,
-          }}
-        >
-          <Text
-            style={[
-              textStyles.body,
-              { color: colors.mutedForeground, textAlign: "center" },
-            ]}
+      <>
+        {header}
+        <Screen edges={UNDER_NATIVE_HEADER}>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              paddingHorizontal: spacing.xl,
+              paddingTop: spacing.xl,
+              gap: spacing.md,
+            }}
           >
-            {message}
-          </Text>
-          {!isNotFound ? (
-            <Pressable
-              onPress={() => {
-                void mutateMatch();
-              }}
-              style={{
-                backgroundColor: colors.primary,
-                borderRadius: radius.md,
-                paddingHorizontal: spacing.xl,
-                paddingVertical: spacing.md,
-              }}
+            <Text
+              style={[
+                textStyles.body,
+                { color: colors.mutedForeground, textAlign: "center" },
+              ]}
             >
-              <Text style={[textStyles.button, { color: colors.primaryForeground }]}>
-                {i18n.t("gameDetail.retry")}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </Screen>
+              {message}
+            </Text>
+            {!isNotFound ? (
+              <Pressable
+                onPress={() => {
+                  void mutateMatch();
+                }}
+                style={{
+                  backgroundColor: colors.primary,
+                  borderRadius: radius.md,
+                  paddingHorizontal: spacing.xl,
+                  paddingVertical: spacing.md,
+                }}
+              >
+                <Text style={[textStyles.button, { color: colors.primaryForeground }]}>
+                  {i18n.t("gameDetail.retry")}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </Screen>
+      </>
     );
   }
 
@@ -173,9 +188,9 @@ export default function GameDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerTitle: `${homeName} – ${guestName}` }} />
+      {header}
       <Screen
-        headerOffset={44}
+        edges={UNDER_NATIVE_HEADER}
         onRefresh={[
           () => mutateMatch(),
           () => mutateContext(),

@@ -38,9 +38,14 @@ export default defineConfig({
         // foundation's new tests (global error handler, nav architecture, app
         // config). Measured 10.08/8.01/9.59/9.96 — branches, functions and
         // lines have not yet cleared their next whole point.
+        //
+        // Ratcheted 2026-08-11 (#216): lines 9 -> 10, on the native-header
+        // tests (header options, tab-bar minimize behaviour, the widened nav
+        // architecture suite). Measured 10.2/8.02/9.68/10.08 — statements,
+        // branches and functions hold.
         branches: 8,
         functions: 9,
-        lines: 9,
+        lines: 10,
         statements: 10,
       },
     },

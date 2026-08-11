@@ -7,7 +7,7 @@ import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
-import { Screen } from "@/components/Screen";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { ErrorState } from "@/components/ErrorState";
 import { MatchCardFull } from "@/components/MatchCardFull";
 import { MatchCardCompact } from "@/components/MatchCardCompact";
@@ -34,6 +34,11 @@ export default function TeamDetailScreen() {
   } = useSWR("teams:all", () => publicApi.getTeams());
 
   const team = teams?.find((t) => String(t.id) === id) ?? null;
+
+  // Built before the loading and error branches, and rendered by all three:
+  // attaching header options only once the team list arrives reconfigures the
+  // native header mid push-transition, which flashes a header overlay.
+  const header = <Stack.Screen options={{ headerTitle: team?.name ?? "" }} />;
 
   const {
     data: teamStats,
@@ -200,18 +205,21 @@ export default function TeamDetailScreen() {
 
   if (isLoading) {
     return (
-      <Screen headerOffset={44}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingTop: spacing.xl,
-          }}
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </Screen>
+      <>
+        {header}
+        <Screen edges={UNDER_NATIVE_HEADER}>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              paddingTop: spacing.xl,
+            }}
+          >
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </Screen>
+      </>
     );
   }
 
@@ -219,19 +227,22 @@ export default function TeamDetailScreen() {
   // Reachable by deep link: the id may simply not be in the teams list.
   if (teamsState === "error" || !team) {
     return (
-      <Screen headerOffset={44}>
-        <ErrorState
-          message={
-            teamsState === "error"
-              ? i18n.t("common.loadFailed")
-              : i18n.t("common.notFound")
-          }
-          retryLabel={i18n.t("common.retry")}
-          onRetry={() => {
-            void mutateTeams();
-          }}
-        />
-      </Screen>
+      <>
+        {header}
+        <Screen edges={UNDER_NATIVE_HEADER}>
+          <ErrorState
+            message={
+              teamsState === "error"
+                ? i18n.t("common.loadFailed")
+                : i18n.t("common.notFound")
+            }
+            retryLabel={i18n.t("common.retry")}
+            onRetry={() => {
+              void mutateTeams();
+            }}
+          />
+        </Screen>
+      </>
     );
   }
 
@@ -446,10 +457,13 @@ export default function TeamDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerTitle: team.name }} />
-      <Screen headerOffset={44} scroll={false}>
+      {header}
+      <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
         <FlatList
           data={allMatches}
+          // The screen's scroll view: it takes the content inset for the
+          // transparent header floating over it.
+          contentInsetAdjustmentBehavior="automatic"
           renderItem={renderMatchItem}
           keyExtractor={keyExtractMatch}
           ListHeaderComponent={listHeader}

@@ -47,21 +47,9 @@ export default function BoardListScreen() {
     </Pressable>
   );
 
-  if (isLoading && !data) {
-    return (
-      <>
-        <Stack.Screen
-          options={{
-            title: i18n.t("admin.boards.title"),
-            headerRight: renderHeaderRight,
-          }}
-        />
-        <BoardListSkeleton />
-        <CreateBoardSheet ref={createRef} />
-      </>
-    );
-  }
-
+  // One declaration site, rendered by both the skeleton and the loaded list:
+  // attaching the title and the "+" button only after the boards arrive
+  // reconfigures the native header mid push-transition, which flashes.
   return (
     <>
       <Stack.Screen
@@ -70,99 +58,103 @@ export default function BoardListScreen() {
           headerRight: renderHeaderRight,
         }}
       />
-      <FlatList
-        data={data ?? []}
-        keyExtractor={(b) => String(b.id)}
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, flexGrow: 1 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={isValidating && !isLoading}
-            onRefresh={() => {
-              void mutate();
-            }}
-            tintColor={colors.foreground}
-          />
-        }
-        ListEmptyComponent={
-          <View
-            style={{
-              flex: 1,
-              alignItems: "center",
-              justifyContent: "center",
-              paddingVertical: spacing["3xl"],
-              gap: spacing.md,
-            }}
-          >
-            <Text
-              style={{
-                color: colors.foreground,
-                textAlign: "center",
-                fontSize: 16,
-                fontWeight: "600",
+      {isLoading && !data ? (
+        <BoardListSkeleton />
+      ) : (
+        <FlatList
+          data={data ?? []}
+          keyExtractor={(b) => String(b.id)}
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={{ padding: spacing.lg, gap: spacing.md, flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isValidating && !isLoading}
+              onRefresh={() => {
+                void mutate();
               }}
-            >
-              {i18n.t("admin.boards.empty")}
-            </Text>
-            <Text
+              tintColor={colors.foreground}
+            />
+          }
+          ListEmptyComponent={
+            <View
               style={{
-                color: colors.mutedForeground,
-                textAlign: "center",
-                fontSize: 14,
-              }}
-            >
-              {i18n.t("admin.boards.emptyHint")}
-            </Text>
-            <Pressable
-              onPress={openCreate}
-              accessibilityRole="button"
-              style={{
-                marginTop: spacing.sm,
-                paddingHorizontal: spacing.lg,
-                paddingVertical: spacing.md,
-                borderRadius: radius.md,
-                backgroundColor: colors.primary,
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: spacing["3xl"],
+                gap: spacing.md,
               }}
             >
               <Text
                 style={{
-                  color: colors.primaryForeground,
-                  fontWeight: "700",
+                  color: colors.foreground,
+                  textAlign: "center",
+                  fontSize: 16,
+                  fontWeight: "600",
+                }}
+              >
+                {i18n.t("admin.boards.empty")}
+              </Text>
+              <Text
+                style={{
+                  color: colors.mutedForeground,
+                  textAlign: "center",
                   fontSize: 14,
                 }}
               >
-                {i18n.t("admin.boards.new")}
+                {i18n.t("admin.boards.emptyHint")}
               </Text>
-            </Pressable>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => router.push(`/admin/boards/${item.id}`)}
-            accessibilityRole="button"
-            accessibilityLabel={item.name}
-            style={{
-              padding: spacing.lg,
-              borderRadius: radius.md,
-              backgroundColor: colors.surfaceHigh,
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}
-          >
-            <Text style={{ color: colors.foreground, fontSize: 17, fontWeight: "600" }}>
-              {item.name}
-            </Text>
-            {item.description ? (
-              <Text
-                numberOfLines={2}
-                style={{ color: colors.mutedForeground, marginTop: spacing.xs }}
+              <Pressable
+                onPress={openCreate}
+                accessibilityRole="button"
+                style={{
+                  marginTop: spacing.sm,
+                  paddingHorizontal: spacing.lg,
+                  paddingVertical: spacing.md,
+                  borderRadius: radius.md,
+                  backgroundColor: colors.primary,
+                }}
               >
-                {item.description}
+                <Text
+                  style={{
+                    color: colors.primaryForeground,
+                    fontWeight: "700",
+                    fontSize: 14,
+                  }}
+                >
+                  {i18n.t("admin.boards.new")}
+                </Text>
+              </Pressable>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              onPress={() => router.push(`/admin/boards/${item.id}`)}
+              accessibilityRole="button"
+              accessibilityLabel={item.name}
+              style={{
+                padding: spacing.lg,
+                borderRadius: radius.md,
+                backgroundColor: colors.surfaceHigh,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <Text style={{ color: colors.foreground, fontSize: 17, fontWeight: "600" }}>
+                {item.name}
               </Text>
-            ) : null}
-          </Pressable>
-        )}
-      />
+              {item.description ? (
+                <Text
+                  numberOfLines={2}
+                  style={{ color: colors.mutedForeground, marginTop: spacing.xs }}
+                >
+                  {item.description}
+                </Text>
+              ) : null}
+            </Pressable>
+          )}
+        />
+      )}
       <CreateBoardSheet ref={createRef} />
     </>
   );
