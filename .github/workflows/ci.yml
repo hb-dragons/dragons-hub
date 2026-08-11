@@ -134,6 +134,23 @@ jobs:
       - name: Build
         run: pnpm build
 
+  native-doctor:
+    # EAS runs `expo doctor` inside the cloud build and fails the whole build
+    # on a non-zero exit, so a dependency-graph mistake otherwise costs a
+    # 10-20 minute cloud build to discover. Same 20 checks, run here for free.
+    name: Expo Doctor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Expo doctor
+        run: pnpm --filter @dragons/native check:doctor
+
   pi:
     name: Pi Tests
     runs-on: ubuntu-latest

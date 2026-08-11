@@ -281,13 +281,16 @@ When `app.json > expo.version` changes:
 ## `expo doctor` gates the build
 
 EAS runs `expo doctor` during the build and fails the whole build on a
-non-zero exit, so a doctor failure costs a full cloud build. Run it
-locally first — it is the same 20 checks (SDK 57 added one; it was 19
-on SDK 55):
+non-zero exit, so a doctor failure costs a full cloud build. Since #213
+CI runs the same 20 checks on every PR (the `native-doctor` job), and
+`expo-doctor` is a pinned devDependency rather than an `npx` download,
+so the version CI runs is the version you run:
 
 ```bash
-cd apps/native && npx expo-doctor
+pnpm --filter @dragons/native check:doctor
 ```
+
+(It was 19 checks on SDK 55; SDK 57 added one.)
 
 As of #213 all 20 pass, with nothing skipped. Three of them needed
 structural fixes to get there:

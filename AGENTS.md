@@ -1241,7 +1241,7 @@ Two operational constraints the code relies on but doesn't state inline:
 
 | Workflow | File | Triggers | Jobs |
 |----------|------|----------|------|
-| CI | `.github/workflows/ci.yml` | PR, push main/master, dispatch | `lint` (eslint + `check:i18n` + `check:design-tokens` + tsc + knip), `test` (test + `check:coverage-scripts` + `check:skipped-tests` + coverage), `build`, `pi` (pytest over `apps/pi`), `ai-slop`, `lockfile-check`, `dependency-review`, `dependency-audit`, `secret-scan` |
+| CI | `.github/workflows/ci.yml` | PR, push main/master, dispatch | `lint` (eslint + `check:i18n` + `check:design-tokens` + tsc + knip), `test` (test + `check:coverage-scripts` + `check:skipped-tests` + coverage), `build`, `native-doctor` (`expo doctor` over `apps/native`), `pi` (pytest over `apps/pi`), `ai-slop`, `lockfile-check`, `dependency-review`, `dependency-audit`, `secret-scan` |
 | Deploy | `.github/workflows/deploy.yml` | `workflow_run` after a green CI on main, dispatch | `check-ci`, `determine-changes` (path filters live in `.github/scripts/change-patterns.sh`), `run-migrations`, `build-web`, `build-api`, `summary` |
 | CD | `.github/workflows/cd.yml` | push main, `v*.*.*` tags, dispatch | `deliver` (build + pack artifacts), `release` (GitHub release) |
 | DB migrations | `.github/workflows/db-migrations.yml` | dispatch only | `migrate`. Actions: `migrate` or `check`. There is deliberately no `push` action — `drizzle-kit push` drops hand-written SQL indexes |

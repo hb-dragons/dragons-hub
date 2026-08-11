@@ -6,13 +6,16 @@
   "expo": {
     "install": {
       "//": "react is pinned to one version workspace-wide (see `overrides` in pnpm-workspace.yaml), which is a patch ahead of the SDK 57 pin. Excluding it here keeps `expo doctor`'s dependency-version check ON for every other package instead of skipping the whole check.",
-      "exclude": ["react"]
+      "exclude": [
+        "react"
+      ]
     }
   },
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
     "android": "expo run:android",
+    "check:doctor": "expo-doctor",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
@@ -64,6 +67,7 @@
   "devDependencies": {
     "@types/react": "^19.2.14",
     "@vitest/coverage-v8": "^4.1.6",
+    "expo-doctor": "1.20.1",
     "react-native-svg-transformer": "^1.5.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
