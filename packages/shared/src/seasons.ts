@@ -1,0 +1,51 @@
+export type SeasonStatus = "upcoming" | "active" | "archived";
+
+export const SEASON_STATUSES: readonly SeasonStatus[] = [
+  "upcoming",
+  "active",
+  "archived",
+] as const;
+
+export interface Season {
+  id: number;
+  name: string;
+  sdkSeasonId: number | null;
+  status: SeasonStatus;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SeasonWithCounts extends Season {
+  leagueCount: number;
+  /** Fixtures pulled for this season's leagues — 0 until the sync has run. */
+  gameCount: number;
+}
+
+export interface BrowsableLeague {
+  ligaId: number;
+  ligaNr: number | null;
+  name: string;
+  skName: string;
+  akName: string;
+  geschlecht: string;
+  vorabliga: boolean;
+  alreadyTracked: boolean;
+}
+
+export interface SetSeasonLeaguesResult {
+  tracked: number;
+  untracked: number;
+}
+
+export interface SeasonSummary {
+  leagueCount: number;
+  gameCount: number;
+  /**
+   * Fixture slots the federation has not yet assigned a team to. `null` when
+   * the federation could not be read — a partial count is indistinguishable
+   * from a genuinely low one, so we report nothing rather than a wrong number.
+   */
+  placeholderSlots: number | null;
+}

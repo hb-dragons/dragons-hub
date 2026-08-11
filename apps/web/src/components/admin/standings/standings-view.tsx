@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { useTranslations } from "next-intl"
 import useSWR from "swr"
 import { queries } from "@/lib/swr-queries"
+import { SeasonContextSelect } from "@/components/admin/seasons/season-context-select"
 import { ErrorState } from "@/components/ui/error-state"
 import { LoadingState } from "@/components/ui/loading-state"
 import { Trophy } from "lucide-react"
@@ -19,34 +21,56 @@ import { cn } from "@dragons/ui/lib/utils"
 
 export function StandingsView() {
   const t = useTranslations("standings")
-  const standingsQ = queries.standings()
+  // `undefined` is the active season, matching the server prefetch's key.
+  const [seasonId, setSeasonId] = useState<number | undefined>(undefined)
+  const standingsQ = queries.standings(seasonId)
   const { data: leagues, error, isLoading, mutate } = useSWR(
     standingsQ.key,
     standingsQ.fetcher,
   )
 
+  const leagueList = leagues ?? []
+
+  // The season picker stays mounted through every state below. An upcoming
+  // season legitimately has no standings until its first sync, and returning
+  // the bare empty state would strand the admin there with no way back to the
+  // active season.
+  const picker = <SeasonContextSelect value={seasonId} onChange={setSeasonId} />
+
   // A failed request is not "no standings data" — never collapse the two.
   if (error) {
-    return <ErrorState onRetry={() => { void mutate(); }} />
+    return (
+      <div className="space-y-8">
+        {picker}
+        <ErrorState onRetry={() => { void mutate(); }} />
+      </div>
+    )
   }
 
   if (isLoading && !leagues) {
-    return <LoadingState rows={5} />
+    return (
+      <div className="space-y-8">
+        {picker}
+        <LoadingState rows={5} />
+      </div>
+    )
   }
-
-  const leagueList = leagues ?? []
 
   if (leagueList.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-        <Trophy className="mb-2 h-8 w-8" />
-        <p>{t("empty")}</p>
+      <div className="space-y-8">
+        {picker}
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <Trophy className="mb-2 h-8 w-8" />
+          <p>{t("empty")}</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-8">
+      {picker}
       {leagueList.map((league) => (
         <div key={league.leagueId} className="space-y-2">
           <div>

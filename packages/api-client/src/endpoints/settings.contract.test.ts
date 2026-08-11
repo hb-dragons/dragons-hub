@@ -3,7 +3,6 @@ import {
   settingsClubConfigSchema,
   settingsBookingConfigSchema,
   settingsRefereeReminderSchema,
-  leagueNumbersSchema,
   leagueOwnClubRefsSchema,
 } from "@dragons/contracts";
 import { ApiClient } from "../client";
@@ -64,17 +63,6 @@ describe("settings request bodies satisfy @dragons/contracts schemas", () => {
       "settingsRefereeReminderSchema rejected the setRefereeReminder body",
     ).toBeUndefined();
     expect(calls[0]!.url).toContain("/admin/settings/referee-reminders");
-    expect(calls[0]!.method).toBe("PUT");
-  });
-
-  it("setLeagues body parses against leagueNumbersSchema", async () => {
-    const { api, calls } = recordingClient();
-    await api.setLeagues({ leagueNumbers: [12345, 67890] });
-    const parsed = leagueNumbersSchema.safeParse(calls[0]!.body);
-    expect(
-      parsed.error?.issues,
-      "leagueNumbersSchema rejected the setLeagues body",
-    ).toBeUndefined();
     expect(calls[0]!.method).toBe("PUT");
   });
 

@@ -7,6 +7,7 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "./setup-test-db";
+import { seedActiveSeason } from "./seed-season";
 import { leagues, venueBookings, venues } from "@dragons/db/schema";
 
 let ctx: TestDbContext;
@@ -54,6 +55,7 @@ describe("setupTestDb", () => {
   });
 
   it("supports Drizzle ORM insert and select", async () => {
+    const seasonRefId = await seedActiveSeason(ctx);
     const [league] = await ctx.db
       .insert(leagues)
       .values({
@@ -62,6 +64,7 @@ describe("setupTestDb", () => {
         name: "Regionalliga West",
         seasonId: 100,
         seasonName: "2025/26",
+        seasonRefId,
       })
       .returning();
 
@@ -99,12 +102,14 @@ describe("resetTestDb", () => {
   });
 
   it("truncates all data", async () => {
+    const seasonRefId = await seedActiveSeason(ctx);
     await ctx.db.insert(leagues).values({
       apiLigaId: 99999,
       ligaNr: 1,
       name: "Test",
       seasonId: 1,
       seasonName: "Test",
+      seasonRefId,
     });
 
     await resetTestDb(ctx);
@@ -171,6 +176,7 @@ describe("resetTestDb", () => {
   });
 
   it("resets sequences to 1", async () => {
+    const seasonRefId = await seedActiveSeason(ctx);
     const [first] = await ctx.db
       .insert(leagues)
       .values({
@@ -179,6 +185,7 @@ describe("resetTestDb", () => {
         name: "First",
         seasonId: 1,
         seasonName: "Test",
+        seasonRefId,
       })
       .returning();
 
@@ -186,16 +193,19 @@ describe("resetTestDb", () => {
   });
 
   it("resets a sequence advanced by a rolled-back insert", async () => {
+    const rolledBackSeason = await seedActiveSeason(ctx);
     await ctx.client.exec(`
       BEGIN;
-      INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name)
-      VALUES (42, 42, 'Rolled back', 1, 'Test');
+      INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id)
+      VALUES (42, 42, 'Rolled back', 1, 'Test', ${rolledBackSeason});
       ROLLBACK;
     `);
     expect(await ctx.db.select().from(leagues)).toEqual([]);
 
     await resetTestDb(ctx);
 
+    // The reset took the season with it, so this needs its own.
+    const seasonRefId = await seedActiveSeason(ctx);
     const [row] = await ctx.db
       .insert(leagues)
       .values({
@@ -204,6 +214,7 @@ describe("resetTestDb", () => {
         name: "After",
         seasonId: 1,
         seasonName: "Test",
+        seasonRefId,
       })
       .returning();
     expect(row!.id).toBe(1);

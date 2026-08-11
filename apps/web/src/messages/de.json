@@ -10,6 +10,7 @@
     "referees": "Schiedsrichter",
     "teams": "Teams",
     "sync": "Synchronisation",
+    "seasons": "Saisons",
     "settings": "Einstellungen",
     "standings": "Tabellen",
     "venues": "Hallen",
@@ -929,10 +930,7 @@
     "leagues": {
       "title": "Verfolgte Ligen",
       "description": "Liganummern (liganr) eingeben, die synchronisiert werden sollen, getrennt durch Kommas.",
-      "numbersLabel": "Liganummern",
-      "numbersPlaceholder": "z.B. 4102, 4105, 4003",
       "configureClubFirst": "Bitte zuerst oben einen Verein konfigurieren.",
-      "notFound": "Nicht gefunden: {numbers}",
       "columns": {
         "ligaNr": "Liga Nr",
         "name": "Name",
@@ -940,8 +938,6 @@
         "ownClubRefs": "Vereins-SR"
       },
       "toast": {
-        "partial": "{tracked} Liga(s) gespeichert. {notFoundCount} nicht gefunden: {notFoundList}",
-        "saved": "{count} Liga(s) werden verfolgt",
         "saveFailed": "Liga-Einstellungen konnten nicht gespeichert werden"
       }
     },
@@ -958,6 +954,72 @@
       "description": "Zwischen hellem und dunklem Modus wählen",
       "light": "Hell",
       "dark": "Dunkel"
+    },
+    "seasons": {
+      "title": "Saisons",
+      "contextLabel": "Saison",
+      "activate": "Aktivieren",
+      "createSeason": "Saison erstellen",
+      "confirmEmptyActivate": "Diese Saison hat keine Ligen. Das Aktivieren zeigt einen leeren Spielplan auf der öffentlichen Seite. Fortfahren?",
+      "status": {
+        "upcoming": "Bevorstehend",
+        "active": "Aktiv",
+        "archived": "Archiviert"
+      },
+      "toast": {
+        "activated": "Saison aktiviert",
+        "activateFailed": "Saison konnte nicht aktiviert werden"
+      },
+      "manage": {
+        "button": "Ligen verwalten",
+        "title": "Ligen verwalten",
+        "description": "Ligen dieser Saison hinzufügen oder entfernen.",
+        "save": "Speichern & synchronisieren",
+        "saved": "Ligen aktualisiert",
+        "saveFailed": "Ligen konnten nicht gespeichert werden",
+        "loadFailed": "Ligen konnten nicht vom Verband geladen werden"
+      },
+      "wizard": {
+        "title": "Neue Saison",
+        "nameLabel": "Saisonname",
+        "nameDescription": "Benenne die kommende Saison und wähle anschließend ihre Ligen.",
+        "next": "Weiter",
+        "selectDescription": "Wähle die zu verfolgenden Vorabliga-Ligen für diese Saison aus.",
+        "searchPlaceholder": "Ligen suchen…",
+        "ownClubOnly": "Nur Ligen meines Vereins",
+        "showTeams": "Mannschaften anzeigen",
+        "hideTeams": "Mannschaften ausblenden",
+        "teamsLoading": "Mannschaften werden geladen…",
+        "teamsError": "Mannschaften konnten nicht geladen werden",
+        "noTeams": "Noch keine Mannschaften eingetragen",
+        "selectedCount": "{count} ausgewählt",
+        "loadingLeagues": "Ligen werden geladen…",
+        "noLeagues": "Keine Ligen gefunden",
+        "noMatches": "Keine Ligen passen zur Suche",
+        "confirm": "Erstellen & synchronisieren",
+        "syncing": "Synchronisierung läuft…",
+        "close": "Schließen",
+        "syncFailed": "Synchronisierung fehlgeschlagen — Sync-Log prüfen",
+        "discoverFailed": "Ligen konnten nicht vom Verband geladen werden",
+        "createFailed": "Saison konnte nicht erstellt werden",
+        "startDateLabel": "Startdatum (optional)",
+        "endDateLabel": "Enddatum (optional)",
+        "reviewTitle": "Saison bereit",
+        "reviewLeagues": "Ligen übernommen",
+        "reviewGames": "Spiele geladen",
+        "reviewPlaceholders": "Offene Spielpaarungen",
+        "reviewPlaceholderHint": "Der Verband hat für diese Spiele noch nicht beide Mannschaften benannt, daher werden sie noch nicht importiert. Sie kommen mit einem späteren Sync dazu.",
+        "reviewUnavailable": "Zahlen konnten nicht geladen werden. Die Saison und ihre Ligen sind gespeichert.",
+        "reviewProvisional": "Die Synchronisierung lief noch, als wir sie aus den Augen verloren haben. Diese Zahlen sind daher vorläufig — die endgültigen stehen im Sync-Log."
+      },
+      "subtitle": "Die Ligen der nächsten Saison im Hintergrund vorbereiten und dann live schalten.",
+      "empty": "Noch keine Saisons. Lege eine an, um die Ligen einer Saison zu verfolgen.",
+      "columns": {
+        "name": "Saison",
+        "status": "Status",
+        "leagues": "Ligen",
+        "games": "Spiele"
+      }
     },
     "pushTest": {
       "pageTitle": "Benachrichtigungen",

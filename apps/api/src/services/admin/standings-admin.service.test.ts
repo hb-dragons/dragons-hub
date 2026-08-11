@@ -16,11 +16,13 @@ vi.mock("../../config/database", () => ({
 // --- Imports (after mocks) ---
 
 import { getStandings } from "./standings-admin.service";
+import { invalidateActiveSeasonCache } from "./season.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- PGlite setup ---
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -29,6 +31,11 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetTestDb(ctx);
+  const result = await ctx.client.query<{ id: number }>(
+    `INSERT INTO seasons (name, status) VALUES ('2025/26', 'active') RETURNING id`,
+  );
+  activeSeasonId = result.rows[0]!.id;
+  invalidateActiveSeasonCache();
   vi.clearAllMocks();
 });
 
@@ -45,6 +52,7 @@ async function insertLeague(overrides: Record<string, unknown> = {}) {
     name: "Kreisliga A",
     season_id: 1,
     season_name: "2025/26",
+    season_ref_id: activeSeasonId,
     is_tracked: true,
   };
   const data = { ...defaults, ...overrides };
@@ -273,5 +281,99 @@ describe("getStandings", () => {
 
     // Own-club league first, foreign leagues alphabetical after
     expect(result.map((r) => r.leagueName)).toEqual(["Own Liga", "Bar Liga", "Foo Liga"]);
+  });
+
+  it("only returns standings from the active season", async () => {
+    // The active season (id = activeSeasonId) is already seeded in beforeEach.
+    const upcomingResult = await ctx.client.query<{ id: number }>(
+      `INSERT INTO seasons (name, status) VALUES ('2026/27', 'upcoming') RETURNING id`,
+    );
+    const upcomingId = upcomingResult.rows[0]!.id;
+
+    const activeLeague = await insertLeague({ api_liga_id: 1 });
+    const upcomingLeague = await insertLeague({ api_liga_id: 2, liga_nr: 4103, name: "Next", season_ref_id: upcomingId });
+
+    await insertTeam({ api_team_permanent_id: 1000, name: "Team A" });
+    await insertTeam({ api_team_permanent_id: 2000, name: "Team B", season_team_id: 2, team_competition_id: 2 });
+
+    await insertStanding(activeLeague, 1000, { position: 1 });
+    await insertStanding(upcomingLeague, 2000, { position: 1 });
+
+    const result = await getStandings();
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.leagueId).toBe(activeLeague);
+  });
+
+  it("returns empty array when there is no active season", async () => {
+    await ctx.client.query(`UPDATE seasons SET status = 'archived'`);
+    invalidateActiveSeasonCache();
+
+    const leagueId = await insertLeague({ api_liga_id: 1 });
+    await insertTeam({ api_team_permanent_id: 1000, name: "Team A" });
+    await insertStanding(leagueId, 1000, { position: 1 });
+
+    const result = await getStandings();
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe("getStandings season scope", () => {
+  async function seedUpcomingSeasonStandings() {
+    const upcoming = await ctx.client.query<{ id: number }>(
+      `INSERT INTO seasons (name, status) VALUES ('2026/27', 'upcoming') RETURNING id`,
+    );
+    const seasonId = upcoming.rows[0]!.id;
+    const leagueId = await insertLeague({
+      api_liga_id: 2,
+      name: "Next Season League",
+      season_ref_id: seasonId,
+    });
+    await insertTeam({ api_team_permanent_id: 2000, name: "Next Season Team" });
+    await insertStanding(leagueId, 2000);
+    return seasonId;
+  }
+
+  it("defaults to the active season when no season is named", async () => {
+    const activeLeague = await insertLeague({ api_liga_id: 1, name: "This Season League" });
+    await insertTeam({ api_team_permanent_id: 1000 });
+    await insertStanding(activeLeague, 1000);
+    await seedUpcomingSeasonStandings();
+
+    const result = await getStandings();
+
+    expect(result.map((l) => l.leagueName)).toEqual(["This Season League"]);
+  });
+
+  it("returns the named season instead when one is given", async () => {
+    const activeLeague = await insertLeague({ api_liga_id: 1, name: "This Season League" });
+    await insertTeam({ api_team_permanent_id: 1000 });
+    await insertStanding(activeLeague, 1000);
+    const upcomingId = await seedUpcomingSeasonStandings();
+
+    // This is what lets an admin check an upcoming season's table while the
+    // public standings page stays on the live season.
+    const result = await getStandings(upcomingId);
+
+    expect(result.map((l) => l.leagueName)).toEqual(["Next Season League"]);
+  });
+
+  it("returns nothing for a season that does not exist", async () => {
+    const activeLeague = await insertLeague({ api_liga_id: 1 });
+    await insertTeam({ api_team_permanent_id: 1000 });
+    await insertStanding(activeLeague, 1000);
+
+    expect(await getStandings(999_999)).toEqual([]);
+  });
+
+  it("returns nothing when no season is named and none is active", async () => {
+    const activeLeague = await insertLeague({ api_liga_id: 1 });
+    await insertTeam({ api_team_permanent_id: 1000 });
+    await insertStanding(activeLeague, 1000);
+    await ctx.client.query(`UPDATE seasons SET status = 'archived'`);
+    invalidateActiveSeasonCache();
+
+    expect(await getStandings()).toEqual([]);
   });
 });

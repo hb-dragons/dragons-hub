@@ -2,7 +2,6 @@
 /** @public — mirrors the federation API surface; see the note at the foot of this file. */
 export type {
   SdkClubSearchResult,
-  SdkDiscoveredCompetition,
   SdkClubMatch,
   SdkClubMatchesResponse,
 } from "./types/club";

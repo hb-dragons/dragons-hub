@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   buildCalendarFeed: vi.fn(),
   getPublicMatchDetail: vi.fn(),
   getMatchContext: vi.fn(),
+  getActiveSeasonId: vi.fn(),
 }));
 
 vi.mock("../../services/admin/match-admin.service", () => ({
@@ -25,6 +26,10 @@ vi.mock("../../services/public/match-context.service", () => ({
 
 vi.mock("../../services/public/calendar.service", () => ({
   buildCalendarFeed: mocks.buildCalendarFeed,
+}));
+
+vi.mock("../../services/admin/season.service", () => ({
+  getActiveSeasonId: mocks.getActiveSeasonId,
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -49,6 +54,7 @@ function json(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getActiveSeasonId.mockResolvedValue(3);
 });
 
 describe("GET /matches (public)", () => {

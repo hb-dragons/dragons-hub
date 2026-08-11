@@ -2,13 +2,13 @@ import { Hono } from "hono";
 import { describeRoute, validator } from "hono-openapi";
 import {
   getTrackedLeagues,
-  resolveAndSaveLeagues,
   setLeagueOwnClubRefs,
+  getLeagueTeams,
 } from "../../services/admin/league-discovery.service";
 import { requirePermission } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
 import type { AppEnv } from "../../types";
-import { leagueNumbersSchema, leagueOwnClubRefsSchema, leagueIdParamSchema } from "@dragons/contracts";
+import { leagueOwnClubRefsSchema, leagueIdParamSchema, ligaIdParamSchema } from "@dragons/contracts";
 
 const leagueRoutes = new Hono<AppEnv>();
 
@@ -29,23 +29,6 @@ leagueRoutes.get(
   },
 );
 
-// PUT /admin/settings/leagues - Set tracked leagues by liganr
-leagueRoutes.put(
-  "/settings/leagues",
-  settingsUpdate,
-  validator("json", leagueNumbersSchema, validationHook),
-  describeRoute({
-    description: "Set tracked leagues by league number",
-    tags: ["Leagues"],
-    responses: { 200: { description: "Success" } },
-  }),
-  async (c) => {
-    const { leagueNumbers } = c.req.valid("json");
-    const result = await resolveAndSaveLeagues(leagueNumbers);
-    return c.json(result);
-  },
-);
-
 // PATCH /admin/settings/leagues/:id/own-club-refs - Toggle own-club-refs for a league
 leagueRoutes.patch(
   "/settings/leagues/:id/own-club-refs",
@@ -62,6 +45,22 @@ leagueRoutes.patch(
     const { ownClubRefs } = c.req.valid("json");
     await setLeagueOwnClubRefs(leagueId, ownClubRefs);
     return c.json({ ok: true });
+  },
+);
+
+// GET /admin/leagues/:ligaId/teams - list a federation league's team roster
+leagueRoutes.get(
+  "/leagues/:ligaId/teams",
+  settingsUpdate,
+  validator("param", ligaIdParamSchema, validationHook),
+  describeRoute({
+    description: "List the teams in a federation league",
+    tags: ["Leagues"],
+    responses: { 200: { description: "Success" } },
+  }),
+  async (c) => {
+    const { ligaId } = c.req.valid("param");
+    return c.json(await getLeagueTeams(ligaId));
   },
 );
 

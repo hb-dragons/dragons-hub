@@ -29,6 +29,7 @@ import type { TestDbContext } from "../../test/setup-test-db";
 import {
   leagues,
   matches,
+  seasons,
   teams,
 } from "@dragons/db/schema";
 import {
@@ -39,6 +40,7 @@ import {
 } from "./config";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -46,6 +48,11 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await resetTestDb(ctx);
+  const [season] = await ctx.db
+    .insert(seasons)
+    .values({ name: "2025/26", status: "active" })
+    .returning();
+  activeSeasonId = season!.id;
 });
 afterAll(async () => {
   await closeTestDb(ctx);
@@ -59,6 +66,7 @@ async function seed(): Promise<{ matchId: number }> {
     name: "Test Liga",
     seasonId: 2026,
     seasonName: "2025/26",
+    seasonRefId: activeSeasonId,
   });
   await ctx.db.insert(teams).values([
     {

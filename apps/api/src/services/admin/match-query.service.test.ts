@@ -62,8 +62,10 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { seedActiveSeason } from "../../test/seed-season";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -72,6 +74,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetTestDb(ctx);
+  activeSeasonId = await seedActiveSeason(ctx);
 });
 
 afterAll(async () => {
@@ -140,6 +143,7 @@ async function seedLeague(name: string): Promise<number> {
       name,
       seasonId: 2025,
       seasonName: "2025/26",
+      seasonRefId: activeSeasonId,
     })
     .returning({ id: leagues.id });
   return row!.id;

@@ -66,8 +66,10 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { seedActiveSeason } from "../../test/seed-season";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -76,6 +78,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetTestDb(ctx);
+  activeSeasonId = await seedActiveSeason(ctx);
   vi.clearAllMocks();
 });
 
@@ -168,6 +171,7 @@ async function seedMatch(opts: { kickoffTime: string; matchNo?: number }): Promi
       name: "Regionalliga",
       seasonId: 2025,
       seasonName: "2025/26",
+      seasonRefId: activeSeasonId,
     })
     .returning({ id: leagues.id });
   const [row] = await ctx.db

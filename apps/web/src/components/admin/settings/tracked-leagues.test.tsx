@@ -5,12 +5,9 @@ import { cleanup, render, screen, fireEvent, act } from "@testing-library/react"
 import { NextIntlClientProvider } from "next-intl";
 
 const mocks = vi.hoisted(() => ({
-  setLeagues: vi.fn(),
   setLeagueOwnClubRefs: vi.fn(),
   mutate: vi.fn(),
   toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-  toastWarning: vi.fn(),
 }));
 
 // Mutable SWR cache keyed the same way the component asks for it. Simulates the
@@ -26,7 +23,6 @@ vi.mock("swr", () => ({
 vi.mock("@/lib/api", () => ({
   api: {
     settings: {
-      setLeagues: mocks.setLeagues,
       setLeagueOwnClubRefs: mocks.setLeagueOwnClubRefs,
       getClub: vi.fn(),
       getLeagues: vi.fn(),
@@ -35,36 +31,32 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: {
-    error: mocks.toastError,
-    success: mocks.toastSuccess,
-    warning: mocks.toastWarning,
-  },
+  toast: { error: mocks.toastError },
 }));
 
 import { TrackedLeagues } from "./tracked-leagues";
 
 const messages = {
-  common: { save: "Save", saving: "Saving..." },
+  common: {
+    save: "Save",
+    saving: "Saving...",
+    search: "Search",
+    noResults: "No results",
+    columns: "Columns",
+    columnsToggle: "Toggle columns",
+  },
   settings: {
     leagues: {
       title: "Tracked Leagues",
-      description: "Enter the league numbers",
-      numbersLabel: "League Numbers",
-      numbersPlaceholder: "e.g. 4102",
+      description: "Leagues tracked for the active season",
       configureClubFirst: "Configure a club first",
-      notFound: "Not found: {numbers}",
       columns: {
         ligaNr: "Liga Nr",
         name: "Name",
         season: "Season",
         ownClubRefs: "Own Refs",
       },
-      toast: {
-        partial: "Partial",
-        saved: "Tracking {count}",
-        saveFailed: "Failed",
-      },
+      toast: { saveFailed: "Failed" },
     },
   },
 };
@@ -79,92 +71,75 @@ function wrap(ui: React.ReactNode) {
 
 const leaguesPayload = {
   leagues: [
-    {
-      id: 1,
-      ligaNr: 4102,
-      name: "Oberliga",
-      seasonName: "2025/26",
-      ownClubRefs: true,
-    },
-    {
-      id: 2,
-      ligaNr: 4105,
-      name: "Bezirksliga",
-      seasonName: "2025/26",
-      ownClubRefs: false,
-    },
+    { id: 1, ligaNr: 4102, name: "Oberliga", seasonName: "2025/26", ownClubRefs: true },
+    { id: 2, ligaNr: 4105, name: "Bezirksliga", seasonName: "2025/26", ownClubRefs: false },
   ],
 };
-
-function input() {
-  return screen.getByLabelText("League Numbers") as HTMLInputElement;
-}
-
-function saveButton() {
-  return screen.getByRole("button", { name: /Save/ });
-}
 
 describe("TrackedLeagues", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     for (const key of Object.keys(swrData)) delete swrData[key];
     swrData["/admin/settings/club"] = { clubId: 1, clubName: "Dragons" };
-    mocks.setLeagues.mockResolvedValue({ tracked: 2, notFound: [] });
+    mocks.setLeagueOwnClubRefs.mockResolvedValue(undefined);
   });
   afterEach(cleanup);
 
-  it("syncs the input once the league list arrives after first render", () => {
-    // Server prefetch failed -> SWR fallback is null for the leagues key.
-    swrData["/admin/settings/leagues"] = null;
-    const { rerender } = render(wrap(<TrackedLeagues />));
-    expect(input()).toHaveValue("");
-
-    // Client revalidation lands.
-    swrData["/admin/settings/leagues"] = leaguesPayload;
-    rerender(wrap(<TrackedLeagues />));
-
-    expect(input()).toHaveValue("4102, 4105");
-  });
-
-  it("never posts an empty league list after a failed prefetch", async () => {
-    swrData["/admin/settings/leagues"] = null;
-    const { rerender } = render(wrap(<TrackedLeagues />));
-
-    // Save must not be usable while the tracked list is unknown.
-    expect(saveButton()).toBeDisabled();
-
-    swrData["/admin/settings/leagues"] = leaguesPayload;
-    rerender(wrap(<TrackedLeagues />));
-
-    await act(async () => {
-      fireEvent.click(saveButton());
-    });
-
-    expect(mocks.setLeagues).toHaveBeenCalledWith({
-      leagueNumbers: [4102, 4105],
-    });
-  });
-
-  it("still posts an empty list when the user explicitly clears the field", async () => {
+  it("lists the active season's tracked leagues", () => {
     swrData["/admin/settings/leagues"] = leaguesPayload;
     render(wrap(<TrackedLeagues />));
-    expect(input()).toHaveValue("4102, 4105");
 
-    fireEvent.change(input(), { target: { value: "" } });
-    await act(async () => {
-      fireEvent.click(saveButton());
-    });
-
-    expect(mocks.setLeagues).toHaveBeenCalledWith({ leagueNumbers: [] });
+    expect(screen.getByText("Oberliga")).toBeInTheDocument();
+    expect(screen.getByText("Bezirksliga")).toBeInTheDocument();
+    expect(screen.getByText("4102")).toBeInTheDocument();
   });
 
-  it("keeps user edits when the leagues cache revalidates underneath", () => {
+  it("offers no way to edit the tracked set — that moved to the seasons page", () => {
     swrData["/admin/settings/leagues"] = leaguesPayload;
-    const { rerender } = render(wrap(<TrackedLeagues />));
+    render(wrap(<TrackedLeagues />));
 
-    fireEvent.change(input(), { target: { value: "4102" } });
-    rerender(wrap(<TrackedLeagues />));
+    // The paste-a-list-of-league-numbers form was removed with the route behind
+    // it; `liganr` is null for preliminary leagues, so it could not reach a new
+    // season's leagues at all.
+    expect(screen.queryByRole("button", { name: /Save/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/League Numbers/)).not.toBeInTheDocument();
+  });
 
-    expect(input()).toHaveValue("4102");
+  it("prompts to configure a club before anything is tracked", () => {
+    delete swrData["/admin/settings/club"];
+    render(wrap(<TrackedLeagues />));
+
+    expect(screen.getByText("Configure a club first")).toBeInTheDocument();
+  });
+
+  it("renders nothing but the prompt when the league list has not arrived yet", () => {
+    render(wrap(<TrackedLeagues />));
+
+    expect(screen.queryByText("Oberliga")).not.toBeInTheDocument();
+  });
+
+  it("persists an own-club-refs toggle and revalidates the list", async () => {
+    swrData["/admin/settings/leagues"] = leaguesPayload;
+    render(wrap(<TrackedLeagues />));
+
+    const toggles = screen.getAllByRole("switch");
+    await act(async () => {
+      fireEvent.click(toggles[1]!); // Bezirksliga, currently false
+    });
+
+    expect(mocks.setLeagueOwnClubRefs).toHaveBeenCalledWith(2, { ownClubRefs: true });
+    expect(mocks.mutate).toHaveBeenCalledWith("/admin/settings/leagues");
+  });
+
+  it("surfaces a toast when the toggle fails to save", async () => {
+    swrData["/admin/settings/leagues"] = leaguesPayload;
+    mocks.setLeagueOwnClubRefs.mockRejectedValue(new Error("nope"));
+    render(wrap(<TrackedLeagues />));
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("switch")[0]!);
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith("Failed");
   });
 });

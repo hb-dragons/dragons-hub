@@ -1,3 +1,5 @@
+import type { SdkLigaData } from "./liga";
+
 export interface SdkClubSearchResult {
   vereinId: number;
   vereinsname: string;
@@ -5,22 +7,11 @@ export interface SdkClubSearchResult {
   kontaktData: unknown;
 }
 
-export interface SdkDiscoveredCompetition {
-  ligaId: number;
-  liganr: number;
-  liganame: string;
-  seasonId: number;
-  seasonName: string;
-  akName: string;
-  geschlecht: string;
-  skName: string;
-  verbandId: number;
-  verbandName: string;
-}
-
 export interface SdkClubMatch {
   matchId: number;
-  competition: SdkDiscoveredCompetition;
+  // The club-matches endpoint nests the league under `ligaData` (same shape as
+  // the spielplan/tabelle responses), not `competition`.
+  ligaData: SdkLigaData;
 }
 
 export interface SdkClubMatchesResponse {

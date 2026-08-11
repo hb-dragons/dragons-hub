@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   updateMatchLocal: vi.fn(),
   releaseOverride: vi.fn(),
   reconcileMatch: vi.fn(),
+  getActiveSeasonId: vi.fn(),
 }));
 
 vi.mock("../../services/admin/match-admin.service", () => ({
@@ -23,6 +24,10 @@ vi.mock("../../services/admin/match-admin.service", () => ({
 
 vi.mock("../../services/venue-booking/venue-booking.service", () => ({
   reconcileMatch: mocks.reconcileMatch,
+}));
+
+vi.mock("../../services/admin/season.service", () => ({
+  getActiveSeasonId: mocks.getActiveSeasonId,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -59,6 +64,7 @@ function json(response: Response) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.reconcileMatch.mockResolvedValue(undefined);
+  mocks.getActiveSeasonId.mockResolvedValue(3);
 });
 
 describe("GET /matches", () => {

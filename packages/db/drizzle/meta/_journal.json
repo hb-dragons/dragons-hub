@@ -323,6 +323,13 @@
       "when": 1785614409144,
       "tag": "0045_slow_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1786435311766,
+      "tag": "0046_busy_hammerhead",
+      "breakpoints": true
     }
   ]
 }

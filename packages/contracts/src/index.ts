@@ -210,13 +210,18 @@ export {
 } from "./devices";
 
 export {
-  leagueNumbersSchema,
   leagueOwnClubRefsSchema,
   leagueIdParamSchema,
-  type LeagueNumbersBody,
+  ligaIdParamSchema,
   type LeagueOwnClubRefsBody,
   type LeagueIdParam,
+  type LigaIdParam,
 } from "./league";
+
+export {
+  standingsListQuerySchema,
+  type StandingsListQuery,
+} from "./standings";
 
 export {
   scoreboardListQuerySchema,
@@ -226,6 +231,17 @@ export {
   type ScoreboardLastEventId,
   type ScoreboardDeviceQuery,
 } from "./scoreboard";
+
+export {
+  createSeasonSchema,
+  seasonIdParamSchema,
+  browseLeaguesQuerySchema,
+  seasonLeaguesSchema,
+  type CreateSeasonBody,
+  type SeasonIdParam,
+  type BrowseLeaguesQuery,
+  type SeasonLeaguesBody,
+} from "./season";
 
 export {
   settingsClubConfigSchema,

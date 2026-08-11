@@ -70,6 +70,7 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { seedActiveSeason } from "../../test/seed-season";
 
 let ctx: TestDbContext;
 
@@ -484,6 +485,7 @@ interface AssignmentWorld {
  * three lookup maps `syncRefereeAssignmentsFromData` takes.
  */
 async function seedAssignmentWorld(): Promise<AssignmentWorld> {
+  const seasonRefId = await seedActiveSeason(ctx);
   await ctx.db.insert(leagues).values({
     id: 10,
     apiLigaId: 1,
@@ -491,6 +493,7 @@ async function seedAssignmentWorld(): Promise<AssignmentWorld> {
     name: "Bezirksliga",
     seasonId: 2025,
     seasonName: "2025/26",
+    seasonRefId,
   });
   await ctx.db.insert(teams).values([
     { apiTeamPermanentId: 10, seasonTeamId: 100, teamCompetitionId: 1, name: "Home", clubId: 1 },

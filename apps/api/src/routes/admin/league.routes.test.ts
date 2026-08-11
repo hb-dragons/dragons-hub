@@ -6,14 +6,14 @@ import type { AppEnv } from "../../types";
 
 const mocks = vi.hoisted(() => ({
   getTrackedLeagues: vi.fn(),
-  resolveAndSaveLeagues: vi.fn(),
   setLeagueOwnClubRefs: vi.fn(),
+  getLeagueTeams: vi.fn(),
 }));
 
 vi.mock("../../services/admin/league-discovery.service", () => ({
   getTrackedLeagues: mocks.getTrackedLeagues,
-  resolveAndSaveLeagues: mocks.resolveAndSaveLeagues,
   setLeagueOwnClubRefs: mocks.setLeagueOwnClubRefs,
+  getLeagueTeams: mocks.getLeagueTeams,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -72,86 +72,6 @@ describe("GET /settings/leagues", () => {
   });
 });
 
-describe("PUT /settings/leagues", () => {
-  it("resolves and saves league numbers", async () => {
-    const result = {
-      resolved: [{ ligaNr: 4102, ligaId: 58001, name: "Regionalliga West", seasonName: "2025/26" }],
-      notFound: [],
-      tracked: 1,
-      untracked: 0,
-    };
-    mocks.resolveAndSaveLeagues.mockResolvedValue(result);
-
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: [4102] }),
-    });
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual(result);
-    expect(mocks.resolveAndSaveLeagues).toHaveBeenCalledWith([4102]);
-  });
-
-  it("accepts empty league numbers array", async () => {
-    const result = { resolved: [], notFound: [], tracked: 0, untracked: 2 };
-    mocks.resolveAndSaveLeagues.mockResolvedValue(result);
-
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: [] }),
-    });
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual(result);
-  });
-
-  it("returns 400 for missing leagueNumbers", async () => {
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-
-  it("returns 400 for non-array leagueNumbers", async () => {
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: "4102" }),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-
-  it("returns 400 for negative numbers", async () => {
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: [-1] }),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-
-  it("returns 400 for non-integer numbers", async () => {
-    const res = await app.request("/settings/leagues", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ leagueNumbers: [4102.5] }),
-    });
-
-    expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
-  });
-});
-
 describe("PATCH /settings/leagues/:id/own-club-refs", () => {
   it("sets ownClubRefs and returns ok", async () => {
     mocks.setLeagueOwnClubRefs.mockResolvedValue(undefined);
@@ -206,5 +126,27 @@ describe("PATCH /settings/leagues/:id/own-club-refs", () => {
       body: JSON.stringify({ ownClubRefs: true }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /leagues/:ligaId/teams", () => {
+  it("returns the league's teams", async () => {
+    const result = {
+      teams: [
+        { teamPermanentId: 1, name: "Opponents", clubId: 9999, isOwnClub: false },
+        { teamPermanentId: 2, name: "Hanover Dragons I", clubId: 4121, isOwnClub: true },
+      ],
+    };
+    mocks.getLeagueTeams.mockResolvedValue(result);
+    const res = await app.request("/leagues/54141/teams");
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual(result);
+    expect(mocks.getLeagueTeams).toHaveBeenCalledWith(54141);
+  });
+
+  it("rejects a non-numeric ligaId with 400", async () => {
+    const res = await app.request("/leagues/abc/teams");
+    expect(res.status).toBe(400);
+    expect(mocks.getLeagueTeams).not.toHaveBeenCalled();
   });
 });

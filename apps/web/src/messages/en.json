@@ -10,6 +10,7 @@
     "referees": "Referees",
     "teams": "Teams",
     "sync": "Sync",
+    "seasons": "Seasons",
     "settings": "Settings",
     "standings": "Standings",
     "venues": "Venues",
@@ -929,10 +930,7 @@
     "leagues": {
       "title": "Tracked Leagues",
       "description": "Enter the league numbers (liganr) you want to sync, separated by commas.",
-      "numbersLabel": "League Numbers",
-      "numbersPlaceholder": "e.g. 4102, 4105, 4003",
       "configureClubFirst": "Configure a club above before setting leagues.",
-      "notFound": "Not found: {numbers}",
       "columns": {
         "ligaNr": "Liga Nr",
         "name": "Name",
@@ -940,8 +938,6 @@
         "ownClubRefs": "Own Refs"
       },
       "toast": {
-        "partial": "Saved {tracked} league(s). {notFoundCount} not found: {notFoundList}",
-        "saved": "Tracking {count} league(s)",
         "saveFailed": "Failed to save league settings"
       }
     },
@@ -958,6 +954,72 @@
       "description": "Choose between light and dark mode",
       "light": "Light",
       "dark": "Dark"
+    },
+    "seasons": {
+      "title": "Seasons",
+      "contextLabel": "Season",
+      "activate": "Activate",
+      "createSeason": "Create season",
+      "confirmEmptyActivate": "This season has no leagues. Activating it will show an empty schedule on the public site. Continue?",
+      "status": {
+        "upcoming": "Upcoming",
+        "active": "Active",
+        "archived": "Archived"
+      },
+      "toast": {
+        "activated": "Season activated",
+        "activateFailed": "Failed to activate season"
+      },
+      "manage": {
+        "button": "Manage leagues",
+        "title": "Manage leagues",
+        "description": "Add or remove the leagues this season tracks.",
+        "save": "Save & sync",
+        "saved": "Leagues updated",
+        "saveFailed": "Could not save leagues",
+        "loadFailed": "Could not load leagues from the federation"
+      },
+      "wizard": {
+        "title": "New season",
+        "nameLabel": "Season name",
+        "nameDescription": "Name the upcoming season, then pick its leagues.",
+        "next": "Next",
+        "selectDescription": "Select the preliminary (Vorabliga) leagues to track this season.",
+        "searchPlaceholder": "Search leagues…",
+        "ownClubOnly": "Only my club's leagues",
+        "showTeams": "Show teams",
+        "hideTeams": "Hide teams",
+        "teamsLoading": "Loading teams…",
+        "teamsError": "Could not load teams",
+        "noTeams": "No teams listed yet",
+        "selectedCount": "{count} selected",
+        "loadingLeagues": "Loading leagues…",
+        "noLeagues": "No leagues found",
+        "noMatches": "No leagues match your search",
+        "confirm": "Create & sync",
+        "syncing": "Syncing…",
+        "close": "Close",
+        "syncFailed": "Sync failed — check the sync log",
+        "discoverFailed": "Could not load leagues from the federation",
+        "createFailed": "Could not create the season",
+        "startDateLabel": "Start date (optional)",
+        "endDateLabel": "End date (optional)",
+        "reviewTitle": "Season ready",
+        "reviewLeagues": "Leagues tracked",
+        "reviewGames": "Games pulled",
+        "reviewPlaceholders": "Unassigned fixture slots",
+        "reviewPlaceholderHint": "The federation has not yet named both teams for these fixtures, so they are not imported yet. They arrive on a later sync once the teams are set.",
+        "reviewUnavailable": "Counts could not be loaded. The season and its leagues are saved.",
+        "reviewProvisional": "The sync was still running when we stopped watching it, so these counts are provisional. Check the sync log for the final figures."
+      },
+      "subtitle": "Prepare next season's leagues in the background, then make it live.",
+      "empty": "No seasons yet. Create one to start tracking a season's leagues.",
+      "columns": {
+        "name": "Season",
+        "status": "Status",
+        "leagues": "Leagues",
+        "games": "Games"
+      }
     },
     "pushTest": {
       "pageTitle": "Notifications",

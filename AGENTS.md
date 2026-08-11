@@ -110,7 +110,8 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | Table | File | Key Columns |
 |-------|------|-------------|
 | `appSettings` | `packages/db/src/schema/app-settings.ts` | key (unique), value — stores club_id, club_name |
-| `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId, isTracked, discoveredAt, dataHash |
+| `seasons` | `packages/db/src/schema/seasons.ts` | id, name, sdkSeasonId (nullable int), status (`upcoming`\|`active`\|`archived`), startDate, endDate, createdAt, updatedAt — partial-unique index enforces at most one `active` row at a time; `activateSeason()` archives the current active in the same transaction |
+| `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId (legacy SDK int), seasonRefId (FK → seasons.id, NOT NULL), vorabliga (boolean), isTracked, discoveredAt, dataHash — season scoping for matches/standings flows through `leagues.seasonRefId`; sync gates to active+upcoming seasons; public reads are active-season-only; admin reads accept an optional `seasonId` query param (defaulting to the active season) |
 | `teams` | `packages/db/src/schema/teams.ts` | apiTeamPermanentId (unique), name, clubId, isOwnClub, dataHash |
 | `venues` | `packages/db/src/schema/venues.ts` | apiId (unique), name, street, postalCode, city, lat/lng, dataHash |
 | `matches` | `packages/db/src/schema/matches.ts` | apiMatchId (unique), leagueId FK, venueId FK, scores, sr1Open, sr2Open, sr3Open, JSONB fields, versioning |
@@ -523,10 +524,29 @@ League tracking lives under `/admin/settings/leagues`. There is no
 | PUT | `/admin/settings/booking` | Set booking configuration |
 | GET | `/admin/settings/referee-reminders` | Get referee reminder day offsets |
 | PUT | `/admin/settings/referee-reminders` | Set referee reminder day offsets |
-| GET | `/admin/settings/leagues` | Tracked leagues, grouped by season, with tracking status |
-| PUT | `/admin/settings/leagues` | Set tracked leagues by league number |
+| GET | `/admin/settings/leagues` | Tracked leagues for the active season, with tracking status |
 | PATCH | `/admin/settings/leagues/:id/own-club-refs` | Set whether a league uses own-club referees |
 | POST | `/admin/settings/referee-games-sync` | Trigger a manual referee games sync |
+| GET | `/admin/leagues/:ligaId/teams` | Team roster of a federation league, own-club teams marked |
+
+`PUT /admin/settings/leagues` (set tracked leagues by pasting league numbers) was
+removed with the seasons work. `liganr` is null for preliminary (`vorabliga`)
+leagues, so the flow could not reach a new season's leagues at all; leagues are
+now picked per season through the endpoints below.
+
+### Admin - Seasons
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/seasons` | List seasons with per-season league counts |
+| POST | `/admin/seasons` | Create a season (always `upcoming`) |
+| GET | `/admin/seasons/browse` | Browse federation leagues, not tied to a season |
+| POST | `/admin/seasons/:id/activate` | Archive the current active season and activate this one |
+| POST | `/admin/seasons/:id/archive` | Archive a season without activating another |
+| GET | `/admin/seasons/:id/discover` | Browse federation leagues, marking the ones this season already tracks |
+| GET | `/admin/seasons/:id/leagues` | Leagues tracked by a season |
+| PUT | `/admin/seasons/:id/leagues` | Replace a season's tracked league set |
+| GET | `/admin/seasons/:id/summary` | League, game and unassigned-slot counts for a season |
 
 ### Admin - Matches
 

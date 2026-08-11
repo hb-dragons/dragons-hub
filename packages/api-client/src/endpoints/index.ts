@@ -53,3 +53,5 @@ export { scoreboardEndpoints } from "./scoreboard";
 export { standingsEndpoints } from "./standings";
 
 export { userEndpoints } from "./user";
+
+export { seasonsEndpoints } from "./seasons";

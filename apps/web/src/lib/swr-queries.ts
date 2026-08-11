@@ -52,7 +52,10 @@ export function makeQueries(api: Api) {
       fetcher: () => api.sync.schedule("referee-games"),
     }),
     // matches
-    matches: () => ({ key: SWR_KEYS.matches, fetcher: () => api.matches.list() }),
+    matches: (seasonId?: number) => ({
+      key: SWR_KEYS.matches(seasonId),
+      fetcher: () => api.matches.list(seasonId === undefined ? undefined : { seasonId }),
+    }),
     dashboardTodayMatches: (date: string) => ({
       key: SWR_KEYS.dashboardTodayMatches(date),
       fetcher: () => api.matches.list({ dateFrom: date, dateTo: date, limit: 20, offset: 0 }),
@@ -71,7 +74,10 @@ export function makeQueries(api: Api) {
     }),
     // teams / standings / venues
     teams: () => ({ key: SWR_KEYS.teams, fetcher: () => api.teams.list() }),
-    standings: () => ({ key: SWR_KEYS.standings, fetcher: () => api.standings.list() }),
+    standings: (seasonId?: number) => ({
+      key: SWR_KEYS.standings(seasonId),
+      fetcher: () => api.standings.list(seasonId === undefined ? {} : { seasonId }),
+    }),
     venues: () => ({ key: SWR_KEYS.venues, fetcher: () => api.venues.list() }),
     // referee-admin
     refereesPaginated: (opts: Parameters<typeof normReferees>[0] = {}) => {
@@ -172,6 +178,8 @@ export function makeQueries(api: Api) {
       key: SWR_KEYS.taskDetail(id),
       fetcher: () => api.boards.getTask(id),
     }),
+    // seasons
+    seasons: () => ({ key: SWR_KEYS.seasons, fetcher: () => api.seasons.list() }),
   } as const;
 }
 

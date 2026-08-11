@@ -1,9 +1,23 @@
 import { getDb } from "../../config/database";
 import { standings, leagues, teams } from "@dragons/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import type { LeagueStandings } from "@dragons/shared";
+import { withActiveSeason } from "../season-scope";
 
-export async function getStandings(): Promise<LeagueStandings[]> {
+/**
+ * Standings for one season's tracked leagues.
+ *
+ * `seasonId` is optional and defaults to the active season. The public
+ * standings route calls this with no argument and must keep doing so — only the
+ * admin route lets a caller name a season, so an admin can check an upcoming
+ * season's table while the public site stays on the live one.
+ */
+export async function getStandings(seasonId?: number): Promise<LeagueStandings[]> {
+  if (seasonId !== undefined) return standingsForSeason(seasonId);
+  return withActiveSeason(standingsForSeason, []);
+}
+
+async function standingsForSeason(seasonId: number): Promise<LeagueStandings[]> {
   const rows = await getDb()
     .select({
       leagueId: leagues.id,
@@ -28,7 +42,7 @@ export async function getStandings(): Promise<LeagueStandings[]> {
     .from(standings)
     .innerJoin(leagues, eq(standings.leagueId, leagues.id))
     .innerJoin(teams, eq(standings.teamApiId, teams.apiTeamPermanentId))
-    .where(eq(leagues.isTracked, true))
+    .where(and(eq(leagues.isTracked, true), eq(leagues.seasonRefId, seasonId)))
     .orderBy(asc(leagues.name), asc(standings.position));
 
   const grouped = new Map<number, LeagueStandings>();

@@ -32,9 +32,18 @@ vi.mock("../../config/database", () => ({
 // --- Imports (after mocks) ---
 
 import { getTeamStats } from "./team-stats.service";
-import { leagues, matches, standings, teams } from "@dragons/db/schema";
+import { invalidateActiveSeasonCache } from "../admin/season.service";
+import { leagues, matches, seasons, standings, teams } from "@dragons/db/schema";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
+/**
+ * League every seeded match belongs to unless a test says otherwise. The form
+ * query joins `matches -> leagues` to reach the season, so a match with a null
+ * `league_id` has no season and is deliberately not part of a season-scoped
+ * form — see the "ignores a match that belongs to no league" case below.
+ */
+let defaultLeagueId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -43,6 +52,14 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetTestDb(ctx);
+  const [season] = await ctx.db
+    .insert(seasons)
+    .values({ name: "2025/26", status: "active" })
+    .returning({ id: seasons.id });
+  activeSeasonId = season!.id;
+  // Season ids change every test and the active-season id is cached for 60s.
+  invalidateActiveSeasonCache();
+  defaultLeagueId = await seedLeague(900, "Default League");
   vi.clearAllMocks();
 });
 
@@ -65,7 +82,7 @@ async function seedTeam(apiTeamPermanentId: number, name: string): Promise<numbe
   return row!.id;
 }
 
-async function seedLeague(apiLigaId: number, name: string): Promise<number> {
+async function seedLeague(apiLigaId: number, name: string, seasonRefId?: number): Promise<number> {
   const [row] = await ctx.db
     .insert(leagues)
     .values({
@@ -74,6 +91,7 @@ async function seedLeague(apiLigaId: number, name: string): Promise<number> {
       name,
       seasonId: 2026,
       seasonName: "2025/26",
+      seasonRefId: seasonRefId ?? activeSeasonId,
     })
     .returning({ id: leagues.id });
   return row!.id;
@@ -86,6 +104,8 @@ interface MatchSpec {
   kickoffDate: string;
   homeScore?: number | null;
   guestScore?: number | null;
+  /** `null` puts the match in no league at all, and so in no season. */
+  leagueId?: number | null;
 }
 
 async function seedMatch(spec: MatchSpec): Promise<number> {
@@ -101,6 +121,7 @@ async function seedMatch(spec: MatchSpec): Promise<number> {
       guestTeamApiId: spec.guest,
       homeScore: spec.homeScore ?? null,
       guestScore: spec.guestScore ?? null,
+      leagueId: spec.leagueId === undefined ? defaultLeagueId : spec.leagueId,
     })
     .returning({ id: matches.id });
   return row!.id;
@@ -304,5 +325,54 @@ describe("getTeamStats — form", () => {
     expect(result!.form.map((f) => f.matchId)).toEqual(
       [...ids].reverse().slice(0, 5),
     );
+  });
+});
+
+describe("getTeamStats — season scope", () => {
+  it("returns null when no season is active", async () => {
+    const teamId = await seedTeam(100, "Dragons 1");
+    await ctx.db.update(seasons).set({ status: "archived" });
+    invalidateActiveSeasonCache();
+
+    expect(await getTeamStats(teamId)).toBeNull();
+  });
+});
+
+describe("getTeamStats — form season scope", () => {
+  it("ignores a match that belongs to no league, and so to no season", async () => {
+    const teamId = await seedTeam(100, "Dragons 1");
+    await seedTeam(200, "Rivals");
+    await seedMatch({
+      apiMatchId: 1,
+      home: 100,
+      guest: 200,
+      kickoffDate: "2026-01-10",
+      homeScore: 80,
+      guestScore: 70,
+      leagueId: null,
+    });
+
+    expect((await getTeamStats(teamId))!.form).toEqual([]);
+  });
+
+  it("ignores a match played in another season", async () => {
+    const teamId = await seedTeam(100, "Dragons 1");
+    await seedTeam(200, "Rivals");
+    const [old] = await ctx.db
+      .insert(seasons)
+      .values({ name: "2024/25", status: "archived" })
+      .returning({ id: seasons.id });
+    const oldLeagueId = await seedLeague(901, "Last Season", old!.id);
+    await seedMatch({
+      apiMatchId: 1,
+      home: 100,
+      guest: 200,
+      kickoffDate: "2025-01-10",
+      homeScore: 80,
+      guestScore: 70,
+      leagueId: oldLeagueId,
+    });
+
+    expect((await getTeamStats(teamId))!.form).toEqual([]);
   });
 });

@@ -52,7 +52,7 @@ vi.mock("./sdk-client", () => ({
 
 import { fetchAllSyncData, extractRefereeAssignments } from "./data-fetcher";
 import type { LeagueFetchedData } from "./data-fetcher";
-import { leagues } from "@dragons/db/schema";
+import { leagues, seasons } from "@dragons/db/schema";
 import {
   setupTestDb,
   resetTestDb,
@@ -77,10 +77,19 @@ afterAll(async () => {
   await closeTestDb(ctx);
 });
 
-/** Insert leagues and return their generated ids in insertion order. */
+/**
+ * Insert leagues under an active season and return their generated ids in
+ * insertion order. `leagues.seasonRefId` is NOT NULL and the fetch is gated on
+ * the season being active or upcoming, so every league needs a season to live
+ * in — `data-fetcher.season-gate.test.ts` covers the gate itself.
+ */
 async function seedLeagues(
   rows: Array<{ apiLigaId: number; name: string; isTracked?: boolean }>,
 ): Promise<number[]> {
+  const [season] = await ctx.db
+    .insert(seasons)
+    .values({ name: "2025/26", status: "active" })
+    .returning({ id: seasons.id });
   const inserted = await ctx.db
     .insert(leagues)
     .values(
@@ -90,6 +99,7 @@ async function seedLeagues(
         name: r.name,
         seasonId: 2025,
         seasonName: "2025/26",
+        seasonRefId: season!.id,
         isTracked: r.isTracked ?? true,
       })),
     )

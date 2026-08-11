@@ -1,189 +1,231 @@
-import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { setupTestDb, resetTestDb, type TestDbContext } from "../../test/setup-test-db";
 
-// --- Mock setup ---
-//
-// Only the federation SDK is stubbed — it is a network boundary. drizzle-orm
-// and @dragons/db/schema are deliberately NOT mocked: the previous version of
-// this file replaced `eq`/`and`/`notInArray` with identity stubs and counted
-// `mockInsert` calls, so the upsert lookup could have matched on the wrong
-// column and the untrack predicate could have been inverted with every test
-// still green. Everything below runs against a real (in-process PGlite)
-// Postgres.
-
-const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
-const mocks = vi.hoisted(() => ({ getAllLigen: vi.fn() }));
-
+const { dbHolder, getAllLigen, getClubMatches, getTabelle, getSpielplan } = vi.hoisted(() => ({
+  dbHolder: { ref: null as unknown },
+  getAllLigen: vi.fn(),
+  getClubMatches: vi.fn(),
+  getTabelle: vi.fn(),
+  getSpielplan: vi.fn(),
+}));
 vi.mock("../../config/database", () => ({
   getDb: () =>
-    new Proxy(
-      {},
-      {
-        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
-      },
-    ),
+    new Proxy({}, { get: (_t, p) => (dbHolder.ref as Record<string | symbol, unknown>)[p] }),
 }));
-
 vi.mock("../sync/sdk-client", () => ({
-  sdkClient: { getAllLigen: (...args: unknown[]) => mocks.getAllLigen(...args) },
+  sdkClient: { getAllLigen, getClubMatches, getTabelle, getSpielplan },
 }));
 
-// --- Imports (after mocks) ---
+const mockGetActiveSeasonId = vi.fn();
+vi.mock("./season.service", () => ({
+  getActiveSeasonId: (...args: unknown[]) => mockGetActiveSeasonId(...args),
+  invalidateActiveSeasonCache: vi.fn(),
+}));
+
+const mockGetClubConfig = vi.fn();
+vi.mock("./settings.service", () => ({
+  getClubConfig: (...args: unknown[]) => mockGetClubConfig(...args),
+}));
 
 import {
-  resolveAndSaveLeagues,
+  browseLeagues,
+  setSeasonLeagues,
   getTrackedLeagues,
   setLeagueOwnClubRefs,
+  getLeagueTeams,
 } from "./league-discovery.service";
 import { leagues } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
-import type { SdkLiga } from "@dragons/sdk";
-import {
-  setupTestDb,
-  resetTestDb,
-  closeTestDb,
-  type TestDbContext,
-} from "../../test/setup-test-db";
 
 let ctx: TestDbContext;
-
 beforeAll(async () => {
   ctx = await setupTestDb();
   dbHolder.ref = ctx.db;
 });
-
+afterAll(async () => {
+  await ctx.client.close();
+});
 beforeEach(async () => {
   await resetTestDb(ctx);
   vi.clearAllMocks();
-  mocks.getAllLigen.mockResolvedValue([]);
+  mockGetActiveSeasonId.mockResolvedValue(null);
+  mockGetClubConfig.mockResolvedValue({ clubId: 4121, clubName: "Dragons" });
+  getClubMatches.mockResolvedValue({ club: { vereinId: 4121, vereinsname: "Dragons" }, matches: [] });
 });
 
-afterAll(async () => {
-  await closeTestDb(ctx);
-});
-
-// --- Helpers ---
-
-function makeLiga(overrides: Partial<SdkLiga> = {}): SdkLiga {
+function liga(
+  ligaId: number,
+  vorabliga: boolean,
+  liganr: number | null = null,
+  skName = "Oberliga",
+) {
   return {
-    ligaId: 58001,
-    liganr: 4102,
-    liganame: "Regionalliga West",
-    seasonId: 2025,
-    seasonName: "2025/26",
-    skName: "RL",
-    akName: "Herren",
-    geschlecht: "m",
+    ligaId,
+    liganr,
+    liganame: `Liga ${ligaId}`,
+    seasonId: 2026,
+    seasonName: "2026/27",
+    skName,
+    akName: "Senioren",
+    geschlecht: "männlich",
     verbandId: 7,
-    verbandName: "DBB",
-    ...overrides,
-  } as SdkLiga;
+    verbandName: "NDS",
+    vorabliga,
+    tableExists: false,
+    crossTableExists: false,
+  };
 }
 
-/** Seed a league row directly, bypassing the service. */
-async function seedLeague(opts: {
-  apiLigaId: number;
-  ligaNr: number;
-  name?: string;
-  isTracked?: boolean;
-  ownClubRefs?: boolean;
-}): Promise<number> {
-  const [row] = await ctx.db
-    .insert(leagues)
-    .values({
-      apiLigaId: opts.apiLigaId,
-      ligaNr: opts.ligaNr,
-      name: opts.name ?? `League ${opts.ligaNr}`,
-      seasonId: 2025,
-      seasonName: "2025/26",
-      isTracked: opts.isTracked ?? true,
-      ownClubRefs: opts.ownClubRefs ?? false,
-    })
-    .returning({ id: leagues.id });
-  return row!.id;
+async function makeSeason(status: string): Promise<number> {
+  const r = await ctx.client.query<{ id: number }>(
+    `INSERT INTO seasons (name, status) VALUES ('2026/27',$1) RETURNING id`,
+    [status],
+  );
+  return r.rows[0]!.id;
 }
 
-async function allLeagues() {
-  return ctx.db.select().from(leagues).orderBy(leagues.apiLigaId);
-}
-
-// --- Tests ---
-
-describe("resolveAndSaveLeagues", () => {
-  it("inserts a league that is not yet in the database", async () => {
-    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
-
-    const result = await resolveAndSaveLeagues([4102]);
-
-    expect(result.resolved).toEqual([
-      { ligaNr: 4102, ligaId: 58001, name: "Regionalliga West", seasonName: "2025/26" },
-    ]);
-    expect(result.notFound).toEqual([]);
-    expect(result.tracked).toBe(1);
-
-    const rows = await allLeagues();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      apiLigaId: 58001,
-      ligaNr: 4102,
-      name: "Regionalliga West",
-      seasonName: "2025/26",
-      skName: "RL",
-      akName: "Herren",
-      geschlecht: "m",
-      verbandId: 7,
-      verbandName: "DBB",
-      isTracked: true,
-      isActive: true,
-    });
+describe("browseLeagues", () => {
+  it("returns only vorabligas when vorabligaOnly is set", async () => {
+    getAllLigen.mockResolvedValue([liga(54136, true), liga(48666, false, 4001)]);
+    const rows = await browseLeagues({ vorabligaOnly: true });
+    expect(rows.map((r) => r.ligaId)).toEqual([54136]);
   });
 
-  it("updates the existing row instead of inserting a second one", async () => {
-    // Note the ligaNr differs from apiLigaId, so a lookup on the wrong column
-    // would miss and duplicate-insert (blocked by the unique index) instead.
-    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, name: "Stale name", isTracked: false });
+  it("includes Regionalliga leagues under vorabligaOnly even though they are not flagged vorabliga", async () => {
+    // The federation never marks the top tiers vorabliga (promotion/relegation is
+    // settled before the season), but a Regionalliga club still needs to pick its
+    // league during new-season onboarding.
+    getAllLigen.mockResolvedValue([
+      liga(54136, true), // vorabliga Oberliga — included
+      liga(48666, false, 4001), // committed Oberliga — excluded
+      liga(47756, false, 4002, "1.Regionalliga"), // committed Regionalliga — included
+      liga(49733, false, 4003, "2.Regionalliga"), // committed Regionalliga — included
+    ]);
+    const rows = await browseLeagues({ vorabligaOnly: true });
+    expect(rows.map((r) => r.ligaId).sort((a, b) => a - b)).toEqual([47756, 49733, 54136]);
+  });
 
-    mocks.getAllLigen.mockResolvedValue([makeLiga({ liganame: "Fresh name" })]);
+  it("narrows to leagues our club plays in when ownClubOnly is set", async () => {
+    getAllLigen.mockResolvedValue([liga(54141, true), liga(54142, true), liga(54143, true)]);
+    getClubMatches.mockResolvedValue({
+      club: { vereinId: 4121, vereinsname: "Dragons" },
+      matches: [
+        { matchId: 1, ligaData: { ligaId: 54141 } },
+        { matchId: 2, ligaData: { ligaId: 54143 } },
+        { matchId: 3, ligaData: { ligaId: 54141 } }, // duplicate league — deduped
+      ],
+    });
+    const rows = await browseLeagues({ vorabligaOnly: true, ownClubOnly: true });
+    expect(rows.map((r) => r.ligaId).sort((a, b) => a - b)).toEqual([54141, 54143]);
+    expect(getClubMatches).toHaveBeenCalledWith(4121);
+  });
 
-    const result = await resolveAndSaveLeagues([4102]);
+  it("does not throw and skips null ligaData entries in club matches", async () => {
+    getAllLigen.mockResolvedValue([liga(54141, true), liga(54142, true), liga(54143, true)]);
+    getClubMatches.mockResolvedValue({
+      club: { vereinId: 4121, vereinsname: "Dragons" },
+      matches: [
+        { matchId: 1, ligaData: { ligaId: 54141 } },
+        { matchId: 2, ligaData: null },
+        { matchId: 3, ligaData: { ligaId: 54143 } },
+      ],
+    });
+    const rows = await browseLeagues({ vorabligaOnly: true, ownClubOnly: true });
+    expect(rows.map((r) => r.ligaId).sort((a, b) => a - b)).toEqual([54141, 54143]);
+  });
 
-    expect(result.tracked).toBe(1);
-    const rows = await allLeagues();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.name).toBe("Fresh name");
-    expect(rows[0]!.isTracked).toBe(true);
+  it("does not filter by club when ownClubOnly is set but no club is configured", async () => {
+    mockGetClubConfig.mockResolvedValue(null);
+    getAllLigen.mockResolvedValue([liga(54141, true), liga(54142, true)]);
+    const rows = await browseLeagues({ vorabligaOnly: true, ownClubOnly: true });
+    expect(rows.map((r) => r.ligaId)).toEqual([54141, 54142]);
+    expect(getClubMatches).not.toHaveBeenCalled();
+  });
+
+  it("marks alreadyTracked leagues for the season", async () => {
+    const seasonId = await makeSeason("upcoming");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga)
+       VALUES (54136, 0, 'Liga 54136', 2026, '2026/27', $1, true, true)`,
+      [seasonId],
+    );
+    getAllLigen.mockResolvedValue([liga(54136, true), liga(54137, true)]);
+    const rows = await browseLeagues({ seasonId });
+    expect(rows.find((r) => r.ligaId === 54136)?.alreadyTracked).toBe(true);
+    expect(rows.find((r) => r.ligaId === 54137)?.alreadyTracked).toBe(false);
+  });
+
+  it("marks all leagues as alreadyTracked:false when no seasonId provided", async () => {
+    // No seasonId → trackedIds set stays empty → all alreadyTracked false
+    getAllLigen.mockResolvedValue([liga(54136, true), liga(54137, false, 4001)]);
+    const rows = await browseLeagues({});
+    expect(rows.every((r) => r.alreadyTracked === false)).toBe(true);
+  });
+});
+
+describe("setSeasonLeagues", () => {
+  it("tracks selected ligas under the season and scoped-untracks the rest", async () => {
+    const seasonId = await makeSeason("upcoming");
+    getAllLigen.mockResolvedValue([liga(54136, true), liga(54137, true)]);
+    const first = await setSeasonLeagues(seasonId, [54136, 54137]);
+    expect(first.tracked).toBe(2);
+    const second = await setSeasonLeagues(seasonId, [54136]); // drop 54137
+    expect(second.untracked).toBe(1);
+    const tracked = await getTrackedLeagues(seasonId);
+    expect(tracked.leagues.map((l) => l.apiLigaId)).toEqual([54136]);
+  });
+
+  it("does not touch leagues from other seasons", async () => {
+    const otherSeason = await makeSeason("active");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga)
+       VALUES (99999, 0, 'Other', 2025, '2025/26', $1, true, false)`,
+      [otherSeason],
+    );
+    const upcoming = await makeSeason("upcoming");
+    getAllLigen.mockResolvedValue([liga(54136, true)]);
+    await setSeasonLeagues(upcoming, [54136]);
+    const other = await getTrackedLeagues(otherSeason);
+    expect(other.leagues.map((l) => l.apiLigaId)).toContain(99999);
   });
 
   it("keeps insert-only columns when the upsert takes the conflict path (#77)", async () => {
     // The per-league SELECT-then-INSERT-or-UPDATE is one atomic upsert now.
     // `isActive` and `discoveredAt` must stay insert-only: a league someone
-    // deactivated locally must not come back to life on the next resolve, and
+    // deactivated locally must not come back to life on the next selection, and
     // the discovery timestamp is history, not current state.
-    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: false });
-    const discoveredAt = new Date("2020-01-01T00:00:00Z");
-    await ctx.db
-      .update(leagues)
-      .set({ isActive: false, discoveredAt })
-      .where(eq(leagues.apiLigaId, 58001));
+    const seasonId = await makeSeason("upcoming");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id,
+                            is_tracked, vorabliga, is_active, discovered_at)
+       VALUES (54136, 0, 'Stale name', 2026, '2026/27', $1, false, false, false, '2020-01-01T00:00:00Z')`,
+      [seasonId],
+    );
 
-    mocks.getAllLigen.mockResolvedValue([makeLiga({ liganame: "Fresh name" })]);
+    getAllLigen.mockResolvedValue([liga(54136, true)]);
+    await setSeasonLeagues(seasonId, [54136]);
 
-    await resolveAndSaveLeagues([4102]);
-
-    const rows = await allLeagues();
+    const rows = await ctx.db.select().from(leagues);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.name).toBe("Fresh name");
+    expect(rows[0]!.name).toBe("Liga 54136");
     expect(rows[0]!.isTracked).toBe(true);
     expect(rows[0]!.isActive).toBe(false);
-    expect(rows[0]!.discoveredAt).toEqual(discoveredAt);
+    expect(rows[0]!.discoveredAt).toEqual(new Date("2020-01-01T00:00:00Z"));
   });
 
-  it("leaves the tracked set untouched when the untrack pass fails (#77)", async () => {
+  it("leaves the season's tracked set untouched when the untrack pass fails (#77)", async () => {
     // Tracking is replaced as a whole. Split across statements, a failure
     // part-way left some leagues tracked and others already untracked, and the
     // sync picks its work from exactly that flag.
-    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true });
-    await seedLeague({ apiLigaId: 58002, ligaNr: 4103, isTracked: true });
-    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
+    const seasonId = await makeSeason("upcoming");
+    for (const apiLigaId of [54136, 54137]) {
+      await ctx.client.query(
+        `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id,
+                              is_tracked, vorabliga)
+         VALUES ($1, 0, 'Seeded', 2026, '2026/27', $2, true, false)`,
+        [apiLigaId, seasonId],
+      );
+    }
+    getAllLigen.mockResolvedValue([liga(54136, true)]);
 
     const real = ctx.db as unknown as Record<string | symbol, unknown>;
     dbHolder.ref = new Proxy(
@@ -216,171 +258,117 @@ describe("resolveAndSaveLeagues", () => {
       },
     );
 
-    await expect(resolveAndSaveLeagues([4102])).rejects.toThrow("untrack failed");
+    await expect(setSeasonLeagues(seasonId, [54136])).rejects.toThrow("untrack failed");
 
     dbHolder.ref = ctx.db;
-    const rows = await allLeagues();
-    // The upsert of 58001 rolled back with the failed untrack of 58002.
+    const rows = await ctx.db.select().from(leagues).orderBy(leagues.apiLigaId);
+    // The upsert of 54136 rolled back with the failed untrack of 54137.
     expect(rows.map((r) => r.isTracked)).toEqual([true, true]);
-    expect(rows.find((r) => r.apiLigaId === 58001)!.name).toBe("League 4102");
-  });
-
-  it("reports league numbers the federation does not know", async () => {
-    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
-
-    const result = await resolveAndSaveLeagues([4102, 9999]);
-
-    expect(result.resolved.map((r) => r.ligaNr)).toEqual([4102]);
-    expect(result.notFound).toEqual([9999]);
-    expect(result.tracked).toBe(1);
-  });
-
-  it("untracks previously tracked leagues that are not in the new set", async () => {
-    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true }); // stays
-    await seedLeague({ apiLigaId: 58002, ligaNr: 4105, isTracked: true }); // dropped
-    await seedLeague({ apiLigaId: 58003, ligaNr: 4003, isTracked: true }); // dropped
-
-    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
-
-    const result = await resolveAndSaveLeagues([4102]);
-
-    expect(result.untracked).toBe(2);
-    const rows = await allLeagues();
-    expect(rows.map((r) => [r.apiLigaId, r.isTracked])).toEqual([
-      [58001, true],
-      [58002, false],
-      [58003, false],
-    ]);
-  });
-
-  it("does not re-count leagues that were already untracked", async () => {
-    await seedLeague({ apiLigaId: 58002, ligaNr: 4105, isTracked: false });
-
-    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
-
-    const result = await resolveAndSaveLeagues([4102]);
-
-    expect(result.untracked).toBe(0);
-  });
-
-  it("untracks everything when no league number resolves", async () => {
-    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true });
-    await seedLeague({ apiLigaId: 58002, ligaNr: 4105, isTracked: true });
-
-    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
-
-    const result = await resolveAndSaveLeagues([9999, 8888]);
-
-    expect(result.resolved).toEqual([]);
-    expect(result.notFound).toEqual([9999, 8888]);
-    expect(result.tracked).toBe(0);
-    expect(result.untracked).toBe(2);
-    expect((await allLeagues()).every((r) => r.isTracked === false)).toBe(true);
-  });
-
-  it("untracks everything when an empty array is passed", async () => {
-    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true });
-    mocks.getAllLigen.mockResolvedValue([makeLiga()]);
-
-    const result = await resolveAndSaveLeagues([]);
-
-    expect(result).toMatchObject({ resolved: [], tracked: 0, untracked: 1 });
-    expect((await allLeagues())[0]!.isTracked).toBe(false);
-  });
-
-  it("handles an empty SDK response", async () => {
-    mocks.getAllLigen.mockResolvedValue([]);
-
-    const result = await resolveAndSaveLeagues([4102]);
-
-    expect(result).toMatchObject({ resolved: [], notFound: [4102], tracked: 0 });
-    expect(await allLeagues()).toEqual([]);
-  });
-
-  it("normalises the SDK's empty/null optional fields on insert", async () => {
-    // `seasonId`/`seasonName` are nullable in SdkLiga; the rest arrive as empty
-    // strings / 0 from the federation and the service maps falsy -> NULL.
-    mocks.getAllLigen.mockResolvedValue([
-      makeLiga({
-        seasonId: null,
-        seasonName: null,
-        skName: "",
-        akName: "",
-        geschlecht: "",
-        verbandId: 0,
-        verbandName: "",
-      }),
-    ]);
-
-    const result = await resolveAndSaveLeagues([4102]);
-
-    expect(result.resolved[0]).toMatchObject({ ligaNr: 4102, seasonName: "" });
-    const [row] = await allLeagues();
-    expect(row).toMatchObject({
-      seasonId: 0,
-      seasonName: "",
-      skName: null,
-      akName: null,
-      geschlecht: null,
-      verbandId: null,
-      verbandName: null,
-    });
-  });
-
-  it("resolves several league numbers at once", async () => {
-    mocks.getAllLigen.mockResolvedValue([
-      makeLiga({ ligaId: 58001, liganr: 4102, liganame: "Liga A" }),
-      makeLiga({ ligaId: 58002, liganr: 4105, liganame: "Liga B" }),
-      makeLiga({ ligaId: 58003, liganr: 4003, liganame: "Liga C" }),
-    ]);
-
-    const result = await resolveAndSaveLeagues([4102, 4105]);
-
-    expect(result.resolved.map((r) => r.name)).toEqual(["Liga A", "Liga B"]);
-    expect(result.tracked).toBe(2);
-    expect((await allLeagues()).map((r) => r.apiLigaId)).toEqual([58001, 58002]);
+    expect(rows.find((r) => r.apiLigaId === 54136)!.name).toBe("Seeded");
   });
 });
 
 describe("getTrackedLeagues", () => {
-  it("returns only the tracked leagues", async () => {
-    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, name: "Regionalliga West", isTracked: true });
-    await seedLeague({ apiLigaId: 58002, ligaNr: 4105, name: "Oberliga", isTracked: true });
-    await seedLeague({ apiLigaId: 58003, ligaNr: 4003, name: "Untracked", isTracked: false });
-
-    const result = await getTrackedLeagues();
-
-    expect(result.leagueNumbers.sort()).toEqual([4102, 4105]);
-    expect(result.leagues.map((l) => l.name).sort()).toEqual(["Oberliga", "Regionalliga West"]);
+  it("returns only leagues for the given seasonId (explicit arg)", async () => {
+    const s1 = await makeSeason("active");
+    const s2 = await makeSeason("upcoming");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga)
+       VALUES (11111, 0, 'League S1', 2025, '2025/26', $1, true, false),
+              (22222, 0, 'League S2', 2026, '2026/27', $2, true, false)`,
+      [s1, s2],
+    );
+    const result = await getTrackedLeagues(s1);
+    expect(result.leagues.map((l) => l.apiLigaId)).toEqual([11111]);
   });
 
-  it("returns an empty state when nothing is tracked", async () => {
-    await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: false });
+  it("returns leagues scoped to active season when no arg passed", async () => {
+    const s1 = await makeSeason("active");
+    const s2 = await makeSeason("upcoming");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga)
+       VALUES (11111, 0, 'League S1', 2025, '2025/26', $1, true, false),
+              (22222, 0, 'League S2', 2026, '2026/27', $2, true, false)`,
+      [s1, s2],
+    );
+    mockGetActiveSeasonId.mockResolvedValue(s1);
+    const result = await getTrackedLeagues();
+    expect(result.leagues.map((l) => l.apiLigaId)).toEqual([11111]);
+  });
+
+  it("returns nothing when no season is named and none is active", async () => {
+    // Dropping the season predicate here used to return every season's tracked
+    // leagues at once, mixing archived ones into the settings list.
+    const s1 = await makeSeason("archived");
+    const s2 = await makeSeason("upcoming");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga)
+       VALUES (11111, 0, 'League S1', 2025, '2025/26', $1, true, false),
+              (22222, 0, 'League S2', 2026, '2026/27', $2, true, false)`,
+      [s1, s2],
+    );
+    mockGetActiveSeasonId.mockResolvedValue(null);
 
     expect(await getTrackedLeagues()).toEqual({ leagueNumbers: [], leagues: [] });
-  });
-
-  it("defaults ownClubRefs to false when the column is null", async () => {
-    const id = await seedLeague({ apiLigaId: 58001, ligaNr: 4102, isTracked: true });
-    await ctx.db.update(leagues).set({ ownClubRefs: null }).where(eq(leagues.id, id));
-
-    const result = await getTrackedLeagues();
-
-    expect(result.leagues[0]!.ownClubRefs).toBe(false);
   });
 });
 
 describe("setLeagueOwnClubRefs", () => {
-  it("flips the flag on the addressed league only", async () => {
-    const target = await seedLeague({ apiLigaId: 58001, ligaNr: 4102 });
-    await seedLeague({ apiLigaId: 58002, ligaNr: 4105 });
+  it("updates ownClubRefs for the given league id", async () => {
+    const seasonId = await makeSeason("active");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id, is_tracked, vorabliga, own_club_refs)
+       VALUES (77777, 0, 'Test', 2025, '2025/26', $1, true, false, false)`,
+      [seasonId],
+    );
+    const r = await ctx.client.query<{ id: number }>(
+      `SELECT id FROM leagues WHERE api_liga_id = 77777`,
+    );
+    const leagueId = r.rows[0]!.id;
+    await setLeagueOwnClubRefs(leagueId, true);
+    const check = await ctx.client.query<{ own_club_refs: boolean }>(
+      `SELECT own_club_refs FROM leagues WHERE id = $1`,
+      [leagueId],
+    );
+    expect(check.rows[0]!.own_club_refs).toBe(true);
+  });
+});
 
-    await setLeagueOwnClubRefs(target, true);
+describe("getLeagueTeams", () => {
+  function teamRef(teamPermanentId: number, teamname: string, clubId: number | null) {
+    return { seasonTeamId: 0, teamCompetitionId: 0, teamPermanentId, teamname, teamnameSmall: "", clubId, verzicht: false };
+  }
 
-    const rows = await allLeagues();
-    expect(rows.map((r) => [r.apiLigaId, r.ownClubRefs])).toEqual([
-      [58001, true],
-      [58002, false],
+  it("lists teams from the standings table and marks our club", async () => {
+    getTabelle.mockResolvedValue([
+      { team: teamRef(1, "Opponents", 9999) },
+      { team: teamRef(2, "Hanover Dragons I", 4121) },
+    ]);
+    const res = await getLeagueTeams(54141);
+    expect(getSpielplan).not.toHaveBeenCalled();
+    expect(res.teams).toEqual([
+      { teamPermanentId: 1, name: "Opponents", clubId: 9999, isOwnClub: false },
+      { teamPermanentId: 2, name: "Hanover Dragons I", clubId: 4121, isOwnClub: true },
+    ]);
+  });
+
+  it("falls back to the schedule when the table is empty, deduping by teamPermanentId", async () => {
+    getTabelle.mockResolvedValue([]);
+    getSpielplan.mockResolvedValue([
+      { homeTeam: teamRef(1, "A", 4121), guestTeam: teamRef(2, "B", 10) },
+      { homeTeam: teamRef(1, "A", 4121), guestTeam: null },
+    ]);
+    const res = await getLeagueTeams(54141);
+    expect(res.teams.map((t) => t.teamPermanentId)).toEqual([1, 2]);
+    expect(res.teams[0]).toMatchObject({ isOwnClub: true });
+  });
+
+  it("keeps placeholder slots (clubId null) and never marks them own-club", async () => {
+    mockGetClubConfig.mockResolvedValue(null); // no club configured
+    getTabelle.mockResolvedValue([{ team: teamRef(5, "Platzhalter 6", null) }]);
+    const res = await getLeagueTeams(54144);
+    expect(res.teams).toEqual([
+      { teamPermanentId: 5, name: "Platzhalter 6", clubId: null, isOwnClub: false },
     ]);
   });
 });

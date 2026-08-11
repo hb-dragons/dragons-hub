@@ -32,6 +32,7 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { seedActiveSeason } from "../../test/seed-season";
 
 let ctx: TestDbContext;
 
@@ -53,9 +54,10 @@ beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2025-06-01T00:00:00.000Z"));
 
+  const activeSeasonId = await seedActiveSeason(ctx);
   await ctx.db.insert(leagues).values([
-    { id: LEAGUE_A, apiLigaId: 1, ligaNr: 1, name: "Bezirksliga", seasonId: 1, seasonName: "2024/25" },
-    { id: LEAGUE_B, apiLigaId: 2, ligaNr: 2, name: "Kreisliga", seasonId: 1, seasonName: "2024/25" },
+    { id: LEAGUE_A, apiLigaId: 1, ligaNr: 1, name: "Bezirksliga", seasonId: 1, seasonName: "2024/25", seasonRefId: activeSeasonId },
+    { id: LEAGUE_B, apiLigaId: 2, ligaNr: 2, name: "Kreisliga", seasonId: 1, seasonName: "2024/25", seasonRefId: activeSeasonId },
   ]);
   await ctx.db.insert(teams).values([
     { apiTeamPermanentId: TEAM_A, seasonTeamId: 10, teamCompetitionId: 1, name: "Team A", clubId: 1 },

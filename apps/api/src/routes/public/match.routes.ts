@@ -11,6 +11,8 @@ import {
 } from "@dragons/contracts";
 import { validationHook } from "../../middleware/validation";
 import { env } from "../../config/env";
+import { getActiveSeasonId } from "../../services/admin/season.service";
+import { NO_SEASON } from "../../services/season-scope";
 
 function resolveIcsHostname(): string {
   try {
@@ -34,7 +36,15 @@ publicMatchRoutes.get(
   }),
   async (c) => {
     const query = c.req.valid("query");
-    const result = await getOwnClubMatches({ ...query, excludeInactive: true });
+    // The season scope is applied *after* the spread on purpose: `query` carries
+    // a client-supplied seasonId, and a public caller must not be able to read
+    // another season by passing one.
+    const activeSeasonId = await getActiveSeasonId();
+    const result = await getOwnClubMatches({
+      ...query,
+      excludeInactive: true,
+      seasonId: activeSeasonId ?? NO_SEASON,
+    });
     return c.json(result);
   },
 );
@@ -66,6 +76,7 @@ publicMatchRoutes.get(
 
     const toDateStr = (d: Date) => d.toISOString().split("T")[0];
 
+    const activeSeasonId = await getActiveSeasonId();
     const result = await getOwnClubMatches({
       limit: 1000,
       offset: 0,
@@ -75,6 +86,7 @@ publicMatchRoutes.get(
       leagueId: query.leagueId,
       dateFrom: query.dateFrom ?? toDateStr(defaultFrom),
       dateTo: query.dateTo ?? toDateStr(defaultTo),
+      seasonId: activeSeasonId ?? NO_SEASON,
     });
 
     const ics = buildCalendarFeed(result.items, {

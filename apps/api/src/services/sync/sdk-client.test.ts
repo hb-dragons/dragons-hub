@@ -707,7 +707,7 @@ describe("SdkClient", () => {
     it("returns club matches response", async () => {
       const mockResponse = {
         club: { vereinId: 1, vereinsname: "Dragons" },
-        matches: [{ matchId: 100, competition: { ligaId: 1 } }],
+        matches: [{ matchId: 100, ligaData: { ligaId: 1 } }],
       };
       mockGetActualMatches.mockResolvedValue(mockResponse);
 

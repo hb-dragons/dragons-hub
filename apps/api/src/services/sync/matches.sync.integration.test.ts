@@ -42,10 +42,13 @@ beforeAll(async () => {
 beforeEach(async () => {
   await resetTestDb(ctx);
   vi.clearAllMocks();
+  const season = await ctx.client.query<{ id: number }>(
+    `INSERT INTO seasons (name, status) VALUES ('2024/25', 'active') RETURNING id`,
+  );
   await ctx.client.query(
-    `INSERT INTO leagues (id, api_liga_id, liga_nr, name, season_id, season_name)
-     VALUES ($1, 1, 1, 'Bezirksliga', 1, '2024/25')`,
-    [LEAGUE_ID],
+    `INSERT INTO leagues (id, api_liga_id, liga_nr, name, season_id, season_name, season_ref_id)
+     VALUES ($1, 1, 1, 'Bezirksliga', 1, '2024/25', $2)`,
+    [LEAGUE_ID, season.rows[0]!.id],
   );
   await ctx.client.query(
     `INSERT INTO teams (api_team_permanent_id, season_team_id, team_competition_id, name, club_id)

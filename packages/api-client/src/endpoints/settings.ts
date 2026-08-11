@@ -5,13 +5,11 @@ import type {
   RefereeReminderConfig,
   LeagueOwnClubRefsResponse,
   TrackedLeaguesResponse,
-  ResolveResult,
 } from "@dragons/shared";
 import type {
   SettingsClubConfig,
   SettingsBookingConfig,
   SettingsRefereeReminder,
-  LeagueNumbersBody,
   LeagueOwnClubRefsBody,
 } from "@dragons/contracts";
 import type { ApiClient } from "../client";
@@ -40,9 +38,6 @@ export function settingsEndpoints(client: ApiClient) {
     },
     getLeagues(): Promise<TrackedLeaguesResponse> {
       return client.get("/admin/settings/leagues");
-    },
-    setLeagues(body: LeagueNumbersBody): Promise<ResolveResult> {
-      return client.put("/admin/settings/leagues", body);
     },
     setLeagueOwnClubRefs(
       id: number,

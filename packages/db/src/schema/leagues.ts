@@ -6,6 +6,7 @@ import {
   boolean,
   timestamp,
 } from "drizzle-orm/pg-core";
+import { seasons } from "./seasons";
 
 export const leagues = pgTable("leagues", {
   id: serial("id").primaryKey(),
@@ -19,6 +20,10 @@ export const leagues = pgTable("leagues", {
   geschlecht: varchar("geschlecht", { length: 20 }),
   verbandId: integer("verband_id"),
   verbandName: varchar("verband_name", { length: 100 }),
+  seasonRefId: integer("season_ref_id")
+    .notNull()
+    .references(() => seasons.id),
+  vorabliga: boolean("vorabliga").notNull().default(false),
   isActive: boolean("is_active").default(true),
   isTracked: boolean("is_tracked").default(true),
   ownClubRefs: boolean("own_club_refs").default(false),

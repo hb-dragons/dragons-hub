@@ -14,6 +14,7 @@ export const matchListQuerySchema = z.object({
     .transform((v) => v === "true")
     .optional(),
   teamApiId: z.coerce.number().int().positive().optional(),
+  seasonId: z.coerce.number().int().positive().optional(),
 });
 
 // GET /admin/matches shares matchListQuerySchema above and passes the entire

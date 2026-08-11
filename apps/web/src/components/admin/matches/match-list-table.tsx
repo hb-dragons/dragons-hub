@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react"
 import { useTranslations, useFormatter } from "next-intl"
 import useSWR, { useSWRConfig } from "swr"
-import { SWR_KEYS } from "@/lib/swr-keys"
 import { queries } from "@/lib/swr-queries"
+import { SeasonContextSelect } from "@/components/admin/seasons/season-context-select"
 import type { ColumnDef, FilterFn, Row } from "@tanstack/react-table"
 import {
   Tooltip,
@@ -297,7 +297,10 @@ export function MatchListTable() {
   const tBookings = useTranslations("bookings")
   const format = useFormatter()
   const { mutate } = useSWRConfig()
-  const matchesQ = queries.matches()
+  // `undefined` means the active season, which is also what the server prefetch
+  // asked for — so the first render reuses that data rather than refetching it.
+  const [seasonId, setSeasonId] = useState<number | undefined>(undefined)
+  const matchesQ = queries.matches(seasonId)
   const { data: response } = useSWR(matchesQ.key, matchesQ.fetcher)
   const columns = useMemo(() => getColumns(t, tBookings, format), [t, tBookings, format])
   const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null)
@@ -355,6 +358,7 @@ export function MatchListTable() {
       >
         {(table) => (
           <DataTableToolbar table={table}>
+            <SeasonContextSelect value={seasonId} onChange={setSeasonId} />
             <div className="relative">
               <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -393,7 +397,7 @@ export function MatchListTable() {
           onOpenChange={(open) => {
             if (!open) setSelectedMatchId(null)
           }}
-          onSaved={() => { void mutate(SWR_KEYS.matches); }}
+          onSaved={() => { void mutate(matchesQ.key); }}
         />
       </Sheet>
     </TooltipProvider>

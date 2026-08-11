@@ -64,10 +64,12 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { seedActiveSeason } from "../../test/seed-season";
 import { EVENT_TYPES, validateEventPayload } from "@dragons/shared";
 import { renderPushTemplate } from "../notifications/templates/push";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 
 const LEAGUE_DB_ID = 10;
 const API_MATCH_ID = 1000;
@@ -83,6 +85,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   mockPublishDomainEvent.mockResolvedValue(undefined);
 
+  activeSeasonId = await seedActiveSeason(ctx);
   await ctx.db.insert(leagues).values({
     id: LEAGUE_DB_ID,
     apiLigaId: 1,
@@ -90,6 +93,7 @@ beforeEach(async () => {
     name: "Bezirksliga",
     seasonId: 2025,
     seasonName: "2025/26",
+    seasonRefId: activeSeasonId,
   });
   await ctx.db.insert(teams).values([
     { apiTeamPermanentId: 10, seasonTeamId: 100, teamCompetitionId: 1, name: "Home", clubId: 1 },
@@ -926,6 +930,7 @@ describe("syncMatchesFromData — update path", () => {
       name: "Kreisliga",
       seasonId: 2025,
       seasonName: "2025/26",
+      seasonRefId: activeSeasonId,
     });
 
     // Same match, same payload, now reported under a different league.

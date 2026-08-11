@@ -70,8 +70,10 @@ import {
   closeTestDb,
   type TestDbContext,
 } from "../../test/setup-test-db";
+import { seedActiveSeason } from "../../test/seed-season";
 
 let ctx: TestDbContext;
+let activeSeasonId: number;
 
 beforeAll(async () => {
   ctx = await setupTestDb();
@@ -86,6 +88,7 @@ beforeEach(async () => {
   mockScheduleReminderJobs.mockResolvedValue(undefined);
   mockCancelReminderJobs.mockResolvedValue(undefined);
   mockGetClubConfig.mockResolvedValue({ clubId: 300, clubName: "SC Dragons" });
+  activeSeasonId = await seedActiveSeason(ctx);
 });
 
 afterAll(async () => {
@@ -382,6 +385,7 @@ async function seedLeague(apiLigaId: number, ownClubRefs: boolean) {
     name: "Kreisliga Nord",
     seasonId: 2026,
     seasonName: "2025/26",
+    seasonRefId: activeSeasonId,
     ownClubRefs,
   });
 }

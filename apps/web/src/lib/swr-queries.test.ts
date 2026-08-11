@@ -58,9 +58,20 @@ describe("makeQueries", () => {
   it("standings(): key + dispatch to standings.list", async () => {
     const { api, calls } = mockApi();
     const q = makeQueries(api).standings();
-    expect(q.key).toBe(SWR_KEYS.standings);
+    expect(q.key).toBe(SWR_KEYS.standings());
     await q.fetcher();
-    expect(calls[0]).toEqual({ method: "standings.list", args: [] });
+    // No season named: the API defaults to the active one and the key stays the
+    // bare path, sharing a cache entry with the server prefetch.
+    expect(calls[0]).toEqual({ method: "standings.list", args: [{}] });
+  });
+
+  it("standings(seasonId): keys and filters by the named season", async () => {
+    const { api, calls } = mockApi();
+    const q = makeQueries(api).standings(3);
+    expect(q.key).toBe(SWR_KEYS.standings(3));
+    expect(q.key).not.toBe(SWR_KEYS.standings());
+    await q.fetcher();
+    expect(calls[0]).toEqual({ method: "standings.list", args: [{ seasonId: 3 }] });
   });
 
   // --- matchDetail (existing) ---
@@ -128,9 +139,20 @@ describe("makeQueries", () => {
   it("matches: key + dispatch to matches.list()", async () => {
     const { api, calls } = mockApi();
     const q = makeQueries(api).matches();
-    expect(q.key).toBe(SWR_KEYS.matches);
+    expect(q.key).toBe(SWR_KEYS.matches());
     await q.fetcher();
-    expect(calls[0]).toEqual({ method: "matches.list", args: [] });
+    // No season named: the API picks the active one, and the key stays the bare
+    // path so this shares a cache entry with the server prefetch.
+    expect(calls[0]).toEqual({ method: "matches.list", args: [undefined] });
+  });
+
+  it("matches(seasonId): keys and filters by the named season", async () => {
+    const { api, calls } = mockApi();
+    const q = makeQueries(api).matches(7);
+    expect(q.key).toBe(SWR_KEYS.matches(7));
+    expect(q.key).not.toBe(SWR_KEYS.matches());
+    await q.fetcher();
+    expect(calls[0]).toEqual({ method: "matches.list", args: [{ seasonId: 7 }] });
   });
 
   it("dashboardTodayMatches(date): key + dispatch with date filters", async () => {

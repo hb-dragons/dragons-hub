@@ -152,7 +152,12 @@ export type {
   ResolvedLeague,
   ResolveResult,
   TrackedLeaguesResponse,
+  LeagueTeam,
+  LeagueTeamsResponse,
 } from "./leagues";
+
+// Seasons
+export * from "./seasons";
 
 // Domain events
 export * from "./domain-events";

@@ -21,6 +21,7 @@ import {
   scoreboardEndpoints,
   standingsEndpoints,
   userEndpoints,
+  seasonsEndpoints,
 } from "./endpoints";
 
 export function createApi(client: ApiClient) {
@@ -46,6 +47,7 @@ export function createApi(client: ApiClient) {
     scoreboard: scoreboardEndpoints(client),
     standings: standingsEndpoints(client),
     users: userEndpoints(client),
+    seasons: seasonsEndpoints(client),
   };
 }
 

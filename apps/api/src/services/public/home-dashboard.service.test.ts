@@ -41,10 +41,12 @@ vi.mock("../admin/match-query.service", () => ({
 // --- Imports (after mocks) ---
 
 import { getHomeDashboard } from "./home-dashboard.service";
-import { leagues, standings, teams } from "@dragons/db/schema";
+import { getActiveSeasonId, invalidateActiveSeasonCache } from "../admin/season.service";
+import { leagues, seasons, standings, teams } from "@dragons/db/schema";
 
 let ctx: TestDbContext;
 let leagueId: number;
+let activeSeasonId: number;
 let trace: QueryTrace;
 
 beforeAll(async () => {
@@ -56,6 +58,11 @@ beforeAll(async () => {
 beforeEach(async () => {
   await resetTestDb(ctx);
   vi.clearAllMocks();
+  const [season] = await ctx.db
+    .insert(seasons)
+    .values({ name: "2025/26", status: "active" })
+    .returning({ id: seasons.id });
+  activeSeasonId = season!.id;
   const [league] = await ctx.db
     .insert(leagues)
     .values({
@@ -64,10 +71,17 @@ beforeEach(async () => {
       name: "Kreisliga A",
       seasonId: 2026,
       seasonName: "2025/26",
+      seasonRefId: activeSeasonId,
     })
     .returning({ id: leagues.id });
   leagueId = league!.id;
   mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0 });
+  // The active-season id is cached with a 60s TTL and season ids change every
+  // test, so drop the previous test's entry and warm it against this test's
+  // season. Warming keeps the query-fan-out assertions counting the dashboard's
+  // own queries rather than a one-off cache fill.
+  invalidateActiveSeasonCache();
+  await getActiveSeasonId();
   trace.reset();
 });
 
@@ -136,10 +150,13 @@ describe("getHomeDashboard — match sections", () => {
     await getHomeDashboard();
 
     const today = new Date().toISOString().split("T")[0]!;
+    // Every request carries the active season: the public home page must never
+    // mix an upcoming season's fixtures into the live one.
+    const seasonId = activeSeasonId;
     expect(mocks.getOwnClubMatches.mock.calls.map((c) => c[0])).toEqual([
-      { limit: 1, offset: 0, dateFrom: today, hasScore: false, sort: "asc", excludeInactive: true },
-      { limit: 5, offset: 0, dateTo: today, hasScore: true, sort: "desc", excludeInactive: true },
-      { limit: 3, offset: 0, dateFrom: today, hasScore: false, sort: "asc", excludeInactive: true },
+      { limit: 1, offset: 0, dateFrom: today, hasScore: false, sort: "asc", excludeInactive: true, seasonId },
+      { limit: 5, offset: 0, dateTo: today, hasScore: true, sort: "desc", excludeInactive: true, seasonId },
+      { limit: 3, offset: 0, dateFrom: today, hasScore: false, sort: "asc", excludeInactive: true, seasonId },
     ]);
   });
 });
@@ -234,5 +251,58 @@ describe("getHomeDashboard — query fan-out", () => {
     // `Promise.all` would break.
     expect(trace.startCount()).toBe(2);
     expect(trace.overlaps(1)).toBe(true);
+  });
+});
+
+describe("getHomeDashboard — season scope", () => {
+  it("counts only the active season's standings", async () => {
+    await seedTeam(10, "Dragons 1", true);
+    await seedStanding(10, 3, 1);
+
+    // The same own-club team, one season earlier: archived, so it must not be
+    // added to the club's live record.
+    const [oldSeason] = await ctx.db
+      .insert(seasons)
+      .values({ name: "2024/25", status: "archived" })
+      .returning({ id: seasons.id });
+    const [oldLeague] = await ctx.db
+      .insert(leagues)
+      .values({
+        apiLigaId: 400,
+        ligaNr: 400,
+        name: "Kreisliga A",
+        seasonId: 2025,
+        seasonName: "2024/25",
+        seasonRefId: oldSeason!.id,
+      })
+      .returning({ id: leagues.id });
+    await ctx.db
+      .insert(standings)
+      .values({ leagueId: oldLeague!.id, teamApiId: 10, position: 1, played: 30, won: 20, lost: 10 });
+
+    const { clubStats } = await getHomeDashboard();
+
+    expect(clubStats.totalWins).toBe(3);
+    expect(clubStats.totalLosses).toBe(1);
+  });
+
+  it("returns the empty dashboard but still counts teams when no season is active", async () => {
+    await seedTeam(10, "Dragons 1", true);
+    await seedStanding(10, 3, 1);
+    await ctx.db.update(seasons).set({ status: "archived" });
+    invalidateActiveSeasonCache();
+
+    const dashboard = await getHomeDashboard();
+
+    expect(dashboard.nextGame).toBeNull();
+    expect(dashboard.recentResults).toEqual([]);
+    expect(dashboard.upcomingGames).toEqual([]);
+    expect(dashboard.clubStats).toEqual({
+      teamCount: 1,
+      totalWins: 0,
+      totalLosses: 0,
+      winPercentage: 0,
+    });
+    expect(mocks.getOwnClubMatches).not.toHaveBeenCalled();
   });
 });

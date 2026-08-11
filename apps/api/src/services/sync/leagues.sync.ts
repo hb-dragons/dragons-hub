@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
-import { leagues } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
+import { leagues, seasons } from "@dragons/db/schema";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import pLimit from "p-limit";
 import { sdkClient } from "./sdk-client";
 import { computeEntityHash } from "./hash";
@@ -34,6 +34,11 @@ function ligaDataHashData(ligaData: SdkLigaData): Record<string, unknown> {
     geschlecht: ligaData.geschlecht,
     verbandId: ligaData.verbandId,
     verbandName: ligaData.verbandName,
+    // A preliminary league becoming committed keeps its ligaId but flips this
+    // flag. Leaving it out of the hash meant the promotion changed nothing else
+    // the hash covers, so the row was skipped as unchanged and kept claiming to
+    // be preliminary for the rest of the season.
+    vorabliga: ligaData.vorabliga,
   };
 }
 
@@ -51,16 +56,17 @@ export async function syncLeagues(syncLogger?: SyncLogger): Promise<LeagueSyncRe
 
   try {
     const trackedLeagues = await getDb()
-      .select()
+      .select({ leagues })
       .from(leagues)
-      .where(eq(leagues.isTracked, true));
+      .innerJoin(seasons, eq(leagues.seasonRefId, seasons.id))
+      .where(and(eq(leagues.isTracked, true), inArray(seasons.status, ["active", "upcoming"])));
 
     log.info({ count: trackedLeagues.length }, "Refreshing metadata for tracked leagues");
 
     const limit = pLimit(LEAGUE_SYNC_CONCURRENCY);
     await Promise.all(
-      trackedLeagues.map((league) =>
-        limit(() => syncOneLeague(league, result, syncLogger)),
+      trackedLeagues.map((row) =>
+        limit(() => syncOneLeague(row.leagues, result, syncLogger)),
       ),
     );
   } catch (error) {
@@ -81,6 +87,24 @@ export async function syncLeagues(syncLogger?: SyncLogger): Promise<LeagueSyncRe
     "Leagues sync completed",
   );
   return result;
+}
+
+/**
+ * Record the federation's own season id on the season row the first time a sync
+ * sees it.
+ *
+ * A season created through the onboarding wizard has only the admin's label —
+ * the WAM liga list carries no `seasonName` for preliminary leagues, so there is
+ * nothing to derive it from until a league's `ligaData` arrives. Written once
+ * and then left alone: `IS NULL` makes this a no-op on every later sync, and it
+ * never overwrites a value an admin supplied at creation.
+ */
+async function backfillSeasonSdkId(seasonRefId: number, sdkSeasonId: number | null): Promise<void> {
+  if (sdkSeasonId == null) return;
+  await getDb()
+    .update(seasons)
+    .set({ sdkSeasonId, updatedAt: new Date() })
+    .where(and(eq(seasons.id, seasonRefId), isNull(seasons.sdkSeasonId)));
 }
 
 async function syncOneLeague(
@@ -132,10 +156,13 @@ async function syncOneLeague(
         geschlecht: ligaData.geschlecht || null,
         verbandId: ligaData.verbandId || null,
         verbandName: ligaData.verbandName || null,
+        vorabliga: ligaData.vorabliga ?? false,
         dataHash: hash,
         updatedAt: new Date(),
       })
       .where(eq(leagues.id, league.id));
+
+    await backfillSeasonSdkId(league.seasonRefId, ligaData.seasonId);
 
     result.updated++;
     await syncLogger?.log({
