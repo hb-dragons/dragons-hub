@@ -60,6 +60,9 @@ const pnpmStoreBase = execSync("pnpm store path", { encoding: "utf8" })
 
 const makeSandbox = () =>
   docker({
+    // The default image name is derived from the directory name, which breaks
+    // when running from a worktree checkout — pin it to the built image.
+    imageName: "sandcastle:dragons-hub",
     mounts: [{ hostPath: pnpmStoreBase, sandboxPath: pnpmStoreBase }],
   });
 
