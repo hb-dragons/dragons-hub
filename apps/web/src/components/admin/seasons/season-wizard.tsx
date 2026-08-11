@@ -6,7 +6,8 @@ import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { toast } from "sonner";
-import type { BrowsableLeague } from "@dragons/shared";
+import type { BrowsableLeague, SeasonSummary } from "@dragons/shared";
+import { SyncLiveLogs } from "@/components/admin/sync/sync-live-logs";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,8 @@ import { Button } from "@dragons/ui/components/button";
 import { LeaguePicker } from "./league-picker";
 
 type Step = "name" | "select" | "syncing" | "done";
+
+const POLL_INTERVAL_MS = 2000;
 
 export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const t = useTranslations();
@@ -41,6 +44,10 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
   // The season is created only on final confirm; this id lets a retry after a
   // mid-confirm failure reuse the created season instead of making a duplicate.
   const [createdId, setCreatedId] = useState<number | null>(null);
+  // The triggered run, so step 4 can stream its log. `null` means the sync was
+  // never kicked off (the trigger call failed) — the review still renders.
+  const [syncRunId, setSyncRunId] = useState<number | null>(null);
+  const [summary, setSummary] = useState<SeasonSummary | null>(null);
   // Tracks the live `open` prop so async handlers can bail out of applying
   // state to a dialog the user has already closed mid-flight.
   const openRef = useRef(open);
@@ -58,6 +65,8 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     setLoadingLeagues(false);
     setSubmitting(false);
     setCreatedId(null);
+    setSyncRunId(null);
+    setSummary(null);
   }
 
   function handleOpenChange(v: boolean) {
@@ -91,6 +100,41 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     void loadLeagues(v);
   }
 
+  // The SSE "complete" event can fire before the job has started processing, so
+  // it is not proof the sync is done. Poll the run the way the sync dashboard's
+  // SyncCompletionWatcher does — until its status is neither running nor
+  // pending — before trusting any counts. The wizard lives outside
+  // SyncRunProvider, so it cannot reuse that watcher.
+  async function waitForRun(runId: number) {
+    while (openRef.current) {
+      const page = await api.sync.logs({ limit: 20, offset: 0 });
+      const run = page.items.find((r) => r.id === runId);
+      if (run && run.status !== "running" && run.status !== "pending") return;
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    }
+  }
+
+  async function finishWithSummary(id: number) {
+    try {
+      const counts = await api.seasons.summary(id);
+      if (!openRef.current) return;
+      setSummary(counts);
+    } catch {
+      // Counts are the nice-to-have; the season exists either way.
+      if (!openRef.current) return;
+      setSummary(null);
+    }
+    await mutate(SWR_KEYS.seasons);
+    if (openRef.current) setStep("done");
+  }
+
+  async function handleSyncStreamComplete() {
+    if (createdId === null || syncRunId === null) return;
+    await waitForRun(syncRunId);
+    if (!openRef.current) return;
+    await finishWithSummary(createdId);
+  }
+
   // Final commit: create the season, persist the picked leagues, then sync.
   async function confirm() {
     if (submitting) return;
@@ -110,14 +154,17 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
       await api.seasons.setLeagues(id, { ligaIds: [...selected] });
       setStep("syncing");
       try {
-        await api.sync.trigger();
-        toast.success(t("settings.seasons.wizard.synced"));
+        const run = await api.sync.trigger();
+        if (!openRef.current) return;
+        setSyncRunId(run.syncRunId);
+        // Step 4 now owns the rest: it streams the run's log and advances once
+        // the run is actually finished.
+        return;
       } catch {
         // The season and its leagues are saved; only the sync kick-off failed.
         toast.error(t("settings.seasons.wizard.syncFailed"));
+        await finishWithSummary(id);
       }
-      await mutate(SWR_KEYS.seasons);
-      setStep("done");
     } catch {
       toast.error(t("settings.seasons.wizard.createFailed"));
     } finally {
@@ -142,6 +189,7 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
+        className={step === "syncing" ? "sm:max-w-3xl" : undefined}
         // While committing (create -> save leagues -> sync) the dialog must not
         // close: an interrupted commit would orphan the just-created season.
         onEscapeKeyDown={(e) => {
@@ -229,10 +277,17 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
         )}
 
         {step === "syncing" && (
-          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            {t("settings.seasons.wizard.syncing")}
-          </div>
+          syncRunId === null ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              {t("settings.seasons.wizard.syncing")}
+            </div>
+          ) : (
+            <SyncLiveLogs
+              syncRunId={syncRunId}
+              onComplete={() => { void handleSyncStreamComplete(); }}
+            />
+          )
         )}
 
         {step === "done" && (

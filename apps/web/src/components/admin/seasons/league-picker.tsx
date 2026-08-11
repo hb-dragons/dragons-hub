@@ -138,6 +138,7 @@ function LeagueRow({
         <Checkbox
           className="mt-0.5"
           checked={checked}
+          aria-label={league.name}
           onCheckedChange={(c) => onToggle(league.ligaId, c === true)}
         />
         <span className="flex flex-1 flex-col">

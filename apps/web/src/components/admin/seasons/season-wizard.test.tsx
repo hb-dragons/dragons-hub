@@ -3,24 +3,37 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
-const { browse, create, setLeagues, trigger, toastError, toastSuccess } = vi.hoisted(() => ({
-  browse: vi.fn(),
-  create: vi.fn(),
-  setLeagues: vi.fn(),
-  trigger: vi.fn(),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
+const { browse, create, setLeagues, trigger, syncLogs, summary, toastError, toastSuccess } =
+  vi.hoisted(() => ({
+    browse: vi.fn(),
+    create: vi.fn(),
+    setLeagues: vi.fn(),
+    trigger: vi.fn(),
+    syncLogs: vi.fn(),
+    summary: vi.fn(),
+    toastError: vi.fn(),
+    toastSuccess: vi.fn(),
+  }));
 
 vi.mock("@/lib/api", () => ({
   api: {
-    seasons: { browse, create, setLeagues, discover: vi.fn(), leagueTeams: vi.fn() },
-    sync: { trigger },
+    seasons: { browse, create, setLeagues, summary, discover: vi.fn(), leagueTeams: vi.fn() },
+    sync: { trigger, logs: syncLogs },
   },
 }));
 vi.mock("swr", () => ({ useSWRConfig: () => ({ mutate: vi.fn() }) }));
 vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }));
+
+// The real component opens an EventSource; the wizard only needs its
+// onComplete callback, so stand in a button that fires it on demand.
+vi.mock("@/components/admin/sync/sync-live-logs", () => ({
+  SyncLiveLogs: ({ syncRunId, onComplete }: { syncRunId: number; onComplete: () => void }) => (
+    <button data-testid="live-logs" data-run-id={syncRunId} onClick={onComplete}>
+      live
+    </button>
+  ),
+}));
 
 import { SeasonWizard } from "./season-wizard";
 
@@ -34,7 +47,9 @@ beforeEach(() => {
   browse.mockResolvedValue(LEAGUES);
   create.mockResolvedValue({ id: 9, name: "2026/27", status: "upcoming" });
   setLeagues.mockResolvedValue({ tracked: 1, untracked: 0 });
-  trigger.mockResolvedValue({ ok: true });
+  trigger.mockResolvedValue({ jobId: "j1", syncRunId: 77, status: "queued", message: "" });
+  syncLogs.mockResolvedValue({ items: [{ id: 77, status: "completed" }] });
+  summary.mockResolvedValue({ leagueCount: 1, gameCount: 12, placeholderSlots: 0 });
 });
 
 afterEach(cleanup);
@@ -93,8 +108,7 @@ describe("SeasonWizard", () => {
     );
     expect(setLeagues).toHaveBeenCalledWith(9, { ligaIds: [1] });
     await waitFor(() => expect(trigger).toHaveBeenCalled());
-    expect(await screen.findByText("settings.seasons.wizard.done")).toBeInTheDocument();
-    expect(toastSuccess).toHaveBeenCalledWith("settings.seasons.wizard.synced");
+    expect(await screen.findByTestId("live-logs")).toBeInTheDocument();
   });
 
   it("shows an error and stays on the name step when discovery fails", async () => {
@@ -137,8 +151,8 @@ describe("SeasonWizard", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows the syncing step while the background sync is kicked off", async () => {
-    const d = deferred<{ ok: boolean }>();
+  it("shows a bare spinner until the trigger response names the run", async () => {
+    const d = deferred<{ jobId: string; syncRunId: number; status: string; message: string }>();
     trigger.mockReturnValueOnce(d.promise);
     render(<SeasonWizard open onOpenChange={() => {}} />);
     nameAndAdvance();
@@ -146,8 +160,8 @@ describe("SeasonWizard", () => {
     fireEvent.click(screen.getAllByRole("checkbox")[0]!);
     fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
     expect(await screen.findByText("settings.seasons.wizard.syncing")).toBeInTheDocument();
-    d.resolve({ ok: true });
-    expect(await screen.findByText("settings.seasons.wizard.done")).toBeInTheDocument();
+    d.resolve({ jobId: "j1", syncRunId: 77, status: "queued", message: "" });
+    expect(await screen.findByTestId("live-logs")).toBeInTheDocument();
   });
 
   it("ignores a fetch that resolves after the dialog was closed", async () => {
@@ -191,5 +205,82 @@ describe("SeasonWizard", () => {
     });
     expect(screen.queryByText("Oberliga Herren Ost")).not.toBeInTheDocument();
     expect(screen.getByText("Landesliga Damen")).toBeInTheDocument();
+  });
+
+  it("streams the triggered run's log instead of a bare spinner", async () => {
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    const logs = await screen.findByTestId("live-logs");
+    // The run id from trigger() reaches the log stream rather than being dropped.
+    expect(logs).toHaveAttribute("data-run-id", "77");
+  });
+
+  it("stays on the sync step when the stream completes before the run does", async () => {
+    // The SSE 'complete' event can arrive before the job starts processing.
+    syncLogs.mockResolvedValue({ items: [{ id: 77, status: "running" }] });
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    fireEvent.click(await screen.findByTestId("live-logs"));
+
+    await waitFor(() => expect(syncLogs).toHaveBeenCalled());
+    expect(screen.queryByText("settings.seasons.wizard.close")).not.toBeInTheDocument();
+    expect(summary).not.toHaveBeenCalled();
+  });
+
+  it("advances to the review once the run reaches a terminal status", async () => {
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    fireEvent.click(await screen.findByTestId("live-logs"));
+
+    await screen.findByText("settings.seasons.wizard.close");
+    expect(summary).toHaveBeenCalledWith(9);
+  });
+
+  it("still reaches the review when the sync could not be triggered", async () => {
+    trigger.mockRejectedValue(new Error("queue down"));
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    // Season and leagues are saved; only the sync kick-off failed.
+    await screen.findByText("settings.seasons.wizard.close");
+    expect(toastError).toHaveBeenCalledWith("settings.seasons.wizard.syncFailed");
+  });
+
+  it("keeps the dialog shut while committing but releases it once the sync starts", async () => {
+    const pending = deferred<{ tracked: number; untracked: number }>();
+    setLeagues.mockReturnValue(pending.promise);
+    const onOpenChange = vi.fn();
+    render(<SeasonWizard open onOpenChange={onOpenChange} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+
+    // Mid-commit: an interrupted commit would orphan the created season.
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+    pending.resolve({ tracked: 1, untracked: 0 });
+    await screen.findByTestId("live-logs");
+
+    // Syncing: the work is committed and the sync continues server-side, so the
+    // admin must not be held in the modal for its whole duration.
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 });
