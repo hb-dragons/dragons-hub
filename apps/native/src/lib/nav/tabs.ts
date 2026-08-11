@@ -1,18 +1,12 @@
-import type {
-  MaterialIcon,
-  SFSymbolIcon,
-} from "expo-router/unstable-native-tabs";
 import type { TabId } from "@dragons/shared";
+import type { AppTab } from "@/components/nav/AppTabs";
 
-/** SF Symbol object form expected by `<NativeTabs.Trigger.Icon sf={...} />`. */
-type SfIcon = Extract<NonNullable<SFSymbolIcon["sf"]>, object>;
-
-export interface TabConfig {
-  /** expo-router route name within the (tabs) group. */
-  name: string;
+/**
+ * A tab as declared here, i.e. an `AppTab` whose label is still a translation
+ * key — `(tabs)/_layout.tsx` resolves it against the active locale.
+ */
+export interface TabConfig extends Omit<AppTab, "label"> {
   labelKey: string;
-  sf: SfIcon;
-  md: MaterialIcon["md"];
 }
 
 export const TAB_CONFIG: Record<TabId, TabConfig> = {
