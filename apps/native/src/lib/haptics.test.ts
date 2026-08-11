@@ -128,6 +128,7 @@ const HAPTIC_CALL_SITES: Record<string, readonly HapticName[]> = {
   // took effect or failed.
   "src/components/ClaimGameButton.tsx": ["success", "error"],
   "src/app/(tabs)/officiating/index.tsx": ["success", "error"],
+  "src/app/referee-assign.tsx": ["success", "error"],
 
   // Board mutations. `warning` is reserved for a destructive action that took
   // effect with undo still on screen; a rejected request is `error`.

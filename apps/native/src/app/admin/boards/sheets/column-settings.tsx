@@ -7,7 +7,7 @@ import { singleLineInput } from "@/components/ui/inputStyles";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useColumnMutations } from "@/hooks/board/useColumnMutations";
 import { useSeedOnce } from "@/hooks/useSeedOnce";
-import { parseNumericParam } from "@/lib/board/sheet-params";
+import { parseNumericParam } from "@/lib/nav/route-params";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 

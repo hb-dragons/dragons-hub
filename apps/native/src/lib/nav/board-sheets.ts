@@ -1,6 +1,6 @@
 import { router, type Href } from "expo-router";
 import type { BoardSortMode, TaskPriority } from "@dragons/shared";
-import { formatIdList } from "@/lib/board/sheet-params";
+import { formatIdList } from "@/lib/nav/route-params";
 import { createSheetResult } from "./sheet-result";
 
 /**

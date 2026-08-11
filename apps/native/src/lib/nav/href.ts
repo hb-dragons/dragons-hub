@@ -48,6 +48,7 @@ export const APP_ROUTES: Record<string, (...params: string[]) => RouteHref> = {
   "/assistant": () => "/assistant",
   "/sign-in": () => "/sign-in",
   "/admin/boards": () => "/admin/boards",
+  "/referee-assign": () => "/referee-assign",
   "/+not-found": () => "/+not-found",
   // The board's utility sheets (#219). They are routes, so they are part of the
   // inventory this table diffs against disk; `board-sheets.ts` is what screens

@@ -8,6 +8,7 @@ import {
   SHEET_ROUTE_PREFIX,
   SHEET_ROUTE_SEGMENT,
   formSheetOptions,
+  searchSheetOptions,
   sheetScreenName,
 } from "@/lib/nav/sheet-routes";
 
@@ -119,5 +120,45 @@ describe("board sheet routes", () => {
     // A hand-written <Stack.Screen name="boards/sheets/..."> would leave the
     // table describing a presentation nothing reads.
     expect(layout).not.toMatch(/name="boards\/sheets\//);
+  });
+});
+
+/**
+ * The second sheet shape (issue #223): a form sheet that keeps its native
+ * header, because the header is where its search field belongs.
+ */
+describe("searchSheetOptions", () => {
+  const options = searchSheetOptions({ tintColor: "#ffffff" });
+
+  it("presents as a swipe-dismissible form sheet with a grabber", () => {
+    expect(options.presentation).toBe("formSheet");
+    expect(options.gestureEnabled).toBe(true);
+    expect(options.sheetGrabberVisible).toBe(true);
+  });
+
+  // Unlike the board's sheets, which draw their titles in content and hide the
+  // header to save the height `fitToContents` exists for.
+  it("keeps the native header, which is what carries the search field", () => {
+    expect(options.headerShown).toBe(true);
+  });
+
+  it("tints the header with the app's own foreground colour", () => {
+    // The app's theme can be forced light or dark independently of the system
+    // appearance, so the header cannot be left to pick its own label colour.
+    expect(options.headerTintColor).toBe("#ffffff");
+  });
+
+  // The size vocabulary's `[1]`, for exactly the reason it was written down:
+  // the keyboard is up for most of this sheet's life.
+  it("opens full height, the only detent a search-over-a-list sheet can use", () => {
+    expect(options.sheetAllowedDetents).toEqual([1]);
+    expect(options.sheetInitialDetentIndex).toBe(0);
+  });
+
+  // The title depends on which slot is being filled, so the screen declares it
+  // inline; the layout would have to guess.
+  it("leaves the title to the screen", () => {
+    expect(options.title).toBeUndefined();
+    expect(options.headerTitle).toBeUndefined();
   });
 });

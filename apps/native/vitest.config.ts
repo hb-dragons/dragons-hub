@@ -63,10 +63,17 @@ export default defineConfig({
         // together cover more than any one of them did, so the floors are
         // re-measured here rather than left at the highest single branch's.
         // Measured 14.5/9.58/17.04/14.2 — branches holds at 9.
-        branches: 9,
-        functions: 17,
-        lines: 14,
-        statements: 14,
+        //
+        // Ratcheted 2026-08-11 (#223): every floor up by one point. The
+        // referee-assignment modal — 693 untested lines — became a route
+        // sheet, and the logic it carried inline (distance brackets, candidate
+        // grouping, avatar swatches, slot params) moved into tested lib
+        // modules alongside the header search field's options. Measured
+        // 15.57/10.2/18.43/15.16.
+        branches: 10,
+        functions: 18,
+        lines: 15,
+        statements: 15,
       },
     },
   },

@@ -5,7 +5,7 @@ import { ColumnColorPicker } from "@/components/board/ColumnColorPicker";
 import { SheetScreen } from "@/components/sheets/SheetScreen";
 import { singleLineInput } from "@/components/ui/inputStyles";
 import { useColumnMutations } from "@/hooks/board/useColumnMutations";
-import { parseNumericParam } from "@/lib/board/sheet-params";
+import { parseNumericParam } from "@/lib/nav/route-params";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 

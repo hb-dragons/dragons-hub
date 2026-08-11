@@ -3,7 +3,7 @@ import { useLocalSearchParams } from "expo-router";
 import type { BoardSortMode } from "@dragons/shared";
 import { SheetScreen } from "@/components/sheets/SheetScreen";
 import { useSheetResult } from "@/hooks/useSheetResult";
-import { SORT_MODES, parseSortMode } from "@/lib/board/sheet-params";
+import { SORT_MODES, parseSortMode } from "@/lib/nav/route-params";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 

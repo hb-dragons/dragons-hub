@@ -30,6 +30,7 @@ import {
   detailHeaderOptions,
   tabRootHeaderOptions,
 } from "@/lib/nav/headers";
+import { searchSheetOptions } from "@/lib/nav/sheet-routes";
 import { installGlobalErrorHandler } from "@/lib/global-error-handler";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { ToastProvider } from "@/hooks/useToast";
@@ -66,6 +67,13 @@ function RootNavigator() {
         <Stack.Screen name="referee-game/[id]" options={detail} />
         <Stack.Screen name="h2h/[teamApiId]" options={detail} />
         <Stack.Screen name="+not-found" options={detail} />
+        {/* Referee assignment (#223): a form sheet whose native header carries
+            the search field. The title names the slot, so the screen declares
+            that one option itself. */}
+        <Stack.Screen
+          name="referee-assign"
+          options={searchSheetOptions({ tintColor: colors.foreground })}
+        />
         {/* The Standings tab's content, pushed: same large title, plus a back button. */}
         <Stack.Screen
           name="league-tables"

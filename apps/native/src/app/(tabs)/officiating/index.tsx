@@ -17,7 +17,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { RefereeGameCard } from "@/components/RefereeGameCard";
-import { AssignRefereeModal } from "@/components/AssignRefereeModal";
+import { openAssignRefereeSheet } from "@/lib/nav/referee-sheets";
 import { authClient } from "@/lib/auth-client";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
@@ -101,10 +101,6 @@ export default function OfficiatingScreen() {
   const showMine = isReferee(user) || !isAdmin;
 
   const [segment, setSegment] = useState<Segment>(showMine ? "mine" : "open");
-  const [assignModal, setAssignModal] = useState<{
-    game: RefereeGameListItem;
-    slotNumber: 1 | 2;
-  } | null>(null);
 
   // Session resolves async: if the user turns out to have no Mine segment,
   // leave "mine" for "open".
@@ -338,8 +334,9 @@ export default function OfficiatingScreen() {
               isAdmin={isAdmin}
               onAdminAssign={
                 isAdmin
-                  ? (slotNumber) =>
-                      setAssignModal({ game: item, slotNumber })
+                  ? // The sheet revalidates this screen's key itself once an
+                    // assignment lands (#223).
+                    (slotNumber) => openAssignRefereeSheet(item.apiMatchId, slotNumber)
                   : undefined
               }
               onAdminUnassign={
@@ -364,15 +361,6 @@ export default function OfficiatingScreen() {
         contentContainerStyle={listContentStyle}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
-      />
-      <AssignRefereeModal
-        visible={assignModal !== null}
-        game={assignModal?.game ?? null}
-        slotNumber={assignModal?.slotNumber ?? 1}
-        onClose={() => setAssignModal(null)}
-        onSuccess={async () => {
-          await mutate();
-        }}
       />
     </Screen>
   );

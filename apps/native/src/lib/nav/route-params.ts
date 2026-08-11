@@ -1,12 +1,16 @@
 import { TASK_PRIORITIES, type BoardSortMode, type TaskPriority } from "@dragons/shared";
 
 /**
- * Reading the board sheets' route params (issue #219).
+ * Reading a sheet route's params (issue #219).
  *
  * A sheet that is a route takes its input from the URL, which means every
  * value arrives as a string, may be repeated (expo-router types params as
  * `string | string[]`), and may be absent. Each sheet route reads its params
  * through these so the fallbacks are stated once.
+ *
+ * Lived under `lib/board/` until #223, when the referee-assignment sheet — the
+ * first route sheet outside the board — needed the same reading. Nothing here
+ * was ever board-specific beyond the sort/priority vocabularies.
  */
 
 export type RouteParam = string | string[] | undefined;

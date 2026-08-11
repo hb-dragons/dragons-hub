@@ -6,6 +6,7 @@ import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { bottomSearchToolbarClearance } from "@/lib/ui/search-toolbar";
+import { searchFieldOptions } from "@/lib/nav/search-bar";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
@@ -380,19 +381,15 @@ function BoardDetailBody() {
       <Stack.Screen
         options={{
           title: board?.name ?? "",
-          headerSearchBarOptions: {
+          headerSearchBarOptions: searchFieldOptions({
             placeholder: i18n.t("board.search.placeholder"),
-            hideWhenScrolling: false,
-            // Explicit "integrated" (iOS 26 bottom toolbar). With the default
-            // "automatic", UIKit reserves a stacked under-title slot during the
-            // push transition and draws its bar background over the column
-            // pills until the search bar settles into the bottom toolbar —
-            // visible as a header overlay that flashes and disappears.
+            // The iOS 26 bottom toolbar; `bottomSearchToolbarClearance` above
+            // is what keeps the columns and the FAB clear of it.
             placement: "integrated",
-            onChangeText: (e) => commitSearchQuery(e.nativeEvent.text),
+            onChangeText: commitSearchQuery,
             // Clearing is a deliberate action, not a keystroke — apply at once.
-            onCancelButtonPress: () => setSearchQuery(""),
-          },
+            onCancel: () => setSearchQuery(""),
+          }),
           headerRight: () => (
             <View
               style={{
