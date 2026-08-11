@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { TAB_CONFIG } from "@/lib/nav/tabs";
@@ -8,6 +8,7 @@ import {
   importsOf,
   rel,
   resolveInPackage,
+  valueImportSites,
 } from "../../../test/source-tree";
 
 /**
@@ -100,7 +101,104 @@ describe("navigation architecture", () => {
     const declared = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
     expect(declared.filter((name) => name.startsWith("@react-navigation/"))).toEqual([]);
   });
+
+  // #221: symbols arrive through expo-router's native tabs either way, but the
+  // rest of the chrome needs the package itself. Declaring it directly also
+  // pins it: an Expo SDK package has to match the SDK's major or it links
+  // against a different native runtime than the one the app builds.
+  it("declares expo-symbols directly, at the SDK's major", () => {
+    const { dependencies = {} } = JSON.parse(readFileSync(PACKAGE_JSON, "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+    const sdkMajor = /^~?(\d+)\./.exec(dependencies.expo ?? "")?.[1];
+    expect(sdkMajor, "cannot read the Expo SDK major from the expo dependency").toBeTruthy();
+    expect(dependencies["expo-symbols"]).toMatch(new RegExp(`^~${sdkMajor}\\.`));
+  });
+
+  // expo-symbols is beta and says so on its own docs page; the spec (#212)
+  // accepted that deliberately. The containment is the same shape as ADR 0003's
+  // for native tabs: one wrapper renders `SymbolView`, everything else names a
+  // role from `lib/ui/icons.ts`, so a breaking change to the component is a
+  // one-file fix. The registry names the same package for its symbol *types*,
+  // which erase at build time and cannot break at runtime.
+  it("renders the beta SymbolView from the Icon wrapper only", () => {
+    expect(valueImportSites("expo-symbols")).toEqual(["src/components/ui/Icon.tsx"]);
+    expect(importSites("expo-symbols")).toEqual([
+      "src/components/ui/Icon.tsx",
+      "src/lib/ui/icons.ts",
+    ]);
+  });
 });
+
+describe("icon language", () => {
+  /**
+   * Characters the app used to draw as icons: a sort control, an overflow
+   * button, a close button, a tick, a warning. Typed into a `<Text>` they take
+   * the text font's shape and weight, land at whatever baseline the font
+   * decides, and look like a keyboard character next to a real symbol.
+   */
+  const GLYPH_ICONS = ["⇅", "⋯", "×", "✕", "✓", "✔", "⚠", "›", "‹", "▾", "▸"];
+
+  it("draws no icon as a literal glyph", () => {
+    for (const file of SOURCE_FILES) {
+      const source = readFileSync(file, "utf8");
+      const found = GLYPH_ICONS.filter((glyph) => source.includes(glyph));
+      expect(found, `${rel(file)} draws an icon as a text glyph`).toEqual([]);
+    }
+  });
+
+  // "+" is a legitimate character in source (arithmetic, string joins), so this
+  // one is scoped to a JSX text node that holds nothing else — which is only
+  // ever an add button.
+  it("draws no add button as a bare plus", () => {
+    for (const file of SOURCE_FILES) {
+      const source = readFileSync(file, "utf8");
+      expect(/>\s*\+\s*</.test(source), `${rel(file)} draws an add button as a text glyph`)
+        .toBe(false);
+    }
+  });
+
+  // A glyph hides just as well inside a translation as inside JSX: two labels
+  // read "+ Add card" and "+ New column" until #221, which is the same button
+  // with the same keyboard character, only spelled in a place a reviewer looks
+  // at less often. The symbol goes beside the label; the label is words.
+  it("puts no icon glyph in a translated label", () => {
+    const localeDir = resolveInPackage("src/i18n");
+    for (const file of readdirSync(localeDir).filter((name) => name.endsWith(".json"))) {
+      const strings = JSON.parse(readFileSync(path.join(localeDir, file), "utf8")) as object;
+      for (const [key, value] of flatten(strings)) {
+        const found = GLYPH_ICONS.filter((glyph) => value.includes(glyph));
+        expect(found, `${file}: ${key} draws an icon in a label`).toEqual([]);
+        expect(/^\+/.test(value), `${file}: ${key} draws an icon in a label`).toBe(false);
+      }
+    }
+  });
+
+  // The brand assets are drawings, not icons: no symbol catalogue has the
+  // Dragons logo. Everything else that used to be a hand-drawn path — the
+  // send arrow, the task card's meta icons, the referee search field — is a
+  // symbol now, so `react-native-svg` is reached through the two brand
+  // components and the `*.svg` imports they make.
+  it("keeps SVG for the brand assets only", () => {
+    expect(importSites("react-native-svg")).toEqual([]);
+    const svgAssets = SOURCE_FILES.filter((file) =>
+      importsOf(file).some((spec) => spec.endsWith(".svg")),
+    ).map(rel);
+    expect(svgAssets).toEqual([
+      "src/components/brand/Logo.tsx",
+      "src/components/brand/Wordmark.tsx",
+    ]);
+  });
+});
+
+/** Every `key.path -> string` pair in a nested translation file. */
+function flatten(node: object, prefix = ""): [string, string][] {
+  return Object.entries(node).flatMap(([key, value]) =>
+    typeof value === "object" && value !== null
+      ? flatten(value as object, `${prefix}${key}.`)
+      : [[`${prefix}${key}`, String(value)] as [string, string]],
+  );
+}
 
 /** Route files that render a screen, i.e. everything under `app/` bar the layouts. */
 const SCREEN_FILES = SOURCE_FILES.filter(

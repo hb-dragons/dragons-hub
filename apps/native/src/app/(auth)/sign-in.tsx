@@ -16,6 +16,7 @@ import { fontFamilies } from "@/theme/typography";
 import { authClient } from "@/lib/auth-client";
 import { i18n } from "@/lib/i18n";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { Icon } from "@/components/ui/Icon";
 
 export default function SignInScreen() {
   const { colors, textStyles, spacing, radius } = useTheme();
@@ -110,9 +111,7 @@ export default function SignInScreen() {
           },
         ]}
       >
-        <Text style={{ color: colors.foreground, fontSize: 28, lineHeight: 32 }}>
-          ×
-        </Text>
+        <Icon name="close" size={22} color={colors.foreground} />
       </Pressable>
 
       <View style={[styles.content, { gap: spacing.lg }]}>

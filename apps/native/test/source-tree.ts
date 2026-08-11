@@ -55,6 +55,26 @@ export function importSites(module: string): string[] {
   ).map(rel);
 }
 
+/**
+ * Like `importSites`, but only where the module is imported for a *value*.
+ *
+ * A containment rule about a runtime API — "only this file may render that
+ * component" — should not be tripped by a neighbour importing a type from the
+ * same package, since types erase at build time. Recognises the `import type`
+ * form; a file that mixes `import { type A, B }` counts as a value import,
+ * which is what that syntax means.
+ */
+export function valueImportSites(module: string): string[] {
+  const importStatement = /(?:^|\n)\s*import\s+(type\s+)?[^;]*?from\s*["']([^"']+)["']/g;
+  return SOURCE_FILES.filter((file) => {
+    const source = readFileSync(file, "utf8");
+    return [...source.matchAll(importStatement)].some(
+      ([, typeOnly, spec]) =>
+        typeOnly === undefined && (spec === module || spec!.startsWith(`${module}/`)),
+    );
+  }).map(rel);
+}
+
 /** Absolute path for a package-relative one, so callers can name files as they read. */
 export const resolveInPackage = (relativePath: string): string =>
   path.join(PACKAGE_DIR, relativePath);

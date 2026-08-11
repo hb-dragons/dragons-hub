@@ -11,6 +11,7 @@ import type { TaskCardData, BoardColumnData, TaskContentRect } from "@dragons/sh
 import { TaskCard, type TaskDragCallbacks } from "./TaskCard";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { Icon } from "@/components/ui/Icon";
 
 export interface BoardColumnHandle {
   /** Imperatively scroll the column's ScrollView. */
@@ -272,11 +273,15 @@ const BoardColumnImpl = forwardRef<BoardColumnHandle, BoardColumnProps>(
                   borderWidth: 1,
                   borderStyle: "dashed",
                   borderColor: colors.border,
+                  flexDirection: "row",
+                  gap: spacing.xs,
                   alignItems: "center",
+                  justifyContent: "center",
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={i18n.t("board.column.addCard")}
               >
+                <Icon name="add" size={14} color={colors.mutedForeground} />
                 <Text style={{ color: colors.mutedForeground }}>
                   {i18n.t("board.column.addCard")}
                 </Text>

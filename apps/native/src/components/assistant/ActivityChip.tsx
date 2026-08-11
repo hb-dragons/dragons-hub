@@ -2,6 +2,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { toolChip } from "@/lib/assistant/tool-parts";
+import { Icon } from "@/components/ui/Icon";
 import type { UiPart } from "@/lib/assistant/messages";
 
 const KNOWN = new Set(["get_standings", "get_dashboard", "list_matches"]);
@@ -24,5 +25,10 @@ export function ActivityChip({ part }: { part: UiPart }) {
   if (chip.status === "error") {
     return <Text style={[textStyles.caption, { color: colors.destructive, marginBottom: spacing.xs }]}>{i18n.t("assistant.activity.failed", { what })}</Text>;
   }
-  return <Text style={[textStyles.caption, { color: colors.mutedForeground, marginBottom: spacing.xs }]}>{`✓ ${i18n.t("assistant.activity.checked", { what })}`}</Text>;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: spacing.xs }}>
+      <Icon name="check" size={12} color={colors.mutedForeground} />
+      <Text style={[textStyles.caption, { color: colors.mutedForeground }]}>{i18n.t("assistant.activity.checked", { what })}</Text>
+    </View>
+  );
 }

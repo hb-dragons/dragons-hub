@@ -9,6 +9,8 @@ import Animated, {
 } from "react-native-reanimated";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
+import { i18n } from "@/lib/i18n";
+import { Icon } from "@/components/ui/Icon";
 
 interface BoardHeaderProps {
   columns: BoardColumnData[];
@@ -115,6 +117,9 @@ export function BoardHeader({
         <Pressable
           onPress={onAddColumnPress}
           accessibilityRole="button"
+          // The pill used to be labelled by its own "+" text; a symbol
+          // contributes no text for VoiceOver to read, so the label is explicit.
+          accessibilityLabel={i18n.t("board.column.add")}
           style={{
             height: PILL_HEIGHT,
             paddingHorizontal: spacing.md,
@@ -126,7 +131,7 @@ export function BoardHeader({
             justifyContent: "center",
           }}
         >
-          <Text style={{ color: colors.mutedForeground, fontSize: 14, fontWeight: "600" }}>+</Text>
+          <Icon name="add" size={14} color={colors.mutedForeground} />
         </Pressable>
       ) : null}
     </ScrollView>

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import useSWR from "swr";
 import { SheetScreen } from "@/components/sheets/SheetScreen";
 import { singleLineInput } from "@/components/ui/inputStyles";
+import { Icon } from "@/components/ui/Icon";
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
@@ -126,11 +127,7 @@ export function AssigneeSelectSheet({ title, initialSelected, onApply, testID }:
               justifyContent: "center",
             }}
           >
-            {isSelected ? (
-              <Text style={{ color: colors.primaryForeground, fontSize: 14, fontWeight: "700" }}>
-                ✓
-              </Text>
-            ) : null}
+            {isSelected ? <Icon name="check" size={14} color={colors.primaryForeground} /> : null}
           </View>
         </Pressable>
       );

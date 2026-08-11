@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { ComponentRef } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
-import Svg, { Path, Rect } from "react-native-svg";
 import type {
   TaskCardData,
   TaskAssignee,
@@ -12,6 +11,7 @@ import type {
 import { dueDateBucket, type DueDateBucket } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { Icon } from "@/components/ui/Icon";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
@@ -127,49 +127,6 @@ export function dueColorFor(
     default:
       return colors.mutedForeground;
   }
-}
-
-// ---------------------------------------------------------------------------
-// Inline SVG icons (no icon lib in native)
-// ---------------------------------------------------------------------------
-
-function CalendarIcon({ size = 12, color }: { size?: number; color: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect
-        x={3}
-        y={5}
-        width={18}
-        height={16}
-        rx={2}
-        stroke={color}
-        strokeWidth={2}
-      />
-      <Path d="M3 10h18" stroke={color} strokeWidth={2} />
-      <Path d="M8 3v4M16 3v4" stroke={color} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function CheckSquareIcon({ size = 12, color }: { size?: number; color: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M9 11l3 3L22 4"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -530,7 +487,7 @@ function TaskCardImpl({
                   gap: 4,
                 }}
               >
-                <CalendarIcon size={12} color={dueColour} />
+                <Icon name="due" size={12} color={dueColour} />
                 <Text
                   style={{
                     color: dueColour,
@@ -552,7 +509,7 @@ function TaskCardImpl({
                 gap: 4,
               }}
             >
-              <CheckSquareIcon size={12} color={colors.mutedForeground} />
+              <Icon name="checklist" size={12} color={colors.mutedForeground} />
               <Text
                 style={{
                   color: colors.mutedForeground,

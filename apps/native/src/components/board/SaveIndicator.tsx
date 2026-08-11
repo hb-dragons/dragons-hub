@@ -1,6 +1,7 @@
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useTheme } from "@/hooks/useTheme";
+import { Icon } from "@/components/ui/Icon";
 
 export type SaveState = "idle" | "saving" | "saved";
 
@@ -12,7 +13,7 @@ interface Props {
 
 /**
  * 12px three-state indicator: idle (renders nothing), saving (small spinner),
- * saved (✓ in primary). The parent flips state to "saving" on commit, then
+ * saved (a tick in primary). The parent flips state to "saving" on commit, then
  * to "saved" on resolve, then back to "idle" after ~1s via setTimeout.
  */
 export function SaveIndicator({ state, label }: Props) {
@@ -45,9 +46,7 @@ export function SaveIndicator({ state, label }: Props) {
             justifyContent: "center",
           }}
         >
-          <Text style={{ color: colors.primaryForeground, fontSize: 9, fontWeight: "700" }}>
-            ✓
-          </Text>
+          <Icon name="check" size={9} color={colors.primaryForeground} />
         </View>
       )}
     </Animated.View>
