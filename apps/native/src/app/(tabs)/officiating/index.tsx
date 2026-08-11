@@ -138,7 +138,7 @@ export default function OfficiatingScreen() {
                 haptics.success();
                 Alert.alert(i18n.t("refereeGame.admin.removeSuccess"));
               } catch (e) {
-                haptics.warning();
+                haptics.error();
                 const message =
                   e instanceof APIError
                     ? e.message

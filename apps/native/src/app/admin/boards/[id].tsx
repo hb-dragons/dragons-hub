@@ -303,8 +303,11 @@ function BoardDetailBody() {
         }
       };
 
+      // No haptic on the long press itself: revealing a menu is none of the
+      // three HIG categories (#218). The interim ActionSheetIOS path therefore
+      // goes silent; the first-party context menu that replaces it (#220)
+      // brings UIKit's own menu haptic, which is the feedback this imitated.
       if (Platform.OS === "ios") {
-        haptics.light();
         const actions: TaskContextAction[] = ["move", "priority", "due", "delete"];
         ActionSheetIOS.showActionSheetWithOptions(
           {

@@ -1,6 +1,7 @@
 import { Pressable, Text } from "react-native";
 import { useTheme } from "@/hooks/useTheme";
 import { haptics } from "@/lib/haptics";
+import { filterPillA11y } from "@/lib/ui/a11y";
 
 interface FilterPillProps {
   label: string;
@@ -13,6 +14,7 @@ export function FilterPill({ label, active, onPress }: FilterPillProps) {
 
   return (
     <Pressable
+      {...filterPillA11y(label, active)}
       onPress={() => {
         haptics.selection();
         onPress();

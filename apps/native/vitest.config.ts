@@ -47,6 +47,11 @@ export default defineConfig({
         // Ratcheted 2026-08-11 (#217): statements 10 -> 11, functions 9 -> 11,
         // lines 9 -> 11, on the typed-href route table and its tests. Measured
         // 11.44/8.52/11.67/11.25 — branches still short of 9.
+        //
+        // Ratcheted 2026-08-11 (#218): functions and lines 9 -> 10, on the
+        // haptic-semantics and filter-pill a11y tests. Measured
+        // 10.36/8.02/10.85/10.26 — statements and branches hold. Superseded by
+        // #217's higher floors above, which this merge keeps.
         branches: 8,
         functions: 11,
         lines: 11,

@@ -20,7 +20,7 @@ export function useChecklistMutations(boardId: number) {
   }
 
   function notifyError() {
-    haptics.warning();
+    haptics.error();
     toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
   }
 
@@ -71,7 +71,7 @@ export function useChecklistMutations(boardId: number) {
         await adminBoardApi.deleteChecklistItem(taskId, itemId);
         await refresh(taskId);
       } catch (error) {
-        haptics.warning();
+        haptics.error();
         toast.show({ title: i18n.t("toast.deleteFailed"), variant: "error" });
         throw error;
       }

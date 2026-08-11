@@ -26,7 +26,7 @@ export function useBoardMutations() {
       toast.show({ title: i18n.t("toast.boardCreated"), variant: "success" });
       return created;
     } catch (error) {
-      haptics.warning();
+      haptics.error();
       toast.show({ title: i18n.t("toast.createFailed"), variant: "error" });
       throw error;
     }
@@ -41,7 +41,7 @@ export function useBoardMutations() {
       ]);
       return next;
     } catch (error) {
-      haptics.warning();
+      haptics.error();
       toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
       throw error;
     }
@@ -57,7 +57,7 @@ export function useBoardMutations() {
       haptics.success();
       toast.show({ title: i18n.t("toast.boardDeleted"), variant: "success" });
     } catch (error) {
-      haptics.warning();
+      haptics.error();
       toast.show({ title: i18n.t("toast.deleteFailed"), variant: "error" });
       throw error;
     }
