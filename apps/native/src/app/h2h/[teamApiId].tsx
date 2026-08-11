@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { View, Text, FlatList, ActivityIndicator, RefreshControl } from "react-native";
 import { useLocalSearchParams, router, Stack } from "expo-router";
 import useSWR from "swr";
+import type { MatchListItem } from "@dragons/shared";
 import { Screen } from "../../components/Screen";
 import { MatchCardFull } from "../../components/MatchCardFull";
 import { useTheme } from "../../hooks/useTheme";
@@ -19,6 +20,11 @@ export default function H2HScreen() {
   );
 
   const { refreshing, onRefresh } = useRefresh(() => mutate());
+
+  // Stable handler: MatchCardFull is memo-wrapped.
+  const openMatch = useCallback((match: MatchListItem) => {
+    router.push(`/game/${String(match.id)}`);
+  }, []);
 
   const first = data?.items[0];
   const opponentName = first
@@ -63,7 +69,7 @@ export default function H2HScreen() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <View style={{ marginBottom: spacing.sm }}>
-              <MatchCardFull match={item} onPress={() => router.push(`/game/${item.id}`)} />
+              <MatchCardFull match={item} onPress={openMatch} />
             </View>
           )}
           contentContainerStyle={listContentStyle}

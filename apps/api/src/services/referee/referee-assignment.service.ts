@@ -7,7 +7,7 @@ import {
   refereeAssignmentRules,
   refereeAssignmentIntents,
 } from "@dragons/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { sdkClient } from "../sync/sdk-client";
 import { publishDomainEvent } from "../events/event-publisher";
 import { EVENT_TYPES } from "@dragons/shared";
@@ -17,16 +17,7 @@ import type {
   CandidateSearchResponse,
 } from "@dragons/shared";
 import { isRefereeEligibleForGame, type EligibilitySlot } from "./referee-slot-resolver";
-
-export class AssignmentError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-  ) {
-    super(message);
-    this.name = "AssignmentError";
-  }
-}
+import { AssignmentError } from "./referee-assignment.errors";
 
 const FEDERATION_SUCCESS = "Änderungen erfolgreich übernommen";
 
@@ -35,11 +26,11 @@ export async function assignReferee(
   slotNumber: 1 | 2,
   refereeApiId: number,
 ): Promise<AssignRefereeResponse> {
-  // 1. Look up game
+  // 1. Look up game (a withdrawn game — issue #105 — is not actionable)
   const games = await getDb()
     .select()
     .from(refereeGames)
-    .where(eq(refereeGames.apiMatchId, spielplanId))
+    .where(and(eq(refereeGames.apiMatchId, spielplanId), isNull(refereeGames.removedAt)))
     .limit(1);
 
   const game = games[0];
@@ -138,8 +129,8 @@ export async function assignReferee(
 
   const slotUpdate =
     slotNumber === 1
-      ? { sr1Name: refereeName, sr1RefereeApiId: refereeApiId, sr1Status: "assigned" }
-      : { sr2Name: refereeName, sr2RefereeApiId: refereeApiId, sr2Status: "assigned" };
+      ? { sr1Name: refereeName, sr1RefereeApiId: refereeApiId, sr1Status: "assigned" as const }
+      : { sr2Name: refereeName, sr2RefereeApiId: refereeApiId, sr2Status: "assigned" as const };
 
   // 6. Win the slot locally BEFORE submitting to the federation. The federation
   // has no compare-and-set (submitRefereeAssignment is an unconditional set), so
@@ -155,6 +146,7 @@ export async function assignReferee(
     .where(
       and(
         eq(refereeGames.apiMatchId, spielplanId),
+        isNull(refereeGames.removedAt),
         eq(slotStatusColumn, "open"),
       ),
     )
@@ -174,7 +166,7 @@ export async function assignReferee(
     const currentRows = await getDb()
       .select()
       .from(refereeGames)
-      .where(eq(refereeGames.apiMatchId, spielplanId))
+      .where(and(eq(refereeGames.apiMatchId, spielplanId), isNull(refereeGames.removedAt)))
       .limit(1);
     const currentApiId =
       slotNumber === 1
@@ -200,14 +192,15 @@ export async function assignReferee(
   const rollbackClaim = async () => {
     const slotClear =
       slotNumber === 1
-        ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" }
-        : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" };
+        ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" as const }
+        : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" as const };
     await getDb()
       .update(refereeGames)
       .set(slotClear)
       .where(
         and(
           eq(refereeGames.apiMatchId, spielplanId),
+          isNull(refereeGames.removedAt),
           eq(slotRefereeApiIdColumn, refereeApiId),
           eq(slotStatusColumn, "assigned"),
         ),
@@ -238,52 +231,69 @@ export async function assignReferee(
     }
   }
 
-  // 8. Upsert intent (only when game has a linked match). Runs on the idempotent
-  // reclaim too: the upsert is idempotent, so it recovers a missing intent if
-  // the original call died after the federation submit but before persisting it.
-  if (game.matchId != null) {
-    await getDb()
-      .insert(refereeAssignmentIntents)
-      .values({
-        matchId: game.matchId,
-        refereeId: referee.id,
-        slotNumber,
-        clickedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [
-          refereeAssignmentIntents.matchId,
-          refereeAssignmentIntents.refereeId,
-          refereeAssignmentIntents.slotNumber,
-        ],
-        set: { clickedAt: new Date() },
-      });
-  }
+  // 8. Record the assignment intent and the domain event in ONE transaction.
+  // The federation call above has to stay outside it — it is network I/O and
+  // holding a transaction open across it would pin a connection for the
+  // duration of a third-party request — so the durable local state that
+  // follows the submit is what gets made atomic. A crash between the intent
+  // upsert and the event insert previously left a referee assigned with no
+  // notification and no outbox row to recover from. Passing `tx` inserts the
+  // event with the intent; the outbox poller enqueues it after commit.
+  //
+  // The intent upsert runs on the idempotent reclaim too: it is idempotent, so
+  // it recovers a missing intent if the original call died after the federation
+  // submit but before persisting it. The event does not — on a reclaim the
+  // assignment is not happening now, and replaying REFEREE_ASSIGNED would spam
+  // a stale "just assigned" notification.
+  const matchIdForIntent = game.matchId;
+  if (matchIdForIntent != null || !idempotentReclaim) {
+    await getDb().transaction(async (tx) => {
+      if (matchIdForIntent != null) {
+        const clickedAt = new Date();
+        await tx
+          .insert(refereeAssignmentIntents)
+          .values({
+            matchId: matchIdForIntent,
+            refereeId: referee.id,
+            slotNumber,
+            clickedAt,
+          })
+          .onConflictDoUpdate({
+            target: [
+              refereeAssignmentIntents.matchId,
+              refereeAssignmentIntents.refereeId,
+              refereeAssignmentIntents.slotNumber,
+            ],
+            set: { clickedAt },
+          });
+      }
 
-  // 10. Publish domain event — only for a fresh assignment. On an idempotent
-  // reclaim the assignment isn't happening now, so replaying REFEREE_ASSIGNED
-  // would spam a stale "just assigned" notification.
-  if (!idempotentReclaim) {
-    await publishDomainEvent({
-      type: EVENT_TYPES.REFEREE_ASSIGNED,
-      source: "manual",
-      entityType: "referee",
-      entityId: referee.id,
-      entityName: refereeName,
-      deepLinkPath: "/admin/referees",
-      payload: {
-        matchNo: game.matchNo,
-        homeTeam: game.homeTeamName,
-        guestTeam: game.guestTeamName,
-        refereeName,
-        role: slotKey.toUpperCase(),
-        teamIds: [],
-        refereeId: referee.id,
-        matchId: game.matchId,
-        kickoffDate: game.kickoffDate,
-        kickoffTime: game.kickoffTime,
-        deepLink: `/referee-game/${game.id}`,
-      },
+      if (!idempotentReclaim) {
+        await publishDomainEvent(
+          {
+            type: EVENT_TYPES.REFEREE_ASSIGNED,
+            source: "manual",
+            entityType: "referee",
+            entityId: referee.id,
+            entityName: refereeName,
+            deepLinkPath: "/admin/referees",
+            payload: {
+              matchNo: game.matchNo,
+              homeTeam: game.homeTeamName,
+              guestTeam: game.guestTeamName,
+              refereeName,
+              role: slotKey.toUpperCase(),
+              teamIds: [],
+              refereeId: referee.id,
+              matchId: game.matchId,
+              kickoffDate: game.kickoffDate,
+              kickoffTime: game.kickoffTime,
+              deepLink: `/referee-game/${game.id}`,
+            },
+          },
+          tx,
+        );
+      }
     });
   }
 
@@ -296,15 +306,51 @@ export async function assignReferee(
   };
 }
 
+/**
+ * Self-service entry point: a referee may only assign themselves.
+ *
+ * `assignReferee` itself stays unrestricted — `admin/referee-assignment.routes.ts`
+ * assigns any qualified referee under `requirePermission`, and
+ * `referee-claim.service.ts` calls it internally after already resolving and
+ * validating the referee itself — so hoisting an ownership check into
+ * `assignReferee` would either break admin assignment (which has no "caller
+ * referee" concept at all) or make the check skippable by a caller that simply
+ * omits an optional argument. This wrapper is the one and only path a
+ * self-service caller uses, so the ownership check cannot be bypassed by a
+ * missed argument: `callerRefereeId` is required, and a call site that forgets
+ * it fails to typecheck.
+ */
+export async function assignRefereeAsSelf(
+  spielplanId: number,
+  slotNumber: 1 | 2,
+  refereeApiId: number,
+  callerRefereeId: number,
+): Promise<AssignRefereeResponse> {
+  const [refereeRow] = await getDb()
+    .select({ apiId: referees.apiId, isOwnClub: referees.isOwnClub })
+    .from(referees)
+    .where(eq(referees.id, callerRefereeId))
+    .limit(1);
+
+  if (!refereeRow || refereeRow.apiId !== refereeApiId) {
+    throw new AssignmentError("Cannot assign another referee", "FORBIDDEN");
+  }
+  if (!refereeRow.isOwnClub) {
+    throw new AssignmentError("Referee is not an own-club referee", "NOT_OWN_CLUB");
+  }
+
+  return assignReferee(spielplanId, slotNumber, refereeApiId);
+}
+
 export async function unassignReferee(
   spielplanId: number,
   slotNumber: 1 | 2,
 ): Promise<UnassignRefereeResponse> {
-  // 1. Look up game
+  // 1. Look up game (a withdrawn game — issue #105 — is not actionable)
   const games = await getDb()
     .select()
     .from(refereeGames)
-    .where(eq(refereeGames.apiMatchId, spielplanId))
+    .where(and(eq(refereeGames.apiMatchId, spielplanId), isNull(refereeGames.removedAt)))
     .limit(1);
 
   const game = games[0];
@@ -317,13 +363,29 @@ export async function unassignReferee(
 
   const slotKey = slotNumber === 1 ? "sr1" : "sr2";
 
-  // 2. Call federation unassignment
+  const srApiId = slotNumber === 1 ? game.sr1RefereeApiId : game.sr2RefereeApiId;
+  const srStatus = slotNumber === 1 ? game.sr1Status : game.sr2Status;
+
+  // 2. An already-open slot is nothing to undo. Returning early keeps the call
+  // idempotent (a double-click still succeeds) without telling the federation
+  // to clear a slot that is already clear, and without emitting a
+  // referee.unassigned event for a referee who was never there — that event
+  // used to go out with entityId 0 and an empty referee name, which reads to a
+  // subscriber as "somebody was dropped from this game".
+  if (srApiId == null && srStatus === "open") {
+    return { success: true, slot: slotKey, status: "open" };
+  }
+
+  // 3. Call federation unassignment. Like assignReferee, this network call is
+  // deliberately outside the transaction below; the local write is what the
+  // next sync reconciles against the federation anyway, so a failure after this
+  // point self-heals rather than needing the two to be atomic.
   const submitResponse = await sdkClient.submitRefereeUnassignment(
     spielplanId,
     slotNumber,
   );
 
-  // 3. Check federation success
+  // 4. Check federation success
   if (!submitResponse.gameInfoMessages.includes(FEDERATION_SUCCESS)) {
     throw new AssignmentError(
       `Federation rejected unassignment: ${submitResponse.gameInfoMessages.join(", ")}`,
@@ -331,71 +393,90 @@ export async function unassignReferee(
     );
   }
 
-  // 4. Clear slot fields in refereeGames
-  const slotClear =
-    slotNumber === 1
-      ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" }
-      : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" };
-
-  await getDb()
-    .update(refereeGames)
-    .set(slotClear)
-    .where(eq(refereeGames.apiMatchId, spielplanId));
-
-  // 5. Delete intent (only when game has a linked match and a referee was assigned)
+  // 5. Resolve the local referee row for the referee we are dropping, so the
+  // event can name them. Independent of whether the game is linked to a match —
+  // only the intent delete needs the match id.
   let refereeEntityId = 0;
-
-  if (game.matchId != null) {
-    const srApiId =
-      slotNumber === 1 ? game.sr1RefereeApiId : game.sr2RefereeApiId;
-
-    if (srApiId != null) {
-      const refereeRows = await getDb()
-        .select()
-        .from(referees)
-        .where(eq(referees.apiId, srApiId))
-        .limit(1);
-
-      const referee = refereeRows[0];
-      if (referee) {
-        refereeEntityId = referee.id;
-        await getDb()
-          .delete(refereeAssignmentIntents)
-          .where(
-            and(
-              eq(refereeAssignmentIntents.matchId, game.matchId),
-              eq(refereeAssignmentIntents.refereeId, referee.id),
-              eq(refereeAssignmentIntents.slotNumber, slotNumber),
-            ),
-          );
-      }
-    }
+  if (srApiId != null) {
+    const [referee] = await getDb()
+      .select()
+      .from(referees)
+      .where(eq(referees.apiId, srApiId))
+      .limit(1);
+    if (referee) refereeEntityId = referee.id;
   }
 
-  // 6. Publish domain event
+  // 6. Clear the slot, drop the intent and record the event as one unit. Split
+  // apart, a failure between them left the slot open locally with the intent
+  // still standing (the next sync would "confirm" an assignment that no longer
+  // exists) or with nobody notified. The clear is a compare-and-set on the
+  // referee still occupying the slot so it cannot wipe an assignment a
+  // concurrent caller made while the federation call above was in flight.
+  const slotClear =
+    slotNumber === 1
+      ? { sr1Name: null, sr1RefereeApiId: null, sr1Status: "open" as const }
+      : { sr2Name: null, sr2RefereeApiId: null, sr2Status: "open" as const };
+
+  const slotRefereeApiIdColumn =
+    slotNumber === 1 ? refereeGames.sr1RefereeApiId : refereeGames.sr2RefereeApiId;
+
   const refereeName =
     slotNumber === 1 ? (game.sr1Name ?? "") : (game.sr2Name ?? "");
 
-  await publishDomainEvent({
-    type: EVENT_TYPES.REFEREE_UNASSIGNED,
-    source: "manual",
-    entityType: "referee",
-    entityId: refereeEntityId,
-    entityName: refereeName,
-    deepLinkPath: "/admin/referees",
-    payload: {
-      matchNo: game.matchNo,
-      homeTeam: game.homeTeamName,
-      guestTeam: game.guestTeamName,
-      refereeName,
-      role: slotKey.toUpperCase(),
-      teamIds: [],
-      refereeId: refereeEntityId > 0 ? refereeEntityId : undefined,
-      matchId: game.matchId,
-      kickoffDate: game.kickoffDate,
-      kickoffTime: game.kickoffTime,
-      deepLink: `/referee-game/${game.id}`,
-    },
+  await getDb().transaction(async (tx) => {
+    await tx
+      .update(refereeGames)
+      .set(slotClear)
+      .where(
+        and(
+          eq(refereeGames.apiMatchId, spielplanId),
+          isNull(refereeGames.removedAt),
+          srApiId == null
+            ? isNull(slotRefereeApiIdColumn)
+            : eq(slotRefereeApiIdColumn, srApiId),
+        ),
+      );
+
+    if (game.matchId != null && refereeEntityId > 0) {
+      await tx
+        .delete(refereeAssignmentIntents)
+        .where(
+          and(
+            eq(refereeAssignmentIntents.matchId, game.matchId),
+            eq(refereeAssignmentIntents.refereeId, refereeEntityId),
+            eq(refereeAssignmentIntents.slotNumber, slotNumber),
+          ),
+        );
+    }
+
+    // Only a slot that actually held a referee produces a referee.unassigned
+    // event. Retracting an open offer drops nobody.
+    if (srApiId != null) {
+      await publishDomainEvent(
+        {
+          type: EVENT_TYPES.REFEREE_UNASSIGNED,
+          source: "manual",
+          entityType: "referee",
+          entityId: refereeEntityId,
+          entityName: refereeName,
+          deepLinkPath: "/admin/referees",
+          payload: {
+            matchNo: game.matchNo,
+            homeTeam: game.homeTeamName,
+            guestTeam: game.guestTeamName,
+            refereeName,
+            role: slotKey.toUpperCase(),
+            teamIds: [],
+            refereeId: refereeEntityId > 0 ? refereeEntityId : undefined,
+            matchId: game.matchId,
+            kickoffDate: game.kickoffDate,
+            kickoffTime: game.kickoffTime,
+            deepLink: `/referee-game/${game.id}`,
+          },
+        },
+        tx,
+      );
+    }
   });
 
   // 7. Return response

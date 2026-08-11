@@ -1,4 +1,12 @@
 // @vitest-environment happy-dom
+// @vitest-environment-options { "settings": { "disableIframePageLoading": true, "errorCapture": "disabled" } }
+//
+// `broadcast-control.tsx` renders <iframe src="/overlay"> for the live preview,
+// and happy-dom really fetches iframe sources. Nothing serves localhost:3000
+// during a test run, so that request is still in flight when `cleanup()`
+// unmounts the iframe; the resulting abort surfaces as an unhandled
+// DOMException that intermittently races process exit and fails the whole run
+// with every test passing. The preview iframe's content is not under test here.
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -39,6 +47,10 @@ const messages = {
     obsUrl: "OBS URL",
     copy: "Copy",
     noMatch: "No match",
+    matchTitle: "{home} vs {guest}",
+    matchSubtitle: "{date} · {time}",
+    preview: "Preview",
+    previewTitle: "Overlay preview",
     errors: { matchRequired: "Match required" },
   },
 };
@@ -78,7 +90,7 @@ describe("BroadcastControl", () => {
         />,
       ),
     );
-    const iframe = screen.getByTitle("overlay-preview") as HTMLIFrameElement;
+    const iframe = screen.getByTitle("Overlay preview") as HTMLIFrameElement;
     expect(iframe).toBeInTheDocument();
     expect(iframe.getAttribute("src")).toBe("/overlay");
   });
@@ -92,6 +104,6 @@ describe("BroadcastControl", () => {
         />,
       ),
     );
-    expect(screen.queryByTitle("overlay-preview")).toBeNull();
+    expect(screen.queryByTitle("Overlay preview")).toBeNull();
   });
 });

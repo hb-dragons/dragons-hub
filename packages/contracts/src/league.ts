@@ -1,13 +1,12 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
-export const leagueOwnClubRefsSchema = z.object({
+export const leagueOwnClubRefsSchema = z.strictObject({
   ownClubRefs: z.boolean(),
 });
 
 /** Path param for PATCH /admin/settings/leagues/:id/own-club-refs. */
-export const leagueIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const leagueIdParamSchema = idParamSchema;
 
 export type LeagueOwnClubRefsBody = z.infer<typeof leagueOwnClubRefsSchema>;
 export type LeagueIdParam = z.infer<typeof leagueIdParamSchema>;

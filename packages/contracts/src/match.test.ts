@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   matchListQuerySchema,
+  publicMatchListQuerySchema,
   matchIdParamSchema,
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
@@ -48,6 +49,17 @@ describe("matchListQuerySchema", () => {
     expect(result).toMatchObject({ teamApiId: 42 });
   });
 
+  // matchListQuerySchema is shared with GET /admin/matches, which passes the
+  // whole validated query straight through to getOwnClubMatches without
+  // destructuring individual keys. It deliberately has no opponentApiId
+  // field — see publicMatchListQuerySchema below — and isn't .strict(), so an
+  // unknown opponentApiId key is silently stripped rather than rejected. This
+  // is the pre-Task-8 behaviour and must stay that way for the admin route.
+  it("silently strips an unrecognized opponentApiId key", () => {
+    const result = matchListQuerySchema.parse({ opponentApiId: "abc" });
+    expect(result).not.toHaveProperty("opponentApiId");
+  });
+
   it("rejects invalid dateFrom format", () => {
     expect(() => matchListQuerySchema.parse({ dateFrom: "01-01-2025" })).toThrow();
   });
@@ -78,6 +90,35 @@ describe("matchListQuerySchema", () => {
 
   it("rejects non-numeric leagueId string", () => {
     expect(() => matchListQuerySchema.parse({ leagueId: "abc" })).toThrow();
+  });
+});
+
+describe("publicMatchListQuerySchema", () => {
+  it("parses minimal input with the same defaults as matchListQuerySchema", () => {
+    const result = publicMatchListQuerySchema.parse({});
+    expect(result).toEqual({ limit: 1000, offset: 0, sort: "asc" });
+  });
+
+  it("still accepts every matchListQuerySchema field", () => {
+    const result = publicMatchListQuerySchema.parse({ teamApiId: "7", leagueId: "3", sort: "desc" });
+    expect(result).toMatchObject({ teamApiId: 7, leagueId: 3, sort: "desc" });
+  });
+
+  it("coerces opponentApiId to number", () => {
+    const result = publicMatchListQuerySchema.parse({ opponentApiId: "42" });
+    expect(result).toMatchObject({ opponentApiId: 42 });
+  });
+
+  it("rejects zero opponentApiId", () => {
+    expect(() => publicMatchListQuerySchema.parse({ opponentApiId: "0" })).toThrow();
+  });
+
+  it("rejects negative opponentApiId", () => {
+    expect(() => publicMatchListQuerySchema.parse({ opponentApiId: "-1" })).toThrow();
+  });
+
+  it("rejects non-numeric opponentApiId string", () => {
+    expect(() => publicMatchListQuerySchema.parse({ opponentApiId: "abc" })).toThrow();
   });
 });
 
@@ -151,6 +192,31 @@ describe("matchUpdateBodySchema", () => {
   it("accepts overtime scores", () => {
     const result = matchUpdateBodySchema.parse({ homeOt1: 5, guestOt1: 3 });
     expect(result).toMatchObject({ homeOt1: 5, guestOt1: 3 });
+  });
+
+  // An "achtel" match is played in eight periods; the DB has homeQ5..homeQ8 and
+  // MatchDetail exposes them, but the update body stopped at Q4 — so a wrong
+  // period score on an achtel match could not be corrected through the UI at all.
+  it.each([5, 6, 7, 8])("accepts period %s scores", (period) => {
+    const result = matchUpdateBodySchema.parse({
+      [`homeQ${period}`]: 12,
+      [`guestQ${period}`]: 10,
+    });
+    expect(result).toMatchObject({
+      [`homeQ${period}`]: 12,
+      [`guestQ${period}`]: 10,
+    });
+  });
+
+  it("accepts null period 5-8 scores to clear the override", () => {
+    const result = matchUpdateBodySchema.parse({ homeQ8: null, guestQ8: null });
+    expect(result).toMatchObject({ homeQ8: null, guestQ8: null });
+  });
+
+  it("rejects a key the schema does not declare", () => {
+    // A mistyped field used to be silently dropped, returning 200 unchanged.
+    expect(() => matchUpdateBodySchema.parse({ homeQ9: 5 })).toThrow();
+    expect(() => matchUpdateBodySchema.parse({ kickofDate: "2025-04-01" })).toThrow();
   });
 
   it("accepts changeReason", () => {

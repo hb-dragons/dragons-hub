@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from "react";
-import { applyColumnReorder } from "@dragons/shared";
 import type { BoardColumnData } from "@dragons/shared";
 import { haptics } from "@/lib/haptics";
 import { useColumnMutations } from "./useColumnMutations";
@@ -83,18 +82,12 @@ export function useColumnDrag(
     reordered.splice(state.targetIndex, 0, moved);
 
     // Translate to position deltas. We reassign sequential positions so the
-    // wire payload is unambiguous; `applyColumnReorder` is idempotent against
-    // sequential positions and matches the server's convention.
+    // wire payload is unambiguous and matches the server's convention.
     const order = reordered.map((c, i) => ({ id: c.id, position: i }));
 
     haptics.success();
     cancel();
     try {
-      // Result of applyColumnReorder is unused at this point — the SWR
-      // revalidation inside reorder() reconciles state. The pure helper is
-      // referenced here to make the relationship between the hook and
-      // shared logic explicit and to keep the import alive.
-      void applyColumnReorder(columns, order);
       await mutations.reorder(order);
     } catch {
       // toast already shown by hook

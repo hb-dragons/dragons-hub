@@ -16,6 +16,7 @@ import {
 } from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import useSWR from "swr";
+import { useDebouncedValue } from "@/hooks/useDebounce";
 import { authClient } from "@/lib/auth-client";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
@@ -45,14 +46,19 @@ export const AssigneeFilterSheet = forwardRef<AssigneeFilterSheetHandle>(
     const { colors, spacing, radius } = theme;
     const insets = useSafeAreaInsets();
 
+    // One request per pause, not per keystroke. The SWR key must use the
+    // debounced value too: every keystroke produces a distinct key, so
+    // `dedupingInterval` cannot collapse them.
+    const debouncedSearch = useDebouncedValue(search);
+
     const { data: userPage, isLoading } = useSWR(
-      ["admin/users", search],
+      ["admin/users", debouncedSearch],
       async () => {
         const result = await authClient.admin.listUsers({
           query: {
             limit: 50,
             offset: 0,
-            searchValue: search || undefined,
+            searchValue: debouncedSearch || undefined,
             searchField: "name",
             searchOperator: "contains",
           },

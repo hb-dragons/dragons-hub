@@ -21,8 +21,12 @@ export interface RefereeAssignedPayload {
   deepLink?: string | null;
 }
 
-/** Fallback native route when the event carries no explicit deep link. */
-const FALLBACK_DEEP_LINK = "/officiating";
+/**
+ * Fallback native route when the event carries no explicit deep link.
+ * Every deep link a push emits has to resolve to a route declared under
+ * `apps/native/src/app/` — `deep-link-routes.test.ts` enforces that.
+ */
+export const FALLBACK_DEEP_LINK = "/officiating";
 
 export function refereeDeepLink(payload: { deepLink?: string | null }): string {
   return payload.deepLink ?? FALLBACK_DEEP_LINK;

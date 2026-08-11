@@ -1,4 +1,19 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
+
+/**
+ * Path param for POST /referee/games/:spielplanId/assign.
+ */
+export const refereeAssignParamSchema = z.object({
+  spielplanId: z.coerce.number().int().positive(),
+});
+export type RefereeAssignParam = z.infer<typeof refereeAssignParamSchema>;
+
+/**
+ * Path param for POST/DELETE /referee/games/:id/claim.
+ */
+export const refereeClaimParamSchema = idParamSchema;
+export type RefereeClaimParam = z.infer<typeof refereeClaimParamSchema>;
 
 /**
  * Query params for GET /referee/games.
@@ -25,10 +40,11 @@ export type RefereeGamesQuery = z.infer<typeof refereeGamesQuerySchema>;
 
 /**
  * Body for POST /referee/games/:spielplanId/assign.
- * The referee may only assign themselves; the ownership check happens in the
- * route handler after parsing.
+ * The referee may only assign themselves; the ownership check happens in
+ * `assignRefereeAsSelf` (`apps/api/src/services/referee/referee-assignment.service.ts`),
+ * not the route handler.
  */
-export const refereeAssignBodySchema = z.object({
+export const refereeAssignBodySchema = z.strictObject({
   slotNumber: z.union([z.literal(1), z.literal(2)]),
   refereeApiId: z.number().int().positive(),
 });
@@ -40,7 +56,7 @@ export type RefereeAssignBody = z.infer<typeof refereeAssignBodySchema>;
  * The entire body is optional — an empty body is a valid claim request.
  */
 export const refereeClaimBodySchema = z
-  .object({
+  .strictObject({
     slotNumber: z.union([z.literal(1), z.literal(2)]).optional(),
   })
   .optional();

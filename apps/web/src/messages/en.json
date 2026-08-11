@@ -59,7 +59,8 @@
       "sync": "Sync Status",
       "syncHealthy": "Healthy",
       "syncFailed": "Needs Attention",
-      "syncIdle": "Idle"
+      "syncIdle": "Idle",
+      "syncUnknown": "Status unknown"
     }
   },
   "refereeGames": {
@@ -235,7 +236,8 @@
     "release": "Release",
     "unsavedChanges": "Unsaved changes",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "toggleTheme": "Toggle theme"
   },
   "matches": {
     "title": "Matches",
@@ -268,6 +270,10 @@
       "title": "Reschedule assistant",
       "description": "Describe your constraints; I'll suggest valid dates and venues.",
       "placeholder": "e.g. next 3 weeks, prefer Saturday evenings, keep our gym",
+      "stop": "Stop",
+      "retry": "Retry",
+      "newChat": "Start a new chat",
+      "error": "Something went wrong. Please try again.",
       "send": "Send"
     }
   },
@@ -276,10 +282,12 @@
     "matchdayBadge": "MD {day}",
     "overrideCount": "{count, plural, =1 {# Override} other {# Overrides}}",
     "overrideActive": "Override active",
+    "editTitle": "{home} vs {guest}",
     "info": {
       "title": "Match Info",
       "matchNo": "Match No",
       "matchday": "Matchday",
+      "matchdaySummary": "Matchday {day} · {league}",
       "league": "League",
       "date": "Date",
       "time": "Time",
@@ -322,7 +330,8 @@
       "anschreiber": "Scorer",
       "zeitnehmer": "Timekeeper",
       "shotclock": "Shot Clock",
-      "placeholder": "Select team..."
+      "placeholder": "Select team...",
+      "clear": "Clear {role}"
     },
     "notes": {
       "title": "Notes",
@@ -719,6 +728,11 @@
       "passwordSetFailed": "Failed to set password",
       "refereeLinked": "Referee linked successfully",
       "refereeLinkFailed": "Failed to link referee"
+    },
+    "validation": {
+      "nameRequired": "Name is required",
+      "emailInvalid": "Enter a valid email address",
+      "passwordTooShort": "Password must be at least 8 characters"
     }
   },
   "board": {
@@ -734,6 +748,7 @@
     "boardName": "Board name",
     "boardDescription": "Description (optional)",
     "dnd": {
+      "handle": "Drag {title}",
       "pickUp": "Picked up {title}. Now in {column}, position {position} of {total}. Use arrow keys to move, Space or Enter to drop, Escape to cancel.",
       "move": "Now in {column}, position {position} of {total}.",
       "drop": "Dropped in {column} at position {position}.",
@@ -815,7 +830,8 @@
       "updated": "Task updated",
       "deleted": "Task deleted",
       "moved": "Task moved"
-    }
+    },
+    "moreActions": "Board actions"
   },
   "bookings": {
     "title": "Venue Bookings",
@@ -881,6 +897,7 @@
       "calculated": "Calculated",
       "reasonPlaceholder": "Reason for override...",
       "linkedMatches": "Linked Matches",
+      "opponent": "vs {guest}",
       "notes": "Notes",
       "notesPlaceholder": "Add notes...",
       "delete": "Delete Booking",
@@ -1079,6 +1096,14 @@
     "instructionApple": "Calendar → File → New Calendar Subscription",
     "instructionGoogle": "Settings → Add calendar → From URL",
     "instructionOutlook": "Add calendar → From the internet",
+    "heroTitle": "Dragons",
+    "heroSubtitle": "Basketball",
+    "weekendLabel": "Sa/Su {satDay}/{sunDay} {month}",
+    "previousWeekend": "Previous weekend",
+    "nextWeekend": "Next weekend",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "kickoffDateTime": "{date} · {time}",
     "countdown": {
       "today": "Today",
       "tomorrow": "Tomorrow",
@@ -1113,7 +1138,10 @@
       "record": "Record",
       "ptsFor": "Pts For",
       "ptsAgainst": "Pts Against",
-      "noData": "No match data available"
+      "noData": "No match data available",
+      "quarterLabel": "Q{number}",
+      "overtimeLabel": "OT{number}",
+      "teamColumn": "Team"
     },
     "teamDetail": {
       "form": "Form",
@@ -1146,6 +1174,28 @@
       "online": "Live",
       "connecting": "Connecting…",
       "offline": "Waiting for data…"
+    },
+    "debug": {
+      "noDeviceId": "(no device id configured)",
+      "lastFrame": "Last frame: {at} ({seconds}s ago)",
+      "pause": "Pause",
+      "resume": "Resume",
+      "foulsTitle": "Fouls home / guest",
+      "timeoutsTitle": "Timeouts home / guest",
+      "flagsTitle": "Timeout active / clock running",
+      "columns": {
+        "id": "id",
+        "at": "at",
+        "home": "H",
+        "guest": "G",
+        "period": "Q",
+        "clock": "clock",
+        "shotClock": "SC",
+        "fouls": "F H/G",
+        "timeouts": "TO H/G",
+        "flags": "flags",
+        "hex": "hex"
+      }
     }
   },
   "broadcast": {
@@ -1174,13 +1224,24 @@
     "noMatchesFound": "No matches found.",
     "pickerTitle": "Pick match",
     "useDefault": "(default)",
+    "matchTitle": "{home} vs {guest}",
+    "matchSubtitle": "{date} · {time}",
+    "preview": "Preview",
+    "previewTitle": "Overlay preview",
     "errors": {
       "matchRequired": "Pick a match before going live."
     },
     "overlay": {
       "live": "Live",
       "offline": "Off air",
-      "stale": "Connection stalled"
+      "stale": "Connection stalled",
+      "overtime": "OT",
+      "overtimeNumbered": "OT{number}",
+      "timeout": "Timeout",
+      "timeoutShort": "TO",
+      "tipOff": "Tip-off",
+      "foulsLabel": "Fouls: {count}",
+      "timeoutsLabel": "Timeouts: {count}"
     }
   },
   "notifications": {
@@ -1212,6 +1273,32 @@
       "urgency": "Urgency",
       "error": "Error",
       "retries": "Retries"
+    },
+    "entityTypes": {
+      "match": "Match",
+      "booking": "Booking",
+      "referee": "Referee",
+      "task": "Task",
+      "unknown": "Other"
+    },
+    "statuses": {
+      "pending": "Pending",
+      "sent": "Sent",
+      "sent_ticket": "Accepted",
+      "delivered": "Delivered",
+      "read": "Read",
+      "failed": "Failed",
+      "unknown": "Unknown"
+    },
+    "urgencies": {
+      "immediate": "Immediate",
+      "routine": "Routine",
+      "unknown": "Unknown"
+    },
+    "pagination": {
+      "previous": "Previous page",
+      "next": "Next page",
+      "pageOf": "{page} / {total}"
     }
   },
   "watchRules": {
@@ -1232,6 +1319,8 @@
     "channels": "Channels",
     "urgencyOverride": "Override urgency",
     "noOverride": "Default",
+    "noChannels": "No channels available",
+    "removeFilter": "Remove filter",
     "addFilter": "Add filter",
     "when": "When",
     "and": "And",
@@ -1266,12 +1355,19 @@
     },
     "groupId": "WhatsApp Group ID",
     "groupIdHelp": "Group chat ID from Meta Business dashboard",
+    "webhookOwner": "GitHub owner",
+    "webhookRepo": "GitHub repository",
+    "webhookEventType": "Event type",
+    "webhookEventTypeHelp": "event_type of the repository_dispatch this channel triggers",
     "providerNotConfigured": "Provider not configured — set env vars to enable",
     "typeLabels": {
       "in_app": "In-App",
       "whatsapp_group": "WhatsApp Group",
-      "email": "Email"
-    }
+      "push": "Push Notification",
+      "email": "Email",
+      "webhook": "Webhook"
+    },
+    "typeImmutable": "Type cannot be changed after a channel is created."
   },
   "domainEvents": {
     "title": "Domain Events",
@@ -1292,7 +1388,47 @@
       "sync": "Sync",
       "manual": "Manual",
       "reconciliation": "Reconciliation"
-    }
+    },
+    "count": "{count, plural, one {# event} other {# events}}",
+    "entityTypes": {
+      "match": "match",
+      "booking": "booking",
+      "referee": "referee",
+      "task": "task",
+      "user": "user"
+    },
+    "urgencyLabels": {
+      "immediate": "immediate",
+      "routine": "routine"
+    },
+    "allFilter": "All",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "searchLabel": "Search",
+    "searchPlaceholder": "Search...",
+    "rowsPerPage": "Rows per page",
+    "pageOf": "Page {page} of {total}",
+    "loading": "Loading...",
+    "id": "ID",
+    "entityTypeField": "Entity Type",
+    "entityIdField": "Entity ID",
+    "entityNameField": "Entity Name",
+    "deepLinkPathField": "Deep Link Path",
+    "payloadJson": "Payload (JSON)",
+    "deepLink": "Deep Link",
+    "syncRun": "Sync Run",
+    "enqueued": "Enqueued",
+    "pagination": {
+      "first": "First page",
+      "previous": "Previous page",
+      "next": "Next page",
+      "last": "Last page"
+    },
+    "triggerTypePlaceholder": "match.schedule.changed",
+    "entityNamePlaceholder": "Dragons vs. Tigers",
+    "deepLinkPathPlaceholder": "/admin/matches/123",
+    "urgencyDefaultPlaceholder": "Default",
+    "payloadPlaceholder": "'{\"field\": \"value\"}'"
   },
   "refereeHub": {
     "title": "Referees",
@@ -1404,6 +1540,9 @@
       "history": {
         "total": "{n} games",
         "exportCsv": "Export CSV",
+        "exporting": "Exporting…",
+        "exportFailed": "CSV export failed",
+        "exportTruncated": "Export capped at 1000 rows ({n} games match these filters)",
         "loadMore": "Load more",
         "empty": "No history in selected range",
         "statusPlayed": "Played",
@@ -1420,6 +1559,9 @@
         "allow": "Allow",
         "selectTeam": "Team",
         "none": "No rules",
+        "allowSr1": "SR1",
+        "allowSr2": "SR2",
+        "removeRule": "Remove rule",
         "disabledHint": "Mark as own-club referee first",
         "markOwnClub": "Mark as own club",
         "save": {
@@ -1441,7 +1583,8 @@
       "scope": {
         "own": "Own ({n})",
         "all": "All ({n})"
-      }
+      },
+      "licenseLabel": "Lic {number}"
     }
   },
   "errors": {
@@ -1463,6 +1606,7 @@
     "placeholder": "e.g. who plays this weekend? what place is Herren 1 in?",
     "send": "Send",
     "stop": "Stop",
+    "newChat": "Start a new chat",
     "regenerate": "Regenerate",
     "copy": "Copy",
     "copied": "Copied",
@@ -1488,5 +1632,59 @@
       "list_matches": "fixtures",
       "fallback": "club data"
     }
+  },
+  "socialWizard": {
+    "pageTitle": "Social Post Generator",
+    "createTitle": "Create Social Post",
+    "back": "Back",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "resultsLabel": "Results",
+    "previewLabel": "Preview",
+    "lastWeekendLabel": "Last weekend",
+    "nextWeekendLabel": "Upcoming weekend",
+    "resultsCountSuffix": "matches with a result",
+    "previewCountSuffix": "matches scheduled",
+    "weekAndRange": "Week {week} · {range}",
+    "defaultWeekLabel": "Default week",
+    "chooseOtherWeekLabel": "Choose a different week",
+    "prevWeekAria": "Previous week",
+    "nextWeekAria": "Next week",
+    "weekLabel": "Week {a} / {b}",
+    "loadError": "Failed to load",
+    "step1Summary": "Week {week} ({label})",
+    "matchesCount": "{count, plural, one {# match} other {# matches}}",
+    "photoAlt": "Player photo",
+    "backgroundAlt": "Background",
+    "photoAndBackgroundLabel": "Photo & background",
+    "selectMatchesTitle": "Select matches",
+    "loadingMatches": "Loading matches…",
+    "noMatchesFound": "No matches found",
+    "moveUpAria": "Move up",
+    "moveDownAria": "Move down",
+    "vsLabel": "vs",
+    "homeLabel": "Home",
+    "awayLabel": "Away",
+    "removeMatchAria": "Remove match",
+    "selectAssetsLabel": "Select assets",
+    "selectAssetsTitle": "Select assets",
+    "photosLoadError": "Failed to load photos",
+    "backgroundsLoadError": "Failed to load backgrounds",
+    "loadingPhotos": "Loading photos…",
+    "loadingBackgrounds": "Loading backgrounds…",
+    "photoLabel": "Player photo",
+    "backgroundLabel": "Background",
+    "dragHelpText": "Drag the player photo into place and resize using the corners.",
+    "generateError": "Unknown error while generating",
+    "retryLabel": "Try again",
+    "generating": "Generating…",
+    "generateAndDownload": "Generate & Download",
+    "uploadFailed": "Upload failed",
+    "deleteFailed": "Delete failed",
+    "deleteItemAria": "Delete {name}",
+    "uploadImageAria": "Upload image",
+    "deleteImageTitle": "Delete image?",
+    "deleteImageDescription": "“{name}” will be permanently deleted. This action cannot be undone."
   }
 }

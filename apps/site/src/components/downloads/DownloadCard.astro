@@ -1,0 +1,75 @@
+---
+/**
+ * Download card, ported from the legacy downloads page's UCard: type/size
+ * badge, title, date, soft download button. Classes lifted from prod markup;
+ * the Nuxt "info" blue maps to Tailwind's blue-400 (no info token in the
+ * site theme — identical resolved color).
+ */
+import type { CollectionEntry } from "astro:content";
+
+import { formatDateDe, formatFileSize, formatMimeType } from "../../lib/format";
+import { cmsBaseUrl, mediaUrl } from "../../lib/media";
+import { SOFT_BUTTON_CLASSES } from "../../lib/site-assets";
+import { strings } from "../../lib/strings";
+
+interface Props {
+  download: CollectionEntry<"downloads">["data"];
+}
+
+const { download } = Astro.props;
+const file = download.file;
+const href = mediaUrl(file?.url, cmsBaseUrl());
+---
+
+<div class="rounded-lg overflow-hidden divide-y divide-border bg-card border border-border">
+  <div class="p-4 sm:p-6 space-y-4">
+    <div>
+      <div class="mb-2">
+        <span
+          class="font-medium inline-flex items-center text-xs px-2 py-1 gap-1 rounded-md bg-blue-400/10 text-blue-400 ring ring-inset ring-blue-400/25"
+        >
+          {file?.mimeType != null && <span>{formatMimeType(file.mimeType)}</span>}
+          <span>/</span>
+          <span>{formatFileSize(Math.round(file?.filesize ?? 0))}</span>
+        </span>
+      </div>
+
+      <h3 class="text-base md:text-lg font-semibold text-foreground">{download.title}</h3>
+
+      <div class="flex items-center justify-between text-sm text-muted-foreground">
+        <time datetime={download.createdAt.toISOString()}>{formatDateDe(download.createdAt)}</time>
+      </div>
+    </div>
+
+    <div class="flex justify-end">
+      {
+        href && (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            class={`${SOFT_BUTTON_CLASSES} !px-2.5 !py-1.5 !text-sm !gap-1.5`}
+            aria-label={`${strings.downloads.download} ${download.title}`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="w-5 h-5"
+              aria-hidden="true"
+            >
+              <path d="M12 15V3" />
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <path d="m7 10 5 5 5-5" />
+            </svg>
+            {strings.downloads.download}
+          </a>
+        )
+      }
+    </div>
+  </div>
+</div>

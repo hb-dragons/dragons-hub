@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../config/database";
+import { BroadcastError } from "./config.errors";
 import {
   broadcastConfigs,
   leagues,
@@ -91,13 +92,6 @@ export async function upsertBroadcastConfig(
   const out = await getBroadcastConfig(input.deviceId);
   if (!out) throw new Error("upsert failed");
   return out;
-}
-
-export class BroadcastError extends Error {
-  constructor(public readonly code: "MISSING_MATCH" | "ROW_MISSING") {
-    super(code);
-    this.name = "BroadcastError";
-  }
 }
 
 export async function setBroadcastLive(

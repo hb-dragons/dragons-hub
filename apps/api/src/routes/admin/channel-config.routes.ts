@@ -17,8 +17,11 @@ import {
   updateChannelConfigSchema,
   validateConfigForType,
 } from "@dragons/contracts";
-import type { CreateChannelConfigBody, UpdateChannelConfigBody } from "@dragons/shared";
+import type { ChannelConfigUpdateBodyParsed } from "@dragons/contracts";
+import { CHANNEL_TYPES } from "@dragons/shared";
+import type { ProviderAvailability } from "@dragons/shared";
 import { env } from "../../config/env";
+import { readSmtpSettings } from "../../services/notifications/channels/smtp-settings";
 
 const channelConfigRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
@@ -27,16 +30,21 @@ function isProviderConfigured(type: string): boolean {
   switch (type) {
     case "in_app":
       return true;
+    case "push":
+      // Expo Push needs no credentials — EXPO_ACCESS_TOKEN only upgrades the
+      // send tier, so the provider is always available.
+      return true;
     case "whatsapp_group":
       return !!env.WAHA_BASE_URL;
     case "email":
-      return !!(
-        env.SMTP_HOST &&
-        env.SMTP_PORT &&
-        env.SMTP_USER &&
-        env.SMTP_PASSWORD &&
-        env.SMTP_FROM
-      );
+      // All five or nothing — `readSmtpSettings()` in the adapter applies the
+      // same rule, so the endpoint never advertises a relay the adapter would
+      // then refuse to use.
+      return readSmtpSettings() !== null;
+    case "webhook":
+      // Same rule as the adapter: without the dispatch PAT every send is a
+      // logged skip, so the channel is not offered for creation.
+      return !!env.GH_DISPATCH_TOKEN;
     default:
       return false;
   }
@@ -52,11 +60,15 @@ channelConfigRoutes.get(
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    return c.json({
-      in_app: { configured: isProviderConfigured("in_app") },
-      whatsapp_group: { configured: isProviderConfigured("whatsapp_group") },
-      email: { configured: isProviderConfigured("email") },
-    });
+    // Built from CHANNEL_TYPES so a new channel type is reported automatically
+    // instead of silently missing from the response.
+    const availability = Object.fromEntries(
+      CHANNEL_TYPES.map((type) => [
+        type,
+        { configured: isProviderConfigured(type) },
+      ]),
+    ) as ProviderAvailability;
+    return c.json(availability);
   },
 );
 
@@ -128,7 +140,9 @@ channelConfigRoutes.post(
       );
     }
 
-    const config = await createChannelConfig(body as unknown as CreateChannelConfigBody);
+    // `body.config` is already the parsed, key-stripped ChannelConfig — the
+    // create schema transforms it, so no cast is needed here any more.
+    const config = await createChannelConfig(body);
     return c.json(config, 201);
   },
 );
@@ -149,9 +163,10 @@ channelConfigRoutes.patch(
   }),
   async (c) => {
     const { id } = c.req.valid("param");
-    const body = c.req.valid("json");
+    const { config: rawConfig, ...rest } = c.req.valid("json");
+    const updates: ChannelConfigUpdateBodyParsed = rest;
 
-    if (body.config) {
+    if (rawConfig) {
       const existing = await getChannelConfig(id);
       if (!existing) {
         return c.json(
@@ -160,7 +175,7 @@ channelConfigRoutes.patch(
         );
       }
 
-      const validated = validateConfigForType(existing.type, body.config);
+      const validated = validateConfigForType(existing.type, rawConfig);
       if (!validated) {
         return c.json(
           {
@@ -170,9 +185,13 @@ channelConfigRoutes.patch(
           400,
         );
       }
+      // Persist the *validated* value. Writing `body.config` back would put the
+      // raw record — unknown keys and all — into a jsonb column typed
+      // `$type<ChannelConfig>()`.
+      updates.config = validated;
     }
 
-    const config = await updateChannelConfig(id, body as UpdateChannelConfigBody);
+    const config = await updateChannelConfig(id, updates);
 
     if (!config) {
       return c.json(

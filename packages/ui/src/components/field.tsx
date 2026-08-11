@@ -42,12 +42,14 @@ function FieldDescription({
 function FieldError({
   className,
   children,
+  role = "alert",
   ...props
 }: React.ComponentProps<"p">) {
   if (!children) return null
   return (
     <p
       data-slot="field-error"
+      role={role}
       className={cn("text-destructive text-sm", className)}
       {...props}
     >

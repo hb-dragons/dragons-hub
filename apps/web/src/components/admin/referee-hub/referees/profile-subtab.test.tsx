@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { ProfileSubtab } from "./profile-subtab";
 
@@ -30,32 +30,63 @@ function wrap(ui: React.ReactNode) {
 beforeEach(() => { vi.useFakeTimers(); setVisibility.mockClear(); });
 afterEach(() => { vi.useRealTimers(); cleanup(); });
 
-// Tests hit a React 19 + @radix-ui/react-switch max-update-depth bug when
-// rendered with happy-dom + fake timers (compose-refs identity churn). The
-// component is exercised end-to-end via integration manually; once Radix ships
-// the compose-refs stable-callback fix upstream, drop the .skip.
-//
-// Assertions track the visibility-only PATCH shape following the Profile/Rules
-// subtab split (Plan 2). Rules are now in RulesSubtab with explicit save.
-describe.skip("ProfileSubtab", () => {
+// These tests drive a debounce, so they run on fake timers. Do NOT reach for
+// `waitFor` here: @testing-library/dom only knows how to pump *jest* fake
+// timers, so under vitest's fake timers its polling loop never advances and
+// the test hangs until the vitest timeout. Advance the clock inside `act`
+// instead — that flushes both the debounce timer and the React work it queues.
+describe("ProfileSubtab", () => {
   it("auto-saves via /visibility endpoint after debounce", async () => {
     render(wrap(<ProfileSubtab referee={ref} />));
     fireEvent.click(screen.getByRole("switch", { name: /allow all home/i }));
-    await vi.advanceTimersByTimeAsync(800);
 
-    await waitFor(() => {
-      expect(setVisibility).toHaveBeenCalledWith(1, {
-        allowAllHomeGames: false,
-        allowAwayGames: true,
-        isOwnClub: true,
-      });
+    expect(setVisibility).not.toHaveBeenCalled();
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+
+    expect(setVisibility).toHaveBeenCalledWith(1, {
+      allowAllHomeGames: false,
+      allowAwayGames: true,
+      isOwnClub: true,
     });
+    expect(screen.getByText(/^Saved /)).toBeInTheDocument();
   });
 
   it("Save now button bypasses debounce", async () => {
     render(wrap(<ProfileSubtab referee={ref} />));
     fireEvent.click(screen.getByRole("switch", { name: /allow all home/i }));
-    fireEvent.click(screen.getByRole("button", { name: /save now/i }));
-    await waitFor(() => expect(setVisibility).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /save now/i }));
+    });
+
+    expect(setVisibility).toHaveBeenCalledTimes(1);
+    expect(setVisibility).toHaveBeenCalledWith(1, {
+      allowAllHomeGames: false,
+      allowAwayGames: true,
+      isOwnClub: true,
+    });
+
+    // The debounce timer was cancelled, not merely pre-empted: letting it
+    // expire must not fire a second save.
+    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+    expect(setVisibility).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a failed save without losing the pending edit", async () => {
+    setVisibility.mockRejectedValueOnce(new Error("boom"));
+    render(wrap(<ProfileSubtab referee={ref} />));
+    fireEvent.click(screen.getByRole("switch", { name: /allow away/i }));
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+
+    expect(setVisibility).toHaveBeenCalledWith(1, {
+      allowAllHomeGames: true,
+      allowAwayGames: false,
+      isOwnClub: true,
+    });
+    expect(screen.getByText("Save failed")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: /allow away/i })).toHaveAttribute("aria-checked", "false");
   });
 });

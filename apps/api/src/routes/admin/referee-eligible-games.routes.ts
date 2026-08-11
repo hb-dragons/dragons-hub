@@ -1,10 +1,9 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
-import { eq } from "drizzle-orm";
-import { getDb } from "../../config/database";
-import { referees } from "@dragons/db/schema";
-import { getEligibleOpenGames } from "../../services/referee/eligible-open-games.service";
+import { describeRoute, validator } from "hono-openapi";
+import { getEligibleOpenGamesForReferee } from "../../services/referee/eligible-open-games.service";
 import { requirePermission } from "../../middleware/rbac";
+import { validationHook } from "../../middleware/validation";
+import { refereeIdParamSchema } from "@dragons/contracts";
 import type { AppEnv } from "../../types";
 
 const refereeEligibleGamesRoutes = new Hono<AppEnv>();
@@ -12,6 +11,7 @@ const refereeEligibleGamesRoutes = new Hono<AppEnv>();
 refereeEligibleGamesRoutes.get(
   "/referees/:id/eligible-open-games",
   requirePermission("assignment", "view"),
+  validator("param", refereeIdParamSchema, validationHook),
   describeRoute({
     description: "Returns open games the referee is eligible to take",
     tags: ["Referees"],
@@ -22,23 +22,8 @@ refereeEligibleGamesRoutes.get(
     },
   }),
   async (c) => {
-    const id = Number(c.req.param("id"));
-    if (!Number.isInteger(id) || id <= 0) {
-      return c.json({ error: "Invalid id", code: "VALIDATION_ERROR" }, 400);
-    }
-
-    const [row] = await getDb()
-      .select({ apiId: referees.apiId })
-      .from(referees)
-      .where(eq(referees.id, id))
-      .limit(1);
-
-    if (!row) {
-      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
-    }
-
-    const result = await getEligibleOpenGames(row.apiId);
-    return c.json(result);
+    const { id } = c.req.valid("param");
+    return c.json(await getEligibleOpenGamesForReferee(id));
   },
 );
 

@@ -4,25 +4,13 @@ import type { MatchListItem } from "@dragons/shared";
 import { getNativeTeamColor } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { i18n } from "../lib/i18n";
+import { kickoffCompact } from "../lib/format/kickoff";
 import { fontFamilies } from "../theme/typography";
 import { ClubLogo } from "./brand/ClubLogo";
 
 interface MatchCardFullProps {
   match: MatchListItem;
-  onPress?: () => void;
-}
-
-function getDateLocale(): string {
-  return i18n.locale === "de" ? "de-DE" : "en-US";
-}
-
-function formatHeaderDate(kickoffDate: string, kickoffTime: string): string {
-  const d = new Date(kickoffDate + "T00:00:00");
-  const weekday = d.toLocaleDateString(getDateLocale(), { weekday: "short" });
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const time = kickoffTime.slice(0, 5);
-  return `${weekday} ${day}.${month}. ${time}`;
+  onPress?: (match: MatchListItem) => void;
 }
 
 function getResultBadge(match: MatchListItem): { label: string; variant: "win" | "loss" | "neutral" } | null {
@@ -107,7 +95,7 @@ function MatchCardFullImpl({ match, onPress }: MatchCardFullProps) {
           }}
           numberOfLines={1}
         >
-          {formatHeaderDate(match.kickoffDate, match.kickoffTime)}
+          {kickoffCompact(match.kickoffDate, match.kickoffTime)}
           {venueName ? ` \u2022 ${venueName}` : ""}
         </Text>
 
@@ -231,7 +219,7 @@ function MatchCardFullImpl({ match, onPress }: MatchCardFullProps) {
   if (onPress) {
     return (
       <Pressable
-        onPress={onPress}
+        onPress={() => onPress(match)}
         style={({ pressed }) => (pressed ? { opacity: 0.85 } : undefined)}
       >
         {content}

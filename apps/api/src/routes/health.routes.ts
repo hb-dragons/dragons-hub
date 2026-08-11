@@ -5,6 +5,7 @@ import { getRedis } from "../config/redis";
 import { sql, eq, isNull, and, desc } from "drizzle-orm";
 import { domainEvents, syncRuns } from "@dragons/db/schema";
 import { syncQueue, domainEventsQueue, outboxPollQueue } from "../workers/queues";
+import { requireAnyRole } from "../middleware/rbac";
 
 const healthRoutes = new Hono();
 
@@ -47,13 +48,20 @@ healthRoutes.get(
   },
 );
 
+// Admin-only. Unlike the shallow `/health` above (which uptime probes poll and
+// which only reports up/down per dependency), the deep probe reports queue
+// depths, outbox lag and sync freshness — an operational picture of the club's
+// pipeline that does not belong in an anonymous response.
 healthRoutes.get(
   "/health/deep",
+  requireAnyRole("admin"),
   describeRoute({
     description: "Deep health probe (DB, Redis, queues, outbox lag, sync freshness)",
     tags: ["Health"],
     responses: {
       200: { description: "Healthy" },
+      401: { description: "Unauthenticated" },
+      403: { description: "Not an admin" },
       503: { description: "Degraded" },
     },
   }),

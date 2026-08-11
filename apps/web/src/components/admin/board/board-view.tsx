@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
 import { useBoard, useBoardTasks } from "@/hooks/use-board";
 import { useBoardFilters } from "@/hooks/use-board-filters";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
 import { BoardToolbar } from "./board-toolbar";
 import { KanbanBoard } from "./kanban-board";
 import { CreateTaskDialog } from "./create-task-dialog";
@@ -18,7 +20,8 @@ export interface BoardViewProps {
 export function BoardView({ boardId }: BoardViewProps) {
   const t = useTranslations("board");
   const { filters } = useBoardFilters();
-  const { data: board } = useBoard(boardId);
+  const { data: board, error: boardError, isLoading: boardLoading, mutate: reloadBoard } =
+    useBoard(boardId);
   const { data: allTasks } = useBoardTasks(boardId, filters);
 
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -63,6 +66,16 @@ export function BoardView({ boardId }: BoardViewProps) {
     setOpenTaskId(task.id);
   }
 
+  // "No board found. Create one to get started." is advice the user cannot act
+  // on when the request simply failed — separate the two outcomes.
+  if (boardError) {
+    return <ErrorState onRetry={() => { void reloadBoard(); }} />;
+  }
+
+  if (boardLoading && !board) {
+    return <LoadingState rows={4} />;
+  }
+
   if (!board) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground">
@@ -86,13 +99,19 @@ export function BoardView({ boardId }: BoardViewProps) {
         onEditColumn={openColumnSettings}
       />
 
-      <CreateTaskDialog
-        open={createTaskOpen}
-        onOpenChange={setCreateTaskOpen}
-        boardId={boardId}
-        columns={board.columns}
-        defaultColumnId={createTaskColumnId}
-      />
+      {/* Mounted only while open. The dialog seeds its column select from
+          `defaultColumnId` in a useState initialiser, which runs once per
+          mount — rendered unconditionally it would latch the null it saw on
+          first render and every "+" would file into the first column. */}
+      {createTaskOpen && (
+        <CreateTaskDialog
+          open
+          onOpenChange={setCreateTaskOpen}
+          boardId={boardId}
+          columns={board.columns}
+          defaultColumnId={createTaskColumnId}
+        />
+      )}
 
       <ColumnSettingsDialog
         open={columnSettingsOpen}

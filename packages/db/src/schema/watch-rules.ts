@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import type { ChannelType } from "@dragons/shared";
 
 export interface FilterConditionRow {
   field: "teamId" | "leagueId" | "venueId" | "source";
@@ -14,7 +15,7 @@ export interface FilterConditionRow {
 }
 
 export interface ChannelTargetRow {
-  channel: "in_app" | "whatsapp_group" | "push" | "email";
+  channel: ChannelType;
   targetId: string;
 }
 

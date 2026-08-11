@@ -1,0 +1,20 @@
+import type { CollectionConfig } from "payload";
+
+import { dispatchOnDelete, dispatchOnPublish } from "../hooks/dispatch-rebuild";
+import { publishedOrAuthed } from "../lib/access";
+
+export const Vorstand: CollectionConfig = {
+  slug: "vorstand",
+  versions: { drafts: true },
+  access: { read: publishedOrAuthed },
+  admin: { useAsTitle: "role" },
+  fields: [
+    { name: "role", type: "text", required: true }, // was Strapi vorstand.name (e.g. "1. Vorsitzende")
+    { name: "tasks", type: "textarea" },
+    { name: "person", type: "relationship", relationTo: "people" },
+    { name: "orderIndex", type: "number", required: true },
+    // Optional role-specific photo; the site falls back to person.image.
+    { name: "image", type: "upload", relationTo: "media" },
+  ],
+  hooks: { afterChange: [dispatchOnPublish], afterDelete: [dispatchOnDelete] },
+};

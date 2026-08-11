@@ -17,6 +17,7 @@ on:
           - web
           - api
           - worker
+          - cms
 
 concurrency:
   group: deploy-production
@@ -39,6 +40,7 @@ jobs:
       web: ${{ steps.changes.outputs.web }}
       api: ${{ steps.changes.outputs.api }}
       db: ${{ steps.changes.outputs.db }}
+      cms: ${{ steps.changes.outputs.cms }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -49,6 +51,11 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
+          # WEB_PATTERN / API_PATTERN live in change-patterns.sh (single
+          # source of truth, also exercised by change-patterns.test.sh) so
+          # the workflow and its regression test can never drift apart.
+          source .github/scripts/change-patterns.sh
+
           CHANGED=$(git diff --name-only HEAD~1 HEAD)
           echo "Changed files:"
           echo "$CHANGED"
@@ -56,20 +63,29 @@ jobs:
           web=false
           api=false
           db=false
+          cms=false
 
-          if echo "$CHANGED" | grep -qE '^(apps/web/|packages/ui/|packages/shared/)'; then
+          if echo "$CHANGED" | grep -qE "$WEB_PATTERN"; then
             web=true
           fi
-          if echo "$CHANGED" | grep -qE '^(apps/api/|packages/db/|packages/sdk/|packages/shared/)'; then
+          if echo "$CHANGED" | grep -qE "$API_PATTERN"; then
             api=true
           fi
           if echo "$CHANGED" | grep -qE '^(packages/db/src/schema/|packages/db/drizzle/)'; then
             db=true
           fi
+          # apps/cms depends on no workspace packages, so its filter is only
+          # its own tree plus the root-level build inputs. Kept inline for now
+          # instead of change-patterns.sh (issue #164) — fold a CMS_PATTERN
+          # into that file when it next changes.
+          if echo "$CHANGED" | grep -qE '^(apps/cms/|pnpm-lock\.yaml$|turbo\.json$)'; then
+            cms=true
+          fi
 
           echo "web=$web" >> $GITHUB_OUTPUT
           echo "api=$api" >> $GITHUB_OUTPUT
           echo "db=$db" >> $GITHUB_OUTPUT
+          echo "cms=$cms" >> $GITHUB_OUTPUT
 
   run-migrations:
     name: Run Database Migrations
@@ -178,6 +194,7 @@ jobs:
             NEXT_PUBLIC_API_URL=https://${{ vars.API_DOMAIN }}
             NEXT_PUBLIC_SCOREBOARD_DEVICE_ID=${{ vars.SCOREBOARD_DEVICE_ID }}
             NEXT_PUBLIC_CHATBOT_ENABLED=${{ vars.CHATBOT_ENABLED || 'false' }}
+            NEXT_PUBLIC_ASSISTANT_ENABLED=${{ vars.ASSISTANT_ENABLED || 'false' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -185,6 +202,64 @@ jobs:
         run: |
           gcloud run services update dragons-web-production \
             --image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dragons/web:${{ env.COMMIT_SHA }} \
+            --region=${{ vars.GCP_REGION }}
+
+  # No migrations job: Payload runs its committed migrations at container boot
+  # (prodMigrations via apps/cms/src/instrumentation.ts), so deploying the new
+  # image is the whole rollout.
+  build-cms:
+    name: Build & Deploy CMS
+    runs-on: ubuntu-latest
+    needs: determine-changes
+    if: |
+      needs.determine-changes.outputs.cms == 'true' ||
+      github.event.inputs.services == 'all' ||
+      github.event.inputs.services == 'cms'
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      COMMIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ env.COMMIT_SHA }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # No build-args: Payload reads all of its config from runtime env
+      # (Cloud Run), so the same image serves the testing and prod domains.
+      - name: Build and push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ./apps/cms/Dockerfile
+          push: true
+          tags: |
+            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dragons/cms:${{ env.COMMIT_SHA }}
+            ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dragons/cms:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run services update dragons-cms-production \
+            --image=${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dragons/cms:${{ env.COMMIT_SHA }} \
             --region=${{ vars.GCP_REGION }}
 
   build-api:
@@ -252,7 +327,7 @@ jobs:
   summary:
     name: Deployment Summary
     runs-on: ubuntu-latest
-    needs: [determine-changes, run-migrations, build-web, build-api]
+    needs: [determine-changes, run-migrations, build-web, build-cms, build-api]
     if: always()
     steps:
       - name: Summary
@@ -263,4 +338,5 @@ jobs:
           echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Migrations | ${{ needs.run-migrations.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Web | ${{ needs.build-web.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CMS | ${{ needs.build-cms.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| API + Worker | ${{ needs.build-api.result }} |" >> $GITHUB_STEP_SUMMARY

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { BottomSheetScrollView, BottomSheetTextInput } from "@gorhom/bottom-sheet";
 import type { TaskDetail, TaskPriority } from "@dragons/shared";
@@ -58,6 +58,16 @@ export function TaskDetailBody({ task, boardId }: Props) {
   const [descriptionSave, setDescriptionSave] = useState<SaveState>("idle");
   const titleSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const descriptionSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear pending "saved" -> "idle" timers on unmount so they don't fire
+  // setState against an unmounted sheet (e.g. the task detail sheet is
+  // dismissed right after a save completes).
+  useEffect(() => {
+    return () => {
+      if (titleSavedTimer.current) clearTimeout(titleSavedTimer.current);
+      if (descriptionSavedTimer.current) clearTimeout(descriptionSavedTimer.current);
+    };
+  }, []);
 
   const saveTitle = async () => {
     const trimmed = title.trim();

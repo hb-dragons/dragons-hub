@@ -102,6 +102,12 @@ resource "random_password" "scoreboard_ingest_key" {
   special = false
 }
 
+# Payload's cookie/token signing secret (PAYLOAD_SECRET on the cms service).
+resource "random_password" "payload_secret" {
+  length  = 64
+  special = false
+}
+
 # Dedicated service accounts for Cloud Run
 resource "google_service_account" "api" {
   account_id   = "dragons-api"
@@ -111,6 +117,11 @@ resource "google_service_account" "api" {
 resource "google_service_account" "web" {
   account_id   = "dragons-web"
   display_name = "Dragons Web"
+}
+
+resource "google_service_account" "cms" {
+  account_id   = "dragons-cms"
+  display_name = "Dragons CMS"
 }
 
 resource "google_service_account" "turbo_cache" {
@@ -131,6 +142,42 @@ module "artifact_registry" {
 
 locals {
   artifact_registry_url = module.artifact_registry.repository_url
+
+  # Expo Push access token: a credential, so Secret Manager, never env_vars.
+  # Optional — without it push still works, just on the unauthenticated tier —
+  # so the secret is omitted rather than created empty (Secret Manager rejects
+  # an empty payload, and the API env schema rejects "" for EXPO_ACCESS_TOKEN).
+  expo_access_token_enabled = var.expo_access_token != ""
+
+  # Email delivery. `smtp_host` is the single switch for the whole set: the API
+  # env schema requires all five SMTP_* vars together (readSmtpSettings() treats
+  # a partial set as "not configured") and rejects "" for each of them, so the
+  # keys are omitted entirely rather than passed through empty — the same
+  # precedent as WAHA_BASE_URL above.
+  smtp_enabled = var.smtp_host != ""
+
+  smtp_env_vars = local.smtp_enabled ? {
+    SMTP_HOST = var.smtp_host
+    SMTP_PORT = tostring(var.smtp_port)
+    SMTP_USER = var.smtp_user
+    SMTP_FROM = var.smtp_from
+  } : {}
+
+  # Only the password is a credential; the rest are relay coordinates.
+  smtp_secrets = local.smtp_enabled ? {
+    SMTP_PASSWORD = {
+      secret_name = "smtp-password-production"
+      version     = "latest"
+    }
+  } : {}
+
+  # Payload's public origins (CMS_PUBLIC_URL): first entry becomes serverURL,
+  # all entries are trusted for CORS/CSRF. Domain changes at cutover are a var
+  # change + redeploy — no code involved. The run.app URL is the fallback for
+  # an empty cms_domains only: with LB-only ingress it is not reachable, but
+  # serverURL must never be empty.
+  cms_run_url        = "https://dragons-cms-production-${var.project_number}.${var.region}.run.app"
+  cms_public_origins = length(var.cms_domains) > 0 ? [for domain in var.cms_domains : "https://${domain}"] : [local.cms_run_url]
 }
 
 # Network
@@ -172,6 +219,22 @@ resource "google_project_iam_member" "api_cloudsql_client" {
   depends_on = [google_project_service.apis]
 }
 
+# Payload's database, on the same instance as the app db. Same instance user
+# (`dragons`): the instance is single-tenant and the cloud-sql module owns
+# that user, so DATABASE_URL_CMS below reuses its password.
+resource "google_sql_database" "cms" {
+  name     = "dragons_cms"
+  instance = module.database.instance_name
+}
+
+resource "google_project_iam_member" "cms_cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.cms.email}"
+
+  depends_on = [google_project_service.apis]
+}
+
 # Valkey
 module "valkey" {
   source = "../../modules/valkey"
@@ -195,7 +258,7 @@ module "secrets" {
 
   project_id             = var.project_id
   service_account_emails = [google_service_account.api.email]
-  secret_names = [
+  secret_names = concat([
     "database-url-production",
     "redis-url-production",
     "sdk-username-production",
@@ -206,8 +269,9 @@ module "secrets" {
     "scoreboard-ingest-key-production",
     "google-generative-ai-api-key-production",
     "mcp-token-production",
-  ]
-  secret_values = {
+    ], local.expo_access_token_enabled ? ["expo-access-token-production"] : [],
+  local.smtp_enabled ? ["smtp-password-production"] : [])
+  secret_values = merge({
     "database-url-production"                 = module.database.database_url
     "redis-url-production"                    = module.valkey.connection_url
     "sdk-username-production"                 = var.sdk_username
@@ -218,7 +282,11 @@ module "secrets" {
     "scoreboard-ingest-key-production"        = random_password.scoreboard_ingest_key.result
     "google-generative-ai-api-key-production" = var.google_generative_ai_api_key
     "mcp-token-production"                    = var.mcp_token
-  }
+    }, local.expo_access_token_enabled ? {
+    "expo-access-token-production" = var.expo_access_token
+    } : {}, local.smtp_enabled ? {
+    "smtp-password-production" = var.smtp_password
+  } : {})
 
   depends_on = [google_project_service.apis]
 }
@@ -242,11 +310,12 @@ module "api" {
 
   cpu_idle = true
 
-  env_vars = {
+  env_vars = merge({
     NODE_ENV        = "production"
     RUN_MODE        = "api"
     BETTER_AUTH_URL = "https://${var.api_domain}"
-    TRUSTED_ORIGINS = "https://${var.web_domain}"
+    # First origin doubles as the public URL in notification links (TRUSTED_ORIGINS[0]) — keep web_domain first.
+    TRUSTED_ORIGINS = "https://${var.web_domain},https://hbdragons.de,https://www.hbdragons.de,https://site.testing.hbdragons.de"
     LOG_LEVEL       = "info"
     GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
     GCS_PROJECT_ID  = var.project_id
@@ -260,9 +329,20 @@ module "api" {
     CHATBOT_MODEL        = var.chatbot_model
     ASSISTANT_ENABLED    = var.assistant_enabled
     ASSISTANT_MODEL      = var.assistant_model
-  }
+    # WhatsApp group delivery. The API dispatches through the same pipeline as
+    # the Worker via the admin "retry failed notification" route, so it needs
+    # these too. Omitted entirely when unset: env.ts validates WAHA_BASE_URL as
+    # a URL and `.optional()` does not accept "", so an empty passthrough would
+    # fail the service at boot rather than just disable the channel.
+    }, var.waha_base_url == "" ? {} : {
+    WAHA_BASE_URL = var.waha_base_url
+    WAHA_SESSION  = var.waha_session
+    # Email delivery. The API needs these for the same reason it needs WAHA:
+    # the admin test-send and "retry failed notification" routes dispatch
+    # through the same pipeline. Gated as one set on smtp_host — see locals.
+  }, local.smtp_env_vars)
 
-  secrets = {
+  secrets = merge({
     DATABASE_URL = {
       secret_name = "database-url-production"
       version     = "latest"
@@ -303,7 +383,12 @@ module "api" {
       secret_name = "mcp-token-production"
       version     = "latest"
     }
-  }
+    }, local.expo_access_token_enabled ? {
+    EXPO_ACCESS_TOKEN = {
+      secret_name = "expo-access-token-production"
+      version     = "latest"
+    }
+  } : {}, local.smtp_secrets)
 
   cloudsql_instances = [module.database.connection_name]
   ingress            = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
@@ -331,11 +416,12 @@ module "worker" {
   concurrency   = 1
   timeout       = "900s"
 
-  env_vars = {
+  env_vars = merge({
     NODE_ENV        = "production"
     RUN_MODE        = "worker"
     BETTER_AUTH_URL = "https://${var.api_domain}"
-    TRUSTED_ORIGINS = "https://${var.web_domain}"
+    # First origin doubles as the public URL in notification links (TRUSTED_ORIGINS[0]) — keep web_domain first.
+    TRUSTED_ORIGINS = "https://${var.web_domain},https://hbdragons.de,https://www.hbdragons.de,https://site.testing.hbdragons.de"
     LOG_LEVEL       = "info"
     GCS_BUCKET_NAME = google_storage_bucket.social_assets.name
     GCS_PROJECT_ID  = var.project_id
@@ -348,9 +434,18 @@ module "worker" {
     CHATBOT_MODEL        = var.chatbot_model
     ASSISTANT_ENABLED    = var.assistant_enabled
     ASSISTANT_MODEL      = var.assistant_model
-  }
+    # WhatsApp group delivery. This is the service that runs the event worker,
+    # so without these every WhatsApp notification logs "not configured,
+    # skipping" and is dropped. See the API block for why "" is not passed.
+    }, var.waha_base_url == "" ? {} : {
+    WAHA_BASE_URL = var.waha_base_url
+    WAHA_SESSION  = var.waha_session
+    # Email delivery. This is the service that runs the event worker, so without
+    # these every email notification logs "SMTP is not configured" and is
+    # dropped. Gated as one set on smtp_host — see locals.
+  }, local.smtp_env_vars)
 
-  secrets = {
+  secrets = merge({
     DATABASE_URL = {
       secret_name = "database-url-production"
       version     = "latest"
@@ -387,7 +482,12 @@ module "worker" {
       secret_name = "google-generative-ai-api-key-production"
       version     = "latest"
     }
-  }
+    }, local.expo_access_token_enabled ? {
+    EXPO_ACCESS_TOKEN = {
+      secret_name = "expo-access-token-production"
+      version     = "latest"
+    }
+  } : {}, local.smtp_secrets)
 
   cloudsql_instances = [module.database.connection_name]
   ingress            = "INGRESS_TRAFFIC_ALL"
@@ -421,6 +521,197 @@ module "web" {
   depends_on = [module.api, google_project_service.apis]
 }
 
+# CMS media — GCS bucket for Payload's media collection.
+#
+# Direct-GCS media URLs (`cms_media_public = true`) are the better shape: the
+# static site links straight at storage.googleapis.com instead of proxying
+# every image through the scale-to-zero cms service. It needs an allUsers
+# read grant, which the kviz.me org rejects under
+# `constraints/iam.allowedPolicyMemberDomains` (domain-restricted sharing) —
+# so the default is false and Payload serves media itself.
+#
+# To switch: add a project-level exception for that constraint, then set the
+# GH var CMS_MEDIA_PUBLIC=true. `GCS_MEDIA_PUBLIC` on the service flips
+# Payload's `disablePayloadAccessControl` to match; media URLs are computed on
+# read, so a site rebuild is all that's needed — no data migration.
+#
+# `public_access_prevention` stays "inherited" (not "enforced" like
+# social_assets) so that switch stays possible. This bucket must never hold
+# anything that is not public site content.
+resource "google_storage_bucket" "cms_media" {
+  name                        = "${var.project_id}-cms-media"
+  location                    = var.region
+  project                     = var.project_id
+  uniform_bucket_level_access = true
+  public_access_prevention    = "inherited"
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_storage_bucket_iam_member" "cms_media_cms" {
+  bucket = google_storage_bucket.cms_media.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.cms.email}"
+}
+
+resource "google_storage_bucket_iam_member" "cms_media_public_read" {
+  count = var.cms_media_public ? 1 : 0
+
+  bucket = google_storage_bucket.cms_media.name
+  role   = "roles/storage.objectViewer"
+  member = "allUsers"
+}
+
+# CMS secrets. Standalone resources (turbo-cache pattern) rather than the
+# shared secrets module: that module grants every listed service account
+# access to every secret, and the cms service account must not read api
+# credentials (nor vice versa).
+resource "google_secret_manager_secret" "cms_database_url" {
+  secret_id = "database-url-cms-production"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "cms_database_url" {
+  secret = google_secret_manager_secret.cms_database_url.id
+  # Same shape as the cloud-sql module's database_url output (user `dragons`,
+  # whose password the module owns), pointed at the dragons_cms database on
+  # the same instance.
+  secret_data = "postgresql://dragons:${urlencode(random_password.db_password.result)}@/${google_sql_database.cms.name}?host=/cloudsql/${module.database.connection_name}"
+}
+
+resource "google_secret_manager_secret" "payload_secret" {
+  secret_id = "payload-secret-production"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "payload_secret" {
+  secret      = google_secret_manager_secret.payload_secret.id
+  secret_data = random_password.payload_secret.result
+}
+
+# Fine-grained PAT for the publish → site-rebuild repository_dispatch. The
+# real value is added manually post-apply:
+#   echo -n "<pat>" | gcloud secrets versions add gh-dispatch-token-production --data-file=-
+# Tofu only guarantees a resolvable "latest" so the cms revision can mount the
+# secret from the very first apply. The placeholder is not a credential:
+# GitHub rejects it and the dispatch hook (apps/cms/src/hooks/dispatch-rebuild.ts)
+# logs and swallows the failure, so publishes still save. ignore_changes keeps
+# an apply from ever adding a new version on top of the manually added token.
+resource "google_secret_manager_secret" "gh_dispatch_token" {
+  secret_id = "gh-dispatch-token-production"
+  project   = var.project_id
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "gh_dispatch_token_placeholder" {
+  secret      = google_secret_manager_secret.gh_dispatch_token.id
+  secret_data = "placeholder-add-real-token-via-gcloud"
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
+}
+
+resource "google_secret_manager_secret_iam_member" "cms_database_url_access" {
+  secret_id = google_secret_manager_secret.cms_database_url.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cms.email}"
+  project   = var.project_id
+}
+
+resource "google_secret_manager_secret_iam_member" "payload_secret_access" {
+  secret_id = google_secret_manager_secret.payload_secret.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cms.email}"
+  project   = var.project_id
+}
+
+resource "google_secret_manager_secret_iam_member" "gh_dispatch_token_access" {
+  secret_id = google_secret_manager_secret.gh_dispatch_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cms.email}"
+  project   = var.project_id
+}
+
+# Cloud Run - CMS (Payload admin + REST for site builds; scale-to-zero)
+module "cms" {
+  source = "../../modules/cloud-run"
+
+  project_id      = var.project_id
+  region          = var.region
+  service_name    = "dragons-cms-production"
+  image           = "${local.artifact_registry_url}/cms:${var.image_tag}"
+  port            = 3000
+  service_account = google_service_account.cms.email
+
+  cpu = "1"
+  # 1Gi where web runs 512Mi: sharp decodes uploads in-process (blurhash +
+  # resize) and the Payload admin server needs the headroom.
+  memory        = "1Gi"
+  min_instances = 0
+  max_instances = 2
+
+  env_vars = {
+    NODE_ENV         = "production"
+    GCS_MEDIA_BUCKET = google_storage_bucket.cms_media.name
+    GCS_MEDIA_PUBLIC = tostring(var.cms_media_public)
+    CMS_PUBLIC_URL   = join(",", local.cms_public_origins)
+  }
+
+  secrets = {
+    DATABASE_URL_CMS = {
+      secret_name = "database-url-cms-production"
+      version     = "latest"
+    }
+    PAYLOAD_SECRET = {
+      secret_name = "payload-secret-production"
+      version     = "latest"
+    }
+    GH_DISPATCH_TOKEN = {
+      secret_name = "gh-dispatch-token-production"
+      version     = "latest"
+    }
+  }
+
+  cloudsql_instances = [module.database.connection_name]
+
+  # Same shape as web/api: reachable only through the load balancer, which
+  # makes the module disable the invoker IAM check (see cloud-run/main.tf).
+  # `allow_unauthenticated` would grant allUsers roles/run.invoker, which the
+  # org's domain-restricted-sharing constraint rejects. Consequence: the bare
+  # run.app URL is not reachable — the admin lives on the cms_domains host once
+  # its managed cert provisions. Auth is Payload's own: sessions and API keys.
+  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+
+  depends_on = [
+    google_project_service.apis,
+    google_secret_manager_secret_version.cms_database_url,
+    google_secret_manager_secret_version.payload_secret,
+    google_secret_manager_secret_version.gh_dispatch_token_placeholder,
+    google_secret_manager_secret_iam_member.cms_database_url_access,
+    google_secret_manager_secret_iam_member.payload_secret_access,
+    google_secret_manager_secret_iam_member.gh_dispatch_token_access,
+    google_sql_database.cms,
+  ]
+}
+
 # Load Balancer
 module "load_balancer" {
   source = "../../modules/load-balancer"
@@ -432,8 +723,10 @@ module "load_balancer" {
   api_domain       = var.api_domain
   web_service_name = module.web.service_name
   api_service_name = module.api.service_name
+  cms_service_name = module.cms.service_name
+  cms_domains      = var.cms_domains
 
-  depends_on = [module.web, module.api, google_project_service.apis]
+  depends_on = [module.web, module.api, module.cms, google_project_service.apis]
 }
 
 # NOTE: The GitHub Actions SA needs roles/storage.objectAdmin on the
@@ -625,6 +918,15 @@ output "api_url" {
 
 output "worker_url" {
   value = module.worker.url
+}
+
+output "cms_url" {
+  value = module.cms.url
+}
+
+output "cms_media_bucket" {
+  description = "GCS bucket for Payload CMS media (publicly readable — direct-GCS media URLs)"
+  value       = google_storage_bucket.cms_media.name
 }
 
 output "database_connection_name" {

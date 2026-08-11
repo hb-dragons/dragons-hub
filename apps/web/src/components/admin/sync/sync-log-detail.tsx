@@ -48,23 +48,21 @@ interface SyncLogDetailProps {
 
 const ENTITY_CONFIG: Record<
   EntityType,
-  { icon: React.ElementType; labelKey: "league" | "match" | "team" | "standing" | "venue" | "referee" | "refereeRole" | "refereeGame"; color: string }
+  { icon: React.ElementType; labelKey: "league" | "match" | "team" | "standing" | "venue" | "referee" | "refereeRole" | "refereeGame" }
 > = {
-  league: { icon: Trophy, labelKey: "league", color: "text-yellow-600" },
-  match: { icon: Gamepad2, labelKey: "match", color: "text-purple-600" },
-  team: { icon: Users, labelKey: "team", color: "text-blue-600" },
-  standing: { icon: BarChart, labelKey: "standing", color: "text-green-600" },
-  venue: { icon: MapPin, labelKey: "venue", color: "text-orange-600" },
-  referee: { icon: Shield, labelKey: "referee", color: "text-teal-600" },
+  league: { icon: Trophy, labelKey: "league" },
+  match: { icon: Gamepad2, labelKey: "match" },
+  team: { icon: Users, labelKey: "team" },
+  standing: { icon: BarChart, labelKey: "standing" },
+  venue: { icon: MapPin, labelKey: "venue" },
+  referee: { icon: Shield, labelKey: "referee" },
   refereeRole: {
     icon: ClipboardList,
     labelKey: "refereeRole",
-    color: "text-indigo-600",
   },
   refereeGame: {
     icon: ClipboardList,
     labelKey: "refereeGame",
-    color: "text-cyan-600",
   },
 };
 
@@ -188,18 +186,18 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
     <div className="space-y-4 p-4">
       {/* Error Details */}
       {syncRun.status === "failed" && syncRun.errorMessage && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950/30">
+        <div className="bg-destructive/10 rounded-md p-3">
           <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 h-4 w-4 text-red-600" />
+            <AlertCircle className="text-destructive mt-0.5 h-4 w-4" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-red-800 dark:text-red-400">
+              <p className="text-destructive text-sm font-medium">
                 {syncRun.errorMessage}
               </p>
               {syncRun.errorStack && (
                 <Button
                   variant="ghost"
                   size="xs"
-                  className="mt-1 h-auto p-0 text-xs text-red-600"
+                  className="text-destructive mt-1 h-auto p-0 text-xs"
                   onClick={() => setShowStack(!showStack)}
                 >
                   <ChevronDown
@@ -209,7 +207,7 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
                 </Button>
               )}
               {showStack && syncRun.errorStack && (
-                <pre className="mt-2 max-h-[200px] overflow-auto rounded bg-red-100 p-2 font-mono text-xs text-red-800 dark:bg-red-950 dark:text-red-300">
+                <pre className="bg-destructive/10 text-destructive mt-2 max-h-[200px] overflow-auto rounded p-2 font-mono text-xs">
                   {syncRun.errorStack}
                 </pre>
               )}
@@ -294,7 +292,6 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
               const entityCfg = ENTITY_CONFIG[entry.entityType] ?? {
                 icon: ClipboardList,
                 labelKey: entry.entityType,
-                color: "text-muted-foreground",
               };
               const actionCfg = ACTION_CONFIG[entry.action] ?? ACTION_CONFIG.skipped;
               const EntityIcon = entityCfg.icon;
@@ -311,16 +308,14 @@ export function SyncLogDetail({ syncRun }: SyncLogDetailProps) {
                   >
                     {isExpandable ? (
                       isExpanded ? (
-                        <ChevronDown className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
+                        <ChevronDown className="h-4 w-4 shrink-0" />
                       ) : (
-                        <ChevronRight className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
+                        <ChevronRight className="h-4 w-4 shrink-0" />
                       )
                     ) : (
-                      <EntityIcon className={`h-4 w-4 shrink-0 ${entityCfg.color}`} />
+                      <EntityIcon className="h-4 w-4 shrink-0" />
                     )}
-                    <span className="w-24 shrink-0 text-muted-foreground">
-                      {tEntity(entityCfg.labelKey)}
-                    </span>
+                    <span className="w-24 shrink-0">{tEntity(entityCfg.labelKey)}</span>
                     <div className="min-w-0 flex-1">
                       <span className="block truncate font-medium">
                         {entry.entityName || entry.entityId}

@@ -9,8 +9,9 @@ export function RefereesTab() {
   const t = useTranslations("refereeHub.referees");
   const { state, update } = useRefereeHubUrl();
 
+  // List over detail on narrow screens; side-by-side from md up.
   return (
-    <div className="grid grid-cols-[minmax(320px,1fr)_2fr] gap-px bg-border/15 rounded-md overflow-hidden min-h-[600px]">
+    <div className="bg-border/15 grid min-h-[600px] grid-cols-1 gap-px overflow-hidden rounded-md md:grid-cols-[minmax(320px,1fr)_2fr]">
       <div className="bg-surface-low">
         <RefereeList
           selectedId={state.refereeId}

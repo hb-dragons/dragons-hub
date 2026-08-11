@@ -51,6 +51,14 @@ describe("GET /assets/clubs/:id.webp", () => {
     expect(mocks.readFile).not.toHaveBeenCalled();
   });
 
+  it("returns a coded 404 for a missing logo", async () => {
+    mocks.existsSync.mockReturnValue(false);
+
+    const res = await app.request("/assets/clubs/999999.webp");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Not found", code: "NOT_FOUND" });
+  });
+
   it("returns 404 for non-numeric clubId", async () => {
     const res = await app.request("/assets/clubs/abc.webp");
 
@@ -62,6 +70,10 @@ describe("GET /assets/clubs/:id.webp", () => {
     const res = await app.request("/assets/clubs/0.webp");
 
     expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Invalid clubId",
+      code: "VALIDATION_ERROR",
+    });
   });
 
   it("returns 404 for negative clubId", async () => {

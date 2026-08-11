@@ -1,26 +1,17 @@
 import { getDb } from "../../config/database";
 import { referees, refereeAssignmentRules, teams, matchReferees } from "@dragons/db/schema";
-import { sql, asc, desc, ilike, and, or, eq, inArray } from "drizzle-orm";
+import { sql, asc, desc, ilike, and, or, eq, inArray, isNull } from "drizzle-orm";
 import type {
   RefereeListItem,
   PaginatedResponse,
-  UpdateRefereeVisibilityBody,
-  UpdateRefereeRulesBody,
   RefereeCountsResponse,
 } from "@dragons/shared";
-
-export class RefereeSettingsError extends Error {
-  constructor(
-    message: string,
-    public readonly code:
-      | "NOT_FOUND"
-      | "NOT_OWN_CLUB"
-      | "VALIDATION_ERROR",
-  ) {
-    super(message);
-    this.name = "RefereeSettingsError";
-  }
-}
+import type {
+  RefereeVisibilityBody,
+  UpdateRefereeRulesBodyParsed,
+} from "@dragons/contracts";
+import { escapeLikePattern } from "../utils/sql";
+import { RefereeSettingsError } from "./referee-admin.errors";
 
 type RefereeScope = "own" | "all";
 type RefereeSort = "name" | "workloadAsc" | "workloadDesc";
@@ -41,11 +32,11 @@ export async function getReferees(
   const conditions = [];
   if (scope === "own") conditions.push(eq(referees.isOwnClub, true));
   if (search) {
+    // Escape LIKE metacharacters so a name containing `%` or `_` searches for
+    // that literal character instead of turning into a wildcard.
+    const pattern = `%${escapeLikePattern(search)}%`;
     conditions.push(
-      or(
-        ilike(referees.firstName, `%${search}%`),
-        ilike(referees.lastName, `%${search}%`),
-      ),
+      or(ilike(referees.firstName, pattern), ilike(referees.lastName, pattern)),
     );
   }
 
@@ -74,7 +65,7 @@ export async function getReferees(
         updatedAt: referees.updatedAt,
       })
       .from(referees)
-      .leftJoin(matchReferees, eq(matchReferees.refereeId, referees.id))
+      .leftJoin(matchReferees, and(eq(matchReferees.refereeId, referees.id), isNull(matchReferees.removedAt)))
       .where(whereClause)
       .groupBy(referees.id)
       .orderBy(...orderBy)
@@ -123,7 +114,7 @@ export async function getRefereeById(refereeId: number): Promise<RefereeListItem
       updatedAt: referees.updatedAt,
     })
     .from(referees)
-    .leftJoin(matchReferees, eq(matchReferees.refereeId, referees.id))
+    .leftJoin(matchReferees, and(eq(matchReferees.refereeId, referees.id), isNull(matchReferees.removedAt)))
     .where(eq(referees.id, refereeId))
     .groupBy(referees.id);
 
@@ -155,7 +146,7 @@ export async function getRefereeCounts(): Promise<RefereeCountsResponse> {
 
 export async function updateRefereeVisibility(
   refereeId: number,
-  body: UpdateRefereeVisibilityBody,
+  body: RefereeVisibilityBody,
 ) {
   const [updated] = await getDb()
     .update(referees)
@@ -182,7 +173,7 @@ export async function updateRefereeVisibility(
 
 export async function updateRefereeRules(
   refereeId: number,
-  body: UpdateRefereeRulesBody,
+  body: UpdateRefereeRulesBodyParsed,
 ) {
   return getDb().transaction(async (tx) => {
     const [ref] = await tx

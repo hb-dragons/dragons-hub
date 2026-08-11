@@ -1,0 +1,28 @@
+---
+// Port of dragons-app app/pages/spielplan/index.vue: PageHeader band + page
+// container + the full-plan island. No CMS collections on this route — all
+// data is live sports data fetched client-side by the island.
+import Layout from "../../layouts/Layout.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import SpielplanIsland from "../../components/spielplan/SpielplanIsland";
+import { apiBase } from "../../lib/api-base";
+import { event } from "../../lib/jsonld";
+import { cmsBaseUrl } from "../../lib/media";
+import { fetchUpcomingMatches } from "../../lib/spielplan-events";
+import { strings } from "../../lib/strings";
+
+// SEO (Task C8): the visible plan is island-only, so the SportsEvent JSON-LD
+// is a build-time snapshot of the next games. Content builds (CMS env set)
+// require the fetch — failures fail the build loudly, like the teams pages'
+// standings join; env-less shell builds skip it and ship no events.
+const matches = cmsBaseUrl() !== undefined ? await fetchUpcomingMatches(apiBase()) : [];
+const jsonLd = matches.length > 0 ? matches.map(event) : undefined;
+---
+
+<Layout title={strings.spielplan.heading} description={strings.seo.spielplan} jsonLd={jsonLd}>
+  <PageHeader title={strings.spielplan.heading} />
+  <!-- Legacy UiPageContainer -->
+  <div class="container mx-auto space-y-4 py-8 px-2 md:px-2 xl:px-0">
+    <SpielplanIsland client:idle />
+  </div>
+</Layout>

@@ -27,8 +27,19 @@ export interface PublicTeam {
 
 export function publicEndpoints(client: ApiClient) {
   return {
-    getMatches(params?: MatchQueryParams): Promise<PaginatedResponse<MatchListItem>> {
-      return client.get("/public/matches", params as Record<string, string | number | boolean | undefined>);
+    /**
+     * `opts.signal` lets paging UIs abort a superseded request so a slow
+     * earlier response cannot land after a newer one.
+     */
+    getMatches(
+      params?: MatchQueryParams,
+      opts?: { signal?: AbortSignal },
+    ): Promise<PaginatedResponse<MatchListItem>> {
+      return client.get(
+        "/public/matches",
+        params as Record<string, string | number | boolean | undefined>,
+        opts,
+      );
     },
 
     getStandings(): Promise<LeagueStandings[]> {

@@ -34,6 +34,7 @@ import {
   setLeagueOwnClubRefs,
   getLeagueTeams,
 } from "./league-discovery.service";
+import { leagues } from "@dragons/db/schema";
 
 let ctx: TestDbContext;
 beforeAll(async () => {
@@ -185,6 +186,85 @@ describe("setSeasonLeagues", () => {
     await setSeasonLeagues(upcoming, [54136]);
     const other = await getTrackedLeagues(otherSeason);
     expect(other.leagues.map((l) => l.apiLigaId)).toContain(99999);
+  });
+
+  it("keeps insert-only columns when the upsert takes the conflict path (#77)", async () => {
+    // The per-league SELECT-then-INSERT-or-UPDATE is one atomic upsert now.
+    // `isActive` and `discoveredAt` must stay insert-only: a league someone
+    // deactivated locally must not come back to life on the next selection, and
+    // the discovery timestamp is history, not current state.
+    const seasonId = await makeSeason("upcoming");
+    await ctx.client.query(
+      `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id,
+                            is_tracked, vorabliga, is_active, discovered_at)
+       VALUES (54136, 0, 'Stale name', 2026, '2026/27', $1, false, false, false, '2020-01-01T00:00:00Z')`,
+      [seasonId],
+    );
+
+    getAllLigen.mockResolvedValue([liga(54136, true)]);
+    await setSeasonLeagues(seasonId, [54136]);
+
+    const rows = await ctx.db.select().from(leagues);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.name).toBe("Liga 54136");
+    expect(rows[0]!.isTracked).toBe(true);
+    expect(rows[0]!.isActive).toBe(false);
+    expect(rows[0]!.discoveredAt).toEqual(new Date("2020-01-01T00:00:00Z"));
+  });
+
+  it("leaves the season's tracked set untouched when the untrack pass fails (#77)", async () => {
+    // Tracking is replaced as a whole. Split across statements, a failure
+    // part-way left some leagues tracked and others already untracked, and the
+    // sync picks its work from exactly that flag.
+    const seasonId = await makeSeason("upcoming");
+    for (const apiLigaId of [54136, 54137]) {
+      await ctx.client.query(
+        `INSERT INTO leagues (api_liga_id, liga_nr, name, season_id, season_name, season_ref_id,
+                              is_tracked, vorabliga)
+         VALUES ($1, 0, 'Seeded', 2026, '2026/27', $2, true, false)`,
+        [apiLigaId, seasonId],
+      );
+    }
+    getAllLigen.mockResolvedValue([liga(54136, true)]);
+
+    const real = ctx.db as unknown as Record<string | symbol, unknown>;
+    dbHolder.ref = new Proxy(
+      {},
+      {
+        get: (_t, prop) =>
+          prop === "transaction"
+            ? (...args: unknown[]) => {
+                const [cb, ...rest] = args as [(tx: unknown) => unknown, ...unknown[]];
+                return (real.transaction as (...a: unknown[]) => unknown).call(
+                  real,
+                  (tx: Record<string | symbol, unknown>) =>
+                    cb(
+                      new Proxy(
+                        {},
+                        {
+                          get: (_t2, p2) =>
+                            p2 === "update"
+                              ? () => {
+                                  throw new Error("untrack failed");
+                                }
+                              : tx[p2],
+                        },
+                      ),
+                    ),
+                  ...rest,
+                );
+              }
+            : real[prop],
+      },
+    );
+
+    await expect(setSeasonLeagues(seasonId, [54136])).rejects.toThrow("untrack failed");
+
+    dbHolder.ref = ctx.db;
+    const rows = await ctx.db.select().from(leagues).orderBy(leagues.apiLigaId);
+    // The upsert of 54136 rolled back with the failed untrack of 54137.
+    expect(rows.map((r) => r.isTracked)).toEqual([true, true]);
+    expect(rows.find((r) => r.apiLigaId === 54136)!.name).toBe("Seeded");
   });
 });
 

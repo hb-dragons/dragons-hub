@@ -35,6 +35,18 @@ variable "api_domain" {
   type        = string
 }
 
+variable "cms_domains" {
+  description = "Custom domains for the CMS service, routed via the load balancer (Cloud Run domain-mappings are unavailable in europe-west3). The service has LB-only ingress, so with an empty list it is unreachable. Set to [\"cms.testing.hbdragons.de\"] now; the prod domain cms.hbdragons.de is appended only at cutover — it still points at Strapi. In CI: vars.CMS_DOMAINS."
+  type        = list(string)
+  default     = []
+}
+
+variable "cms_media_public" {
+  description = "Grant allUsers read on the CMS media bucket so Payload emits direct https://storage.googleapis.com/… media URLs instead of proxying every image through the scale-to-zero cms service. Requires a project-level exception to constraints/iam.allowedPolicyMemberDomains — without one the apply fails with 'users named in the policy do not belong to a permitted customer'. In CI: vars.CMS_MEDIA_PUBLIC."
+  type        = bool
+  default     = false
+}
+
 variable "image_tag" {
   description = "Container image tag for initial deployment"
   type        = string
@@ -98,6 +110,66 @@ variable "google_generative_ai_api_key" {
   description = "Google AI Studio API key (GOOGLE_GENERATIVE_AI_API_KEY). Required when chatbot or assistant is enabled; stored in Secret Manager."
   type        = string
   sensitive   = true
+}
+
+variable "waha_base_url" {
+  description = "Base URL of the WAHA (WhatsApp HTTP API) instance (WAHA_BASE_URL). Not a credential — the adapter sends no auth header — so it rides in env_vars. Leave empty to leave WhatsApp group delivery disabled; the API env schema rejects a non-URL value at boot, so an empty value is omitted from env_vars entirely rather than passed through as \"\"."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.waha_base_url == "" || can(regex("^https?://", var.waha_base_url))
+    error_message = "waha_base_url must be empty or an http(s) URL."
+  }
+}
+
+variable "waha_session" {
+  description = "WAHA session name (WAHA_SESSION). Only meaningful when waha_base_url is set."
+  type        = string
+  default     = "default"
+}
+
+variable "smtp_host" {
+  description = "SMTP relay host (SMTP_HOST) for the email notification channel. Not a credential, so it rides in env_vars. Leave empty to leave email delivery disabled: every SMTP_* key, and the smtp-password secret, is then omitted entirely rather than passed through as \"\", which the API env schema rejects at boot."
+  type        = string
+  default     = ""
+}
+
+variable "smtp_port" {
+  description = "SMTP relay port (SMTP_PORT). 465 uses implicit TLS; anything else upgrades via STARTTLS. Only meaningful when smtp_host is set."
+  type        = number
+  default     = 587
+
+  validation {
+    condition     = var.smtp_port > 0 && var.smtp_port <= 65535
+    error_message = "smtp_port must be a valid TCP port."
+  }
+}
+
+variable "smtp_user" {
+  description = "SMTP username (SMTP_USER). Only meaningful when smtp_host is set."
+  type        = string
+  default     = ""
+}
+
+variable "smtp_from" {
+  description = "From header for notification email (SMTP_FROM), e.g. \"Dragons <noreply@example.de>\". Only meaningful when smtp_host is set."
+  type        = string
+  default     = ""
+}
+
+variable "smtp_password" {
+  description = "SMTP password (SMTP_PASSWORD). The only credential in the set, so it is stored in Secret Manager rather than env_vars. Ignored when smtp_host is empty; the secret is then not created at all."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "expo_access_token" {
+  description = "Expo access token (EXPO_ACCESS_TOKEN). Upgrades Expo Push to the authenticated send tier (higher rate limits, better receipt SLA). Credential, so it is stored in Secret Manager. Optional: empty means the secret is not created and push stays on the unauthenticated tier."
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "mcp_token" {

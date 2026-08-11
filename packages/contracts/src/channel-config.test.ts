@@ -6,9 +6,54 @@ import {
   updateChannelConfigSchema,
   validateConfigForType,
 } from "./channel-config";
+import { CHANNEL_TYPES } from "@dragons/shared";
+import type { ChannelType } from "@dragons/shared";
+
+/**
+ * A minimal valid `config` payload per channel type. Typed as an exhaustive
+ * record so adding a channel type to CHANNEL_TYPES is a compile error here
+ * until the new type is given a config shape.
+ */
+const VALID_CONFIG_BY_CHANNEL_TYPE: Record<
+  ChannelType,
+  Record<string, unknown>
+> = {
+  in_app: { audienceRole: "admin", locale: "de" },
+  whatsapp_group: { groupId: "4915100000000@g.us", locale: "de" },
+  push: { provider: "expo" },
+  email: { locale: "de" },
+  webhook: {
+    kind: "github_repository_dispatch",
+    owner: "hb-dragons",
+    repo: "dragons-hub",
+    eventType: "sync-completed",
+  },
+};
 
 describe("createChannelConfigSchema", () => {
   const base = { name: "Test Channel" };
+
+  // Structural guard: the channel type enum must be derived from CHANNEL_TYPES,
+  // not restated. Adding a value to CHANNEL_TYPES without it reaching the
+  // schema (or its per-type config schema) fails here.
+  it.each(CHANNEL_TYPES)("accepts the shared channel type %s", (type) => {
+    const result = createChannelConfigSchema.safeParse({
+      ...base,
+      type,
+      config: VALID_CONFIG_BY_CHANNEL_TYPE[type],
+    });
+    expect(result.error?.issues ?? []).toEqual([]);
+    expect(result.success).toBe(true);
+  });
+
+  it.each(CHANNEL_TYPES)(
+    "validateConfigForType resolves a schema for the shared channel type %s",
+    (type) => {
+      expect(
+        validateConfigForType(type, VALID_CONFIG_BY_CHANNEL_TYPE[type]),
+      ).not.toBeNull();
+    },
+  );
 
   it("accepts in_app with audienceRole admin and locale de", () => {
     const result = createChannelConfigSchema.safeParse({
@@ -46,6 +91,27 @@ describe("createChannelConfigSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  // Email delivers to each recipient's own address, so the config carries no
+  // target of its own — an address here would be a second, unverified one.
+  it("strips a hand-written address from an email config", () => {
+    const result = createChannelConfigSchema.safeParse({
+      ...base,
+      type: "email",
+      config: { locale: "de", to: "someone@example.com" },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.config).toEqual({ locale: "de" });
+  });
+
+  it("rejects email without a locale", () => {
+    const result = createChannelConfigSchema.safeParse({
+      ...base,
+      type: "email",
+      config: {},
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects type push (removed from enum)", () => {
     const result = createChannelConfigSchema.safeParse({
       ...base,
@@ -77,6 +143,36 @@ describe("createChannelConfigSchema", () => {
     const result = createChannelConfigSchema.safeParse({
       ...base,
       type: "in_app",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // `channel_configs.config` is a jsonb column typed `$type<ChannelConfig>()`.
+  // If unknown keys survive parsing, that type is a lie at read time.
+  it("strips keys the channel's config shape does not declare", () => {
+    const result = createChannelConfigSchema.parse({
+      ...base,
+      type: "in_app",
+      config: { audienceRole: "admin", locale: "de", injected: "payload" },
+    });
+    expect(result.config).toEqual({ audienceRole: "admin", locale: "de" });
+  });
+
+  it.each(CHANNEL_TYPES)("strips unknown config keys for %s", (type) => {
+    const result = createChannelConfigSchema.parse({
+      ...base,
+      type,
+      config: { ...VALID_CONFIG_BY_CHANNEL_TYPE[type], injected: "payload" },
+    });
+    expect(result.config).not.toHaveProperty("injected");
+  });
+
+  it("rejects a body carrying a key the schema does not declare", () => {
+    const result = createChannelConfigSchema.safeParse({
+      ...base,
+      type: "in_app",
+      config: VALID_CONFIG_BY_CHANNEL_TYPE.in_app,
+      digstMode: "none", // typo'd key — silently ignored before `.strict()`
     });
     expect(result.success).toBe(false);
   });
@@ -167,6 +263,11 @@ describe("updateChannelConfigSchema", () => {
     expect(updateChannelConfigSchema.parse({ digestTimezone: "Europe/Berlin" })).toEqual({
       digestTimezone: "Europe/Berlin",
     });
+  });
+
+  it("rejects a body carrying a key the schema does not declare", () => {
+    // A mistyped key used to return 200 having changed nothing.
+    expect(() => updateChannelConfigSchema.parse({ enable: false })).toThrow();
   });
 });
 

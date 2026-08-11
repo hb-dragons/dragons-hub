@@ -12,7 +12,7 @@ export interface ResolveResult {
   untracked: number;
 }
 
-export interface TrackedLeague {
+interface TrackedLeague {
   id: number;
   ligaNr: number;
   apiLigaId: number;

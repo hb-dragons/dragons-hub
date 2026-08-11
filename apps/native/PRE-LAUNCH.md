@@ -3,49 +3,44 @@
 Items deferred while the app is in internal-testing phase. Work through
 this list before submitting to the public App Store / Play Store.
 
-Last reviewed: 2026-04-21.
+Last reviewed: 2026-07-26 (issue #118 — this pass corrected several items
+below that had drifted from the code; see the "Resolved" note on each).
 
 ---
 
 ## Store-review blockers
 
-### Remove unused permissions + camera plugin
+### Unused permissions + camera plugin — resolved (#118)
 
-The app declares camera/mic permissions but no code uses them. Apple
-rejects unused purpose strings; Google flags unused dangerous perms.
+The app used to declare camera/mic permissions with no code using them.
+Fixed: `ios.infoPlist.NSCameraUsageDescription`, the `"expo-camera"`
+plugin entry, `android.permission.CAMERA`, and
+`android.permission.RECORD_AUDIO` are all removed from `app.json`, and
+the `expo-camera` dependency is gone from `package.json`.
 
-**`app.json`:**
+`android.permission.USE_FINGERPRINT` is still declared alongside
+`USE_BIOMETRIC` — unverified whether it's still needed for pre-API-28
+support; left as-is pending a decision.
 
-- [ ] Remove `ios.infoPlist.NSCameraUsageDescription`.
-- [ ] Remove `"expo-camera"` entry from `plugins` (including its options
-      block).
-- [ ] Remove `android.permission.CAMERA` from `android.permissions`.
-- [ ] Remove `android.permission.RECORD_AUDIO` from `android.permissions`.
-- [ ] Remove `android.permission.USE_FINGERPRINT` — deprecated API 28+;
-      `USE_BIOMETRIC` covers modern devices.
+### Push notifications — already committed, live in code
 
-**`package.json`:**
+Was documented here as "half-wired" with no caller. That's no longer
+true: `lib/push/registration.ts` calls `Notifications.getPermissionsAsync`
+/ `requestPermissionsAsync` / `getExpoPushTokenAsync` and
+`deviceApi.register`; `lib/push/handler.ts` wires the foreground handler
+and notification-tap deep-linking. Both have test coverage
+(`registration.test.ts`, `handler.test.ts`).
 
-- [ ] Remove `"expo-camera"` dependency.
+The `plugins/remove-push-entitlement.js` this section used to reference
+does not exist — there is no `apps/native/plugins/` directory at all, so
+there's nothing stripping the iOS `aps-environment` entitlement.
 
-Run `pnpm install` after.
+Remaining, still-open:
 
-### Decide on push notifications
-
-Currently half-wired: `expo-notifications` is a dep, `notification.icon`
-+ `color` are configured, but `plugins/remove-push-entitlement.js` strips
-the iOS `aps-environment` entitlement and no code calls
-`Notifications.*` or `deviceApi.register`.
-
-Pick one:
-
-- [ ] **Commit to push:** wire token registration (call
-      `deviceApi.register` after session + permission grant), remove
-      `plugins/remove-push-entitlement`, add iOS Associated Domains
-      entitlement, create Apple push cert + Firebase config via EAS.
-- [ ] **Remove:** drop `expo-notifications` dep, the `notification`
-      block in `app.json`, the `notification-icon.png` asset, and the
-      `./plugins/remove-push-entitlement` plugin entry.
+- [ ] Confirm the iOS Associated Domains entitlement and an Apple push
+      cert / Firebase config are set up via EAS for production push.
+- [ ] Verify APNs / FCM credentials exist for the production EAS profile
+      (`eas credentials`).
 
 ### iOS universal links
 
@@ -60,13 +55,13 @@ not. Without the entitlement iOS silently opens the link in Safari.
       `app.hbdragons.de` with the app's `TeamID.bundleId` and path
       patterns.
 
-### Unused Expo modules
+### Unused Expo modules — resolved (#118)
 
-No code imports these — trims bundle, avoids perms prompts.
-
-- [ ] Remove from `package.json` (and their `app.json` plugin entries
-      if any): `expo-camera`, `expo-web-browser`, `expo-network`.
-      Reassess `expo-notifications` based on the push decision above.
+`expo-camera` and `expo-web-browser` had zero imports and are removed
+from `package.json`. `expo-network` turned out to have a real caller
+(`lib/swr-native-adapters.ts`, `lib/api.ts` — network-state-aware SWR
+reconnect) and was kept. `expo-linking` also had zero imports and is
+removed too (not listed here originally, but same rationale).
 
 ### Android adaptive icon — monochrome
 
@@ -139,19 +134,29 @@ before launch:
 
 ---
 
-## Testing
+## Testing — corrected (#118)
 
-Native has zero tests. Monorepo enforces 90/95% on `apps/api`; native
-is exempt but shouldn't be forever.
+This used to say "native has zero tests" and that `lint` was just
+`tsc --noEmit`. Both were stale: there are 26 `*.test.ts` files under
+`src/`, `lint` runs real ESLint (`eslint .`) separate from `typecheck`
+(`tsc --noEmit`), and `apps/native` has its own `vitest.config.ts`
+coverage gate (currently a measured floor — 48% branches / 27% functions
+/ 49% lines / 48% statements — that ratchets up over time, well below
+`apps/api`'s 90/95% bar). Coverage only instruments `src/lib/**/*.ts` —
+hooks and screens under `src/hooks` and `src/app` aren't measured, since
+there's no React-render test harness here (logic-first vitest; RN/Expo
+are mocked per test, no component rendering).
+
+Still open:
 
 - [ ] Unit-test pure functions: `partitionGames`, `groupByDate`,
       `claimErrorMessage`, `dropErrorMessage`.
-- [ ] Unit-test hooks: `useBiometricLock`, `useAppearanceMode`,
-      `useLocale` (SecureStore / Appearance mocked).
+- [ ] Add a render harness (e.g. `@testing-library/react-native`) so
+      hooks like `useBiometricLock`, `useAppearanceMode`, `useLocale`
+      and screens can get real test coverage instead of only their pure
+      helper functions.
 - [ ] Add one Maestro flow: launch → browse schedule → open a game →
       sign in → open referee tab.
-- [ ] Wire into CI (currently `pnpm --filter @dragons/native lint` is
-      just `tsc --noEmit` — add a real ESLint run + vitest).
 
 ---
 
@@ -159,11 +164,14 @@ is exempt but shouldn't be forever.
 
 ### Pre-launch-ish (bundle size / perf)
 
-- [ ] Move `react-native-svg-transformer` from `dependencies` to
-      `devDependencies` in `apps/native/package.json`.
-- [ ] Replace SecureStore with AsyncStorage for non-secret prefs
-      (`theme_mode`, `locale_pref`, `biometric_lock_enabled`).
-      Keychain / Keystore round-trips slow cold start.
+Two items resolved by #118: `react-native-svg-transformer` moved to
+`devDependencies` (it's a build-time Metro transformer, not a runtime
+dep); `theme_mode`, `locale_pref`, `biometric_lock_enabled` and the
+board filter/sort prefs moved off SecureStore onto plain AsyncStorage
+(`@/lib/local-storage`) — Keychain/Keystore round-trips no longer sit on
+the cold-start path for these. The auth session token is still on
+SecureStore (it's an actual secret).
+
 - [ ] Flatten `team/[id].tsx`: the nested `<FlatList scrollEnabled=
       false>` inside `<Screen>`'s ScrollView defeats virtualization.
       Convert to a single `<FlatList>` with `ListHeaderComponent`.
@@ -203,8 +211,11 @@ is exempt but shouldn't be forever.
 - [ ] `expo-router/unstable-native-tabs` is unstable API. Abstract into
       a local `<AppTabs>` component so the eventual migration touches
       one file.
-- [ ] Experimental `RNS_GAMMA_ENABLED=1` in `ios/Podfile` — re-evaluate
-      when RN Screens ships a stable replacement.
+- [ ] This is a managed-workflow Expo project (no `ios/`/`android/`
+      directories checked in — native config lives entirely in
+      `app.json` and is applied by `expo prebuild`/EAS build). If a
+      future need forces a bare-workflow eject, re-audit any Podfile /
+      Gradle patches added at that point; there's nothing to watch yet.
 
 ---
 

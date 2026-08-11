@@ -1,6 +1,8 @@
+import { useCallback } from "react";
 import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
+import type { MatchListItem } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { StatStrip } from "@/components/StatStrip";
@@ -10,15 +12,14 @@ import { ResultChip } from "@/components/ResultChip";
 import { authClient } from "@/lib/auth-client";
 import { publicApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
+import { kickoffCountdownDays } from "@/lib/format/kickoff";
+import { resolveFetchState } from "@/lib/ui/fetch-state";
+import { ErrorState } from "@/components/ErrorState";
 import { fontFamilies } from "@/theme/typography";
 import { Wordmark } from "@/components/brand/Wordmark";
 
 function getCountdown(kickoffDate: string): string {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const game = new Date(kickoffDate + "T00:00:00");
-  game.setHours(0, 0, 0, 0);
-  const days = Math.round((game.getTime() - today.getTime()) / 86400000);
+  const days = kickoffCountdownDays(kickoffDate);
   if (days === 0) return i18n.t("home.countdown.today");
   if (days === 1) return i18n.t("home.countdown.tomorrow");
   return i18n.t("home.countdown.inDays", { count: days });
@@ -32,11 +33,25 @@ export default function HomeScreen() {
   const initial = session?.user?.name?.trim().charAt(0).toUpperCase() ?? "";
   const isSignedIn = Boolean(session);
 
-  const { data: dashboard, isLoading, mutate } = useSWR("home:dashboard", () =>
-    publicApi.getHomeDashboard(),
+  const {
+    data: dashboard,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR("home:dashboard", () => publicApi.getHomeDashboard());
+
+  const state = resolveFetchState({ isLoading, error, data: dashboard });
+
+  // Stable handler: MatchCard* are memo-wrapped, and an inline arrow per call
+  // site made that memo a no-op.
+  const openMatch = useCallback(
+    (match: MatchListItem) => {
+      router.push(`/game/${String(match.id)}`);
+    },
+    [router],
   );
 
-  if (isLoading || !dashboard) {
+  if (state === "loading") {
     return (
       <Screen>
         <View
@@ -49,6 +64,23 @@ export default function HomeScreen() {
         >
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
+      </Screen>
+    );
+  }
+
+  // SWR flips `isLoading` to false on failure while `data` stays undefined —
+  // the old `isLoading || !dashboard` branch spun here forever, with the
+  // pull-to-refresh stranded in the unreachable success branch below.
+  if (state === "error" || !dashboard) {
+    return (
+      <Screen onRefresh={() => mutate()}>
+        <ErrorState
+          message={i18n.t("common.loadFailed")}
+          retryLabel={i18n.t("common.retry")}
+          onRetry={() => {
+            void mutate();
+          }}
+        />
       </Screen>
     );
   }
@@ -151,10 +183,7 @@ export default function HomeScreen() {
         </View>
 
         {nextGame ? (
-          <MatchCardFull
-            match={nextGame}
-            onPress={() => router.push(`/game/${String(nextGame.id)}`)}
-          />
+          <MatchCardFull match={nextGame} onPress={openMatch} />
         ) : (
           <View
             style={{
@@ -233,11 +262,7 @@ export default function HomeScreen() {
           </Text>
           <View style={{ gap: spacing.sm }}>
             {upcomingGames.slice(0, 3).map((match) => (
-              <MatchCardCompact
-                key={match.id}
-                match={match}
-                onPress={() => router.push(`/game/${String(match.id)}`)}
-              />
+              <MatchCardCompact key={match.id} match={match} onPress={openMatch} />
             ))}
           </View>
         </View>

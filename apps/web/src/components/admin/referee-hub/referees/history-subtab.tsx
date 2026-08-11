@@ -3,8 +3,12 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { useTranslations, useFormatter } from "next-intl";
+import { toast } from "sonner";
 import { formatKickoff } from "@/lib/format-kickoff";
 import { queries } from "@/lib/swr-queries";
+import { SWR_KEYS } from "@/lib/swr-keys";
+// eslint-disable-next-line no-restricted-imports -- getBlob is a binary download not in the typed `api` registry
+import { browserClient } from "@/lib/api";
 import { Button } from "@dragons/ui/components/button";
 import type { RefereeListItem } from "@dragons/shared";
 
@@ -16,6 +20,7 @@ export function HistorySubtab({ referee }: Props) {
   const t = useTranslations("refereeHub.referees.history");
   const format = useFormatter();
   const [pages, setPages] = useState(1);
+  const [exporting, setExporting] = useState(false);
 
   const qs = new URLSearchParams({
     refereeApiId: String(referee.apiId),
@@ -28,12 +33,46 @@ export function HistorySubtab({ referee }: Props) {
   const { data } = useSWR(historyQ.key, historyQ.fetcher);
   const items = data?.items ?? [];
 
+  // The API is a separate origin (no Next rewrites, no app/api route), so a
+  // plain <a href="/api/…"> 404s. Fetch through the credentialed client and
+  // hand the bytes to a synthetic object-URL download instead.
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const { blob, headers } = await browserClient.getBlob(
+        SWR_KEYS.refereeHistoryGamesCsv(qs),
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `referee-history-games-${referee.apiId}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      if (headers.get("X-Result-Truncated") === "true") {
+        toast.warning(
+          t("exportTruncated", { n: headers.get("X-Total-Count") ?? "?" }),
+        );
+      }
+    } catch {
+      toast.error(t("exportFailed"));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="p-4 space-y-3">
       <div className="flex justify-between items-center">
         <div className="text-sm text-muted-foreground">{t("total", { n: String(data?.total ?? items.length) })}</div>
-        <Button asChild size="sm" variant="outline">
-          <a href={`/api/admin/referee/history/games.csv?${qs}`} download>{t("exportCsv")}</a>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={exporting}
+          onClick={() => { void exportCsv(); }}
+        >
+          {exporting ? t("exporting") : t("exportCsv")}
         </Button>
       </div>
 

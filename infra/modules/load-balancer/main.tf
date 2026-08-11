@@ -33,6 +33,25 @@ variable "api_service_name" {
   type        = string
 }
 
+variable "cms_service_name" {
+  description = "Cloud Run CMS service name. Null means no cms backend at all (existing envs keep working unchanged)."
+  type        = string
+  default     = null
+}
+
+variable "cms_domains" {
+  description = "Custom domains for the CMS service. Empty list means no cms cert/host-rule; the service stays reachable on its run.app URL only. Cloud Run domain-mappings are unavailable in europe-west3, so the LB is the only custom-domain path."
+  type        = list(string)
+  default     = []
+}
+
+locals {
+  cms_backend_enabled = var.cms_service_name != null
+  # A host rule needs a backend to point at; without a service the domains
+  # list is ignored.
+  cms_routing_enabled = local.cms_backend_enabled && length(var.cms_domains) > 0
+}
+
 resource "google_compute_global_address" "lb_ip" {
   name         = "dragons-lb-ip-${var.environment}"
   address_type = "EXTERNAL"
@@ -55,6 +74,23 @@ resource "google_compute_managed_ssl_certificate" "api_cert" {
 
   managed {
     domains = [var.api_domain]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# One cert per cms domain, mirroring the web/api single-domain cert pattern:
+# managed certs are immutable, so a per-domain cert lets Phase E append the
+# prod domain without recreating the testing one.
+resource "google_compute_managed_ssl_certificate" "cms_cert" {
+  for_each = local.cms_routing_enabled ? toset(var.cms_domains) : toset([])
+
+  name = substr("dragons-cms-cert-${var.environment}-${replace(each.value, ".", "-")}", 0, 63)
+
+  managed {
+    domains = [each.value]
   }
 
   lifecycle {
@@ -104,6 +140,31 @@ resource "google_compute_region_network_endpoint_group" "api_neg" {
   }
 }
 
+resource "google_compute_backend_service" "cms_backend" {
+  count = local.cms_backend_enabled ? 1 : 0
+
+  name                  = "dragons-cms-backend-${var.environment}"
+  protocol              = "HTTP"
+  port_name             = "http"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+
+  backend {
+    group = google_compute_region_network_endpoint_group.cms_neg[0].id
+  }
+}
+
+resource "google_compute_region_network_endpoint_group" "cms_neg" {
+  count = local.cms_backend_enabled ? 1 : 0
+
+  name                  = "dragons-cms-neg-${var.environment}"
+  network_endpoint_type = "SERVERLESS"
+  region                = var.region
+
+  cloud_run {
+    service = var.cms_service_name
+  }
+}
+
 resource "google_compute_url_map" "lb_url_map" {
   name            = "dragons-url-map-${var.environment}"
   default_service = google_compute_backend_service.web_backend.id
@@ -127,15 +188,34 @@ resource "google_compute_url_map" "lb_url_map" {
     name            = "api-paths"
     default_service = google_compute_backend_service.api_backend.id
   }
+
+  dynamic "host_rule" {
+    for_each = local.cms_routing_enabled ? [1] : []
+    content {
+      hosts        = var.cms_domains
+      path_matcher = "cms-paths"
+    }
+  }
+
+  dynamic "path_matcher" {
+    for_each = local.cms_routing_enabled ? [1] : []
+    content {
+      name            = "cms-paths"
+      default_service = google_compute_backend_service.cms_backend[0].id
+    }
+  }
 }
 
 resource "google_compute_target_https_proxy" "lb_proxy" {
   name    = "dragons-https-proxy-${var.environment}"
   url_map = google_compute_url_map.lb_url_map.id
-  ssl_certificates = [
-    google_compute_managed_ssl_certificate.web_cert.id,
-    google_compute_managed_ssl_certificate.api_cert.id,
-  ]
+  ssl_certificates = concat(
+    [
+      google_compute_managed_ssl_certificate.web_cert.id,
+      google_compute_managed_ssl_certificate.api_cert.id,
+    ],
+    [for cert in google_compute_managed_ssl_certificate.cms_cert : cert.id],
+  )
 }
 
 resource "google_compute_global_forwarding_rule" "lb_forwarding_rule" {
@@ -181,4 +261,8 @@ output "web_domain" {
 
 output "api_domain" {
   value = var.api_domain
+}
+
+output "cms_domains" {
+  value = var.cms_domains
 }

@@ -1,9 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { validator } from "hono-openapi";
 import { z } from "zod";
 import type { Logger } from "pino";
 import type { AppEnv } from "../types";
+import { validationHook } from "./validation";
 
 // --- Mock setup (hoisted before imports) ---
 
@@ -36,6 +38,14 @@ vi.mock("../config/env", () => ({
 // --- Imports (after mocks) ---
 
 import { errorHandler } from "./error";
+import { AppError } from "../app-error";
+import { SyncAlreadyQueuedError } from "../services/sync-jobs.errors";
+import { RefereeSdkNotConfiguredError } from "../services/sync/sdk-client.errors";
+import { TeamReorderError } from "../services/admin/team-admin.errors";
+
+// A stand-in for any service's AppError subclass. The handler must map it from
+// the instance's own `status`, with no knowledge of the subclass.
+class TestAppError extends AppError {}
 
 // App WITHOUT request logger middleware — error handler falls back to root logger
 function createBareApp() {
@@ -55,6 +65,30 @@ function createBareApp() {
 
   app.get("/throw-non-error", () => {
     throw new Error("Unknown error occurred");
+  });
+
+  app.get("/throw-sync-already-queued", () => {
+    throw new SyncAlreadyQueuedError();
+  });
+
+  app.get("/throw-referee-sdk-not-configured", () => {
+    throw new RefereeSdkNotConfiguredError();
+  });
+
+  app.get("/throw-team-reorder", () => {
+    throw TeamReorderError.invalidTeamSet();
+  });
+
+  app.get("/throw-app-error-422", () => {
+    throw new TestAppError("Referee is not qualified", "NOT_QUALIFIED", 422);
+  });
+
+  app.get("/throw-app-error-502", () => {
+    throw new TestAppError("Federation rejected the write", "FEDERATION_ERROR", 502);
+  });
+
+  app.get("/throw-http-400", () => {
+    throw new HTTPException(400, { message: "Malformed JSON in request body" });
   });
 
   app.get("/throw-http-401", () => {
@@ -109,6 +143,85 @@ describe("errorHandler", () => {
     expect(body.code).toBe("VALIDATION_ERROR");
     expect(body.details).toHaveLength(1);
     expect(body.details[0].path).toBe("name");
+  });
+
+  it("returns 409 with the SYNC_ALREADY_QUEUED code for SyncAlreadyQueuedError", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-sync-already-queued");
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "Sync already in progress or queued",
+      code: "SYNC_ALREADY_QUEUED",
+    });
+  });
+
+  it("does not report SyncAlreadyQueuedError to the error logger", async () => {
+    const app = createBareApp();
+    await app.request("/throw-sync-already-queued");
+
+    expect(mocks.rootLogger.error).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 with the REFEREE_SDK_NOT_CONFIGURED code for RefereeSdkNotConfiguredError", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-referee-sdk-not-configured");
+
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.code).toBe("REFEREE_SDK_NOT_CONFIGURED");
+    expect(body.error).toMatch(/REFEREE_SDK_USERNAME/);
+  });
+
+  it("returns 400 with the INVALID_TEAM_SET code for TeamReorderError", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-team-reorder");
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "The team order must list every own-club team exactly once.",
+      code: "INVALID_TEAM_SET",
+    });
+  });
+
+  it("maps an AppError to the status carried on the instance", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-app-error-422");
+
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({
+      error: "Referee is not qualified",
+      code: "NOT_QUALIFIED",
+    });
+  });
+
+  it("does not report a 4xx AppError to the error logger", async () => {
+    const app = createBareApp();
+    await app.request("/throw-app-error-422");
+
+    expect(mocks.rootLogger.error).not.toHaveBeenCalled();
+  });
+
+  it("reports a 5xx AppError to Cloud Error Reporting", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-app-error-502");
+
+    expect(res.status).toBe(502);
+    expect(mocks.rootLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.any(TestAppError),
+        stack_trace: expect.any(String),
+        "@type":
+          "type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent",
+      }),
+      "Federation rejected the write",
+    );
+  });
+
+  it("names an AppError subclass after its own class", () => {
+    const error = new TestAppError("boom", "BOOM", 400);
+
+    expect(error.name).toBe("TestAppError");
   });
 
   it("does not call logger for ZodError", async () => {
@@ -205,6 +318,17 @@ describe("errorHandler", () => {
     expect(mocks.rootLogger.error).not.toHaveBeenCalled();
   });
 
+  it("maps a 400 HTTPException to VALIDATION_ERROR", async () => {
+    const app = createBareApp();
+    const res = await app.request("/throw-http-400");
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Malformed JSON in request body",
+      code: "VALIDATION_ERROR",
+    });
+  });
+
   it("returns 401 with UNAUTHORIZED code for HTTPException(401)", async () => {
     const app = createBareApp();
     const res = await app.request("/throw-http-401");
@@ -239,5 +363,31 @@ describe("errorHandler", () => {
     expect(res.status).toBe(418);
     const body = await res.json();
     expect(body).toEqual({ error: "I'm a teapot", code: "HTTP_ERROR" });
+  });
+
+  // The synthetic HTTPException(400) case above proves the branch itself.
+  // This one proves the branch is wired to the real chain every route in the
+  // sweep depends on: hono-openapi's validator() throws the malformed-JSON
+  // HTTPException before @hono/standard-validator (and so validationHook)
+  // ever runs, and errorHandler still has to catch it. A Hono/hono-openapi
+  // upgrade that changed the thrown status or message would fail this test
+  // even if the synthetic one stayed green.
+  it("maps real malformed JSON posted through a validator() route to VALIDATION_ERROR", async () => {
+    const app = new Hono<AppEnv>();
+    app.onError(errorHandler);
+    app.post(
+      "/v",
+      validator("json", z.object({ a: z.string() }), validationHook),
+      (c) => c.json(c.req.valid("json")),
+    );
+
+    const res = await app.request("/v", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{ not json",
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });

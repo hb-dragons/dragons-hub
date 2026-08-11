@@ -340,13 +340,13 @@ export function KanbanBoard({
         {activeTask && <TaskCard task={activeTask} onOpen={() => {}} />}
         {activeColumn && (
           <div
-            className="flex shrink-0 flex-col rounded-lg border bg-muted/50 shadow-lg"
+            className="bg-surface-low flex shrink-0 flex-col rounded-md shadow-lg"
             style={{
               width: activeSize?.width,
               height: activeSize?.height,
             }}
           >
-            <div className="flex items-center justify-between border-b px-3 py-2">
+            <div className="flex items-center justify-between px-3 py-2">
               <span className="p-1 text-muted-foreground">
                 <GripVertical className="h-4 w-4" />
               </span>

@@ -3,17 +3,18 @@ import {
   boardFiltersKey,
   boardSortKey,
   isPersistableBoardId,
-  isValidSecureStoreKey,
-  SECURE_STORE_KEY_PATTERN,
 } from "@/lib/board/secure-store-keys";
+
+/** Characters expo-secure-store accepts in a key (mirrors the source's own rule). */
+const SECURE_STORE_LEGAL_KEY = /^[A-Za-z0-9._-]+$/;
 
 describe("board secure-store keys", () => {
   it("produces SecureStore-legal keys (no colons)", () => {
     // Regression: colon-separated keys threw "Invalid key provided to
     // SecureStore" on iOS.
     for (const id of [1, 42, 9999]) {
-      expect(boardFiltersKey(id)).toMatch(SECURE_STORE_KEY_PATTERN);
-      expect(boardSortKey(id)).toMatch(SECURE_STORE_KEY_PATTERN);
+      expect(boardFiltersKey(id)).toMatch(SECURE_STORE_LEGAL_KEY);
+      expect(boardSortKey(id)).toMatch(SECURE_STORE_LEGAL_KEY);
       expect(boardFiltersKey(id)).not.toContain(":");
       expect(boardSortKey(id)).not.toContain(":");
     }
@@ -23,12 +24,6 @@ describe("board secure-store keys", () => {
     expect(boardFiltersKey(1)).toBe("board.1.filters");
     expect(boardSortKey(1)).toBe("board.1.sort");
     expect(boardFiltersKey(1)).not.toBe(boardFiltersKey(2));
-  });
-
-  it("isValidSecureStoreKey rejects empty and colon keys", () => {
-    expect(isValidSecureStoreKey("board.1.filters")).toBe(true);
-    expect(isValidSecureStoreKey("")).toBe(false);
-    expect(isValidSecureStoreKey("board:1:filters")).toBe(false);
   });
 
   it("isPersistableBoardId accepts positive integers only", () => {

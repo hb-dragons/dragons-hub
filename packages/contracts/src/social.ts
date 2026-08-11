@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
 export const socialMatchesQuerySchema = z.object({
   type: z.enum(["preview", "results"]),
@@ -8,7 +9,7 @@ export const socialMatchesQuerySchema = z.object({
 
 export type SocialMatchesQuery = z.infer<typeof socialMatchesQuerySchema>;
 
-export const socialGenerateBodySchema = z.object({
+export const socialGenerateBodySchema = z.strictObject({
   type: z.enum(["preview", "results"]),
   calendarWeek: z.number().int().min(1).max(53),
   year: z.number().int().min(2020).max(2100),
@@ -32,6 +33,4 @@ export const socialGenerateBodySchema = z.object({
 
 export type SocialGenerateBody = z.infer<typeof socialGenerateBodySchema>;
 
-export const socialIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const socialIdParamSchema = idParamSchema;

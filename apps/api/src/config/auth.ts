@@ -5,9 +5,45 @@ import { admin } from "better-auth/plugins/admin";
 import { ac, roles } from "@dragons/shared";
 import { getDb } from "./database";
 import { env } from "./env";
+import { logger } from "./logger";
 import { getRedis } from "./redis";
 
 const SECONDARY_STORAGE_PREFIX = "ba:";
+
+/**
+ * The cookie domain that lets the API and the web app share a session, derived
+ * from `BETTER_AUTH_URL` rather than hardcoded. The literal `.app.hbdragons.de`
+ * that used to sit here was correct only as long as nobody moved the API: point
+ * `BETTER_AUTH_URL` at another host and every session cookie is scoped to a
+ * domain the browser will not send it back to, which reads as "signed out on
+ * every request" with nothing logged.
+ *
+ * The service label is dropped so `api.app.example.de` yields `.app.example.de`
+ * and the sibling web host sees the same cookie. Hosts with no parent to scope
+ * to — a bare `localhost`, an IP literal, an unparseable URL — return
+ * `undefined`, and the caller leaves cross-subdomain cookies off instead of
+ * emitting a domain the browser would reject.
+ */
+export function deriveCookieDomain(baseUrl: string): string | undefined {
+  let hostname: string;
+  try {
+    hostname = new URL(baseUrl).hostname;
+  } catch {
+    return undefined;
+  }
+
+  // `URL` keeps IPv6 literals bracketed; neither form has a parent domain.
+  if (hostname.startsWith("[") || /^\d+(\.\d+)*$/.test(hostname)) return undefined;
+
+  const labels = hostname.split(".").filter(Boolean);
+  if (labels.length < 2) return undefined;
+
+  const scope = labels.length > 2 ? labels.slice(1) : labels;
+  return `.${scope.join(".")}`;
+}
+
+const cookieDomain =
+  env.NODE_ENV === "production" ? deriveCookieDomain(env.BETTER_AUTH_URL) : undefined;
 
 export const auth = betterAuth({
   database: drizzleAdapter(getDb(), { provider: "pg" }),
@@ -23,17 +59,37 @@ export const auth = betterAuth({
     disableSignUp: true,
     minPasswordLength: 12,
   },
+  // Every getSession hits secondaryStorage once the 5-minute cookie cache
+  // lapses, so a Redis outage here would otherwise take down every
+  // authenticated route. Degrade instead: a read failure reports a cache miss
+  // and better-auth falls through to the mirrored session table
+  // (storeSessionInDatabase below); a write failure is logged and swallowed,
+  // since Postgres already holds the durable copy and throwing would turn a
+  // cache outage into a sign-in outage.
   secondaryStorage: {
     async get(key) {
-      return getRedis().get(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      try {
+        return await getRedis().get(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      } catch (err) {
+        logger.warn({ err, key }, "Session cache read failed; treating as a miss");
+        return null;
+      }
     },
     async set(key, value, ttl) {
       const k = `${SECONDARY_STORAGE_PREFIX}${key}`;
-      if (ttl && ttl > 0) await getRedis().set(k, value, "EX", ttl);
-      else await getRedis().set(k, value);
+      try {
+        if (ttl && ttl > 0) await getRedis().set(k, value, "EX", ttl);
+        else await getRedis().set(k, value);
+      } catch (err) {
+        logger.warn({ err, key }, "Session cache write failed; skipping cache");
+      }
     },
     async delete(key) {
-      await getRedis().del(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      try {
+        await getRedis().del(`${SECONDARY_STORAGE_PREFIX}${key}`);
+      } catch (err) {
+        logger.warn({ err, key }, "Session cache delete failed; entry will expire via TTL");
+      }
     },
   },
   rateLimit: {
@@ -77,10 +133,9 @@ export const auth = betterAuth({
     // header-size ceilings on Cloud Run / GCLB, and cookieCache decode flips
     // to null on the next request.
     cookiePrefix: "dragons",
-    crossSubDomainCookies:
-      env.NODE_ENV === "production"
-        ? { enabled: true, domain: ".app.hbdragons.de" }
-        : { enabled: false },
+    crossSubDomainCookies: cookieDomain
+      ? { enabled: true, domain: cookieDomain }
+      : { enabled: false },
     defaultCookieAttributes: {
       sameSite: "lax",
       httpOnly: true,

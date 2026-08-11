@@ -66,7 +66,9 @@ afterAll(async () => {
 });
 
 async function setup(options: {
-  dueDate: Date;
+  /** A `Date` is read as its UTC calendar day; pass a `YYYY-MM-DD` string to
+   *  pin the stored day exactly, which is what the club-zone cases need. */
+  dueDate: Date | string;
   isDoneColumn?: boolean;
   hasAssignee?: boolean;
 }) {
@@ -81,7 +83,10 @@ async function setup(options: {
     `INSERT INTO "user" (id, name, email) VALUES ('${userId}', 'A', '${userId}@t.local')
      ON CONFLICT (id) DO NOTHING`,
   );
-  const dueStr = options.dueDate.toISOString().slice(0, 10);
+  const dueStr =
+    typeof options.dueDate === "string"
+      ? options.dueDate
+      : options.dueDate.toISOString().slice(0, 10);
   await ctx.client.exec(
     `INSERT INTO tasks (board_id, column_id, title, due_date)
      VALUES (1, 1, 'Due Soon', '${dueStr}')`,
@@ -219,6 +224,37 @@ describe("runTaskReminderSweep", () => {
         .where(eq(domainEvents.entityId, taskId));
       expect(events).toHaveLength(0);
 
+      const [row] = await (ctx.db as Database)
+        .select({ at: tasks.leadReminderSentAt })
+        .from(tasks)
+        .where(eq(tasks.id, taskId));
+      expect(row!.at).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("excludes a task due today when the club day is ahead of the UTC day (#149)", async () => {
+    // 22:30 UTC on 15 Jul is 00:30 on 16 Jul in Europe/Berlin (CEST). The club
+    // day is already the 16th while the UTC day is still the 15th — the window
+    // the 15-minute sweep hits ~8 times a night. A task due *today* in the club
+    // zone must not match the lead query: "Due tomorrow" would be wrong, and
+    // loadDayOfCandidates sends the correct "Due today" at 08:00 local.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-15T22:30:00Z"));
+
+    try {
+      const { taskId } = await setup({ dueDate: "2026-07-16" });
+
+      await runTaskReminderSweep();
+
+      const events = await (ctx.db as Database)
+        .select()
+        .from(domainEvents)
+        .where(eq(domainEvents.entityId, taskId));
+      expect(events).toHaveLength(0);
+
+      // Not stamped either — a stamped lead reminder never self-corrects.
       const [row] = await (ctx.db as Database)
         .select({ at: tasks.leadReminderSentAt })
         .from(tasks)

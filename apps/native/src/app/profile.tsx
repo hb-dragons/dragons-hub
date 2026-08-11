@@ -6,7 +6,7 @@ import { useLocale } from "@/hooks/useLocale";
 import type { LocalePref } from "@/hooks/useLocale";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
-import { unregisterForPush } from "@/lib/push/registration";
+import { performSignOut } from "@/lib/auth/sign-out";
 import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -35,11 +35,11 @@ export default function ProfileScreen() {
   const { data: session } = authClient.useSession();
 
   async function handleSignOut() {
-    // DELETE push token BEFORE clearing auth — the DELETE endpoint requires
-    // an authenticated session to authorize the deletion.
-    await unregisterForPush();
-    await authClient.signOut();
-    router.replace("/");
+    // Same routine as the 401-triggered forced sign-out: deregister push,
+    // clear the auth session, wipe the SWR cache, and navigate home. Keeping
+    // both paths on one routine is what stops the next user on this device
+    // from seeing this user's cached referee assignments and boards.
+    await performSignOut();
   }
 
   if (!session) {

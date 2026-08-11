@@ -7,41 +7,55 @@ export async function addChecklistItem(
   taskId: number,
   data: { label: string; position?: number },
 ): Promise<ChecklistItem | null> {
-  const [task] = await getDb()
-    .select({ id: tasks.id })
-    .from(tasks)
-    .where(eq(tasks.id, taskId))
-    .limit(1);
+  // One transaction, and the parent task row is locked FOR UPDATE before the
+  // MAX(position) probe. `MAX(position) + 1` is a read-modify-write: two adds
+  // to the same task that interleave between the probe and the insert both
+  // read the same maximum and both write that position, so the list ends up
+  // with two items claiming one slot and an arbitrary render order. Locking
+  // the task serialises adds per task (and only per task — adds to different
+  // tasks never contend) and the existence check comes free with the lock.
+  const item = await getDb().transaction(async (tx) => {
+    const [task] = await tx
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1)
+      .for("update");
 
-  if (!task) return null;
+    if (!task) return null;
 
-  let position = data.position;
-  if (position === undefined) {
-    const [maxPos] = await getDb()
-      .select({
-        maxPosition: sql<number>`COALESCE(MAX(${taskChecklistItems.position}), -1)`,
+    let position = data.position;
+    if (position === undefined) {
+      const [maxPos] = await tx
+        .select({
+          maxPosition: sql<number>`COALESCE(MAX(${taskChecklistItems.position}), -1)`,
+        })
+        .from(taskChecklistItems)
+        .where(eq(taskChecklistItems.taskId, taskId));
+      position = (maxPos?.maxPosition ?? -1) + 1;
+    }
+
+    const [inserted] = await tx
+      .insert(taskChecklistItems)
+      .values({
+        taskId,
+        label: data.label,
+        position,
       })
-      .from(taskChecklistItems)
-      .where(eq(taskChecklistItems.taskId, taskId));
-    position = (maxPos?.maxPosition ?? -1) + 1;
-  }
+      .returning();
 
-  const [item] = await getDb()
-    .insert(taskChecklistItems)
-    .values({
-      taskId,
-      label: data.label,
-      position,
-    })
-    .returning();
+    return inserted ?? null;
+  });
+
+  if (!item) return null;
 
   return {
-    id: item!.id,
-    label: item!.label,
-    isChecked: item!.isChecked,
-    checkedBy: item!.checkedBy,
-    checkedAt: item!.checkedAt?.toISOString() ?? null,
-    position: item!.position,
+    id: item.id,
+    label: item.label,
+    isChecked: item.isChecked,
+    checkedBy: item.checkedBy,
+    checkedAt: item.checkedAt?.toISOString() ?? null,
+    position: item.position,
   };
 }
 

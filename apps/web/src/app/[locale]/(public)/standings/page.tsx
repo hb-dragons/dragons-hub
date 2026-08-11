@@ -30,10 +30,10 @@ export default async function StandingsPage() {
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block overflow-x-auto rounded-xl border">
+          <div className="hidden md:block overflow-x-auto rounded-md bg-card">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/50">
+                <tr className="bg-surface-low font-display text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-3 py-2 text-left font-medium w-8">{t("standings.columns.position")}</th>
                   <th className="px-3 py-2 text-left font-medium">{t("standings.columns.team")}</th>
                   <th className="px-3 py-2 text-center font-medium w-10">{t("standings.columns.played")}</th>
@@ -54,10 +54,10 @@ export default async function StandingsPage() {
           </div>
 
           {/* Mobile table */}
-          <div className="md:hidden overflow-x-auto rounded-xl border">
+          <div className="md:hidden overflow-x-auto rounded-md bg-card">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/50">
+                <tr className="bg-surface-low font-display text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-2 py-2 text-left font-medium w-8">{t("standings.columns.position")}</th>
                   <th className="px-2 py-2 text-left font-medium">{t("standings.columns.team")}</th>
                   <th className="px-2 py-2 text-center font-medium w-12">W-L</th>
@@ -88,9 +88,9 @@ function StandingsRow({
 
   if (variant === "mobile") {
     return (
-      <tr className={cn("border-b last:border-0", isOwn && "bg-mint-tint/10")}>
+      <tr className={cn("hover:bg-surface-high", isOwn && "border-l-2 border-l-primary/50 bg-primary/5")}>
         <td className="px-2 py-2.5 tabular-nums text-muted-foreground">{row.position}</td>
-        <td className={cn("px-2 py-2.5 font-medium", isOwn && "text-mint-shade font-semibold")}>
+        <td className={cn("px-2 py-2.5 font-medium", isOwn && "text-primary font-semibold")}>
           <div className="flex items-center gap-2">
             <ClubLogo clubId={row.clubId} size={18} />
             <span className="block truncate max-w-[140px]">{row.teamNameShort ?? row.teamName}</span>
@@ -103,9 +103,9 @@ function StandingsRow({
   }
 
   return (
-    <tr className={cn("border-b last:border-0", isOwn && "bg-mint-tint/10")}>
+    <tr className={cn("hover:bg-surface-high", isOwn && "border-l-2 border-l-primary/50 bg-primary/5")}>
       <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{row.position}</td>
-      <td className={cn("px-3 py-2.5 font-medium", isOwn && "text-mint-shade font-semibold")}>
+      <td className={cn("px-3 py-2.5 font-medium", isOwn && "text-primary font-semibold")}>
         <div className="flex items-center gap-2">
           <ClubLogo clubId={row.clubId} size={20} />
           <span>{row.teamName}</span>
@@ -116,7 +116,7 @@ function StandingsRow({
       <td className="px-3 py-2.5 text-center tabular-nums">{row.lost}</td>
       <td className="px-3 py-2.5 text-center tabular-nums">{row.pointsFor}</td>
       <td className="px-3 py-2.5 text-center tabular-nums">{row.pointsAgainst}</td>
-      <td className={cn("px-3 py-2.5 text-center tabular-nums", row.pointsDiff > 0 ? "text-green-600" : row.pointsDiff < 0 ? "text-red-500" : "")}>
+      <td className={cn("px-3 py-2.5 text-center tabular-nums", row.pointsDiff > 0 ? "text-primary" : row.pointsDiff < 0 ? "text-destructive" : "")}>
         {row.pointsDiff > 0 ? `+${row.pointsDiff}` : row.pointsDiff}
       </td>
       <td className="px-3 py-2.5 text-center font-semibold tabular-nums">{row.leaguePoints}</td>

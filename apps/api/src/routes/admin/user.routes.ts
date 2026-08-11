@@ -1,17 +1,17 @@
 import { Hono } from "hono";
 import { describeRoute, validator } from "hono-openapi";
-import { getDb } from "../../config/database";
-import { user as userTable, referees } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
 import { requireAnyRole } from "../../middleware/rbac";
 import { validationHook } from "../../middleware/validation";
-import { userRefereeLinkBodySchema } from "@dragons/contracts";
+import { userIdParamSchema, userRefereeLinkBodySchema } from "@dragons/contracts";
+import { setUserRefereeLink } from "../../services/admin/user-admin.service";
+import type { AppEnv } from "../../types";
 
-const userRoutes = new Hono();
+const userRoutes = new Hono<AppEnv>();
 
 userRoutes.patch(
   "/users/:id/referee-link",
   requireAnyRole("admin"),
+  validator("param", userIdParamSchema, validationHook),
   validator("json", userRefereeLinkBodySchema, validationHook),
   describeRoute({
     description: "Link or unlink a referee record from a user account",
@@ -23,33 +23,9 @@ userRoutes.patch(
     },
   }),
   async (c) => {
-    const userId = c.req.param("id");
-    const body = c.req.valid("json");
-
-    // Validate referee exists if linking
-    if (body.refereeId !== null) {
-      const [referee] = await getDb()
-        .select({ id: referees.id })
-        .from(referees)
-        .where(eq(referees.id, body.refereeId))
-        .limit(1);
-
-      if (!referee) {
-        return c.json({ error: "Referee not found" }, 404);
-      }
-    }
-
-    const [updated] = await getDb()
-      .update(userTable)
-      .set({ refereeId: body.refereeId, updatedAt: new Date() })
-      .where(eq(userTable.id, userId))
-      .returning({ id: userTable.id, refereeId: userTable.refereeId });
-
-    if (!updated) {
-      return c.json({ error: "User not found" }, 404);
-    }
-
-    return c.json(updated);
+    const { id } = c.req.valid("param");
+    const { refereeId } = c.req.valid("json");
+    return c.json(await setUserRefereeLink(id, refereeId));
   },
 );
 

@@ -11,6 +11,12 @@ export const BOOKING_STATUSES = [
 ] as const;
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
+// State of one referee slot (SR1/SR2) on a federation fixture. Derived during
+// sync by `deriveSrStatus`, and set to "assigned"/"open" by the assignment
+// service — those are the only writers, so `refereeGames.sr{1,2}Status` carries
+// this as its `$type` rather than a bare `string`.
+export type RefereeSlotStatus = "open" | "offered" | "assigned";
+
 export const SYNC_STATUSES = [
   "pending",
   "running",
@@ -40,8 +46,7 @@ export const ENTRY_ACTIONS = [
 ] as const;
 export type EntryAction = (typeof ENTRY_ACTIONS)[number];
 
-export const DIFF_STATUSES = ["diverged", "synced", "local-only"] as const;
-export type DiffStatus = (typeof DIFF_STATUSES)[number];
+export type DiffStatus = "diverged" | "synced" | "local-only";
 
 // ── Validation Patterns ─────────────────────────────────────────────────────
 

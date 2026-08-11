@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import * as SecureStore from "expo-secure-store";
+import { localStorage } from "@/lib/local-storage";
 import {
   serializeFilters,
   parseFilters,
@@ -12,10 +12,12 @@ import {
 } from "@/lib/board/secure-store-keys";
 
 /**
- * Per-board filter persistence keyed by `board:<id>:filters`. Backed by
- * expo-secure-store (AsyncStorage is not installed in apps/native).
+ * Per-board filter persistence keyed by `board.<id>.filters`. Backed by
+ * plain AsyncStorage (`@/lib/local-storage`) — this is a preference, not a
+ * secret, and a large `assigneeIds` filter set could otherwise approach
+ * Android SecureStore's practical value-size ceiling.
  *
- * The sort mode is stored under `board:<id>:sort`. We expose two state
+ * The sort mode is stored under `board.<id>.sort`. We expose two state
  * tuples so screens can reuse the same hot-path memoisation.
  */
 
@@ -59,7 +61,7 @@ export function useBoardFilterPersistence(boardId: number) {
     let cancelled = false;
     hydratedRef.current = false;
     // A malformed id (NaN, non-positive) can't build a valid storage key —
-    // skip persistence entirely rather than throw inside SecureStore.
+    // skip persistence entirely rather than throw inside storage.
     if (!isPersistableBoardId(boardId)) {
       setState((s) => ({ ...s, hydrating: false }));
       hydratedRef.current = false;
@@ -69,8 +71,8 @@ export function useBoardFilterPersistence(boardId: number) {
     void (async () => {
       try {
         const [rawFilters, rawSort] = await Promise.all([
-          SecureStore.getItemAsync(boardFiltersKey(boardId)),
-          SecureStore.getItemAsync(boardSortKey(boardId)),
+          localStorage.getItem(boardFiltersKey(boardId)),
+          localStorage.getItem(boardSortKey(boardId)),
         ]);
         if (cancelled) return;
         const parsedFilters = parseFilters(rawFilters);
@@ -88,7 +90,7 @@ export function useBoardFilterPersistence(boardId: number) {
   // Persist filters whenever they change post-hydration.
   useEffect(() => {
     if (!hydratedRef.current || !isPersistableBoardId(boardId)) return;
-    void SecureStore.setItemAsync(
+    void localStorage.setItem(
       boardFiltersKey(boardId),
       serializeFilters(state.filters),
     );
@@ -97,7 +99,7 @@ export function useBoardFilterPersistence(boardId: number) {
   // Persist sort mode post-hydration.
   useEffect(() => {
     if (!hydratedRef.current || !isPersistableBoardId(boardId)) return;
-    void SecureStore.setItemAsync(boardSortKey(boardId), state.sort);
+    void localStorage.setItem(boardSortKey(boardId), state.sort);
   }, [boardId, state.sort]);
 
   const setFilters = useCallback(

@@ -1,6 +1,7 @@
 import type { ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
+import { AppError } from "../app-error";
 import { env } from "../config/env";
 import { logger as rootLogger } from "../config/logger";
 import type { AppEnv } from "../types";
@@ -25,15 +26,33 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
     );
   }
 
+  // Every typed service error. The status rides on the instance, so routes stay
+  // a single success path and no route holds an opinion about what a service's
+  // error code means.
+  if (error instanceof AppError) {
+    // A 5xx AppError is still a server fault and has to reach Cloud Error
+    // Reporting; without this it would skip the reporting path at the bottom.
+    if (error.status >= 500) {
+      const log = c.get("logger") ?? rootLogger;
+      log.error(
+        { err: error, stack_trace: error.stack, "@type": REPORTED_ERROR_TYPE },
+        error.message,
+      );
+    }
+    return c.json({ error: error.message, code: error.code }, error.status);
+  }
+
   if (error instanceof HTTPException) {
     const code =
-      error.status === 401
-        ? "UNAUTHORIZED"
-        : error.status === 403
-          ? "FORBIDDEN"
-          : error.status === 404
-            ? "NOT_FOUND"
-            : "HTTP_ERROR";
+      error.status === 400
+        ? "VALIDATION_ERROR"
+        : error.status === 401
+          ? "UNAUTHORIZED"
+          : error.status === 403
+            ? "FORBIDDEN"
+            : error.status === 404
+              ? "NOT_FOUND"
+              : "HTTP_ERROR";
     return c.json({ error: error.message, code }, error.status);
   }
 

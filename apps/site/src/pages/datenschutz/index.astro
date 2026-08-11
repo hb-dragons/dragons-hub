@@ -1,0 +1,242 @@
+---
+// Port of dragons-app app/pages/datenschutz/index.vue — legal content
+// hardcoded in the page by design (plan C4 port table).
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import SafeMail from "../../components/SafeMail.astro";
+import Layout from "../../layouts/Layout.astro";
+import { strings } from "../../lib/strings";
+---
+
+<Layout title={strings.datenschutz.heading} description={strings.seo.datenschutz}>
+  <PageHeader title={strings.datenschutz.heading} />
+
+  <PageContainer>
+    <header class="mb-10">
+      <h1 class="text-3xl font-bold tracking-tight">Datenschutzerklärung</h1>
+      <p class="mt-2 text-sm text-muted-foreground">Stand: 10. August 2025</p>
+    </header>
+
+    <div class="space-y-4">
+      <p>
+        Wir, der <strong>Hanover Basketball Dragons e.V.</strong>, informieren Sie nachfolgend über
+        die Verarbeitung personenbezogener Daten bei Besuch unserer Website und Nutzung unserer
+        Online-Angebote. Die Verarbeitung erfolgt gemäß DSGVO und BDSG.
+      </p>
+    </div>
+
+    <section id="verantwortlicher" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">1. Verantwortlicher</h2>
+      <div class="mt-3 space-y-1">
+        <p><strong>Hanover Basketball Dragons e.V.</strong></p>
+        <p>Kolbergstraße 7</p>
+        <p>30175 Hannover</p>
+        <p>
+          E-Mail:
+          <SafeMail email="info@hbdragons.de" />
+        </p>
+        <p>Vertreten durch den Vorstand gemäß § 26 BGB.</p>
+      </div>
+    </section>
+
+    <section id="allgemeines" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">2. Allgemeines zur Datenverarbeitung</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Wir verarbeiten personenbezogene Daten nur, soweit dies zur Bereitstellung einer
+          funktionsfähigen Website sowie unserer Inhalte und Leistungen erforderlich ist. Die
+          Verarbeitung erfolgt auf Basis der in Abschnitt
+          <a href="#rechtsgrundlagen" class="underline underline-offset-2">Rechtsgrundlagen</a>
+          genannten Vorschriften.
+        </p>
+      </div>
+    </section>
+
+    <section id="hosting" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">3. Hosting (IONOS &amp; Hetzner)</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Unsere Systeme werden auf Servern der
+          <strong>IONOS SE, Elgendorfer Straße 57, 56410 Montabaur, Deutschland</strong>, sowie der
+          <strong>Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Deutschland</strong>,
+          betrieben.
+        </p>
+        <p>
+          Über IONOS hosten wir u.a. unser Headless-CMS (Strapi). Hetzner wird für die
+          Bereitstellung unserer <strong>statischen Website</strong> sowie für den Betrieb unseres
+          <strong>Mail-Servers</strong> genutzt.
+        </p>
+        <p>
+          Die Provider verarbeiten technische Daten (z.&nbsp;B. IP-Adresse, Datum und Uhrzeit des
+          Zugriffs, angeforderte Ressource, HTTP-Status, übertragene Datenmenge, Referrer,
+          User-Agent), um die Bereitstellung und Sicherheit der Website sowie den E-Mail-Betrieb zu
+          gewährleisten.
+        </p>
+        <p>
+          <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an
+          einer sicheren und zuverlässigen Bereitstellung unserer Systeme).
+        </p>
+        <p>Mit IONOS und Hetzner bestehen Verträge über Auftragsverarbeitung gem. Art. 28 DSGVO.</p>
+      </div>
+    </section>
+
+    <section id="cookies" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">4. Verwendung von Cookies</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Unsere Website verwendet <strong>ausschließlich technisch notwendige Cookies</strong>
+          (z.&nbsp;B. Session-Cookies), die für die Funktionsfähigkeit der Seite erforderlich sind
+          (u.&nbsp;a. Sitzungsverwaltung, grundlegende Navigation). Tracking- oder Marketing-Cookies
+          setzen wir nicht ein.
+        </p>
+        <p>
+          <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an
+          der fehlerfreien Bereitstellung der Website). Ein Cookie-Banner ist daher nicht
+          erforderlich.
+        </p>
+        <p class="text-sm text-muted-foreground">
+          Hinweis: Die Speicherdauer technisch notwendiger Cookies ist auf die jeweilige Sitzung
+          oder einen kurzen, zweckgebundenen Zeitraum beschränkt.
+        </p>
+      </div>
+    </section>
+
+    <section id="kontaktformular" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">5. Kontaktformular / Probetraining</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Auf unserer Website stellen wir ein Formular zur Anmeldung für ein Probetraining bereit.
+          Dabei erheben und verarbeiten wir die folgenden Daten:
+        </p>
+        <ul class="list-disc pl-6">
+          <li>Geburtsmonat und Geburtsjahr</li>
+          <li>Geschlecht</li>
+          <li>E-Mail-Adresse</li>
+          <li>Ihre Nachricht (Freitext)</li>
+        </ul>
+        <p>
+          <strong>Zweck der Verarbeitung:</strong> Bearbeitung Ihrer Anfrage, Koordination des
+          Probetrainings sowie ggf. weitere organisatorische Kommunikation.
+        </p>
+        <p>
+          <strong>Speicherung und Empfänger:</strong> Die Angaben werden in unserem Headless-CMS
+          <strong>Strapi</strong> gespeichert (Betrieb über IONOS). Zusätzlich werden die
+          Formulardaten per <strong>E-Mail</strong> über unseren Mail-Server bei
+          <strong>Hetzner</strong> an uns übermittelt. Eine Weitergabe an Dritte findet nicht
+          statt.
+        </p>
+        <p>
+          <strong>Rechtsgrundlagen:</strong> Art. 6 Abs. 1 lit. b DSGVO (vorvertragliche Maßnahmen)
+          und Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an der Vereinsorganisation und
+          Beantwortung von Anfragen).
+        </p>
+        <p>
+          <strong>Speicherdauer:</strong> Die Daten werden spätestens 6 Monate nach Abschluss des
+          Probetrainings gelöscht, sofern keine Mitgliedschaft zustande kommt oder keine
+          gesetzlichen Aufbewahrungspflichten entgegenstehen.
+        </p>
+      </div>
+    </section>
+
+    <section id="server-logfiles" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">6. Server-Logfiles</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Die Hosting-Provider (IONOS und Hetzner) erheben und speichern automatisch Informationen
+          in sogenannten Server-Logfiles, die Ihr Browser automatisch übermittelt. Dazu gehören
+          insbesondere IP-Adresse, Datum und Uhrzeit, Zeitzonendifferenz, aufgerufene URL,
+          HTTP-Statuscode, jeweils übertragene Datenmenge, Referrer-URL sowie Browsertyp/-version
+          und Betriebssystem.
+        </p>
+        <p>
+          <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an
+          der technischen Bereitstellung und Sicherheit, insbesondere zur Abwehr und Aufklärung von
+          Missbrauchs- oder Angriffsszenarien).
+        </p>
+      </div>
+    </section>
+
+    <section id="sicherheit" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">
+        7. Sicherheit (SSL/TLS &amp; technische/organisatorische Maßnahmen)
+      </h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Wir verwenden für die <strong>gesamte Kommunikation SSL/TLS-Verschlüsselung</strong>.
+          Eine verschlüsselte Verbindung erkennen Sie u.&nbsp;a. an „https://“ und dem
+          Schloss-Symbol in der Adresszeile Ihres Browsers. Dadurch können Daten, die Sie an uns
+          übermitteln, nicht von Dritten mitgelesen werden.
+        </p>
+        <p>
+          Darüber hinaus setzen wir angemessene technische und organisatorische Maßnahmen (TOMs)
+          ein, um Ihre Daten gegen Manipulation, Verlust, Zerstörung oder unbefugten Zugriff zu
+          schützen. Unsere Maßnahmen werden entsprechend der technologischen Entwicklung
+          fortlaufend angepasst.
+        </p>
+      </div>
+    </section>
+
+    <section id="rechtsgrundlagen" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">8. Rechtsgrundlagen im Überblick</h2>
+      <ul class="mt-3 list-disc space-y-2 pl-6">
+        <li>
+          <strong>Art. 6 Abs. 1 lit. b DSGVO</strong> – Erforderlichkeit zur Durchführung
+          vorvertraglicher Maßnahmen (Probetraining-Anfragen).
+        </li>
+        <li>
+          <strong>Art. 6 Abs. 1 lit. f DSGVO</strong> – Berechtigtes Interesse (Bereitstellung der
+          Website, Sicherheit, technisch notwendige Cookies, Bearbeitung allgemeiner Anfragen).
+        </li>
+        <li>
+          <strong>Art. 28 DSGVO</strong> – Auftragsverarbeitung (Hosting durch IONOS und Hetzner).
+        </li>
+      </ul>
+    </section>
+
+    <section id="rechte" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">9. Rechte der betroffenen Personen</h2>
+      <div class="mt-3 space-y-4">
+        <p>Betroffene Personen haben folgende Rechte nach der DSGVO:</p>
+        <ul class="list-disc pl-6">
+          <li>Auskunft (Art. 15 DSGVO)</li>
+          <li>Berichtigung (Art. 16 DSGVO)</li>
+          <li>Löschung (Art. 17 DSGVO)</li>
+          <li>Einschränkung der Verarbeitung (Art. 18 DSGVO)</li>
+          <li>Datenübertragbarkeit (Art. 20 DSGVO)</li>
+          <li>Widerspruch (Art. 21 DSGVO)</li>
+          <li>Beschwerde bei einer Aufsichtsbehörde (Art. 77 DSGVO)</li>
+        </ul>
+        <div class="rounded-lg border border-border p-4">
+          <p class="font-medium">Zuständige Aufsichtsbehörde (Niedersachsen)</p>
+          <p>
+            Landesbeauftragte für den Datenschutz Niedersachsen<br />Prinzenstraße 5, 30159
+            Hannover<br />
+            E-Mail:
+            <a href="mailto:poststelle@lfd.niedersachsen.de" class="underline underline-offset-2"
+              >poststelle@lfd.niedersachsen.de</a
+            >
+          </p>
+        </div>
+        <p>
+          Wenn Sie eines Ihrer Rechte ausüben möchten, wenden Sie sich bitte an uns (siehe
+          <a href="#verantwortlicher" class="underline underline-offset-2">Verantwortlicher</a>).
+        </p>
+      </div>
+    </section>
+
+    <section id="aenderungen" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">10. Änderungen dieser Datenschutzerklärung</h2>
+      <p class="mt-3">
+        Wir behalten uns vor, diese Datenschutzerklärung anzupassen, damit sie stets den aktuellen
+        rechtlichen Anforderungen entspricht oder um Änderungen unserer Leistungen in der Erklärung
+        umzusetzen.
+      </p>
+    </section>
+  </PageContainer>
+</Layout>
+
+<style>
+  section :is(h1, h2, h3) {
+    scroll-margin-top: 6rem;
+  }
+</style>

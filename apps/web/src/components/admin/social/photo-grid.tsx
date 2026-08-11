@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Plus, Loader2, X, Check } from "lucide-react";
 import {
   AlertDialog,
@@ -67,6 +68,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
   label,
   aspectRatio,
 }: PhotoGridProps<T>) {
+  const t = useTranslations("socialWizard");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
 
       onUploadComplete();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload fehlgeschlagen");
+      setError(err instanceof Error ? err.message : t("uploadFailed"));
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -104,12 +106,12 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
       await browserClient.delete(`${deleteEndpoint}/${deleteTarget.id}`);
       onDelete(deleteTarget);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+      setError(err instanceof Error ? err.message : t("deleteFailed"));
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
     }
-  }, [deleteTarget, deleteEndpoint, onDelete]);
+  }, [deleteTarget, deleteEndpoint, onDelete, t]);
 
   return (
     <div className="space-y-2">
@@ -156,8 +158,8 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
               {/* Delete button — sibling to select button for valid HTML */}
               <button
                 type="button"
-                aria-label={`${item.originalName} löschen`}
-                className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-red-400 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-black/90 hover:text-red-300"
+                aria-label={t("deleteItemAria", { name: item.originalName })}
+                className="absolute top-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-foreground/70 text-destructive opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-foreground/90"
                 onClick={() => setDeleteTarget(item)}
               >
                 <X className="h-3.5 w-3.5" />
@@ -173,7 +175,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
           disabled={uploading}
           style={{ aspectRatio }}
           className="flex items-center justify-center rounded-md border border-dashed bg-muted text-muted-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Bild hochladen"
+          aria-label={t("uploadImageAria")}
         >
           {uploading ? (
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -195,13 +197,13 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Bild löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteImageTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              &bdquo;{deleteTarget?.originalName}&rdquo; wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+              {t("deleteImageDescription", { name: deleteTarget?.originalName ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { void handleConfirmDelete(); }}
               disabled={deleting}
@@ -210,7 +212,7 @@ export function PhotoGrid<T extends { id: number; filename: string; originalName
               {deleting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
-              Löschen
+              {t("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

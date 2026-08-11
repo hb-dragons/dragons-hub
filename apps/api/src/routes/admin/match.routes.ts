@@ -19,6 +19,7 @@ import {
   releaseOverrideParamsSchema,
 } from "@dragons/contracts";
 import { getActiveSeasonId } from "../../services/admin/season.service";
+import { NO_SEASON } from "../../services/season-scope";
 
 const matchRoutes = new Hono<AppEnv>();
 
@@ -34,7 +35,7 @@ matchRoutes.get(
   }),
   async (c) => {
     const query = c.req.valid("query");
-    const seasonId = query.seasonId ?? (await getActiveSeasonId()) ?? -1;
+    const seasonId = query.seasonId ?? (await getActiveSeasonId()) ?? NO_SEASON;
     const result = await getOwnClubMatches({ ...query, seasonId });
     return c.json(result);
   },

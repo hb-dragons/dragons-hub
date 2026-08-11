@@ -30,6 +30,7 @@ vi.mock("../../config/logger", () => ({
 
 import { eventRoutes } from "./event.routes";
 import { errorHandler } from "../../middleware/error";
+import { EVENT_ENTITY_TYPES } from "@dragons/shared";
 
 // Test app with fake user context
 const app = new Hono<AppEnv>();
@@ -172,6 +173,34 @@ describe("GET /events", () => {
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
+  // Before #155 these three were bare `z.string()`, so a typo sailed through
+  // and matched zero rows — a silent empty page indistinguishable from a
+  // genuine no-results.
+  it.each([
+    ["type", "match.nonsense"],
+    ["entityType", "hall"],
+    ["source", "cron"],
+  ])("returns 400 for an unknown %s filter value", async (field, value) => {
+    const res = await app.request(`/events?${field}=${value}`);
+
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  // The listing has to stay able to reach system-event rows, which is why the
+  // filters enumerate the stored vocabulary and not the publishable one (#154).
+  it.each([
+    ["type", "admin.test_push"],
+    ["entityType", "user"],
+    ["entityType", "task"],
+  ])("accepts the stored-only %s value %s", async (field, value) => {
+    mocks.listDomainEvents.mockResolvedValue({ events: [], total: 0 });
+
+    const res = await app.request(`/events?${field}=${value}`);
+
+    expect(res.status).toBe(200);
+  });
+
   it("returns 400 for search exceeding 200 chars", async () => {
     const longSearch = "a".repeat(201);
     const res = await app.request(`/events?search=${longSearch}`);
@@ -229,6 +258,31 @@ describe("POST /events/trigger", () => {
       actor: "test-user-123",
     });
   });
+
+  // Structural guard: every EVENT_ENTITY_TYPES value must be replayable.
+  it.each(EVENT_ENTITY_TYPES)(
+    "accepts the shared entity type %s",
+    async (entityType) => {
+      mocks.triggerManualEvent.mockResolvedValue({ eventId: "01ABC" });
+
+      const res = await app.request("/events/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "task.assigned",
+          entityType,
+          entityId: 7,
+          entityName: "Book the hall",
+          deepLinkPath: "/admin/boards/1?task=7",
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      expect(mocks.triggerManualEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ entityType }),
+      );
+    },
+  );
 
   it("passes urgencyOverride when provided", async () => {
     mocks.triggerManualEvent.mockResolvedValue({ eventId: "01ABC" });

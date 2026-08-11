@@ -1,9 +1,23 @@
 import { getDb } from "../../config/database";
-import { refereeAssignmentRules, teams } from "@dragons/db/schema";
-import { eq, and } from "drizzle-orm";
-import type { RefereeRulesResponse, UpdateRefereeRulesBody } from "@dragons/shared";
+import { refereeAssignmentRules, referees, teams } from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
+import type { RefereeRulesResponse } from "@dragons/shared";
+import { RefereeSettingsError } from "../admin/referee-admin.errors";
 
 export async function getRulesForReferee(refereeId: number): Promise<RefereeRulesResponse> {
+  const [referee] = await getDb()
+    .select({ isOwnClub: referees.isOwnClub })
+    .from(referees)
+    .where(eq(referees.id, refereeId))
+    .limit(1);
+
+  if (!referee) {
+    throw new RefereeSettingsError("Referee not found", "NOT_FOUND");
+  }
+  if (!referee.isOwnClub) {
+    throw new RefereeSettingsError("Referee is not an own-club referee", "NOT_OWN_CLUB");
+  }
+
   const rows = await getDb()
     .select({
       id: refereeAssignmentRules.id,
@@ -18,73 +32,4 @@ export async function getRulesForReferee(refereeId: number): Promise<RefereeRule
     .where(eq(refereeAssignmentRules.refereeId, refereeId));
 
   return { rules: rows };
-}
-
-export async function updateRulesForReferee(
-  refereeId: number,
-  body: UpdateRefereeRulesBody,
-): Promise<RefereeRulesResponse> {
-  await getDb().transaction(async (tx) => {
-    await tx
-      .delete(refereeAssignmentRules)
-      .where(eq(refereeAssignmentRules.refereeId, refereeId));
-
-    if (body.rules.length > 0) {
-      const now = new Date();
-      await tx.insert(refereeAssignmentRules).values(
-        body.rules.map((rule) => ({
-          refereeId,
-          teamId: rule.teamId,
-          deny: rule.deny,
-          allowSr1: rule.allowSr1,
-          allowSr2: rule.allowSr2,
-          createdAt: now,
-          updatedAt: now,
-        })),
-      );
-    }
-  });
-
-  return getRulesForReferee(refereeId);
-}
-
-export async function hasAnyRules(refereeId: number): Promise<boolean> {
-  const rows = await getDb()
-    .select({ id: refereeAssignmentRules.id })
-    .from(refereeAssignmentRules)
-    .where(eq(refereeAssignmentRules.refereeId, refereeId))
-    .limit(1);
-
-  return rows.length > 0;
-}
-
-export async function getRuleForRefereeAndTeam(
-  refereeId: number,
-  teamId: number,
-): Promise<{ deny: boolean; allowSr1: boolean; allowSr2: boolean } | null> {
-  const [rule] = await getDb()
-    .select({
-      deny: refereeAssignmentRules.deny,
-      allowSr1: refereeAssignmentRules.allowSr1,
-      allowSr2: refereeAssignmentRules.allowSr2,
-    })
-    .from(refereeAssignmentRules)
-    .where(
-      and(
-        eq(refereeAssignmentRules.refereeId, refereeId),
-        eq(refereeAssignmentRules.teamId, teamId),
-      ),
-    )
-    .limit(1);
-
-  return rule ?? null;
-}
-
-export async function getAllowedTeamIdsForReferee(refereeId: number): Promise<number[]> {
-  const rows = await getDb()
-    .select({ teamId: refereeAssignmentRules.teamId })
-    .from(refereeAssignmentRules)
-    .where(eq(refereeAssignmentRules.refereeId, refereeId));
-
-  return rows.map((r) => r.teamId);
 }

@@ -1,0 +1,47 @@
+---
+// Port of dragons-app app/pages/dragons/projekte/index.vue + ProjectRows:
+// CMS page header (slug=projekte) over the shared ItemRows band and project
+// list; any layout blocks render below.
+import { getCollection } from "astro:content";
+
+import ItemRows, { type RowItem } from "../../../components/ItemRows.astro";
+import PageBlocks from "../../../components/page-blocks/PageBlocks.astro";
+import PageContainer from "../../../components/PageContainer.astro";
+import PageHeader from "../../../components/PageHeader.astro";
+import Layout from "../../../layouts/Layout.astro";
+import { cmsBaseUrl } from "../../../lib/media";
+import { publishedPage } from "../../../lib/pages";
+import { publishedOnly } from "../../../lib/published";
+import { pageSeo } from "../../../lib/seo";
+import { toSiteImage } from "../../../lib/site-image";
+import { strings } from "../../../lib/strings";
+
+const cmsBase = cmsBaseUrl();
+
+const page = publishedPage(await getCollection("pages"), "projekte");
+
+const headerTitle = page?.header?.title ?? strings.dragons.projekte.heading;
+const seo = pageSeo(page, cmsBase, strings.seo.projekte);
+
+const projects: RowItem[] = (await getCollection("projects", publishedOnly)).map(({ data }) => ({
+  name: data.title,
+  description: data.description,
+  logo: toSiteImage(data.image, cmsBase),
+  link: data.link,
+}));
+---
+
+<Layout title={headerTitle} description={seo.description} image={seo.image}>
+  <PageHeader title={headerTitle} image={toSiteImage(page?.header?.image, cmsBase)} />
+
+  <PageContainer>
+    <ItemRows
+      items={projects}
+      heroTitle={strings.dragons.projekte.heroTitle}
+      heroDescription={strings.dragons.projekte.heroDescription}
+      listTitle={strings.dragons.projekte.listTitle}
+      buttonLabel={strings.dragons.projekte.buttonLabel}
+    />
+    <PageBlocks layout={page?.layout} />
+  </PageContainer>
+</Layout>

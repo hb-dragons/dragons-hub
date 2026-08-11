@@ -2,7 +2,7 @@
   "name": "dragons-all",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.5.1",
+  "packageManager": "pnpm@11.21.0",
   "scripts": {
     "dev": "turbo dev --parallel",
     "build": "turbo build",
@@ -12,8 +12,10 @@
     "coverage": "turbo coverage",
     "check:ai-slop": "node scripts/check-ai-slop.mjs",
     "check:coverage-scripts": "node scripts/check-coverage-scripts.mjs",
+    "check:design-tokens": "node scripts/check-design-tokens.mjs",
+    "check:skipped-tests": "node scripts/check-skipped-tests.mjs",
     "check:i18n": "pnpm --filter @dragons/web i18n:check",
-    "security:audit": "pnpm audit --audit-level=high",
+    "security:audit": "pnpm audit --audit-level=high --ignore-registry-errors",
     "knip": "knip",
     "clean": "turbo clean",
     "seed:extract": "pnpm --filter @dragons/api exec tsx ../../scripts/extract-test-seed.ts"

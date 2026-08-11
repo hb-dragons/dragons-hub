@@ -1,4 +1,3 @@
-import { getColorPreset } from "@dragons/shared";
 import type { MatchDetail, MatchListItem } from "./types";
 
 export function formatMatchTime(timeStr: string): string {
@@ -53,11 +52,4 @@ export function getOpponentName(match: MatchListItem): string {
     return match.guestTeamName;
   }
   return match.homeTeamName;
-}
-
-// Re-export for admin badge usage: returns { bg, border, text } for current color scheme
-export function getTeamColor(teamName: string, badgeColor?: string | null) {
-  const preset = getColorPreset(badgeColor, teamName);
-  // Admin always uses dark mode style (dark bg, light text) for badge contrast
-  return preset.dark;
 }

@@ -321,9 +321,11 @@ describe("checklistItemUpdateBodySchema", () => {
     });
   });
 
-  it("strips unknown checkedBy field (derived from session, not body)", () => {
-    const result = checklistItemUpdateBodySchema.parse({ checkedBy: "admin" });
-    expect(result).not.toHaveProperty("checkedBy");
+  it("rejects a checkedBy field (derived from session, not body)", () => {
+    // Strict schema: a field the server owns is a 400, not a silent strip.
+    expect(checklistItemUpdateBodySchema.safeParse({ checkedBy: "admin" }).success).toBe(
+      false,
+    );
   });
 
   it("accepts empty object", () => {
@@ -349,12 +351,10 @@ describe("commentCreateBodySchema (session-author)", () => {
     expect(result.success).toBe(true);
   });
 
-  it("does not expose an authorId field in parsed output", () => {
+  it("rejects an authorId field (the author is the session user)", () => {
+    // Strict schema: a field the server owns is a 400, not a silent strip.
     const result = commentCreateBodySchema.safeParse({ body: "Hello", authorId: "x" });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data).not.toHaveProperty("authorId");
-    }
+    expect(result.success).toBe(false);
   });
 
   it("requires non-empty body", () => {

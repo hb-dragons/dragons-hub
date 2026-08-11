@@ -5,7 +5,7 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
 
 const statusValue = z.enum(["played", "cancelled", "forfeited"]);
-export type HistoryStatusValue = z.infer<typeof statusValue>;
+type HistoryStatusValue = z.infer<typeof statusValue>;
 
 // Accept:
 //   - undefined | "" | "all"   → []

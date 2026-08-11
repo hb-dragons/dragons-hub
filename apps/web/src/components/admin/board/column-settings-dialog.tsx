@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { useSWRConfig } from "swr";
-import { api } from "@/lib/api";
-import { SWR_KEYS } from "@/lib/swr-keys";
+import { useColumnMutations } from "@/hooks/use-column-mutations";
 import { Button } from "@dragons/ui/components/button";
 import { Input } from "@dragons/ui/components/input";
 import { Label } from "@dragons/ui/components/label";
@@ -17,6 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@dragons/ui/components/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@dragons/ui/components/alert-dialog";
 import { Loader2, Trash2 } from "lucide-react";
 import type { BoardColumnData } from "./types";
 
@@ -34,7 +42,7 @@ export function ColumnSettingsDialog({
   column,
 }: ColumnSettingsDialogProps) {
   const t = useTranslations();
-  const { mutate } = useSWRConfig();
+  const { addColumn, updateColumn, deleteColumn } = useColumnMutations(boardId);
   const isEditing = column !== null;
 
   const [name, setName] = useState("");
@@ -42,6 +50,7 @@ export function ColumnSettingsDialog({
   const [isDoneColumn, setIsDoneColumn] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (column) {
@@ -66,14 +75,14 @@ export function ColumnSettingsDialog({
       };
 
       if (isEditing) {
-        await api.boards.updateColumn(boardId, column.id, body);
+        await updateColumn(column.id, body);
       } else {
-        await api.boards.addColumn(boardId, body);
+        await addColumn(body);
       }
-      await mutate(SWR_KEYS.boardDetail(boardId));
       onOpenChange(false);
     } catch {
-      // Error surfaced by api.boards (toast handled upstream)
+      // useColumnMutations already toasted the failure; keep the dialog open
+      // so the user can retry or copy their input out.
     } finally {
       setSaving(false);
     }
@@ -83,12 +92,12 @@ export function ColumnSettingsDialog({
     if (!column) return;
     setDeleting(true);
     try {
-      await api.boards.deleteColumn(boardId, column.id);
-      await mutate(SWR_KEYS.boardDetail(boardId));
-      await mutate(SWR_KEYS.boardTasks(boardId));
+      await deleteColumn(column.id);
+      setConfirmDeleteOpen(false);
       onOpenChange(false);
     } catch {
-      // Error surfaced by api.boards (toast handled upstream)
+      // useColumnMutations already toasted the failure (the API refuses to
+      // delete a column that still holds tasks); keep both dialogs open.
     } finally {
       setDeleting(false);
     }
@@ -129,7 +138,7 @@ export function ColumnSettingsDialog({
               />
               {color && (
                 <span
-                  className="inline-block h-6 w-6 rounded-full border"
+                  className="border-border/20 inline-block h-6 w-6 rounded-full border"
                   style={{ backgroundColor: color }}
                 />
               )}
@@ -151,7 +160,7 @@ export function ColumnSettingsDialog({
             <Button
               type="button"
               variant="destructive"
-              onClick={() => { void handleDelete(); }}
+              onClick={() => setConfirmDeleteOpen(true)}
               disabled={deleting}
               className="mr-auto"
             >
@@ -175,6 +184,40 @@ export function ColumnSettingsDialog({
             {saving ? t("common.saving") : t("common.save")}
           </Button>
         </DialogFooter>
+
+        <AlertDialog
+          open={confirmDeleteOpen}
+          onOpenChange={setConfirmDeleteOpen}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t("board.delete.columnTitle")}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("board.delete.columnBody")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>
+                {t("board.delete.cancel")}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={(e) => {
+                  // Keep the confirmation open until the request settles so a
+                  // failure stays visible next to the action that caused it.
+                  e.preventDefault();
+                  void handleDelete();
+                }}
+              >
+                {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {t("board.delete.confirm")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

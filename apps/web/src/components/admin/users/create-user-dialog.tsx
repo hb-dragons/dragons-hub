@@ -22,13 +22,15 @@ import { Field, FieldLabel, FieldError } from "@dragons/ui/components/field"
 
 // Roles are assigned post-creation via the user actions dialog (T14).
 // New users start with no elevated access (role = null).
-const createUserSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-})
+function buildCreateUserSchema(t: ReturnType<typeof useTranslations>) {
+  return z.object({
+    name: z.string().min(1, t("users.validation.nameRequired")),
+    email: z.string().email(t("users.validation.emailInvalid")),
+    password: z.string().min(8, t("users.validation.passwordTooShort")),
+  })
+}
 
-type CreateUserFormValues = z.infer<typeof createUserSchema>
+type CreateUserFormValues = z.infer<ReturnType<typeof buildCreateUserSchema>>
 
 interface CreateUserDialogProps {
   open: boolean
@@ -45,7 +47,7 @@ export function CreateUserDialog({
   const [submitting, setSubmitting] = useState(false)
 
   const form = useForm<CreateUserFormValues>({
-    resolver: zodResolver(createUserSchema),
+    resolver: zodResolver(buildCreateUserSchema(t)),
     defaultValues: {
       name: "",
       email: "",
@@ -97,8 +99,9 @@ export function CreateUserDialog({
             name="name"
             render={({ field, fieldState }) => (
               <Field>
-                <FieldLabel>{t("users.createDialog.nameLabel")}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{t("users.createDialog.nameLabel")}</FieldLabel>
                 <Input
+                  id={field.name}
                   placeholder={t("users.createDialog.namePlaceholder")}
                   {...field}
                 />
@@ -111,8 +114,9 @@ export function CreateUserDialog({
             name="email"
             render={({ field, fieldState }) => (
               <Field>
-                <FieldLabel>{t("users.createDialog.emailLabel")}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{t("users.createDialog.emailLabel")}</FieldLabel>
                 <Input
+                  id={field.name}
                   type="email"
                   placeholder={t("users.createDialog.emailPlaceholder")}
                   {...field}
@@ -126,8 +130,9 @@ export function CreateUserDialog({
             name="password"
             render={({ field, fieldState }) => (
               <Field>
-                <FieldLabel>{t("users.createDialog.passwordLabel")}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{t("users.createDialog.passwordLabel")}</FieldLabel>
                 <Input
+                  id={field.name}
                   type="password"
                   placeholder={t("users.createDialog.passwordPlaceholder")}
                   {...field}

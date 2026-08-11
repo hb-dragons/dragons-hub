@@ -1,0 +1,102 @@
+---
+// Port of dragons-app app/pages/impressum/index.vue — legal content
+// hardcoded in the page by design (plan C4 port table).
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import SafeMail from "../../components/SafeMail.astro";
+import Layout from "../../layouts/Layout.astro";
+import { strings } from "../../lib/strings";
+---
+
+<Layout title={strings.impressum.heading} description={strings.seo.impressum}>
+  <PageHeader title={strings.impressum.heading} />
+
+  <PageContainer>
+    <header class="mb-10">
+      <h1 class="text-3xl font-bold tracking-tight">Impressum</h1>
+      <p class="mt-2 text-sm text-muted-foreground">Stand: 10. August 2025</p>
+    </header>
+
+    <p>Angaben gemäß § 5 TMG und – soweit einschlägig – § 55 Abs. 2 MStV.</p>
+
+    <section id="anbieter" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">1. Diensteanbieter</h2>
+      <div class="mt-3 space-y-1">
+        <p><strong>Hanover Basketball Dragons e.V.</strong></p>
+        <p>Kolbergstraße 7</p>
+        <p>30175 Hannover</p>
+        <p>Deutschland</p>
+      </div>
+    </section>
+
+    <section id="vertretung" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">2. Vertretungsberechtigter Vorstand (§ 26 BGB)</h2>
+      <p class="mt-3">Vertreten durch den Vorstand gemäß § 26 BGB:</p>
+      <ul class="mt-2 list-disc pl-6">
+        <li>Talha Dis, 1. Vorsitzender</li>
+        <li>Kianusch Pour Rahimi, stellv. Vorsitzender</li>
+      </ul>
+    </section>
+
+    <section id="kontakt" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">3. Kontakt</h2>
+      <div class="mt-3 space-y-1">
+        <p>
+          E-Mail:
+          <SafeMail email="info@hbdragons.de" />
+        </p>
+      </div>
+    </section>
+
+    <section id="register" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">4. Registereintrag</h2>
+      <div class="mt-3 space-y-1">
+        <p>Eingetragen im Vereinsregister des <strong>Amtsgericht Hannover</strong></p>
+        <p>Registernummer: <strong>VR201353</strong></p>
+      </div>
+    </section>
+
+    <section id="haftung" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">7. Haftung für Inhalte &amp; Links</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte auf diesen Seiten
+          nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir jedoch nicht
+          verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach
+          Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Verpflichtungen zur
+          Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen
+          bleiben hiervon unberührt. Eine diesbezügliche Haftung ist jedoch erst ab dem Zeitpunkt
+          der Kenntnis einer konkreten Rechtsverletzung möglich.
+        </p>
+        <p>
+          Unser Angebot enthält ggf. Links zu externen Websites Dritter, auf deren Inhalte wir
+          keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr
+          übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder
+          Betreiber der Seiten verantwortlich. Rechtswidrige Inhalte waren zum Zeitpunkt der
+          Verlinkung nicht erkennbar. Eine permanente inhaltliche Kontrolle der verlinkten Seiten
+          ist jedoch ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei
+          Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen.
+        </p>
+      </div>
+    </section>
+
+    <section id="urheberrecht" class="scroll-mt-24">
+      <h2 class="text-2xl font-semibold">8. Urheberrecht / Bildnachweise</h2>
+      <div class="mt-3 space-y-4">
+        <p>
+          Die durch die Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen
+          dem deutschen Urheberrecht. Beiträge Dritter sind als solche gekennzeichnet. Die
+          Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der
+          Grenzen des Urheberrechts bedürfen der schriftlichen Zustimmung des jeweiligen Autors
+          bzw. Erstellers.
+        </p>
+      </div>
+    </section>
+  </PageContainer>
+</Layout>
+
+<style>
+  section :is(h1, h2, h3) {
+    scroll-margin-top: 6rem;
+  }
+</style>

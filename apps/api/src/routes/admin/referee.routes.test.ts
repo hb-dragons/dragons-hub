@@ -4,25 +4,13 @@ import type { AppEnv } from "../../types";
 
 // --- Mocks (hoisted before imports) ---
 
-const mocks = vi.hoisted(() => {
-  class RefereeSettingsError extends Error {
-    constructor(
-      message: string,
-      public readonly code: "NOT_FOUND" | "NOT_OWN_CLUB" | "VALIDATION_ERROR",
-    ) {
-      super(message);
-      this.name = "RefereeSettingsError";
-    }
-  }
-  return {
-    getReferees: vi.fn(),
-    getRefereeCounts: vi.fn(),
-    getRefereeById: vi.fn(),
-    updateRefereeVisibility: vi.fn(),
-    updateRefereeRules: vi.fn(),
-    RefereeSettingsError,
-  };
-});
+const mocks = vi.hoisted(() => ({
+  getReferees: vi.fn(),
+  getRefereeCounts: vi.fn(),
+  getRefereeById: vi.fn(),
+  updateRefereeVisibility: vi.fn(),
+  updateRefereeRules: vi.fn(),
+}));
 
 vi.mock("../../services/admin/referee-admin.service", () => ({
   getReferees: mocks.getReferees,
@@ -30,7 +18,6 @@ vi.mock("../../services/admin/referee-admin.service", () => ({
   getRefereeById: mocks.getRefereeById,
   updateRefereeVisibility: mocks.updateRefereeVisibility,
   updateRefereeRules: mocks.updateRefereeRules,
-  RefereeSettingsError: mocks.RefereeSettingsError,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -47,6 +34,11 @@ vi.mock("../../config/logger", () => ({
 
 import { refereeRoutes } from "./referee.routes";
 import { errorHandler } from "../../middleware/error";
+// The real class, deliberately not mocked: errorHandler maps it by
+// `instanceof AppError`, so a stand-in `extends Error` double would fall
+// through to a 500 and these status assertions would test nothing. The errors
+// module is a leaf with no database imports, so using it here is free.
+import { RefereeSettingsError } from "../../services/admin/referee-admin.errors";
 
 // Test app without auth middleware
 const app = new Hono<AppEnv>();
@@ -61,6 +53,35 @@ function json(response: Response) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("id param validation (shared envelope)", () => {
+  // Paths are relative to this file's mount point ("/"), not the app's
+  // "/admin" prefix in routes/index.ts — this test app mounts refereeRoutes
+  // at "/" directly, matching every other test in this file.
+  //
+  // Bodies must satisfy each PATCH handler's own body schema (both
+  // z.strictObject with required fields). An empty `{}` would fail body
+  // validation before the handler's id guard ever runs, and the JSON
+  // validator's rejection shape happens to also be
+  // { code: "VALIDATION_ERROR", details: [...] } — so the test would pass
+  // without ever exercising the id param, for the wrong reason.
+  it.each([
+    ["PATCH", "/referees/abc/visibility", { allowAllHomeGames: true, allowAwayGames: false, isOwnClub: true }],
+    ["PATCH", "/referees/abc/rules", { rules: [] }],
+    ["GET", "/referees/abc", undefined],
+  ])("%s %s rejects a non-numeric id with the shared envelope", async (method, path, body) => {
+    const res = await app.request(path, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: expect.any(Array),
+    });
+  });
 });
 
 describe("GET /referees", () => {
@@ -236,8 +257,7 @@ describe("PATCH /referees/:id/visibility", () => {
 
     expect(res.status).toBe(400);
     const body = await json(res);
-    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
-    expect(body.error).toBe("Invalid referee ID");
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR", details: expect.any(Array) });
   });
 
   it("returns 400 for negative referee ID", async () => {
@@ -249,8 +269,7 @@ describe("PATCH /referees/:id/visibility", () => {
 
     expect(res.status).toBe(400);
     const body = await json(res);
-    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
-    expect(body.error).toBe("Invalid referee ID");
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR", details: expect.any(Array) });
   });
 
   it("returns 400 for invalid body", async () => {
@@ -266,7 +285,7 @@ describe("PATCH /referees/:id/visibility", () => {
 
   it("returns 404 for non-existent referee via RefereeSettingsError", async () => {
     mocks.updateRefereeVisibility.mockRejectedValue(
-      new mocks.RefereeSettingsError("Referee 999 not found", "NOT_FOUND"),
+      new RefereeSettingsError("Referee 999 not found", "NOT_FOUND"),
     );
 
     const res = await app.request("/referees/999/visibility", {
@@ -348,13 +367,12 @@ describe("PATCH /referees/:id/rules", () => {
     });
     expect(res.status).toBe(400);
     const body = await json(res);
-    expect(body).toMatchObject({ code: "VALIDATION_ERROR" });
-    expect(body.error).toBe("Invalid referee ID");
+    expect(body).toMatchObject({ code: "VALIDATION_ERROR", details: expect.any(Array) });
   });
 
   it("returns 404 when service throws NOT_FOUND", async () => {
     mocks.updateRefereeRules.mockRejectedValue(
-      new mocks.RefereeSettingsError("Referee 999 not found", "NOT_FOUND"),
+      new RefereeSettingsError("Referee 999 not found", "NOT_FOUND"),
     );
     const res = await app.request("/referees/999/rules", {
       method: "PATCH",
@@ -367,7 +385,7 @@ describe("PATCH /referees/:id/rules", () => {
 
   it("returns 400 when service throws NOT_OWN_CLUB", async () => {
     mocks.updateRefereeRules.mockRejectedValue(
-      new mocks.RefereeSettingsError("Referee is not an own-club referee", "NOT_OWN_CLUB"),
+      new RefereeSettingsError("Referee is not an own-club referee", "NOT_OWN_CLUB"),
     );
     const res = await app.request("/referees/1/rules", {
       method: "PATCH",
@@ -380,7 +398,7 @@ describe("PATCH /referees/:id/rules", () => {
 
   it("returns 400 when service throws VALIDATION_ERROR for invalid teamIds", async () => {
     mocks.updateRefereeRules.mockRejectedValue(
-      new mocks.RefereeSettingsError("Invalid or non-own-club team IDs: 99", "VALIDATION_ERROR"),
+      new RefereeSettingsError("Invalid or non-own-club team IDs: 99", "VALIDATION_ERROR"),
     );
     const res = await app.request("/referees/1/rules", {
       method: "PATCH",

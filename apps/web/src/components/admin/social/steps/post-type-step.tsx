@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@dragons/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@dragons/ui/components/card";
@@ -34,6 +35,8 @@ function ActionCard({
   loading: boolean;
   onClick: () => void;
 }) {
+  const t = useTranslations("socialWizard");
+  const locale = useLocale();
   const disabled = loading || option === null || option.matchCount === 0;
 
   return (
@@ -42,7 +45,7 @@ function ActionCard({
       disabled={disabled}
       onClick={onClick}
       className={[
-        "flex-1 rounded-lg border p-4 text-left transition-colors",
+        "flex-1 rounded-md border p-4 text-left transition-colors",
         disabled
           ? "cursor-not-allowed border-border bg-muted/50 opacity-50"
           : "cursor-pointer border-border bg-card hover:border-primary hover:bg-accent/5",
@@ -55,7 +58,10 @@ function ActionCard({
       ) : option !== null ? (
         <>
           <div className="mt-3 text-sm font-medium">
-            KW {option.week} · {option.dateFrom && formatDateRange(option.dateFrom, option.dateTo)}
+            {t("weekAndRange", {
+              week: option.week,
+              range: option.dateFrom ? formatDateRange(option.dateFrom, option.dateTo, locale) : "",
+            })}
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
             {option.matchCount} {countSuffix}
@@ -77,12 +83,13 @@ export function PostTypeStep({
   canNavigateNext,
   weekLabel,
 }: PostTypeStepProps) {
+  const t = useTranslations("socialWizard");
   const [showPicker, setShowPicker] = useState(false);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Social Post erstellen</CardTitle>
+        <CardTitle>{t("createTitle")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {error && (
@@ -94,17 +101,17 @@ export function PostTypeStep({
         <div className="flex gap-3">
           <ActionCard
             option={resultsOption}
-            typeLabel="Ergebnisse"
-            contextLabel="Letztes Wochenende"
-            countSuffix="Spiele mit Ergebnis"
+            typeLabel={t("resultsLabel")}
+            contextLabel={t("lastWeekendLabel")}
+            countSuffix={t("resultsCountSuffix")}
             loading={loading}
             onClick={() => resultsOption && onSelectCard("results", resultsOption)}
           />
           <ActionCard
             option={previewOption}
-            typeLabel="Vorschau"
-            contextLabel="Kommendes Wochenende"
-            countSuffix="Spiele geplant"
+            typeLabel={t("previewLabel")}
+            contextLabel={t("nextWeekendLabel")}
+            countSuffix={t("previewCountSuffix")}
             loading={loading}
             onClick={() => previewOption && onSelectCard("preview", previewOption)}
           />
@@ -116,18 +123,18 @@ export function PostTypeStep({
             onClick={() => setShowPicker((prev) => !prev)}
             className="text-sm text-primary hover:underline"
           >
-            {showPicker ? "Standardwoche" : "Andere Woche wählen"}
+            {showPicker ? t("defaultWeekLabel") : t("chooseOtherWeekLabel")}
           </button>
         </div>
 
         {showPicker && (
-          <div className="flex items-center justify-between rounded-lg bg-muted/50 px-2 py-2">
+          <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-2">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => onNavigateWeek("prev")}
               disabled={!canNavigatePrev}
-              aria-label="Vorherige Woche"
+              aria-label={t("prevWeekAria")}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -137,7 +144,7 @@ export function PostTypeStep({
               size="icon"
               onClick={() => onNavigateWeek("next")}
               disabled={!canNavigateNext}
-              aria-label="Nächste Woche"
+              aria-label={t("nextWeekAria")}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

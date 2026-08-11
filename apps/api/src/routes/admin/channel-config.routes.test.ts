@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   env: {
     WAHA_BASE_URL: "http://waha:3000",
     // SMTP vars not set — email provider is unconfigured
-  } as Record<string, string | undefined>,
+  } as Record<string, string | number | undefined>,
 }));
 
 vi.mock("../../services/admin/channel-config-admin.service", () => ({
@@ -52,6 +52,7 @@ vi.mock("../../config/logger", () => ({
 
 import { channelConfigRoutes } from "./channel-config.routes";
 import { errorHandler } from "../../middleware/error";
+import { CHANNEL_TYPES } from "@dragons/shared";
 
 const app = new Hono<AppEnv>();
 app.onError(errorHandler);
@@ -59,6 +60,19 @@ app.route("/", channelConfigRoutes);
 
 function json(response: Response) {
   return response.json();
+}
+
+/** A complete SMTP relay configuration, as `readSmtpSettings` requires it. */
+const FULL_SMTP_ENV = {
+  SMTP_HOST: "smtp.example.com",
+  SMTP_PORT: 587,
+  SMTP_USER: "noreply@example.com",
+  SMTP_PASSWORD: "secret",
+  SMTP_FROM: "Dragons <noreply@example.com>",
+} as const;
+
+function clearSmtpEnv() {
+  for (const key of Object.keys(FULL_SMTP_ENV)) delete mocks.env[key];
 }
 
 const sampleConfig = {
@@ -310,17 +324,61 @@ describe("DELETE /channel-configs/:id", () => {
 });
 
 describe("GET /channel-configs/providers", () => {
-  it("returns all three types with configured status", async () => {
+  it("returns every shared channel type with configured status", async () => {
     const res = await app.request("/channel-configs/providers");
 
     expect(res.status).toBe(200);
     const body = await json(res);
+    // Structural guard: the response must cover CHANNEL_TYPES exactly, so a
+    // channel type added to the shared array cannot go unreported.
+    expect(Object.keys(body).sort()).toEqual([...CHANNEL_TYPES].sort());
     expect(body).toEqual({
       in_app: { configured: true },
       whatsapp_group: { configured: true },
+      push: { configured: true },
       email: { configured: false },
+      webhook: { configured: false },
     });
   });
+
+  it("reports webhook as configured once GH_DISPATCH_TOKEN is set", async () => {
+    mocks.env.GH_DISPATCH_TOKEN = "ghp_test";
+    try {
+      const res = await app.request("/channel-configs/providers");
+
+      expect((await json(res)).webhook).toEqual({ configured: true });
+    } finally {
+      delete mocks.env.GH_DISPATCH_TOKEN;
+    }
+  });
+
+  it("reports email as configured once every SMTP var is set", async () => {
+    Object.assign(mocks.env, FULL_SMTP_ENV);
+    try {
+      const res = await app.request("/channel-configs/providers");
+
+      expect((await json(res)).email).toEqual({ configured: true });
+    } finally {
+      clearSmtpEnv();
+    }
+  });
+
+  // The provider gate applies the same all-or-nothing rule the adapter does,
+  // so a half-configured relay is never advertised as usable.
+  it.each(Object.keys(FULL_SMTP_ENV))(
+    "reports email as unconfigured when only %s is missing",
+    async (missing) => {
+      Object.assign(mocks.env, FULL_SMTP_ENV);
+      delete mocks.env[missing];
+      try {
+        const res = await app.request("/channel-configs/providers");
+
+        expect((await json(res)).email).toEqual({ configured: false });
+      } finally {
+        clearSmtpEnv();
+      }
+    },
+  );
 
   it("in_app is always configured", async () => {
     // Even with empty env, in_app should be true
@@ -352,6 +410,60 @@ describe("POST /channel-configs (provider gate)", () => {
     expect(mocks.createChannelConfig).toHaveBeenCalled();
   });
 
+  it("creates a push channel config", async () => {
+    mocks.createChannelConfig.mockResolvedValue({
+      ...sampleConfig,
+      name: "Expo Push",
+      type: "push",
+      config: { provider: "expo" },
+    });
+
+    const res = await app.request("/channel-configs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Expo Push",
+        type: "push",
+        config: { provider: "expo" },
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(mocks.createChannelConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "push", config: { provider: "expo" } }),
+    );
+  });
+
+  it("creates an email channel config when SMTP is fully set", async () => {
+    Object.assign(mocks.env, FULL_SMTP_ENV);
+    mocks.createChannelConfig.mockResolvedValue({
+      ...sampleConfig,
+      name: "Email Channel",
+      type: "email",
+      config: { locale: "de" },
+    });
+    try {
+      const res = await app.request("/channel-configs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Email Channel",
+          type: "email",
+          config: { locale: "de" },
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      expect(mocks.createChannelConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "email", config: { locale: "de" } }),
+      );
+    } finally {
+      clearSmtpEnv();
+    }
+  });
+
+  // The channel is offerable, but a config created against a relay that does
+  // not exist would black-hole every notification routed to it.
   it("returns 400 PROVIDER_NOT_CONFIGURED when email SMTP is not set", async () => {
     const res = await app.request("/channel-configs", {
       method: "POST",
@@ -364,11 +476,11 @@ describe("POST /channel-configs (provider gate)", () => {
     });
 
     expect(res.status).toBe(400);
-    const body = await json(res);
-    expect(body).toMatchObject({
+    expect(await json(res)).toMatchObject({
       error: 'Provider for "email" is not configured',
       code: "PROVIDER_NOT_CONFIGURED",
     });
+    expect(mocks.createChannelConfig).not.toHaveBeenCalled();
   });
 });
 
@@ -389,6 +501,30 @@ describe("PATCH /channel-configs/:id (typed config validation)", () => {
     expect(mocks.validateConfigForType).toHaveBeenCalledWith("in_app", {
       audienceRole: "admin",
       locale: "de",
+    });
+  });
+
+  it("persists the validated config, not the raw body", async () => {
+    mocks.getChannelConfig.mockResolvedValue({ ...sampleConfig, type: "in_app" });
+    // What the per-type schema returns: the same object with unknown keys gone.
+    mocks.validateConfigForType.mockReturnValue({ audienceRole: "admin", locale: "de" });
+    mocks.updateChannelConfig.mockResolvedValue(sampleConfig);
+
+    const res = await app.request("/channel-configs/1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Renamed",
+        config: { audienceRole: "admin", locale: "de", injected: "payload" },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    // The raw body — carrying `injected` — must never reach the jsonb column,
+    // which is typed `$type<ChannelConfig>()`.
+    expect(mocks.updateChannelConfig).toHaveBeenCalledWith(1, {
+      name: "Renamed",
+      config: { audienceRole: "admin", locale: "de" },
     });
   });
 

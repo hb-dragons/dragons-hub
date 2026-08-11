@@ -1,18 +1,18 @@
 import { z } from "zod";
 
-export const settingsClubConfigSchema = z.object({
+export const settingsClubConfigSchema = z.strictObject({
   clubId: z.number().int().positive(),
   clubName: z.string().min(1),
 });
 
-export const settingsBookingConfigSchema = z.object({
+export const settingsBookingConfigSchema = z.strictObject({
   bufferBefore: z.number().int().min(0),
   bufferAfter: z.number().int().min(0),
   gameDuration: z.number().int().positive(),
   dueDaysBefore: z.number().int().min(0),
 });
 
-export const settingsRefereeReminderSchema = z.object({
+export const settingsRefereeReminderSchema = z.strictObject({
   days: z.array(z.number().int().positive()).min(1).max(10),
 });
 

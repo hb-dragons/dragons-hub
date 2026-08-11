@@ -1,0 +1,40 @@
+---
+// Port of dragons-app app/pages/dragons/philosophie/index.vue. The legacy
+// page was a hardcoded "Coming soon"; here the CMS page (slug=philosophie)
+// may carry layout blocks — until it does, the ComingSoon section keeps
+// prod parity.
+import { getCollection } from "astro:content";
+
+import ComingSoon from "../../../components/ComingSoon.astro";
+import PageBlocks from "../../../components/page-blocks/PageBlocks.astro";
+import PageContainer from "../../../components/PageContainer.astro";
+import PageHeader from "../../../components/PageHeader.astro";
+import Layout from "../../../layouts/Layout.astro";
+import { cmsBaseUrl } from "../../../lib/media";
+import { publishedPage } from "../../../lib/pages";
+import { pageSeo } from "../../../lib/seo";
+import { toSiteImage } from "../../../lib/site-image";
+import { strings } from "../../../lib/strings";
+
+const cmsBase = cmsBaseUrl();
+
+const page = publishedPage(await getCollection("pages"), "philosophie");
+const blocks = page?.layout ?? [];
+
+const headerTitle = page?.header?.title ?? strings.dragons.philosophie.heading;
+const seo = pageSeo(page, cmsBase, strings.seo.philosophie);
+---
+
+<Layout title={headerTitle} description={seo.description} image={seo.image}>
+  <PageHeader title={headerTitle} image={toSiteImage(page?.header?.image, cmsBase)} />
+
+  {
+    blocks.length > 0 ? (
+      <PageContainer>
+        <PageBlocks layout={blocks} />
+      </PageContainer>
+    ) : (
+      <ComingSoon />
+    )
+  }
+</Layout>

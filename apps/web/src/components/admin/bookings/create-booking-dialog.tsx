@@ -6,6 +6,7 @@ import useSWR, { useSWRConfig } from "swr";
 import { api } from "@/lib/api";
 import { SWR_KEYS } from "@/lib/swr-keys";
 import { queries } from "@/lib/swr-queries";
+import { resolveVenueId, type SelectedVenue } from "@/lib/venue-selection";
 import {
   Dialog,
   DialogContent,
@@ -38,8 +39,11 @@ export function CreateBookingDialog({
   const venuesQ = queries.venues();
   const { data: venues } = useSWR(open ? venuesQ.key : null, venuesQ.fetcher);
 
-  const [venueId, setVenueId] = useState<number | null>(null);
+  const [selectedVenue, setSelectedVenue] = useState<SelectedVenue | null>(null);
   const [venueQuery, setVenueQuery] = useState("");
+  // Single source of truth: the id only survives while the visible text still
+  // names the venue that was picked.
+  const venueId = resolveVenueId(selectedVenue, venueQuery);
   const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -48,7 +52,7 @@ export function CreateBookingDialog({
   const [submitting, setSubmitting] = useState(false);
 
   function resetForm() {
-    setVenueId(null);
+    setSelectedVenue(null);
     setVenueQuery("");
     setDate("");
     setStartTime("");
@@ -78,7 +82,7 @@ export function CreateBookingDialog({
   );
 
   function handleSelectVenue(option: ComboboxOption) {
-    setVenueId(Number(option.value));
+    setSelectedVenue({ id: Number(option.value), label: option.label });
   }
 
   async function handleSubmit(e: React.FormEvent) {

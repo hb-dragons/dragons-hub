@@ -129,7 +129,12 @@ describe("broadcast/config", () => {
 
   it("setBroadcastLive(true) requires a matchId", async () => {
     await upsertBroadcastConfig({ deviceId: "d1" });
-    await expect(setBroadcastLive("d1", true)).rejects.toThrow(/MISSING_MATCH/);
+    // Assert on `code`, not the message: the message used to be the bare code
+    // and is now the human text the route previously substituted.
+    await expect(setBroadcastLive("d1", true)).rejects.toMatchObject({
+      code: "MISSING_MATCH",
+      status: 400,
+    });
   });
 
   it("setBroadcastLive sets startedAt/endedAt timestamps", async () => {

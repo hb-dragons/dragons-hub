@@ -44,6 +44,9 @@ jobs:
       - name: i18n completeness check
         run: pnpm check:i18n
 
+      - name: Design token check
+        run: pnpm check:design-tokens
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -54,6 +57,23 @@ jobs:
     name: Test & Coverage
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The API suite's DB coverage runs on in-process PGlite, but a few modules
+    # reach Redis for real: bullmq builds its own ioredis client from the
+    # connection URL rather than going through `config/redis`, so importing a
+    # worker module opens a socket to 6379. Without this service that socket
+    # rejection escapes as an unhandled rejection and fails the job even though
+    # every test passes — which is why CI has been red on main since 2026-06-18
+    # while local runs (with docker/docker-compose.dev.yml up) were green.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       TURBO_API: http://localhost:9080
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
@@ -75,6 +95,9 @@ jobs:
 
       - name: Coverage-script check
         run: pnpm check:coverage-scripts
+
+      - name: Skipped-test check
+        run: pnpm check:skipped-tests
 
       - name: Coverage
         run: pnpm coverage
@@ -110,6 +133,26 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  pi:
+    name: Pi Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install -r apps/pi/requirements-dev.txt
+
+      - name: Test
+        working-directory: apps/pi
+        run: pytest
 
   ai-slop:
     name: AI Slop Check
@@ -158,7 +201,7 @@ jobs:
   dependency-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -166,7 +209,13 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
+      # The audit itself takes ~2s; anything near this budget means pnpm's
+      # local audit path traversal has blown up again (issue #136), not that
+      # the registry is slow. Bounding the step rather than the job makes that
+      # distinction legible: a step timeout points here, a job timeout points
+      # at checkout/install.
       - name: Run vulnerability audit
+        timeout-minutes: 2
         run: pnpm security:audit
 
   secret-scan:

@@ -1,0 +1,7 @@
+# Uploaded by deploy-site.yml into every release as releases/<sha>/.htaccess.
+# It is the docroot file for site.testing.hbdragons.de; live traffic also
+# passes through here via current/, so the noindex header is host-gated.
+SetEnvIf Host ^site\.testing\. TESTING_HOST
+Header set X-Robots-Tag "noindex, nofollow" env=TESTING_HOST
+
+ErrorDocument 404 /404.html

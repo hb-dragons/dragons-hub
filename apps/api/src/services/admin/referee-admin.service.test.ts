@@ -1,62 +1,29 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from "vitest";
 
-const mockSelect = vi.fn();
-const mockSelectDistinct = vi.fn();
-const mockUpdate = vi.fn();
-const mockTransaction = vi.fn();
+// --- Mock setup ---
+//
+// drizzle-orm and @dragons/db/schema are deliberately NOT mocked. The previous
+// version of this file stubbed `eq`/`and`/`or`/`ilike`/`sql` with identity
+// functions and asserted `JSON.stringify(orderByArgs)).toMatch(/asc/i)` — so
+// inverting the own-club scope filter to `eq(referees.isOwnClub, false)`, or
+// dropping the `isNull(removedAt)` tombstone guard from the workload join, left
+// every test green. Everything below runs the real SQL (aggregate, join,
+// group-by, order-by) against an in-process PGlite Postgres, including the real
+// `getDb().transaction()`.
+
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockSelect(...args),
-    selectDistinct: (...args: unknown[]) => mockSelectDistinct(...args),
-    update: (...args: unknown[]) => mockUpdate(...args),
-    transaction: (cb: (tx: unknown) => unknown) => mockTransaction(cb),
-  }),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
-vi.mock("@dragons/db/schema", () => ({
-  referees: {
-    id: "r.id",
-    apiId: "r.apiId",
-    firstName: "r.fn",
-    lastName: "r.ln",
-    licenseNumber: "r.lic",
-    allowAllHomeGames: "r.aahg",
-    allowAwayGames: "r.aag",
-    isOwnClub: "r.ioc",
-    createdAt: "r.ca",
-    updatedAt: "r.ua",
-  },
-  refereeRoles: { id: "rr.id", name: "rr.name" },
-  matchReferees: {
-    refereeId: "mr.refId",
-    matchId: "mr.matchId",
-    roleId: "mr.roleId",
-  },
-  refereeAssignmentRules: {
-    id: "rar.id",
-    refereeId: "rar.refId",
-    teamId: "rar.teamId",
-    deny: "rar.deny",
-    allowSr1: "rar.sr1",
-    allowSr2: "rar.sr2",
-  },
-  teams: { id: "t.id", name: "t.name", isOwnClub: "t.ioc" },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  or: vi.fn((...args: unknown[]) => ({ or: args })),
-  ilike: vi.fn((...args: unknown[]) => ({ ilike: args })),
-  asc: vi.fn((...args: unknown[]) => ({ asc: args })),
-  desc: vi.fn((...args: unknown[]) => ({ desc: args })),
-  sql: Object.assign(vi.fn((...args: unknown[]) => {
-    const result = { sql: args, as: (alias: string) => ({ sql: args, alias }) };
-    return result;
-  }), { raw: vi.fn((...args: unknown[]) => ({ sql: args })) }),
-  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
-}));
+// --- Imports (after mocks) ---
 
 import {
   getReferees,
@@ -64,292 +31,415 @@ import {
   getRefereeCounts,
   updateRefereeVisibility,
   updateRefereeRules,
-  RefereeSettingsError,
 } from "./referee-admin.service";
+import { RefereeSettingsError } from "./referee-admin.errors";
+import {
+  matches,
+  matchReferees,
+  refereeAssignmentRules,
+  refereeRoles,
+  referees,
+  teams,
+} from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
-function makeDate(iso: string) {
-  return { toISOString: () => iso };
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
+
+// --- Helpers ---
+
+let apiIdSeq = 0;
+
+async function seedReferee(opts: {
+  firstName?: string;
+  lastName?: string;
+  isOwnClub?: boolean;
+  licenseNumber?: number;
+  allowAllHomeGames?: boolean;
+  allowAwayGames?: boolean;
+}): Promise<number> {
+  const [row] = await ctx.db
+    .insert(referees)
+    .values({
+      apiId: ++apiIdSeq + 1000,
+      firstName: opts.firstName ?? "First",
+      lastName: opts.lastName ?? "Last",
+      licenseNumber: opts.licenseNumber ?? null,
+      isOwnClub: opts.isOwnClub ?? false,
+      allowAllHomeGames: opts.allowAllHomeGames ?? false,
+      allowAwayGames: opts.allowAwayGames ?? false,
+    })
+    .returning({ id: referees.id });
+  return row!.id;
 }
 
-function buildChain(result: unknown) {
-  const chain: Record<string, unknown> = {};
-  const methods = [
-    "from",
-    "leftJoin",
-    "innerJoin",
-    "where",
-    "groupBy",
-    "orderBy",
-    "limit",
-    "offset",
-  ];
-  for (const m of methods) {
-    chain[m] = vi.fn().mockReturnValue(chain);
+async function seedTeam(opts: { name: string; isOwnClub: boolean }): Promise<number> {
+  const n = ++apiIdSeq;
+  const [row] = await ctx.db
+    .insert(teams)
+    .values({
+      apiTeamPermanentId: 5000 + n,
+      seasonTeamId: 6000 + n,
+      teamCompetitionId: 7000 + n,
+      name: opts.name,
+      clubId: 1,
+      isOwnClub: opts.isOwnClub,
+    })
+    .returning({ id: teams.id, apiTeamPermanentId: teams.apiTeamPermanentId });
+  return row!.id;
+}
+
+/** Seed `count` matches and assign `refereeId` to slot 1 of each. */
+async function assignMatches(
+  refereeId: number,
+  count: number,
+  opts: { removed?: boolean } = {},
+): Promise<void> {
+  const [role] = await ctx.db
+    .select({ id: refereeRoles.id })
+    .from(refereeRoles)
+    .limit(1);
+  const roleId =
+    role?.id ??
+    (
+      await ctx.db
+        .insert(refereeRoles)
+        .values({ apiId: 1, name: "Schiedsrichter", shortName: "SR" })
+        .returning({ id: refereeRoles.id })
+    )[0]!.id;
+
+  // Two teams shared by every match.
+  let teamRows = await ctx.db.select({ api: teams.apiTeamPermanentId }).from(teams).limit(2);
+  if (teamRows.length < 2) {
+    await seedTeam({ name: "Match home", isOwnClub: true });
+    await seedTeam({ name: "Match guest", isOwnClub: false });
+    teamRows = await ctx.db.select({ api: teams.apiTeamPermanentId }).from(teams).limit(2);
   }
-  // Make the chain thenable so Promise.all resolves it
-  chain.then = (resolve: (v: unknown) => void) => {
-    resolve(result);
-    return chain;
-  };
-  return chain;
+  const homeApi = teamRows[0]!.api;
+  const guestApi = teamRows[1]!.api;
+
+  for (let i = 0; i < count; i++) {
+    const n = ++apiIdSeq;
+    const [match] = await ctx.db
+      .insert(matches)
+      .values({
+        apiMatchId: 90000 + n,
+        matchNo: n,
+        matchDay: 1,
+        kickoffDate: "2026-01-15",
+        kickoffTime: "18:00:00",
+        homeTeamApiId: homeApi,
+        guestTeamApiId: guestApi,
+      })
+      .returning({ id: matches.id });
+    await ctx.db.insert(matchReferees).values({
+      matchId: match!.id,
+      refereeId,
+      roleId,
+      slotNumber: 1,
+      removedAt: opts.removed ? new Date() : null,
+    });
+  }
 }
 
-describe("getReferees scope + sort", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+// --- Tests ---
 
-  it("returns all referees when scope is 'all'", async () => {
-    const rows = [
-      {
-        id: 1,
-        apiId: 100,
-        firstName: "A",
-        lastName: "Z",
-        licenseNumber: 1,
-        allowAllHomeGames: false,
-        allowAwayGames: false,
-        isOwnClub: true,
-        matchCount: 5,
-        createdAt: makeDate("2025-01-01T00:00:00.000Z"),
-        updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
-      },
-      {
-        id: 2,
-        apiId: 200,
-        firstName: "B",
-        lastName: "Y",
-        licenseNumber: 2,
-        allowAllHomeGames: false,
-        allowAwayGames: false,
-        isOwnClub: false,
-        matchCount: 3,
-        createdAt: makeDate("2025-01-03T00:00:00.000Z"),
-        updatedAt: makeDate("2025-01-04T00:00:00.000Z"),
-      },
-    ];
-    const countResult = [{ count: 2 }];
-
-    const dataChain = buildChain(rows);
-    const countChain = buildChain(countResult);
-
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
+describe("getReferees — scope", () => {
+  it("returns every referee when scope is 'all'", async () => {
+    await seedReferee({ lastName: "Own", isOwnClub: true });
+    await seedReferee({ lastName: "Foreign", isOwnClub: false });
 
     const result = await getReferees({ limit: 50, offset: 0, scope: "all" });
 
-    expect(result.items).toHaveLength(2);
     expect(result.total).toBe(2);
-    expect(result.items.some((r) => !r.isOwnClub)).toBe(true);
-    expect(result.items[0]).not.toHaveProperty("roles");
-    expect(mockSelectDistinct).not.toHaveBeenCalled();
+    expect(result.items.map((r) => r.lastName).sort()).toEqual(["Foreign", "Own"]);
   });
 
-  it("filters to own-club when scope is 'own'", async () => {
-    const rows = [
-      {
-        id: 1,
-        apiId: 100,
-        firstName: "A",
-        lastName: "Z",
-        licenseNumber: 1,
-        allowAllHomeGames: false,
-        allowAwayGames: false,
-        isOwnClub: true,
-        matchCount: 5,
-        createdAt: makeDate("2025-01-01T00:00:00.000Z"),
-        updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
-      },
-    ];
-    const countResult = [{ count: 1 }];
-
-    const dataChain = buildChain(rows);
-    const countChain = buildChain(countResult);
-
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
+  it("returns only own-club referees when scope is 'own'", async () => {
+    await seedReferee({ lastName: "Own", isOwnClub: true });
+    await seedReferee({ lastName: "Foreign", isOwnClub: false });
 
     const result = await getReferees({ limit: 50, offset: 0, scope: "own" });
 
-    expect(result.items).toHaveLength(1);
-    expect(result.items[0]?.isOwnClub).toBe(true);
+    expect(result.total).toBe(1);
+    expect(result.items.map((r) => r.lastName)).toEqual(["Own"]);
+    expect(result.items[0]!.isOwnClub).toBe(true);
+  });
+});
+
+describe("getReferees — search", () => {
+  it("matches on first name, case-insensitively", async () => {
+    await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+    await seedReferee({ firstName: "Bernd", lastName: "Yilmaz", isOwnClub: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "anna" });
+
+    expect(result.items.map((r) => r.firstName)).toEqual(["Anna"]);
+    expect(result.total).toBe(1);
   });
 
-  it("orders by ascending workload when sort is 'workloadAsc'", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
+  it("matches on last name too (OR, not AND)", async () => {
+    await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+    await seedReferee({ firstName: "Bernd", lastName: "Yilmaz", isOwnClub: true });
 
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "yilm" });
 
-    await getReferees({ limit: 50, offset: 0, scope: "own", sort: "workloadAsc" });
-
-    // The chain's orderBy was called — verify via the chain mock
-    expect(dataChain.orderBy).toHaveBeenCalled();
-    const orderByArgs = (dataChain.orderBy as ReturnType<typeof vi.fn>).mock.calls[0];
-    // drizzle-orm asc/desc mocks return { asc: [...] } / { desc: [...] }
-    expect(JSON.stringify(orderByArgs)).toMatch(/asc/i);
+    expect(result.items.map((r) => r.lastName)).toEqual(["Yilmaz"]);
   });
 
-  it("orders by descending workload when sort is 'workloadDesc'", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
+  it("ANDs the scope filter with the search filter", async () => {
+    await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+    await seedReferee({ firstName: "Anna", lastName: "Fremd", isOwnClub: false });
 
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
+    const result = await getReferees({ limit: 50, offset: 0, scope: "own", search: "anna" });
 
-    await getReferees({ limit: 50, offset: 0, scope: "all", sort: "workloadDesc" });
-
-    expect(dataChain.orderBy).toHaveBeenCalled();
-    const orderByArgs = (dataChain.orderBy as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(JSON.stringify(orderByArgs)).toMatch(/desc/i);
+    expect(result.items.map((r) => r.lastName)).toEqual(["Zimmer"]);
+    expect(result.total).toBe(1);
   });
 
-  it("returns empty results when total is 0", async () => {
-    const dataChain = buildChain([]);
-    const countChain = buildChain([{ count: 0 }]);
+  // Without escapeLikePattern the search string is spliced straight into a LIKE
+  // pattern, so `%` matches everything and `_` matches any character — an
+  // admin-facing wildcard nobody asked for.
+  it("treats a bare % as a literal character, not a wildcard", async () => {
+    await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+    await seedReferee({ firstName: "Bernd", lastName: "Yilmaz", isOwnClub: true });
 
-    mockSelect
-      .mockReturnValueOnce(dataChain)
-      .mockReturnValueOnce(countChain);
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "%" });
 
+    // Unescaped, `%…%` would return both referees; the count follows the same
+    // predicate, so both the page and the total have to come back empty.
+    expect(result.items).toEqual([]);
+    expect(result.total).toBe(0);
+  });
+
+  it("treats _ as a literal character, not a single-character wildcard", async () => {
+    await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "A_na" });
+
+    expect(result.items).toEqual([]);
+  });
+
+  it("finds a name that genuinely contains an underscore", async () => {
+    await seedReferee({ firstName: "A_na", lastName: "Zimmer", isOwnClub: true });
+    await seedReferee({ firstName: "Anna", lastName: "Yilmaz", isOwnClub: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "A_na" });
+
+    expect(result.items.map((r) => r.firstName)).toEqual(["A_na"]);
+  });
+
+  it("treats a backslash as a literal character", async () => {
+    await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all", search: "\\" });
+
+    expect(result.items).toEqual([]);
+  });
+});
+
+describe("getReferees — workload", () => {
+  it("counts distinct live assignments and ignores tombstoned ones", async () => {
+    const busy = await seedReferee({ lastName: "Busy", isOwnClub: true });
+    const idle = await seedReferee({ lastName: "Idle", isOwnClub: true });
+    await assignMatches(busy, 3);
+    await assignMatches(idle, 2, { removed: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all" });
+    const byName = new Map(result.items.map((r) => [r.lastName, r.matchCount]));
+
+    expect(byName.get("Busy")).toBe(3);
+    expect(byName.get("Idle")).toBe(0);
+  });
+
+  it("sorts by ascending workload when sort is 'workloadAsc'", async () => {
+    const a = await seedReferee({ lastName: "Alpha", isOwnClub: true });
+    const b = await seedReferee({ lastName: "Bravo", isOwnClub: true });
+    const c = await seedReferee({ lastName: "Charlie", isOwnClub: true });
+    await assignMatches(b, 1);
+    await assignMatches(c, 4);
+    void a;
+
+    const result = await getReferees({
+      limit: 50,
+      offset: 0,
+      scope: "own",
+      sort: "workloadAsc",
+    });
+
+    expect(result.items.map((r) => r.lastName)).toEqual(["Alpha", "Bravo", "Charlie"]);
+    expect(result.items.map((r) => r.matchCount)).toEqual([0, 1, 4]);
+  });
+
+  it("sorts by descending workload when sort is 'workloadDesc'", async () => {
+    const a = await seedReferee({ lastName: "Alpha", isOwnClub: true });
+    const b = await seedReferee({ lastName: "Bravo", isOwnClub: true });
+    const c = await seedReferee({ lastName: "Charlie", isOwnClub: true });
+    await assignMatches(b, 1);
+    await assignMatches(c, 4);
+    void a;
+
+    const result = await getReferees({
+      limit: 50,
+      offset: 0,
+      scope: "own",
+      sort: "workloadDesc",
+    });
+
+    expect(result.items.map((r) => r.lastName)).toEqual(["Charlie", "Bravo", "Alpha"]);
+  });
+
+  it("sorts by last name then first name by default", async () => {
+    await seedReferee({ firstName: "Bernd", lastName: "Adler", isOwnClub: true });
+    await seedReferee({ firstName: "Anna", lastName: "Adler", isOwnClub: true });
+    await seedReferee({ firstName: "Carla", lastName: "Zimmer", isOwnClub: true });
+
+    const result = await getReferees({ limit: 50, offset: 0, scope: "all" });
+
+    expect(result.items.map((r) => `${r.lastName},${r.firstName}`)).toEqual([
+      "Adler,Anna",
+      "Adler,Bernd",
+      "Zimmer,Carla",
+    ]);
+  });
+});
+
+describe("getReferees — pagination", () => {
+  it("returns an empty page when nothing matches", async () => {
     const result = await getReferees({ limit: 20, offset: 0, scope: "own" });
 
     expect(result).toEqual({ items: [], total: 0, limit: 20, offset: 0, hasMore: false });
   });
 
-  it("returns hasMore=true when more results exist", async () => {
-    const rows = [
-      {
-        id: 1,
-        apiId: 100,
-        firstName: "A",
-        lastName: "Z",
-        licenseNumber: 1,
-        allowAllHomeGames: false,
-        allowAwayGames: false,
-        isOwnClub: true,
-        matchCount: 1,
-        createdAt: makeDate("2025-01-01T00:00:00.000Z"),
-        updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
-      },
-    ];
+  it("reports hasMore while rows remain and false on the last page", async () => {
+    for (const n of ["A", "B", "C"]) await seedReferee({ lastName: n, isOwnClub: true });
 
-    mockSelect
-      .mockReturnValueOnce(buildChain(rows))
-      .mockReturnValueOnce(buildChain([{ count: 5 }]));
+    const first = await getReferees({ limit: 2, offset: 0, scope: "all" });
+    expect(first.total).toBe(3);
+    expect(first.items.map((r) => r.lastName)).toEqual(["A", "B"]);
+    expect(first.hasMore).toBe(true);
 
-    const result = await getReferees({ limit: 1, offset: 0, scope: "all" });
-
-    expect(result.hasMore).toBe(true);
-    expect(result.total).toBe(5);
+    const second = await getReferees({ limit: 2, offset: 2, scope: "all" });
+    expect(second.items.map((r) => r.lastName)).toEqual(["C"]);
+    expect(second.hasMore).toBe(false);
   });
 
-  it("defaults total to 0 when count result is empty", async () => {
-    mockSelect
-      .mockReturnValueOnce(buildChain([]))
-      .mockReturnValueOnce(buildChain([]));
+  it("counts every matching row, not just the page", async () => {
+    for (const n of ["A", "B", "C", "D"]) await seedReferee({ lastName: n, isOwnClub: true });
+    await seedReferee({ lastName: "E", isOwnClub: false });
 
-    const result = await getReferees({ limit: 10, offset: 0, scope: "all" });
+    const result = await getReferees({ limit: 1, offset: 0, scope: "own" });
 
-    expect(result.total).toBe(0);
+    expect(result.items).toHaveLength(1);
+    expect(result.total).toBe(4);
   });
 });
 
 describe("getRefereeById", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  it("returns the addressed referee with its live match count", async () => {
+    const target = await seedReferee({ firstName: "Anna", lastName: "Zimmer", isOwnClub: true });
+    const other = await seedReferee({ lastName: "Other", isOwnClub: true });
+    await assignMatches(target, 2);
+    await assignMatches(other, 5);
 
-  it("returns a single RefereeListItem when present", async () => {
-    const row = {
-      id: 1,
-      apiId: 100,
-      firstName: "A",
-      lastName: "Z",
-      licenseNumber: 1,
-      allowAllHomeGames: false,
-      allowAwayGames: false,
+    const result = await getRefereeById(target);
+
+    expect(result).toMatchObject({
+      id: target,
+      firstName: "Anna",
+      lastName: "Zimmer",
       isOwnClub: true,
-      matchCount: 5,
-      createdAt: makeDate("2025-01-01T00:00:00.000Z"),
-      updatedAt: makeDate("2025-01-02T00:00:00.000Z"),
-    };
-
-    mockSelect.mockReturnValueOnce(buildChain([row]));
-
-    const ref = await getRefereeById(1);
-    expect(ref).toMatchObject({ id: 1 });
-    expect(ref).not.toHaveProperty("roles");
+      matchCount: 2,
+    });
+    expect(result).not.toHaveProperty("roles");
   });
 
   it("returns null when no row matches", async () => {
-    mockSelect.mockReturnValueOnce(buildChain([]));
+    await seedReferee({ lastName: "Present" });
 
-    const ref = await getRefereeById(999_999);
-    expect(ref).toBeNull();
+    expect(await getRefereeById(999_999)).toBeNull();
   });
 });
 
-function buildUpdateChain(result: unknown[]) {
-  const chain: Record<string, unknown> = {};
-  const methods = ["set", "where"];
-  for (const m of methods) {
-    chain[m] = vi.fn().mockReturnValue(chain);
-  }
-  chain.returning = vi.fn().mockResolvedValue(result);
-  return chain;
-}
+describe("getRefereeCounts", () => {
+  it("counts own-club referees separately from all referees", async () => {
+    await seedReferee({ isOwnClub: true });
+    await seedReferee({ isOwnClub: true });
+    await seedReferee({ isOwnClub: false });
 
-describe("updateRefereeVisibility", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+    expect(await getRefereeCounts()).toEqual({ own: 2, all: 3 });
   });
 
-  it("updates visibility flags and returns the result", async () => {
-    const updated = { id: 1, allowAllHomeGames: true, allowAwayGames: false };
-    const chain = buildUpdateChain([updated]);
-    mockUpdate.mockReturnValueOnce(chain);
+  it("returns zeros for an empty table", async () => {
+    expect(await getRefereeCounts()).toEqual({ own: 0, all: 0 });
+  });
+});
 
-    const result = await updateRefereeVisibility(1, {
+describe("updateRefereeVisibility", () => {
+  it("persists the flags on the addressed referee only", async () => {
+    const target = await seedReferee({ lastName: "Target" });
+    const bystander = await seedReferee({ lastName: "Bystander" });
+
+    const result = await updateRefereeVisibility(target, {
       allowAllHomeGames: true,
+      allowAwayGames: false,
+      isOwnClub: true,
+    });
+
+    expect(result).toEqual({
+      id: target,
+      allowAllHomeGames: true,
+      allowAwayGames: false,
+      isOwnClub: true,
+    });
+
+    const [stored] = await ctx.db
+      .select()
+      .from(referees)
+      .where(eq(referees.id, bystander));
+    expect(stored).toMatchObject({
+      allowAllHomeGames: false,
       allowAwayGames: false,
       isOwnClub: false,
     });
-
-    expect(result).toEqual(updated);
-    expect(mockUpdate).toHaveBeenCalledTimes(1);
-    expect(chain.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        allowAllHomeGames: true,
-        allowAwayGames: false,
-        isOwnClub: false,
-      }),
-    );
   });
 
-  it("returns updated values when both flags are true", async () => {
-    const updated = { id: 2, allowAllHomeGames: true, allowAwayGames: true };
-    const chain = buildUpdateChain([updated]);
-    mockUpdate.mockReturnValueOnce(chain);
+  it("can set both flags at once", async () => {
+    const id = await seedReferee({});
 
-    const result = await updateRefereeVisibility(2, {
+    const result = await updateRefereeVisibility(id, {
       allowAllHomeGames: true,
       allowAwayGames: true,
       isOwnClub: false,
     });
 
-    expect(result).toEqual(updated);
+    expect(result).toEqual({
+      id,
+      allowAllHomeGames: true,
+      allowAwayGames: true,
+      isOwnClub: false,
+    });
   });
 
-  it("throws for non-existent referee", async () => {
-    const chain = buildUpdateChain([]);
-    mockUpdate.mockReturnValueOnce(chain);
-
+  it("throws NOT_FOUND for a referee that does not exist", async () => {
     await expect(
       updateRefereeVisibility(999, {
         allowAllHomeGames: true,
@@ -360,107 +450,7 @@ describe("updateRefereeVisibility", () => {
   });
 });
 
-// --- updateRefereeSettings ---
-
-interface TxStubConfig {
-  updateReturning?: unknown[];
-  selectVisibility?: unknown[];
-  selectValidTeams?: unknown[];
-  finalRules?: unknown[];
-}
-
-function buildTx(cfg: TxStubConfig) {
-  const calls: { kind: string; args: unknown[] }[] = [];
-
-  function selectChain(result: unknown[]) {
-    const chain: Record<string, unknown> = {};
-    for (const m of ["from", "innerJoin", "where", "limit"]) {
-      chain[m] = vi.fn().mockReturnValue(chain);
-    }
-    chain.then = (resolve: (v: unknown) => void) => {
-      resolve(result);
-      return chain;
-    };
-    return chain;
-  }
-
-  function updateChain(result: unknown[]) {
-    const chain: Record<string, unknown> = {};
-    for (const m of ["set", "where"]) {
-      chain[m] = vi.fn().mockReturnValue(chain);
-    }
-    chain.returning = vi.fn().mockResolvedValue(result);
-    return chain;
-  }
-
-  let selectCallIdx = 0;
-  const selectResults = [
-    cfg.selectVisibility,
-    cfg.selectValidTeams,
-    cfg.finalRules,
-  ].filter((x): x is unknown[] => x !== undefined);
-
-  const tx = {
-    update: vi.fn((..._args) => {
-      calls.push({ kind: "update", args: _args });
-      return updateChain(cfg.updateReturning ?? []);
-    }),
-    select: vi.fn((..._args) => {
-      calls.push({ kind: "select", args: _args });
-      const result = selectResults[selectCallIdx] ?? [];
-      selectCallIdx++;
-      return selectChain(result);
-    }),
-    delete: vi.fn(() => {
-      calls.push({ kind: "delete", args: [] });
-      const chain: Record<string, unknown> = {};
-      chain.where = vi.fn().mockResolvedValue(undefined);
-      return chain;
-    }),
-    insert: vi.fn((..._args) => {
-      calls.push({ kind: "insert", args: _args });
-      const chain: Record<string, unknown> = {};
-      chain.values = vi.fn().mockResolvedValue(undefined);
-      return chain;
-    }),
-  };
-
-  return { tx, calls };
-}
-
-function runTx(cfg: TxStubConfig) {
-  const { tx, calls } = buildTx(cfg);
-  mockTransaction.mockImplementationOnce((cb: (tx: unknown) => unknown) => cb(tx));
-  return { tx, calls };
-}
-
-describe("getRefereeCounts", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("returns own and all counts", async () => {
-    const chain = buildChain([{ own: 7, all: 42 }]);
-    mockSelect.mockReturnValueOnce(chain);
-
-    const result = await getRefereeCounts();
-    expect(result).toEqual({ own: 7, all: 42 });
-  });
-
-  it("defaults to zero counts when result is empty", async () => {
-    const chain = buildChain([]);
-    mockSelect.mockReturnValueOnce(chain);
-
-    const result = await getRefereeCounts();
-    expect(result).toEqual({ own: 0, all: 0 });
-  });
-});
-
 describe("updateRefereeRules", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("RefereeSettingsError is properly typed", () => {
     const err = new RefereeSettingsError("test", "NOT_OWN_CLUB");
     expect(err).toBeInstanceOf(Error);
@@ -468,79 +458,131 @@ describe("updateRefereeRules", () => {
     expect(err.name).toBe("RefereeSettingsError");
   });
 
-  it("throws NOT_FOUND when referee does not exist", async () => {
-    runTx({ selectVisibility: [] });
-
-    await expect(
-      updateRefereeRules(999, { rules: [] }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  it("throws NOT_FOUND when the referee does not exist", async () => {
+    await expect(updateRefereeRules(999, { rules: [] })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
   });
 
-  it("throws NOT_OWN_CLUB when referee is not own-club", async () => {
-    runTx({ selectVisibility: [{ isOwnClub: false }] });
+  it("throws NOT_OWN_CLUB when the referee is not own-club", async () => {
+    const id = await seedReferee({ isOwnClub: false });
 
-    await expect(updateRefereeRules(1, { rules: [] })).rejects.toMatchObject({
+    await expect(updateRefereeRules(id, { rules: [] })).rejects.toMatchObject({
       code: "NOT_OWN_CLUB",
     });
   });
 
-  it("throws VALIDATION_ERROR for non-own-club team IDs", async () => {
-    runTx({
-      selectVisibility: [{ isOwnClub: true }],
-      selectValidTeams: [],
-    });
+  it("throws VALIDATION_ERROR for a team that is not own-club", async () => {
+    const refereeId = await seedReferee({ isOwnClub: true });
+    const foreignTeam = await seedTeam({ name: "Foreign", isOwnClub: false });
 
     await expect(
-      updateRefereeRules(1, { rules: [{ teamId: 99, deny: false, allowSr1: true, allowSr2: false }] }),
+      updateRefereeRules(refereeId, {
+        rules: [{ teamId: foreignTeam, deny: false, allowSr1: true, allowSr2: false }],
+      }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
-  it("clears rules when rules array is empty", async () => {
-    const { tx } = runTx({
-      selectVisibility: [{ isOwnClub: true }],
-      finalRules: [],
-    });
+  it("throws VALIDATION_ERROR for a team id that does not exist", async () => {
+    const refereeId = await seedReferee({ isOwnClub: true });
 
-    await updateRefereeRules(1, { rules: [] });
-
-    expect(tx.delete).toHaveBeenCalledTimes(1);
-    expect(tx.insert).not.toHaveBeenCalled();
+    await expect(
+      updateRefereeRules(refereeId, {
+        rules: [{ teamId: 999_999, deny: false, allowSr1: true, allowSr2: false }],
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
-  it("upserts rules and returns them", async () => {
-    const finalRules = [
-      { id: 1, teamId: 10, teamName: "Team A", deny: false, allowSr1: true, allowSr2: true },
-    ];
-    const { tx } = runTx({
-      selectVisibility: [{ isOwnClub: true }],
-      selectValidTeams: [{ id: 10 }],
-      finalRules,
+  it("rolls the whole transaction back when validation fails", async () => {
+    const refereeId = await seedReferee({ isOwnClub: true });
+    const ownTeam = await seedTeam({ name: "Own", isOwnClub: true });
+    await updateRefereeRules(refereeId, {
+      rules: [{ teamId: ownTeam, deny: false, allowSr1: true, allowSr2: true }],
     });
 
-    const result = await updateRefereeRules(1, {
-      rules: [{ teamId: 10, deny: false, allowSr1: true, allowSr2: true }],
-    });
+    await expect(
+      updateRefereeRules(refereeId, {
+        rules: [{ teamId: 999_999, deny: false, allowSr1: true, allowSr2: false }],
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 
-    expect(result).toEqual({ rules: finalRules });
-    expect(tx.delete).toHaveBeenCalledTimes(1);
-    expect(tx.insert).toHaveBeenCalledTimes(1);
+    // The pre-existing rule must survive the failed call.
+    const stored = await ctx.db
+      .select()
+      .from(refereeAssignmentRules)
+      .where(eq(refereeAssignmentRules.refereeId, refereeId));
+    expect(stored).toHaveLength(1);
   });
 
-  it("zeros allowSr1/allowSr2 when rule.deny=true", async () => {
-    const { tx } = runTx({
-      selectVisibility: [{ isOwnClub: true }],
-      selectValidTeams: [{ id: 10 }],
-      finalRules: [],
+  it("clears the referee's rules when an empty array is submitted", async () => {
+    const refereeId = await seedReferee({ isOwnClub: true });
+    const ownTeam = await seedTeam({ name: "Own", isOwnClub: true });
+    await updateRefereeRules(refereeId, {
+      rules: [{ teamId: ownTeam, deny: false, allowSr1: true, allowSr2: true }],
     });
 
-    await updateRefereeRules(1, {
-      rules: [{ teamId: 10, deny: true, allowSr1: true, allowSr2: true }],
+    const result = await updateRefereeRules(refereeId, { rules: [] });
+
+    expect(result).toEqual({ rules: [] });
+    expect(
+      await ctx.db
+        .select()
+        .from(refereeAssignmentRules)
+        .where(eq(refereeAssignmentRules.refereeId, refereeId)),
+    ).toHaveLength(0);
+  });
+
+  it("leaves another referee's rules alone", async () => {
+    const target = await seedReferee({ isOwnClub: true });
+    const other = await seedReferee({ isOwnClub: true });
+    const ownTeam = await seedTeam({ name: "Own", isOwnClub: true });
+    await updateRefereeRules(other, {
+      rules: [{ teamId: ownTeam, deny: false, allowSr1: true, allowSr2: true }],
     });
 
-    const valuesArg = (tx.insert as unknown as { mock: { results: { value: { values: ReturnType<typeof vi.fn> } }[] } })
-      .mock.results[0]?.value.values;
-    expect(valuesArg).toHaveBeenCalledWith([
-      expect.objectContaining({ teamId: 10, deny: true, allowSr1: false, allowSr2: false }),
+    await updateRefereeRules(target, { rules: [] });
+
+    expect(
+      await ctx.db
+        .select()
+        .from(refereeAssignmentRules)
+        .where(eq(refereeAssignmentRules.refereeId, other)),
+    ).toHaveLength(1);
+  });
+
+  it("replaces the rule set and returns it joined with the team name", async () => {
+    const refereeId = await seedReferee({ isOwnClub: true });
+    const teamA = await seedTeam({ name: "Team A", isOwnClub: true });
+
+    const result = await updateRefereeRules(refereeId, {
+      rules: [{ teamId: teamA, deny: false, allowSr1: true, allowSr2: true }],
+    });
+
+    expect(result.rules).toEqual([
+      {
+        id: expect.any(Number),
+        teamId: teamA,
+        teamName: "Team A",
+        deny: false,
+        allowSr1: true,
+        allowSr2: true,
+      },
     ]);
+  });
+
+  it("forces allowSr1/allowSr2 to false when the rule denies", async () => {
+    const refereeId = await seedReferee({ isOwnClub: true });
+    const teamA = await seedTeam({ name: "Team A", isOwnClub: true });
+
+    const result = await updateRefereeRules(refereeId, {
+      rules: [{ teamId: teamA, deny: true, allowSr1: true, allowSr2: true }],
+    });
+
+    expect(result.rules[0]).toMatchObject({ deny: true, allowSr1: false, allowSr2: false });
+    const [stored] = await ctx.db
+      .select()
+      .from(refereeAssignmentRules)
+      .where(eq(refereeAssignmentRules.refereeId, refereeId));
+    expect(stored).toMatchObject({ deny: true, allowSr1: false, allowSr2: false });
   });
 });

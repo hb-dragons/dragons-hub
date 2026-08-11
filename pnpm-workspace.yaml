@@ -2,6 +2,34 @@ packages:
   - apps/*
   - packages/*
 overrides:
+  # Two copies of a native module fail `expo doctor`, which gates the EAS
+  # build. All three are satisfiable by a single version — nothing is being
+  # forced past a constraint it declares:
+  #   react: packages/shared declares react as a peer at ^19.0.0, which pnpm
+  #     auto-installs, resolving to 19.2.4 while every app pins 19.2.6.
+  #   react-native: apps/native pins 0.83.4, but the expo packages resolved a
+  #     second peer variant against 0.85.1, which forked most of the expo-*
+  #     tree into two copies of each module.
+  #   expo-glass-effect: expo-router asks for ^55.0.10 and apps/native pins
+  #     55.0.11, so one copy serves both.
+  react: 19.2.6
+  react-native: 0.83.4
+  expo-glass-effect: 55.0.11
+  # Capped at 1.6.23: better-auth 1.6.24 regressed the client-plugin generics, so
+  # any plugin declaring `getActions` stops being assignable to
+  # `BetterAuthClientPlugin`. One bad plugin collapses inference for the whole
+  # array, so native's `expoClient()` + `adminClient()` lose their `getCookie` and
+  # `admin` actions and apps/native no longer typechecks. Bisected 1.6.23 ok ->
+  # 1.6.24 broken; 1.6.25 and 1.7.0-rc.2 still broken. Ours: issue #138, upstream:
+  # better-auth/better-auth#10515 (open, no fix released).
+  # The documented upstream workaround (`as BetterAuthClientPlugin`) does not suit
+  # us: it erases the asserted plugin's own actions, and we call `getCookie()` in
+  # apps/native/src/lib/api.ts and src/app/assistant.tsx.
+  # These pin every copy, including the one `@daveyplate/better-auth-ui` pulls in,
+  # so the four workspaces depending on better-auth stay coherent. Lift once
+  # upstream ships a fix — that also unblocks workspace-wide `pnpm update -r`.
+  better-auth: 1.6.23
+  '@better-auth/expo': 1.6.23
   replace>minimatch: 3.1.5
   '@prisma/dev>hono': '>=4.12.18'
   '@prisma/dev>@hono/node-server': '>=1.19.13'
@@ -13,14 +41,53 @@ overrides:
   effect: '>=3.20.0'
   lodash: '>=4.18.0'
   '@xmldom/xmldom': ^0.8.13
-  next: '>=16.2.6'
+  next: '>=16.2.11 <17'
   kysely: 0.28.17
   '@tootallnate/once': '>=3.0.1'
-  postcss: '>=8.5.10'
+  postcss: '>=8.5.18 <9'
+  # Security floors raised together with the pnpm bump in issue #136 — the
+  # audit job had timed out on every run since 2026-08-02, so none of these
+  # advisories had ever been reported. Each floor is the lowest patched
+  # version GitHub advisories names.
+  #
+  # `sharp` and `vite` are also declared directly (apps/api, apps/cms). The
+  # declared range is what a human reads, so it was raised too; these entries
+  # exist because the tree still carried older transitive copies that the
+  # declared range does not reach.
+  #
+  # Every floor is bounded on the right. An open-ended `>=x` is a trap here:
+  # pnpm resolves it to the newest release on npm, so `>=1.1.18` on a v1
+  # consumer silently dragged minimatch@3 onto brace-expansion@5. Where a
+  # package has two live major lines, the floor is scoped per line with a
+  # `@^N` selector so a v1 consumer is not dragged onto v5.
+  'brace-expansion@^1': '>=1.1.18 <2'
+  'brace-expansion@^5': '>=5.0.9 <6'
+  fast-uri: '>=3.1.5 <4'
+  'form-data@^2': '>=2.5.6 <3'
+  ip-address: '>=10.3.1 <11'
+  'js-yaml@^3': '>=3.15.1 <4'
+  'js-yaml@^4': '>=4.3.1 <5'
+  'nanoid@^3': '>=3.3.17 <4'
+  'nanoid@^5': '>=5.1.16 <6'
+  sharp: '>=0.35.0 <0.36'
+  shell-quote: '>=1.8.5 <2'
+  svgo: '>=3.3.4 <4'
+  vite: '>=8.0.16 <9'
+  'ws@^7': '>=7.5.11 <8'
+  'ws@^8': '>=8.21.0 <9'
   '@esbuild-kit/core-utils>esbuild': '>=0.25.0'
   '@instantdb/core>uuid': '>=11.1.1'
+auditConfig:
+  # `pnpm audit` has no fix for these: both are `<= 2.0.2` and GitHub reports
+  # `first_patched_version: null`, while npm's newest image-size is 2.0.2. The
+  # package is Metro's, i.e. bundler tooling that never ships, and reaching it
+  # needs a hostile ICNS/JXL/HEIF file already in the repo. Tracked in #211 —
+  # drop these two the moment upstream publishes a patch.
+  ignoreGhsas:
+    - GHSA-w3rx-r6r6-pgpr
+    - GHSA-5p2g-fcmc-qvqq
+
 allowBuilds:
-  basketball-bund-sdk: true
   esbuild: true
   '@swc/core': true
   '@parcel/watcher': true
@@ -28,3 +95,8 @@ allowBuilds:
   msgpackr-extract: false
   sharp: false
   unrs-resolver: false
+  # pnpm 11.21 keys git/tarball dependencies by their full spec, so the bare
+  # `basketball-bund-sdk: true` this replaces no longer matched anything and
+  # the SDK's build scripts were silently skipped. Same intent, spelled the
+  # way this pnpm reads it.
+  basketball-bund-sdk@https://codeload.github.com/dirkdrutschmann/basketball-bund-sdk/tar.gz/c72789068d9ec5910440f9e2b94f99b6e56d4800: true

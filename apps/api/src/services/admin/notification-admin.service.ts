@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { notificationLog, domainEvents, channelConfigs, user } from "@dragons/db/schema";
-import { eq, and, desc, count, ne, inArray } from "drizzle-orm";
+import { eq, and, desc, count, ne, inArray, isNull } from "drizzle-orm";
 import { parseRoles } from "@dragons/shared";
 import { dispatchImmediate } from "../notifications/notification-pipeline";
 import { logger } from "../../config/logger";
@@ -29,7 +29,7 @@ export async function recipientKeysForUserId(userId: string): Promise<string[]> 
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export interface NotificationCenterItem {
+interface NotificationCenterItem {
   id: number;
   eventId: string;
   watchRuleId: number | null;
@@ -62,17 +62,20 @@ export interface NotificationCenterListResult {
 // ── listNotifications ───────────────────────────────────────────────────────
 
 export async function listNotifications(params: {
-  userId?: string;
+  userId: string;
   limit?: number;
   offset?: number;
 }): Promise<NotificationCenterListResult> {
   const { userId, limit = 20, offset = 0 } = params;
 
-  // userId scopes to that user's recipient keys; omitting it returns the whole
-  // log (admin monitoring view).
-  const where = userId
-    ? inArray(notificationLog.recipientId, await recipientKeysForUserId(userId))
-    : undefined;
+  // userId is required: it used to be optional, and omitting it returned the
+  // entire log across every recipient. Both that and the `?userId=` query
+  // param are gone (issue #123) — a read is always scoped to one user's
+  // recipient keys, and the route supplies the caller's id from the session.
+  const where = inArray(
+    notificationLog.recipientId,
+    await recipientKeysForUserId(userId),
+  );
 
   const [totalRow] = await getDb()
     .select({ count: count() })
@@ -158,23 +161,6 @@ export async function markAllRead(userId: string): Promise<number> {
   return result.length;
 }
 
-// ── getUnreadCount ──────────────────────────────────────────────────────────
-
-export async function getUnreadCount(userId: string): Promise<number> {
-  const keys = await recipientKeysForUserId(userId);
-  const [row] = await getDb()
-    .select({ count: count() })
-    .from(notificationLog)
-    .where(
-      and(
-        inArray(notificationLog.recipientId, keys),
-        ne(notificationLog.status, "read"),
-      ),
-    );
-
-  return Number(row!.count);
-}
-
 // ── retryFailedNotification ─────────────────────────────────────────────────
 
 export async function retryFailedNotification(
@@ -219,9 +205,10 @@ export async function retryFailedNotification(
   const [config] = await getDb()
     .select({ id: channelConfigs.id, type: channelConfigs.type, config: channelConfigs.config })
     .from(channelConfigs)
-    .where(eq(channelConfigs.id, entry.channelConfigId))
+    .where(and(eq(channelConfigs.id, entry.channelConfigId), isNull(channelConfigs.deletedAt)))
     .limit(1);
-  /* v8 ignore next 3 -- defensive: notification_log.channel_config_id is a FK, so the config always exists */
+  // The FK guarantees the row is still there, but it may have been retired
+  // (`deleted_at`), and re-dispatching down a retired route is not allowed.
   if (!config) {
     return { success: false, error: "Channel config no longer exists" };
   }

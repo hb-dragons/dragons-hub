@@ -27,12 +27,12 @@ publicAssetsRoutes.get(
     const raw = c.req.param("id");
     const id = Number(raw.replace(/\.webp$/, ""));
     if (!Number.isInteger(id) || id <= 0) {
-      return c.json({ error: "Invalid clubId" }, 400);
+      return c.json({ error: "Invalid clubId", code: "VALIDATION_ERROR" }, 400);
     }
 
     const resolved = path.join(CLUBS_DIR, `${id}.webp`);
     if (!existsSync(resolved)) {
-      return c.json({ error: "Not found" }, 404);
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
     }
 
     const buf = await readFile(resolved);

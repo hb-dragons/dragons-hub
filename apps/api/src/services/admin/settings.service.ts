@@ -1,8 +1,24 @@
+import { z } from "zod";
 import { getDb } from "../../config/database";
 import { appSettings } from "@dragons/db/schema";
 import { eq } from "drizzle-orm";
 import type { ClubConfig, BookingSettings } from "@dragons/shared";
 import { BOOKING_DEFAULTS } from "@dragons/shared";
+import { readSettings, readIntSetting } from "../settings/app-settings.reader";
+
+// Validates the *stored* value, not a request — request schemas live in
+// @dragons/contracts; this one never sees the wire (spec decision D5).
+const REFEREE_REMINDER_DAYS_FALLBACK = [7, 3, 1] as const;
+const refereeReminderDaysSchema = z.array(z.number().int().positive()).min(1);
+
+const CLUB_KEYS = { id: "club_id", name: "club_name" } as const;
+
+const BOOKING_KEYS = {
+  bufferBefore: "venue_booking_buffer_before",
+  bufferAfter: "venue_booking_buffer_after",
+  gameDuration: "venue_booking_game_duration",
+  dueDaysBefore: "venue_booking_due_days_before",
+} as const;
 
 export async function getSetting(key: string): Promise<string | null> {
   const [row] = await getDb()
@@ -24,34 +40,49 @@ export async function upsertSetting(key: string, value: string): Promise<void> {
 }
 
 export async function getClubConfig(): Promise<ClubConfig | null> {
-  const clubId = await getSetting("club_id");
-  const clubName = await getSetting("club_name");
+  const values = await readSettings([CLUB_KEYS.id, CLUB_KEYS.name]);
+  const clubId = values.get(CLUB_KEYS.id);
   if (!clubId) return null;
-  return { clubId: parseInt(clubId, 10), clubName: clubName ?? "" };
+  return { clubId: parseInt(clubId, 10), clubName: values.get(CLUB_KEYS.name) ?? "" };
 }
 
 export async function setClubConfig(clubId: number, clubName: string): Promise<void> {
-  await upsertSetting("club_id", String(clubId));
-  await upsertSetting("club_name", clubName);
+  await upsertSetting(CLUB_KEYS.id, String(clubId));
+  await upsertSetting(CLUB_KEYS.name, clubName);
 }
 
 export async function getBookingSettings(): Promise<BookingSettings> {
-  const bufferBefore = await getSetting("venue_booking_buffer_before");
-  const bufferAfter = await getSetting("venue_booking_buffer_after");
-  const gameDuration = await getSetting("venue_booking_game_duration");
-  const dueDaysBefore = await getSetting("venue_booking_due_days_before");
+  const values = await readSettings(Object.values(BOOKING_KEYS));
 
   return {
-    bufferBefore: bufferBefore ? parseInt(bufferBefore, 10) : BOOKING_DEFAULTS.bufferBefore,
-    bufferAfter: bufferAfter ? parseInt(bufferAfter, 10) : BOOKING_DEFAULTS.bufferAfter,
-    gameDuration: gameDuration ? parseInt(gameDuration, 10) : BOOKING_DEFAULTS.gameDuration,
-    dueDaysBefore: dueDaysBefore ? parseInt(dueDaysBefore, 10) : BOOKING_DEFAULTS.dueDaysBefore,
+    bufferBefore: readIntSetting(values, BOOKING_KEYS.bufferBefore, BOOKING_DEFAULTS.bufferBefore),
+    bufferAfter: readIntSetting(values, BOOKING_KEYS.bufferAfter, BOOKING_DEFAULTS.bufferAfter),
+    gameDuration: readIntSetting(values, BOOKING_KEYS.gameDuration, BOOKING_DEFAULTS.gameDuration),
+    dueDaysBefore: readIntSetting(
+      values,
+      BOOKING_KEYS.dueDaysBefore,
+      BOOKING_DEFAULTS.dueDaysBefore,
+    ),
   };
 }
 
 export async function setBookingSettings(settings: BookingSettings): Promise<void> {
-  await upsertSetting("venue_booking_buffer_before", String(settings.bufferBefore));
-  await upsertSetting("venue_booking_buffer_after", String(settings.bufferAfter));
-  await upsertSetting("venue_booking_game_duration", String(settings.gameDuration));
-  await upsertSetting("venue_booking_due_days_before", String(settings.dueDaysBefore));
+  await upsertSetting(BOOKING_KEYS.bufferBefore, String(settings.bufferBefore));
+  await upsertSetting(BOOKING_KEYS.bufferAfter, String(settings.bufferAfter));
+  await upsertSetting(BOOKING_KEYS.gameDuration, String(settings.gameDuration));
+  await upsertSetting(BOOKING_KEYS.dueDaysBefore, String(settings.dueDaysBefore));
+}
+
+export async function getRefereeReminderDays(): Promise<number[]> {
+  const value = await getSetting("referee_reminder_days");
+  // Always a fresh copy — callers get `number[]`, not the shared readonly
+  // default, so sorting or mutating a returned fallback can't corrupt it for
+  // the next caller.
+  if (!value) return [...REFEREE_REMINDER_DAYS_FALLBACK];
+  try {
+    const parsed = refereeReminderDaysSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : [...REFEREE_REMINDER_DAYS_FALLBACK];
+  } catch {
+    return [...REFEREE_REMINDER_DAYS_FALLBACK];
+  }
 }

@@ -5,6 +5,7 @@ import {
   refereeApiMatchParamSchema,
   refereeMatchIdParamSchema,
   refereeGameIdParamSchema,
+  refereeIdParamSchema,
 } from "./referee";
 
 describe("refereeListQuerySchema", () => {
@@ -226,5 +227,23 @@ describe("refereeGameIdParamSchema", () => {
 
   it("rejects a negative value", () => {
     expect(() => refereeGameIdParamSchema.parse({ id: "-5" })).toThrow();
+  });
+});
+
+describe("refereeIdParamSchema", () => {
+  it("coerces a numeric string to a positive integer", () => {
+    expect(refereeIdParamSchema.parse({ id: "7" })).toEqual({ id: 7 });
+  });
+
+  it("rejects a non-numeric string", () => {
+    expect(() => refereeIdParamSchema.parse({ id: "abc" })).toThrow();
+  });
+
+  it("rejects zero", () => {
+    expect(() => refereeIdParamSchema.parse({ id: "0" })).toThrow();
+  });
+
+  it("rejects a negative value", () => {
+    expect(() => refereeIdParamSchema.parse({ id: "-1" })).toThrow();
   });
 });

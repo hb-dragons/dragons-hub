@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
-import * as SecureStore from "expo-secure-store";
+import { localStorage } from "@/lib/local-storage";
+import { DEFAULT_RELOCK_GRACE_PERIOD_MS, subscribeBackgroundRelock } from "@/lib/biometric-relock";
 
 const BIOMETRIC_KEY = "biometric_lock_enabled";
 
-export function useBiometricLock() {
+export function useBiometricLock(options?: { relockGracePeriodMs?: number }) {
+  const relockGracePeriodMs = options?.relockGracePeriodMs ?? DEFAULT_RELOCK_GRACE_PERIOD_MS;
   const [isSupported, setIsSupported] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -20,7 +22,7 @@ export function useBiometricLock() {
     async function init() {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      const stored = await SecureStore.getItemAsync(BIOMETRIC_KEY);
+      const stored = await localStorage.getItem(BIOMETRIC_KEY);
       const enabled = stored === "true";
 
       if (cancelled) return;
@@ -35,6 +37,20 @@ export function useBiometricLock() {
       cancelled = true;
     };
   }, []);
+
+  // Re-arm the lock: `isLocked` above only reflects the mount-time read of
+  // SecureStore, so without this the lock protects nothing after the first
+  // unlock — backgrounding the app and returning re-enters the authed tree
+  // with no prompt for the rest of the process lifetime. Only a genuine
+  // `background` (not iOS's transient `inactive`) counts; see
+  // `biometric-relock.ts` for the AppState semantics.
+  useEffect(() => {
+    if (!isEnabled) return;
+    return subscribeBackgroundRelock({
+      onRelock: () => setIsLocked(true),
+      gracePeriodMs: relockGracePeriodMs,
+    });
+  }, [isEnabled, relockGracePeriodMs]);
 
   const authenticate = useCallback(async (): Promise<boolean> => {
     const result = await LocalAuthentication.authenticateAsync({
@@ -53,11 +69,11 @@ export function useBiometricLock() {
         disableDeviceFallback: false,
       });
       if (!result.success) return;
-      await SecureStore.setItemAsync(BIOMETRIC_KEY, "true");
+      await localStorage.setItem(BIOMETRIC_KEY, "true");
       setIsEnabled(true);
     } else {
       // Disabling
-      await SecureStore.setItemAsync(BIOMETRIC_KEY, "false");
+      await localStorage.setItem(BIOMETRIC_KEY, "false");
       setIsEnabled(false);
       setIsLocked(false);
     }

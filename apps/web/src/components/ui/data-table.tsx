@@ -34,7 +34,10 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   children?: (table: TanstackTable<TData>) => React.ReactNode
-  onRowClick?: (row: Row<TData>, event: React.MouseEvent) => void
+  onRowClick?: (
+    row: Row<TData>,
+    event: React.MouseEvent | React.KeyboardEvent,
+  ) => void
   rowClassName?: (row: Row<TData>) => string | undefined
   emptyState?: React.ReactNode
   initialColumnVisibility?: VisibilityState
@@ -121,8 +124,22 @@ export function DataTable<TData, TValue>({
                   onRowClick && "cursor-pointer",
                   rowClassName?.(row),
                 )}
+                role={onRowClick ? "button" : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
                 onClick={
                   onRowClick ? (e) => onRowClick(row, e) : undefined
+                }
+                onKeyDown={
+                  onRowClick
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          // Space also scrolls the page for a focused
+                          // non-form element — stop that before firing.
+                          e.preventDefault()
+                          onRowClick(row, e)
+                        }
+                      }
+                    : undefined
                 }
               >
                 {row.getVisibleCells().map((cell) => (

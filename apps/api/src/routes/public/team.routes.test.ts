@@ -4,27 +4,13 @@ import type { AppEnv } from "../../types";
 
 // --- Mocks (hoisted before imports) ---
 
-const mockSelect = vi.fn();
-const mockFrom = vi.fn();
-
 const mocks = vi.hoisted(() => ({
-  select: vi.fn(),
-  from: vi.fn(),
+  listPublicTeams: vi.fn(),
   getTeamStats: vi.fn(),
 }));
 
-vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => {
-      mockSelect(...args);
-      return {
-        from: (...fArgs: unknown[]) => {
-          mockFrom(...fArgs);
-          return { orderBy: () => mocks.from() };
-        },
-      };
-    },
-  }),
+vi.mock("../../services/public/team-list.service", () => ({
+  listPublicTeams: mocks.listPublicTeams,
 }));
 
 vi.mock("../../services/public/team-stats.service", () => ({
@@ -61,7 +47,7 @@ describe("GET /teams (public)", () => {
       { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", isOwnClub: true },
       { id: 2, name: "Dragons Herren 2", nameShort: null, isOwnClub: true },
     ];
-    mocks.from.mockResolvedValue(teamList);
+    mocks.listPublicTeams.mockResolvedValue(teamList);
 
     const res = await app.request("/teams");
 
@@ -70,7 +56,7 @@ describe("GET /teams (public)", () => {
   });
 
   it("returns 200 with empty array when no teams exist", async () => {
-    mocks.from.mockResolvedValue([]);
+    mocks.listPublicTeams.mockResolvedValue([]);
 
     const res = await app.request("/teams");
 
@@ -106,20 +92,21 @@ describe("GET /teams/:id/stats (public)", () => {
     expect(mocks.getTeamStats).toHaveBeenCalledWith(1);
   });
 
-  it("returns 404 when team not found", async () => {
+  it("returns 404 with a NOT_FOUND code when team not found", async () => {
     mocks.getTeamStats.mockResolvedValue(null);
 
     const res = await app.request("/teams/99/stats");
 
     expect(res.status).toBe(404);
-    expect(await json(res)).toMatchObject({ error: "Team not found" });
+    expect(await json(res)).toEqual({ error: "Team not found", code: "NOT_FOUND" });
   });
 
   it("returns 400 for non-numeric id", async () => {
     const res = await app.request("/teams/abc/stats");
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ error: "Invalid team id" });
+    const body = await json(res);
+    expect(body.code).toBe("VALIDATION_ERROR");
     expect(mocks.getTeamStats).not.toHaveBeenCalled();
   });
 
@@ -127,7 +114,8 @@ describe("GET /teams/:id/stats (public)", () => {
     const res = await app.request("/teams/0/stats");
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ error: "Invalid team id" });
+    const body = await json(res);
+    expect(body.code).toBe("VALIDATION_ERROR");
     expect(mocks.getTeamStats).not.toHaveBeenCalled();
   });
 
@@ -135,6 +123,7 @@ describe("GET /teams/:id/stats (public)", () => {
     const res = await app.request("/teams/-5/stats");
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toMatchObject({ error: "Invalid team id" });
+    const body = await json(res);
+    expect(body.code).toBe("VALIDATION_ERROR");
   });
 });

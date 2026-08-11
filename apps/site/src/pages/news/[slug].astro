@@ -1,0 +1,98 @@
+---
+// Port of dragons-app app/pages/news/[slug].vue: header from the post, date
+// badge, Lexical content rendered to HTML at build, gallery + lightbox as the
+// page's single island. Posts without a gallery ship zero JS.
+import { getCollection } from "astro:content";
+
+import PostGallery, { type GalleryImage } from "../../components/news/PostGallery";
+import NewsRichText from "../../components/news/RichText.astro";
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import Layout from "../../layouts/Layout.astro";
+import { blurhashToDataUri } from "../../lib/blurhash";
+import { formatDateDe } from "../../lib/format";
+import { newsArticle } from "../../lib/jsonld";
+import { lexicalToPlainText } from "../../lib/lexical-text";
+import { cmsBaseUrl, mediaUrl } from "../../lib/media";
+import { publishedOnly } from "../../lib/published";
+import { absoluteUrl, canonicalUrl, DEFAULT_OG_IMAGE, metaDescription } from "../../lib/seo";
+import { toSiteImage } from "../../lib/site-image";
+import { strings } from "../../lib/strings";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("posts", publishedOnly);
+  return posts.map((entry) => ({
+    params: { slug: entry.data.slug },
+    props: { post: entry.data },
+  }));
+}
+
+type Props = Awaited<ReturnType<typeof getStaticPaths>>[number]["props"];
+
+const { post } = Astro.props;
+const cmsBase = cmsBaseUrl();
+
+// Precompute lightbox images at build: absolute URLs + blurhash placeholders
+// (the decoder needs Node's Buffer, so it cannot run inside the island).
+const gallery: GalleryImage[] = (post.gallery ?? []).flatMap((media) => {
+  const src = mediaUrl(media.url, cmsBase);
+  if (src == null) return [];
+  return [
+    {
+      src,
+      placeholder: media.blurhash ? blurhashToDataUri(media.blurhash) : null,
+      alt: media.alt ?? null,
+      width: media.width ?? null,
+      height: media.height ?? null,
+    },
+  ];
+});
+
+// SEO (Task C8): CMS override ?? text derived from the post body; the header
+// image doubles as the OG card unless a dedicated one is set.
+const description = metaDescription(
+  post.seoDescription,
+  lexicalToPlainText(post.content),
+  strings.seo.news,
+);
+const ogImage = toSiteImage(post.ogImage ?? post.headerImage, cmsBase)?.url ?? null;
+const jsonLd = newsArticle({
+  headline: post.title,
+  datePublished: post.publishedDate,
+  url: canonicalUrl(Astro.site, Astro.url.pathname),
+  // Article rich results want an image, so mirror the OG fallback chain all
+  // the way down to the default club photo.
+  image: absoluteUrl(ogImage ?? DEFAULT_OG_IMAGE, Astro.site),
+  description,
+});
+---
+
+<Layout
+  title={post.title}
+  description={description}
+  image={ogImage}
+  jsonLd={jsonLd}
+  ogType="article"
+>
+  <PageHeader title={post.title} image={toSiteImage(post.headerImage, cmsBase)} />
+
+  <PageContainer class="max-w-7xl !px-4">
+    <div class="flex justify-between items-center">
+      <span
+        class="inline-flex items-center px-2 py-1 gap-1 rounded-md text-foreground bg-card text-sm @md:text-base @lg:text-lg @xl:text-xl font-semibold"
+      >
+        {formatDateDe(post.publishedDate)}
+      </span>
+    </div>
+
+    <NewsRichText content={post.content} />
+
+    {
+      gallery.length > 0 && (
+        <div class="mt-8">
+          <PostGallery client:visible images={gallery} />
+        </div>
+      )
+    }
+  </PageContainer>
+</Layout>

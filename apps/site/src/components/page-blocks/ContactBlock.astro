@@ -1,0 +1,36 @@
+---
+/**
+ * contact block: Vorstand band (angled cards) + Ehrenamtliche grid, ported
+ * from dragons-app dragons/team/index.vue. Entries resolve against the fully
+ * populated vorstand/positions collections and keep the legacy orderIndex
+ * ordering; rendering itself lives in VorstandGrid/PositionsGrid, shared with
+ * the contact page.
+ */
+import { getCollection, type CollectionEntry } from "astro:content";
+
+import { resolveRefs } from "../../lib/page-blocks";
+import { publishedOnly } from "../../lib/published";
+import PositionsGrid from "../kontakt/PositionsGrid.astro";
+import VorstandGrid from "../kontakt/VorstandGrid.astro";
+
+type Layout = NonNullable<CollectionEntry<"pages">["data"]["layout"]>;
+
+interface Props {
+  block: Extract<Layout[number], { blockType: "contact" }>;
+}
+
+const { block } = Astro.props;
+
+const allVorstand = (await getCollection("vorstand", publishedOnly)).map((entry) => entry.data);
+const allPositions = (await getCollection("positions", publishedOnly)).map((entry) => entry.data);
+
+const vorstand = resolveRefs(block.vorstand, allVorstand).sort(
+  (a, b) => a.orderIndex - b.orderIndex,
+);
+const positions = resolveRefs(block.positions, allPositions).sort(
+  (a, b) => a.orderIndex - b.orderIndex,
+);
+---
+
+<VorstandGrid entries={vorstand} />
+<PositionsGrid entries={positions} />

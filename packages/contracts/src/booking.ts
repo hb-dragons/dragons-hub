@@ -1,9 +1,8 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 import { dateSchema, timeSchema, bookingStatusSchema } from "@dragons/shared";
 
-export const bookingIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const bookingIdParamSchema = idParamSchema;
 
 export const bookingListQuerySchema = z.object({
   status: bookingStatusSchema.optional(),
@@ -11,7 +10,7 @@ export const bookingListQuerySchema = z.object({
   dateTo: dateSchema.optional(),
 });
 
-export const bookingUpdateBodySchema = z.object({
+export const bookingUpdateBodySchema = z.strictObject({
   overrideStartTime: timeSchema.nullable().optional(),
   overrideEndTime: timeSchema.nullable().optional(),
   overrideReason: z.string().max(500).nullable().optional(),
@@ -19,11 +18,11 @@ export const bookingUpdateBodySchema = z.object({
   notes: z.string().max(1000).nullable().optional(),
 });
 
-export const bookingStatusBodySchema = z.object({
+export const bookingStatusBodySchema = z.strictObject({
   status: bookingStatusSchema,
 });
 
-export const bookingCreateBodySchema = z.object({
+export const bookingCreateBodySchema = z.strictObject({
   venueId: z.number().int().positive(),
   date: dateSchema,
   overrideStartTime: timeSchema,

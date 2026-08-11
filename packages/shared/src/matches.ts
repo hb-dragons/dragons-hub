@@ -1,25 +1,42 @@
 import type { BookingStatus, DiffStatus } from "./constants";
-export interface RefereeSlotInfo {
-  slotNumber: number;
-  isOpen: boolean;
-  referee: {
-    id: number;
-    firstName: string | null;
-    lastName: string | null;
-  } | null;
-  role: {
-    id: number;
-    name: string;
-    shortName: string | null;
-  } | null;
-  intent: {
-    refereeId: number;
-    refereeFirstName: string | null;
-    refereeLastName: string | null;
-    clickedAt: string;
-    confirmedBySyncAt: string | null;
-  } | null;
+interface RefereeSlotReferee {
+  id: number;
+  firstName: string | null;
+  lastName: string | null;
 }
+
+interface RefereeSlotRole {
+  id: number;
+  name: string;
+  shortName: string | null;
+}
+
+interface RefereeSlotIntent {
+  refereeId: number;
+  refereeFirstName: string | null;
+  refereeLastName: string | null;
+  clickedAt: string;
+  confirmedBySyncAt: string | null;
+}
+
+interface RefereeSlotBase {
+  slotNumber: number;
+  intent: RefereeSlotIntent | null;
+}
+
+/**
+ * A slot is either open or filled — never both (issue #105). Encoding that as a
+ * union rather than as three independent fields means a caller physically
+ * cannot build `{ isOpen: true, referee: {...} }`, so the contradiction cannot
+ * reappear at some other call site.
+ */
+export type RefereeSlotInfo =
+  | (RefereeSlotBase & { isOpen: true; referee: null; role: null })
+  | (RefereeSlotBase & {
+      isOpen: false;
+      referee: RefereeSlotReferee | null;
+      role: RefereeSlotRole | null;
+    });
 
 export interface FieldDiff {
   field: string;
@@ -67,9 +84,10 @@ export interface MatchListItem {
   venuePostalCode: string | null;
   venueCity: string | null;
   venueNameOverride: string | null;
-  isConfirmed: boolean | null;
-  isForfeited: boolean | null;
-  isCancelled: boolean | null;
+  // NOT NULL in `matches` (migration 0042) — no `?? false` needed downstream.
+  isConfirmed: boolean;
+  isForfeited: boolean;
+  isCancelled: boolean;
   anschreiber: string | null;
   zeitnehmer: string | null;
   shotclock: string | null;

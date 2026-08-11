@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import type { ComponentRef } from "react";
 import { View, Text, Pressable, useWindowDimensions } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
-import type { TaskCardData, TaskAssignee, TaskPriority } from "@dragons/shared";
+import type {
+  TaskCardData,
+  TaskAssignee,
+  TaskPriority,
+  TaskContentRect,
+} from "@dragons/shared";
 import { dueDateBucket, type DueDateBucket } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
@@ -23,14 +29,6 @@ export interface TaskCardLayout {
   y: number;
   width: number;
   height: number;
-}
-
-export interface TaskContentRect {
-  contentX: number;
-  contentY: number;
-  width: number;
-  height: number;
-  columnId: number;
 }
 
 export interface TaskDragCallbacks {
@@ -322,7 +320,7 @@ function AvatarStack({
 // TaskCard
 // ---------------------------------------------------------------------------
 
-export function TaskCard({
+function TaskCardImpl({
   task,
   onPress,
   onLongPress,
@@ -351,7 +349,50 @@ export function TaskCard({
     transform: [{ scale: dropPulse.value }],
   }));
 
-  const cardRef = useAnimatedRef<Animated.View>();
+  // Typed against the component the ref is actually attached to
+  // (AnimatedPressable), not Animated.View. The two are distinct types even
+  // under @types/react 19.2.14 — that version just still accepts the
+  // assignment, so the old annotation type-checked by accident. 19.2.17
+  // tells a Pressable's ReactNativeElement apart from a View instance and
+  // rejects it, and the `^19.2.14` range already admits 19.2.17, so this is
+  // a latent break rather than a hypothetical one.
+  const cardRef = useAnimatedRef<ComponentRef<typeof AnimatedPressable>>();
+
+  // Built once per (onDrag, task) rather than on every render: `Gesture.Pan()`
+  // constructs a new gesture object and, when its identity changes,
+  // GestureDetector tears down and re-attaches the native recogniser — which
+  // during a drag happens on every animation frame.
+  const dragGesture = useMemo(() => {
+    if (!onDrag) return null;
+    const { start: safeStart, move: safeMove, end: safeEnd } = onDrag;
+    return Gesture.Pan()
+      .activateAfterLongPress(300)
+      .onStart(() => {
+        "worklet";
+        const m = measure(cardRef);
+        if (!m) return;
+        runOnJS(safeStart)(task, {
+          x: m.pageX,
+          y: m.pageY,
+          width: m.width,
+          height: m.height,
+        });
+      })
+      .onUpdate((e) => {
+        "worklet";
+        runOnJS(safeMove)(e.absoluteX, e.absoluteY);
+      })
+      .onEnd(() => {
+        "worklet";
+        runOnJS(safeEnd)();
+      })
+      .onFinalize((_e, success) => {
+        "worklet";
+        if (!success) {
+          runOnJS(safeEnd)();
+        }
+      });
+  }, [onDrag, task, cardRef]);
 
   const handleLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -580,39 +621,9 @@ export function TaskCard({
     cardContent
   );
 
-  if (!onDrag) {
+  if (!dragGesture) {
     return swipeWrapped;
   }
-
-  const { start: safeStart, move: safeMove, end: safeEnd } = onDrag;
-
-  const dragGesture = Gesture.Pan()
-    .activateAfterLongPress(300)
-    .onStart(() => {
-      "worklet";
-      const m = measure(cardRef);
-      if (!m) return;
-      runOnJS(safeStart)(task, {
-        x: m.pageX,
-        y: m.pageY,
-        width: m.width,
-        height: m.height,
-      });
-    })
-    .onUpdate((e) => {
-      "worklet";
-      runOnJS(safeMove)(e.absoluteX, e.absoluteY);
-    })
-    .onEnd(() => {
-      "worklet";
-      runOnJS(safeEnd)();
-    })
-    .onFinalize((_e, success) => {
-      "worklet";
-      if (!success) {
-        runOnJS(safeEnd)();
-      }
-    });
 
   return (
     <GestureDetector gesture={dragGesture}>
@@ -622,3 +633,11 @@ export function TaskCard({
     </GestureDetector>
   );
 }
+
+/**
+ * Memoised: a board column renders one of these per task, and the parent
+ * re-renders on every search keystroke and on every drag-move that changes the
+ * highlighted column. All props except `task` are now referentially stable, so
+ * only the cards that actually changed re-render.
+ */
+export const TaskCard = memo(TaskCardImpl);

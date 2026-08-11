@@ -4,11 +4,10 @@ import { eq, desc, count } from "drizzle-orm";
 import type {
   WatchRuleItem,
   WatchRuleListResult,
-  CreateWatchRuleBody,
-  UpdateWatchRuleBody,
   FilterCondition,
   ChannelTarget,
 } from "@dragons/shared";
+import type { WatchRuleCreateBody, WatchRuleUpdateBody } from "@dragons/contracts";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -68,7 +67,7 @@ export async function getWatchRule(id: number): Promise<WatchRuleItem | null> {
 // ── createWatchRule ─────────────────────────────────────────────────────────
 
 export async function createWatchRule(
-  data: CreateWatchRuleBody,
+  data: WatchRuleCreateBody,
   userId: string,
 ): Promise<WatchRuleItem> {
   const [row] = await getDb()
@@ -92,7 +91,7 @@ export async function createWatchRule(
 
 export async function updateWatchRule(
   id: number,
-  data: UpdateWatchRuleBody,
+  data: WatchRuleUpdateBody,
 ): Promise<WatchRuleItem | null> {
   const updates: Record<string, unknown> = { updatedAt: new Date() };
 

@@ -9,6 +9,8 @@ import { MapPin, SearchIcon } from "lucide-react"
 import { Input } from "@dragons/ui/components/input"
 
 import { DataTable } from "@/components/ui/data-table"
+import { ErrorState } from "@/components/ui/error-state"
+import { LoadingState } from "@/components/ui/loading-state"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 
@@ -112,8 +114,20 @@ const venueGlobalFilterFn: FilterFn<VenueListItem> = (
 export function VenueListTable() {
   const t = useTranslations("venues")
   const venuesQ = queries.venues()
-  const { data: venueList } = useSWR(venuesQ.key, venuesQ.fetcher)
+  const { data: venueList, error, isLoading, mutate } = useSWR(
+    venuesQ.key,
+    venuesQ.fetcher,
+  )
   const columns = useMemo(() => getColumns(t), [t])
+
+  // A failed request is not "no venues found" — never collapse the two.
+  if (error) {
+    return <ErrorState onRetry={() => { void mutate(); }} />
+  }
+
+  if (isLoading && !venueList) {
+    return <LoadingState rows={6} />
+  }
 
   const allItems = venueList ?? []
 

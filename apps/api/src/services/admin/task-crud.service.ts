@@ -38,7 +38,7 @@ export async function listTasks(
     );
   }
   if (filters?.priority) {
-    conditions.push(eq(tasks.priority, filters.priority as TaskPriority));
+    conditions.push(eq(tasks.priority, filters.priority));
   }
 
   const rows = await getDb()
@@ -82,7 +82,7 @@ export async function listTasks(
 
   return rows.map((row) => ({
     ...row,
-    priority: row.priority as TaskPriority,
+    priority: row.priority,
     checklistTotal: countMap.get(row.id)?.total ?? 0,
     checklistChecked: countMap.get(row.id)?.checked ?? 0,
     assignees: assigneesMap.get(row.id) ?? [],
@@ -95,7 +95,7 @@ export async function createTask(
     title: string;
     description?: string | null;
     assigneeIds?: string[];
-    priority?: string;
+    priority?: TaskPriority;
     dueDate?: string | null;
     columnId: number;
   },
@@ -139,7 +139,7 @@ export async function createTask(
         columnId: data.columnId,
         title: data.title,
         description: data.description ?? null,
-        priority: (data.priority ?? "normal") as TaskPriority,
+        priority: data.priority ?? "normal",
         dueDate: data.dueDate ?? null,
         position: (maxPos?.maxPosition ?? -1) + 1,
         createdBy: callerId,
@@ -191,7 +191,7 @@ export async function createTask(
     title: created.title,
     description: created.description,
     assignees,
-    priority: created.priority as TaskPriority,
+    priority: created.priority,
     dueDate: created.dueDate,
     position: created.position,
     checklistTotal: 0,
@@ -247,7 +247,7 @@ export async function getTaskDetail(id: number): Promise<TaskDetail | null> {
     title: task.title,
     description: task.description,
     assignees,
-    priority: task.priority as TaskPriority,
+    priority: task.priority,
     dueDate: task.dueDate,
     position: task.position,
     checklistTotal: checklist.length,
@@ -273,7 +273,7 @@ export async function updateTask(
     title?: string;
     description?: string | null;
     assigneeIds?: string[];
-    priority?: string;
+    priority?: TaskPriority;
     dueDate?: string | null;
   },
   callerId: string,

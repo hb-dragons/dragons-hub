@@ -13,6 +13,8 @@ import { Input } from "@dragons/ui/components/input";
 import { Checkbox } from "@dragons/ui/components/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@dragons/ui/components/select";
 import { Button } from "@dragons/ui/components/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
 import { cn } from "@dragons/ui/lib/utils";
 import type { RefereeListItem } from "@dragons/shared";
 
@@ -42,7 +44,7 @@ export function RefereeList({ selectedId, onSelect }: Props) {
   const listKey = refereesPaginatedQ.key;
   const refereeCountsQ = queries.refereeCounts();
 
-  const { data } = useSWR(listKey, refereesPaginatedQ.fetcher);
+  const { data, error, isLoading, mutate: reloadList } = useSWR(listKey, refereesPaginatedQ.fetcher);
   const { data: counts } = useSWR(SWR_KEYS.refereeCounts, refereeCountsQ.fetcher, { dedupingInterval: 30_000 });
   const items = data?.items ?? [];
 
@@ -111,20 +113,40 @@ export function RefereeList({ selectedId, onSelect }: Props) {
       </div>
 
       <div className="flex-1 overflow-auto bg-surface-low">
-        {items.length === 0 && <div className="p-4 text-sm text-muted-foreground">{t("empty")}</div>}
+        {/* A failed list is not "no referees match your filters". */}
+        {error ? (
+          <ErrorState className="m-3" onRetry={() => { void reloadList(); }} />
+        ) : isLoading && !data ? (
+          <LoadingState className="p-3" rows={5} />
+        ) : (
+          items.length === 0 && <div className="p-4 text-sm text-muted-foreground">{t("empty")}</div>
+        )}
         {items.map((r) => (
           <div
             key={r.id}
+            role="button"
+            tabIndex={0}
             className={cn(
               "grid grid-cols-[1fr_36px_44px] items-center gap-2 px-3 py-2 border-l-2 border-l-transparent cursor-pointer hover:bg-surface-high",
               selectedId === r.id && "bg-primary/10 border-l-primary hover:bg-primary/10",
             )}
             onClick={() => onSelect(r.id)}
+            onKeyDown={(e) => {
+              // Only act when the row itself is focused — a nested control
+              // (the own-club checkbox) handles its own Enter/Space.
+              if (e.target !== e.currentTarget) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(r.id);
+              }
+            }}
             data-selected={selectedId === r.id}
           >
             <div className="min-w-0">
               <div className="text-sm font-medium truncate">{r.lastName}, {r.firstName}</div>
-              <div className="text-xs opacity-70 truncate">Lic {r.licenseNumber ?? "—"}</div>
+              <div className="text-xs opacity-70 truncate">
+                {t("licenseLabel", { number: r.licenseNumber ?? "—" })}
+              </div>
             </div>
             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
               <Checkbox

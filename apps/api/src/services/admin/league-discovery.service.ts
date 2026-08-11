@@ -78,61 +78,69 @@ export async function setSeasonLeagues(
   const byId = new Map<number, SdkLiga>(all.map((l) => [l.ligaId, l]));
   const selected = ligaIds.map((id) => byId.get(id)).filter((l): l is SdkLiga => Boolean(l));
 
-  for (const l of selected) {
-    const [existing] = await getDb()
-      .select({ id: leagues.id })
-      .from(leagues)
-      .where(eq(leagues.apiLigaId, l.ligaId))
-      .limit(1);
-    const values = {
-      ligaNr: l.liganr ?? 0,
-      name: l.liganame,
-      seasonId: l.seasonId ?? 0,
-      seasonName: l.seasonName ?? "",
-      skName: l.skName || null,
-      akName: l.akName || null,
-      geschlecht: l.geschlecht || null,
-      verbandId: l.verbandId || null,
-      verbandName: l.verbandName || null,
-      seasonRefId: seasonId,
-      vorabliga: l.vorabliga,
-      isTracked: true,
-      updatedAt: new Date(),
-    };
-    if (existing) {
-      await getDb().update(leagues).set(values).where(eq(leagues.id, existing.id));
-    } else {
-      await getDb().insert(leagues).values({
-        apiLigaId: l.ligaId,
-        isActive: true,
-        discoveredAt: new Date(),
-        ...values,
-      });
-    }
-  }
-
-  // Scoped untrack: only this season's leagues not in the new set.
+  // The season's tracked set is replaced as a whole: every selected league is
+  // tracked and everything else in *this* season is untracked. Split across
+  // statements outside a transaction, a failure part-way through leaves the
+  // season half-configured — some leagues tracked, some already untracked — and
+  // a concurrent read (the sync picks its work from `isTracked`) can observe
+  // that state. One transaction, and the per-league SELECT-then-INSERT-or-UPDATE
+  // becomes a single atomic upsert on the `api_liga_id` unique constraint, so
+  // two callers selecting the same league cannot both take the insert branch.
   const keepIds = selected.map((l) => l.ligaId);
-  const untracked =
-    keepIds.length > 0
-      ? await getDb()
-          .update(leagues)
-          .set({ isTracked: false, updatedAt: new Date() })
-          .where(
-            and(
-              eq(leagues.seasonRefId, seasonId),
-              eq(leagues.isTracked, true),
-              notInArray(leagues.apiLigaId, keepIds),
-            ),
-          )
-          .returning({ id: leagues.id })
-      : await getDb()
-          .update(leagues)
-          .set({ isTracked: false, updatedAt: new Date() })
-          .where(and(eq(leagues.seasonRefId, seasonId), eq(leagues.isTracked, true)))
-          .returning({ id: leagues.id });
+  const untrackedCount = await getDb().transaction(async (tx) => {
+    const now = new Date();
 
-  return { tracked: selected.length, untracked: untracked.length };
+    for (const l of selected) {
+      const values = {
+        ligaNr: l.liganr ?? 0,
+        name: l.liganame,
+        seasonId: l.seasonId ?? 0,
+        seasonName: l.seasonName ?? "",
+        skName: l.skName || null,
+        akName: l.akName || null,
+        geschlecht: l.geschlecht || null,
+        verbandId: l.verbandId || null,
+        verbandName: l.verbandName || null,
+        seasonRefId: seasonId,
+        vorabliga: l.vorabliga,
+        isTracked: true,
+        updatedAt: now,
+      };
+
+      await tx
+        .insert(leagues)
+        .values({
+          apiLigaId: l.ligaId,
+          isActive: true,
+          discoveredAt: now,
+          ...values,
+        })
+        .onConflictDoUpdate({
+          target: leagues.apiLigaId,
+          // `isActive` and `discoveredAt` are insert-only: a league that was
+          // deactivated locally must not be silently reactivated, and the
+          // original discovery timestamp is history.
+          set: values,
+        });
+    }
+
+    // Scoped untrack: only this season's leagues not in the new set. Other
+    // seasons are never touched.
+    const inThisSeason = and(eq(leagues.seasonRefId, seasonId), eq(leagues.isTracked, true));
+    const untracked = await tx
+      .update(leagues)
+      .set({ isTracked: false, updatedAt: now })
+      .where(
+        keepIds.length > 0
+          ? and(inThisSeason, notInArray(leagues.apiLigaId, keepIds))
+          : inThisSeason,
+      )
+      .returning({ id: leagues.id });
+
+    return untracked.length;
+  });
+
+  return { tracked: selected.length, untracked: untrackedCount };
 }
 
 export async function getTrackedLeagues(seasonId?: number): Promise<TrackedLeaguesResponse> {

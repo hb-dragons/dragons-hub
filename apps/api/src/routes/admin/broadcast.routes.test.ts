@@ -8,12 +8,28 @@ import {
   vi,
 } from "vitest";
 import { Hono } from "hono";
+import type { AppEnv } from "../../types";
 import type * as BroadcastPublisher from "../../services/broadcast/publisher";
+import type * as ConfigEnv from "../../config/env";
 
 const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 const mocks = vi.hoisted(() => ({
   publishBroadcastForDevice: vi.fn(),
 }));
+
+// "d1" stands in for the single configured scoreboard panel; the routes reject
+// any other deviceId (see the "unknown device" cases below).
+vi.mock("../../config/env", async () => {
+  const actual = await vi.importActual<typeof ConfigEnv>("../../config/env");
+  return {
+    env: new Proxy(actual.env, {
+      get(target, prop) {
+        if (prop === "SCOREBOARD_DEVICE_ID") return "d1";
+        return Reflect.get(target, prop);
+      },
+    }),
+  };
+});
 
 vi.mock("../../config/database", () => ({
   getDb: () => (new Proxy(
@@ -55,7 +71,9 @@ import {
   seasons,
   teams,
 } from "@dragons/db/schema";
+import { todayInClubZone } from "@dragons/shared";
 import { adminBroadcastRoutes } from "./broadcast.routes";
+import { errorHandler } from "../../middleware/error";
 
 let ctx: TestDbContext;
 let activeSeasonId: number;
@@ -78,8 +96,13 @@ afterAll(async () => {
   await closeTestDb(ctx);
 });
 
+// errorHandler is what turns a BroadcastError into its status now that the
+// route no longer catches it. app.ts registers it globally, so wiring it here
+// keeps the test app faithful to production.
 function app() {
-  return new Hono().route("/admin/broadcast", adminBroadcastRoutes);
+  return new Hono<AppEnv>()
+    .onError(errorHandler)
+    .route("/admin/broadcast", adminBroadcastRoutes);
 }
 
 async function seedMatch(): Promise<{ matchId: number }> {
@@ -118,7 +141,9 @@ async function seedMatch(): Promise<{ matchId: number }> {
       apiMatchId: 1,
       matchNo: 1,
       matchDay: 1,
-      kickoffDate: new Date().toISOString().slice(0, 10),
+      // Club day, matching the picker's scope=today filter — a UTC slice would
+      // seed yesterday's fixture between club midnight and UTC midnight.
+      kickoffDate: todayInClubZone(),
       kickoffTime: "19:30:00",
       leagueId: 100,
       homeTeamApiId: 1,
@@ -134,11 +159,17 @@ describe("GET /admin/broadcast/config", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns null config for unknown device", async () => {
-    const res = await app().request("/admin/broadcast/config?deviceId=x");
+  it("returns null config for the configured device before it is bound", async () => {
+    const res = await app().request("/admin/broadcast/config?deviceId=d1");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { config: unknown };
     expect(body.config).toBeNull();
+  });
+
+  it("404s a deviceId that is not the configured panel", async () => {
+    const res = await app().request("/admin/broadcast/config?deviceId=other");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: "UNKNOWN_DEVICE" });
   });
 
   it("returns the config row when present", async () => {
@@ -179,6 +210,20 @@ describe("PUT /admin/broadcast/config", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it("404s an arbitrary deviceId and writes no config row", async () => {
+    const res = await app().request("/admin/broadcast/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: "attacker-device" }),
+    });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: "UNKNOWN_DEVICE" });
+    // The upsert used to happily create a row for any id the admin UI sent.
+    const rows = await ctx.db.select().from(broadcastConfigs);
+    expect(rows).toHaveLength(0);
+    expect(mocks.publishBroadcastForDevice).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /admin/broadcast/start", () => {
@@ -205,6 +250,16 @@ describe("POST /admin/broadcast/start", () => {
     expect(row!.isLive).toBe(true);
     expect(mocks.publishBroadcastForDevice).toHaveBeenCalledWith("d1");
   });
+
+  it("404s an arbitrary deviceId without publishing", async () => {
+    const res = await app().request("/admin/broadcast/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: "attacker-device" }),
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.publishBroadcastForDevice).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /admin/broadcast/stop", () => {
@@ -224,6 +279,16 @@ describe("POST /admin/broadcast/stop", () => {
     const [row] = await ctx.db.select().from(broadcastConfigs);
     expect(row!.isLive).toBe(false);
     expect(mocks.publishBroadcastForDevice).toHaveBeenCalledWith("d1");
+  });
+
+  it("404s an arbitrary deviceId without publishing", async () => {
+    const res = await app().request("/admin/broadcast/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: "attacker-device" }),
+    });
+    expect(res.status).toBe(404);
+    expect(mocks.publishBroadcastForDevice).not.toHaveBeenCalled();
   });
 });
 
@@ -276,7 +341,7 @@ describe("GET /admin/broadcast/matches", () => {
         isOwnClub: false,
       },
     ]);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInClubZone();
     await ctx.db.insert(matches).values([
       {
         apiMatchId: 10,

@@ -21,6 +21,21 @@ jobs:
     name: Build and Package
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # This job runs `pnpm test`, and a few API modules reach Redis for real —
+    # bullmq builds its own ioredis client from the connection URL rather than
+    # going through `config/redis`. Without this service the socket rejection
+    # escapes as an unhandled rejection and fails the job with every test
+    # passing. Keep in sync with the same block in ci.yml.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       TURBO_API: http://localhost:9080
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}

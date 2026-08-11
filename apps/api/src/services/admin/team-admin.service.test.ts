@@ -407,7 +407,9 @@ describe("reorderOwnClubTeams", () => {
     const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
     await insertOwnClubTeam({ api_team_permanent_id: 2, name: "B" });
 
-    await expect(reorderOwnClubTeams([a])).rejects.toThrow(/INVALID_TEAM_SET/);
+    await expect(reorderOwnClubTeams([a])).rejects.toThrow(
+      expect.objectContaining({ code: "INVALID_TEAM_SET" }),
+    );
   });
 
   it("rejects when teamIds contains a non-own-club team", async () => {
@@ -418,14 +420,18 @@ describe("reorderOwnClubTeams", () => {
       is_own_club: false,
     });
 
-    await expect(reorderOwnClubTeams([a, foreign])).rejects.toThrow(/INVALID_TEAM_SET/);
+    await expect(reorderOwnClubTeams([a, foreign])).rejects.toThrow(
+      expect.objectContaining({ code: "INVALID_TEAM_SET" }),
+    );
   });
 
   it("rejects duplicate teamIds", async () => {
     const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
     const b = await insertOwnClubTeam({ api_team_permanent_id: 2, name: "B" });
 
-    await expect(reorderOwnClubTeams([a, b, a])).rejects.toThrow(/DUPLICATE_TEAM_ID/);
+    await expect(reorderOwnClubTeams([a, b, a])).rejects.toThrow(
+      expect.objectContaining({ code: "DUPLICATE_TEAM_ID" }),
+    );
   });
 });
 

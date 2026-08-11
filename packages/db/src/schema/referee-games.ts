@@ -9,6 +9,7 @@ import {
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
+import type { RefereeSlotStatus } from "@dragons/shared";
 import { matches } from "./matches";
 import { teams } from "./teams";
 
@@ -17,7 +18,10 @@ export const refereeGames = pgTable(
   {
     id: serial("id").primaryKey(),
     apiMatchId: integer("api_match_id").notNull().unique(),
-    matchId: integer("match_id").references(() => matches.id),
+    // referee_games is synced independently and keyed by `api_match_id`; the
+    // link to a local match is enrichment, not ownership. Deleting the match
+    // unlinks the referee game rather than destroying the officiating record.
+    matchId: integer("match_id").references(() => matches.id, { onDelete: "set null" }),
     matchNo: integer("match_no").notNull(),
     kickoffDate: date("kickoff_date").notNull(),
     kickoffTime: time("kickoff_time").notNull(),
@@ -33,8 +37,10 @@ export const refereeGames = pgTable(
     sr2Name: varchar("sr2_name", { length: 150 }),
     sr1RefereeApiId: integer("sr1_referee_api_id"),
     sr2RefereeApiId: integer("sr2_referee_api_id"),
-    sr1Status: varchar("sr1_status", { length: 20 }).notNull().default("open"),
-    sr2Status: varchar("sr2_status", { length: 20 }).notNull().default("open"),
+    sr1Status: varchar("sr1_status", { length: 20 }).notNull().default("open")
+      .$type<RefereeSlotStatus>(),
+    sr2Status: varchar("sr2_status", { length: 20 }).notNull().default("open")
+      .$type<RefereeSlotStatus>(),
     isCancelled: boolean("is_cancelled").notNull().default(false),
     isForfeited: boolean("is_forfeited").notNull().default(false),
     homeClubId: integer("home_club_id"),
@@ -49,6 +55,10 @@ export const refereeGames = pgTable(
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // Tombstone. Set when a future game disappears from a verifiably complete
+    // offenespiele feed (issue #105). Soft, not hard, so referee history and
+    // anything attached to the game survive the withdrawal.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
   },
   (table) => [
     index("referee_games_match_id_idx").on(table.matchId),

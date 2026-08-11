@@ -11,6 +11,7 @@ import {
   syncRefereesFromData,
   syncRefereeRolesFromData,
   syncRefereeAssignmentsFromData,
+  removeStaleRefereeAssignments,
   buildMatchIdLookup,
   confirmIntentsFromSync,
 } from "./referees.sync";
@@ -42,6 +43,7 @@ export interface SyncResult {
     rolesUpdated: number;
     rolesSkipped: number;
     assignmentsCreated: number;
+    assignmentsRemoved: number;
     errors: number;
   };
   totalErrors: string[];
@@ -135,6 +137,7 @@ export async function fullSync(
     allErrors.push(...teamsRes.errors);
     allErrors.push(...venuesRes.errors);
     allErrors.push(...refereesRes.errors);
+    allErrors.push(...rolesRes.errors);
     allErrors.push(...standingsRes.errors);
 
     // Step 4: Matches sync (needs venue FK lookup)
@@ -165,6 +168,22 @@ export async function fullSync(
     );
     committedAny = true;
     allErrors.push(...assignmentsRes.errors);
+
+    // Step 5.1: Tombstone assignments the federation no longer reports (issue
+    // #105). Guarded — a partial fetch is refused rather than read as removal.
+    const removalRes = await removeStaleRefereeAssignments(
+      syncData.leagueData,
+      refereeAssignments,
+      matchIdLookup,
+      syncLogger,
+      syncRun.id,
+    );
+    allErrors.push(...removalRes.errors);
+    if (removalRes.skipped) {
+      await logStep(`Referee assignment removal skipped: ${removalRes.reason}`);
+    } else if (removalRes.removed > 0) {
+      await logStep(`Removed ${removalRes.removed} stale referee assignments`);
+    }
 
     // Step 5.25: Confirm referee assignment intents
     await logStep("Confirming referee assignment intents...");
@@ -222,6 +241,7 @@ export async function fullSync(
         rolesUpdated: rolesRes.updated,
         rolesSkipped: rolesRes.skipped,
         assignmentsCreated: assignmentsRes.created,
+        assignmentsRemoved: removalRes.removed,
       },
     };
 
@@ -285,7 +305,8 @@ export async function fullSync(
         rolesUpdated: rolesRes.updated,
         rolesSkipped: rolesRes.skipped,
         assignmentsCreated: assignmentsRes.created,
-        errors: refereesRes.errors.length + assignmentsRes.errors.length,
+        assignmentsRemoved: removalRes.removed,
+        errors: refereesRes.errors.length + assignmentsRes.errors.length + removalRes.errors.length,
       },
       totalErrors: allErrors,
       status: "completed",
@@ -365,7 +386,7 @@ export async function fullSync(
       matches: { created: 0, updated: 0, skipped: 0, errors: 0 },
       standings: { created: 0, updated: 0, skipped: 0, errors: 0 },
       venues: { created: 0, updated: 0, skipped: 0, errors: 0 },
-      referees: { created: 0, updated: 0, skipped: 0, rolesCreated: 0, rolesUpdated: 0, rolesSkipped: 0, assignmentsCreated: 0, errors: 0 },
+      referees: { created: 0, updated: 0, skipped: 0, rolesCreated: 0, rolesUpdated: 0, rolesSkipped: 0, assignmentsCreated: 0, assignmentsRemoved: 0, errors: 0 },
       totalErrors: allErrors,
       status: failureStatus,
     };

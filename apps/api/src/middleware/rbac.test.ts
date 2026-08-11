@@ -18,11 +18,9 @@ import {
   requireAuth,
   requireAnyRole,
   requirePermission,
-  assertPermission,
   requireRefereeSelf,
   requireRefereeSelfOrAdminRole,
 } from "./rbac";
-import { errorHandler } from "./error";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -181,73 +179,79 @@ describe("requirePermission", () => {
   });
 });
 
-// --- assertPermission ---
-describe("assertPermission", () => {
-  const app = new Hono();
-  app.use("/x/*", requireAuth);
-  app.get("/x/row/:id", async (c) => {
-    await assertPermission(c, "assignment", "update");
-    return c.json({ ok: true });
-  });
+// --- session reuse ---
+//
+// Production mounts these guards behind `app.use("/admin/*", requireAuth)`, so
+// every admin request used to resolve the session twice: once in requireAuth and
+// again in the granular guard. The guards now read what requireAuth left on the
+// context, and still fetch when nothing is there.
+describe("session lookups per request", () => {
+  const withAuth = new Hono();
+  withAuth.use("/admin/*", requireAuth);
+  withAuth.use("/admin/perm/*", requirePermission("referee", "update"));
+  withAuth.use("/admin/role/*", requireAnyRole("admin"));
+  withAuth.get("/admin/perm/x", (c) => c.json({ ok: true }));
+  withAuth.get("/admin/role/x", (c) => c.json({ ok: true }));
 
-  it("throws 403 when permission denied", async () => {
-    mockGetSession.mockResolvedValue({
-      user: { id: "u1", role: "venueManager" },
-      session: { id: "s1" },
-    });
-    mockUserHasPermission.mockResolvedValue({ success: false });
-    const res = await app.request("/x/row/42");
-    expect(res.status).toBe(403);
-  });
+  const adminSession = { user: { id: "u1", role: "admin" }, session: { id: "s1" } };
 
-  it("returns 200 when permission granted", async () => {
-    mockGetSession.mockResolvedValue({
-      user: { id: "u1", role: "refereeAdmin" },
-      session: { id: "s1" },
-    });
+  it("resolves the session once when requireAuth precedes requirePermission", async () => {
+    mockGetSession.mockResolvedValue(adminSession);
     mockUserHasPermission.mockResolvedValue({ success: true });
-    const res = await app.request("/x/row/42");
+
+    const res = await withAuth.request("/admin/perm/x");
+
     expect(res.status).toBe(200);
-  });
-});
-
-// --- assertPermission with errorHandler registered ---
-// Regression guard: without errorHandler branching on HTTPException, these
-// throws would reach the default 500 fallthrough and mask the real status.
-describe("assertPermission with errorHandler registered", () => {
-  const app = new Hono<AppEnv>();
-  app.onError(errorHandler);
-  app.use("/y/*", requireAuth);
-  app.get("/y/row/:id", async (c) => {
-    await assertPermission(c, "assignment", "update");
-    return c.json({ ok: true });
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
   });
 
-  it("returns 403 with FORBIDDEN when permission denied (not 500)", async () => {
-    mockGetSession.mockResolvedValue({
-      user: { id: "u1", role: "venueManager" },
-      session: { id: "s1" },
+  it("resolves the session once when requireAuth precedes requireAnyRole", async () => {
+    mockGetSession.mockResolvedValue(adminSession);
+
+    const res = await withAuth.request("/admin/role/x");
+
+    expect(res.status).toBe(200);
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("still passes the cached user id to userHasPermission", async () => {
+    mockGetSession.mockResolvedValue(adminSession);
+    mockUserHasPermission.mockResolvedValue({ success: true });
+
+    await withAuth.request("/admin/perm/x");
+
+    expect(mockUserHasPermission).toHaveBeenCalledWith({
+      body: { userId: "u1", permissions: { referee: ["update"] } },
     });
-    mockUserHasPermission.mockResolvedValue({ success: false });
-    const res = await app.request("/y/row/42");
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body).toEqual({ error: "Forbidden", code: "FORBIDDEN" });
   });
 
-  it("returns 401 with UNAUTHORIZED when user is missing from context", async () => {
-    // Build a separate app that skips requireAuth so assertPermission sees no user
-    const appNoAuth = new Hono<AppEnv>();
-    appNoAuth.onError(errorHandler);
-    appNoAuth.get("/y/row/:id", async (c) => {
-      await assertPermission(c, "assignment", "update");
-      return c.json({ ok: true });
-    });
+  // The guards must not assume requireAuth ran: mounted alone they fetch the
+  // session themselves and populate the context for downstream handlers.
+  it("fetches and populates the context when requirePermission is mounted alone", async () => {
+    const solo = new Hono<AppEnv>();
+    solo.use("/solo/*", requirePermission("referee", "update"));
+    solo.get("/solo/x", (c) => c.json({ userId: c.get("user").id, sessionId: c.get("session").id }));
 
-    const res = await appNoAuth.request("/y/row/42");
-    expect(res.status).toBe(401);
-    const body = await res.json();
-    expect(body).toEqual({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    mockGetSession.mockResolvedValue(adminSession);
+    mockUserHasPermission.mockResolvedValue({ success: true });
+
+    const res = await solo.request("/solo/x");
+
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(await res.json()).toEqual({ userId: "u1", sessionId: "s1" });
+  });
+
+  it("fetches and populates the context when requireAnyRole is mounted alone", async () => {
+    const solo = new Hono<AppEnv>();
+    solo.use("/solo/*", requireAnyRole("admin"));
+    solo.get("/solo/x", (c) => c.json({ userId: c.get("user").id, sessionId: c.get("session").id }));
+
+    mockGetSession.mockResolvedValue(adminSession);
+
+    const res = await solo.request("/solo/x");
+
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(await res.json()).toEqual({ userId: "u1", sessionId: "s1" });
   });
 });
 

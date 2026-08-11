@@ -1,8 +1,7 @@
 import { useSWRConfig } from "swr";
 import { adminBoardApi } from "@/lib/api";
-import { haptics } from "@/lib/haptics";
 import { useToast } from "@/hooks/useToast";
-import { i18n } from "@/lib/i18n";
+import { withErrorToast } from "@/lib/board/with-error-toast";
 import { taskKey } from "./useTaskDetail";
 
 const tasksPrefix = (boardId: number) => `admin/boards/${boardId}/tasks`;
@@ -18,26 +17,24 @@ export function useAssigneeMutations(boardId: number) {
     ]);
   }
 
-  async function withErrorToast<T>(fn: () => Promise<T>): Promise<T> {
-    try {
-      return await fn();
-    } catch (error) {
-      haptics.warning();
-      toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
-      throw error;
-    }
-  }
-
   return {
     add: (taskId: number, userId: string) =>
-      withErrorToast(async () => {
-        await adminBoardApi.addAssignee(taskId, userId);
-        await reconcile(taskId);
-      }),
+      withErrorToast(
+        async () => {
+          await adminBoardApi.addAssignee(taskId, userId);
+          await reconcile(taskId);
+        },
+        "toast.saveFailed",
+        toast,
+      ),
     remove: (taskId: number, userId: string) =>
-      withErrorToast(async () => {
-        await adminBoardApi.removeAssignee(taskId, userId);
-        await reconcile(taskId);
-      }),
+      withErrorToast(
+        async () => {
+          await adminBoardApi.removeAssignee(taskId, userId);
+          await reconcile(taskId);
+        },
+        "toast.deleteFailed",
+        toast,
+      ),
   };
 }

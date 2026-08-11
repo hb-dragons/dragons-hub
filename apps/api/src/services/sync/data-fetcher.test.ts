@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import type { SdkGetGameResponse, SdkSpielplanMatch, SdkTabelleEntry } from "@dragons/sdk";
 
 // --- Mock setup ---
@@ -15,22 +15,18 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
-const mockSelect = vi.fn();
+// Real Postgres (pglite) with real migrations and the real `eq` operator. The
+// previous mocked-ORM version stubbed `eq` to a bare `vi.fn()` and fed `select()` a
+// fixed row list, so `where(eq(leagues.isTracked, true))` was never executed —
+// flipping the tracked filter to `false` left all 16 tests green.
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockSelect(...args),
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  leagues: { id: "id", apiLigaId: "apiLigaId", isTracked: "isTracked", seasonRefId: "seasonRefId" },
-  seasons: { id: "id", status: "status" },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-  inArray: vi.fn(),
+  getDb: () =>
+    new Proxy(
+      {},
+      { get: (_t, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop] },
+    ),
 }));
 
 const mockPLimit = vi.fn();
@@ -56,10 +52,60 @@ vi.mock("./sdk-client", () => ({
 
 import { fetchAllSyncData, extractRefereeAssignments } from "./data-fetcher";
 import type { LeagueFetchedData } from "./data-fetcher";
+import { leagues, seasons } from "@dragons/db/schema";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
-beforeEach(() => {
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  dbHolder.ref = ctx.db;
   vi.clearAllMocks();
 });
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
+
+/**
+ * Insert leagues under an active season and return their generated ids in
+ * insertion order. `leagues.seasonRefId` is NOT NULL and the fetch is gated on
+ * the season being active or upcoming, so every league needs a season to live
+ * in — `data-fetcher.season-gate.test.ts` covers the gate itself.
+ */
+async function seedLeagues(
+  rows: Array<{ apiLigaId: number; name: string; isTracked?: boolean }>,
+): Promise<number[]> {
+  const [season] = await ctx.db
+    .insert(seasons)
+    .values({ name: "2025/26", status: "active" })
+    .returning({ id: seasons.id });
+  const inserted = await ctx.db
+    .insert(leagues)
+    .values(
+      rows.map((r) => ({
+        apiLigaId: r.apiLigaId,
+        ligaNr: r.apiLigaId,
+        name: r.name,
+        seasonId: 2025,
+        seasonName: "2025/26",
+        seasonRefId: season!.id,
+        isTracked: r.isTracked ?? true,
+      })),
+    )
+    .returning({ id: leagues.id });
+  return inserted.map((r) => r.id);
+}
 
 function makeMatch(overrides: Partial<SdkSpielplanMatch> = {}): SdkSpielplanMatch {
   return {
@@ -109,6 +155,21 @@ function makeGameResponse(overrides: Partial<SdkGetGameResponse> = {}): SdkGetGa
       spieltag: 1,
       spieldatum: Date.now(),
       spielfeldId: 50,
+      // Status/provenance fields the live API returns (SdkGameDetails).
+      ergebnisbestaetigt: false,
+      verzicht: false,
+      abgesagt: false,
+      ergebnisVon: "SR",
+      dssUseraccountId: null,
+      spielortGeandert: false,
+      spielzeitGeandert: false,
+      liga: null,
+      spielleitungList: null,
+      sr1Verein: null,
+      sr2Verein: null,
+      sr1VereinInformiert: null,
+      sr2VereinInformiert: null,
+      ats: null,
       heimEndstand: 0,
       gastEndstand: 0,
       heimHalbzeitstand: 0,
@@ -156,13 +217,6 @@ function makeGameResponse(overrides: Partial<SdkGetGameResponse> = {}): SdkGetGa
 
 describe("fetchAllSyncData", () => {
   it("returns empty data when no tracked leagues in DB", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
 
     const result = await fetchAllSyncData();
 
@@ -172,17 +226,43 @@ describe("fetchAllSyncData", () => {
     expect(result.referees.size).toBe(0);
   });
 
-  it("fetches data for tracked leagues", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([
-          { id: 1, apiLigaId: 1001, name: "Test Liga" },
-          { id: 2, apiLigaId: 1002, name: "Test Liga 2" },
-        ]),
-        }),
-      }),
+  it("returns empty data and never authenticates when every league is untracked", async () => {
+    await seedLeagues([{ apiLigaId: 1001, name: "Untracked", isTracked: false }]);
+
+    const result = await fetchAllSyncData();
+
+    expect(result.leagueData).toHaveLength(0);
+    expect(mockEnsureAuthenticated).not.toHaveBeenCalled();
+    expect(mockGetSpielplan).not.toHaveBeenCalled();
+  });
+
+  it("fetches only the tracked leagues, carrying their real db id and name", async () => {
+    const [trackedId] = await seedLeagues([
+      { apiLigaId: 1001, name: "Test Liga" },
+      { apiLigaId: 1002, name: "Untracked Liga", isTracked: false },
+    ]);
+    mockEnsureAuthenticated.mockResolvedValue(undefined);
+    mockGetSpielplan.mockResolvedValue([makeMatch()]);
+    mockGetTabelle.mockResolvedValue([]);
+    mockGetGameDetailsBatch.mockResolvedValue(new Map([[1000, makeGameResponse()]]));
+
+    const result = await fetchAllSyncData();
+
+    expect(result.leagueData).toHaveLength(1);
+    expect(result.leagueData[0]).toMatchObject({
+      leagueApiId: 1001,
+      leagueDbId: trackedId,
+      leagueName: "Test Liga",
     });
+    expect(mockGetSpielplan).toHaveBeenCalledTimes(1);
+    expect(mockGetSpielplan).toHaveBeenCalledWith(1001);
+  });
+
+  it("fetches data for tracked leagues", async () => {
+    await seedLeagues([
+      { apiLigaId: 1001, name: "Test Liga" },
+      { apiLigaId: 1002, name: "Test Liga 2" },
+    ]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([makeMatch()]);
     mockGetTabelle.mockResolvedValue([]);
@@ -191,17 +271,12 @@ describe("fetchAllSyncData", () => {
     const result = await fetchAllSyncData();
 
     expect(result.leagueData).toHaveLength(2);
+    expect([...result.leagueData].map((d) => d.leagueApiId).sort()).toEqual([1001, 1002]);
     expect(mockEnsureAuthenticated).toHaveBeenCalled();
   });
 
   it("collects unique teams from match data", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([
       makeMatch({ homeTeam: { teamPermanentId: 10, seasonTeamId: 1, teamCompetitionId: 1, teamname: "A", teamnameSmall: "A", clubId: 1, verzicht: false } }),
@@ -218,13 +293,7 @@ describe("fetchAllSyncData", () => {
 
   it("collects unique venues from game details", async () => {
     const gameResp = makeGameResponse();
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([makeMatch()]);
     mockGetTabelle.mockResolvedValue([]);
@@ -265,13 +334,7 @@ describe("fetchAllSyncData", () => {
         offenAngeboten: false,
       },
     });
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([makeMatch()]);
     mockGetTabelle.mockResolvedValue([]);
@@ -284,13 +347,7 @@ describe("fetchAllSyncData", () => {
   });
 
   it("handles matches with no matchId", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([makeMatch({ matchId: 0 })]);
     mockGetTabelle.mockResolvedValue([]);
@@ -302,13 +359,7 @@ describe("fetchAllSyncData", () => {
   });
 
   it("skips teams with no teamPermanentId and warns for null teams", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([
       makeMatch({ homeTeam: null, guestTeam: null }),
@@ -331,13 +382,7 @@ describe("fetchAllSyncData", () => {
   });
 
   it("warns for zero teamPermanentId in spielplan", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([
       makeMatch({
@@ -360,13 +405,7 @@ describe("fetchAllSyncData", () => {
   });
 
   it("collects teams from tabelle entries", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([]);
     mockGetTabelle.mockResolvedValue([
@@ -386,13 +425,7 @@ describe("fetchAllSyncData", () => {
   });
 
   it("skips tabelle entries with zero teamPermanentId", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([]);
     mockGetTabelle.mockResolvedValue([
@@ -415,13 +448,7 @@ describe("fetchAllSyncData", () => {
     gameResp.game1.heimMannschaftLiga.mannschaft.spielfeld = null;
     gameResp.game1.gastMannschaftLiga.mannschaft.spielfeld = null;
 
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([makeMatch()]);
     mockGetTabelle.mockResolvedValue([]);
@@ -449,13 +476,7 @@ describe("fetchAllSyncData", () => {
       },
     });
 
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([{ id: 1, apiLigaId: 1001, name: "Test Liga" }]),
-        }),
-      }),
-    });
+    await seedLeagues([{ apiLigaId: 1001, name: "Test Liga" }]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([makeMatch()]);
     mockGetTabelle.mockResolvedValue([]);
@@ -467,16 +488,10 @@ describe("fetchAllSyncData", () => {
   });
 
   it("limits league fetch concurrency to 3", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue([
-          { id: 1, apiLigaId: 100, name: "League A" },
-          { id: 2, apiLigaId: 200, name: "League B" },
-        ]),
-        }),
-      }),
-    });
+    await seedLeagues([
+      { apiLigaId: 100, name: "League A" },
+      { apiLigaId: 200, name: "League B" },
+    ]);
     mockEnsureAuthenticated.mockResolvedValue(undefined);
     mockGetSpielplan.mockResolvedValue([]);
     mockGetTabelle.mockResolvedValue([]);

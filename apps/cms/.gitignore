@@ -1,0 +1,13 @@
+# next.js
+/.next/
+/out/
+
+# env files
+.env*
+
+# local dev media uploads (prod uses GCS)
+/media/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ArrowUp, ArrowDown, X } from "lucide-react";
 import { Button } from "@dragons/ui/components/button";
 import { Badge } from "@dragons/ui/components/badge";
@@ -23,6 +24,8 @@ export function MatchReviewStep({
   onNext,
   onBack,
 }: MatchReviewStepProps) {
+  const t = useTranslations("socialWizard");
+
   function moveUp(index: number) {
     if (index === 0) return;
     const updated = [...matches];
@@ -56,12 +59,12 @@ export function MatchReviewStep({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Spiele auswählen</CardTitle>
+        <CardTitle>{t("selectMatchesTitle")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {loading && (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
-            <span className="animate-pulse">Spiele werden geladen…</span>
+            <span className="animate-pulse">{t("loadingMatches")}</span>
           </div>
         )}
 
@@ -72,7 +75,7 @@ export function MatchReviewStep({
         )}
 
         {!loading && !error && matches.length === 0 && (
-          <div className="py-8 text-center text-muted-foreground">Keine Spiele gefunden</div>
+          <div className="py-8 text-center text-muted-foreground">{t("noMatchesFound")}</div>
         )}
 
         {!loading && !error && matches.length > 0 && (
@@ -89,7 +92,7 @@ export function MatchReviewStep({
                     className="h-6 w-6"
                     disabled={index === 0}
                     onClick={() => moveUp(index)}
-                    aria-label="Nach oben"
+                    aria-label={t("moveUpAria")}
                   >
                     <ArrowUp className="h-3 w-3" />
                   </Button>
@@ -99,7 +102,7 @@ export function MatchReviewStep({
                     className="h-6 w-6"
                     disabled={index === matches.length - 1}
                     onClick={() => moveDown(index)}
-                    aria-label="Nach unten"
+                    aria-label={t("moveDownAria")}
                   >
                     <ArrowDown className="h-3 w-3" />
                   </Button>
@@ -109,10 +112,10 @@ export function MatchReviewStep({
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="font-medium">{match.teamLabel}</span>
                     <span className="font-mono text-muted-foreground">{formatScore(match)}</span>
-                    <span className="text-muted-foreground">vs</span>
+                    <span className="text-muted-foreground">{t("vsLabel")}</span>
                     <span>{match.opponent}</span>
                     <Badge variant={match.isHome ? "default" : "secondary"}>
-                      {match.isHome ? "Heim" : "Auswärts"}
+                      {match.isHome ? t("homeLabel") : t("awayLabel")}
                     </Badge>
                   </div>
                 </div>
@@ -122,7 +125,7 @@ export function MatchReviewStep({
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
                   onClick={() => removeMatch(index)}
-                  aria-label="Spiel entfernen"
+                  aria-label={t("removeMatchAria")}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -133,10 +136,10 @@ export function MatchReviewStep({
 
         <div className="flex justify-between pt-2">
           <Button variant="outline" onClick={onBack}>
-            Zurück
+            {t("back")}
           </Button>
           <Button onClick={onNext} disabled={matches.length === 0}>
-            Assets auswählen
+            {t("selectAssetsLabel")}
           </Button>
         </div>
       </CardContent>

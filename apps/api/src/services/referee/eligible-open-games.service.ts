@@ -1,7 +1,11 @@
 import pLimit from "p-limit";
+import { eq } from "drizzle-orm";
+import { getDb } from "../../config/database";
+import { referees } from "@dragons/db/schema";
 import { getRefereeGames } from "./referee-games.service";
 import { searchCandidates } from "./referee-assignment.service";
 import { isRefereeEligibleForGame } from "./referee-slot-resolver";
+import { RefereeSettingsError } from "../admin/referee-admin.errors";
 import type { EligibleOpenGamesResponse, RefereeGameListItem } from "@dragons/shared";
 
 /**
@@ -48,4 +52,30 @@ export async function getEligibleOpenGames(
   );
 
   return { items: evaluated.filter((g): g is RefereeGameListItem => g !== null) };
+}
+
+/**
+ * Route-facing entry point: resolves the internal referee id to the federation
+ * `apiId` `getEligibleOpenGames` needs, throwing `RefereeSettingsError`
+ * `NOT_FOUND` for an unknown referee.
+ *
+ * `getEligibleOpenGames` itself stays unrestricted and keyed on `apiId` —
+ * callers that already hold one (e.g. a future federation-facing caller with
+ * no local referee row to resolve) still call it directly. Reusing
+ * `RefereeSettingsError` rather than adding a class here avoids a second
+ * one-entry status table for the same code (see `referee-admin.errors.ts`).
+ */
+export async function getEligibleOpenGamesForReferee(
+  id: number,
+): Promise<EligibleOpenGamesResponse> {
+  const [row] = await getDb()
+    .select({ apiId: referees.apiId })
+    .from(referees)
+    .where(eq(referees.id, id))
+    .limit(1);
+
+  if (!row) {
+    throw new RefereeSettingsError("Referee not found", "NOT_FOUND");
+  }
+  return getEligibleOpenGames(row.apiId);
 }

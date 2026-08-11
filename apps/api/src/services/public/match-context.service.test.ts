@@ -1,304 +1,353 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
+import { traceQueries, type QueryTrace } from "../../test/trace-queries";
 
 // --- Mocks (hoisted before imports) ---
+//
+// Deliberately NOT mocking drizzle-orm or @dragons/db/schema. The head-to-head
+// query is the whole service: `WHERE both scores present AND ((home=A AND
+// guest=B) OR (home=B AND guest=A))`. Under the old identity stubs that nested
+// predicate was inert — swapping the outer `or` for an `and`, which makes every
+// H2H record permanently empty, left all nine tests green — and the six query
+// results were hand-fed in a fixed order, so a change of query order alone
+// would have silently rewired the assertions.
 
-const mocks = vi.hoisted(() => ({
-  select: vi.fn(),
-  from: vi.fn(),
-  where: vi.fn(),
-  limit: vi.fn(),
-  orderBy: vi.fn(),
-}));
-
-const chainable = {
-  from: mocks.from,
-  where: mocks.where,
-  limit: mocks.limit,
-  orderBy: mocks.orderBy,
-};
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => {
-      mocks.select(...args);
-      return chainable;
-    },
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  matches: {
-    id: "matches.id",
-    homeTeamApiId: "matches.home_team_api_id",
-    guestTeamApiId: "matches.guest_team_api_id",
-    homeScore: "matches.home_score",
-    guestScore: "matches.guest_score",
-    kickoffDate: "matches.kickoff_date",
-  },
-  teams: {
-    apiTeamPermanentId: "teams.api_team_permanent_id",
-    isOwnClub: "teams.is_own_club",
-    name: "teams.name",
-  },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-  or: vi.fn(),
-  desc: vi.fn(),
-  isNotNull: vi.fn(),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) =>
+          (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
 // --- Imports (after mocks) ---
 
 import { getMatchContext } from "./match-context.service";
+import { matches, teams } from "@dragons/db/schema";
 
-// --- Helpers ---
+const DRAGONS = 10;
+const RIVALS = 20;
+const THIRD = 30;
 
-/**
- * Query 1: match lookup — select().from().where().limit()
- * Terminal: limit
- */
-function setupMatchLookup(result: unknown[]) {
-  chainable.from.mockReturnValueOnce(chainable);
-  chainable.where.mockReturnValueOnce(chainable);
-  chainable.limit.mockResolvedValueOnce(result);
-}
+let ctx: TestDbContext;
+let trace: QueryTrace;
 
-/**
- * Query 2: h2h matches — select().from().where().orderBy()
- * Terminal: orderBy (no .limit() in service code)
- */
-function setupH2HQuery(result: unknown[]) {
-  chainable.from.mockReturnValueOnce(chainable);
-  chainable.where.mockReturnValueOnce(chainable);
-  chainable.orderBy.mockResolvedValueOnce(result);
-}
-
-/**
- * Query 3/4: team row lookup — select().from().where().limit()
- * Terminal: limit
- */
-function setupTeamRow(result: unknown[]) {
-  chainable.from.mockReturnValueOnce(chainable);
-  chainable.where.mockReturnValueOnce(chainable);
-  chainable.limit.mockResolvedValueOnce(result);
-}
-
-/**
- * Query 5/6: getTeamForm — select().from().where().orderBy().limit()
- * Terminal: limit (orderBy is intermediate)
- */
-function setupFormQuery(result: unknown[]) {
-  chainable.from.mockReturnValueOnce(chainable);
-  chainable.where.mockReturnValueOnce(chainable);
-  chainable.orderBy.mockReturnValueOnce(chainable);
-  chainable.limit.mockResolvedValueOnce(result);
-}
-
-// --- Tests ---
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  Object.values(chainable).forEach((fn) => fn.mockReturnValue(chainable));
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  trace = traceQueries(ctx.db as object);
+  dbHolder.ref = trace.db;
 });
 
-describe("getMatchContext", () => {
-  it("returns null when match not found", async () => {
-    setupMatchLookup([]);
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  vi.clearAllMocks();
+  trace.reset();
+});
 
-    const result = await getMatchContext(999);
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
-    expect(result).toBeNull();
+async function seedTeam(
+  apiTeamPermanentId: number,
+  name: string,
+  isOwnClub: boolean,
+): Promise<void> {
+  await ctx.db.insert(teams).values({
+    apiTeamPermanentId,
+    seasonTeamId: apiTeamPermanentId * 10,
+    teamCompetitionId: apiTeamPermanentId,
+    name,
+    clubId: isOwnClub ? 1 : 2,
+    isOwnClub,
+  });
+}
+
+interface MatchSpec {
+  apiMatchId: number;
+  home: number;
+  guest: number;
+  kickoffDate: string;
+  homeScore?: number | null;
+  guestScore?: number | null;
+}
+
+async function seedMatch(spec: MatchSpec): Promise<number> {
+  const [row] = await ctx.db
+    .insert(matches)
+    .values({
+      apiMatchId: spec.apiMatchId,
+      matchNo: spec.apiMatchId,
+      matchDay: 1,
+      kickoffDate: spec.kickoffDate,
+      kickoffTime: "18:00:00",
+      homeTeamApiId: spec.home,
+      guestTeamApiId: spec.guest,
+      homeScore: spec.homeScore ?? null,
+      guestScore: spec.guestScore ?? null,
+    })
+    .returning({ id: matches.id });
+  return row!.id;
+}
+
+/** Dragons (own club) at home vs Rivals — the fixture the context is asked about. */
+async function seedUpcomingFixture(): Promise<number> {
+  await seedTeam(DRAGONS, "Dragons", true);
+  await seedTeam(RIVALS, "Rivals", false);
+  return seedMatch({
+    apiMatchId: 1,
+    home: DRAGONS,
+    guest: RIVALS,
+    kickoffDate: "2026-04-01",
+  });
+}
+
+describe("getMatchContext — guards", () => {
+  it("returns null when the match does not exist", async () => {
+    expect(await getMatchContext(999)).toBeNull();
   });
 
   it("returns null when neither team is own club (#82)", async () => {
-    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
-    setupH2HQuery([]);
-    setupTeamRow([{ isOwnClub: false, name: "Foreign A" }]);
-    setupTeamRow([{ isOwnClub: false, name: "Foreign B" }]);
+    await seedTeam(DRAGONS, "Foreign A", false);
+    await seedTeam(RIVALS, "Foreign B", false);
+    const id = await seedMatch({
+      apiMatchId: 1,
+      home: DRAGONS,
+      guest: RIVALS,
+      kickoffDate: "2026-04-01",
+    });
 
-    const result = await getMatchContext(1);
-
-    // No own-club side → "our team" W/L is meaningless and the detail route
-    // hides the match, so context must not be exposed.
-    expect(result).toBeNull();
+    expect(await getMatchContext(id)).toBeNull();
   });
 
   it("returns null when both teams are own club (#82)", async () => {
-    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
-    setupH2HQuery([]);
-    setupTeamRow([{ isOwnClub: true, name: "Dragons A" }]);
-    setupTeamRow([{ isOwnClub: true, name: "Dragons B" }]);
+    await seedTeam(DRAGONS, "Dragons A", true);
+    await seedTeam(RIVALS, "Dragons B", true);
+    const id = await seedMatch({
+      apiMatchId: 1,
+      home: DRAGONS,
+      guest: RIVALS,
+      kickoffDate: "2026-04-01",
+    });
 
-    const result = await getMatchContext(1);
-
-    expect(result).toBeNull();
+    expect(await getMatchContext(id)).toBeNull();
   });
+});
 
-  it("returns full context with H2H and form", async () => {
-    // Query 1: match lookup
-    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
+describe("getMatchContext — head to head", () => {
+  it("aggregates wins, losses and points from the own-club perspective", async () => {
+    const matchId = await seedUpcomingFixture();
+    await seedMatch({ apiMatchId: 101, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-03-01", homeScore: 80, guestScore: 70 });
+    await seedMatch({ apiMatchId: 102, home: RIVALS, guest: DRAGONS, kickoffDate: "2026-02-01", homeScore: 75, guestScore: 85 });
+    await seedMatch({ apiMatchId: 103, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-01-01", homeScore: 60, guestScore: 70 });
 
-    // Query 2: h2h matches — 3 matches, our team (home=isOwnClub) wins 2, loses 1
-    setupH2HQuery([
-      { id: 101, kickoffDate: "2026-03-01", homeTeamApiId: 10, guestTeamApiId: 20, homeScore: 80, guestScore: 70 },
-      { id: 102, kickoffDate: "2026-02-01", homeTeamApiId: 20, guestTeamApiId: 10, homeScore: 75, guestScore: 85 },
-      { id: 103, kickoffDate: "2026-01-01", homeTeamApiId: 10, guestTeamApiId: 20, homeScore: 60, guestScore: 70 },
-    ]);
+    const result = await getMatchContext(matchId);
 
-    // Query 3: homeTeam row — own club
-    setupTeamRow([{ isOwnClub: true, name: "Dragons" }]);
-
-    // Query 4: guestTeam row
-    setupTeamRow([{ isOwnClub: false, name: "Opponents" }]);
-
-    // Query 5: homeForm
-    setupFormQuery([
-      { id: 201, homeTeamApiId: 10, homeScore: 90, guestScore: 80 },
-    ]);
-
-    // Query 6: guestForm
-    setupFormQuery([
-      { id: 301, homeTeamApiId: 20, homeScore: 50, guestScore: 60 },
-    ]);
-
-    const result = await getMatchContext(1);
-
-    expect(result).not.toBeNull();
-    // H2H: ourTeam=10 (home is own club)
-    // Match 101: home=10, ourScore=80 vs 70 → W
-    // Match 102: home=20, ourScore=85(guest) vs 75(home) → W
-    // Match 103: home=10, ourScore=60 vs 70 → L
-    expect(result!.headToHead.wins).toBe(2);
-    expect(result!.headToHead.losses).toBe(1);
-    expect(result!.headToHead.pointsFor).toBe(80 + 85 + 60);
-    expect(result!.headToHead.pointsAgainst).toBe(70 + 75 + 70);
+    expect(result!.headToHead).toMatchObject({
+      wins: 2,
+      losses: 1,
+      pointsFor: 80 + 85 + 60,
+      pointsAgainst: 70 + 75 + 70,
+    });
     expect(result!.headToHead.previousMeetings).toHaveLength(3);
-
-    // Form
-    expect(result!.homeForm).toEqual([{ result: "W", matchId: 201 }]);
-    expect(result!.guestForm).toEqual([{ result: "L", matchId: 301 }]);
   });
 
-  it("caps previousMeetings at 5", async () => {
-    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
+  it("includes the reverse fixture, not just the same-order one", async () => {
+    const matchId = await seedUpcomingFixture();
+    await seedMatch({ apiMatchId: 102, home: RIVALS, guest: DRAGONS, kickoffDate: "2026-02-01", homeScore: 75, guestScore: 85 });
 
-    // 7 h2h matches
-    const h2hData = Array.from({ length: 7 }, (_, i) => ({
-      id: 100 + i,
-      kickoffDate: `2026-0${i + 1}-01`,
-      homeTeamApiId: 10,
-      guestTeamApiId: 20,
-      homeScore: 80,
-      guestScore: 70,
-    }));
-    setupH2HQuery(h2hData);
+    const result = await getMatchContext(matchId);
 
-    setupTeamRow([{ isOwnClub: true, name: "Dragons" }]);
-    setupTeamRow([{ isOwnClub: false, name: "Opponents" }]);
-    setupFormQuery([]);
-    setupFormQuery([]);
+    // An `and` in place of the outer `or` demands both orderings of the same
+    // row at once, which empties every head-to-head record.
+    expect(result!.headToHead.previousMeetings.map((m) => m.matchId)).toHaveLength(1);
+    expect(result!.headToHead.wins).toBe(1);
+  });
 
-    const result = await getMatchContext(1);
+  it("excludes matches against a third team", async () => {
+    const matchId = await seedUpcomingFixture();
+    await seedTeam(THIRD, "Others", false);
+    await seedMatch({ apiMatchId: 104, home: DRAGONS, guest: THIRD, kickoffDate: "2026-03-01", homeScore: 99, guestScore: 10 });
+    await seedMatch({ apiMatchId: 105, home: THIRD, guest: RIVALS, kickoffDate: "2026-03-02", homeScore: 99, guestScore: 10 });
+
+    const result = await getMatchContext(matchId);
+
+    expect(result!.headToHead.previousMeetings).toEqual([]);
+    expect(result!.headToHead.wins).toBe(0);
+  });
+
+  it("excludes meetings that are missing either score", async () => {
+    const matchId = await seedUpcomingFixture();
+    await seedMatch({ apiMatchId: 106, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-03-01" });
+    await seedMatch({ apiMatchId: 107, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-03-02", homeScore: 80 });
+
+    expect((await getMatchContext(matchId))!.headToHead.previousMeetings).toEqual([]);
+  });
+
+  it("caps previousMeetings at 5 but counts every meeting in the totals", async () => {
+    const matchId = await seedUpcomingFixture();
+    for (let i = 1; i <= 7; i++) {
+      await seedMatch({
+        apiMatchId: 100 + i,
+        home: DRAGONS,
+        guest: RIVALS,
+        kickoffDate: `2026-0${i}-01`,
+        homeScore: 80,
+        guestScore: 70,
+      });
+    }
+
+    const result = await getMatchContext(matchId);
 
     expect(result!.headToHead.previousMeetings).toHaveLength(5);
-    // All 7 should still count for stats
     expect(result!.headToHead.wins).toBe(7);
     expect(result!.headToHead.losses).toBe(0);
   });
 
-  it("handles guest being own club", async () => {
-    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
+  it("lists previousMeetings newest first", async () => {
+    const matchId = await seedUpcomingFixture();
+    const oldest = await seedMatch({ apiMatchId: 101, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-01-01", homeScore: 80, guestScore: 70 });
+    const newest = await seedMatch({ apiMatchId: 102, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-03-01", homeScore: 80, guestScore: 70 });
 
-    // h2h: home=10 wins (but our team is guest=20, so we lose)
-    setupH2HQuery([
-      { id: 101, kickoffDate: "2026-03-01", homeTeamApiId: 10, guestTeamApiId: 20, homeScore: 80, guestScore: 70 },
+    const result = await getMatchContext(matchId);
+
+    expect(result!.headToHead.previousMeetings.map((m) => m.matchId)).toEqual([
+      newest,
+      oldest,
     ]);
-
-    // homeTeamRow is NOT own club
-    setupTeamRow([{ isOwnClub: false, name: "Rivals" }]);
-    // guestTeamRow IS own club
-    setupTeamRow([{ isOwnClub: true, name: "Dragons" }]);
-
-    setupFormQuery([]);
-    setupFormQuery([]);
-
-    const result = await getMatchContext(1);
-
-    // ourTeamApiId = 20 (guest is own club)
-    // Match 101: home=10, so ourScore = guestScore=70, theirScore = homeScore=80 → L
-    expect(result!.headToHead.wins).toBe(0);
-    expect(result!.headToHead.losses).toBe(1);
-    expect(result!.headToHead.pointsFor).toBe(70);
-    expect(result!.headToHead.pointsAgainst).toBe(80);
-    expect(result!.headToHead.previousMeetings[0]!.isWin).toBe(false);
-    expect(result!.headToHead.previousMeetings[0]!.homeIsOwnClub).toBe(false);
   });
 
-  it("resolves team names correctly when home/guest are swapped in previous meetings", async () => {
-    // Current match: Dragons(10) home vs Rivals(20) guest
-    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
+  it("inverts the perspective when the own-club team is the guest", async () => {
+    await seedTeam(DRAGONS, "Rivals", false);
+    await seedTeam(RIVALS, "Dragons", true);
+    const matchId = await seedMatch({
+      apiMatchId: 1,
+      home: DRAGONS,
+      guest: RIVALS,
+      kickoffDate: "2026-04-01",
+    });
+    await seedMatch({ apiMatchId: 101, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-03-01", homeScore: 80, guestScore: 70 });
 
-    setupH2HQuery([
-      // Same order as current match
-      { id: 101, kickoffDate: "2026-03-01", homeTeamApiId: 10, guestTeamApiId: 20, homeScore: 80, guestScore: 70 },
-      // Swapped: Rivals at home, Dragons as guest
-      { id: 102, kickoffDate: "2026-02-01", homeTeamApiId: 20, guestTeamApiId: 10, homeScore: 75, guestScore: 85 },
+    const result = await getMatchContext(matchId);
+
+    expect(result!.headToHead).toMatchObject({
+      wins: 0,
+      losses: 1,
+      pointsFor: 70,
+      pointsAgainst: 80,
+    });
+    expect(result!.headToHead.previousMeetings[0]).toMatchObject({
+      isWin: false,
+      homeIsOwnClub: false,
+    });
+  });
+
+  it("names each side by its position in that meeting, not in the current match", async () => {
+    const matchId = await seedUpcomingFixture();
+    const sameOrder = await seedMatch({ apiMatchId: 101, home: DRAGONS, guest: RIVALS, kickoffDate: "2026-03-01", homeScore: 80, guestScore: 70 });
+    const swapped = await seedMatch({ apiMatchId: 102, home: RIVALS, guest: DRAGONS, kickoffDate: "2026-02-01", homeScore: 75, guestScore: 85 });
+
+    const meetings = (await getMatchContext(matchId))!.headToHead.previousMeetings;
+
+    expect(meetings).toMatchObject([
+      {
+        matchId: sameOrder,
+        date: "2026-03-01",
+        homeTeamName: "Dragons",
+        guestTeamName: "Rivals",
+        homeScore: 80,
+        guestScore: 70,
+        homeIsOwnClub: true,
+      },
+      {
+        matchId: swapped,
+        date: "2026-02-01",
+        homeTeamName: "Rivals",
+        guestTeamName: "Dragons",
+        homeScore: 75,
+        guestScore: 85,
+        homeIsOwnClub: false,
+      },
     ]);
-
-    setupTeamRow([{ isOwnClub: true, name: "Dragons" }]);
-    setupTeamRow([{ isOwnClub: false, name: "Rivals" }]);
-    setupFormQuery([]);
-    setupFormQuery([]);
-
-    const result = await getMatchContext(1);
-    const meetings = result!.headToHead.previousMeetings;
-
-    // Match 101: same order — home=Dragons, guest=Rivals
-    expect(meetings[0]!.homeTeamName).toBe("Dragons");
-    expect(meetings[0]!.guestTeamName).toBe("Rivals");
-    expect(meetings[0]!.homeIsOwnClub).toBe(true);
-
-    // Match 102: swapped — home=Rivals, guest=Dragons
-    expect(meetings[1]!.homeTeamName).toBe("Rivals");
-    expect(meetings[1]!.guestTeamName).toBe("Dragons");
-    expect(meetings[1]!.homeIsOwnClub).toBe(false);
   });
 });
 
-describe("getTeamForm (via getMatchContext)", () => {
-  function setupForFormTest(formData: unknown[]) {
-    setupMatchLookup([{ homeTeamApiId: 10, guestTeamApiId: 20 }]);
-    setupH2HQuery([]);
-    setupTeamRow([{ isOwnClub: true, name: "Dragons" }]);
-    setupTeamRow([{ isOwnClub: false, name: "Opponents" }]);
-    // homeForm is the one we're testing
-    setupFormQuery(formData);
-    // guestForm
-    setupFormQuery([]);
-  }
+describe("getMatchContext — per-team form", () => {
+  it("computes each side's form from its own recent matches", async () => {
+    const matchId = await seedUpcomingFixture();
+    await seedTeam(THIRD, "Others", false);
+    const dragonsWin = await seedMatch({ apiMatchId: 201, home: DRAGONS, guest: THIRD, kickoffDate: "2026-03-10", homeScore: 90, guestScore: 80 });
+    const rivalsLoss = await seedMatch({ apiMatchId: 301, home: RIVALS, guest: THIRD, kickoffDate: "2026-03-11", homeScore: 50, guestScore: 60 });
 
-  it("computes W correctly for home team", async () => {
-    setupForFormTest([
-      { id: 1, homeTeamApiId: 10, homeScore: 90, guestScore: 70 },
-    ]);
+    const result = await getMatchContext(matchId);
 
-    const result = await getMatchContext(1);
-
-    expect(result!.homeForm).toEqual([{ result: "W", matchId: 1 }]);
+    expect(result!.homeForm).toEqual([{ result: "W", matchId: dragonsWin }]);
+    expect(result!.guestForm).toEqual([{ result: "L", matchId: rivalsLoss }]);
   });
 
-  it("computes L correctly for guest team perspective", async () => {
-    // Team 10 is guest and loses
-    setupForFormTest([
-      { id: 2, homeTeamApiId: 50, homeScore: 90, guestScore: 70 },
-    ]);
+  it("scores a form entry from the guest side when the team played away", async () => {
+    const matchId = await seedUpcomingFixture();
+    await seedTeam(THIRD, "Others", false);
+    const away = await seedMatch({ apiMatchId: 202, home: THIRD, guest: DRAGONS, kickoffDate: "2026-03-10", homeScore: 90, guestScore: 70 });
 
-    const result = await getMatchContext(1);
+    const result = await getMatchContext(matchId);
 
-    // homeForm is for teamApiId=10, which is guest here: ourScore=70, theirScore=90 → L
-    expect(result!.homeForm).toEqual([{ result: "L", matchId: 2 }]);
+    expect(result!.homeForm).toEqual([{ result: "L", matchId: away }]);
+  });
+
+  it("keeps only the five most recent form entries, newest first", async () => {
+    const matchId = await seedUpcomingFixture();
+    await seedTeam(THIRD, "Others", false);
+    const ids: number[] = [];
+    for (let i = 1; i <= 7; i++) {
+      ids.push(
+        await seedMatch({
+          apiMatchId: 200 + i,
+          home: DRAGONS,
+          guest: THIRD,
+          kickoffDate: `2026-0${i}-15`,
+          homeScore: 90,
+          guestScore: 80,
+        }),
+      );
+    }
+
+    const result = await getMatchContext(matchId);
+
+    expect(result!.homeForm.map((f) => f.matchId)).toEqual(
+      [...ids].reverse().slice(0, 5),
+    );
+  });
+
+  it("ignores unfinished matches in form", async () => {
+    const matchId = await seedUpcomingFixture();
+    await seedTeam(THIRD, "Others", false);
+    await seedMatch({ apiMatchId: 203, home: DRAGONS, guest: THIRD, kickoffDate: "2026-03-10" });
+
+    expect((await getMatchContext(matchId))!.homeForm).toEqual([]);
+  });
+});
+
+describe("getMatchContext — query fan-out", () => {
+  it("pairs the two team lookups and the two form queries instead of awaiting them one by one", async () => {
+    const matchId = await seedUpcomingFixture();
+    trace.reset();
+
+    await getMatchContext(matchId);
+
+    // 0 match, 1 head-to-head, 2 home team, 3 guest team, 4 home form, 5 guest form.
+    expect(trace.startCount()).toBe(6);
+    expect(trace.overlaps(3)).toBe(true);
+    expect(trace.overlaps(5)).toBe(true);
   });
 });

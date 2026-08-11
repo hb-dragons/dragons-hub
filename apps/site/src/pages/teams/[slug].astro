@@ -1,0 +1,75 @@
+---
+// Port of dragons-app app/pages/teams/[slug].vue: team header, the team +
+// trainer hero, the last/next game band, and the Spielplan/Tabelle tabs.
+// The islands get the CMS team's apiTeamPermanentId join key as a prop and
+// query /public/* client-side (plan Task C5 Step 4); the league name joins
+// in once at build time from /public/standings.
+import { getCollection } from "astro:content";
+
+import Layout from "../../layouts/Layout.astro";
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import NextPrevGame from "../../components/teams/NextPrevGame";
+import TeamTabs from "../../components/teams/TeamTabs";
+import TeamTrainer from "../../components/teams/TeamTrainer.astro";
+import { apiBase } from "../../lib/api-base";
+import { sportsTeam } from "../../lib/jsonld";
+import { cmsBaseUrl } from "../../lib/media";
+import { publishedOnly } from "../../lib/published";
+import { absoluteUrl, canonicalUrl, metaDescription } from "../../lib/seo";
+import { strings } from "../../lib/strings";
+import { primaryTrainer, toSiteImage } from "../../lib/team-detail";
+import { fetchTeamLeagueNames, leagueNameFor } from "../../lib/team-league";
+
+export async function getStaticPaths() {
+  const teams = await getCollection("teams", publishedOnly);
+  // One standings fetch for every team page (content builds only — the
+  // collection is empty on env-less shell builds, so this never runs there).
+  const leagueNames =
+    teams.length > 0 ? await fetchTeamLeagueNames(apiBase()) : new Map<number, string>();
+  return teams.map(({ data }) => ({
+    params: { slug: data.slug },
+    props: {
+      team: data,
+      leagueName: leagueNameFor(leagueNames, data.apiTeamPermanentId),
+    },
+  }));
+}
+
+const { team, leagueName } = Astro.props;
+const cmsBase = cmsBaseUrl();
+
+const teamImage = toSiteImage(team.teamImage, cmsBase);
+const trainerData = primaryTrainer(team.trainers);
+const trainer =
+  trainerData === null
+    ? null
+    : { name: trainerData.name, image: toSiteImage(trainerData.image, cmsBase) };
+const teamApiId = team.apiTeamPermanentId ?? null;
+
+// SEO (Task C8): CMS override ?? a derived one-liner; the team photo is the
+// OG card unless a dedicated image is set.
+const description = metaDescription(
+  team.seoDescription,
+  `${team.name}${strings.seo.teamDescriptionTail}`,
+);
+const ogImage = toSiteImage(team.ogImage ?? team.teamImage, cmsBase)?.url ?? null;
+const jsonLd = sportsTeam({
+  name: team.name,
+  url: canonicalUrl(Astro.site, Astro.url.pathname),
+  image: ogImage === null ? null : absoluteUrl(ogImage, Astro.site),
+  coachName: trainer?.name ?? null,
+});
+---
+
+<Layout title={team.name} description={description} image={ogImage} jsonLd={jsonLd}>
+  <PageHeader title={team.name} image={teamImage} />
+
+  <PageContainer class="space-y-4 md:space-y-8 lg:space-y-12">
+    <TeamTrainer teamImage={teamImage} leagueName={leagueName} trainer={trainer} />
+
+    <NextPrevGame client:visible teamApiId={teamApiId} />
+
+    <TeamTabs client:visible teamApiId={teamApiId} />
+  </PageContainer>
+</Layout>

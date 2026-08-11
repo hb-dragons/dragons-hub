@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import type { Logger } from "pino";
 
 type PinoMockCall = [Record<string, unknown>];
 
@@ -383,13 +384,237 @@ describe("logger", () => {
     await import("./logger");
     const opts = pinoMock.mock.calls[0]![0] as Record<string, unknown>;
     expect(opts.transport).toBeUndefined();
-    expect(opts.formatters).toBeUndefined();
-    expect(opts.redact).toBeUndefined();
     expect(opts.mixin).toBeTypeOf("function");
     expect(opts.level).toBe("warn");
+    // Test mode has no GCP level formatter — only the redaction walk, which
+    // every mode carries. Asserted here as "no severity mapping", not as "no
+    // formatters at all", so adding a formatter is not automatically a failure.
+    const formatters = opts.formatters as Record<string, unknown> | undefined;
+    expect(formatters?.level).toBeUndefined();
     // Prevents noise in tests
     expect((pinoMock.mock.calls[0] as PinoMockCall)[0]).not.toHaveProperty(
       "transport",
     );
+  });
+
+  // Redaction used to be configured only in the production branch, so a
+  // password or bearer token logged during development or in CI went out in
+  // clear text. The paths must be byte-identical across all three branches —
+  // anything else means a gap that only shows up after deploy.
+  describe("redaction applies in every environment", () => {
+    // Builds a real pino against a capture stream through the app's own
+    // `createLogger`, so every case here asserts what actually reaches stdout.
+    //
+    // `createLogger` rather than `pino(buildOptions())` on purpose: redaction
+    // is three parts — the declarative bare paths, the `scrub` formatter, and
+    // the `child` wrapper — and only the first two live in the options object.
+    // A probe assembled from `buildOptions()` would pass while child-binding
+    // redaction was broken.
+    async function realProbe(
+      nodeEnv: string,
+    ): Promise<{ probe: Logger; written: string[] }> {
+      vi.resetModules();
+      // Earlier cases in this file register a pino mock and a log-context mock,
+      // and doMock survives resetModules. These cases need the real serializer,
+      // and no stray mixin fields in the emitted line.
+      vi.doUnmock("pino");
+      vi.doUnmock("./log-context");
+      vi.doMock("./env", () => ({
+        env: {
+          NODE_ENV: nodeEnv,
+          LOG_LEVEL: "info",
+          SERVICE_NAME: "api",
+          SERVICE_VERSION: "1.0",
+          GCP_PROJECT_ID: undefined,
+        },
+      }));
+
+      const written: string[] = [];
+      const { createLogger } = await import("./logger");
+      const probe = createLogger({
+        write: (chunk: string) => {
+          written.push(chunk);
+        },
+      });
+
+      return { probe, written };
+    }
+
+    // Redaction used to be configured only in the production branch. This
+    // asserts the rule is live in all three, by writing a line and reading it
+    // back rather than by inspecting `redact.paths` — the paths array stopped
+    // describing the coverage when the any-depth walk replaced the wildcards
+    // (#143), and asserting on output survives that kind of change.
+    //
+    // The four positions are the ones the retired path list called out
+    // individually: a request header, an env var name, a one-level nested key,
+    // and a key under a container.
+    const POSITIONS = {
+      "request header": {
+        payload: { req: { headers: { authorization: "header-secret" } } },
+        secret: "header-secret",
+      },
+      "env var name": {
+        payload: { env: { SDK_PASSWORD: "env-secret" } },
+        secret: "env-secret",
+      },
+      "one level down": {
+        payload: { creds: { password: "nested-secret" } },
+        secret: "nested-secret",
+      },
+      "under a container": {
+        payload: { req: { body: { token: "container-secret" } } },
+        secret: "container-secret",
+      },
+    };
+
+    it.each(["production", "development", "test"])(
+      "censors every documented position in NODE_ENV=%s",
+      async (nodeEnv) => {
+        for (const [label, { payload, secret }] of Object.entries(POSITIONS)) {
+          const { probe, written } = await realProbe(nodeEnv);
+          probe.info({ ...payload, keep: "visible" }, "probe");
+          const line = written.join("");
+          expect(line, `${label} leaked in ${nodeEnv}`).not.toContain(secret);
+          expect(line).toContain("[REDACTED]");
+          expect(line).toContain("visible");
+        }
+      },
+    );
+
+    // Dev and test used to differ from production here, which meant a gap that
+    // only showed up after deploy. Compare the emitted payload rather than the
+    // paths array: what has to match is the censoring, not the config shape.
+    //
+    // The envelope legitimately differs between modes (production adds
+    // service/version and renames msg to message; dev and test carry
+    // pid/hostname), so the envelope keys are dropped and the payload compared.
+    it("censors identically in dev and test as in production", async () => {
+      const payload = {
+        creds: { password: "p" },
+        req: { body: { token: "t" }, headers: { authorization: "a" } },
+        deep: { a: { b: { c: { secret: "s" } } } },
+        list: [{ apiKey: "k" }],
+        keep: "visible",
+      };
+
+      const ENVELOPE = new Set([
+        "time",
+        "level",
+        "severity",
+        "service",
+        "version",
+        "pid",
+        "hostname",
+        "msg",
+        "message",
+      ]);
+
+      const emitted: Record<string, Record<string, unknown>> = {};
+      for (const nodeEnv of ["production", "development", "test"]) {
+        const { probe, written } = await realProbe(nodeEnv);
+        probe.info(payload, "probe");
+        const parsed = JSON.parse(written.join("")) as Record<string, unknown>;
+        emitted[nodeEnv] = Object.fromEntries(
+          Object.entries(parsed).filter(([k]) => !ENVELOPE.has(k)),
+        );
+      }
+
+      expect(emitted.development).toEqual(emitted.production);
+      expect(emitted.test).toEqual(emitted.production);
+      expect(emitted.production).toEqual({
+        creds: { password: "[REDACTED]" },
+        req: {
+          body: { token: "[REDACTED]" },
+          headers: { authorization: "[REDACTED]" },
+        },
+        deep: { a: { b: { c: { secret: "[REDACTED]" } } } },
+        list: [{ apiKey: "[REDACTED]" }],
+        keep: "visible",
+      });
+    });
+
+    it.each(["test", "development"])(
+      "censors a secret written through a real pino in NODE_ENV=%s",
+      async (nodeEnv) => {
+        const { probe, written } = await realProbe(nodeEnv);
+
+        // `*.password` / `*.body.token`: the paths cover nested objects, which
+        // is how services log request context. Shape the payload accordingly.
+        probe.info(
+          {
+            creds: { password: "hunter2" },
+            req: { body: { token: "bearer-abc" } },
+            keep: "visible",
+          },
+          "probe",
+        );
+
+        const line = written.join("");
+        expect(line).not.toContain("hunter2");
+        expect(line).not.toContain("bearer-abc");
+        expect(line).toContain("[REDACTED]");
+        expect(line).toContain("visible");
+      },
+    );
+
+    // `*.password` is a pino wildcard for "a password one level down", so it
+    // does not match a password at the root of the logged object. Every
+    // sensitive key had that hole, and `logger.debug({ token })` while poking
+    // at an auth path is an easy thing to write. Listed here independently of
+    // the implementation on purpose: this is the intent, not a mirror of
+    // SENSITIVE_KEYS.
+    const ROOT_SECRETS = {
+      password: "root-password-value",
+      token: "root-token-value",
+      accessToken: "root-accessToken-value",
+      refreshToken: "root-refreshToken-value",
+      apiKey: "root-apiKey-value",
+      api_key: "root-api_key-value",
+      secret: "root-secret-value",
+      authorization: "root-authorization-value",
+      cookie: "root-cookie-value",
+    };
+
+    it.each(["production", "development", "test"])(
+      "censors a top-level sensitive key in NODE_ENV=%s",
+      async (nodeEnv) => {
+        const { probe, written } = await realProbe(nodeEnv);
+
+        probe.info({ ...ROOT_SECRETS, keep: "visible" }, "probe");
+
+        const line = written.join("");
+        for (const [key, value] of Object.entries(ROOT_SECRETS)) {
+          expect(line, `top-level ${key} leaked`).not.toContain(value);
+        }
+        expect(line).toContain("[REDACTED]");
+        expect(line).toContain("visible");
+      },
+    );
+
+    // The nested cases above only run in test/development; production carries
+    // the same paths but a different options object, so prove it there too.
+    it("still censors nested and header secrets in NODE_ENV=production", async () => {
+      const { probe, written } = await realProbe("production");
+
+      probe.info(
+        {
+          creds: { password: "nested-hunter2" },
+          req: {
+            body: { token: "nested-bearer" },
+            headers: { authorization: "Bearer header-secret" },
+          },
+          keep: "visible",
+        },
+        "probe",
+      );
+
+      const line = written.join("");
+      expect(line).not.toContain("nested-hunter2");
+      expect(line).not.toContain("nested-bearer");
+      expect(line).not.toContain("header-secret");
+      expect(line).toContain("[REDACTED]");
+      expect(line).toContain("visible");
+    });
   });
 });

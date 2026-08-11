@@ -1,230 +1,180 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterAll, vi } from "vitest";
 
 // --- Mock setup ---
+//
+// drizzle-orm and @dragons/db/schema are deliberately NOT mocked. The previous
+// version of this file stubbed `eq` with an identity function and handed back
+// canned rows, so `where(eq(appSettings.key, key))` could have looked up any
+// column, or a hardcoded key, and every test still passed. Everything below
+// runs against a real (in-process PGlite) Postgres with the real migrations.
 
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
+
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mockSelect(...args),
-    insert: (...args: unknown[]) => mockInsert(...args),
-  }),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
-vi.mock("@dragons/db/schema", () => ({
-  appSettings: {
-    key: "key",
-    value: "value",
-    updatedAt: "updatedAt",
-  },
-}));
+// --- Imports (after mocks) ---
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-}));
+import {
+  getSetting,
+  upsertSetting,
+  getClubConfig,
+  setClubConfig,
+  getBookingSettings,
+  setBookingSettings,
+  getRefereeReminderDays,
+} from "./settings.service";
+import { appSettings } from "@dragons/db/schema";
+import { eq } from "drizzle-orm";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
+import { traceQueries, type QueryTrace } from "../../test/trace-queries";
 
-import { getSetting, upsertSetting, getClubConfig, setClubConfig, getBookingSettings, setBookingSettings } from "./settings.service";
+let ctx: TestDbContext;
+let trace: QueryTrace;
 
-beforeEach(() => {
-  vi.clearAllMocks();
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  trace = traceQueries(ctx.db as object);
+  dbHolder.ref = trace.db;
 });
 
-// --- Helpers ---
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  trace.reset();
+});
 
-function mockSelectReturning(value: string | null) {
-  const row = value !== null ? { value } : undefined;
-  mockSelect.mockReturnValue({
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue(row ? [row] : []),
-      }),
-    }),
-  });
-}
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
 
-function mockInsertSuccess() {
-  mockInsert.mockReturnValue({
-    values: vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
-    }),
-  });
+async function readRaw(key: string): Promise<string | undefined> {
+  const [row] = await ctx.db
+    .select({ value: appSettings.value })
+    .from(appSettings)
+    .where(eq(appSettings.key, key));
+  return row?.value;
 }
 
 describe("getSetting", () => {
-  it("returns value when setting exists", async () => {
-    mockSelectReturning("4121");
+  it("returns the value stored under exactly that key", async () => {
+    await ctx.db.insert(appSettings).values([
+      { key: "club_id", value: "4121" },
+      { key: "club_name", value: "Dragons" },
+    ]);
 
-    const result = await getSetting("club_id");
-
-    expect(result).toBe("4121");
+    expect(await getSetting("club_id")).toBe("4121");
+    expect(await getSetting("club_name")).toBe("Dragons");
   });
 
-  it("returns null when setting does not exist", async () => {
-    mockSelectReturning(null);
+  it("does not match a row whose *value* happens to equal the key", async () => {
+    // Guards against the predicate matching on the wrong column.
+    await ctx.db.insert(appSettings).values({ key: "unrelated", value: "club_id" });
 
-    const result = await getSetting("nonexistent");
+    expect(await getSetting("club_id")).toBeNull();
+  });
 
-    expect(result).toBeNull();
+  it("returns null when the key does not exist", async () => {
+    await ctx.db.insert(appSettings).values({ key: "club_id", value: "4121" });
+
+    expect(await getSetting("nonexistent")).toBeNull();
   });
 });
 
 describe("upsertSetting", () => {
-  it("inserts or updates a setting", async () => {
-    mockInsertSuccess();
-
+  it("inserts a new row", async () => {
     await upsertSetting("club_id", "4121");
 
-    expect(mockInsert).toHaveBeenCalled();
+    expect(await readRaw("club_id")).toBe("4121");
+  });
+
+  it("updates in place on conflict rather than inserting a duplicate", async () => {
+    await upsertSetting("club_id", "4121");
+    await upsertSetting("club_id", "9999");
+
+    const rows = await ctx.db.select().from(appSettings);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.value).toBe("9999");
+  });
+
+  it("leaves other keys untouched", async () => {
+    await upsertSetting("club_id", "4121");
+    await upsertSetting("club_name", "Dragons");
+    await upsertSetting("club_id", "1");
+
+    expect(await readRaw("club_name")).toBe("Dragons");
+  });
+
+  it("advances updatedAt on the conflicting update", async () => {
+    await upsertSetting("club_id", "4121");
+    const [before] = await ctx.db.select().from(appSettings);
+    await new Promise((r) => setTimeout(r, 5));
+    await upsertSetting("club_id", "4122");
+    const [after] = await ctx.db.select().from(appSettings);
+
+    expect(after!.updatedAt.getTime()).toBeGreaterThan(before!.updatedAt.getTime());
   });
 });
 
 describe("getClubConfig", () => {
-  it("returns club config when both settings exist", async () => {
-    let callIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const values = [{ value: "4121" }, { value: "Dragons" }];
-      const row = values[callIndex++];
-      return {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue(row ? [row] : []),
-          }),
-        }),
-      };
-    });
+  it("returns the club config when both settings exist", async () => {
+    await setClubConfig(4121, "Dragons");
 
-    const result = await getClubConfig();
-
-    expect(result).toEqual({ clubId: 4121, clubName: "Dragons" });
+    expect(await getClubConfig()).toEqual({ clubId: 4121, clubName: "Dragons" });
   });
 
   it("returns null when club_id is not set", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+    await upsertSetting("club_name", "Dragons");
 
-    const result = await getClubConfig();
-
-    expect(result).toBeNull();
+    expect(await getClubConfig()).toBeNull();
   });
 
-  it("returns empty club name when only club_id is set", async () => {
-    let callIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const values = [{ value: "4121" }, undefined];
-      const row = values[callIndex++];
-      return {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue(row ? [row] : []),
-          }),
-        }),
-      };
-    });
+  it("returns an empty club name when only club_id is set", async () => {
+    await upsertSetting("club_id", "4121");
 
-    const result = await getClubConfig();
+    expect(await getClubConfig()).toEqual({ clubId: 4121, clubName: "" });
+  });
 
-    expect(result).toEqual({ clubId: 4121, clubName: "" });
+  it("reads both keys in a single query", async () => {
+    await setClubConfig(4121, "Dragons");
+    trace.reset();
+
+    await getClubConfig();
+
+    expect(trace.startCount()).toBe(1);
   });
 });
 
 describe("setClubConfig", () => {
-  it("upserts both club_id and club_name", async () => {
-    mockInsertSuccess();
-
+  it("writes club_id and club_name under their own keys", async () => {
     await setClubConfig(4121, "Dragons");
 
-    expect(mockInsert).toHaveBeenCalledTimes(2);
+    expect(await readRaw("club_id")).toBe("4121");
+    expect(await readRaw("club_name")).toBe("Dragons");
+  });
+
+  it("overwrites a previous club config", async () => {
+    await setClubConfig(4121, "Dragons");
+    await setClubConfig(999, "Tigers");
+
+    expect(await getClubConfig()).toEqual({ clubId: 999, clubName: "Tigers" });
+    expect(await ctx.db.select().from(appSettings)).toHaveLength(2);
   });
 });
 
 describe("getBookingSettings", () => {
-  it("returns stored settings when all exist", async () => {
-    let callIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const values = [
-        { value: "45" },
-        { value: "30" },
-        { value: "120" },
-        { value: "14" },
-      ];
-      const row = values[callIndex++];
-      return {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue(row ? [row] : []),
-          }),
-        }),
-      };
-    });
-
-    const result = await getBookingSettings();
-
-    expect(result).toEqual({
-      bufferBefore: 45,
-      bufferAfter: 30,
-      gameDuration: 120,
-      dueDaysBefore: 14,
-    });
-  });
-
-  it("returns defaults when no settings exist", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
-
-    const result = await getBookingSettings();
-
-    expect(result).toEqual({
-      bufferBefore: 60,
-      bufferAfter: 60,
-      gameDuration: 90,
-      dueDaysBefore: 7,
-    });
-  });
-
-  it("returns partial defaults when some settings exist", async () => {
-    let callIndex = 0;
-    mockSelect.mockImplementation(() => {
-      const values = [
-        { value: "45" },
-        undefined,
-        { value: "120" },
-        undefined,
-      ];
-      const row = values[callIndex++];
-      return {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue(row ? [row] : []),
-          }),
-        }),
-      };
-    });
-
-    const result = await getBookingSettings();
-
-    expect(result).toEqual({
-      bufferBefore: 45,
-      bufferAfter: 60,
-      gameDuration: 120,
-      dueDaysBefore: 7,
-    });
-  });
-});
-
-describe("setBookingSettings", () => {
-  it("upserts all four booking settings", async () => {
-    mockInsertSuccess();
-
+  it("returns the stored settings when all four exist", async () => {
     await setBookingSettings({
       bufferBefore: 45,
       bufferAfter: 30,
@@ -232,6 +182,99 @@ describe("setBookingSettings", () => {
       dueDaysBefore: 14,
     });
 
-    expect(mockInsert).toHaveBeenCalledTimes(4);
+    expect(await getBookingSettings()).toEqual({
+      bufferBefore: 45,
+      bufferAfter: 30,
+      gameDuration: 120,
+      dueDaysBefore: 14,
+    });
+  });
+
+  it("returns the defaults when nothing is stored", async () => {
+    expect(await getBookingSettings()).toEqual({
+      bufferBefore: 60,
+      bufferAfter: 60,
+      gameDuration: 90,
+      dueDaysBefore: 7,
+    });
+  });
+
+  it("mixes stored values with defaults per key", async () => {
+    await upsertSetting("venue_booking_buffer_before", "45");
+    await upsertSetting("venue_booking_game_duration", "120");
+
+    expect(await getBookingSettings()).toEqual({
+      bufferBefore: 45,
+      bufferAfter: 60,
+      gameDuration: 120,
+      dueDaysBefore: 7,
+    });
+  });
+
+  it("keeps a stored zero rather than treating it as unset", async () => {
+    await upsertSetting("venue_booking_buffer_before", "0");
+
+    expect((await getBookingSettings()).bufferBefore).toBe(0);
+  });
+
+  it("falls back to the default when a stored value is not a number", async () => {
+    await upsertSetting("venue_booking_buffer_after", "not-a-number");
+
+    expect((await getBookingSettings()).bufferAfter).toBe(60);
+  });
+
+  it("reads all four keys in a single query", async () => {
+    await setBookingSettings({
+      bufferBefore: 45,
+      bufferAfter: 30,
+      gameDuration: 120,
+      dueDaysBefore: 14,
+    });
+    trace.reset();
+
+    await getBookingSettings();
+
+    expect(trace.startCount()).toBe(1);
+  });
+});
+
+describe("setBookingSettings", () => {
+  it("writes each value under its own distinct key", async () => {
+    await setBookingSettings({
+      bufferBefore: 45,
+      bufferAfter: 30,
+      gameDuration: 120,
+      dueDaysBefore: 14,
+    });
+
+    expect(await readRaw("venue_booking_buffer_before")).toBe("45");
+    expect(await readRaw("venue_booking_buffer_after")).toBe("30");
+    expect(await readRaw("venue_booking_game_duration")).toBe("120");
+    expect(await readRaw("venue_booking_due_days_before")).toBe("14");
+    expect(await ctx.db.select().from(appSettings)).toHaveLength(4);
+  });
+});
+
+describe("getRefereeReminderDays", () => {
+  it("returns the stored days when valid", async () => {
+    await upsertSetting("referee_reminder_days", JSON.stringify([7, 3, 1]));
+
+    expect(await getRefereeReminderDays()).toEqual([7, 3, 1]);
+  });
+
+  it("returns the default [7, 3, 1] when not configured", async () => {
+    expect(await getRefereeReminderDays()).toEqual([7, 3, 1]);
+  });
+
+  it("falls back to the default when the stored value is malformed JSON", async () => {
+    await upsertSetting("referee_reminder_days", "not json");
+
+    expect(await getRefereeReminderDays()).toEqual([7, 3, 1]);
+  });
+
+  it("falls back to the default when the stored value is not an array of numbers", async () => {
+    await upsertSetting("referee_reminder_days", JSON.stringify({ nope: true }));
+
+    await expect(getRefereeReminderDays()).resolves.toEqual([7, 3, 1]);
   });
 });

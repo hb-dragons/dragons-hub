@@ -4,7 +4,15 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "node": "24.16.0",
+      "pnpm": "11.21.0",
+      "env": {
+        "EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK": "1"
+      }
+    },
     "development": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
@@ -13,7 +21,8 @@
       }
     },
     "preview": {
-      "distribution": "internal",
+      "extends": "base",
+      "distribution": "store",
       "channel": "preview",
       "autoIncrement": true,
       "env": {
@@ -22,6 +31,7 @@
       }
     },
     "production": {
+      "extends": "base",
       "autoIncrement": true,
       "channel": "production",
       "env": {

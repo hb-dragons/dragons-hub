@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { channelConfigs, watchRules } from "@dragons/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { logger } from "../../config/logger";
 
 const log = logger.child({ service: "referee-notification-seed" });
@@ -24,6 +24,8 @@ export async function seedRefereeNotificationConfig(): Promise<void> {
       and(
         eq(channelConfigs.name, CHANNEL_CONFIG_NAME),
         eq(channelConfigs.type, "whatsapp_group"),
+        // A retired config must not be reused — seed a fresh one instead.
+        isNull(channelConfigs.deletedAt),
       ),
     )
     .limit(1);

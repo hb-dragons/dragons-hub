@@ -1,5 +1,6 @@
 import type { MiddlewareHandler } from "hono";
-import { getRedis } from "../config/redis";
+import { logger } from "../config/logger";
+import { getRedis, incrementWithTtl } from "../config/redis";
 import type { AppEnv } from "../types";
 
 const FAIL_WINDOW_SEC = 15 * 60;
@@ -15,7 +16,7 @@ const LOCKOUT_SEC = 30 * 60;
 //
 // If only one entry is present (no trusted proxy in front, e.g. local dev),
 // fall back to using it as-is rather than dropping the header.
-function clientFromForwardedFor(value: string | undefined): string | null {
+export function clientFromForwardedFor(value: string | undefined): string | null {
   if (!value) return null;
   const parts = value.split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.length === 0) return null;
@@ -54,8 +55,7 @@ export async function isLockedOut(ip: string, email: string): Promise<boolean> {
 
 export async function recordAuthFailure(ip: string, email: string): Promise<void> {
   const key = failKey(ip, email);
-  const count = await getRedis().incr(key);
-  if (count === 1) await getRedis().expire(key, FAIL_WINDOW_SEC);
+  const count = await incrementWithTtl(key, FAIL_WINDOW_SEC);
   if (count >= FAIL_THRESHOLD) {
     await getRedis().set(lockKey(ip, email), "1", "EX", LOCKOUT_SEC);
     await getRedis().del(key);
@@ -85,7 +85,20 @@ export const signInLockout: MiddlewareHandler<AppEnv> = async (c, next) => {
   // trusted client IP. Fall back to a shared bucket only when it's absent.
   const ip = c.req.header("x-forwarded-for")?.trim() || "unknown";
 
-  if (email && (await isLockedOut(ip, email))) {
+  // Fail open on a Redis outage: the lockout counter is defence in depth, not
+  // the credential check. better-auth still verifies the password and applies
+  // its own /sign-in/email rate limit, so degrading beats 500ing sign-in for
+  // everyone. (This catch is only reachable because the request-path client has
+  // a finite maxRetriesPerRequest — see config/redis.ts.)
+  let locked = false;
+  if (email) {
+    try {
+      locked = await isLockedOut(ip, email);
+    } catch (err) {
+      logger.warn({ err }, "Sign-in lockout check Redis error; failing open");
+    }
+  }
+  if (locked) {
     return c.json({ error: "Too many failed attempts. Try again later." }, 429);
   }
 
@@ -94,11 +107,17 @@ export const signInLockout: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!email) return;
 
   const status = c.res.status;
-  if (status === 200 || status === 201) {
-    await clearAuthFailures(ip, email);
-  } else if (status === 401 || status === 403) {
-    // 400 is a malformed/validation rejection, not a credential failure — it
-    // must not count toward lockout, or an attacker could trip it with junk.
-    await recordAuthFailure(ip, email);
+  try {
+    if (status === 200 || status === 201) {
+      await clearAuthFailures(ip, email);
+    } else if (status === 401 || status === 403) {
+      // 400 is a malformed/validation rejection, not a credential failure — it
+      // must not count toward lockout, or an attacker could trip it with junk.
+      await recordAuthFailure(ip, email);
+    }
+  } catch (err) {
+    // The response is already produced; a bookkeeping failure must not replace
+    // it with a 500.
+    logger.warn({ err, status }, "Sign-in lockout bookkeeping Redis error; skipping");
   }
 };

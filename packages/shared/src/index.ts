@@ -5,17 +5,14 @@ export {
   SYNC_STATUSES,
   ENTITY_TYPES,
   ENTRY_ACTIONS,
-  DIFF_STATUSES,
-  DATE_REGEX,
-  TIME_REGEX,
 } from "./constants";
 export type {
   TaskPriority,
   BookingStatus,
+  RefereeSlotStatus,
   SyncStatus,
   EntityType,
   EntryAction,
-  DiffStatus,
 } from "./constants";
 
 // Validation schemas
@@ -48,7 +45,6 @@ export type {
 export type { OwnClubTeam, TeamReorderItem } from "./teams";
 
 export type {
-  BookingMatch,
   BookingListItem,
   BookingDetail,
   ReconcilePreview,
@@ -76,17 +72,6 @@ export {
   applyTaskMove,
   applyColumnReorder,
 } from "./board-dnd";
-export type { DragItem, DropTarget } from "./board-dnd";
-
-// Undo entries for destructive board operations
-export { buildUndoEntry } from "./board-undo";
-export type {
-  UndoEntry,
-  UndoableSnapshot,
-  UndoableTaskSnapshot,
-  UndoableChecklistSnapshot,
-  UndoableCommentSnapshot,
-} from "./board-undo";
 
 // Board filter persistence (pure, native side wraps with expo-secure-store)
 export { serializeFilters, parseFilters } from "./board-filter-storage";
@@ -106,8 +91,6 @@ export type {
   TaskContentRect,
   PagerLayout,
   ColumnScrollState,
-  FindDropTargetArgs,
-  FindDropTargetResult,
 } from "./board-drop-target";
 
 export type {
@@ -116,9 +99,6 @@ export type {
   SyncRunEntry,
   SyncStatusResponse,
   SyncRunEntriesResponse,
-  SyncJobData,
-  Job,
-  JobsResponse,
   SyncScheduleData,
   TriggerResponse,
   LiveLogEntry,
@@ -132,8 +112,6 @@ export type {
   RefereeRule,
   RefereeRulesResponse,
   RefereeCountsResponse,
-  UpdateRefereeRulesBody,
-  UpdateRefereeVisibilityBody,
   EligibleOpenGamesResponse,
 } from "./referees";
 export type { StandingItem, LeagueStandings } from "./standings";
@@ -147,9 +125,7 @@ export type {
   NotificationPreferences,
   FailedNotificationItem,
   FailedNotificationListResult,
-  TestPushTicket,
   TestPushResponse,
-  TestPushRecentItem,
   TestPushRecentResponse,
 } from "./notifications";
 export type {
@@ -158,8 +134,12 @@ export type {
   SocialBackground,
   SocialActionResponse,
 } from "./social";
+export {
+  USER_TOGGLEABLE_EVENTS,
+  USER_TOGGLEABLE_EVENT_TYPES,
+  isUserToggleableEventType,
+} from "./notification-events";
 export type { UserToggleableEventType } from "./notification-events";
-export { USER_TOGGLEABLE_EVENTS, isUserToggleableEventType } from "./notification-events";
 export type {
   ClubConfig,
   BookingSettings,
@@ -171,7 +151,6 @@ export { BOOKING_DEFAULTS } from "./settings";
 export type {
   ResolvedLeague,
   ResolveResult,
-  TrackedLeague,
   TrackedLeaguesResponse,
   LeagueTeam,
   LeagueTeamsResponse,
@@ -182,11 +161,8 @@ export * from "./seasons";
 
 // Domain events
 export * from "./domain-events";
-export {
-  eventPayloadSchemas,
-  validateEventPayload,
-  type PayloadValidation,
-} from "./domain-event-schemas";
+export { validateEventPayload } from "./domain-event-schemas";
+export type { EventPayload, RefereeSlotsPayload } from "./domain-event-schemas";
 
 // Watch rules
 export * from "./watch-rules";
@@ -195,12 +171,10 @@ export * from "./watch-rules";
 export * from "./channel-configs";
 
 // Team colors
-export { COLOR_PRESETS, COLOR_PRESET_KEYS, getColorPreset } from "./team-colors";
-export type { ColorPreset, ColorPresetMode } from "./team-colors";
+export { COLOR_PRESET_KEYS, getColorPreset } from "./team-colors";
 
 // Native team colors
 export { getNativeTeamColor } from "./native-team-colors";
-export type { NativeTeamColor } from "./native-team-colors";
 
 // Match context & dashboard types
 export type {
@@ -216,7 +190,6 @@ export type {
 
 // Referee assignment
 export type {
-  AssignRefereeBody,
   AssignRefereeResponse,
   UnassignRefereeResponse,
   CandidateSearchResponse,
@@ -227,22 +200,13 @@ export { clubLogoUrl } from "./brand";
 
 // RBAC — role/permission definitions and helpers
 export {
-  statement,
   ac,
   roles,
-  admin,
-  refereeAdmin,
-  venueManager,
-  teamManager,
-  coach,
   ROLE_NAMES,
   parseRoles,
   can,
-  canAll,
-  hasRole,
   satisfiesRole,
   isReferee,
-  isMember,
   canViewOpenGames,
 } from "./rbac";
 export type { RoleName, Resource, Action, GateUser } from "./rbac";
@@ -253,6 +217,9 @@ export * from "./nav-tabs";
 export * from "./today";
 
 export * from "./referee-history";
+
+// Kickoff "today" resolution + formatting (timezone-explicit; shared by web + native)
+export * from "./kickoff";
 
 // Notification events
 export * from "./notification-events";

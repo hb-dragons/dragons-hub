@@ -49,14 +49,31 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+// Runtime value, so it comes straight from the package rather than `./types`,
+// which is type-only re-exports.
+import {
+  EVENT_SOURCES,
+  STORED_EVENT_ENTITY_TYPES,
+  STORED_EVENT_TYPE_VALUES,
+} from "@dragons/shared";
+import type {
+  EventSource,
+  StoredEventEntityType,
+  StoredEventType,
+} from "@dragons/shared";
 import type {
   DomainEventItem,
   TriggerEventBody,
 } from "./types";
 
 // Dialog form state: the trigger body fields the user edits directly.
-// `payload` and `urgencyOverride` are assembled at submit time.
-type TriggerEventForm = Omit<TriggerEventBody, "payload" | "urgencyOverride">;
+// `payload` and `urgencyOverride` are assembled at submit time. `type` is
+// typed as a plain string here — the admin free-types it into an Input — and
+// narrowed to TriggerEventBody["type"] at submission; the server rejects an
+// unknown event type via the tightened triggerEventSchema.
+type TriggerEventForm = Omit<TriggerEventBody, "payload" | "urgencyOverride" | "type"> & {
+  type: string;
+};
 
 // ---------------------------------------------------------------------------
 // Badge variant helpers
@@ -96,14 +113,33 @@ function sourceLabel(source: string, t: TranslateFunc): string {
   }
 }
 
+function entityTypeLabel(entityType: string, t: TranslateFunc): string {
+  switch (entityType) {
+    case "match": return t("entityTypes.match" as never);
+    case "booking": return t("entityTypes.booking" as never);
+    case "referee": return t("entityTypes.referee" as never);
+    case "task": return t("entityTypes.task" as never);
+    case "user": return t("entityTypes.user" as never);
+    default: return entityType;
+  }
+}
+
+function urgencyLabel(urgency: string, t: TranslateFunc): string {
+  switch (urgency) {
+    case "immediate": return t("urgencyLabels.immediate" as never);
+    case "routine": return t("urgencyLabels.routine" as never);
+    default: return urgency;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Filters
 // ---------------------------------------------------------------------------
 
 interface Filters {
-  type: string;
-  entityType: string;
-  source: string;
+  type: StoredEventType | "";
+  entityType: StoredEventEntityType | "";
+  source: EventSource | "";
   from: string;
   to: string;
   search: string;
@@ -119,6 +155,24 @@ const EMPTY_FILTERS: Filters = {
 };
 
 const PAGE_SIZES = [25, 50, 100];
+
+// Radix rejects an empty-string SelectItem value, so "no filter" needs a
+// sentinel. It must never reach the query: since #155 the API rejects an
+// unknown type/entityType/source outright, and before that it matched them as
+// literals and returned zero rows, which left the browser permanently empty
+// with no way to clear the filter.
+const ALL = "__all__";
+
+/**
+ * Radix hands `onValueChange` a bare `string`. Re-narrow it against the list the
+ * options were built from, so the sentinel — or a stale option — resolves to "no
+ * filter" rather than being asserted into the query type and 400ing the request.
+ */
+function fromSelect<T extends string>(value: string, allowed: readonly T[]): T | "" {
+  return allowed.find((candidate) => candidate === value) ?? "";
+}
+
+const toSelect = (value: string) => (value === "" ? ALL : value);
 
 // ---------------------------------------------------------------------------
 // Component
@@ -161,8 +215,11 @@ export function EventBrowser() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  // Generic over the key so each filter keeps its own narrowed value type — a
+  // plain `value: string` here would silently re-widen `type`/`entityType`/
+  // `source` and undo the point of narrowing them.
   const updateFilter = useCallback(
-    (key: keyof Filters, value: string) => {
+    <K extends keyof Filters>(key: K, value: Filters[K]) => {
       setFilters((prev) => ({ ...prev, [key]: value }));
       setPage(1);
     },
@@ -190,6 +247,7 @@ export function EventBrowser() {
     try {
       const body: TriggerEventBody = {
         ...triggerForm,
+        type: triggerForm.type as TriggerEventBody["type"],
         payload: triggerPayload ? JSON.parse(triggerPayload) : {},
         ...(triggerUrgency
           ? { urgencyOverride: triggerUrgency as "immediate" | "routine" }
@@ -223,9 +281,7 @@ export function EventBrowser() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <CardTitle className="text-base font-medium">
-          {total > 0
-            ? `${total} event${total === 1 ? "" : "s"}`
-            : t("empty")}
+          {total > 0 ? t("count", { count: total }) : t("empty")}
         </CardTitle>
 
         <Dialog open={triggerOpen} onOpenChange={setTriggerOpen}>
@@ -248,12 +304,12 @@ export function EventBrowser() {
                   onChange={(e) =>
                     setTriggerForm((f) => ({ ...f, type: e.target.value }))
                   }
-                  placeholder="match.time_changed"
+                  placeholder={t("triggerTypePlaceholder")}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label>{t("columns.entity")} Type</Label>
+                  <Label>{t("entityTypeField")}</Label>
                   <Select
                     value={triggerForm.entityType}
                     onValueChange={(v) =>
@@ -267,14 +323,14 @@ export function EventBrowser() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="match">match</SelectItem>
-                      <SelectItem value="booking">booking</SelectItem>
-                      <SelectItem value="referee">referee</SelectItem>
+                      <SelectItem value="match">{t("entityTypes.match")}</SelectItem>
+                      <SelectItem value="booking">{t("entityTypes.booking")}</SelectItem>
+                      <SelectItem value="referee">{t("entityTypes.referee")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label>{t("columns.entity")} ID</Label>
+                  <Label>{t("entityIdField")}</Label>
                   <Input
                     type="number"
                     value={triggerForm.entityId || ""}
@@ -288,7 +344,7 @@ export function EventBrowser() {
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label>{t("columns.entity")} Name</Label>
+                <Label>{t("entityNameField")}</Label>
                 <Input
                   value={triggerForm.entityName}
                   onChange={(e) =>
@@ -297,11 +353,11 @@ export function EventBrowser() {
                       entityName: e.target.value,
                     }))
                   }
-                  placeholder="Dragons vs. Tigers"
+                  placeholder={t("entityNamePlaceholder")}
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Deep Link Path</Label>
+                <Label>{t("deepLinkPathField")}</Label>
                 <Input
                   value={triggerForm.deepLinkPath}
                   onChange={(e) =>
@@ -310,27 +366,27 @@ export function EventBrowser() {
                       deepLinkPath: e.target.value,
                     }))
                   }
-                  placeholder="/admin/matches/123"
+                  placeholder={t("deepLinkPathPlaceholder")}
                 />
               </div>
               <div className="grid gap-2">
                 <Label>{t("columns.urgency")}</Label>
                 <Select value={triggerUrgency} onValueChange={setTriggerUrgency}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Default" />
+                    <SelectValue placeholder={t("urgencyDefaultPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="immediate">immediate</SelectItem>
-                    <SelectItem value="routine">routine</SelectItem>
+                    <SelectItem value="immediate">{t("urgencyLabels.immediate")}</SelectItem>
+                    <SelectItem value="routine">{t("urgencyLabels.routine")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Payload (JSON)</Label>
+                <Label>{t("payloadJson")}</Label>
                 <Textarea
                   value={triggerPayload}
                   onChange={(e) => setTriggerPayload(e.target.value)}
-                  placeholder='{"field": "value"}'
+                  placeholder={t("payloadPlaceholder")}
                   className="font-mono text-sm"
                   rows={4}
                 />
@@ -361,29 +417,48 @@ export function EventBrowser() {
             <Label className="text-xs text-muted-foreground">
               {t("columns.type")}
             </Label>
-            <Input
-              className="h-8 w-44"
-              placeholder="match.*"
-              value={filters.type}
-              onChange={(e) => updateFilter("type", e.target.value)}
-            />
+            {/* A select, not a text input (#155). The API matches `type`
+                exactly, so the old free-text box could only ever produce a
+                valid filter or a silent empty page — and its `match.*`
+                placeholder advertised a glob the server never supported. */}
+            <Select
+              value={toSelect(filters.type)}
+              onValueChange={(v) => updateFilter("type", fromSelect(v, STORED_EVENT_TYPE_VALUES))}
+            >
+              <SelectTrigger className="h-8 w-56" aria-label={t("columns.type")}>
+                <SelectValue placeholder={t("allFilter")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>{t("allFilter")}</SelectItem>
+                {STORED_EVENT_TYPE_VALUES.map((eventType) => (
+                  <SelectItem key={eventType} value={eventType}>
+                    {eventType}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-1.5">
             <Label className="text-xs text-muted-foreground">
               {t("columns.entity")}
             </Label>
             <Select
-              value={filters.entityType}
-              onValueChange={(v) => updateFilter("entityType", v)}
+              value={toSelect(filters.entityType)}
+              onValueChange={(v) => updateFilter("entityType", fromSelect(v, STORED_EVENT_ENTITY_TYPES))}
             >
-              <SelectTrigger className="h-8 w-32">
-                <SelectValue placeholder="All" />
+              <SelectTrigger className="h-8 w-32" aria-label={t("columns.entity")}>
+                <SelectValue placeholder={t("allFilter")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="match">match</SelectItem>
-                <SelectItem value="booking">booking</SelectItem>
-                <SelectItem value="referee">referee</SelectItem>
+                <SelectItem value={ALL}>{t("allFilter")}</SelectItem>
+                <SelectItem value="match">{t("entityTypes.match")}</SelectItem>
+                <SelectItem value="booking">{t("entityTypes.booking")}</SelectItem>
+                <SelectItem value="referee">{t("entityTypes.referee")}</SelectItem>
+                {/* `task` was missing, so task events — the most frequent kind
+                    the reminder worker emits — could not be filtered at all.
+                    `user` is what publishSystemEvent writes (#154). */}
+                <SelectItem value="task">{t("entityTypes.task")}</SelectItem>
+                <SelectItem value="user">{t("entityTypes.user")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -392,14 +467,14 @@ export function EventBrowser() {
               {t("columns.source")}
             </Label>
             <Select
-              value={filters.source}
-              onValueChange={(v) => updateFilter("source", v)}
+              value={toSelect(filters.source)}
+              onValueChange={(v) => updateFilter("source", fromSelect(v, EVENT_SOURCES))}
             >
-              <SelectTrigger className="h-8 w-36">
-                <SelectValue placeholder="All" />
+              <SelectTrigger className="h-8 w-36" aria-label={t("columns.source")}>
+                <SelectValue placeholder={t("allFilter")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value={ALL}>{t("allFilter")}</SelectItem>
                 <SelectItem value="sync">{t("sourceLabels.sync")}</SelectItem>
                 <SelectItem value="manual">
                   {t("sourceLabels.manual")}
@@ -411,7 +486,7 @@ export function EventBrowser() {
             </Select>
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-xs text-muted-foreground">From</Label>
+            <Label className="text-xs text-muted-foreground">{t("fromLabel")}</Label>
             <Input
               type="date"
               className="h-8 w-36"
@@ -420,7 +495,7 @@ export function EventBrowser() {
             />
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-xs text-muted-foreground">To</Label>
+            <Label className="text-xs text-muted-foreground">{t("toLabel")}</Label>
             <Input
               type="date"
               className="h-8 w-36"
@@ -429,10 +504,10 @@ export function EventBrowser() {
             />
           </div>
           <div className="grid gap-1.5">
-            <Label className="text-xs text-muted-foreground">Search</Label>
+            <Label className="text-xs text-muted-foreground">{t("searchLabel")}</Label>
             <Input
               className="h-8 w-48"
-              placeholder="Search..."
+              placeholder={t("searchPlaceholder")}
               value={filters.search}
               onChange={(e) => updateFilter("search", e.target.value)}
             />
@@ -457,7 +532,7 @@ export function EventBrowser() {
               {isLoading && events.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center">
-                    <span className="text-muted-foreground">Loading...</span>
+                    <span className="text-muted-foreground">{t("loading")}</span>
                   </TableCell>
                 </TableRow>
               ) : events.length === 0 ? (
@@ -490,7 +565,7 @@ export function EventBrowser() {
         {/* Pagination */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Rows per page</span>
+            <span>{t("rowsPerPage")}</span>
             <Select
               value={String(pageSize)}
               onValueChange={(v) => {
@@ -513,13 +588,14 @@ export function EventBrowser() {
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
-              Page {page} of {totalPages}
+              {t("pageOf", { page, total: totalPages })}
             </span>
             <div className="flex items-center gap-1">
               <Button
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
+                aria-label={t("pagination.first")}
                 onClick={() => setPage(1)}
                 disabled={page <= 1}
               >
@@ -529,6 +605,7 @@ export function EventBrowser() {
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
+                aria-label={t("pagination.previous")}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
               >
@@ -538,6 +615,7 @@ export function EventBrowser() {
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
+                aria-label={t("pagination.next")}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
               >
@@ -547,6 +625,7 @@ export function EventBrowser() {
                 variant="outline"
                 size="icon"
                 className="h-8 w-8"
+                aria-label={t("pagination.last")}
                 onClick={() => setPage(totalPages)}
                 disabled={page >= totalPages}
               >
@@ -573,11 +652,25 @@ interface EventRowProps {
 }
 
 function EventRow({ event, isExpanded, onToggle, format, t }: EventRowProps) {
+  const detailId = `event-detail-${event.id}`;
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTableRowElement>) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onToggle();
+    }
+  }
+
   return (
     <>
       <TableRow
         className="cursor-pointer hover:bg-muted/50"
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-controls={detailId}
         onClick={onToggle}
+        onKeyDown={handleKeyDown}
       >
         <TableCell className="w-8 px-2">
           {isExpanded ? (
@@ -595,7 +688,7 @@ function EventRow({ event, isExpanded, onToggle, format, t }: EventRowProps) {
           <div className="flex items-center gap-2">
             <span className="truncate max-w-[200px]">{event.entityName}</span>
             <Badge variant="outline" className="text-xs">
-              {event.entityType}
+              {entityTypeLabel(event.entityType, t)}
             </Badge>
           </div>
         </TableCell>
@@ -612,7 +705,7 @@ function EventRow({ event, isExpanded, onToggle, format, t }: EventRowProps) {
             variant={urgencyBadgeVariant(event.urgency)}
             className="text-xs"
           >
-            {event.urgency}
+            {urgencyLabel(event.urgency, t)}
           </Badge>
         </TableCell>
         <TableCell className="tabular-nums whitespace-nowrap">
@@ -626,25 +719,25 @@ function EventRow({ event, isExpanded, onToggle, format, t }: EventRowProps) {
         </TableCell>
       </TableRow>
       {isExpanded && (
-        <TableRow>
+        <TableRow id={detailId}>
           <TableCell colSpan={7} className="bg-muted/30 p-4">
             <pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 font-mono text-xs leading-relaxed">
               {JSON.stringify(event.payload, null, 2)}
             </pre>
             <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
               <span>
-                ID: <code className="font-mono">{event.id}</code>
+                {t("id")}: <code className="font-mono">{event.id}</code>
               </span>
               {event.syncRunId != null && (
-                <span>Sync Run: {event.syncRunId}</span>
+                <span>{t("syncRun")}: {event.syncRunId}</span>
               )}
               <span>
-                Deep Link:{" "}
+                {t("deepLink")}:{" "}
                 <code className="font-mono">{event.deepLinkPath}</code>
               </span>
               {event.enqueuedAt && (
                 <span>
-                  Enqueued:{" "}
+                  {t("enqueued")}:{" "}
                   {format.dateTime(new Date(event.enqueuedAt), {
                     dateStyle: "medium",
                     timeStyle: "short",

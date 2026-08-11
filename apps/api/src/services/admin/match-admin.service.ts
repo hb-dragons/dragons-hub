@@ -9,6 +9,13 @@ import {
 } from "@dragons/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
+
+/**
+ * Overridable columns that are NOT NULL in `matches` (migration 0042). Clearing
+ * an override on one of these restores `false` when there is nothing to restore
+ * from remote — `null` would violate the constraint.
+ */
+const NOT_NULL_STATUS_FIELDS = new Set<string>(["isForfeited", "isCancelled"]);
 import type { MatchDetailResponse, EventType } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import type { MatchUpdateData, TransactionClient } from "./match-query.service";
@@ -40,26 +47,15 @@ async function loadTeamNames(
 
 // ── Re-exports ──────────────────────────────────────────────────────────────
 
-export { computeDiffs, OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
-export type { DiffStatus, FieldDiff } from "@dragons/shared";
-export type { DiffInput, OverridableField, LocalOnlyField, AllEditableField } from "./match-diff.service";
+export { computeDiffs } from "./match-diff.service";
 
-export type { OverrideInfo, MatchListItem, MatchDetail, MatchDetailResponse } from "@dragons/shared";
+export type { MatchDetailResponse } from "@dragons/shared";
 export {
   getOwnClubMatches,
   getMatchDetail,
   getMatchChangeHistory,
-  queryMatchWithJoins,
-  loadOverrides,
-  loadRemoteSnapshot,
-  buildDetailResponse,
 } from "./match-query.service";
-export type {
-  MatchListParams,
-  MatchUpdateData,
-  MatchRow,
-  TransactionClient,
-} from "./match-query.service";
+export type { MatchUpdateData } from "./match-query.service";
 
 // ── Write operations ────────────────────────────────────────────────────────
 
@@ -104,7 +100,11 @@ export async function updateMatchLocal(
       if (rawVal === null && isOverridable) {
         clearedOverrides.add(field);
         const restored = remoteSnapshot?.[field];
-        newVal = (restored ?? null) as typeof rawVal;
+        // Status flags are NOT NULL in the schema, and there may be no remote
+        // snapshot to restore from (never synced, or a purely local match).
+        // Their cleared value is `false` — writing null violates the constraint.
+        const cleared = NOT_NULL_STATUS_FIELDS.has(field) ? false : null;
+        newVal = (restored ?? cleared) as typeof rawVal;
       }
 
       const oldVal = locked[field as keyof typeof locked];
@@ -205,10 +205,16 @@ export async function updateMatchLocal(
 
     const teamIds = [locked.homeTeamApiId, locked.guestTeamApiId];
     const teamNames = await loadTeamNames(tx, locked.homeTeamApiId, locked.guestTeamApiId);
-    const emitEvent = async (eventType: string, extraPayload: Record<string, unknown>) => {
+    // Kickoff *after* this edit: `updateValues` holds what is being written,
+    // `locked` the pre-edit row.
+    const effectiveKickoff = (field: "kickoffDate" | "kickoffTime"): string | null => {
+      const value = field in updateValues ? updateValues[field] : locked[field];
+      return value == null ? null : String(value);
+    };
+    const emitEvent = async (eventType: EventType, extraPayload: Record<string, unknown>) => {
       try {
         await publishDomainEvent({
-          type: eventType as EventType,
+          type: eventType,
           source: "manual",
           actor: changedBy,
           entityType: "match",
@@ -221,6 +227,12 @@ export async function updateMatchLocal(
             guestTeam: teamNames.guest,
             leagueId: locked.leagueId,
             teamIds,
+            // The local matches row id, so the push templates can deep-link to
+            // /game/:id. Without it match.cancelled emitted "/game/undefined"
+            // and its template threw out of dispatch on the missing kickoff.
+            matchId: id,
+            kickoffDate: effectiveKickoff("kickoffDate"),
+            kickoffTime: effectiveKickoff("kickoffTime"),
             ...extraPayload,
           },
         }, tx);
@@ -230,15 +242,10 @@ export async function updateMatchLocal(
     };
 
     if (changedFieldNames.has("kickoffDate") || changedFieldNames.has("kickoffTime")) {
-      // Include the effective kickoffDate so urgency can be classified
-      // based on how soon the match is, even for time-only changes.
-      const effectiveDate = ("kickoffDate" in updateValues
-        ? String(updateValues.kickoffDate)
-        : String(locked.kickoffDate)) ?? null;
-
+      // The base payload already carries the effective kickoffDate, so urgency
+      // is classified on how soon the match is even for a time-only change.
       await emitEvent(EVENT_TYPES.MATCH_SCHEDULE_CHANGED, {
         leagueName: "",
-        kickoffDate: effectiveDate,
         changes: fieldChanges
           .filter((c) => c.field === "kickoffDate" || c.field === "kickoffTime")
           .map((c) => ({ field: c.field, oldValue: c.oldValue, newValue: c.newValue })),
@@ -417,7 +424,7 @@ export async function releaseOverride(
     if (isScheduleField && currentStr !== remoteStr) {
       try {
         await publishDomainEvent({
-          type: EVENT_TYPES.MATCH_SCHEDULE_CHANGED as EventType,
+          type: EVENT_TYPES.MATCH_SCHEDULE_CHANGED,
           source: "manual",
           actor: changedBy,
           entityType: "match",
@@ -439,7 +446,7 @@ export async function releaseOverride(
     if (isVenueField && currentStr !== remoteStr) {
       try {
         await publishDomainEvent({
-          type: EVENT_TYPES.MATCH_VENUE_CHANGED as EventType,
+          type: EVENT_TYPES.MATCH_VENUE_CHANGED,
           source: "manual",
           actor: changedBy,
           entityType: "match",

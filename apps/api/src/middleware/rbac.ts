@@ -1,8 +1,33 @@
 import type { Context, MiddlewareHandler } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { auth } from "../config/auth";
 import type { Resource, Action, RoleName } from "@dragons/shared";
 import { isReferee, satisfiesRole } from "@dragons/shared";
+
+type SessionUser = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>["user"];
+
+/**
+ * Resolve the caller once per request.
+ *
+ * Every `requirePermission` / `requireAnyRole` mount sits under `/admin`, and
+ * `app.ts` guards that whole prefix with `app.use("/admin/*", requireAuth)`
+ * (plus the two explicit `requireAuth, requireAnyRole("admin")` doc routes), so
+ * the session is already on the context by the time a granular guard runs and
+ * re-asking better-auth costs a second lookup for an identical answer.
+ *
+ * The fallback is not decorative: a guard mounted on its own — as several unit
+ * tests do, and as a future route group might — finds nothing on the context,
+ * fetches the session itself and populates it, exactly as before.
+ */
+async function resolveUser(c: Context): Promise<SessionUser | null> {
+  const cached = c.get("user") as SessionUser | undefined;
+  if (cached) return cached;
+
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return null;
+  c.set("user", session.user);
+  c.set("session", session.session);
+  return session.user;
+}
 
 export const requireAuth: MiddlewareHandler = async (c, next) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -19,58 +44,32 @@ export function requirePermission<R extends Resource>(
   action: Action<R>,
 ): MiddlewareHandler {
   return async (c, next) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) {
+    const user = await resolveUser(c);
+    if (!user) {
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
     const result = await auth.api.userHasPermission({
       body: {
-        userId: session.user.id,
+        userId: user.id,
         permissions: { [resource]: [action] } as Record<string, string[]>,
       },
     });
     if (!result.success) {
       return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
     }
-    c.set("user", session.user);
-    c.set("session", session.session);
     await next();
   };
 }
 
-// Throws HTTPException so error middleware can produce the JSON response.
-export async function assertPermission<R extends Resource>(
-  c: Context,
-  resource: R,
-  action: Action<R>,
-): Promise<void> {
-  const user = c.get("user") as { id: string } | undefined;
-  if (!user) {
-    throw new HTTPException(401, { message: "Unauthorized" });
-  }
-  const result = await auth.api.userHasPermission({
-    body: {
-      userId: user.id,
-      permissions: { [resource]: [action] } as Record<string, string[]>,
-    },
-  });
-  if (!result.success) {
-    throw new HTTPException(403, { message: "Forbidden" });
-  }
-}
-
 export function requireAnyRole(...names: RoleName[]): MiddlewareHandler {
   return async (c, next) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) {
+    const user = await resolveUser(c);
+    if (!user) {
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
-    const user = session.user as { role?: string | null };
-    if (!names.some((n) => satisfiesRole(user, n))) {
+    if (!names.some((n) => satisfiesRole(user as { role?: string | null }, n))) {
       return c.json({ error: "Forbidden", code: "FORBIDDEN" }, 403);
     }
-    c.set("user", session.user);
-    c.set("session", session.session);
     await next();
   };
 }

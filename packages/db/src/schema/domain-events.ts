@@ -6,6 +6,12 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import type {
+  EventSource,
+  EventUrgency,
+  StoredEventEntityType,
+  StoredEventType,
+} from "@dragons/shared";
 import { syncRuns } from "./sync-runs";
 
 // NOTE: A partial outbox index exists (migration 0040) but cannot be expressed in Drizzle schema.
@@ -15,13 +21,16 @@ export const domainEvents = pgTable(
   "domain_events",
   {
     id: text("id").primaryKey(), // ULID
-    type: text("type").notNull(),
-    source: text("source").notNull(), // "sync" | "manual" | "reconciliation"
-    urgency: text("urgency").notNull(), // "immediate" | "routine"
+    // The *stored* unions, wider than the publishable ones: `publishSystemEvent`
+    // writes `admin.test_push` / `user`, which are deliberately absent from
+    // EVENT_TYPES and EVENT_ENTITY_TYPES. See @dragons/shared.
+    type: text("type").notNull().$type<StoredEventType>(),
+    source: text("source").notNull().$type<EventSource>(),
+    urgency: text("urgency").notNull().$type<EventUrgency>(),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     actor: text("actor"),
     syncRunId: integer("sync_run_id").references(() => syncRuns.id),
-    entityType: text("entity_type").notNull(), // "match" | "booking" | "referee"
+    entityType: text("entity_type").notNull().$type<StoredEventEntityType>(),
     entityId: integer("entity_id").notNull(),
     entityName: text("entity_name").notNull(),
     deepLinkPath: text("deep_link_path").notNull(),

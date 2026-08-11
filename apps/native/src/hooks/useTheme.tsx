@@ -11,6 +11,7 @@ import { spacing, radius } from "@/theme/spacing";
 import { buildNavigationTheme } from "@/theme/navigation-theme";
 import type { ColorToken } from "@/theme/colors";
 import { useAppearanceMode, type Mode } from "./useAppearanceMode";
+import { useLocaleSubscription } from "./useLocale";
 
 export type { Mode };
 
@@ -56,6 +57,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 }
 
 export function useTheme(): ThemeContextValue {
+  // Locale subscription, not a theme concern — but a load-bearing one.
+  //
+  // `LocaleProvider` used to remount its whole subtree (`key={locale}`) so that
+  // components re-read `i18n.t(...)`, which reset navigation state. Dropping
+  // the remount is only safe if the components rendering translated text
+  // actually re-render: React Navigation wraps each screen in a
+  // `StaticContainer` that bails out unless its route/navigation props change,
+  // so a re-render of the navigator alone does not reach screen bodies. A
+  // context subscription does — React propagates context changes through
+  // bailed-out subtrees to find consumers.
+  //
+  // Every themed component in this app calls `useTheme()`, so subscribing here
+  // gives exactly the set of components that render UI, with one line instead
+  // of a `t()` migration across every screen.
+  useLocaleSubscription();
+
   const ctx = useContext(ThemeContext);
   if (ctx === null) {
     throw new Error("useTheme must be used within a ThemeProvider");

@@ -1,0 +1,50 @@
+---
+/**
+ * Mouse-following spotlight card, ported from dragons-app UiSpotlightCard.
+ * The glow position is driven by two CSS custom properties set from a tiny
+ * shared vanilla script (no framework hydration); show/hide runs on pure CSS.
+ */
+interface Props {
+  class?: string;
+  spotlightColor?: string;
+}
+
+const { class: className = "", spotlightColor = "rgba(255, 255, 255, 0.25)" } = Astro.props;
+---
+
+<div
+  class:list={["spotlight-card relative rounded-3xl border overflow-hidden p-8", className]}
+  data-spotlight
+  style={`--spotlight-color: ${spotlightColor}`}
+>
+  <div
+    class="spotlight-glow pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 ease-in-out"
+    aria-hidden="true"
+  >
+  </div>
+  <slot />
+</div>
+
+<style>
+  .spotlight-glow {
+    background: radial-gradient(
+      circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      var(--spotlight-color),
+      transparent 80%
+    );
+  }
+  .spotlight-card:hover .spotlight-glow,
+  .spotlight-card:focus-within .spotlight-glow {
+    opacity: 0.6;
+  }
+</style>
+
+<script>
+  for (const card of document.querySelectorAll<HTMLElement>("[data-spotlight]")) {
+    card.addEventListener("mousemove", (event) => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
+      card.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
+    });
+  }
+</script>

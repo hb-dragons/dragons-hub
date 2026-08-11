@@ -160,14 +160,14 @@ export function RulesSubtab({ referee }: Props) {
             {!rule.deny && (
               <>
                 <label className="flex items-center gap-1 text-xs">
-                  <Checkbox checked={rule.allowSr1} onCheckedChange={(v) => updateRule(i, { allowSr1: v === true })} /> SR1
+                  <Checkbox checked={rule.allowSr1} onCheckedChange={(v) => updateRule(i, { allowSr1: v === true })} /> {t("allowSr1")}
                 </label>
                 <label className="flex items-center gap-1 text-xs">
-                  <Checkbox checked={rule.allowSr2} onCheckedChange={(v) => updateRule(i, { allowSr2: v === true })} /> SR2
+                  <Checkbox checked={rule.allowSr2} onCheckedChange={(v) => updateRule(i, { allowSr2: v === true })} /> {t("allowSr2")}
                 </label>
               </>
             )}
-            <Button variant="ghost" size="icon" onClick={() => removeRule(i)} aria-label="remove">
+            <Button variant="ghost" size="icon" onClick={() => removeRule(i)} aria-label={t("removeRule")}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>

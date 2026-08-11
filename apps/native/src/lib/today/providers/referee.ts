@@ -2,11 +2,7 @@ import useSWR from "swr";
 import { canViewOpenGames, type GateUser, type TodayItem } from "@dragons/shared";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
-
-function todayIso(): string {
-  const n = new Date();
-  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-}
+import { kickoffToday } from "@/lib/format/kickoff";
 
 export const refereeProvider = {
   id: "referee",
@@ -17,7 +13,7 @@ export const refereeProvider = {
       refereeApi.getGames({ status: "active", limit: 500 }),
     );
     if (!data) return [];
-    const today = todayIso();
+    const today = kickoffToday();
     const items: TodayItem[] = [];
 
     const openCount = data.items.filter(

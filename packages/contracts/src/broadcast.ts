@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const broadcastUpsertSchema = z.object({
+export const broadcastUpsertSchema = z.strictObject({
   deviceId: z.string().min(1),
   matchId: z.number().int().positive().nullable().optional(),
   homeAbbr: z.string().max(8).nullable().optional(),
@@ -9,7 +9,7 @@ export const broadcastUpsertSchema = z.object({
   guestColorOverride: z.string().max(20).nullable().optional(),
 });
 
-export const broadcastStartStopSchema = z.object({ deviceId: z.string().min(1) });
+export const broadcastStartStopSchema = z.strictObject({ deviceId: z.string().min(1) });
 
 export const broadcastMatchesQuerySchema = z.object({
   q: z.string().optional(),

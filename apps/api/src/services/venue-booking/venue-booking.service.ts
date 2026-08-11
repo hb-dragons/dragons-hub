@@ -6,16 +6,15 @@ import {
   matches,
   teams,
   venues,
-  appSettings,
 } from "@dragons/db/schema";
 import { eq, and, or, inArray, sql } from "drizzle-orm";
+import { readSettings, readIntSetting } from "../settings/app-settings.reader";
 import { type BookingConfig } from "./booking-calculator";
 import { planReconciliation } from "./booking-planner";
 import type {
   ReconcilePreview,
   ReconcilePreviewMatch,
   ReconcileResult,
-  BookingStatus,
 } from "@dragons/shared";
 import { EVENT_TYPES } from "@dragons/shared";
 import { publishDomainEvent } from "../events/event-publisher";
@@ -24,45 +23,36 @@ const log = logger.child({ service: "venue-booking" });
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
+// `venue_booking_due_days_before` is deliberately absent: this config feeds the
+// booking time-window calculation only. The due-date setting is read by
+// `services/admin/settings.service.ts`, which owns it.
 const SETTING_KEYS = {
   bufferBefore: "venue_booking_buffer_before",
   bufferAfter: "venue_booking_buffer_after",
   gameDuration: "venue_booking_game_duration",
-  dueDaysBefore: "venue_booking_due_days_before",
 } as const;
 
 const DEFAULTS = {
   bufferBefore: 60,
   bufferAfter: 60,
   gameDuration: 90,
-  dueDaysBefore: 7,
 } as const;
 
 export async function getBookingConfig(): Promise<BookingConfig> {
-  const rows = await getDb()
-    .select({ key: appSettings.key, value: appSettings.value })
-    .from(appSettings)
-    .where(
-      inArray(appSettings.key, [
-        SETTING_KEYS.bufferBefore,
-        SETTING_KEYS.bufferAfter,
-        SETTING_KEYS.gameDuration,
-      ]),
-    );
-
-  const settings = new Map(rows.map((r) => [r.key, r.value]));
-
-  function parse(key: string, fallback: number): number {
-    const raw = settings.get(key);
-    if (raw == null) return fallback;
-    const parsed = parseInt(raw, 10);
-    return Number.isNaN(parsed) ? fallback : parsed;
-  }
+  const settings = await readSettings([
+    SETTING_KEYS.bufferBefore,
+    SETTING_KEYS.bufferAfter,
+    SETTING_KEYS.gameDuration,
+  ]);
 
   return {
-    bufferBeforeMinutes: parse(SETTING_KEYS.bufferBefore, DEFAULTS.bufferBefore),
-    bufferAfterMinutes: parse(SETTING_KEYS.bufferAfter, DEFAULTS.bufferAfter),
-    defaultGameDurationMinutes: parse(SETTING_KEYS.gameDuration, DEFAULTS.gameDuration),
+    bufferBeforeMinutes: readIntSetting(settings, SETTING_KEYS.bufferBefore, DEFAULTS.bufferBefore),
+    bufferAfterMinutes: readIntSetting(settings, SETTING_KEYS.bufferAfter, DEFAULTS.bufferAfter),
+    defaultGameDurationMinutes: readIntSetting(
+      settings,
+      SETTING_KEYS.gameDuration,
+      DEFAULTS.gameDuration,
+    ),
   };
 }
 
@@ -126,7 +116,12 @@ async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, Re
   if (matchIds.length === 0) return new Map();
 
   const homeTeam = getDb()
-    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name, customName: teams.customName })
+    .select({
+      apiTeamPermanentId: teams.apiTeamPermanentId,
+      name: teams.name,
+      customName: teams.customName,
+      badgeColor: teams.badgeColor,
+    })
     .from(teams)
     .as("home_team");
   const guestTeam = getDb()
@@ -142,6 +137,7 @@ async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, Re
       isCancelled: matches.isCancelled,
       homeTeam: homeTeam.name,
       homeTeamCustomName: homeTeam.customName,
+      homeBadgeColor: homeTeam.badgeColor,
       guestTeam: guestTeam.name,
     })
     .from(matches)
@@ -155,10 +151,11 @@ async function fetchMatchDisplayInfo(matchIds: number[]): Promise<Map<number, Re
       id: r.id,
       homeTeam: r.homeTeam,
       homeTeamCustomName: r.homeTeamCustomName,
+      homeBadgeColor: r.homeBadgeColor,
       guestTeam: r.guestTeam,
       kickoffTime: r.kickoffTime,
-      isForfeited: r.isForfeited ?? false,
-      isCancelled: r.isCancelled ?? false,
+      isForfeited: r.isForfeited,
+      isCancelled: r.isCancelled,
     });
   }
   return map;
@@ -252,7 +249,7 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
       bookingId: u.bookingId,
       venueName: nameOf(u.venueId),
       date: u.date,
-      status: u.status as BookingStatus,
+      status: u.status,
       currentStartTime: u.currentStartTime,
       currentEndTime: u.currentEndTime,
       newStartTime: u.newStartTime,
@@ -266,7 +263,7 @@ export async function previewReconciliation(): Promise<ReconcilePreview> {
       bookingId: r.bookingId,
       venueName: nameOf(r.venueId),
       date: r.date,
-      status: r.status as BookingStatus,
+      status: r.status,
       reason: r.reason,
       matches: displayOf(r.displayMatchIds),
     });

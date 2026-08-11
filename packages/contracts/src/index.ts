@@ -1,3 +1,5 @@
+export { idParamSchema, type IdParam } from "./common";
+
 export {
   boardIdParamSchema,
   boardCreateBodySchema,
@@ -15,11 +17,14 @@ export {
 
 export {
   matchListQuerySchema,
+  publicMatchListQuerySchema,
   matchIdParamSchema,
+  publicMatchIdParamSchema,
   matchUpdateBodySchema,
   matchHistoryQuerySchema,
   releaseOverrideParamsSchema,
   type MatchListQuery,
+  type PublicMatchListQuery,
   type MatchUpdateBody,
   type MatchIdParam,
   type MatchHistoryQuery,
@@ -47,7 +52,9 @@ export {
   type ChannelConfigIdParam,
   type ChannelConfigListQuery,
   type ChannelConfigCreateBody,
+  type ChannelConfigCreateBodyParsed,
   type ChannelConfigUpdateBody,
+  type ChannelConfigUpdateBodyParsed,
 } from "./channel-config";
 
 export {
@@ -60,7 +67,6 @@ export {
 export {
   notificationIdParamSchema,
   notificationListQuerySchema,
-  notificationUserIdQuerySchema,
   notificationPreferencesBodySchema,
   type NotificationListQuery,
   type NotificationPreferencesBody,
@@ -75,8 +81,6 @@ export {
 
 export {
   refereeRulesParamSchema,
-  refereeRuleItemSchema,
-  refereeRulesArraySchema,
   updateRefereeRulesBodySchema,
   type RefereeRulesParam,
   type UpdateRefereeRulesBodyParsed,
@@ -88,11 +92,13 @@ export {
   refereeApiMatchParamSchema,
   refereeMatchIdParamSchema,
   refereeGameIdParamSchema,
+  refereeIdParamSchema,
   type RefereeListQuery,
   type RefereeVisibilityBody,
   type RefereeApiMatchParam,
   type RefereeMatchIdParam,
   type RefereeGameIdParam,
+  type RefereeIdParam,
 } from "./referee";
 
 export {
@@ -113,14 +119,16 @@ export {
 } from "./social";
 
 export {
-  syncPaginationSchema,
   syncLogsQuerySchema,
   syncEntryIdParamSchema,
   syncEntriesQuerySchema,
   syncStreamParamSchema,
   syncJobStatusesQuerySchema,
+  syncJobIdParamSchema,
+  syncTypeQuerySchema,
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
+  SYNC_JOB_STATUSES,
   type SyncLogsQuery,
   type SyncEntriesQuery,
   type SyncUpdateScheduleBody,
@@ -176,6 +184,7 @@ export {
 } from "./watch-rule";
 
 export {
+  publicTeamIdParamSchema,
   publicScheduleIcsQuerySchema,
   type PublicScheduleIcsQuery,
 } from "./public";
@@ -184,14 +193,20 @@ export {
   refereeGamesQuerySchema,
   refereeAssignBodySchema,
   refereeClaimBodySchema,
+  refereeAssignParamSchema,
+  refereeClaimParamSchema,
   type RefereeGamesQuery,
   type RefereeAssignBody,
   type RefereeClaimBody,
+  type RefereeAssignParam,
+  type RefereeClaimParam,
 } from "./referee-self";
 
 export {
   deviceRegisterBodySchema,
+  deviceTokenParamSchema,
   type DeviceRegisterBody,
+  type DeviceTokenParam,
 } from "./devices";
 
 export {
@@ -206,8 +221,10 @@ export {
 export {
   scoreboardListQuerySchema,
   scoreboardLastEventIdSchema,
+  scoreboardDeviceQuerySchema,
   type ScoreboardListQuery,
   type ScoreboardLastEventId,
+  type ScoreboardDeviceQuery,
 } from "./scoreboard";
 
 export {
@@ -233,6 +250,8 @@ export {
 export {
   userRefereeLinkBodySchema,
   type UserRefereeLinkBody,
+  userIdParamSchema,
+  type UserIdParam,
 } from "./user";
 
 export {
@@ -250,3 +269,18 @@ export {
 } from "./notification-test";
 
 export { qaChatBodySchema, type QaChatBody } from "./qa";
+
+export {
+  assistantRescheduleChatBodySchema,
+  type AssistantRescheduleChatBody,
+} from "./assistant";
+
+export {
+  unsubscribeQuerySchema,
+  type UnsubscribeQuery,
+} from "./unsubscribe";
+
+export {
+  probetrainingRequestSchema,
+  type ProbetrainingRequest,
+} from "./probetraining";

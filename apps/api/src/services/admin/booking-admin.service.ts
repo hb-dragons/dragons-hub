@@ -30,7 +30,7 @@ async function getVenueName(venueId: number): Promise<string> {
 }
 
 export interface BookingListFilters {
-  status?: string;
+  status?: BookingStatus;
   dateFrom?: string;
   dateTo?: string;
 }
@@ -40,7 +40,7 @@ export async function listBookings(
 ): Promise<BookingListItem[]> {
   const conditions = [];
   if (filters?.status) {
-    conditions.push(eq(venueBookings.status, filters.status as BookingStatus));
+    conditions.push(eq(venueBookings.status, filters.status));
   }
   if (filters?.dateFrom) {
     conditions.push(gte(venueBookings.date, filters.dateFrom));
@@ -94,7 +94,7 @@ export async function listBookings(
     overrideEndTime: row.overrideEndTime,
     effectiveStartTime: row.overrideStartTime ?? row.calculatedStartTime,
     effectiveEndTime: row.overrideEndTime ?? row.calculatedEndTime,
-    status: row.status as BookingStatus,
+    status: row.status,
     needsReconfirmation: row.needsReconfirmation,
     notes: row.notes,
     matchCount: Number(row.matchCount),
@@ -132,7 +132,12 @@ export async function getBookingDetail(
 
   // Fetch linked matches
   const homeTeam = getDb()
-    .select({ apiTeamPermanentId: teams.apiTeamPermanentId, name: teams.name, customName: teams.customName })
+    .select({
+      apiTeamPermanentId: teams.apiTeamPermanentId,
+      name: teams.name,
+      customName: teams.customName,
+      badgeColor: teams.badgeColor,
+    })
     .from(teams)
     .as("home_team");
   const guestTeam = getDb()
@@ -148,6 +153,7 @@ export async function getBookingDetail(
       kickoffTime: matches.kickoffTime,
       homeTeam: homeTeam.name,
       homeTeamCustomName: homeTeam.customName,
+      homeBadgeColor: homeTeam.badgeColor,
       guestTeam: guestTeam.name,
       leagueName: leagues.name,
     })
@@ -178,7 +184,7 @@ export async function getBookingDetail(
     effectiveStartTime:
       booking.overrideStartTime ?? booking.calculatedStartTime,
     effectiveEndTime: booking.overrideEndTime ?? booking.calculatedEndTime,
-    status: booking.status as BookingStatus,
+    status: booking.status,
     needsReconfirmation: booking.needsReconfirmation,
     notes: booking.notes,
     confirmedBy: booking.confirmedBy,
@@ -303,7 +309,7 @@ export async function updateBooking(
     effectiveStartTime:
       updated.overrideStartTime ?? updated.calculatedStartTime,
     effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-    status: updated.status as BookingStatus,
+    status: updated.status,
     needsReconfirmation: updated.needsReconfirmation,
     notes: updated.notes,
     matchCount: Number(matchCountResult[0]!.count),
@@ -312,9 +318,9 @@ export async function updateBooking(
 
 export async function updateBookingStatus(
   id: number,
-  status: string,
+  status: BookingStatus,
 ): Promise<BookingListItem | null> {
-  const base = { status: status as BookingStatus, updatedAt: new Date() };
+  const base = { status, updatedAt: new Date() };
   const set =
     status === "confirmed"
       ? { ...base, confirmedAt: new Date(), needsReconfirmation: false }
@@ -383,7 +389,7 @@ export async function updateBookingStatus(
     effectiveStartTime:
       updated.overrideStartTime ?? updated.calculatedStartTime,
     effectiveEndTime: updated.overrideEndTime ?? updated.calculatedEndTime,
-    status: updated.status as BookingStatus,
+    status: updated.status,
     needsReconfirmation: updated.needsReconfirmation,
     notes: updated.notes,
     matchCount: Number(matchCountResult[0]!.count),
@@ -400,83 +406,97 @@ export interface BookingCreateData {
   matchIds?: number[];
 }
 
+/**
+ * Create a booking, link its matches and record the `booking.created` event as
+ * one unit.
+ *
+ * Everything that makes up "a booking exists" is written in a single
+ * transaction. Previously the booking row, each junction row and the domain
+ * event were separate statements: a failure while linking matches left a
+ * booking with a partial match list and no event, and the duplicate check was a
+ * plain SELECT, so two concurrent creates for the same (venue, date) both
+ * passed it and the second died on `venue_bookings_venue_date_uniq` with a 500
+ * instead of the intended `null`. The insert now arbitrates on that unique
+ * index itself, and the per-match junction inserts collapse into one statement.
+ */
 export async function createBooking(
   data: BookingCreateData,
 ): Promise<BookingDetail | null> {
-  // Verify venue exists
-  const [venue] = await getDb()
-    .select({ id: venues.id })
-    .from(venues)
-    .where(eq(venues.id, data.venueId))
-    .limit(1);
+  const matchIds = [...new Set(data.matchIds ?? [])];
 
-  if (!venue) return null;
+  const created = await getDb().transaction(async (tx) => {
+    // Verify venue exists (its name is needed for the event below anyway)
+    const [venue] = await tx
+      .select({ id: venues.id, name: venues.name })
+      .from(venues)
+      .where(eq(venues.id, data.venueId))
+      .limit(1);
 
-  // Check for duplicate (same venue + date)
-  const [existing] = await getDb()
-    .select({ id: venueBookings.id })
-    .from(venueBookings)
-    .where(
-      and(
-        eq(venueBookings.venueId, data.venueId),
-        eq(venueBookings.date, data.date),
-      ),
-    )
-    .limit(1);
+    if (!venue) return null;
 
-  if (existing) return null;
-
-  const [created] = await getDb()
-    .insert(venueBookings)
-    .values({
-      venueId: data.venueId,
-      date: data.date,
-      calculatedStartTime: data.overrideStartTime,
-      calculatedEndTime: data.overrideEndTime,
-      overrideStartTime: data.overrideStartTime,
-      overrideEndTime: data.overrideEndTime,
-      overrideReason: data.overrideReason ?? null,
-      notes: data.notes ?? null,
-      status: "pending",
-      needsReconfirmation: false,
-    })
-    .returning({ id: venueBookings.id });
-
-  if (!created) return null;
-
-  // Link matches if provided
-  if (data.matchIds && data.matchIds.length > 0) {
-    for (const matchId of data.matchIds) {
-      await getDb().insert(venueBookingMatches).values({
-        venueBookingId: created.id,
-        matchId,
-      });
-    }
-  }
-
-  // Emit booking.created event
-  try {
-    const venueName = await getVenueName(data.venueId);
-    await publishDomainEvent({
-      type: EVENT_TYPES.BOOKING_CREATED,
-      source: "manual",
-      entityType: "booking",
-      entityId: created.id,
-      entityName: `${venueName} - ${data.date}`,
-      deepLinkPath: `/admin/bookings/${created.id}`,
-      payload: {
-        venueName,
+    // Duplicate (same venue + date) resolves against the unique index rather
+    // than a preceding SELECT, so the check cannot be won by two callers.
+    const [inserted] = await tx
+      .insert(venueBookings)
+      .values({
+        venueId: data.venueId,
         date: data.date,
-        startTime: data.overrideStartTime,
-        endTime: data.overrideEndTime,
-        matchCount: data.matchIds?.length ?? 0,
-      },
-    });
-  } catch (error) {
-    log.warn({ err: error, bookingId: created.id }, "Failed to emit booking.created event");
-  }
+        calculatedStartTime: data.overrideStartTime,
+        calculatedEndTime: data.overrideEndTime,
+        overrideStartTime: data.overrideStartTime,
+        overrideEndTime: data.overrideEndTime,
+        overrideReason: data.overrideReason ?? null,
+        notes: data.notes ?? null,
+        status: "pending",
+        needsReconfirmation: false,
+      })
+      .onConflictDoNothing({
+        target: [venueBookings.venueId, venueBookings.date],
+      })
+      .returning({ id: venueBookings.id });
 
-  return getBookingDetail(created.id);
+    if (!inserted) return null;
+
+    // Link matches if provided — one multi-row insert, not one per match.
+    if (matchIds.length > 0) {
+      await tx.insert(venueBookingMatches).values(
+        matchIds.map((matchId) => ({
+          venueBookingId: inserted.id,
+          matchId,
+        })),
+      );
+    }
+
+    const venueName = venue.name;
+
+    // Published inside the transaction (outbox): the event row commits with the
+    // booking, so a crash between the two cannot lose it. The outbox poller
+    // enqueues it after commit.
+    await publishDomainEvent(
+      {
+        type: EVENT_TYPES.BOOKING_CREATED,
+        source: "manual",
+        entityType: "booking",
+        entityId: inserted.id,
+        entityName: `${venueName} - ${data.date}`,
+        deepLinkPath: `/admin/bookings/${inserted.id}`,
+        payload: {
+          venueName,
+          date: data.date,
+          startTime: data.overrideStartTime,
+          endTime: data.overrideEndTime,
+          matchCount: matchIds.length,
+        },
+      },
+      tx,
+    );
+
+    return inserted.id;
+  });
+
+  if (created === null) return null;
+
+  return getBookingDetail(created);
 }
 
 export async function deleteBooking(id: number): Promise<boolean> {

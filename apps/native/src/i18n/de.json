@@ -235,7 +235,10 @@
     "apply": "Anwenden",
     "loading": "Laden…",
     "vs": "vs",
-    "at": "@"
+    "at": "@",
+    "loadFailed": "Seite konnte nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "notFound": "Nicht gefunden"
   },
   "admin": {
     "boards": {
@@ -375,6 +378,11 @@
       "reload": "Neu laden"
     }
   },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "body": "Dieser Link führt nirgendwo hin. Vielleicht ist er veraltet.",
+    "action": "Zurück zur App"
+  },
   "toast": {
     "saved": "Änderungen gespeichert",
     "saveFailed": "Speichern fehlgeschlagen",
@@ -395,6 +403,7 @@
     "placeholder": "Frag nach Spielen, Tabellen, Ergebnissen",
     "send": "Senden",
     "stop": "Stopp",
+    "newChat": "Neuen Chat starten",
     "regenerate": "Neu generieren",
     "copy": "Kopieren",
     "copied": "Kopiert",

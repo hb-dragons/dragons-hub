@@ -3,7 +3,7 @@ import type { TodayProvider } from "./types";
 import { refereeProvider } from "./providers/referee";
 import { clubProvider } from "./providers/club";
 
-export const TODAY_PROVIDERS: TodayProvider[] = [refereeProvider, clubProvider];
+const TODAY_PROVIDERS: TodayProvider[] = [refereeProvider, clubProvider];
 
 /**
  * Aggregates every provider's items. All providers' hooks run unconditionally

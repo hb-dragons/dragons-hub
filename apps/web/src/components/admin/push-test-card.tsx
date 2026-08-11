@@ -38,6 +38,11 @@ const statusVariant: Record<
   failed: "destructive",
 };
 
+// The API types this status as a bare string, so an unrecognised value is
+// reachable. Translate what the catalog knows; label the rest generically
+// instead of leaking the raw enum token into the UI.
+const STATUS_KEYS = new Set(Object.keys(statusVariant));
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -47,6 +52,11 @@ function formatDate(iso: string | null): string {
 
 export function PushTestCard() {
   const t = useTranslations("settings.pushTest");
+  const tStatus = useTranslations("notifications.statuses");
+  const statusLabel = (status: string) =>
+    tStatus(
+      (STATUS_KEYS.has(status) ? status : "unknown") as Parameters<typeof tStatus>[0],
+    );
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -72,7 +82,7 @@ export function PushTestCard() {
       await mutate();
     } catch (err) {
       if (err instanceof APIError) {
-        if (err.status === 400 && /no_devices/i.test(err.message)) {
+        if (err.code === "NO_DEVICES") {
           toast.error(t("noDevicesError"));
         } else if (err.status === 403) {
           toast.error(t("permissionError"));
@@ -156,7 +166,7 @@ export function PushTestCard() {
                         <Badge
                           variant={statusVariant[row.status] ?? "outline"}
                         >
-                          {row.status}
+                          {statusLabel(row.status)}
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-xs truncate text-xs">

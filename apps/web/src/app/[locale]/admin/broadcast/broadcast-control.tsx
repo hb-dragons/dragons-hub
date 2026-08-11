@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useId, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Copy, Pencil, Play, Radio, Square } from "lucide-react";
 import { api } from "@/lib/api";
@@ -16,6 +16,7 @@ import { Field, FieldLabel } from "@dragons/ui/components/field";
 import { Badge } from "@dragons/ui/components/badge";
 import { PageHeader } from "@/components/admin/shared/page-header";
 import type { BroadcastConfig, BroadcastMatch } from "@dragons/shared";
+import type { BroadcastUpsertBody } from "@dragons/api-client";
 import { MatchPicker } from "./match-picker";
 
 interface Props {
@@ -27,6 +28,7 @@ const subscribeNoop = () => () => {};
 
 export function BroadcastControl({ deviceId, initial }: Props) {
   const t = useTranslations("broadcast");
+  const fieldIds = useId();
   const [config, setConfig] = useState<BroadcastConfig | null>(initial.config);
   const [match, setMatch] = useState<BroadcastMatch | null>(initial.match);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -46,7 +48,12 @@ export function BroadcastControl({ deviceId, initial }: Props) {
     setMatch(next.match);
   }
 
-  async function save(partial: Partial<BroadcastConfig>) {
+  // `Partial<BroadcastUpsertBody>`, not `Partial<BroadcastConfig>`: the response
+  // shape also carries isLive/startedAt/endedAt/updatedAt, which the request
+  // contract does not accept. Excess-property checking does not apply through a
+  // spread, so typing this against the response type would let a future
+  // `save({ isLive: true })` compile and then 400 at runtime.
+  async function save(partial: Partial<BroadcastUpsertBody>) {
     setError(null);
     await api.broadcast.upsertConfig({ deviceId, ...partial });
     await reload();
@@ -100,12 +107,16 @@ export function BroadcastControl({ deviceId, initial }: Props) {
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-1 min-w-0">
                   <p className="font-display text-lg font-bold leading-tight">
-                    {match.home.name}
-                    <span className="px-2 text-muted-foreground">vs</span>
-                    {match.guest.name}
+                    {t("matchTitle", {
+                      home: match.home.name,
+                      guest: match.guest.name,
+                    })}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {match.kickoffDate} · {match.kickoffTime.slice(0, 5)}
+                    {t("matchSubtitle", {
+                      date: match.kickoffDate,
+                      time: match.kickoffTime.slice(0, 5),
+                    })}
                     {match.league?.name ? ` · ${match.league.name}` : ""}
                   </p>
                 </div>
@@ -142,32 +153,36 @@ export function BroadcastControl({ deviceId, initial }: Props) {
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <Field>
-                <FieldLabel>{t("homeAbbr")}</FieldLabel>
+                <FieldLabel htmlFor={`${fieldIds}-home-abbr`}>{t("homeAbbr")}</FieldLabel>
                 <Input
+                  id={`${fieldIds}-home-abbr`}
                   defaultValue={config?.homeAbbr ?? ""}
                   maxLength={8}
                   onBlur={(e) => { void save({ homeAbbr: e.target.value || null }); }}
                 />
               </Field>
               <Field>
-                <FieldLabel>{t("guestAbbr")}</FieldLabel>
+                <FieldLabel htmlFor={`${fieldIds}-guest-abbr`}>{t("guestAbbr")}</FieldLabel>
                 <Input
+                  id={`${fieldIds}-guest-abbr`}
                   defaultValue={config?.guestAbbr ?? ""}
                   maxLength={8}
                   onBlur={(e) => { void save({ guestAbbr: e.target.value || null }); }}
                 />
               </Field>
               <Field>
-                <FieldLabel>{t("homeColor")}</FieldLabel>
+                <FieldLabel htmlFor={`${fieldIds}-home-color`}>{t("homeColor")}</FieldLabel>
                 <Input
+                  id={`${fieldIds}-home-color`}
                   placeholder={t("useDefault")}
                   defaultValue={config?.homeColorOverride ?? ""}
                   onBlur={(e) => { void save({ homeColorOverride: e.target.value || null }); }}
                 />
               </Field>
               <Field>
-                <FieldLabel>{t("guestColor")}</FieldLabel>
+                <FieldLabel htmlFor={`${fieldIds}-guest-color`}>{t("guestColor")}</FieldLabel>
                 <Input
+                  id={`${fieldIds}-guest-color`}
                   placeholder={t("useDefault")}
                   defaultValue={config?.guestColorOverride ?? ""}
                   onBlur={(e) => { void save({ guestColorOverride: e.target.value || null }); }}
@@ -182,7 +197,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="font-display text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Preview
+              {t("preview")}
             </CardTitle>
             <Badge variant="outline" className="font-mono">
               16:9
@@ -195,7 +210,7 @@ export function BroadcastControl({ deviceId, initial }: Props) {
             >
               <iframe
                 src="/overlay"
-                title="overlay-preview"
+                title={t("previewTitle")}
                 className="size-full"
               />
             </div>

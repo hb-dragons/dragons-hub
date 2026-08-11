@@ -5,45 +5,17 @@ import type { AppEnv } from "../../types";
 // --- Mocks (hoisted before imports) ---
 
 const mocks = vi.hoisted(() => ({
-  dbSelect: vi.fn(),
-  dbUpdate: vi.fn(),
+  setUserRefereeLink: vi.fn(),
 }));
 
-vi.mock("../../config/database", () => {
-  const selectChain = {
-    from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockImplementation(() => mocks.dbSelect()),
-  };
-  const updateChain = {
-    set: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    returning: vi.fn().mockImplementation(() => mocks.dbUpdate()),
-  };
-  return {
-    getDb: () => ({
-      select: vi.fn(() => selectChain),
-      update: vi.fn(() => updateChain),
-    }),
-  };
-});
-
-vi.mock("@dragons/db/schema", () => ({
-  user: { id: "user.id", refereeId: "user.refereeId" },
-  referees: { id: "referees.id" },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => args),
+vi.mock("../../services/admin/user-admin.service", () => ({
+  setUserRefereeLink: mocks.setUserRefereeLink,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
-  requirePermission: vi.fn(() =>
-    async (_c: unknown, next: () => Promise<void>) => next(),
-  ),
-  requireAnyRole: vi.fn(() =>
-    async (_c: unknown, next: () => Promise<void>) => next(),
-  ),
+  requireAnyRole: () => async (_c: unknown, next: () => Promise<void>) => {
+    await next();
+  },
 }));
 
 vi.mock("../../config/logger", () => ({
@@ -54,17 +26,23 @@ vi.mock("../../config/logger", () => ({
 
 import { userRoutes } from "./user.routes";
 import { errorHandler } from "../../middleware/error";
+// The real class, deliberately not mocked: errorHandler maps it by
+// `instanceof AppError`, so a stand-in `extends Error` double would fall
+// through to a 500 and these status assertions would test nothing. The errors
+// module is a leaf with no database imports, so using it here is free.
+import { UserAdminError } from "../../services/admin/user-admin.errors";
 
-// Test app without auth middleware
 const app = new Hono<AppEnv>();
 app.onError(errorHandler);
 app.route("/", userRoutes);
 
-function json(response: Response) {
-  return response.json();
+function patch(userId: string, body: unknown) {
+  return app.request(`/users/${userId}/referee-link`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
-
-// --- Tests ---
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -72,59 +50,52 @@ beforeEach(() => {
 
 describe("PATCH /users/:id/referee-link", () => {
   it("links a referee to a user", async () => {
-    mocks.dbSelect.mockResolvedValue([{ id: 42 }]);
-    mocks.dbUpdate.mockResolvedValue([{ id: "user-1", refereeId: 42 }]);
+    mocks.setUserRefereeLink.mockResolvedValue({ id: "user-1", refereeId: 42 });
 
-    const res = await app.request("/users/user-1/referee-link", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refereeId: 42 }),
-    });
+    const res = await patch("user-1", { refereeId: 42 });
 
     expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ id: "user-1", refereeId: 42 });
+    expect(await res.json()).toEqual({ id: "user-1", refereeId: 42 });
+    expect(mocks.setUserRefereeLink).toHaveBeenCalledWith("user-1", 42);
   });
 
-  it("unlinks a referee (refereeId: null)", async () => {
-    mocks.dbUpdate.mockResolvedValue([{ id: "user-1", refereeId: null }]);
+  it("unlinks a referee from a user", async () => {
+    mocks.setUserRefereeLink.mockResolvedValue({ id: "user-1", refereeId: null });
 
-    const res = await app.request("/users/user-1/referee-link", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refereeId: null }),
-    });
+    const res = await patch("user-1", { refereeId: null });
 
     expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ id: "user-1", refereeId: null });
-    // Should not query referees table when unlinking
-    expect(mocks.dbSelect).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ id: "user-1", refereeId: null });
+    expect(mocks.setUserRefereeLink).toHaveBeenCalledWith("user-1", null);
   });
 
-  it("returns 404 when referee does not exist", async () => {
-    mocks.dbSelect.mockResolvedValue([]);
+  it("returns 404 with the REFEREE_NOT_FOUND code when the referee does not exist", async () => {
+    mocks.setUserRefereeLink.mockRejectedValue(
+      new UserAdminError("Referee not found", "REFEREE_NOT_FOUND"),
+    );
 
-    const res = await app.request("/users/user-1/referee-link", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refereeId: 999 }),
-    });
+    const res = await patch("user-1", { refereeId: 4242 });
 
     expect(res.status).toBe(404);
-    expect(await json(res)).toEqual({ error: "Referee not found" });
-    expect(mocks.dbUpdate).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({ code: "REFEREE_NOT_FOUND" });
   });
 
-  it("returns 404 when user does not exist", async () => {
-    mocks.dbSelect.mockResolvedValue([{ id: 42 }]);
-    mocks.dbUpdate.mockResolvedValue([]);
+  it("returns 404 with the USER_NOT_FOUND code when the user does not exist", async () => {
+    mocks.setUserRefereeLink.mockRejectedValue(
+      new UserAdminError("User not found", "USER_NOT_FOUND"),
+    );
 
-    const res = await app.request("/users/nonexistent/referee-link", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refereeId: 42 }),
-    });
+    const res = await patch("nonexistent", { refereeId: 42 });
 
     expect(res.status).toBe(404);
-    expect(await json(res)).toEqual({ error: "User not found" });
+    expect(await res.json()).toMatchObject({ code: "USER_NOT_FOUND" });
+  });
+
+  it("rejects a non-integer refereeId with 400 without calling the service", async () => {
+    const res = await patch("user-1", { refereeId: "42" });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mocks.setUserRefereeLink).not.toHaveBeenCalled();
   });
 });

@@ -23,7 +23,7 @@ describe("publicEndpoints", () => {
       const params = { limit: 10, offset: 0, leagueId: 5 };
       await endpoints.getMatches(params);
 
-      expect(client.get).toHaveBeenCalledWith("/public/matches", params);
+      expect(client.get).toHaveBeenCalledWith("/public/matches", params, undefined);
     });
 
     it("works without params", async () => {
@@ -35,6 +35,21 @@ describe("publicEndpoints", () => {
       expect(client.get).toHaveBeenCalledWith(
         "/public/matches",
         undefined,
+        undefined,
+      );
+    });
+
+    it("forwards an abort signal so paging UIs can cancel a superseded request", async () => {
+      const client = mockClient();
+      const endpoints = publicEndpoints(client);
+      const controller = new AbortController();
+
+      await endpoints.getMatches({ limit: 1 }, { signal: controller.signal });
+
+      expect(client.get).toHaveBeenCalledWith(
+        "/public/matches",
+        { limit: 1 },
+        { signal: controller.signal },
       );
     });
   });

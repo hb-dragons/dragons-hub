@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { userRefereeLinkBodySchema } from "./user";
+import { userIdParamSchema, userRefereeLinkBodySchema } from "./user";
 
 describe("userRefereeLinkBodySchema", () => {
   it("accepts a positive integer refereeId", () => {
@@ -30,5 +30,33 @@ describe("userRefereeLinkBodySchema", () => {
 
   it("rejects string", () => {
     expect(() => userRefereeLinkBodySchema.parse({ refereeId: "42" })).toThrow();
+  });
+});
+
+// user.id is a better-auth text id (text().primaryKey()), not a serial int,
+// so this deliberately does not alias the shared numeric idParamSchema.
+describe("userIdParamSchema", () => {
+  it("accepts a better-auth text id", () => {
+    expect(userIdParamSchema.parse({ id: "user-abc123" })).toEqual({
+      id: "user-abc123",
+    });
+  });
+
+  it("rejects an empty id", () => {
+    expect(userIdParamSchema.safeParse({ id: "" }).success).toBe(false);
+  });
+
+  it("rejects an id over 255 characters", () => {
+    expect(userIdParamSchema.safeParse({ id: "a".repeat(256) }).success).toBe(
+      false,
+    );
+  });
+
+  it("rejects a missing id", () => {
+    expect(userIdParamSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("does not coerce a numeric id, unlike the shared idParamSchema", () => {
+    expect(userIdParamSchema.parse({ id: "5" })).toEqual({ id: "5" });
   });
 });

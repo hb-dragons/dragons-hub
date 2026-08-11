@@ -1,6 +1,6 @@
 import { getDb } from "../../config/database";
 import { refereeGames } from "@dragons/db/schema";
-import { and, eq, gte, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, or, ilike, sql, asc, inArray } from "drizzle-orm";
 import type { RefereeGameListItem } from "@dragons/shared";
 
 const isTrackedLeagueExpr = sql<boolean>`${refereeGames.matchId} IS NOT NULL`.as("is_tracked_league");
@@ -38,6 +38,38 @@ const refereeGameColumns = {
 export { refereeGameColumns };
 
 /**
+ * A row as `refereeGameColumns` selects it, before decoration.
+ *
+ * It differs from the wire shape in exactly one place: `last_synced_at` is a
+ * `timestamp` column, so drizzle hands back a `Date`, while
+ * `RefereeGameListItem` — the type web and native read the JSON response
+ * through — promises the ISO string.
+ */
+type RefereeGameRow = Omit<RefereeGameListItem, "mySlot" | "claimableSlots" | "lastSyncedAt"> & {
+  lastSyncedAt: Date | null;
+};
+
+/**
+ * Turn a selected row into the response item.
+ *
+ * Every referee-game reader funnels its rows through here so the `Date` →
+ * ISO-string conversion happens once. Relying on `JSON.stringify` to paper
+ * over the difference worked only because `Date.toJSON()` happens to produce
+ * the same text; anything that read `lastSyncedAt` before serialization got a
+ * `Date` while the type said `string`.
+ */
+export function toRefereeGameListItem(
+  row: RefereeGameRow,
+  decoration: Pick<RefereeGameListItem, "mySlot" | "claimableSlots">,
+): RefereeGameListItem {
+  return {
+    ...row,
+    ...decoration,
+    lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+  };
+}
+
+/**
  * Compute which slot (1, 2) the given referee apiId is assigned to, or null.
  * Pass `null` apiId for admin views — always returns null.
  */
@@ -55,10 +87,11 @@ export async function getRefereeGameById(id: number): Promise<RefereeGameListIte
   const [row] = await getDb()
     .select(refereeGameColumns)
     .from(refereeGames)
-    .where(eq(refereeGames.id, id))
+    // Tombstoned games (issue #105) are withdrawn fixtures, not live ones.
+    .where(and(eq(refereeGames.id, id), isNull(refereeGames.removedAt)))
     .limit(1);
   if (!row) return null;
-  return { ...row, mySlot: null, claimableSlots: [] } as RefereeGameListItem;
+  return toRefereeGameListItem(row, { mySlot: null, claimableSlots: [] });
 }
 
 interface GetRefereeGamesParams {
@@ -76,7 +109,8 @@ interface GetRefereeGamesParams {
 
 export async function getRefereeGames(params: GetRefereeGamesParams) {
   const { limit, offset, search, status, league, dateFrom, dateTo, gameType, assignedRefereeApiId, slotStatus } = params;
-  const conditions = [];
+  // Games withdrawn from the federation schedule are tombstoned, never listed (issue #105).
+  const conditions = [isNull(refereeGames.removedAt)];
 
   // Status
   if (status === "cancelled") conditions.push(eq(refereeGames.isCancelled, true));
@@ -157,11 +191,9 @@ export async function getRefereeGames(params: GetRefereeGamesParams) {
   ]);
 
   const total = countResult[0]?.count ?? 0;
-  const decorated = items.map((row) => ({
-    ...row,
-    mySlot: null as null,
-    claimableSlots: [] as (1 | 2)[],
-  })) as RefereeGameListItem[];
+  const decorated: RefereeGameListItem[] = items.map((row) =>
+    toRefereeGameListItem(row, { mySlot: null, claimableSlots: [] }),
+  );
   return {
     items: decorated,
     total, limit, offset,

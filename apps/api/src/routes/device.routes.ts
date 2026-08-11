@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import { describeRoute, validator } from "hono-openapi";
-import { getDb } from "../config/database";
-import { pushDevices } from "@dragons/db/schema";
-import { eq, and } from "drizzle-orm";
 import { auth } from "../config/auth";
-import { deviceRegisterBodySchema } from "@dragons/contracts";
+import { deviceRegisterBodySchema, deviceTokenParamSchema } from "@dragons/contracts";
 import { validationHook } from "../middleware/validation";
+import {
+  registerPushDevice,
+  unregisterPushDevice,
+} from "../services/notifications/push-device.service";
 
 const deviceRoutes = new Hono();
 
@@ -19,30 +20,14 @@ deviceRoutes.post(
     responses: {
       200: { description: "Device registered" },
       401: { description: "Unauthorized" },
+      409: { description: "Token registered to a different account" },
     },
   }),
   async (c) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) {
-      return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
-    }
-
+    if (!session) return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     const { token, platform, locale } = c.req.valid("json");
-
-    await getDb()
-      .insert(pushDevices)
-      .values({ userId: session.user.id, token, platform, locale })
-      .onConflictDoUpdate({
-        target: pushDevices.token,
-        set: {
-          userId: session.user.id,
-          platform,
-          locale,
-          lastSeenAt: new Date(),
-          updatedAt: new Date(),
-        },
-      });
-
+    await registerPushDevice({ userId: session.user.id, token, platform, locale });
     return c.json({ success: true });
   },
 );
@@ -50,6 +35,7 @@ deviceRoutes.post(
 // DELETE /:token — Unregister device token
 deviceRoutes.delete(
   "/:token",
+  validator("param", deviceTokenParamSchema, validationHook),
   describeRoute({
     description: "Unregister device token",
     tags: ["Devices"],
@@ -64,12 +50,8 @@ deviceRoutes.delete(
       return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
     }
 
-    const token = c.req.param("token");
-    await getDb()
-      .delete(pushDevices)
-      .where(
-        and(eq(pushDevices.token, token), eq(pushDevices.userId, session.user.id)),
-      );
+    const { token } = c.req.valid("param");
+    await unregisterPushDevice(session.user.id, token);
 
     return c.json({ success: true });
   },

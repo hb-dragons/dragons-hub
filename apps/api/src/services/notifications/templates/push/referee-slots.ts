@@ -1,9 +1,14 @@
 import type { Locale, PushTemplateOutput } from "./types";
 import { BODY_MAX, TITLE_MAX } from "./types";
 import { formatDate, truncate } from "./_utils";
+import { FALLBACK_DEEP_LINK } from "./referee-assigned";
 
 export interface RefereeSlotsPushPayload {
-  matchId: number;
+  /**
+   * `referee_games.match_id` — the local `matches` row id. Null until the
+   * referee game has been linked to a synced match, hence the fallback below.
+   */
+  matchId: number | null;
   homeTeam: string;
   guestTeam: string;
   kickoffDate: string;
@@ -13,7 +18,17 @@ export interface RefereeSlotsPushPayload {
   sr1Assigned: string | null;
   sr2Assigned: string | null;
   reminderLevel?: number;
-  eventId: string;
+}
+
+/**
+ * The whole point of this push is "come claim this game", so it has to land on
+ * a screen that can actually claim it. `/game/:id` is a declared expo-router
+ * route (`apps/native/src/app/game/[id].tsx`) and renders `<ClaimGameButton>`
+ * for signed-in referees. When the referee game has no linked `matches` row
+ * there is no id to route by, so fall back to the officiating list.
+ */
+function refereeSlotsDeepLink(p: Pick<RefereeSlotsPushPayload, "matchId">): string {
+  return p.matchId != null ? `/game/${p.matchId}` : FALLBACK_DEEP_LINK;
 }
 
 export function renderRefereeSlotsPush(
@@ -25,9 +40,10 @@ export function renderRefereeSlotsPush(
     title: truncate(titleFor(locale, variant), TITLE_MAX),
     body: truncate(bodyFor(p, locale, variant), BODY_MAX),
     data: {
-      deepLink: "/(tabs)/referee",
+      deepLink: refereeSlotsDeepLink(p),
       eventType: variant === "needed" ? "referee.slots.needed" : "referee.slots.reminder",
-      eventId: p.eventId,
+      // `eventId` is injected by renderPushTemplate — it lives on the dispatch
+      // envelope, not in the payload, and no emit site publishes it.
       matchId: p.matchId,
     },
   };

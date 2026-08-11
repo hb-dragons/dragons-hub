@@ -5,7 +5,8 @@ import { refereeReminderWorker } from "./referee-reminder.worker";
 import { pushReceiptWorker } from "./push-receipt.worker";
 import { taskReminderWorker } from "./task-reminder.worker";
 import { outboxPollWorker } from "./outbox-poll.worker";
-import { initializeScheduledJobs, initTaskReminders, triggerRefereeGamesSync, syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue, outboxPollQueue } from "./queues";
+import { syncQueue, digestQueue, domainEventsQueue, refereeRemindersQueue, pushReceiptQueue, taskRemindersQueue, outboxPollQueue, clearRepeatables } from "./queues";
+import { initializeScheduledJobs, initTaskReminders, triggerRefereeGamesSync } from "../services/sync-jobs.service";
 import { seedRefereeNotificationConfig } from "../services/notifications/seed-referee-watch-rule";
 import { getDb } from "../config/database";
 import { env } from "../config/env";
@@ -19,7 +20,12 @@ import {
   channelConfigs,
 } from "@dragons/db/schema";
 import { eq, lt, and, inArray } from "drizzle-orm";
-import { startHeartbeat, stopHeartbeat, isInstanceAlive, INSTANCE_ID } from "./instance-heartbeat";
+import {
+  startHeartbeat,
+  stopHeartbeat,
+  filterAliveInstances,
+  INSTANCE_ID,
+} from "./instance-heartbeat";
 
 export async function initializeWorkers() {
   logger.info("Initializing workers...");
@@ -35,13 +41,12 @@ export async function initializeWorkers() {
     .from(syncRuns)
     .where(eq(syncRuns.status, "running"));
 
-  const deadRunIds: number[] = [];
-  for (const run of candidateRuns) {
-    const alive = await isInstanceAlive(run.ownerInstanceId);
-    if (!alive) {
-      deadRunIds.push(run.id);
-    }
-  }
+  const aliveOwners = await filterAliveInstances(
+    candidateRuns.map((run) => run.ownerInstanceId),
+  );
+  const deadRunIds = candidateRuns
+    .filter((run) => !run.ownerInstanceId || !aliveOwners.has(run.ownerInstanceId))
+    .map((run) => run.id);
 
   if (deadRunIds.length > 0) {
     await getDb()
@@ -204,10 +209,7 @@ export async function cleanupOldDomainEvents(
  */
 export async function initializeScheduledDigests(): Promise<void> {
   // Remove existing repeatable digest jobs to avoid duplicates
-  const repeatableJobs = await digestQueue.getRepeatableJobs();
-  for (const job of repeatableJobs) {
-    await digestQueue.removeRepeatableByKey(job.key);
-  }
+  await clearRepeatables(digestQueue);
 
   const scheduledChannels = await getDb()
     .select()
@@ -297,11 +299,4 @@ export async function shutdownWorkers() {
   logger.info("Worker shutdown complete");
 }
 
-export { syncWorker };
-export { eventWorker };
-export { digestWorker };
-export { refereeReminderWorker };
-export { pushReceiptWorker };
-export { taskReminderWorker };
-export { outboxPollWorker };
 export * from "./queues";

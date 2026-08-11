@@ -310,6 +310,42 @@ describe("requestLogger", () => {
     });
   });
 
+  it("ignores a client-supplied X-Forwarded-For prefix", async () => {
+    const app = createApp();
+    // A caller who sends their own XFF gets it preserved and appended to by
+    // the proxy chain, so entry [0] is whatever they chose. Reading [0] let
+    // any caller stamp an arbitrary IP onto every request row they produced.
+    await app.request("/test", {
+      headers: {
+        "x-forwarded-for": "9.9.9.9, 203.0.113.5, 10.0.0.1",
+      },
+    });
+
+    const infoCall = mockChildLogger.info.mock.calls[0]!;
+    expect(infoCall[0].httpRequest.remoteIp).toBe("203.0.113.0");
+    expect(infoCall[0].httpRequest.remoteIp).not.toBe("9.9.9.0");
+  });
+
+  it("uses the only X-Forwarded-For entry when there is no proxy chain", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: { "x-forwarded-for": "203.0.113.5" },
+    });
+
+    const infoCall = mockChildLogger.info.mock.calls[0]!;
+    expect(infoCall[0].httpRequest.remoteIp).toBe("203.0.113.0");
+  });
+
+  it("omits remoteIp when X-Forwarded-For is not an IP at all", async () => {
+    const app = createApp();
+    await app.request("/test", {
+      headers: { "x-forwarded-for": "not-an-ip, still-not-an-ip" },
+    });
+
+    const infoCall = mockChildLogger.info.mock.calls[0]!;
+    expect(infoCall[0].httpRequest.remoteIp).toBeUndefined();
+  });
+
   it("falls back to x-real-ip and anonymizes it", async () => {
     const app = createApp();
     await app.request("/test", {

@@ -1,11 +1,17 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Badge } from "@dragons/ui/components/badge";
-import { Calendar, CheckSquare, Paperclip, MessageSquare } from "lucide-react";
+import {
+  Calendar,
+  CheckSquare,
+  Paperclip,
+  MessageSquare,
+  GripVertical,
+} from "lucide-react";
 import type { TaskCardData, TaskPriority } from "@dragons/shared";
+import { clubDayAnchor } from "@dragons/shared";
 import { AssigneeStack } from "./assignee-stack";
-import { LabelsBar } from "./labels-bar.stub";
 
 const priorityVariant: Record<
   TaskPriority,
@@ -19,24 +25,35 @@ const priorityVariant: Record<
 
 interface TaskCardProps {
   task: TaskCardData & {
-    labels?: { id: number; color: string; name?: string | null }[];
     attachmentCount?: number;
     commentCount?: number;
   };
   onOpen: (task: TaskCardData) => void;
-  dragHandle?: React.HTMLAttributes<HTMLDivElement>;
+  /** dnd-kit sortable attributes + listeners, spread onto the card's grip. */
+  dragHandle?: React.HTMLAttributes<HTMLButtonElement>;
 }
 
 export function TaskCard({ task, onOpen, dragHandle }: TaskCardProps) {
   const t = useTranslations("board");
+  const format = useFormatter();
   const variant = priorityVariant[task.priority];
   const hasChecklist = task.checklistTotal > 0;
 
+  // The sortable listeners live on a dedicated grip, not on the card. Spread
+  // onto the card they fought its own Enter/Space handler — whichever was
+  // declared last won, and dnd-kit's KeyboardSensor became unreachable. Keeping
+  // them separate gives keyboard users both journeys: Enter/Space on the card
+  // opens it, Enter/Space on the grip picks it up.
+  const { onClick: onHandleClick, ...handleProps } = dragHandle ?? {};
+
   return (
     <div
-      {...dragHandle}
       onClick={() => onOpen(task)}
       onKeyDown={(e) => {
+        // Only react to keys pressed while the card itself holds focus. The
+        // grip is a child; its keystrokes belong to dnd-kit, and swallowing
+        // them here (or calling stopPropagation there) would break the drag.
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onOpen(task);
@@ -44,12 +61,28 @@ export function TaskCard({ task, onOpen, dragHandle }: TaskCardProps) {
       }}
       role="button"
       tabIndex={0}
-      className="cursor-pointer rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="bg-card hover:bg-surface-high focus-visible:ring-ring cursor-pointer rounded-md p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
-      <LabelsBar labels={task.labels} />
-
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium leading-tight">{task.title}</p>
+        {dragHandle && (
+          <button
+            type="button"
+            {...handleProps}
+            aria-label={t("dnd.handle", { title: task.title })}
+            // Clicks stop here so grabbing the grip doesn't also open the task.
+            // Key events must NOT be stopped: React's stopPropagation also
+            // stops the native event, and dnd-kit's KeyboardSensor listens for
+            // the arrow/space keys on the document.
+            onClick={(e) => {
+              e.stopPropagation();
+              onHandleClick?.(e);
+            }}
+            className="-ml-1 shrink-0 cursor-grab p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        )}
+        <p className="flex-1 text-sm font-medium leading-tight">{task.title}</p>
         <Badge variant={variant} className="shrink-0">
           {t(`priority.${task.priority}`)}
         </Badge>
@@ -60,7 +93,11 @@ export function TaskCard({ task, onOpen, dragHandle }: TaskCardProps) {
           {task.dueDate && (
             <span className="inline-flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {task.dueDate}
+              {/* dueDate is a bare Berlin calendar day; anchoring it in Berlin
+                  keeps the rendered day right on a UTC server and for an admin
+                  in any zone. Rendering the raw string also skipped locale
+                  formatting that every other date in the board goes through. */}
+              {format.dateTime(clubDayAnchor(task.dueDate), "short")}
             </span>
           )}
           {hasChecklist && (

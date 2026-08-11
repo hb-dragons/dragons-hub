@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useId, useRef } from "react";
 import { useTranslations, useFormatter } from "next-intl";
 import { useRouter } from "@/lib/navigation";
 import { useForm, Controller } from "react-hook-form";
@@ -53,9 +53,10 @@ import {
 import { AlertTriangle, Loader2, RotateCcw, Save, X, Users } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
-import { can } from "@dragons/shared";
+import { can, clubDayAnchor } from "@dragons/shared";
 import type { OwnClubTeam } from "@dragons/shared";
 import { api } from "@/lib/api";
+import { resolveVenueId, type SelectedVenue } from "@/lib/venue-selection";
 import {
   formatMatchTime,
   formatPeriodScores,
@@ -73,6 +74,7 @@ import type { MatchUpdateBody } from "@dragons/api-client";
 // ---------------------------------------------------------------------------
 
 function OverrideField({
+  controlId,
   label,
   remoteDisplay,
   children,
@@ -82,6 +84,8 @@ function OverrideField({
   onReset,
   canEdit,
 }: {
+  /** id of the control this label names — without it the label is decoration. */
+  controlId: string;
   label: string;
   remoteDisplay?: string;
   children: React.ReactNode;
@@ -97,7 +101,7 @@ function OverrideField({
   return (
     <Field>
       <div className="flex min-h-6 items-center justify-between">
-        <FieldLabel>{label}</FieldLabel>
+        <FieldLabel htmlFor={controlId}>{label}</FieldLabel>
         <div className="flex items-center gap-1">
           {canEdit && isDirty && onReset && (
             <Button
@@ -169,7 +173,7 @@ function getTeamDisplayName(team: OwnClubTeam): string {
 function SheetSkeleton() {
   return (
     <div className="flex flex-col gap-6 px-4 pb-4">
-      <div className="rounded-lg bg-muted/30 p-4">
+      <div className="rounded-md bg-muted/30 p-4">
         <Skeleton className="mb-3 h-4 w-24" />
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -211,6 +215,11 @@ export function MatchEditSheet({
   const t = useTranslations();
   const format = useFormatter();
   const router = useRouter();
+  // One prefix per mounted sheet: `${fieldIds}-kickoffDate` names the control,
+  // `${fieldIds}-kickoffDate-error` the message that describes it.
+  const fieldIds = useId();
+  const controlId = (name: keyof MatchFormValues) => `${fieldIds}-${name}`;
+  const errorId = (name: keyof MatchFormValues) => `${fieldIds}-${name}-error`;
   const { data: session } = authClient.useSession();
   const canEdit = can(session?.user ?? null, "match", "update");
   const [loading, setLoading] = useState(false);
@@ -218,7 +227,9 @@ export function MatchEditSheet({
   const [diffs, setDiffs] = useState<FieldDiff[]>([]);
   const [saving, setSaving] = useState(false);
   const [ownClubTeams, setOwnClubTeams] = useState<OwnClubTeam[]>([]);
-  const selectedVenueIdRef = useRef<number | null>(null);
+  // Remembers both the id and the label it was picked under, so the id can be
+  // reconciled against the text actually in the field at save time.
+  const selectedVenueRef = useRef<SelectedVenue | null>(null);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [setAllOpen, setSetAllOpen] = useState(false);
 
@@ -270,7 +281,7 @@ export function MatchEditSheet({
         if (cancelled) return;
         setMatch(result.match);
         setDiffs(result.diffs);
-        selectedVenueIdRef.current = null;
+        selectedVenueRef.current = null;
         form.reset(getDefaultValues(result.match));
       })
       .catch(() => {
@@ -327,9 +338,15 @@ export function MatchEditSheet({
 
       const updateData: MatchUpdateBody = { ...dirtyValues };
 
-      // Include venueId when a venue was selected from the combobox
-      if (currentDirtyFields.venueNameOverride && selectedVenueIdRef.current != null) {
-        updateData.venueId = selectedVenueIdRef.current;
+      // Include venueId only when the text in the field still names the venue
+      // that was picked from the combobox — a free-text edit since then means
+      // the remembered id belongs to a different venue.
+      if (currentDirtyFields.venueNameOverride) {
+        const venueId = resolveVenueId(
+          selectedVenueRef.current,
+          data.venueNameOverride,
+        );
+        if (venueId != null) updateData.venueId = venueId;
       }
 
       if (Object.keys(updateData).length === 0) return;
@@ -339,7 +356,7 @@ export function MatchEditSheet({
         const result = await api.matches.update(match.id, updateData);
         setMatch(result.match);
         setDiffs(result.diffs);
-        selectedVenueIdRef.current = null;
+        selectedVenueRef.current = null;
         form.reset(getDefaultValues(result.match));
         toast.success(t("matchDetail.toast.updated"));
         router.refresh();
@@ -361,7 +378,7 @@ export function MatchEditSheet({
         const result = await api.matches.releaseOverride(match.id, fieldName);
         setMatch(result.match);
         setDiffs(result.diffs);
-        selectedVenueIdRef.current = null;
+        selectedVenueRef.current = null;
         form.reset(getDefaultValues(result.match));
         toast.success(t("matchDetail.toast.overrideReleased"));
         router.refresh();
@@ -416,19 +433,24 @@ export function MatchEditSheet({
           onClick={handleClose}
         >
           <X />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t("common.close")}</span>
         </Button>
 
         <SheetHeader>
           <SheetTitle>
             {match
-              ? `${match.homeTeamName} vs ${match.guestTeamName}`
+              ? t("matchDetail.editTitle", {
+                  home: match.homeTeamName,
+                  guest: match.guestTeamName,
+                })
               : t("matches.title")}
           </SheetTitle>
           {match && (
             <SheetDescription>
-              {t("matchDetail.info.matchday")} {match.matchDay} &middot;{" "}
-              {match.leagueName ?? "\u2014"}
+              {t("matchDetail.info.matchdaySummary", {
+                day: match.matchDay,
+                league: match.leagueName ?? "\u2014",
+              })}
             </SheetDescription>
           )}
         </SheetHeader>
@@ -442,7 +464,7 @@ export function MatchEditSheet({
           >
             <div className="flex flex-col gap-6 overflow-y-auto px-4 pb-4">
               {/* #1 — Read-only match info in card-like container */}
-              <section className="rounded-lg bg-muted/30 p-4">
+              <section className="rounded-md bg-muted/30 p-4">
                 <h3 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
                   {t("matchDetail.info.title")}
                 </h3>
@@ -501,10 +523,10 @@ export function MatchEditSheet({
                 </dl>
 
                 {/* Score table — quarters, halftime, final in one view */}
-                <div className="mt-4 overflow-x-auto rounded-md border">
+                <div className="bg-card mt-4 overflow-x-auto rounded-md">
                   <table className="w-full border-collapse text-sm">
                     <thead>
-                      <tr className="border-b">
+                      <tr className="bg-surface-low">
                         <th className="px-2 py-1.5 text-left text-xs font-medium text-muted-foreground" />
                         {periodScores.map((p) => (
                           <th
@@ -515,11 +537,11 @@ export function MatchEditSheet({
                           </th>
                         ))}
                         {periodScores.length > 0 && (
-                          <th className="border-l px-2 py-1.5 text-center text-xs font-medium text-muted-foreground">
+                          <th className="text-muted-foreground px-2 py-1.5 text-center text-xs font-medium">
                             {t("matchDetail.score.halftime")}
                           </th>
                         )}
-                        <th className={`px-2 py-1.5 text-center text-xs font-semibold${periodScores.length > 0 ? "" : " border-l"}`}>
+                        <th className="px-2 py-1.5 text-center text-xs font-semibold">
                           {t("matchDetail.score.final")}
                         </th>
                       </tr>
@@ -533,11 +555,11 @@ export function MatchEditSheet({
                           </td>
                         ))}
                         {periodScores.length > 0 && (
-                          <td className="border-l px-2 py-1.5 text-center tabular-nums">
+                          <td className="px-2 py-1.5 text-center tabular-nums">
                             {match.homeHalftimeScore ?? "\u2014"}
                           </td>
                         )}
-                        <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
+                        <td className="px-2 py-1.5 text-center font-bold tabular-nums">
                           {match.homeScore ?? "\u2014"}
                         </td>
                       </tr>
@@ -549,11 +571,11 @@ export function MatchEditSheet({
                           </td>
                         ))}
                         {periodScores.length > 0 && (
-                          <td className="border-l px-2 py-1.5 text-center tabular-nums">
+                          <td className="px-2 py-1.5 text-center tabular-nums">
                             {match.guestHalftimeScore ?? "\u2014"}
                           </td>
                         )}
-                        <td className={`px-2 py-1.5 text-center font-bold tabular-nums${periodScores.length > 0 ? "" : " border-l"}`}>
+                        <td className="px-2 py-1.5 text-center font-bold tabular-nums">
                           {match.guestScore ?? "\u2014"}
                         </td>
                       </tr>
@@ -578,10 +600,11 @@ export function MatchEditSheet({
                     name="kickoffDate"
                     render={({ field }) => (
                       <OverrideField
+                        controlId={controlId("kickoffDate")}
                         label={t("matchDetail.overrides.date")}
                         remoteDisplay={
                           remoteKickoffDate
-                            ? format.dateTime(new Date(remoteKickoffDate + "T00:00:00"), "matchDate")
+                            ? format.dateTime(clubDayAnchor(remoteKickoffDate), "matchDate")
                             : undefined
                         }
                         isOverridden={match.overriddenFields.includes("kickoffDate")}
@@ -592,6 +615,7 @@ export function MatchEditSheet({
                       >
                         <div className={dirtyRing("kickoffDate")}>
                           <DatePicker
+                            id={controlId("kickoffDate")}
                             value={
                               typeof field.value === "string" ? field.value : null
                             }
@@ -609,6 +633,7 @@ export function MatchEditSheet({
                     name="kickoffTime"
                     render={({ field }) => (
                       <OverrideField
+                        controlId={controlId("kickoffTime")}
                         label={t("matchDetail.overrides.time")}
                         remoteDisplay={
                           remoteKickoffTime
@@ -623,6 +648,7 @@ export function MatchEditSheet({
                       >
                         <div className={dirtyRing("kickoffTime")}>
                           <TimePicker
+                            id={controlId("kickoffTime")}
                             value={
                               typeof field.value === "string" ? field.value : null
                             }
@@ -644,7 +670,7 @@ export function MatchEditSheet({
                     render={({ field }) => (
                       <Field className="flex items-center justify-start gap-4 space-y-0">
                         <div className="flex items-center gap-2">
-                          <FieldLabel>
+                          <FieldLabel htmlFor={controlId("isForfeited")}>
                             {t("matchDetail.overrides.forfeited")}
                           </FieldLabel>
                           {match.overriddenFields.includes("isForfeited") && (
@@ -656,6 +682,7 @@ export function MatchEditSheet({
                         </div>
                         <div className="flex items-center gap-2">
                           <Switch
+                            id={controlId("isForfeited")}
                             checked={field.value === true}
                             onCheckedChange={(checked) => field.onChange(checked)}
                             disabled={!canEdit}
@@ -684,7 +711,7 @@ export function MatchEditSheet({
                     render={({ field }) => (
                       <Field className="flex items-center justify-start gap-4 space-y-0">
                         <div className="flex items-center gap-2">
-                          <FieldLabel>
+                          <FieldLabel htmlFor={controlId("isCancelled")}>
                             {t("matchDetail.overrides.cancelled")}
                           </FieldLabel>
                           {match.overriddenFields.includes("isCancelled") && (
@@ -696,6 +723,7 @@ export function MatchEditSheet({
                         </div>
                         <div className="flex items-center gap-2">
                           <Switch
+                            id={controlId("isCancelled")}
                             checked={field.value === true}
                             onCheckedChange={(checked) => field.onChange(checked)}
                             disabled={!canEdit}
@@ -725,6 +753,7 @@ export function MatchEditSheet({
                   name="venueNameOverride"
                   render={({ field, fieldState }) => (
                     <OverrideField
+                      controlId={controlId("venueNameOverride")}
                       label={t("matchDetail.overrides.venue")}
                       remoteDisplay={
                         match.venueName
@@ -748,6 +777,13 @@ export function MatchEditSheet({
                     >
                       <div className={dirtyRing("venueNameOverride")}>
                         <Combobox
+                          id={controlId("venueNameOverride")}
+                          aria-invalid={!!fieldState.error}
+                          aria-describedby={
+                            fieldState.error
+                              ? errorId("venueNameOverride")
+                              : undefined
+                          }
                           value={field.value ?? ""}
                           onChange={(v) => field.onChange(v || null)}
                           onSearch={async (q) => {
@@ -764,14 +800,19 @@ export function MatchEditSheet({
                           }}
                           onSelect={(option) => {
                             field.onChange(option.label);
-                            selectedVenueIdRef.current = Number(option.value);
+                            selectedVenueRef.current = {
+                              id: Number(option.value),
+                              label: option.label,
+                            };
                           }}
                           placeholder={t("matchDetail.overrides.venuePlaceholder")}
                           className="h-9"
                           disabled={!canEdit}
                         />
                       </div>
-                      <FieldError>{fieldState.error?.message}</FieldError>
+                      <FieldError id={errorId("venueNameOverride")}>
+                        {fieldState.error?.message}
+                      </FieldError>
                     </OverrideField>
                   )}
                 />
@@ -824,14 +865,23 @@ export function MatchEditSheet({
                       name={fieldName}
                       render={({ field, fieldState }) => (
                         <Field>
-                          <FieldLabel>{t(`matchDetail.staff.${fieldName}`)}</FieldLabel>
+                          <FieldLabel htmlFor={controlId(fieldName)}>
+                            {t(`matchDetail.staff.${fieldName}`)}
+                          </FieldLabel>
                           <div className="flex items-center gap-1">
                             <Select
                               value={field.value ?? ""}
                               onValueChange={(v) => field.onChange(v)}
                               disabled={!canEdit}
                             >
-                              <SelectTrigger className={`h-9 w-full ${dirtyRing(fieldName)}`}>
+                              <SelectTrigger
+                                id={controlId(fieldName)}
+                                aria-invalid={!!fieldState.error}
+                                aria-describedby={
+                                  fieldState.error ? errorId(fieldName) : undefined
+                                }
+                                className={`h-9 w-full ${dirtyRing(fieldName)}`}
+                              >
                                 <SelectValue placeholder={t("matchDetail.staff.placeholder")} />
                               </SelectTrigger>
                               <SelectContent>
@@ -851,13 +901,18 @@ export function MatchEditSheet({
                                 variant="ghost"
                                 size="icon-sm"
                                 className="shrink-0 text-muted-foreground"
+                                aria-label={t("matchDetail.staff.clear", {
+                                  role: t(`matchDetail.staff.${fieldName}`),
+                                })}
                                 onClick={() => field.onChange(null)}
                               >
                                 <X className="h-3.5 w-3.5" />
                               </Button>
                             )}
                           </div>
-                          <FieldError>{fieldState.error?.message}</FieldError>
+                          <FieldError id={errorId(fieldName)}>
+                            {fieldState.error?.message}
+                          </FieldError>
                         </Field>
                       )}
                     />
@@ -888,7 +943,7 @@ export function MatchEditSheet({
                         {t(`bookings.status.${match.booking.status}`)}
                       </Badge>
                       {match.booking.needsReconfirmation && (
-                        <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                        <span className="text-heat inline-flex items-center gap-1 text-xs">
                           <AlertTriangle className="h-3 w-3" />
                           {t("matchDetail.booking.needsReconfirmation")}
                         </span>
@@ -911,12 +966,21 @@ export function MatchEditSheet({
                   name="internalNotes"
                   render={({ field, fieldState }) => (
                     <Field>
-                      <FieldLabel>{t("matchDetail.notes.internal")}</FieldLabel>
-                      <FieldDescription>
+                      <FieldLabel htmlFor={controlId("internalNotes")}>
+                        {t("matchDetail.notes.internal")}
+                      </FieldLabel>
+                      <FieldDescription id={`${controlId("internalNotes")}-hint`}>
                         {t("matchDetail.notes.internalDescription")}
                       </FieldDescription>
                       <Textarea
+                        id={controlId("internalNotes")}
                         rows={4}
+                        aria-invalid={!!fieldState.error}
+                        aria-describedby={
+                          fieldState.error
+                            ? `${controlId("internalNotes")}-hint ${errorId("internalNotes")}`
+                            : `${controlId("internalNotes")}-hint`
+                        }
                         value={field.value ?? ""}
                         onChange={(e) =>
                           field.onChange(e.target.value || null)
@@ -925,7 +989,9 @@ export function MatchEditSheet({
                         disabled={!canEdit}
                         className={dirtyRing("internalNotes")}
                       />
-                      <FieldError>{fieldState.error?.message}</FieldError>
+                      <FieldError id={errorId("internalNotes")}>
+                        {fieldState.error?.message}
+                      </FieldError>
                     </Field>
                   )}
                 />
@@ -935,12 +1001,21 @@ export function MatchEditSheet({
                   name="publicComment"
                   render={({ field, fieldState }) => (
                     <Field>
-                      <FieldLabel>{t("matchDetail.notes.public")}</FieldLabel>
-                      <FieldDescription>
+                      <FieldLabel htmlFor={controlId("publicComment")}>
+                        {t("matchDetail.notes.public")}
+                      </FieldLabel>
+                      <FieldDescription id={`${controlId("publicComment")}-hint`}>
                         {t("matchDetail.notes.publicDescription")}
                       </FieldDescription>
                       <Textarea
+                        id={controlId("publicComment")}
                         rows={3}
+                        aria-invalid={!!fieldState.error}
+                        aria-describedby={
+                          fieldState.error
+                            ? `${controlId("publicComment")}-hint ${errorId("publicComment")}`
+                            : `${controlId("publicComment")}-hint`
+                        }
                         value={field.value ?? ""}
                         onChange={(e) =>
                           field.onChange(e.target.value || null)
@@ -949,7 +1024,9 @@ export function MatchEditSheet({
                         disabled={!canEdit}
                         className={dirtyRing("publicComment")}
                       />
-                      <FieldError>{fieldState.error?.message}</FieldError>
+                      <FieldError id={errorId("publicComment")}>
+                        {fieldState.error?.message}
+                      </FieldError>
                     </Field>
                   )}
                 />
@@ -958,7 +1035,7 @@ export function MatchEditSheet({
             </div>
 
             {/* #4 — Footer: Cancel + Save — sticky at bottom */}
-            <div className="flex gap-2 border-t bg-background px-4 py-4">
+            <div className="bg-surface-low flex gap-2 px-4 py-4">
               {canEdit ? (
                 <>
                   <Button

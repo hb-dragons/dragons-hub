@@ -4,7 +4,6 @@ import {
   listNotifications,
   markRead,
   markAllRead,
-  getUnreadCount,
   retryFailedNotification,
 } from "../../services/admin/notification-admin.service";
 import {
@@ -23,26 +22,33 @@ import type {
 import {
   notificationIdParamSchema,
   notificationListQuerySchema,
-  notificationUserIdQuerySchema,
   notificationPreferencesBodySchema,
 } from "@dragons/contracts";
 
 const notificationRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
 
-// GET /admin/notifications - List notifications for a user
+// GET /admin/notifications - List the caller's notifications
 notificationRoutes.get(
   "/notifications",
   settingsUpdate,
   validator("query", notificationListQuerySchema, validationHook),
   describeRoute({
-    description: "List notifications for a user from the notification log",
+    description: "List the caller's notifications from the notification log",
     tags: ["Notifications"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const query = c.req.valid("query");
-    const result: NotificationListResult = await listNotifications(query);
+    const { limit, offset } = c.req.valid("query");
+    // Decision (issue #123): cross-user reads of the notification log are not
+    // intended, so the recipient comes from the session and `userId` is gone
+    // from the query contract. `settings:update` is held by several roles; it
+    // is authorisation to use the admin UI, not to read someone else's inbox.
+    const result: NotificationListResult = await listNotifications({
+      userId: c.get("user").id,
+      limit,
+      offset,
+    });
     return c.json(result);
   },
 );
@@ -90,23 +96,6 @@ notificationRoutes.patch(
     // across every recipient.
     const count = await markAllRead(c.get("user").id);
     return c.json({ updated: count } satisfies NotificationMarkAllReadResponse);
-  },
-);
-
-// GET /admin/notifications/unread-count - Unread count for a user
-notificationRoutes.get(
-  "/notifications/unread-count",
-  settingsUpdate,
-  validator("query", notificationUserIdQuerySchema, validationHook),
-  describeRoute({
-    description: "Get unread count for a user",
-    tags: ["Notifications"],
-    responses: { 200: { description: "Success" } },
-  }),
-  async (c) => {
-    const { userId } = c.req.valid("query");
-    const count = await getUnreadCount(userId);
-    return c.json({ count });
   },
 );
 
@@ -171,16 +160,9 @@ notificationRoutes.patch(
   async (c) => {
     const userId = c.get("user").id;
     const body = c.req.valid("json");
-    try {
-      const prefs: NotificationPreferences =
-        await updateUserNotificationPreferences(userId, body);
-      return c.json(prefs);
-    } catch (err) {
-      if (err instanceof Error && /unknown event type/i.test(err.message)) {
-        return c.json({ error: err.message, code: "INVALID_EVENT_TYPE" }, 400);
-      }
-      throw err;
-    }
+    const prefs: NotificationPreferences =
+      await updateUserNotificationPreferences(userId, body);
+    return c.json(prefs);
   },
 );
 

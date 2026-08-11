@@ -4,16 +4,13 @@ import {
   referees,
   refereeAssignmentRules,
 } from "@dragons/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type {
   AssignRefereeResponse,
   UnassignRefereeResponse,
 } from "@dragons/shared";
-import {
-  assignReferee,
-  unassignReferee,
-  AssignmentError,
-} from "./referee-assignment.service";
+import { assignReferee, unassignReferee } from "./referee-assignment.service";
+import { AssignmentError } from "./referee-assignment.errors";
 import { resolveClaimableSlots } from "./referee-slot-resolver";
 
 export interface ClaimRefereeGameParams {
@@ -60,7 +57,8 @@ export async function claimRefereeGame(
   const [game] = await getDb()
     .select()
     .from(refereeGames)
-    .where(eq(refereeGames.id, gameId))
+    // A withdrawn game (issue #105) is not actionable.
+    .where(and(eq(refereeGames.id, gameId), isNull(refereeGames.removedAt)))
     .limit(1);
 
   if (!game) {
@@ -125,7 +123,8 @@ export async function unclaimRefereeGame(
   const [game] = await getDb()
     .select()
     .from(refereeGames)
-    .where(eq(refereeGames.id, gameId))
+    // A withdrawn game (issue #105) is not actionable.
+    .where(and(eq(refereeGames.id, gameId), isNull(refereeGames.removedAt)))
     .limit(1);
 
   if (!game) {

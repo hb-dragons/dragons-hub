@@ -384,8 +384,8 @@ describe("makeQueries", () => {
   // --- events ---
   it("domainEvents(query, params): key uses params; fetcher calls events.list(query)", async () => {
     const { api, calls } = mockApi();
-    const query = { type: "match.updated" };
-    const params = "type=match.updated";
+    const query = { type: "match.result_changed" };
+    const params = "type=match.result_changed";
     const q = makeQueries(api).domainEvents(query, params);
     expect(q.key).toBe(SWR_KEYS.domainEvents(params));
     await q.fetcher();

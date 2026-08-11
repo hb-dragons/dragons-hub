@@ -18,7 +18,7 @@ export function PublicHeader() {
   const t = useTranslations();
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-[var(--safe-area-top)]">
+    <header className="sticky top-0 z-50 bg-surface-low/95 backdrop-blur supports-[backdrop-filter]:bg-surface-low/60 pt-[var(--safe-area-top)]">
       <div className="mx-auto flex h-14 max-w-2xl items-center gap-4 px-4">
         <Link href="/" className="flex items-center">
           <Wordmark width={110} alt="Dragons" />

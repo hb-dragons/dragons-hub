@@ -1,8 +1,33 @@
 // ── Event metadata types ─────────────────────────────────────────────────────
 
-export type EventSource = "sync" | "manual" | "reconciliation";
-export type EventUrgency = "immediate" | "routine";
-export type EventEntityType = "match" | "booking" | "referee" | "task";
+/**
+ * Where an event came from. Single source of truth — the admin listing's
+ * `source` filter derives its enum from this array rather than restating the
+ * literals, which is what let it accept any string and silently return nothing.
+ * `publishSystemEvent` writes `"manual"`, so system events need no extra member.
+ */
+export const EVENT_SOURCES = ["sync", "manual", "reconciliation"] as const;
+export type EventSource = (typeof EVENT_SOURCES)[number];
+/**
+ * Delivery urgency. Single source of truth — both the manual-trigger contract
+ * and the watch-rule `urgencyOverride` derive their enum from this array rather
+ * than restating the literals (watch-rule used to take a bare string, so a
+ * typo'd urgency saved cleanly and did nothing).
+ */
+export const EVENT_URGENCIES = ["immediate", "routine"] as const;
+export type EventUrgency = (typeof EVENT_URGENCIES)[number];
+/**
+ * Every entity a domain event can be raised against. Single source of truth —
+ * the manual-trigger request contract derives its `entityType` enum from this
+ * array rather than restating the literals.
+ */
+export const EVENT_ENTITY_TYPES = [
+  "match",
+  "booking",
+  "referee",
+  "task",
+] as const;
+export type EventEntityType = (typeof EVENT_ENTITY_TYPES)[number];
 
 // ── Event type constants ─────────────────────────────────────────────────────
 
@@ -52,320 +77,87 @@ export const EVENT_TYPES = {
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
 
-// ── Payload interfaces ───────────────────────────────────────────────────────
+/**
+ * Every event type as a flat array. Watch rules validate their `eventTypes`
+ * against this, so a typo'd type is rejected at the boundary instead of being
+ * saved into a rule that then never fires.
+ */
+export const EVENT_TYPE_VALUES = Object.values(EVENT_TYPES) as readonly EventType[];
 
-export interface FieldChange {
-  field: string;
-  oldValue: string | number | boolean | null;
-  newValue: string | number | boolean | null;
-}
+// ── System event constants ───────────────────────────────────────────────────
 
-export interface MatchCreatedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueId: number;
-  leagueName: string;
-  kickoffDate: string;
-  kickoffTime: string;
-  venueId: number | null;
-  venueName: string | null;
-  teamIds: number[];
-}
+/**
+ * Types that exist only to anchor rows the schema requires an event for, never
+ * to notify anyone.
+ *
+ * Deliberately **not** part of `EVENT_TYPES`: `notification_log` has a foreign
+ * key to `domain_events`, so the admin test-push route needs a row to point at,
+ * but the type must stay out of the public vocabulary or an admin could aim a
+ * watch rule at it or fire one from the manual trigger. Watch rules and
+ * `triggerEventSchema` validate against `EVENT_TYPE_VALUES`, which is why that
+ * array stays domain-only — see `STORED_EVENT_TYPE_VALUES` for the wider set
+ * that describes what the table can actually hold.
+ */
+export const SYSTEM_EVENT_TYPES = ["admin.test_push"] as const;
+export type SystemEventType = (typeof SYSTEM_EVENT_TYPES)[number];
 
-export interface MatchScheduleChangedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueName: string;
-  leagueId?: number | null;
-  teamIds: number[];
-  changes: FieldChange[];
-}
+/**
+ * Entity types only system events use. A system event is about an account
+ * action rather than one of the tracked entities in `EVENT_ENTITY_TYPES`.
+ */
+export const SYSTEM_EVENT_ENTITY_TYPES = ["user"] as const;
+export type SystemEventEntityType = (typeof SYSTEM_EVENT_ENTITY_TYPES)[number];
 
-export interface MatchVenueChangedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueName: string;
-  leagueId?: number | null;
-  teamIds: number[];
-  oldVenueId: number | null;
-  oldVenueName: string | null;
-  newVenueId: number | null;
-  newVenueName: string | null;
-}
+/**
+ * What a persisted `domain_events` row can actually hold, domain and system
+ * events together — the type of the columns and of anything that reads them
+ * back out, such as the admin event listing.
+ *
+ * Kept separate from `EventType` / `EventEntityType` on purpose. Those two are
+ * the *publishable* vocabulary and are what write-side contracts validate
+ * against; these two are the *readable* one. Collapsing them would let an admin
+ * trigger `admin.test_push` by hand, which is the thing the split prevents.
+ */
+export type StoredEventType = EventType | SystemEventType;
+export type StoredEventEntityType = EventEntityType | SystemEventEntityType;
 
-export interface MatchCancelledPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueName: string;
-  leagueId?: number | null;
-  teamIds: number[];
-  reason: string | null;
-}
+/** Runtime counterparts, for filters that must accept any stored value. */
+export const STORED_EVENT_TYPE_VALUES = [
+  ...EVENT_TYPE_VALUES,
+  ...SYSTEM_EVENT_TYPES,
+] as readonly StoredEventType[];
+export const STORED_EVENT_ENTITY_TYPES = [
+  ...EVENT_ENTITY_TYPES,
+  ...SYSTEM_EVENT_ENTITY_TYPES,
+] as readonly StoredEventEntityType[];
 
-export interface MatchForfeitedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueName: string;
-  leagueId?: number | null;
-  teamIds: number[];
-}
-
-export interface MatchScoreChangedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueName: string;
-  leagueId?: number | null;
-  teamIds: number[];
-  homeScore: number;
-  guestScore: number;
-  oldHomeScore?: number | null;
-  oldGuestScore?: number | null;
-}
-
-export interface MatchRemovedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueName: string;
-  leagueId?: number | null;
-  teamIds: number[];
-}
-
-export interface MatchConfirmedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueName: string;
-  leagueId?: number | null;
-  teamIds: number[];
-  homeScore: number | null;
-  guestScore: number | null;
-}
-
-export interface MatchResultEnteredPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueName: string;
-  leagueId?: number | null;
-  teamIds: number[];
-  homeScore: number;
-  guestScore: number;
-}
-
-export interface MatchResultChangedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  leagueName: string;
-  leagueId?: number | null;
-  teamIds: number[];
-  oldHomeScore: number;
-  oldGuestScore: number;
-  newHomeScore: number;
-  newGuestScore: number;
-}
-
-export interface RefereeAssignedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  refereeName: string;
-  role: string;
-  teamIds: number[];
-}
-
-export interface RefereeUnassignedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  refereeName: string;
-  role: string;
-  teamIds: number[];
-}
-
-export interface RefereeReassignedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  oldRefereeName: string;
-  newRefereeName: string;
-  role: string;
-  teamIds: number[];
-}
-
-export interface RefereeSlotsPayload {
-  matchId: number | null;
-  matchNo: number | null;
-  homeTeam: string;
-  guestTeam: string;
-  leagueId: number | null;
-  leagueName: string;
-  kickoffDate: string;
-  kickoffTime: string;
-  venueId: number | null;
-  venueName: string | null;
-  sr1Open: boolean;
-  sr2Open: boolean;
-  sr1Assigned: string | null;
-  sr2Assigned: string | null;
-  reminderLevel?: number;
-  deepLink: string;
-}
-
-export interface BookingCreatedPayload {
-  venueName: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  matchCount: number;
-}
-
-export interface BookingStatusChangedPayload {
-  venueName: string;
-  date: string;
-  oldStartTime?: string;
-  oldEndTime?: string;
-  newStartTime?: string;
-  newEndTime?: string;
-  oldStatus?: string;
-  newStatus?: string;
-  reason?: string;
-}
-
-export interface BookingNeedsReconfirmationPayload {
-  venueName: string;
-  date: string;
-  reason: string;
-}
-
-export interface OverrideConflictPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  field: string;
-  overrideValue: string | number | boolean | null;
-  remoteValue: string | number | boolean | null;
-}
-
-export interface OverrideAppliedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  field: string;
-  originalValue: string | number | boolean | null;
-  overrideValue: string | number | boolean | null;
-  appliedBy: string;
-}
-
-export interface OverrideRevertedPayload {
-  matchNo: number;
-  homeTeam: string;
-  guestTeam: string;
-  field: string;
-  overrideValue: string | number | boolean | null;
-  revertedBy: string;
-}
-
-export interface SyncCompletedPayload {
-  syncRunId: number;
-  syncType: string;
-  durationMs: number;
-  recordsProcessed: number;
-  recordsCreated: number;
-  recordsUpdated: number;
-  recordsFailed: number;
-  eventsEmitted: number;
-}
-
-export interface TaskAssignedPayload {
-  taskId: number;
-  boardId: number;
-  boardName: string;
-  title: string;
-  assigneeUserIds: string[];   // recipient userIds
-  assignedBy: string;          // display name of the acting user (for templates)
-  dueDate: string | null;
-  priority: "low" | "normal" | "high";
-}
-
-export interface TaskUnassignedPayload {
-  taskId: number;
-  boardId: number;
-  boardName: string;
-  title: string;
-  unassignedUserIds: string[]; // recipient userIds
-  unassignedBy: string;        // display name of the acting user (for templates)
-}
-
-export interface TaskCommentAddedPayload {
-  taskId: number;
-  boardId: number;
-  boardName: string;
-  title: string;
-  commentId: number;
-  authorId: string;            // userId of comment author
-  authorName: string;          // display name (for templates)
-  bodyPreview: string;
-  recipientUserIds: string[];
-}
-
-export interface TaskDueReminderPayload {
-  taskId: number;
-  boardId: number;
-  boardName: string;
-  title: string;
-  dueDate: string;
-  reminderKind: "lead" | "day_of";
-  assigneeUserIds: string[];
-}
-
-// ── Union payload type ───────────────────────────────────────────────────────
-
-export type DomainEventPayload =
-  | MatchCreatedPayload
-  | MatchScheduleChangedPayload
-  | MatchVenueChangedPayload
-  | MatchCancelledPayload
-  | MatchForfeitedPayload
-  | MatchScoreChangedPayload
-  | MatchRemovedPayload
-  | MatchConfirmedPayload
-  | MatchResultEnteredPayload
-  | MatchResultChangedPayload
-  | RefereeAssignedPayload
-  | RefereeUnassignedPayload
-  | RefereeReassignedPayload
-  | RefereeSlotsPayload
-  | BookingCreatedPayload
-  | BookingStatusChangedPayload
-  | BookingNeedsReconfirmationPayload
-  | OverrideConflictPayload
-  | OverrideAppliedPayload
-  | OverrideRevertedPayload
-  | SyncCompletedPayload
-  | TaskAssignedPayload
-  | TaskUnassignedPayload
-  | TaskCommentAddedPayload
-  | TaskDueReminderPayload;
+// ── Payload types ────────────────────────────────────────────────────────────
+//
+// The contract for every event payload lives in `domain-event-schemas.ts` (zod),
+// which `validateEventPayload` enforces at publish time. Payloads a caller needs
+// to name in a type position — `RefereeSlotsPayload`, or `EventPayload<E>` for
+// any event — are derived from those schemas there, never restated by hand: a
+// second declaration is free to drift from what producers actually publish.
 
 // ── API response types ───────────────────────────────────────────────────────
 
+/**
+ * One row of the admin event listing.
+ *
+ * `type` and `entityType` are the **stored** unions, not the publishable ones:
+ * `listDomainEvents` returns system-event rows too, and declaring the narrower
+ * union here told consumers a `switch` was exhaustive when live rows fell
+ * outside it (#154).
+ */
 export interface DomainEventItem {
   id: string;
-  type: EventType;
+  type: StoredEventType;
   source: EventSource;
   urgency: EventUrgency;
   occurredAt: string;
   actor: string | null;
   syncRunId: number | null;
-  entityType: EventEntityType;
+  entityType: StoredEventEntityType;
   entityId: number;
   entityName: string;
   deepLinkPath: string;

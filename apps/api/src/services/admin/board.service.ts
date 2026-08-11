@@ -229,26 +229,49 @@ export async function updateColumn(
   };
 }
 
+/**
+ * Delete an empty column. Returns false when the column does not exist on this
+ * board, or still holds tasks.
+ *
+ * `tasks.column_id` has no ON DELETE action, so deleting a column a task still
+ * points at raises a foreign-key violation — a 500, not the intended "column
+ * not empty" answer. The emptiness check and the delete therefore run in one
+ * transaction, with the column row locked FOR UPDATE first: an INSERT into
+ * `tasks` referencing this column has to take a FOR KEY SHARE lock on that same
+ * row, which our FOR UPDATE blocks until we commit. Without the lock the check
+ * and the delete are a TOCTOU pair and a task created in the gap turns the
+ * delete into that 500.
+ */
 export async function deleteColumn(
   boardId: number,
   colId: number,
 ): Promise<boolean> {
-  // Check if column has tasks
-  const [taskCount] = await getDb()
-    .select({ count: count() })
-    .from(tasks)
-    .where(eq(tasks.columnId, colId));
+  return await getDb().transaction(async (tx) => {
+    const [column] = await tx
+      .select({ id: boardColumns.id })
+      .from(boardColumns)
+      .where(and(eq(boardColumns.id, colId), eq(boardColumns.boardId, boardId)))
+      .limit(1)
+      .for("update");
 
-  if (taskCount && taskCount.count > 0) {
-    return false;
-  }
+    if (!column) return false;
 
-  const [deleted] = await getDb()
-    .delete(boardColumns)
-    .where(and(eq(boardColumns.id, colId), eq(boardColumns.boardId, boardId)))
-    .returning({ id: boardColumns.id });
+    const [taskCount] = await tx
+      .select({ count: count() })
+      .from(tasks)
+      .where(eq(tasks.columnId, colId));
 
-  return !!deleted;
+    if (taskCount && taskCount.count > 0) {
+      return false;
+    }
+
+    const [deleted] = await tx
+      .delete(boardColumns)
+      .where(and(eq(boardColumns.id, colId), eq(boardColumns.boardId, boardId)))
+      .returning({ id: boardColumns.id });
+
+    return !!deleted;
+  });
 }
 
 export async function reorderColumns(

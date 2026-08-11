@@ -34,6 +34,7 @@ import { AddColumnSheet, type AddColumnSheetHandle } from "@/components/board/Ad
 import type { BoardColumnHandle } from "@/components/board/BoardColumn";
 import type { BoardColumnData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
+import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { i18n } from "@/lib/i18n";
 import { haptics } from "@/lib/haptics";
 import { authClient } from "@/lib/auth-client";
@@ -62,7 +63,12 @@ function BoardDetailBody() {
   ) => void;
   const sort = persistence.sort;
   const setSort = persistence.setSort;
+  // The header search bar is a *native* (uncontrolled) field, so there is no
+  // per-keystroke state to keep in sync — pushing every character into screen
+  // state re-rendered the whole pager, and with it every TaskCard. Commit the
+  // query once typing pauses instead.
   const [searchQuery, setSearchQuery] = useState("");
+  const commitSearchQuery = useDebouncedCallback(setSearchQuery);
 
   const currentUserId = authClient.useSession().data?.user?.id ?? null;
 
@@ -209,6 +215,16 @@ function BoardDetailBody() {
   // ---------------------------------------------------------------------------
   // Context menu / other interactions (unchanged)
   // ---------------------------------------------------------------------------
+
+  // BoardPager is memoised; inline arrow props would defeat that on every
+  // screen re-render (search, filters, refresh flag, drag frames).
+  const onTaskPress = useCallback((task: TaskCardData) => {
+    taskSheetRef.current?.open(task.id);
+  }, []);
+
+  const onRefreshPager = useCallback(() => {
+    void onPullRefresh();
+  }, [onPullRefresh]);
 
   const onPillPress = useCallback((i: number) => {
     setActiveIndex(i);
@@ -391,7 +407,8 @@ function BoardDetailBody() {
             // pills until the search bar settles into the bottom toolbar —
             // visible as a header overlay that flashes and disappears.
             placement: "integrated",
-            onChangeText: (e) => setSearchQuery(e.nativeEvent.text),
+            onChangeText: (e) => commitSearchQuery(e.nativeEvent.text),
+            // Clearing is a deliberate action, not a keystroke — apply at once.
             onCancelButtonPress: () => setSearchQuery(""),
           },
           headerRight: () => (
@@ -444,7 +461,10 @@ function BoardDetailBody() {
           container: it is positioned in window-absolute coordinates, which
           only line up with the unpadded root. */}
       <View style={{ flex: 1, paddingTop: headerHeight, paddingBottom: contentBottomInset }}>
-        {boardLoading && !board ? (
+        {/* Also gate on persistence.hydrating: without it, the board renders
+            with default (empty) filters for a frame or two before the
+            persisted filters land, which briefly shows the wrong task set. */}
+        {(boardLoading && !board) || persistence.hydrating ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator color={colors.foreground} />
           </View>
@@ -563,12 +583,8 @@ function BoardDetailBody() {
                 ref={pagerRef}
                 columns={columns}
                 tasks={tasks ?? []}
-                onActiveColumnChange={(i) => {
-                  setActiveIndex(i);
-                }}
-                onTaskPress={(task: TaskCardData) => {
-                  taskSheetRef.current?.open(task.id);
-                }}
+                onActiveColumnChange={setActiveIndex}
+                onTaskPress={onTaskPress}
                 onTaskLongPress={handleTaskLongPress}
                 onTaskDelete={handleTaskDelete}
                 onColumnLongPress={onColumnLongPress}
@@ -585,7 +601,7 @@ function BoardDetailBody() {
                 onPagerLayout={onPagerLayout}
                 columnRefs={columnRefsMap}
                 refreshing={refreshing}
-                onRefresh={() => { void onPullRefresh(); }}
+                onRefresh={onRefreshPager}
                 scrollEnabled={!columnDrag.reordering}
               />
             )}

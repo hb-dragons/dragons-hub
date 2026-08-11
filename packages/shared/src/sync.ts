@@ -42,6 +42,10 @@ export interface SyncRun {
   durationMs: number | null;
   errorMessage: string | null;
   errorStack: string | null;
+  /** Which orchestrator step failed — added for incident triage. */
+  failedStep: string | null;
+  /** Which instance owned the run — added for incident triage. */
+  ownerInstanceId: string | null;
   summary: SyncRunSummary | null;
   createdAt: string;
 }
@@ -75,28 +79,6 @@ export interface SyncRunEntriesResponse {
     skipped: number;
     failed: number;
   };
-}
-
-export interface SyncJobData {
-  type: string;
-  triggeredBy?: string;
-}
-
-export interface Job {
-  id: string | undefined;
-  name: string;
-  data: SyncJobData;
-  status: string;
-  progress: number | object;
-  timestamp: number | undefined;
-  processedOn: number | undefined;
-  finishedOn: number | undefined;
-  failedReason: string | undefined;
-}
-
-export interface JobsResponse {
-  items: Job[];
-  validStatuses: string[];
 }
 
 export interface SyncScheduleData {

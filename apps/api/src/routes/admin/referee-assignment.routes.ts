@@ -13,18 +13,9 @@ import {
   assignReferee,
   unassignReferee,
   searchCandidates,
-  AssignmentError,
 } from "../../services/referee/referee-assignment.service";
 
-const ERROR_STATUS_MAP: Record<string, number> = {
-  GAME_NOT_FOUND: 404,
-  NOT_QUALIFIED: 422,
-  SLOT_TAKEN: 409,
-  DENY_RULE: 403,
-  FEDERATION_ERROR: 502,
-  FORBIDDEN: 403,
-};
-
+// AssignmentError carries its own status; middleware/error.ts maps it.
 const adminRefereeAssignmentRoutes = new Hono<AppEnv>();
 
 adminRefereeAssignmentRoutes.get(
@@ -38,16 +29,8 @@ adminRefereeAssignmentRoutes.get(
 
     const eligibilitySlot = slot === 1 ? (1 as const) : slot === 2 ? (2 as const) : ("either" as const);
 
-    try {
-      const result = await searchCandidates(spielplanId, search, pageFrom, pageSize, eligibilitySlot);
-      return c.json(result);
-    } catch (error) {
-      if (error instanceof AssignmentError) {
-        const status = ERROR_STATUS_MAP[error.code] ?? 500;
-        return c.json({ error: error.message, code: error.code }, status as never);
-      }
-      throw error;
-    }
+    const result = await searchCandidates(spielplanId, search, pageFrom, pageSize, eligibilitySlot);
+    return c.json(result);
   },
 );
 
@@ -60,16 +43,8 @@ adminRefereeAssignmentRoutes.post(
     const { spielplanId } = c.req.valid("param");
     const { slotNumber, refereeApiId } = c.req.valid("json");
 
-    try {
-      const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
-      return c.json(result);
-    } catch (error) {
-      if (error instanceof AssignmentError) {
-        const status = ERROR_STATUS_MAP[error.code] ?? 500;
-        return c.json({ error: error.message, code: error.code }, status as never);
-      }
-      throw error;
-    }
+    const result = await assignReferee(spielplanId, slotNumber, refereeApiId);
+    return c.json(result);
   },
 );
 
@@ -80,16 +55,8 @@ adminRefereeAssignmentRoutes.delete(
   async (c) => {
     const { spielplanId, slotNumber } = c.req.valid("param");
 
-    try {
-      const result = await unassignReferee(spielplanId, slotNumber);
-      return c.json(result);
-    } catch (error) {
-      if (error instanceof AssignmentError) {
-        const status = ERROR_STATUS_MAP[error.code] ?? 500;
-        return c.json({ error: error.message, code: error.code }, status as never);
-      }
-      throw error;
-    }
+    const result = await unassignReferee(spielplanId, slotNumber);
+    return c.json(result);
   },
 );
 

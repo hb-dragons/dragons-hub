@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
 export const refereeListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(50),
@@ -10,7 +11,7 @@ export const refereeListQuerySchema = z.object({
 
 export type RefereeListQuery = z.infer<typeof refereeListQuerySchema>;
 
-export const refereeVisibilityBodySchema = z.object({
+export const refereeVisibilityBodySchema = z.strictObject({
   allowAllHomeGames: z.boolean(),
   allowAwayGames: z.boolean(),
   isOwnClub: z.boolean(),
@@ -29,10 +30,12 @@ export const refereeMatchIdParamSchema = z.object({
 });
 
 /** Path param for GET /referee/games/:id */
-export const refereeGameIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const refereeGameIdParamSchema = idParamSchema;
+
+/** Path param for the admin referee routes: PATCH/GET /admin/referees/:id[...] */
+export const refereeIdParamSchema = idParamSchema;
 
 export type RefereeApiMatchParam = z.infer<typeof refereeApiMatchParamSchema>;
 export type RefereeMatchIdParam = z.infer<typeof refereeMatchIdParamSchema>;
 export type RefereeGameIdParam = z.infer<typeof refereeGameIdParamSchema>;
+export type RefereeIdParam = z.infer<typeof refereeIdParamSchema>;

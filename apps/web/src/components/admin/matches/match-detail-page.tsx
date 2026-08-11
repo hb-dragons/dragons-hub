@@ -6,6 +6,7 @@ import { useRouter } from "@/lib/navigation";
 import { Link } from "@/lib/navigation";
 import useSWR, { useSWRConfig } from "swr";
 import { queries } from "@/lib/swr-queries";
+import { clubDayAnchor } from "@dragons/shared";
 import {
   Card,
   CardContent,
@@ -26,6 +27,7 @@ import type {
   MatchDetailResponse,
   MatchChangeHistoryResponse,
 } from "./types";
+import { PageHeader } from "@/components/admin/shared/page-header";
 
 interface MatchDetailPageProps {
   matchId: number;
@@ -44,6 +46,12 @@ export function MatchDetailPage({
   const { mutate: globalMutate } = useSWRConfig();
   const [editOpen, setEditOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
+
+  // Mirrors the API's ASSISTANT_ENABLED. Without it the copilot endpoint is not
+  // mounted server-side and the sheet can only fail silently, so hide the entry
+  // point entirely. Next inlines NEXT_PUBLIC_* at build time — the deploy
+  // workflow feeds this from the same GitHub variable as TF_VAR_assistant_enabled.
+  const assistantEnabled = process.env.NEXT_PUBLIC_ASSISTANT_ENABLED === "true";
 
   const matchDetailQ = queries.matchDetail(matchId);
   const { data: detailData, mutate: mutateDetail } = useSWR(
@@ -69,39 +77,36 @@ export function MatchDetailPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <PageHeader
+        title={`${match.homeTeamName} vs ${match.guestTeamName}`}
+        subtitle={
+          t("matchDetail.matchday", { day: String(match.matchDay) }) +
+          (match.leagueName ? ` \u00B7 ${match.leagueName}` : "")
+        }
+      >
         <Link href="/admin/matches">
           <Button variant="ghost" size="sm">
             <ArrowLeft className="mr-1 h-4 w-4" />
             {t("common.back")}
           </Button>
         </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">
-            {match.homeTeamName} vs {match.guestTeamName}
-          </h1>
-          <p className="text-muted-foreground">
-            {t("matchDetail.matchday", { day: String(match.matchDay) })}
-            {match.leagueName ? ` \u00B7 ${match.leagueName}` : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {overrideCount > 0 && (
-            <Badge variant="outline" className="border-amber-500 text-amber-600">
-              {t("matchDetail.overrideCount", { count: overrideCount })}
-            </Badge>
-          )}
-          <Can resource="match" action="update">
+        {overrideCount > 0 && (
+          <Badge variant="outline" className="border-heat/50 text-heat">
+            {t("matchDetail.overrideCount", { count: overrideCount })}
+          </Badge>
+        )}
+        <Can resource="match" action="update">
+          {assistantEnabled && (
             <Button variant="outline" size="sm" onClick={() => setRescheduleOpen(true)}>
               {t("matchDetail.reschedule.trigger")}
             </Button>
-            <Button size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              {t("matchDetail.edit")}
-            </Button>
-          </Can>
-        </div>
-      </div>
+          )}
+          <Button size="sm" onClick={() => setEditOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            {t("matchDetail.edit")}
+          </Button>
+        </Can>
+      </PageHeader>
 
       {/* Match Info */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -126,7 +131,7 @@ export function MatchDetailPage({
               <div>
                 <dt className="text-muted-foreground">{t("matchDetail.info.date")}</dt>
                 <dd className="font-medium">
-                  {format.dateTime(new Date(match.kickoffDate + "T00:00:00"), "matchDate")}
+                  {format.dateTime(clubDayAnchor(match.kickoffDate), "matchDate")}
                 </dd>
               </div>
               <div>
@@ -266,7 +271,7 @@ export function MatchDetailPage({
                 {t(`bookings.status.${match.booking.status}`)}
               </Badge>
               {match.booking.needsReconfirmation && (
-                <Badge variant="outline" className="border-amber-500 text-amber-600">
+                <Badge variant="outline" className="border-heat/50 text-heat">
                   {t("matchDetail.booking.needsReconfirmation")}
                 </Badge>
               )}
@@ -292,11 +297,13 @@ export function MatchDetailPage({
       </Sheet>
 
       {/* Reschedule Chat Sheet */}
-      <RescheduleChatSheet
-        matchId={matchId}
-        open={rescheduleOpen}
-        onOpenChange={setRescheduleOpen}
-      />
+      {assistantEnabled && (
+        <RescheduleChatSheet
+          matchId={matchId}
+          open={rescheduleOpen}
+          onOpenChange={setRescheduleOpen}
+        />
+      )}
     </div>
   );
 }

@@ -1,17 +1,17 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD");
 
-export const createSeasonSchema = z.object({
+export const createSeasonSchema = z.strictObject({
   name: z.string().min(1).max(100),
   sdkSeasonId: z.number().int().positive().nullish(),
   startDate: dateString.nullish(),
   endDate: dateString.nullish(),
 });
 
-export const seasonIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+/** Path param for the `/admin/seasons/:id` routes. */
+export const seasonIdParamSchema = idParamSchema;
 
 const optionalBoolFromQuery = z
   .enum(["true", "false"])
@@ -24,7 +24,7 @@ export const browseLeaguesQuerySchema = z.object({
   ownClubOnly: optionalBoolFromQuery,
 });
 
-export const seasonLeaguesSchema = z.object({
+export const seasonLeaguesSchema = z.strictObject({
   ligaIds: z.array(z.number().int().positive()),
 });
 

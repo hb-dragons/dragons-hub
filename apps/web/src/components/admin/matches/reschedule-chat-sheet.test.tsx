@@ -1,11 +1,33 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 
+type ChatStatus = "ready" | "submitted" | "streaming" | "error";
+
+const sendMessage = vi.fn();
+const stop = vi.fn();
+const regenerate = vi.fn();
+const setMessages = vi.fn();
+const clearError = vi.fn();
+let chatState: {
+  status: ChatStatus;
+  error?: Error;
+  messages: { id: string; role: string; parts: { type: string; text: string }[] }[];
+} = { status: "ready", messages: [] };
+
 vi.mock("@ai-sdk/react", () => ({
-  useChat: () => ({ messages: [], sendMessage: vi.fn(), status: "ready" }),
+  useChat: () => ({
+    messages: chatState.messages,
+    sendMessage,
+    status: chatState.status,
+    error: chatState.error,
+    stop,
+    regenerate,
+    setMessages,
+    clearError,
+  }),
 }));
 
 vi.mock("ai", () => ({
@@ -25,6 +47,10 @@ const messages = {
       description: "Describe your constraints; I'll suggest valid dates and venues.",
       placeholder: "e.g. next 3 weeks, prefer Saturday evenings, keep our gym",
       send: "Send",
+      stop: "Stop",
+      retry: "Retry",
+      newChat: "Start a new chat",
+      error: "Something went wrong. Please try again.",
     },
   },
 };
@@ -37,16 +63,88 @@ function wrap(ui: React.ReactNode) {
   );
 }
 
+function open() {
+  return render(wrap(<RescheduleChatSheet matchId={1} open onOpenChange={() => {}} />));
+}
+
 describe("RescheduleChatSheet", () => {
+  beforeEach(() => {
+    chatState = { status: "ready", messages: [] };
+    sendMessage.mockClear();
+    stop.mockClear();
+    regenerate.mockClear();
+    setMessages.mockClear();
+    clearError.mockClear();
+  });
   afterEach(cleanup);
 
   it("renders the panel title when open", () => {
-    render(wrap(<RescheduleChatSheet matchId={1} open onOpenChange={() => {}} />));
+    open();
     expect(screen.getByText("Reschedule assistant")).toBeInTheDocument();
   });
 
   it("renders the send button when open", () => {
-    render(wrap(<RescheduleChatSheet matchId={1} open onOpenChange={() => {}} />));
+    open();
     expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+  });
+
+  it("offers Stop instead of Send while the assistant is streaming", () => {
+    chatState = { status: "streaming", messages: [] };
+    open();
+    expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  describe("after a failed request", () => {
+    beforeEach(() => {
+      // AI SDK v6 leaves the chat in `status: "error"` after a 500; nothing
+      // resets it, so anything gated on `status === "ready"` stays dead.
+      chatState = { status: "error", error: new Error("500"), messages: [] };
+    });
+
+    it("surfaces the failure", () => {
+      open();
+      expect(
+        screen.getByText("Something went wrong. Please try again."),
+      ).toBeInTheDocument();
+    });
+
+    it("offers a retry that regenerates the last turn", () => {
+      open();
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(regenerate).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the composer usable so a new message can still be sent", () => {
+      open();
+      const send = screen.getByRole("button", { name: "Send" });
+      expect(send).toBeEnabled();
+
+      fireEvent.change(screen.getByPlaceholderText(messages.matches.reschedule.placeholder), {
+        target: { value: "try again next week" },
+      });
+      fireEvent.click(send);
+      expect(sendMessage).toHaveBeenCalledWith({ text: "try again next week" });
+    });
+
+    // Issue #148: Retry calls `regenerate()`, which re-sends the same message
+    // list — useless when the list itself is what the server rejected. Dropping
+    // the transcript is the only client-side escape from that, and `clearError`
+    // must go with it or the chat stays parked in `status: "error"`.
+    it("offers a new chat as the escape from a body the server will keep rejecting", () => {
+      open();
+      fireEvent.click(screen.getByRole("button", { name: "Start a new chat" }));
+      expect(setMessages).toHaveBeenCalledWith([]);
+      expect(clearError).toHaveBeenCalledTimes(1);
+      expect(regenerate).not.toHaveBeenCalled();
+    });
+  });
+
+  it("does not offer the new-chat control when there is no error", () => {
+    open();
+    expect(
+      screen.queryByRole("button", { name: "Start a new chat" }),
+    ).not.toBeInTheDocument();
   });
 });

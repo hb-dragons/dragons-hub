@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
 import { getDb } from "../../config/database";
 import { refereeGames, matches, leagues, teams } from "@dragons/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 import { logger } from "../../config/logger";
-import { createRefereeSdkClient } from "./referee-sdk-client";
+import { sdkClient } from "./sdk-client";
 import { getClubConfig } from "../admin/settings.service";
 import { publishDomainEvent } from "../events/event-publisher";
 import { scheduleReminderJobs, cancelReminderJobs } from "../referee/referee-reminders.service";
+import { evaluatePageCompleteness, evaluateRemovalBlastRadius } from "./removal-guard";
 import { EVENT_TYPES } from "@dragons/shared";
 import type { RefereeSlotsPayload } from "@dragons/shared";
 import type { SdkOffeneSpielResult, SdkSpielleitung } from "@dragons/sdk";
@@ -46,6 +47,21 @@ export function computeRefereeGameHash(row: {
     row.isForfeited,
   ];
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
+}
+
+/**
+ * The Berlin calendar day an instant falls on, as `YYYY-MM-DD`. Explicitly
+ * timezone-pinned: the API container runs UTC, kickoff dates are stored as
+ * Berlin local dates, and reading "today" off the host clock would shift the
+ * removal cutoff by a day around midnight.
+ */
+export function berlinDateString(instant: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Berlin",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
 }
 
 function epochMsToBerlin(epochMs: number): { date: string; time: string } {
@@ -157,19 +173,176 @@ function buildPayload(row: ReturnType<typeof mapApiResultToRow> & { matchId?: nu
   };
 }
 
+// --- Removal (issue #105) ---
+
+export interface RefereeGameRemovalResult {
+  removed: number;
+  skipped: boolean;
+  reason: string | null;
+}
+
+/**
+ * Tombstone referee games that have vanished from the offenespiele feed.
+ *
+ * Same removal semantics as referee assignments (see `removal-guard.ts`), with
+ * the completeness check matched to how this feed is fetched: it is paginated
+ * and declares a `total`, so anything short of that total means a page went
+ * missing and no removal may happen.
+ *
+ * Two extra safeguards specific to this feed:
+ *  - Only games at or after today (Berlin) are candidates. Past games roll off
+ *    the federation's search naturally, and tombstoning them would silently
+ *    erase referee history.
+ *  - The removal set still has to clear the mass-removal circuit breaker.
+ */
+export async function removeWithdrawnRefereeGames(
+  pagination: { total: number; received: number },
+  feedApiMatchIds: number[],
+  syncLogger?: SyncLogger,
+  syncRunId?: number | null,
+  now: Date = new Date(),
+): Promise<RefereeGameRemovalResult> {
+  const pageGate = evaluatePageCompleteness(pagination.total, pagination.received);
+  if (!pageGate.allowed) {
+    log.warn({ ...pagination, reason: pageGate.reason }, "Skipping referee game removal — feed is not verifiably complete");
+    await syncLogger?.log({
+      entityType: "refereeGame",
+      entityId: "removal",
+      action: "skipped",
+      message: `Referee game removal skipped: ${pageGate.reason}`,
+      metadata: { ...pagination },
+    });
+    return { removed: 0, skipped: true, reason: pageGate.reason };
+  }
+
+  const cutoff = berlinDateString(now);
+
+  const liveFuture = await getDb()
+    .select()
+    .from(refereeGames)
+    .where(and(isNull(refereeGames.removedAt), gte(refereeGames.kickoffDate, cutoff)));
+
+  if (liveFuture.length === 0) {
+    return { removed: 0, skipped: false, reason: null };
+  }
+
+  const feedIds = new Set(feedApiMatchIds);
+  const candidates = liveFuture.filter((row) => !feedIds.has(row.apiMatchId));
+  if (candidates.length === 0) {
+    return { removed: 0, skipped: false, reason: null };
+  }
+
+  const blastGate = evaluateRemovalBlastRadius(candidates.length, liveFuture.length);
+  if (!blastGate.allowed) {
+    log.error(
+      { candidates: candidates.length, live: liveFuture.length, reason: blastGate.reason },
+      "Refusing referee game removal — blast radius too large",
+    );
+    await syncLogger?.log({
+      entityType: "refereeGame",
+      entityId: "removal",
+      action: "skipped",
+      message: `Referee game removal skipped: ${blastGate.reason}`,
+      metadata: { candidates: candidates.length, live: liveFuture.length },
+    });
+    return { removed: 0, skipped: true, reason: blastGate.reason };
+  }
+
+  const removedAt = new Date();
+  let removed = 0;
+
+  for (const row of candidates) {
+    try {
+      // Tombstone + event in one transaction. The tombstone is the only
+      // evidence behind a match.removed notification, so the two must not be
+      // able to exist without each other: published after the commit, a crash
+      // in between left a game silently withdrawn with nothing to recover from
+      // (no outbox row). Passing `tx` inserts the event with the tombstone and
+      // the outbox poller enqueues it after commit.
+      const tombstoned = await getDb().transaction(async (tx) => {
+        const updated = await tx
+          .update(refereeGames)
+          .set({ removedAt, updatedAt: removedAt })
+          .where(and(eq(refereeGames.id, row.id), isNull(refereeGames.removedAt)))
+          .returning({ id: refereeGames.id });
+        if (updated.length === 0) return false;
+
+        await publishDomainEvent(
+          {
+            type: EVENT_TYPES.MATCH_REMOVED,
+            source: "sync",
+            syncRunId,
+            entityType: "match",
+            entityId: row.matchId ?? row.id,
+            entityName: `${row.homeTeamName} vs ${row.guestTeamName}`,
+            deepLinkPath: "/admin/referee-games",
+            payload: {
+              matchNo: row.matchNo,
+              homeTeam: row.homeTeamName,
+              guestTeam: row.guestTeamName,
+              leagueName: row.leagueName ?? "",
+              leagueId: null,
+              teamIds: [row.homeTeamId, row.guestTeamId].filter((id): id is number => id !== null),
+              reason: "withdrawn from federation schedule",
+              // Null until the referee game has been linked to a synced match.
+              matchId: row.matchId,
+            },
+          },
+          tx,
+        );
+
+        return true;
+      });
+
+      if (!tombstoned) continue;
+      removed++;
+
+      // Redis, not Postgres: kept outside the transaction so the tombstone
+      // does not hold one open across a network call, and so a reminder queue
+      // that is down cannot roll back a removal that is already decided.
+      try {
+        await cancelReminderJobs(row.apiMatchId);
+      } catch (err) {
+        log.warn({ err, apiMatchId: row.apiMatchId }, "Failed to cancel reminder jobs for removed game");
+      }
+
+      await syncLogger?.log({
+        entityType: "refereeGame",
+        entityId: String(row.apiMatchId),
+        entityName: `${row.homeTeamName} vs ${row.guestTeamName}`,
+        action: "updated",
+        message: "Game withdrawn from federation schedule",
+      });
+    } catch (err) {
+      log.error({ err, apiMatchId: row.apiMatchId }, "Failed to remove referee game");
+      await syncLogger?.log({
+        entityType: "refereeGame",
+        entityId: String(row.apiMatchId),
+        action: "failed",
+        message: `Failed to remove referee game: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+
+  log.info({ removed, candidates: candidates.length }, "Removed withdrawn referee games");
+  return { removed, skipped: false, reason: null };
+}
+
 // --- Main sync ---
 
 export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: number | null): Promise<{
   created: number;
   updated: number;
   unchanged: number;
+  removed: number;
 }> {
-  const client = createRefereeSdkClient();
-  const response = await client.fetchOffeneSpiele();
+  const response = await sdkClient.fetchOffeneSpiele();
 
   if (response.results.length === 0) {
+    // An empty feed is never treated as "everything was withdrawn" — see the
+    // pagination guard in removeWithdrawnRefereeGames (issue #105).
     log.info("No referee games returned from API");
-    return { created: 0, updated: 0, unchanged: 0 };
+    return { created: 0, updated: 0, unchanged: 0, removed: 0 };
   }
 
   log.info({ count: response.results.length }, "Processing referee games from API");
@@ -253,95 +426,183 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
       const guestTeamId = teamByClubId.get(mapped.guestClubId) ?? null;
       const hash = computeRefereeGameHash(mapped);
 
-      const existing = existingByApiMatchId.get(mapped.apiMatchId);
+      let existing = existingByApiMatchId.get(mapped.apiMatchId) ?? null;
       const matchId = matchIdByApiMatchId.get(mapped.apiMatchId) ?? null;
+
+      const rowValues = {
+        ...mapped,
+        matchId,
+        homeTeamId,
+        guestTeamId,
+        ownClubRefs,
+        isHomeGame,
+        isGuestGame,
+        dataHash: hash,
+      };
 
       if (!existing) {
         // INSERT
         const now = new Date();
-        const [inserted] = await getDb().insert(refereeGames).values({
-          ...mapped,
-          matchId,
-          homeTeamId,
-          guestTeamId,
-          ownClubRefs,
-          isHomeGame,
-          isGuestGame,
-          dataHash: hash,
-          lastSyncedAt: now,
-          createdAt: now,
-          updatedAt: now,
-        })
-          // apiMatchId is unique; a concurrent run (e.g. the post-sync trigger
-          // racing the scheduled job) could insert the same row first. Upsert
-          // instead of throwing a unique violation that would drop this update.
-          .onConflictDoUpdate({
-            target: refereeGames.apiMatchId,
-            set: {
-              ...mapped,
-              matchId,
-              homeTeamId,
-              guestTeamId,
-              ownClubRefs,
-              isHomeGame,
-              isGuestGame,
-              dataHash: hash,
-              lastSyncedAt: now,
-              updatedAt: now,
-            },
-          })
-          .returning({ id: refereeGames.id, apiMatchId: refereeGames.apiMatchId });
 
-        created++;
-        await syncLogger?.log({
-          entityType: "refereeGame",
-          entityId: String(mapped.apiMatchId),
-          entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
-          action: "created",
-          message: hasOpenOurClubSlot(mapped) ? "New game with open our-club slot" : "New game",
+        // apiMatchId is unique; a concurrent run (e.g. the post-sync trigger
+        // racing the scheduled job) could insert the same row between the batch
+        // read above and this statement. `onConflictDoNothing` concedes instead
+        // of throwing a unique violation that would drop this game.
+        //
+        // It is deliberately not `onConflictDoUpdate` (issue #85). The update
+        // form silently turned the conflict into an UPDATE while this branch
+        // went on to run the INSERT side effects — counting a creation, emitting
+        // REFEREE_SLOTS_NEEDED and scheduling reminders — and skipped every
+        // update-branch transition (cancellation, both-slots-filled, slot
+        // reopened, kickoff moved). Conceding lets the code below re-read the
+        // row the winner wrote and take the UPDATE path against real previous
+        // state, which is the only place those transitions can be detected.
+        //
+        // The row and its REFEREE_SLOTS_NEEDED event commit together (outbox);
+        // the poller enqueues the event after commit.
+        const insertedId = await getDb().transaction(async (tx) => {
+          const [row] = await tx
+            .insert(refereeGames)
+            .values({ ...rowValues, lastSyncedAt: now, createdAt: now, updatedAt: now })
+            .onConflictDoNothing({ target: refereeGames.apiMatchId })
+            .returning({ id: refereeGames.id });
+
+          if (!row) return null;
+
+          if (!mapped.isCancelled && !mapped.isForfeited && hasOpenOurClubSlot(mapped)) {
+            await publishDomainEvent(
+              {
+                type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+                source: "sync",
+                syncRunId,
+                entityType: "referee",
+                entityId: row.id,
+                entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
+                deepLinkPath: `/admin/referee-games`,
+                payload: { ...buildPayload({ ...mapped, matchId }) },
+              },
+              tx,
+            );
+          }
+
+          return row.id;
         });
 
-        // Emit event + schedule reminders for open our-club slots (not cancelled/forfeited)
-        if (!mapped.isCancelled && !mapped.isForfeited && hasOpenOurClubSlot(mapped)) {
-          try {
-            await publishDomainEvent({
-              type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
-              source: "sync",
-              syncRunId,
-              entityType: "referee",
-              entityId: inserted!.id,
-              entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
-              deepLinkPath: `/admin/referee-games`,
-              payload: { ...buildPayload({ ...mapped, matchId }) },
-            });
-          } catch (err) {
-            log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to emit REFEREE_SLOTS_NEEDED event");
+        if (insertedId !== null) {
+          created++;
+          await syncLogger?.log({
+            entityType: "refereeGame",
+            entityId: String(mapped.apiMatchId),
+            entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
+            action: "created",
+            message: hasOpenOurClubSlot(mapped) ? "New game with open our-club slot" : "New game",
+          });
+
+          // Reminder jobs live in Redis, so they stay outside the transaction:
+          // a queue outage must not roll back a game we already stored.
+          if (!mapped.isCancelled && !mapped.isForfeited && hasOpenOurClubSlot(mapped)) {
+            try {
+              await scheduleReminderJobs(mapped.apiMatchId, insertedId, mapped.kickoffDate, mapped.kickoffTime);
+            } catch (err) {
+              log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to schedule reminder jobs");
+            }
           }
 
-          try {
-            await scheduleReminderJobs(mapped.apiMatchId, inserted!.id, mapped.kickoffDate, mapped.kickoffTime);
-          } catch (err) {
-            log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to schedule reminder jobs");
-          }
+          continue;
         }
-      } else if (existing.dataHash !== hash) {
+
+        // Lost the race. Re-read what the winner wrote and continue as an
+        // update, so this run's data still lands and the transitions below are
+        // evaluated against the row that actually exists.
+        const [raced] = await getDb()
+          .select()
+          .from(refereeGames)
+          .where(eq(refereeGames.apiMatchId, mapped.apiMatchId))
+          .limit(1);
+
+        if (!raced) {
+          log.warn(
+            { apiMatchId: mapped.apiMatchId },
+            "Referee game insert conflicted but the conflicting row could not be read",
+          );
+          continue;
+        }
+
+        log.info(
+          { apiMatchId: mapped.apiMatchId },
+          "Referee game inserted concurrently; applying this run's data as an update",
+        );
+        existing = raced;
+      }
+
+      // The federation is listing this game again after withdrawing it, so the
+      // row is live again (issue #142). The upsert reads tombstoned rows on
+      // purpose — apiMatchId is unique, so an insert would collide — but the
+      // update used to leave `removedAt` set, and every consumer filters on
+      // `isNull(removedAt)`. The game kept receiving fresh data while staying
+      // invisible in the game list, the claim flow, the visibility service, the
+      // history reads and the reminder worker.
+      const resurrected = existing.removedAt !== null;
+
+      // `|| resurrected` matters as much as the tombstone clear itself: a game
+      // re-listed with byte-identical data hashes the same, so the skip below
+      // would leave it tombstoned forever, with no later sync able to recover it.
+      if (existing.dataHash !== hash || resurrected) {
         // UPDATE
         const now = new Date();
-        await getDb()
-          .update(refereeGames)
-          .set({
-            ...mapped,
-            matchId,
-            homeTeamId,
-            guestTeamId,
-            ownClubRefs,
-            isHomeGame,
-            isGuestGame,
-            dataHash: hash,
-            lastSyncedAt: now,
-            updatedAt: now,
-          })
-          .where(eq(refereeGames.id, existing.id));
+
+        // Transitions are decided from the pre-update row, before it is
+        // overwritten. The branch structure mirrors the original: a fresh
+        // cancellation wins over "both slots filled", and both win over the
+        // slot-opened / kickoff-moved checks.
+        const wasCancelledOrForfeited = existing.isCancelled || existing.isForfeited;
+        const nowCancelledOrForfeited = mapped.isCancelled || mapped.isForfeited;
+        const justCancelled = nowCancelledOrForfeited && !wasCancelledOrForfeited;
+        const slotsJustFilled = !justCancelled && bothSlotsFilled(mapped);
+        const stillOpen = !justCancelled && !slotsJustFilled && !nowCancelledOrForfeited;
+
+        // A slot opened (was assigned, now not)
+        const slotOpened =
+          stillOpen &&
+          ((mapped.sr1OurClub && existing.sr1Status === "assigned" && mapped.sr1Status !== "assigned") ||
+            (mapped.sr2OurClub && existing.sr2Status === "assigned" && mapped.sr2Status !== "assigned"));
+
+        const kickoffChanged =
+          stillOpen &&
+          (existing.kickoffDate !== mapped.kickoffDate ||
+            existing.kickoffTime !== mapped.kickoffTime);
+
+        const existingId = existing.id;
+
+        // A revived game is news in the same way a brand-new one is: the
+        // withdrawal emitted match.removed and cancelled its reminders, so
+        // reviving the row silently would leave it visible but unannounced and
+        // unreminded — the same missed officiating duty, better hidden.
+        const revivedWithOpenSlot =
+          resurrected && !nowCancelledOrForfeited && hasOpenOurClubSlot(mapped);
+
+        await getDb().transaction(async (tx) => {
+          await tx
+            .update(refereeGames)
+            .set({ ...rowValues, removedAt: null, lastSyncedAt: now, updatedAt: now })
+            .where(eq(refereeGames.id, existingId));
+
+          if (slotOpened || revivedWithOpenSlot) {
+            await publishDomainEvent(
+              {
+                type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
+                source: "sync",
+                syncRunId,
+                entityType: "referee",
+                entityId: existingId,
+                entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
+                deepLinkPath: `/admin/referee-games`,
+                payload: { ...buildPayload({ ...mapped, matchId }) },
+              },
+              tx,
+            );
+          }
+        });
 
         updated++;
         await syncLogger?.log({
@@ -349,62 +610,48 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
           entityId: String(mapped.apiMatchId),
           entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
           action: "updated",
-          message: "Game data changed",
+          message: resurrected ? "Game re-listed by federation" : "Game data changed",
         });
 
-        // Detect state changes and act accordingly
-        const wasCancelledOrForfeited = existing.isCancelled || existing.isForfeited;
-        const nowCancelledOrForfeited = mapped.isCancelled || mapped.isForfeited;
-
-        if (nowCancelledOrForfeited && !wasCancelledOrForfeited) {
-          // Game was cancelled or forfeited — cancel reminders
+        // Reminder jobs are Redis work; they run after the row is committed.
+        if (resurrected) {
+          // Cancel before scheduling even though the withdrawal already
+          // cancelled: that call is best-effort (it only logs on failure), so a
+          // revival must not stack a second set of reminders on a surviving one.
+          try {
+            await cancelReminderJobs(mapped.apiMatchId);
+            if (revivedWithOpenSlot) {
+              await scheduleReminderJobs(
+                mapped.apiMatchId,
+                existingId,
+                mapped.kickoffDate,
+                mapped.kickoffTime,
+              );
+            }
+          } catch (err) {
+            log.warn(
+              { err, apiMatchId: mapped.apiMatchId },
+              "Failed to re-arm reminder jobs for a re-listed game",
+            );
+          }
+        } else if (justCancelled) {
           try {
             await cancelReminderJobs(mapped.apiMatchId);
           } catch (err) {
             log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to cancel reminder jobs on cancellation");
           }
-        } else if (bothSlotsFilled(mapped)) {
-          // Both slots now filled — cancel reminders
+        } else if (slotsJustFilled) {
           try {
             await cancelReminderJobs(mapped.apiMatchId);
           } catch (err) {
             log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to cancel reminder jobs when slots filled");
           }
-        } else {
-          // Check if a slot opened (was assigned, now not)
-          const slotOpened =
-            (mapped.sr1OurClub && existing.sr1Status === "assigned" && mapped.sr1Status !== "assigned") ||
-            (mapped.sr2OurClub && existing.sr2Status === "assigned" && mapped.sr2Status !== "assigned");
-
-          if (slotOpened && !nowCancelledOrForfeited) {
-            try {
-              await publishDomainEvent({
-                type: EVENT_TYPES.REFEREE_SLOTS_NEEDED,
-                source: "sync",
-                syncRunId,
-                entityType: "referee",
-                entityId: existing.id,
-                entityName: `${mapped.homeTeamName} vs ${mapped.guestTeamName}`,
-                deepLinkPath: `/admin/referee-games`,
-                payload: { ...buildPayload({ ...mapped, matchId }) },
-              });
-            } catch (err) {
-              log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to emit REFEREE_SLOTS_NEEDED event on slot open");
-            }
-          }
-
-          // Check if kickoff changed — reschedule reminders
-          const kickoffChanged =
-            existing.kickoffDate !== mapped.kickoffDate ||
-            existing.kickoffTime !== mapped.kickoffTime;
-
-          if (kickoffChanged && !nowCancelledOrForfeited) {
-            try {
-              await cancelReminderJobs(mapped.apiMatchId);
-              await scheduleReminderJobs(mapped.apiMatchId, existing.id, mapped.kickoffDate, mapped.kickoffTime);
-            } catch (err) {
-              log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to reschedule reminder jobs on kickoff change");
-            }
+        } else if (kickoffChanged) {
+          try {
+            await cancelReminderJobs(mapped.apiMatchId);
+            await scheduleReminderJobs(mapped.apiMatchId, existingId, mapped.kickoffDate, mapped.kickoffTime);
+          } catch (err) {
+            log.warn({ err, apiMatchId: mapped.apiMatchId }, "Failed to reschedule reminder jobs on kickoff change");
           }
         }
       } else {
@@ -428,7 +675,18 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
     }
   }
 
-  log.info({ created, updated, unchanged }, "Referee games sync completed");
+  // Tombstone games that dropped out of the feed (issue #105).
+  const removal = await removeWithdrawnRefereeGames(
+    { total: response.total, received: response.results.length },
+    apiMatchIds,
+    syncLogger,
+    syncRunId,
+  );
+
+  log.info(
+    { created, updated, unchanged, removed: removal.removed },
+    "Referee games sync completed",
+  );
 
   // Emit SYNC_COMPLETED domain event (mirrors full sync behavior)
   if (syncRunId) {
@@ -455,5 +713,5 @@ export async function syncRefereeGames(syncLogger?: SyncLogger, syncRunId?: numb
     }
   }
 
-  return { created, updated, unchanged };
+  return { created, updated, unchanged, removed: removal.removed };
 }

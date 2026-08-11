@@ -42,6 +42,9 @@ import {
   computeDiffs,
 } from "./match-admin.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
+import { publishDomainEvent } from "../events/event-publisher";
+import { EVENT_TYPES, validateEventPayload } from "@dragons/shared";
+import { renderPushTemplate } from "../notifications/templates/push";
 
 let ctx: TestDbContext;
 let activeSeasonId: number;
@@ -671,6 +674,56 @@ describe("updateMatchLocal", () => {
     expect(dateChange.track).toBe("local");
   });
 
+  it("cancelling publishes a payload the push template can render", async () => {
+    await seedBasicData();
+    const matchId = await insertMatch();
+
+    await updateMatchLocal(
+      matchId,
+      { isCancelled: true, changeReason: "Hallensperrung" },
+      "admin@test.com",
+    );
+
+    const call = vi
+      .mocked(publishDomainEvent)
+      .mock.calls.find(([params]) => params.type === EVENT_TYPES.MATCH_CANCELLED);
+    const payload = call![0].payload;
+    // The template deep-links to /game/:id and names the kickoff. Without these
+    // it rendered "/game/undefined" and threw out of dispatch (#124).
+    expect(payload).toMatchObject({
+      matchId,
+      kickoffDate: "2025-03-15",
+      kickoffTime: "18:00:00",
+    });
+    expect(validateEventPayload(EVENT_TYPES.MATCH_CANCELLED, payload).issues ?? []).toEqual([]);
+
+    const push = renderPushTemplate({
+      eventType: EVENT_TYPES.MATCH_CANCELLED,
+      payload,
+      locale: "de",
+      eventId: "evt_1",
+    });
+    expect(push!.data.deepLink).toBe(`/game/${matchId}`);
+    expect(push!.body).not.toContain("undefined");
+    expect(push!.body).toContain("15.03.2025 18:00");
+  });
+
+  it("a kickoff edit publishes the post-edit kickoff, not the old one", async () => {
+    await seedBasicData();
+    const matchId = await insertMatch();
+
+    await updateMatchLocal(matchId, { kickoffTime: "19:30:00" }, "admin@test.com");
+
+    const call = vi
+      .mocked(publishDomainEvent)
+      .mock.calls.find(([params]) => params.type === EVENT_TYPES.MATCH_SCHEDULE_CHANGED);
+    expect(call![0].payload).toMatchObject({
+      matchId,
+      kickoffDate: "2025-03-15",
+      kickoffTime: "19:30:00",
+    });
+  });
+
   it("clears override with null value and removes override row", async () => {
     await seedBasicData();
     // Match was overridden from "2025-03-15" to "2025-04-01"; remote version stores original
@@ -694,6 +747,24 @@ describe("updateMatchLocal", () => {
       [matchId],
     );
     expect(overrides.rows).toHaveLength(0);
+  });
+
+  it("clearing isCancelled with no remote snapshot restores false, not NULL", async () => {
+    await seedBasicData();
+    // `matches.is_cancelled` is NOT NULL (migration 0042). Clearing the override
+    // restores the remote value, and with no remote snapshot that lookup yields
+    // undefined — which has to land on `false`, not `null`.
+    const matchId = await insertMatch({ is_cancelled: true });
+    await insertOverride(matchId, "isCancelled");
+
+    const result = await updateMatchLocal(matchId, { isCancelled: null }, "admin@test.com");
+
+    expect(result!.match.isCancelled).toBe(false);
+    const rows = await ctx.client.query(
+      "SELECT is_cancelled FROM matches WHERE id = $1",
+      [matchId],
+    );
+    expect((rows.rows[0] as Record<string, unknown>).is_cancelled).toBe(false);
   });
 
   it("updates field from null to non-null value", async () => {

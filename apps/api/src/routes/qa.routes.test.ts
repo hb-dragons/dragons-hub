@@ -50,4 +50,17 @@ describe("POST /qa/chat", () => {
     const res = await post({ messages: [] });
     expect(res.status).toBe(400);
   });
+
+  it("rejects an oversized body with a 413 before validating it", async () => {
+    // The contract's own bounds still admit 60 messages x 30 parts x 8000
+    // chars — roughly 9.6 MB — so bodyLimit is the route's real size gate.
+    // 413 rather than 400 also pins the middleware order: this body's single
+    // text part is over MAX_TEXT_CHARS, so a 400 would mean bodyLimit ran late.
+    const res = await post({
+      messages: [
+        { id: "1", role: "user", parts: [{ type: "text", text: "x".repeat(600 * 1024) }] },
+      ],
+    });
+    expect(res.status).toBe(413);
+  });
 });

@@ -1,3 +1,4 @@
+import type { BookingStatus } from "@dragons/shared";
 import { calculateTimeWindow, type BookingConfig } from "./booking-calculator";
 
 // ── Inputs ─────────────────────────────────────────────────────────────────
@@ -16,12 +17,12 @@ export interface PlannerExistingBooking {
   id: number;
   venueId: number;
   date: string;
-  status: string;
+  status: BookingStatus;
   calculatedStartTime: string;
   calculatedEndTime: string;
 }
 
-export type PlanScope = { kind: "all" } | { kind: "matchIds"; matchIds: number[] };
+type PlanScope = { kind: "all" } | { kind: "matchIds"; matchIds: number[] };
 
 export interface PlannerInput {
   groups: ReadonlyMap<string, readonly PlannerMatch[]>;
@@ -33,7 +34,7 @@ export interface PlannerInput {
 
 // ── Plan ─────────────────────────────────────────────────────────────────────
 
-export interface PlanCreate {
+interface PlanCreate {
   venueId: number;
   date: string;
   calculatedStartTime: string;
@@ -41,11 +42,11 @@ export interface PlanCreate {
   matchIds: number[];
 }
 
-export interface PlanUpdate {
+interface PlanUpdate {
   bookingId: number;
   venueId: number;
   date: string;
-  status: string;
+  status: BookingStatus;
   currentStartTime: string;
   currentEndTime: string;
   newStartTime: string;
@@ -56,13 +57,13 @@ export interface PlanUpdate {
   expectedMatchIds: number[];
 }
 
-export type RemovalReason = "all_matches_cancelled" | "no_matches";
+type RemovalReason = "all_matches_cancelled" | "no_matches";
 
-export interface PlanRemoval {
+interface PlanRemoval {
   bookingId: number;
   venueId: number;
   date: string;
-  status: string;
+  status: BookingStatus;
   reason: RemovalReason;
   /** Matches to show in a preview's removal list. */
   displayMatchIds: number[];
@@ -81,7 +82,7 @@ export interface ReconcilePlan {
 }
 
 function isActive(m: PlannerMatch): boolean {
-  return m.isForfeited !== true && m.isCancelled !== true;
+  return !m.isForfeited && !m.isCancelled;
 }
 
 /**

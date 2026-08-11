@@ -1,512 +1,255 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import type { AppEnv } from "../../types";
-import type * as ExpoPushClientModule from "../../services/notifications/expo-push.client";
+
+// --- Mocks (hoisted before imports) ---
+//
+// The business logic (device scoping, aggregation, masking, dedup) now lives
+// in test-push.service.ts and is covered there against a real database. This
+// route test mocks the service wholesale and only proves the wiring: auth,
+// validation, rate limiting, and that a thrown TestPushError reaches the
+// caller through errorHandler with the right status/code — using the real
+// TestPushError class, not a stand-in, so a class that silently fails
+// `instanceof AppError` cannot slip past a green suite.
 
 const mocks = vi.hoisted(() => ({
-  dbSelect: vi.fn(),
-  dbInsert: vi.fn(),
-  dbTransaction: vi.fn(),
-  sendBatch: vi.fn(),
-  redisStore: new Map<string, string>(),
+  getSession: vi.fn(),
+  userHasPermission: vi.fn(),
+  sendAdminTestPush: vi.fn(),
+  listRecentTestPushes: vi.fn(),
+  incrementSlidingWindow: vi.fn(),
+}));
+
+vi.mock("../../config/auth", () => ({
+  auth: {
+    api: {
+      getSession: (...args: unknown[]) => mocks.getSession(...args),
+      userHasPermission: (...args: unknown[]) => mocks.userHasPermission(...args),
+    },
+  },
 }));
 
 vi.mock("../../config/redis", () => ({
-  getRedis: () => ({
-    async set(key: string, value: string, _ex?: string, _ttl?: number, mode?: string) {
-      if (mode === "NX" && mocks.redisStore.has(key)) return null;
-      mocks.redisStore.set(key, value);
-      return "OK";
-    },
-    async ttl(_key: string) {
-      return 9;
-    },
-    async del(...keys: string[]) {
-      for (const k of keys) mocks.redisStore.delete(k);
-      return 0;
-    },
-  }),
-}));
-
-vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: (...args: unknown[]) => mocks.dbSelect(...args),
-    insert: (...args: unknown[]) => mocks.dbInsert(...args),
-    transaction: (fn: (tx: unknown) => Promise<unknown>) => mocks.dbTransaction(fn),
-  }),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  pushDevices: {
-    userId: "user_id",
-    token: "token",
-    platform: "platform",
-    locale: "locale",
-  },
-  notificationLog: {
-    id: "id",
-    eventId: "event_id",
-    createdAt: "created_at",
-  },
-  channelConfigs: { id: "id", type: "type" },
-  domainEvents: { id: "id", type: "type" },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...a: unknown[]) => ({ eq: a })),
-  and: vi.fn((...a: unknown[]) => ({ and: a })),
-  like: vi.fn((...a: unknown[]) => ({ like: a })),
-  desc: vi.fn((a: unknown) => ({ desc: a })),
+  incrementSlidingWindow: (...args: unknown[]) => mocks.incrementSlidingWindow(...args),
 }));
 
 vi.mock("../../config/logger", () => ({
   logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
   },
 }));
 
-vi.mock("../../services/notifications/expo-push.client", async (importOriginal) => {
-  const original = await importOriginal<typeof ExpoPushClientModule>();
-  return {
-    ...original,
-    ExpoPushClient: class {
-      sendBatch(messages: unknown[]) {
-        return mocks.sendBatch(messages);
-      }
-    },
-  };
-});
-
-// RBAC middleware pass-through for tests -- we simulate the user via c.set("user", ...)
-vi.mock("../../middleware/rbac", () => ({
-  requirePermission:
-    () =>
-    async (
-      c: { get: (k: string) => unknown },
-      next: () => Promise<void>,
-    ) => {
-      const user = c.get("user");
-      if (!user)
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-        });
-      if ((user as { role?: string }).role !== "admin") {
-        return new Response(JSON.stringify({ error: "Forbidden" }), {
-          status: 403,
-        });
-      }
-      await next();
-    },
+vi.mock("../../services/notifications/test-push.service", () => ({
+  sendAdminTestPush: (...args: unknown[]) => mocks.sendAdminTestPush(...args),
+  listRecentTestPushes: (...args: unknown[]) => mocks.listRecentTestPushes(...args),
 }));
 
+// --- Imports (after mocks) ---
+
 import { notificationTestRoutes } from "./notification-test.routes";
+import { errorHandler } from "../../middleware/error";
+import { logger } from "../../config/logger";
+import { TestPushError } from "../../services/notifications/test-push.errors";
 
-function makeApp(user: { id: string; role: string } | null) {
-  const app = new Hono<AppEnv>();
-  app.use("*", async (c, next) => {
-    if (user) c.set("user", user as unknown as AppEnv["Variables"]["user"]);
-    await next();
-  });
-  app.route("/", notificationTestRoutes);
-  return app;
-}
+const app = new Hono<AppEnv>();
+app.onError(errorHandler);
+app.route("/", notificationTestRoutes);
 
-function mockSelectSimple(rows: unknown[]) {
-  mocks.dbSelect.mockReturnValueOnce({
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(rows),
-    }),
-  });
-}
-
-function mockInsertCapture() {
-  const domainEventsValues = vi.fn();
-  const logValues = vi.fn();
-  let call = 0;
-  mocks.dbInsert.mockImplementation(() => ({
-    values: vi.fn().mockImplementation((v) => {
-      // First insert in the transaction is domain_events, second is notification_log
-      if (call === 0) domainEventsValues(v);
-      else logValues(v);
-      call++;
-      return Promise.resolve(undefined);
-    }),
-  }));
-  return { domainEventsValues, logValues };
-}
+const ADMIN = "u_admin";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.dbSelect.mockReset();
-  mocks.dbInsert.mockReset();
-  mocks.dbTransaction.mockReset();
-  mocks.sendBatch.mockReset();
-  mocks.redisStore.clear();
-
-  // Default: transaction simulator that delegates tx.insert -> mocks.dbInsert
-  mocks.dbTransaction.mockImplementation(
-    async (fn: (tx: unknown) => Promise<unknown>) => {
-      const tx = {
-        insert: (...a: unknown[]) => mocks.dbInsert(...a),
-      };
-      return fn(tx);
-    },
-  );
+  mocks.getSession.mockResolvedValue({
+    user: { id: ADMIN, role: "admin" },
+    session: { id: "sess-admin" },
+  });
+  mocks.userHasPermission.mockResolvedValue({ success: true });
+  // Under the limit by default: current=1, previous=0 against limit=1.
+  mocks.incrementSlidingWindow.mockResolvedValue([1, 0]);
+  mocks.sendAdminTestPush.mockResolvedValue({
+    deviceCount: 1,
+    tickets: [{ platform: "ios", status: "sent_ticket", ticketId: "tkt_1", error: null }],
+  });
+  mocks.listRecentTestPushes.mockResolvedValue([]);
 });
 
-describe("POST /notifications/test-push", () => {
-  it("returns 401 when no session", async () => {
-    const app = makeApp(null);
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(res.status).toBe(401);
+function post(body: unknown = {}) {
+  return app.request("/notifications/test-push", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+describe("POST /notifications/test-push — authorization", () => {
+  it("returns 401 when there is no session", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    expect((await post()).status).toBe(401);
+    expect(mocks.sendAdminTestPush).not.toHaveBeenCalled();
   });
 
-  it("returns 403 when user is not admin", async () => {
-    const app = makeApp({ id: "u_regular", role: "user" });
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(res.status).toBe(403);
+  it("returns 403 when the caller lacks settings:update", async () => {
+    mocks.userHasPermission.mockResolvedValue({ success: false });
+    expect((await post()).status).toBe(403);
+    expect(mocks.sendAdminTestPush).not.toHaveBeenCalled();
   });
+});
 
-  it("returns 400 when admin has no devices", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([]); // devices query: empty
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
+describe("POST /notifications/test-push — validation", () => {
+  it("rejects a body that fails the contract schema", async () => {
+    const res = await post({ message: 42 });
+
     expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toBe("no_devices");
+    expect(await res.json()).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mocks.sendAdminTestPush).not.toHaveBeenCalled();
   });
 
-  it("sends a test push and logs rows", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      {
-        id: 1,
-        userId: "u_admin",
-        token: "ExponentPushToken[x1]",
-        platform: "ios",
-        locale: "de-DE",
-      },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]); // push channel lookup
-    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_1" }]);
-    const { domainEventsValues, logValues } = mockInsertCapture();
+  it("passes an empty body through as no message", async () => {
+    await post();
 
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "hello" }),
+    expect(mocks.sendAdminTestPush).toHaveBeenCalledWith({
+      callerId: ADMIN,
+      message: undefined,
     });
+  });
+
+  // Regression: validator() must run before rateLimit(). The route's window is
+  // `limit: 1, windowSeconds: 10` — if the limiter ran first, a malformed body
+  // would still increment the counter and burn the caller's only slot, so a
+  // genuinely valid send right after would 429 instead of sending. Asserting
+  // incrementSlidingWindow was never called for the rejected request proves the
+  // limiter did not run at all, not just that the second request happened to
+  // succeed.
+  it("does not consume the rate-limit budget on a malformed body", async () => {
+    const rejected = await post({ message: 42 });
+    expect(rejected.status).toBe(400);
+    expect(mocks.incrementSlidingWindow).not.toHaveBeenCalled();
+
+    mocks.incrementSlidingWindow.mockResolvedValueOnce([1, 0]);
+    const accepted = await post({ message: "hello" });
+    expect(accepted.status).toBe(200);
+  });
+});
+
+describe("POST /notifications/test-push — success delegation", () => {
+  it("passes the caller id and message to the service and returns its result verbatim", async () => {
+    mocks.sendAdminTestPush.mockResolvedValue({
+      deviceCount: 2,
+      tickets: [
+        { platform: "ios", status: "sent_ticket", ticketId: "tkt_1", error: null },
+        { platform: "android", status: "failed", ticketId: null, error: "boom" },
+      ],
+    });
+
+    const res = await post({ message: "hello" });
 
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.deviceCount).toBe(1);
-    expect(body.tickets).toHaveLength(1);
-    expect(body.tickets[0].status).toBe("sent_ticket");
+    expect(await res.json()).toEqual({
+      deviceCount: 2,
+      tickets: [
+        { platform: "ios", status: "sent_ticket", ticketId: "tkt_1", error: null },
+        { platform: "android", status: "failed", ticketId: null, error: "boom" },
+      ],
+    });
+    expect(mocks.sendAdminTestPush).toHaveBeenCalledWith({
+      callerId: ADMIN,
+      message: "hello",
+    });
+  });
+});
 
-    // Synthetic domain_events row inserted first
-    expect(domainEventsValues).toHaveBeenCalled();
-    const eventRow = domainEventsValues.mock.calls[0]![0] as Record<
-      string,
-      unknown
-    >;
-    expect(eventRow.id).toMatch(/^admin_test:u_admin:/);
-    expect(eventRow.type).toBe("admin.test_push");
+describe("POST /notifications/test-push — typed service errors", () => {
+  it("maps a NO_DEVICES rejection to 400 with the error's own code", async () => {
+    mocks.sendAdminTestPush.mockRejectedValue(
+      new TestPushError("Open the native app on a signed-in device first.", "NO_DEVICES"),
+    );
 
-    // notification_log rows referencing that event
-    expect(logValues).toHaveBeenCalled();
-    const rows = logValues.mock.calls[0]![0] as Array<Record<string, unknown>>;
-    expect(rows[0]!.eventId).toMatch(/^admin_test:u_admin:/);
-    expect(rows[0]!.providerTicketId).toBe("tkt_1");
-    expect(rows[0]!.status).toBe("sent_ticket");
+    const res = await post();
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Open the native app on a signed-in device first.",
+      code: "NO_DEVICES",
+    });
   });
 
-  it("records per-ticket failure when Expo rejects", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      {
-        id: 1,
-        userId: "u_admin",
-        token: "ExponentPushToken[bad]",
-        platform: "ios",
-        locale: "de-DE",
-      },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    mocks.sendBatch.mockResolvedValueOnce([
-      { status: "error", message: "oops", details: { error: "SomeError" } },
-    ]);
-    mockInsertCapture();
+  it("maps a PUSH_CHANNEL_MISSING rejection to 500 and reports it", async () => {
+    mocks.sendAdminTestPush.mockRejectedValue(
+      new TestPushError("No push channel is configured", "PUSH_CHANNEL_MISSING"),
+    );
 
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
+    const res = await post();
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.tickets[0].status).toBe("failed");
-    // message wins over details.error (unified message-first precedence via mapTicketError)
-    expect(body.tickets[0].error).toBe("oops");
-  });
-
-  it("handles Expo network error -- returns 200 with all-failed tickets", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      {
-        id: 1,
-        userId: "u_admin",
-        token: "ExponentPushToken[a]",
-        platform: "ios",
-      },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    mocks.sendBatch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
-    mockInsertCapture();
-
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.tickets[0].status).toBe("failed");
-    expect(body.tickets[0].error).toMatch(/ECONNREFUSED|unknown/);
-  });
-
-  it("rate-limits rapid consecutive test pushes from the same user", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-
-    // First call succeeds — queue up all its mocks
-    mockSelectSimple([
-      {
-        id: 1,
-        userId: "u_admin",
-        token: "ExponentPushToken[a]",
-        platform: "ios",
-        locale: "de-DE",
-      },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok", id: "tkt_1" }]);
-    mockInsertCapture();
-
-    const first = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(first.status).toBe(200);
-
-    // Second call within the 10s window should be rejected before any DB work.
-    // No additional mocks queued on purpose — if the handler reaches the DB we'll fail loud.
-    const second = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(second.status).toBe(429);
-    const body = await second.json();
-    expect(body.error).toBe("rate_limited");
-    expect(typeof body.retryAfter).toBe("number");
-    expect(second.headers.get("Retry-After")).toBeTruthy();
-  });
-
-  it("returns 500 when no push channel config exists", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      { id: 1, userId: "u_admin", token: "ExponentPushToken[x]", platform: "ios" },
-    ]); // devices found
-    mockSelectSimple([]); // no push channel config row
-
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
     expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.error).toBe("push_channel_missing");
-  });
-
-  it("handles ok ticket with no ticketId (id is undefined)", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      { id: 1, userId: "u_admin", token: "ExponentPushToken[x]", platform: "ios" },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    // Ticket with status=ok but no id field
-    mocks.sendBatch.mockResolvedValueOnce([{ status: "ok" }]);
-    mockInsertCapture();
-
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
+    expect(await res.json()).toEqual({
+      error: "No push channel is configured",
+      code: "PUSH_CHANNEL_MISSING",
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.tickets[0].ticketId).toBeNull();
-    expect(body.tickets[0].status).toBe("sent_ticket");
+    // The AppError 5xx branch in errorHandler is what reports a 500 to Cloud
+    // Error Reporting — this is the assertion that it actually ran, not just
+    // that the status happened to come out right.
+    expect(logger.error).toHaveBeenCalled();
   });
+});
 
-  it("uses 'unknown' as errorMessage when ticket has no message or details", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mockSelectSimple([
-      { id: 1, userId: "u_admin", token: "ExponentPushToken[x]", platform: "ios" },
-    ]);
-    mockSelectSimple([{ id: 7, type: "push" }]);
-    // Ticket with status=error but no message or details fields
-    mocks.sendBatch.mockResolvedValueOnce([{ status: "error" }]);
-    mockInsertCapture();
+describe("POST /notifications/test-push — rate limiting", () => {
+  it("rate-limits a second test push inside the cooldown window", async () => {
+    mocks.incrementSlidingWindow.mockResolvedValueOnce([1, 0]);
+    expect((await post()).status).toBe(200);
 
-    const res = await app.request("/notifications/test-push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.tickets[0].error).toBe("unknown");
+    mocks.incrementSlidingWindow.mockResolvedValueOnce([2, 0]);
+    const second = await post();
+
+    expect(second.status).toBe(429);
+    expect(await second.json()).toEqual({ error: "Too many requests", code: "RATE_LIMITED" });
+    expect(second.headers.get("Retry-After")).toBe("10");
+    expect(mocks.sendAdminTestPush).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("GET /notifications/test-push/recent", () => {
-  it("returns 401 without session", async () => {
-    const app = makeApp(null);
-    const res = await app.request("/notifications/test-push/recent");
-    expect(res.status).toBe(401);
+  it("returns 401 without a session", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    expect((await app.request("/notifications/test-push/recent")).status).toBe(401);
+    expect(mocks.listRecentTestPushes).not.toHaveBeenCalled();
   });
 
-  it("returns caller's test rows with masked token", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mocks.dbSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 1,
-                sentAt: new Date("2026-04-23T10:00:00Z"),
-                createdAt: new Date("2026-04-23T10:00:00Z"),
-                recipientToken: "ExponentPushToken[abcdef123456]",
-                status: "delivered",
-                providerTicketId: "tkt_1",
-                errorMessage: null,
-              },
-            ]),
-          }),
-        }),
-      }),
-    });
+  it("returns 403 when the caller lacks settings:update", async () => {
+    mocks.userHasPermission.mockResolvedValue({ success: false });
+    expect((await app.request("/notifications/test-push/recent")).status).toBe(403);
+  });
+
+  it("wraps the service result in a results envelope", async () => {
+    mocks.listRecentTestPushes.mockResolvedValue([
+      {
+        id: 1,
+        sentAt: new Date("2026-01-01T00:00:00.000Z"),
+        recipientToken: "...abcdef",
+        status: "sent_ticket",
+        providerTicketId: "tkt_1",
+        errorMessage: null,
+      },
+    ]);
 
     const res = await app.request("/notifications/test-push/recent");
+
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.results).toHaveLength(1);
-    const tok = body.results[0].recipientToken as string;
-    expect(tok.startsWith("...")).toBe(true);
-    expect(tok.length).toBeLessThanOrEqual(9); // "..." + 6
-  });
-
-  it("returns sentAt from createdAt when sentAt is null", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    const createdAt = new Date("2026-04-23T09:00:00Z");
-    mocks.dbSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 2,
-                sentAt: null,
-                createdAt,
-                recipientToken: "ExponentPushToken[xyz789]",
-                status: "failed",
-                providerTicketId: null,
-                errorMessage: "ECONNREFUSED",
-              },
-            ]),
-          }),
-        }),
-      }),
+    expect(await res.json()).toEqual({
+      results: [
+        {
+          id: 1,
+          sentAt: "2026-01-01T00:00:00.000Z",
+          recipientToken: "...abcdef",
+          status: "sent_ticket",
+          providerTicketId: "tkt_1",
+          errorMessage: null,
+        },
+      ],
     });
-
-    const res = await app.request("/notifications/test-push/recent");
-    const body = await res.json();
-    expect(body.results[0].sentAt).toBe(createdAt.toISOString());
-  });
-
-  it("maskToken returns null for null token", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mocks.dbSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 3,
-                sentAt: new Date(),
-                createdAt: new Date(),
-                recipientToken: null,
-                status: "failed",
-                providerTicketId: null,
-                errorMessage: null,
-              },
-            ]),
-          }),
-        }),
-      }),
-    });
-
-    const res = await app.request("/notifications/test-push/recent");
-    const body = await res.json();
-    expect(body.results[0].recipientToken).toBeNull();
-  });
-
-  it("maskToken always masks short tokens (no plaintext leak)", async () => {
-    const app = makeApp({ id: "u_admin", role: "admin" });
-    mocks.dbSelect.mockReturnValueOnce({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 4,
-                sentAt: new Date(),
-                createdAt: new Date(),
-                recipientToken: "abc",
-                status: "sent_ticket",
-                providerTicketId: "t1",
-                errorMessage: null,
-              },
-            ]),
-          }),
-        }),
-      }),
-    });
-
-    const res = await app.request("/notifications/test-push/recent");
-    const body = await res.json();
-    expect(body.results[0].recipientToken).toMatch(/^\.\.\./);
-    expect(body.results[0].recipientToken).not.toBe("abc");
+    expect(mocks.listRecentTestPushes).toHaveBeenCalledWith(ADMIN);
   });
 });

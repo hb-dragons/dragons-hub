@@ -30,10 +30,13 @@ export const matches = pgTable(
     guestTeamApiId: integer("guest_team_api_id").notNull().references(() => teams.apiTeamPermanentId),
     venueId: integer("venue_id").references(() => venues.id),
 
-    // Status flags
-    isConfirmed: boolean("is_confirmed").default(false),
-    isForfeited: boolean("is_forfeited").default(false),
-    isCancelled: boolean("is_cancelled").default(false),
+    // Status flags.
+    // NOT NULL like the referee-slot flags below and like `referee_games`:
+    // a three-valued flag makes `WHERE is_cancelled = false` silently drop rows
+    // (NULL = false evaluates to NULL, not true) and forces consumers into `?? false`.
+    isConfirmed: boolean("is_confirmed").notNull().default(false),
+    isForfeited: boolean("is_forfeited").notNull().default(false),
+    isCancelled: boolean("is_cancelled").notNull().default(false),
 
     // Referee open-slot flags (from SDK offenAngeboten)
     sr1Open: boolean("sr1_open").notNull().default(false),

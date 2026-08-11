@@ -1,21 +1,18 @@
 import { z } from "zod";
+import { idParamSchema } from "./common";
 import { dateSchema, taskPrioritySchema } from "@dragons/shared";
 
 export const taskBoardIdParamSchema = z.object({
   boardId: z.coerce.number().int().positive(),
 });
 
-export const taskIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
+export const taskIdParamSchema = idParamSchema;
 
-export const taskChecklistItemParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
+export const taskChecklistItemParamSchema = idParamSchema.extend({
   itemId: z.coerce.number().int().positive(),
 });
 
-export const taskCommentParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
+export const taskCommentParamSchema = idParamSchema.extend({
   commentId: z.coerce.number().int().positive(),
 });
 
@@ -25,7 +22,7 @@ export const taskListQuerySchema = z.object({
   priority: taskPrioritySchema.optional(),
 });
 
-export const taskCreateBodySchema = z.object({
+export const taskCreateBodySchema = z.strictObject({
   title: z.string().min(1).max(300),
   description: z.string().max(5000).nullable().optional(),
   assigneeIds: z.array(z.string().min(1).max(100)).optional(),
@@ -34,7 +31,7 @@ export const taskCreateBodySchema = z.object({
   columnId: z.number().int().positive(),
 });
 
-export const taskUpdateBodySchema = z.object({
+export const taskUpdateBodySchema = z.strictObject({
   title: z.string().min(1).max(300).optional(),
   description: z.string().max(5000).nullable().optional(),
   assigneeIds: z.array(z.string().min(1).max(100)).optional(),
@@ -42,33 +39,32 @@ export const taskUpdateBodySchema = z.object({
   dueDate: dateSchema.nullable().optional(),
 });
 
-export const taskAssigneeParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
+export const taskAssigneeParamSchema = idParamSchema.extend({
   userId: z.string().min(1).max(100),
 });
 
 export type TaskAssigneeParam = z.infer<typeof taskAssigneeParamSchema>;
 
-export const taskMoveBodySchema = z.object({
+export const taskMoveBodySchema = z.strictObject({
   columnId: z.number().int().positive(),
   position: z.number().int().min(0),
 });
 
-export const checklistItemCreateBodySchema = z.object({
+export const checklistItemCreateBodySchema = z.strictObject({
   label: z.string().min(1).max(200),
   position: z.number().int().min(0).optional(),
 });
 
-export const checklistItemUpdateBodySchema = z.object({
+export const checklistItemUpdateBodySchema = z.strictObject({
   label: z.string().min(1).max(200).optional(),
   isChecked: z.boolean().optional(),
 });
 
-export const commentCreateBodySchema = z.object({
+export const commentCreateBodySchema = z.strictObject({
   body: z.string().min(1).max(5000),
 });
 
-export const commentUpdateBodySchema = z.object({
+export const commentUpdateBodySchema = z.strictObject({
   body: z.string().min(1).max(5000),
 });
 

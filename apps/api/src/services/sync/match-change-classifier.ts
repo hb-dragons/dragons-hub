@@ -1,4 +1,4 @@
-import { EVENT_TYPES } from "@dragons/shared";
+import { EVENT_TYPES, type EventType } from "@dragons/shared";
 
 type FieldValue = string | number | boolean | null | undefined;
 
@@ -14,25 +14,6 @@ function stringify(v: FieldValue): string | null {
 
 function normalizeTime(v: string | null): string | null {
   return v !== null ? v.replace(/^(\d{2}:\d{2}):00$/, "$1") : v;
-}
-
-export function detectFieldChanges<
-  E extends Record<string, FieldValue>,
-  S extends Record<string, FieldValue>,
->(existing: E, snapshot: S, fields: readonly (keyof E & keyof S & string)[]): FieldChange[] {
-  const changes: FieldChange[] = [];
-  for (const name of fields) {
-    let oldStr = stringify(existing[name]);
-    let newStr = stringify(snapshot[name]);
-    if (name === "kickoffTime") {
-      oldStr = normalizeTime(oldStr);
-      newStr = normalizeTime(newStr);
-    }
-    if (oldStr !== newStr) {
-      changes.push({ fieldName: name, oldValue: oldStr, newValue: newStr });
-    }
-  }
-  return changes;
 }
 
 export function computeEffectiveChanges<E extends Record<string, FieldValue>>(
@@ -56,8 +37,8 @@ export function computeEffectiveChanges<E extends Record<string, FieldValue>>(
   return changes;
 }
 
-export function classifyMatchChanges(effectiveChanges: FieldChange[]): string[] {
-  const eventTypes: string[] = [];
+export function classifyMatchChanges(effectiveChanges: FieldChange[]): EventType[] {
+  const eventTypes: EventType[] = [];
   const changedFields = new Set(effectiveChanges.map((c) => c.fieldName));
 
   if (changedFields.has("isCancelled")) {

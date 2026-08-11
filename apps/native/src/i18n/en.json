@@ -235,7 +235,10 @@
     "apply": "Apply",
     "loading": "Loading…",
     "vs": "vs",
-    "at": "@"
+    "at": "@",
+    "loadFailed": "Couldn't load this page",
+    "retry": "Retry",
+    "notFound": "Not found"
   },
   "admin": {
     "boards": {
@@ -375,6 +378,11 @@
       "reload": "Reload"
     }
   },
+  "notFound": {
+    "title": "Page not found",
+    "body": "This link doesn't lead anywhere. It may be out of date.",
+    "action": "Back to the app"
+  },
   "toast": {
     "saved": "Changes saved",
     "saveFailed": "Couldn't save",
@@ -395,6 +403,7 @@
     "placeholder": "Ask about games, standings, results",
     "send": "Send",
     "stop": "Stop",
+    "newChat": "Start a new chat",
     "regenerate": "Regenerate",
     "copy": "Copy",
     "copied": "Copied",

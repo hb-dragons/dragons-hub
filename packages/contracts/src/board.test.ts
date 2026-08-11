@@ -46,16 +46,19 @@ describe("boardCreateBodySchema", () => {
     ).toEqual({ name: "Board", description: null });
   });
 
-  it("accepts createdBy", () => {
-    expect(
+  it("rejects a client-supplied createdBy", () => {
+    // The schema is strict, so an actor field that is set server-side is now a
+    // 400 rather than a silent strip — the caller learns the field is ignored
+    // instead of believing it was honoured.
+    expect(() =>
       boardCreateBodySchema.parse({ name: "Board", createdBy: "admin" }),
-    ).toEqual({ name: "Board", createdBy: "admin" });
+    ).toThrow();
   });
 
-  it("accepts null createdBy", () => {
-    expect(
+  it("rejects a null createdBy", () => {
+    expect(() =>
       boardCreateBodySchema.parse({ name: "Board", createdBy: null }),
-    ).toEqual({ name: "Board", createdBy: null });
+    ).toThrow();
   });
 
   it("rejects empty name", () => {
@@ -83,7 +86,9 @@ describe("boardCreateBodySchema", () => {
     expect(() => boardCreateBodySchema.parse({})).toThrow();
   });
 
-  it("rejects createdBy exceeding 100 characters", () => {
+  it("rejects an over-long createdBy rather than length-checking it", () => {
+    // createdBy is not part of the contract at all: the audit actor is read
+    // from the session, so any body value is rejected outright.
     expect(() =>
       boardCreateBodySchema.parse({ name: "Board", createdBy: "x".repeat(101) }),
     ).toThrow();

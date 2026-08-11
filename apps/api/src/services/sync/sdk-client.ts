@@ -3,6 +3,7 @@ import pLimit from "p-limit";
 import { env } from "../../config/env";
 import { logger } from "../../config/logger";
 import { currentTraceparent } from "../../config/log-context";
+import { RefereeSdkNotConfiguredError } from "./sdk-client.errors";
 
 const log = logger.child({ service: "sdk-client" });
 
@@ -27,9 +28,36 @@ import type {
   SdkSubmitPayload,
   SdkSubmitSlotPayload,
   SdkSubmitResponse,
+  SdkOffeneSpielResult,
+  SdkOffeneSpieleResponse,
+  SdkOpenGamesSearchParams,
 } from "@dragons/sdk";
 
 const BASE_URL = "https://www.basketball-bund.net";
+
+/**
+ * Ceiling on a single federation HTTP call. basketball-bund.net has no SLA and
+ * a hung socket otherwise parks a sync stage forever: `withRetry` only reacts
+ * to a rejection, so a request that never settles never retries and never
+ * fails. An `AbortError` turns that hang into a retryable error.
+ */
+const FEDERATION_REQUEST_TIMEOUT_MS = 30_000;
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    FEDERATION_REQUEST_TIMEOUT_MS,
+  );
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // Rate limiter: token bucket with 15 burst, refilling at 10/sec
 class TokenBucket {
@@ -135,7 +163,7 @@ class AuthenticatedClient {
       password: this.password,
     }).toString();
 
-    const res = await fetch(loginUrl, {
+    const res = await fetchWithTimeout(loginUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -193,7 +221,7 @@ class AuthenticatedClient {
     if (!this.sessionCookie) {
       throw new Error("Not authenticated. Call login() first.");
     }
-    return fetch(`${BASE_URL}${path}`, {
+    return fetchWithTimeout(`${BASE_URL}${path}`, {
       ...options,
       headers: {
         ...options.headers,
@@ -240,6 +268,32 @@ export class SdkClient {
     ansetzenFuerSpiel: 0,
   };
 
+  private static readonly OFFENE_SPIELE_PAGE_SIZE = 200;
+
+  /**
+   * Upper bound on `/rest/offenespiele/search` pages per call. A federation
+   * response whose `total` never agrees with the rows it hands back would
+   * otherwise loop forever against basketball-bund.net. At 200 rows a page this
+   * caps one fetch at 10,000 games, far above any real club's open-game feed.
+   */
+  private static readonly OFFENE_SPIELE_MAX_PAGES = 50;
+
+  private static readonly OFFENE_SPIELE_SEARCH_BASE: Omit<
+    SdkOpenGamesSearchParams,
+    "datum" | "pageFrom"
+  > = {
+    ats: null,
+    ligaKurz: null,
+    pageSize: SdkClient.OFFENE_SPIELE_PAGE_SIZE,
+    sortBy: "sp.spieldatum",
+    sortOrder: "asc",
+    spielStatus: "ALLE",
+    srName: null,
+    vereinsDelegation: "ALLE",
+    vereinsSpiele: "VEREIN",
+    zeitraum: "all",
+  };
+
   private static readonly SLOT_KEY_MAP = {
     1: "sr1",
     2: "sr2",
@@ -271,6 +325,17 @@ export class SdkClient {
   }
 
   private async ensureRefereeAuthenticated(): Promise<void> {
+    // Without REFEREE_SDK_* the referee auth client is constructed with no
+    // credentials and falls back to the main federation account. That account
+    // must never stand in for the referee one on a write: the federation
+    // records the assignment against whoever submitted it, so a misconfigured
+    // deployment would quietly file real assignments under the wrong identity.
+    // Fail loudly instead. (`fetchOffeneSpiele` — a read — returns early before
+    // reaching here and stays inert, which is the intended behaviour there.)
+    if (!env.REFEREE_SDK_USERNAME || !env.REFEREE_SDK_PASSWORD) {
+      throw new RefereeSdkNotConfiguredError();
+    }
+
     const sessionAge = Date.now() - this.refereeAuthClient.authenticatedAt;
     if (!this.refereeAuthClient.authenticated || sessionAge > SdkClient.SESSION_MAX_AGE_MS) {
       if (this.refereeAuthClient.authenticated) {
@@ -570,7 +635,13 @@ export class SdkClient {
         }
         if (!res.ok) {
           const errorBody = typeof res.text === "function" ? await res.text() : "";
-          log.error({ status: res.status, errorBody, payload: body }, "submit assignment failed");
+          // The submit payload carries the referee candidate record (name,
+          // licence, contact fields the federation hands back), so it stays out
+          // of the log. Slot number plus game id is enough to find the call.
+          log.error(
+            { status: res.status, errorBody, spielplanId, slotNumber },
+            "submit assignment failed",
+          );
           throw new Error(`submit assignment failed: ${res.status}`);
         }
         return res.json() as Promise<SdkSubmitResponse>;
@@ -628,6 +699,91 @@ export class SdkClient {
       3,
       `submitRefereeUnassignment(${spielplanId}, slot=${slotNumber})`,
     );
+  }
+
+  private async fetchOffeneSpielePage(
+    pageFrom: number,
+  ): Promise<SdkOffeneSpieleResponse> {
+    await this.rateLimiter.acquire();
+
+    const path = "/rest/offenespiele/search";
+    const payload: SdkOpenGamesSearchParams = {
+      ...SdkClient.OFFENE_SPIELE_SEARCH_BASE,
+      datum: "2000-01-01T00:00:00.000Z",
+      pageFrom,
+    };
+    const init: RequestInit = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    };
+
+    return withRetry(
+      async () => {
+        const res = await this.refereeAuthClient.authenticatedFetch(path, init);
+        if (res.status === 401 || res.status === 403) {
+          await this.refereeAuthClient.login();
+          const retry = await this.refereeAuthClient.authenticatedFetch(
+            path,
+            init,
+          );
+          if (!retry.ok)
+            throw new Error(`offenespiele search failed: ${retry.status}`);
+          return retry.json() as Promise<SdkOffeneSpieleResponse>;
+        }
+        if (!res.ok)
+          throw new Error(`offenespiele search failed: ${res.status}`);
+        return res.json() as Promise<SdkOffeneSpieleResponse>;
+      },
+      3,
+      `fetchOffeneSpiele(pageFrom=${pageFrom})`,
+    );
+  }
+
+  /**
+   * Every open game the referee account can see, paged out of
+   * `/rest/offenespiele/search`. Inert without referee credentials — the
+   * referee auth client falls back to the main SDK account, and that account
+   * must not silently stand in for the referee one.
+   */
+  async fetchOffeneSpiele(): Promise<SdkOffeneSpieleResponse> {
+    if (!env.REFEREE_SDK_USERNAME || !env.REFEREE_SDK_PASSWORD) {
+      log.info(
+        "Referee SDK credentials not configured, skipping offenespiele fetch",
+      );
+      return { total: 0, results: [] };
+    }
+
+    await this.ensureRefereeAuthenticated();
+
+    const results: SdkOffeneSpielResult[] = [];
+    let total = 0;
+
+    for (let page = 0; page < SdkClient.OFFENE_SPIELE_MAX_PAGES; page++) {
+      const body = await this.fetchOffeneSpielePage(
+        page * SdkClient.OFFENE_SPIELE_PAGE_SIZE,
+      );
+      if (page === 0) total = body?.total ?? 0;
+
+      const pageResults = body?.results ?? [];
+      if (pageResults.length === 0) break;
+
+      results.push(...pageResults);
+      if (results.length >= total) break;
+    }
+
+    if (results.length < total) {
+      log.warn(
+        {
+          fetched: results.length,
+          total,
+          maxPages: SdkClient.OFFENE_SPIELE_MAX_PAGES,
+        },
+        "offenespiele pagination stopped before the reported total was reached",
+      );
+    }
+
+    return { total, results };
   }
 
   logout(): void {

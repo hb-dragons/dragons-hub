@@ -1,0 +1,50 @@
+---
+/**
+ * Blurhash-placeholder image, ported from dragons-app UiBlurImage /
+ * UiStaticBlurImage. The hash is decoded at build time into a tiny BMP data
+ * URI painted as the wrapper's background; the real image loads on top and
+ * simply covers it — no client JS involved.
+ */
+import { blurhashToDataUri } from "../lib/blurhash";
+
+interface Props {
+  src: string;
+  blurhash?: string | null | undefined;
+  alt?: string | null | undefined;
+  width?: number | null | undefined;
+  height?: number | null | undefined;
+  /** Wrapper classes (sizing/positioning). */
+  class?: string;
+  /** Image classes (e.g. object-cover, hover transforms). */
+  imgClass?: string;
+  loading?: "lazy" | "eager";
+}
+
+const {
+  src,
+  blurhash,
+  alt,
+  width,
+  height,
+  class: className = "",
+  imgClass = "",
+  loading = "lazy",
+} = Astro.props;
+
+const placeholder = blurhash ? blurhashToDataUri(blurhash) : null;
+const wrapperStyle = placeholder
+  ? `background-image:url(${placeholder});background-size:cover;background-position:center`
+  : undefined;
+---
+
+<div class:list={["overflow-hidden", className]} style={wrapperStyle}>
+  <img
+    src={src}
+    alt={alt ?? ""}
+    width={width ?? undefined}
+    height={height ?? undefined}
+    loading={loading}
+    decoding="async"
+    class:list={["h-full w-full object-cover", imgClass]}
+  />
+</div>

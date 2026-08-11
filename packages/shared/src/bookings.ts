@@ -6,6 +6,8 @@ export interface ReconcilePreviewMatch {
   id: number;
   homeTeam: string;
   homeTeamCustomName: string | null;
+  /** Home team's badge preset key; the badge hashes the name without it. */
+  homeBadgeColor: string | null;
   guestTeam: string;
   kickoffTime: string;
   isForfeited: boolean;
@@ -58,13 +60,15 @@ export interface ReconcileResult {
 
 // ── Booking types ───────────────────────────────────────────────────────────
 
-export interface BookingMatch {
+interface BookingMatch {
   id: number;
   matchNo: number;
   kickoffDate: string;
   kickoffTime: string;
   homeTeam: string;
   homeTeamCustomName: string | null;
+  /** Home team's badge preset key; the badge hashes the name without it. */
+  homeBadgeColor: string | null;
   guestTeam: string;
   leagueName: string | null;
 }

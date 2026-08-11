@@ -1,78 +1,49 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import type { ExtractedReferee, ExtractedRefereeRole, ExtractedRefereeAssignment } from "./data-fetcher";
+import { describe, expect, it, vi, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
+import { eq } from "drizzle-orm";
+import type {
+  ExtractedReferee,
+  ExtractedRefereeRole,
+  ExtractedRefereeAssignment,
+} from "./data-fetcher";
 
-// --- Mock setup ---
+// Real Postgres (pglite) with real migrations, the real drizzle operators and the
+// real `computeEntityHash`.
+//
+// The previous mocked-ORM version stubbed `eq`/`and`/`isNull`/`inArray`/`sql` to
+// identity functions and hand-choreographed every `select()` return value in call
+// order, so none of this file's SQL ran: the `isNull(matchReferees.removedAt)`
+// guard on the existing-assignment lookup (issue #105) and the
+// `setWhere: excluded.data_hash != ...` upsert guard were both invisible, and
+// `confirmIntentsFromSync`'s raw SQL was reduced to a mock returning a fixed
+// rowCount.
+//
+// `removeStaleRefereeAssignments` has its own pglite suite in
+// referees.sync.removal.integration.test.ts and is not re-covered here.
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
+vi.mock("../../config/database", () => ({
+  getDb: () =>
+    new Proxy(
+      {},
+      { get: (_t, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop] },
+    ),
+}));
+
+const mockLogWarn = vi.fn();
 vi.mock("../../config/logger", () => ({
   logger: {
     child: () => ({
       info: vi.fn(),
-      warn: vi.fn(),
+      warn: (...args: unknown[]) => mockLogWarn(...args),
       error: vi.fn(),
       debug: vi.fn(),
     }),
   },
 }));
 
-const mockInsert = vi.fn();
-const mockSelect = vi.fn();
-const mockUpdate = vi.fn();
-const mockExecute = vi.fn();
-vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    insert: (...args: unknown[]) => mockInsert(...args),
-    select: (...args: unknown[]) => mockSelect(...args),
-    update: (...args: unknown[]) => mockUpdate(...args),
-    execute: (...args: unknown[]) => mockExecute(...args),
-  }),
-}));
-
-const mockPublishDomainEvent = vi.fn().mockResolvedValue({ id: "mock-event-id" });
+const mockPublishDomainEvent = vi.fn();
 vi.mock("../events/event-publisher", () => ({
   publishDomainEvent: (...args: unknown[]) => mockPublishDomainEvent(...args),
-}));
-
-vi.mock("@dragons/db/schema", () => ({
-  referees: {
-    apiId: "apiId",
-    id: "id",
-    dataHash: "dataHash",
-    createdAt: "createdAt",
-  },
-  refereeRoles: {
-    apiId: "apiId",
-    id: "id",
-    dataHash: "dataHash",
-    createdAt: "createdAt",
-  },
-  matchReferees: {
-    id: "mr.id",
-    matchId: "matchId",
-    refereeId: "refereeId",
-    roleId: "roleId",
-    slotNumber: "slotNumber",
-  },
-  matches: {
-    id: "id",
-    apiMatchId: "apiMatchId",
-  },
-  refereeAssignmentIntents: {
-    id: "id",
-    matchId: "matchId",
-    refereeId: "refereeId",
-    confirmedBySyncAt: "confirmedBySyncAt",
-  },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((...args: unknown[]) => ({ eq: args })),
-  and: vi.fn((...args: unknown[]) => ({ and: args })),
-  inArray: vi.fn((...args: unknown[]) => ({ inArray: args })),
-  sql: (...args: unknown[]) => args,
-}));
-
-vi.mock("./hash", () => ({
-  computeEntityHash: vi.fn(() => "ref-hash"),
 }));
 
 import {
@@ -82,988 +53,947 @@ import {
   buildMatchIdLookup,
   confirmIntentsFromSync,
 } from "./referees.sync";
+import { computeEntityHash } from "./hash";
+import {
+  referees,
+  refereeRoles,
+  matchReferees,
+  matchChanges,
+  matches,
+  leagues,
+  teams,
+  refereeAssignmentIntents,
+} from "@dragons/db/schema";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
+import { seedActiveSeason } from "../../test/seed-season";
 
-const FROZEN_TIME = new Date("2025-06-01T00:00:00Z");
+let ctx: TestDbContext;
 
-function buildSelectChain(result: unknown) {
-  const thenableResult = {
-    where: vi.fn().mockReturnValue({
-      limit: vi.fn().mockResolvedValue(result),
-    }),
-    then: (resolve: (v: unknown) => void) => {
-      resolve(result);
-      return thenableResult;
-    },
-  };
-  return {
-    from: vi.fn().mockReturnValue(thenableResult),
-  };
-}
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
 
-function buildBatchSelectChain(result: unknown) {
-  const whereResult = {
-    then: (resolve: (v: unknown) => void) => {
-      resolve(result);
-      return whereResult;
-    },
-  };
-  return {
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue(whereResult),
-    }),
-  };
-}
-
-/**
- * Set up mock select calls for the batch-loaded lookup maps
- * used by syncRefereeAssignmentsFromData for event emission.
- * Call after setting up the existing-assignments batch select mock.
- */
-function mockBatchLookups() {
-  // referee names batch
-  mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-    { id: 1, firstName: "John", lastName: "Doe" },
-  ]));
-  // match info batch
-  mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-    { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
-  ]));
-  // role names batch
-  mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-    { id: 2, name: "SR1" },
-  ]));
-}
-
-beforeEach(() => {
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  dbHolder.ref = ctx.db;
   vi.clearAllMocks();
-  vi.useFakeTimers();
-  vi.setSystemTime(FROZEN_TIME);
-  // Default: mockSelect returns empty array (for pre-load queries before upsert)
-  mockSelect.mockReturnValue(buildSelectChain([]));
+  mockPublishDomainEvent.mockResolvedValue({ id: "mock-event-id" });
+  // Only Date is faked: pglite's WASM I/O needs real timers.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2025-06-01T00:00:00.000Z"));
 });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
+
+// --- Fixtures ---
+
+function makeRole(overrides: Partial<ExtractedRefereeRole> = {}): ExtractedRefereeRole {
+  return {
+    schirirolleId: 1,
+    schirirollename: "1. Schiedsrichter",
+    schirirollekurzname: "1. SR",
+    ...overrides,
+  };
+}
+
+function makeReferee(overrides: Partial<ExtractedReferee> = {}): ExtractedReferee {
+  return {
+    schiedsrichterId: 100,
+    vorname: "John",
+    nachname: "Doe",
+    lizenznummer: 12345,
+    ...overrides,
+  };
+}
+
+function roleHash(role: ExtractedRefereeRole) {
+  return computeEntityHash({
+    apiId: role.schirirolleId,
+    name: role.schirirollename,
+    shortName: role.schirirollekurzname,
+  });
+}
+
+function refereeHash(ref: ExtractedReferee) {
+  return computeEntityHash({
+    apiId: ref.schiedsrichterId,
+    firstName: ref.vorname,
+    lastName: ref.nachname,
+    licenseNumber: ref.lizenznummer,
+  });
+}
+
+/** Swap getDb() for a proxy overriding one method and delegating the rest. */
+function overrideDbMethod(name: string, impl: unknown) {
+  const real = ctx.db as unknown as Record<string | symbol, unknown>;
+  dbHolder.ref = new Proxy({}, { get: (_t, prop) => (prop === name ? impl : real[prop]) });
+}
+
+/**
+ * Point getDb() at a db whose `transaction()` rejects. Each assignment write is
+ * a transaction (issue #77), so that is the seam a database failure comes
+ * through — overriding `insert` no longer reaches the statements inside it.
+ */
+function failTransactionWith(reason: unknown) {
+  overrideDbMethod("transaction", () => {
+    if (reason instanceof Error) return Promise.reject(reason);
+    throw reason;
+  });
+}
+
+/**
+ * Run `fn` with a real database trigger that rejects every `match_changes`
+ * insert. The failure comes from Postgres, mid-transaction and after the slot
+ * write has already succeeded, which is what makes it evidence that the two
+ * roll back together — a stubbed insert could not fail *inside* the real
+ * transaction at all.
+ */
+async function withFailingMatchChangesInsert<T>(fn: () => Promise<T>): Promise<T> {
+  await ctx.client.exec(`
+    CREATE FUNCTION fail_match_changes() RETURNS trigger AS $$
+    BEGIN RAISE EXCEPTION 'history down'; END $$ LANGUAGE plpgsql;
+    CREATE TRIGGER fail_match_changes BEFORE INSERT ON match_changes
+      FOR EACH ROW EXECUTE FUNCTION fail_match_changes();
+  `);
+  try {
+    return await fn();
+  } finally {
+    await ctx.client.exec(`
+      DROP TRIGGER fail_match_changes ON match_changes;
+      DROP FUNCTION fail_match_changes();
+    `);
+  }
+}
+
+/** Point getDb() at a db whose upsert rejects while reads stay real. */
+async function withFailingUpsert<T>(reason: unknown, fn: () => Promise<T>): Promise<T> {
+  overrideDbMethod("insert", () => ({
+    values: () => ({
+      onConflictDoUpdate: () => ({ returning: () => Promise.reject(reason) }),
+    }),
+  }));
+  try {
+    return await fn();
+  } finally {
+    dbHolder.ref = ctx.db;
+  }
+}
+
 describe("syncRefereeRolesFromData", () => {
-  it("returns empty for empty map", async () => {
+  it("returns an empty result for an empty map", async () => {
     const result = await syncRefereeRolesFromData(new Map());
 
-    expect(result.created).toBe(0);
-    expect(result.updated).toBe(0);
-    expect(result.skipped).toBe(0);
-    expect(result.roleIdLookup.size).toBe(0);
+    expect(result).toEqual({
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      failed: 0,
+      errors: [],
+      roleIdLookup: new Map(),
+    });
+    expect(await ctx.db.select().from(refereeRoles)).toEqual([]);
   });
 
-  it("creates new roles and returns lookup", async () => {
-    const rolesMap = new Map<number, ExtractedRefereeRole>([
-      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: FROZEN_TIME }]),
-        }),
-      }),
-    });
-    // Pre-load returns existing roles before upsert
-    mockSelect.mockReturnValue(buildSelectChain([{ id: 10, apiId: 1 }]));
+  it("creates new roles, persists the columns and returns the id lookup", async () => {
+    const role = makeRole();
 
-    const result = await syncRefereeRolesFromData(rolesMap);
+    const result = await syncRefereeRolesFromData(new Map([[role.schirirolleId, role]]));
 
     expect(result.created).toBe(1);
     expect(result.updated).toBe(0);
-    expect(result.roleIdLookup.get(1)).toBe(10);
+    expect(result.skipped).toBe(0);
+
+    const [row] = await ctx.db.select().from(refereeRoles);
+    expect(row!.apiId).toBe(1);
+    expect(row!.name).toBe("1. Schiedsrichter");
+    expect(row!.shortName).toBe("1. SR");
+    expect(row!.dataHash).toBe(roleHash(role));
+    expect(result.roleIdLookup.get(1)).toBe(row!.id);
   });
 
-  it("detects updated roles by createdAt mismatch", async () => {
-    const oldDate = new Date("2024-01-01T00:00:00Z");
-    const rolesMap = new Map<number, ExtractedRefereeRole>([
-      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: oldDate }]),
-        }),
-      }),
-    });
+  it("updates a role whose name changed", async () => {
+    await syncRefereeRolesFromData(new Map([[1, makeRole()]]));
+    const [before] = await ctx.db.select().from(refereeRoles);
 
-    const result = await syncRefereeRolesFromData(rolesMap);
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    const renamed = makeRole({ schirirollename: "Hauptschiedsrichter" });
+    const result = await syncRefereeRolesFromData(new Map([[1, renamed]]));
 
-    expect(result.created).toBe(0);
     expect(result.updated).toBe(1);
+    expect(result.created).toBe(0);
+    const [after] = await ctx.db.select().from(refereeRoles);
+    expect(after!.id).toBe(before!.id);
+    expect(after!.name).toBe("Hauptschiedsrichter");
+    expect(after!.dataHash).toBe(roleHash(renamed));
+    expect(result.roleIdLookup.get(1)).toBe(before!.id);
   });
 
-  it("calculates skipped count when hash matches", async () => {
-    const rolesMap = new Map<number, ExtractedRefereeRole>([
-      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
-      [2, { schirirolleId: 2, schirirollename: "2. SR", schirirollekurzname: "2SR" }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+  it("skips an unchanged role and still returns it in the lookup", async () => {
+    const role = makeRole();
+    await syncRefereeRolesFromData(new Map([[1, role]]));
+    const [before] = await ctx.db.select().from(refereeRoles);
 
-    const result = await syncRefereeRolesFromData(rolesMap);
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    const result = await syncRefereeRolesFromData(new Map([[1, role]]));
 
-    expect(result.skipped).toBe(2);
-  });
-
-  it("handles batch error", async () => {
-    const rolesMap = new Map<number, ExtractedRefereeRole>([
-      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockRejectedValue(new Error("DB error")),
-        }),
-      }),
-    });
-
-    const result = await syncRefereeRolesFromData(rolesMap);
-
+    expect(result.skipped).toBe(1);
     expect(result.created).toBe(0);
     expect(result.updated).toBe(0);
+    // The pre-load supplies the lookup even though the upsert returned nothing.
+    expect(result.roleIdLookup.get(1)).toBe(before!.id);
+    const [after] = await ctx.db.select().from(refereeRoles);
+    expect(after!.updatedAt.getTime()).toBe(before!.updatedAt.getTime());
+  });
+
+  it("handles a batch error", async () => {
+    const result = await withFailingUpsert(new Error("DB error"), () =>
+      syncRefereeRolesFromData(new Map([[1, makeRole()]])),
+    );
+
     expect(result.failed).toBe(1);
     expect(result.roleIdLookup.size).toBe(0);
+    expect(await ctx.db.select().from(refereeRoles)).toEqual([]);
   });
 
-  it("logs 'updated' action to logger when changes exist", async () => {
-    const rolesMap = new Map<number, ExtractedRefereeRole>([
-      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: FROZEN_TIME }]),
-        }),
-      }),
-    });
+  // Regression: the batch failure used to be reported only as `failed`, which
+  // fullSync never reads, so a total role-sync failure left the run "completed"
+  // with recordsFailed 0. The errors[] is what reaches allErrors.
+  it("returns the failure in errors[] so fullSync can report it", async () => {
+    const result = await withFailingUpsert(new Error("DB error"), () =>
+      syncRefereeRolesFromData(new Map([[1, makeRole()]])),
+    );
+
+    expect(result.errors).toEqual(["Batch role sync failed: DB error"]);
+  });
+
+  it("returns no errors on a successful batch", async () => {
+    const result = await syncRefereeRolesFromData(new Map([[1, makeRole()]]));
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it("handles a non-Error batch failure", async () => {
     const mockLogger = { log: vi.fn() };
 
-    await syncRefereeRolesFromData(rolesMap, mockLogger as never);
+    await withFailingUpsert("string error", () =>
+      syncRefereeRolesFromData(new Map([[1, makeRole()]]), mockLogger as never),
+    );
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: "refereeRole", action: "updated" }),
+      expect.objectContaining({ message: expect.stringContaining("Unknown error") }),
     );
   });
 
-  it("logs 'skipped' action to logger when all entries skipped", async () => {
-    const rolesMap = new Map<number, ExtractedRefereeRole>([
-      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+  it("logs the 'updated' action when changes exist", async () => {
     const mockLogger = { log: vi.fn() };
 
-    await syncRefereeRolesFromData(rolesMap, mockLogger as never);
+    await syncRefereeRolesFromData(new Map([[1, makeRole()]]), mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: "refereeRole", action: "skipped" }),
+      expect.objectContaining({
+        entityType: "refereeRole",
+        action: "updated",
+        metadata: { created: 1, updated: 0, skipped: 0 },
+      }),
     );
   });
 
-  it("logs failure to logger", async () => {
-    const rolesMap = new Map<number, ExtractedRefereeRole>([
-      [1, { schirirolleId: 1, schirirollename: "1. SR", schirirollekurzname: "1SR" }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockRejectedValue(new Error("fail")),
-        }),
-      }),
-    });
+  it("logs the 'skipped' action when all entries are skipped", async () => {
+    await syncRefereeRolesFromData(new Map([[1, makeRole()]]));
     const mockLogger = { log: vi.fn() };
 
-    await syncRefereeRolesFromData(rolesMap, mockLogger as never);
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    await syncRefereeRolesFromData(new Map([[1, makeRole()]]), mockLogger as never);
 
     expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "failed" }),
+      expect.objectContaining({
+        entityType: "refereeRole",
+        action: "skipped",
+        metadata: { created: 0, updated: 0, skipped: 1 },
+      }),
+    );
+  });
+
+  it("logs failure to the sync logger", async () => {
+    const mockLogger = { log: vi.fn() };
+
+    await withFailingUpsert(new Error("boom"), () =>
+      syncRefereeRolesFromData(new Map([[1, makeRole()]]), mockLogger as never),
+    );
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "refereeRole", action: "failed" }),
     );
   });
 });
 
 describe("syncRefereesFromData", () => {
-  it("returns empty for empty map", async () => {
+  it("returns an empty result for an empty map", async () => {
     const result = await syncRefereesFromData(new Map());
 
     expect(result.created).toBe(0);
     expect(result.refereeIdLookup.size).toBe(0);
+    expect(await ctx.db.select().from(referees)).toEqual([]);
   });
 
-  it("creates new referees", async () => {
-    const refMap = new Map<number, ExtractedReferee>([
-      [1, { schiedsrichterId: 1, vorname: "John", nachname: "Doe", lizenznummer: 12345 }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: FROZEN_TIME }]),
-        }),
-      }),
-    });
-    // Pre-load returns existing referees before upsert
-    mockSelect.mockReturnValue(buildSelectChain([{ id: 10, apiId: 1 }]));
+  it("creates new referees with every column mapped", async () => {
+    const ref = makeReferee();
 
-    const result = await syncRefereesFromData(refMap);
+    const result = await syncRefereesFromData(new Map([[100, ref]]));
 
     expect(result.created).toBe(1);
-    expect(result.refereeIdLookup.get(1)).toBe(10);
+    const [row] = await ctx.db.select().from(referees);
+    expect(row!.apiId).toBe(100);
+    expect(row!.firstName).toBe("John");
+    expect(row!.lastName).toBe("Doe");
+    expect(row!.licenseNumber).toBe(12345);
+    expect(row!.dataHash).toBe(refereeHash(ref));
+    expect(result.refereeIdLookup.get(100)).toBe(row!.id);
   });
 
-  it("detects updated referees", async () => {
-    const oldDate = new Date("2024-01-01T00:00:00Z");
-    const refMap = new Map<number, ExtractedReferee>([
-      [1, { schiedsrichterId: 1, vorname: "John", nachname: "Doe", lizenznummer: 12345 }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: oldDate }]),
-        }),
-      }),
-    });
+  it("updates a referee whose licence number changed", async () => {
+    await syncRefereesFromData(new Map([[100, makeReferee()]]));
+    const [before] = await ctx.db.select().from(referees);
 
-    const result = await syncRefereesFromData(refMap);
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    const result = await syncRefereesFromData(
+      new Map([[100, makeReferee({ lizenznummer: 54321 })]]),
+    );
 
     expect(result.updated).toBe(1);
+    const [after] = await ctx.db.select().from(referees);
+    expect(after!.id).toBe(before!.id);
+    expect(after!.licenseNumber).toBe(54321);
   });
 
-  it("calculates skipped count", async () => {
-    const refMap = new Map<number, ExtractedReferee>([
-      [1, { schiedsrichterId: 1, vorname: "A", nachname: "B", lizenznummer: 1 }],
-      [2, { schiedsrichterId: 2, vorname: "C", nachname: "D", lizenznummer: 2 }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
+  it("skips an unchanged referee (dataHash change detection)", async () => {
+    await syncRefereesFromData(new Map([[100, makeReferee()]]));
+    const [before] = await ctx.db.select().from(referees);
 
-    const result = await syncRefereesFromData(refMap);
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    const result = await syncRefereesFromData(new Map([[100, makeReferee()]]));
 
-    expect(result.skipped).toBe(2);
+    expect(result.skipped).toBe(1);
+    expect(result.created).toBe(0);
+    expect(result.updated).toBe(0);
+    expect(result.refereeIdLookup.get(100)).toBe(before!.id);
+    const [after] = await ctx.db.select().from(referees);
+    expect(after!.updatedAt.getTime()).toBe(before!.updatedAt.getTime());
   });
 
-  it("handles batch error", async () => {
-    const refMap = new Map<number, ExtractedReferee>([
-      [1, { schiedsrichterId: 1, vorname: "A", nachname: "B", lizenznummer: 1 }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockRejectedValue(new Error("fail")),
-        }),
-      }),
-    });
+  it("does not clobber local-only referee columns on update", async () => {
+    await syncRefereesFromData(new Map([[100, makeReferee()]]));
+    await ctx.db
+      .update(referees)
+      .set({ isOwnClub: true, allowAwayGames: true })
+      .where(eq(referees.apiId, 100));
 
-    const result = await syncRefereesFromData(refMap);
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    await syncRefereesFromData(new Map([[100, makeReferee({ nachname: "Renamed" })]]));
 
-    expect(result.errors).toHaveLength(1);
+    const [row] = await ctx.db.select().from(referees);
+    expect(row!.lastName).toBe("Renamed");
+    expect(row!.isOwnClub).toBe(true);
+    expect(row!.allowAwayGames).toBe(true);
+  });
+
+  it("handles a batch error", async () => {
+    const result = await withFailingUpsert(new Error("DB error"), () =>
+      syncRefereesFromData(new Map([[100, makeReferee()]])),
+    );
+
+    expect(result.errors[0]).toContain("Batch referee sync failed");
     expect(result.refereeIdLookup.size).toBe(0);
   });
 
-  it("logs 'skipped' action to logger when all skipped", async () => {
-    const refMap = new Map<number, ExtractedReferee>([
-      [1, { schiedsrichterId: 1, vorname: "A", nachname: "B", lizenznummer: 1 }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    });
-    const mockLogger = { log: vi.fn() };
-
-    await syncRefereesFromData(refMap, mockLogger as never);
-
-    expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: "referee", action: "skipped" }),
-    );
-  });
-
-  it("logs 'updated' action to logger when changes exist", async () => {
-    const refMap = new Map<number, ExtractedReferee>([
-      [1, { schiedsrichterId: 1, vorname: "A", nachname: "B", lizenznummer: 1 }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: 10, apiId: 1, createdAt: FROZEN_TIME }]),
-        }),
-      }),
-    });
-    const mockLogger = { log: vi.fn() };
-
-    await syncRefereesFromData(refMap, mockLogger as never);
-
-    expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ entityType: "referee", action: "updated" }),
-    );
-  });
-
-  it("logs to logger on failure", async () => {
-    const refMap = new Map<number, ExtractedReferee>([
-      [1, { schiedsrichterId: 1, vorname: "A", nachname: "B", lizenznummer: 1 }],
-    ]);
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockRejectedValue(new Error("fail")),
-        }),
-      }),
-    });
-    const mockLogger = { log: vi.fn() };
-
-    await syncRefereesFromData(refMap, mockLogger as never);
-
-    expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "failed" }),
-    );
-  });
-});
-
-describe("syncRefereeAssignmentsFromData", () => {
-  const refereeIdLookup = new Map([[100, 1]]);
-  const roleIdLookup = new Map([[200, 2]]);
-  const matchIdLookup = new Map([[300, 3]]);
-
-  it("returns empty for empty assignments", async () => {
-    const result = await syncRefereeAssignmentsFromData(
-      [],
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
-
-    expect(result.created).toBe(0);
-    expect(result.errors).toHaveLength(0);
-  });
-
-  it("filters out assignments with missing FKs", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 999, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 }, // missing match
-      { matchApiId: 300, schiedsrichterId: 888, schirirolleId: 200, slotNumber: 1 }, // missing referee
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 777, slotNumber: 1 }, // missing role
-    ];
-
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
-
-    expect(result.created).toBe(0);
-  });
-
-  it("creates new assignment", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Batch-load returns no existing assignments
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockBatchLookups();
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    });
-
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
-
-    expect(result.created).toBe(1);
-  });
-
-  it("skips existing assignment with same referee and role", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Batch-load returns existing assignment with same refereeId and roleId
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 1, matchId: 3, slotNumber: 1, refereeId: 1, roleId: 2 },
-    ]));
-    mockBatchLookups();
-
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
-
-    expect(result.created).toBe(0);
-    expect(mockInsert).not.toHaveBeenCalled();
-  });
-
-  it("handles per-assignment errors", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Batch-load returns no existing assignments
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockBatchLookups();
-    // Insert fails
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockRejectedValue(new Error("DB error")),
-    });
-
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
-
-    expect(result.errors).toHaveLength(1);
-  });
-
-  it("logs created assignment to logger", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Batch-load returns no existing assignments
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockBatchLookups();
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    });
-    const mockLogger = { log: vi.fn() };
-
-    await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-      mockLogger as never,
-    );
-
-    expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "created" }),
-    );
-  });
-
-  it("logs failed assignment to logger", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Batch-load returns no existing assignments
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockBatchLookups();
-    // Insert fails
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockRejectedValue(new Error("fail")),
-    });
-    const mockLogger = { log: vi.fn() };
-
-    await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-      mockLogger as never,
-    );
-
-    expect(mockLogger.log).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "failed" }),
-    );
-  });
-
-  it("handles non-Error exception", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Batch-load returns no existing assignments
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockBatchLookups();
-    // Insert fails with non-Error
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockRejectedValue("string"),
-    });
-
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
+  it("handles a non-Error batch failure", async () => {
+    const result = await withFailingUpsert("string error", () =>
+      syncRefereesFromData(new Map([[100, makeReferee()]])),
     );
 
     expect(result.errors[0]).toContain("Unknown error");
   });
 
-  it("updates existing assignment when referee or role changed", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Batch-load returns existing assignment with different refereeId
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
-    ]));
-    mockBatchLookups();
-    mockUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
+  it("logs the 'skipped' action when all entries are skipped", async () => {
+    await syncRefereesFromData(new Map([[100, makeReferee()]]));
+    const mockLogger = { log: vi.fn() };
+
+    vi.setSystemTime(new Date("2025-06-02T00:00:00.000Z"));
+    await syncRefereesFromData(new Map([[100, makeReferee()]]), mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: "referee",
+        action: "skipped",
+        metadata: { created: 0, updated: 0, skipped: 1 },
       }),
-    });
-
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
     );
-
-    expect(result.created).toBe(0);
-    expect(mockUpdate).toHaveBeenCalled();
   });
 
-  it("emits referee.assigned event with correct payload and syncRunId", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockBatchLookups();
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
+  it("logs the 'updated' action when changes exist", async () => {
+    const mockLogger = { log: vi.fn() };
+
+    await syncRefereesFromData(new Map([[100, makeReferee()]]), mockLogger as never);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: "referee",
+        action: "updated",
+        metadata: { created: 1, updated: 0, skipped: 0 },
+      }),
+    );
+  });
+
+  it("logs failure to the sync logger", async () => {
+    const mockLogger = { log: vi.fn() };
+
+    await withFailingUpsert(new Error("boom"), () =>
+      syncRefereesFromData(new Map([[100, makeReferee()]]), mockLogger as never),
+    );
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "referee", action: "failed" }),
+    );
+  });
+});
+
+// --- Assignment fixtures ---
+
+const MATCH_API_ID = 1000;
+
+interface AssignmentWorld {
+  matchId: number;
+  refereeIds: Map<number, number>;
+  roleIds: Map<number, number>;
+  matchIds: Map<number, number>;
+}
+
+/**
+ * Seed a league, two teams, one match, two referees and two roles, and return the
+ * three lookup maps `syncRefereeAssignmentsFromData` takes.
+ */
+async function seedAssignmentWorld(): Promise<AssignmentWorld> {
+  const seasonRefId = await seedActiveSeason(ctx);
+  await ctx.db.insert(leagues).values({
+    id: 10,
+    apiLigaId: 1,
+    ligaNr: 1,
+    name: "Bezirksliga",
+    seasonId: 2025,
+    seasonName: "2025/26",
+    seasonRefId,
+  });
+  await ctx.db.insert(teams).values([
+    { apiTeamPermanentId: 10, seasonTeamId: 100, teamCompetitionId: 1, name: "Home", clubId: 1 },
+    { apiTeamPermanentId: 20, seasonTeamId: 200, teamCompetitionId: 2, name: "Guest", clubId: 2 },
+  ]);
+  const [match] = await ctx.db
+    .insert(matches)
+    .values({
+      apiMatchId: MATCH_API_ID,
+      matchNo: 7,
+      matchDay: 1,
+      kickoffDate: "2025-01-15",
+      kickoffTime: "18:00:00",
+      leagueId: 10,
+      homeTeamApiId: 10,
+      guestTeamApiId: 20,
+      currentRemoteVersion: 3,
+    })
+    .returning();
+
+  const refRows = await ctx.db
+    .insert(referees)
+    .values([
+      { apiId: 100, firstName: "John", lastName: "Doe", licenseNumber: 1 },
+      { apiId: 200, firstName: "Jane", lastName: "Roe", licenseNumber: 2 },
+    ])
+    .returning();
+  const roleRows = await ctx.db
+    .insert(refereeRoles)
+    .values([
+      { apiId: 1, name: "1. Schiedsrichter", shortName: "1. SR" },
+      { apiId: 2, name: "2. Schiedsrichter", shortName: "2. SR" },
+    ])
+    .returning();
+
+  return {
+    matchId: match!.id,
+    refereeIds: new Map(refRows.map((r) => [r.apiId, r.id])),
+    roleIds: new Map(roleRows.map((r) => [r.apiId, r.id])),
+    matchIds: new Map([[MATCH_API_ID, match!.id]]),
+  };
+}
+
+function makeAssignment(
+  overrides: Partial<ExtractedRefereeAssignment> = {},
+): ExtractedRefereeAssignment {
+  return {
+    matchApiId: MATCH_API_ID,
+    schiedsrichterId: 100,
+    schirirolleId: 1,
+    slotNumber: 1,
+    ...overrides,
+  };
+}
+
+function runAssignments(
+  world: AssignmentWorld,
+  assignments: ExtractedRefereeAssignment[],
+  syncLogger?: unknown,
+  syncRunId?: number | null,
+) {
+  return syncRefereeAssignmentsFromData(
+    assignments,
+    world.refereeIds,
+    world.roleIds,
+    world.matchIds,
+    syncLogger as never,
+    syncRunId,
+  );
+}
+
+async function assignmentRows() {
+  return ctx.db.select().from(matchReferees).orderBy(matchReferees.id);
+}
+
+async function liveAssignments() {
+  return (await assignmentRows()).filter((r) => r.removedAt === null);
+}
+
+describe("syncRefereeAssignmentsFromData", () => {
+  it("returns an empty result for no assignments", async () => {
+    const world = await seedAssignmentWorld();
+
+    const result = await runAssignments(world, []);
+
+    expect(result).toEqual({ created: 0, errors: [] });
+    expect(await assignmentRows()).toEqual([]);
+  });
+
+  it("filters out assignments whose match/referee/role cannot be resolved", async () => {
+    const world = await seedAssignmentWorld();
+
+    const result = await runAssignments(world, [
+      makeAssignment({ matchApiId: 999_999 }),
+      makeAssignment({ schiedsrichterId: 999 }),
+      makeAssignment({ schirirolleId: 999 }),
+    ]);
+
+    expect(result.created).toBe(0);
+    expect(await assignmentRows()).toEqual([]);
+  });
+
+  it("creates a new assignment row and records it in the match history", async () => {
+    const world = await seedAssignmentWorld();
+
+    const result = await runAssignments(world, [makeAssignment()], undefined, 5);
+
+    expect(result.created).toBe(1);
+    const rows = await liveAssignments();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      matchId: world.matchId,
+      refereeId: world.refereeIds.get(100),
+      roleId: world.roleIds.get(1),
+      slotNumber: 1,
+      removedAt: null,
     });
 
-    await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-      undefined,
-      42,
+    const [change] = await ctx.db.select().from(matchChanges);
+    expect(change).toMatchObject({
+      matchId: world.matchId,
+      track: "remote",
+      versionNumber: 3, // the match's currentRemoteVersion
+      fieldName: "referee_slot_1",
+      oldValue: null,
+      newValue: "John Doe (1. Schiedsrichter)",
+    });
+  });
+
+  it("leaves an unchanged assignment alone", async () => {
+    const world = await seedAssignmentWorld();
+    await runAssignments(world, [makeAssignment()]);
+    const [before] = await liveAssignments();
+
+    const result = await runAssignments(world, [makeAssignment()]);
+
+    expect(result.created).toBe(0);
+    const rows = await liveAssignments();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe(before!.id);
+    // Only the first run wrote history.
+    expect(await ctx.db.select().from(matchChanges)).toHaveLength(1);
+  });
+
+  it("updates the slot in place when the referee and role change", async () => {
+    const world = await seedAssignmentWorld();
+    await runAssignments(world, [makeAssignment()]);
+    const [before] = await liveAssignments();
+
+    const result = await runAssignments(world, [
+      makeAssignment({ schiedsrichterId: 200, schirirolleId: 2 }),
+    ]);
+
+    expect(result.created).toBe(0);
+    const rows = await liveAssignments();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe(before!.id);
+    expect(rows[0]!.refereeId).toBe(world.refereeIds.get(200));
+    expect(rows[0]!.roleId).toBe(world.roleIds.get(2));
+
+    const changes = await ctx.db.select().from(matchChanges).orderBy(matchChanges.id);
+    expect(changes).toHaveLength(2);
+    expect(changes[1]).toMatchObject({
+      fieldName: "referee_slot_1",
+      oldValue: "John Doe (2. Schiedsrichter)",
+      newValue: "Jane Roe (2. Schiedsrichter)",
+    });
+  });
+
+  it("keys existing assignments by slot, so two slots on one match are independent", async () => {
+    const world = await seedAssignmentWorld();
+
+    const result = await runAssignments(world, [
+      makeAssignment({ slotNumber: 1, schiedsrichterId: 100, schirirolleId: 1 }),
+      makeAssignment({ slotNumber: 2, schiedsrichterId: 200, schirirolleId: 2 }),
+    ]);
+
+    expect(result.created).toBe(2);
+    const rows = await liveAssignments();
+    expect(rows.map((r) => r.slotNumber)).toEqual([1, 2]);
+    expect(rows.map((r) => r.refereeId)).toEqual([
+      world.refereeIds.get(100),
+      world.refereeIds.get(200),
+    ]);
+  });
+
+  it("does not resurrect a tombstoned row — a returning referee gets a fresh one", async () => {
+    const world = await seedAssignmentWorld();
+    await runAssignments(world, [makeAssignment()]);
+    const [original] = await liveAssignments();
+    await ctx.db
+      .update(matchReferees)
+      .set({ removedAt: new Date("2025-05-01T00:00:00Z") })
+      .where(eq(matchReferees.id, original!.id));
+
+    const result = await runAssignments(world, [makeAssignment()]);
+
+    expect(result.created).toBe(1);
+    const rows = await assignmentRows();
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.removedAt).not.toBeNull();
+    expect(rows[1]!.removedAt).toBeNull();
+    expect(rows[1]!.id).not.toBe(original!.id);
+  });
+
+  it("reports a failure when the assignment write is rejected", async () => {
+    const world = await seedAssignmentWorld();
+    failTransactionWith(new Error("Insert failed"));
+    const mockLogger = { log: vi.fn() };
+
+    const result = await runAssignments(world, [makeAssignment()], mockLogger);
+
+    expect(result.errors[0]).toContain("Failed to sync assignment for match");
+    expect(result.errors[0]).toContain("Insert failed");
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: "referee", action: "failed" }),
     );
+  });
+
+  it("reports a non-Error failure as 'Unknown error'", async () => {
+    const world = await seedAssignmentWorld();
+    failTransactionWith("string error");
+
+    const result = await runAssignments(world, [makeAssignment()]);
+
+    expect(result.errors[0]).toContain("Unknown error");
+  });
+
+  it("logs the created assignment to the sync logger", async () => {
+    const world = await seedAssignmentWorld();
+    const mockLogger = { log: vi.fn() };
+
+    await runAssignments(world, [makeAssignment()], mockLogger);
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entityType: "referee",
+        action: "created",
+        entityId: `${world.matchId}-${world.refereeIds.get(100)}-${world.roleIds.get(1)}`,
+      }),
+    );
+  });
+
+  it("emits referee.assigned with the resolved names and syncRunId", async () => {
+    const world = await seedAssignmentWorld();
+
+    await runAssignments(world, [makeAssignment()], undefined, 42);
 
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "referee.assigned",
         source: "sync",
         entityType: "referee",
-        entityId: 3,
+        entityId: world.matchId,
+        entityName: "Match #7",
+        deepLinkPath: `/admin/matches/${world.matchId}`,
         syncRunId: 42,
         payload: expect.objectContaining({
+          matchNo: 7,
+          homeTeam: "10",
+          guestTeam: "20",
           refereeName: "John Doe",
-          refereeId: 1,
-          teamIds: [100, 200],
-          role: "SR1",
+          role: "1. Schiedsrichter",
+          refereeId: world.refereeIds.get(100),
+          teamIds: [10, 20],
         }),
       }),
+      // Published with the transaction client: the event commits with the
+      // assignment (issue #77).
+      expect.anything(),
     );
   });
 
-  it("emits referee.reassigned event with syncRunId when referee changed", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Existing assignment has different referee (id: 99)
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
-    ]));
-    // Batch lookups need to include both old (99) and new (1) referee
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 1, firstName: "John", lastName: "Doe" },
-      { id: 99, firstName: "Old", lastName: "Ref" },
-    ]));
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
-    ]));
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 2, name: "SR1" },
-    ]));
-    mockUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    });
+  it("passes a null syncRunId when none is provided", async () => {
+    const world = await seedAssignmentWorld();
 
-    await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-      undefined,
-      99,
+    await runAssignments(world, [makeAssignment()]);
+
+    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "referee.assigned", syncRunId: null }),
+      expect.anything(),
     );
+  });
+
+  it("emits referee.reassigned with both referee names", async () => {
+    const world = await seedAssignmentWorld();
+    await runAssignments(world, [makeAssignment()]);
+    mockPublishDomainEvent.mockClear();
+
+    await runAssignments(world, [makeAssignment({ schiedsrichterId: 200 })], undefined, 42);
 
     expect(mockPublishDomainEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "referee.reassigned",
-        source: "sync",
-        syncRunId: 99,
+        syncRunId: 42,
         payload: expect.objectContaining({
-          oldRefereeName: "Old Ref",
-          newRefereeName: "John Doe",
-          oldRefereeId: 99,
-          newRefereeId: 1,
+          oldRefereeName: "John Doe",
+          newRefereeName: "Jane Roe",
+          oldRefereeId: world.refereeIds.get(100),
+          newRefereeId: world.refereeIds.get(200),
         }),
       }),
+      expect.anything(),
     );
   });
 
-  it("passes null syncRunId when not provided", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockBatchLookups();
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    });
+  it("does not emit referee.reassigned when only the role changed", async () => {
+    const world = await seedAssignmentWorld();
+    await runAssignments(world, [makeAssignment()]);
+    mockPublishDomainEvent.mockClear();
 
-    await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
+    await runAssignments(world, [makeAssignment({ schirirolleId: 2 })]);
 
-    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        syncRunId: null,
-      }),
-    );
+    expect(mockPublishDomainEvent).not.toHaveBeenCalled();
+    expect((await liveAssignments())[0]!.roleId).toBe(world.roleIds.get(2));
   });
 
-  it("logs warning when publishDomainEvent throws during referee.assigned", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockBatchLookups();
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    });
-    mockPublishDomainEvent.mockRejectedValueOnce(new Error("publish failed"));
+  it("rolls the assignment back when referee.assigned cannot be recorded (#77)", async () => {
+    const world = await seedAssignmentWorld();
+    mockPublishDomainEvent.mockRejectedValue(new Error("Event failed"));
 
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
+    const result = await runAssignments(world, [makeAssignment()]);
 
-    // Assignment still created despite event emission failure
-    expect(result.created).toBe(1);
-    expect(result.errors).toHaveLength(0);
-  });
-
-  it("logs warning when publishDomainEvent throws during referee.reassigned", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Existing assignment has different referee (id: 99)
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
-    ]));
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 1, firstName: "John", lastName: "Doe" },
-      { id: 99, firstName: "Old", lastName: "Ref" },
-    ]));
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
-    ]));
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 2, name: "SR1" },
-    ]));
-    mockUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    });
-    mockPublishDomainEvent.mockRejectedValueOnce(new Error("publish failed"));
-
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
-
-    // Update still succeeds despite event emission failure
+    // The assignment, its history entry and the event are one unit of work.
+    // Storing the assignment while losing the event left a referee assigned
+    // that nobody was ever told about, with no outbox row to recover from; the
+    // failure is now reported and the next sync retries the whole thing.
     expect(result.created).toBe(0);
-    expect(result.errors).toHaveLength(0);
-    expect(mockUpdate).toHaveBeenCalled();
+    expect(result.errors).toHaveLength(1);
+    expect(await liveAssignments()).toEqual([]);
+    expect(await ctx.db.select().from(matchChanges)).toEqual([]);
   });
 
-  it("batch-loads existing assignments and lookup data before processing loop", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 2 },
-    ];
-    // Batch-load returns one existing assignment
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 1, matchId: 3, slotNumber: 1, refereeId: 1, roleId: 2 },
-    ]));
-    // Batch lookup maps for event emission
-    mockBatchLookups();
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    });
+  it("rolls the reassignment back when referee.reassigned cannot be recorded (#77)", async () => {
+    const world = await seedAssignmentWorld();
+    await runAssignments(world, [makeAssignment()]);
+    mockPublishDomainEvent.mockRejectedValue(new Error("Event failed"));
 
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
+    const result = await runAssignments(world, [makeAssignment({ schiedsrichterId: 200 })]);
 
-    // 1 existing assignments + 3 batch lookups (referees, matches, roles)
-    expect(mockSelect).toHaveBeenCalledTimes(4);
-    // Slot 1 exists, slot 2 is new
-    expect(result.created).toBe(1);
+    expect(result.errors).toHaveLength(1);
+    // The slot still holds the original referee.
+    expect((await liveAssignments())[0]!.refereeId).toBe(world.refereeIds.get(100));
   });
 
-  it("skips event emission when match info is not found in batch lookup", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Batch-load returns no existing assignments
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    // referee names batch — has the referee
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 1, firstName: "John", lastName: "Doe" },
-    ]));
-    // match info batch — empty, so matchInfoMap.get(matchId) returns undefined
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    // role names batch
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 2, name: "SR1" },
-    ]));
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    });
+  it("emits nothing when the lookup points at a match that does not exist", async () => {
+    const world = await seedAssignmentWorld();
+    world.matchIds.set(MATCH_API_ID, 999_999);
 
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
+    const result = await runAssignments(world, [makeAssignment()]);
 
-    // Assignment is still created
-    expect(result.created).toBe(1);
-    // But no event is published because matchInfo was not found
+    // The FK rejects the write, so neither history nor an event is produced.
+    expect(result.created).toBe(0);
+    expect(result.errors).toHaveLength(1);
     expect(mockPublishDomainEvent).not.toHaveBeenCalled();
+    expect(await ctx.db.select().from(matchChanges)).toEqual([]);
   });
 
-  it("uses 'Unknown' fallback when referee not found in batch lookup", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    // referee names batch — empty, so refNameMap.get(refereeId) returns undefined -> "Unknown"
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    // match info batch — has the match
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
-    ]));
-    // role names batch
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 2, name: "SR1" },
-    ]));
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    });
+  it("rolls the assignment back when the match-history write fails (#77)", async () => {
+    const world = await seedAssignmentWorld();
 
-    await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
+    const result = await withFailingMatchChangesInsert(() =>
+      runAssignments(world, [makeAssignment()]),
     );
 
-    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        payload: expect.objectContaining({
-          refereeName: "Unknown",
-        }),
-      }),
-    );
+    expect(result.created).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    // The slot write is rolled back with the history write that failed after
+    // it, rather than surviving as an assignment with no recorded provenance.
+    expect(await liveAssignments()).toEqual([]);
   });
 
-  it("uses 'Unknown' fallback when role not found in batch lookup", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    // referee names batch
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 1, firstName: "John", lastName: "Doe" },
-    ]));
-    // match info batch
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
-    ]));
-    // role names batch — empty, so roleNameMap.get(roleId) returns undefined -> "Unknown"
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockInsert.mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    });
+  it("rolls the reassignment back when the history write fails (#77)", async () => {
+    const world = await seedAssignmentWorld();
+    await runAssignments(world, [makeAssignment()]);
 
-    await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
+    const result = await withFailingMatchChangesInsert(() =>
+      runAssignments(world, [makeAssignment({ schiedsrichterId: 200 })]),
     );
 
-    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        payload: expect.objectContaining({
-          role: "Unknown",
-        }),
-      }),
-    );
-  });
-
-  it("skips reassigned event emission when match info is not found", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Existing assignment has different referee
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
-    ]));
-    // referee names batch
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 1, firstName: "John", lastName: "Doe" },
-      { id: 99, firstName: "Old", lastName: "Ref" },
-    ]));
-    // match info batch — empty
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    // role names batch
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 2, name: "SR1" },
-    ]));
-    mockUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    });
-
-    const result = await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
-
-    // Update still happens
-    expect(mockUpdate).toHaveBeenCalled();
-    // But no event is published because matchInfo was not found
-    expect(mockPublishDomainEvent).not.toHaveBeenCalled();
-    expect(result.errors).toHaveLength(0);
-  });
-
-  it("uses 'Unknown' fallbacks for referee names and role in reassigned event", async () => {
-    const assignments: ExtractedRefereeAssignment[] = [
-      { matchApiId: 300, schiedsrichterId: 100, schirirolleId: 200, slotNumber: 1 },
-    ];
-    // Existing assignment has different referee
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 5, matchId: 3, slotNumber: 1, refereeId: 99, roleId: 2 },
-    ]));
-    // referee names batch — empty (both old and new referee missing)
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    // match info batch
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([
-      { id: 3, matchNo: 1, homeTeamApiId: 100, guestTeamApiId: 200 },
-    ]));
-    // role names batch — empty
-    mockSelect.mockReturnValueOnce(buildBatchSelectChain([]));
-    mockUpdate.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    });
-
-    await syncRefereeAssignmentsFromData(
-      assignments,
-      refereeIdLookup,
-      roleIdLookup,
-      matchIdLookup,
-    );
-
-    expect(mockPublishDomainEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "referee.reassigned",
-        payload: expect.objectContaining({
-          oldRefereeName: "Unknown",
-          newRefereeName: "Unknown",
-          role: "Unknown",
-        }),
-      }),
-    );
+    expect(result.errors).toHaveLength(1);
+    expect((await liveAssignments())[0]!.refereeId).toBe(world.refereeIds.get(100));
   });
 });
 
 describe("buildMatchIdLookup", () => {
-  it("returns a map from apiMatchId to id", async () => {
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockResolvedValue([
-        { id: 1, apiMatchId: 1000 },
-        { id: 2, apiMatchId: 2000 },
-      ]),
-    });
+  it("returns a map from apiMatchId to the generated row id", async () => {
+    const world = await seedAssignmentWorld();
 
     const lookup = await buildMatchIdLookup();
 
-    expect(lookup.get(1000)).toBe(1);
-    expect(lookup.get(2000)).toBe(2);
+    expect(lookup.size).toBe(1);
+    expect(lookup.get(MATCH_API_ID)).toBe(world.matchId);
+  });
+
+  it("returns an empty map when there are no matches", async () => {
+    expect((await buildMatchIdLookup()).size).toBe(0);
   });
 });
 
+/**
+ * `confirmIntentsFromSync` returns `result.rowCount`, which the production
+ * node-postgres driver supplies. The pglite driver returns `affectedRows`
+ * instead, so under test the return value is always 0 — assert on the rows the
+ * UPDATE actually touched, and cover the `?? 0` fallback with a stubbed
+ * `execute` below.
+ */
+async function confirmedIntentIds(): Promise<number[]> {
+  const rows = await ctx.db
+    .select()
+    .from(refereeAssignmentIntents)
+    .orderBy(refereeAssignmentIntents.id);
+  return rows.filter((r) => r.confirmedBySyncAt !== null).map((r) => r.id);
+}
+
 describe("confirmIntentsFromSync", () => {
-  it("confirms intents with matching assignments", async () => {
-    mockExecute.mockResolvedValue({ rowCount: 3 });
+  it("confirms only the intents backed by a live assignment in the same slot", async () => {
+    const world = await seedAssignmentWorld();
+    const refA = world.refereeIds.get(100)!;
+    const refB = world.refereeIds.get(200)!;
+    await ctx.db.insert(matchReferees).values({
+      matchId: world.matchId,
+      refereeId: refA,
+      roleId: world.roleIds.get(1)!,
+      slotNumber: 1,
+    });
+    await ctx.db.insert(refereeAssignmentIntents).values([
+      { matchId: world.matchId, refereeId: refA, slotNumber: 1 }, // matches
+      { matchId: world.matchId, refereeId: refA, slotNumber: 2 }, // wrong slot
+      { matchId: world.matchId, refereeId: refB, slotNumber: 1 }, // wrong referee
+    ]);
 
-    const result = await confirmIntentsFromSync();
+    await confirmIntentsFromSync();
 
-    expect(result).toBe(3);
-    expect(mockExecute).toHaveBeenCalledTimes(1);
+    const rows = await ctx.db
+      .select()
+      .from(refereeAssignmentIntents)
+      .orderBy(refereeAssignmentIntents.id);
+    expect(rows[0]!.confirmedBySyncAt).not.toBeNull();
+    expect(rows[1]!.confirmedBySyncAt).toBeNull(); // wrong slot
+    expect(rows[2]!.confirmedBySyncAt).toBeNull(); // wrong referee
+    expect(await confirmedIntentIds()).toEqual([rows[0]!.id]);
   });
 
-  it("returns 0 when no intents match", async () => {
-    mockExecute.mockResolvedValue({ rowCount: 0 });
+  it("does not confirm an intent backed only by a tombstoned assignment", async () => {
+    const world = await seedAssignmentWorld();
+    const refA = world.refereeIds.get(100)!;
+    await ctx.db.insert(matchReferees).values({
+      matchId: world.matchId,
+      refereeId: refA,
+      roleId: world.roleIds.get(1)!,
+      slotNumber: 1,
+      removedAt: new Date("2025-05-01T00:00:00Z"),
+    });
+    await ctx.db
+      .insert(refereeAssignmentIntents)
+      .values({ matchId: world.matchId, refereeId: refA, slotNumber: 1 });
 
-    const result = await confirmIntentsFromSync();
+    await confirmIntentsFromSync();
 
-    expect(result).toBe(0);
+    expect(await confirmedIntentIds()).toEqual([]);
   });
 
-  it("handles null rowCount", async () => {
-    mockExecute.mockResolvedValue({});
+  it("does not re-confirm an already confirmed intent", async () => {
+    const world = await seedAssignmentWorld();
+    const refA = world.refereeIds.get(100)!;
+    await ctx.db.insert(matchReferees).values({
+      matchId: world.matchId,
+      refereeId: refA,
+      roleId: world.roleIds.get(1)!,
+      slotNumber: 1,
+    });
+    await ctx.db.insert(refereeAssignmentIntents).values({
+      matchId: world.matchId,
+      refereeId: refA,
+      slotNumber: 1,
+      confirmedBySyncAt: new Date("2025-05-01T00:00:00Z"),
+    });
 
-    const result = await confirmIntentsFromSync();
+    await confirmIntentsFromSync();
 
-    expect(result).toBe(0);
+    const [row] = await ctx.db.select().from(refereeAssignmentIntents);
+    expect(row!.confirmedBySyncAt!.toISOString()).toBe("2025-05-01T00:00:00.000Z");
   });
 
-  it("handles undefined rowCount", async () => {
-    mockExecute.mockResolvedValue({ rowCount: undefined });
+  it("returns 0 when there are no intents at all", async () => {
+    await seedAssignmentWorld();
 
-    const result = await confirmIntentsFromSync();
+    expect(await confirmIntentsFromSync()).toBe(0);
+  });
 
-    expect(result).toBe(0);
+  it("treats a null rowCount as 0", async () => {
+    overrideDbMethod("execute", async () => ({ rowCount: null }));
+
+    expect(await confirmIntentsFromSync()).toBe(0);
+  });
+
+  it("treats an undefined rowCount as 0", async () => {
+    overrideDbMethod("execute", async () => ({}));
+
+    expect(await confirmIntentsFromSync()).toBe(0);
   });
 });

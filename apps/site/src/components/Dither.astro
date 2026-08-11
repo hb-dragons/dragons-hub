@@ -1,0 +1,30 @@
+---
+/**
+ * Dither background slot: static gradient fallback painted immediately, the
+ * WebGL island (ogl) hydrates lazily on idle and covers it. The fallback
+ * echoes the shader's palette (black field, faint wave-colored patches).
+ */
+import DitherIsland, { type DitherProps } from "./DitherIsland";
+
+type Props = DitherProps;
+
+const { waveColor = [0.5, 0.5, 0.5], ...rest } = Astro.props;
+const [r, g, b] = waveColor.map((channel) => Math.round(channel * 255)) as [
+  number,
+  number,
+  number,
+];
+---
+
+<div class="w-full h-full absolute top-0 left-0">
+  <div
+    class="absolute inset-0"
+    aria-hidden="true"
+    style={`background:
+      radial-gradient(60% 80% at 20% 30%, rgba(${r}, ${g}, ${b}, 0.22), transparent 60%),
+      radial-gradient(50% 70% at 75% 60%, rgba(${r}, ${g}, ${b}, 0.15), transparent 60%),
+      #000;`}
+  >
+  </div>
+  <DitherIsland client:idle waveColor={waveColor} {...rest} />
+</div>

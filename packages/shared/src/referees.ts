@@ -27,20 +27,8 @@ export interface RefereeRulesResponse {
   rules: RefereeRule[];
 }
 
-export interface UpdateRefereeVisibilityBody {
-  allowAllHomeGames: boolean;
-  allowAwayGames: boolean;
-  isOwnClub: boolean;
-}
-
-export interface UpdateRefereeRulesBody {
-  rules: Array<{
-    teamId: number;
-    deny: boolean;
-    allowSr1: boolean;
-    allowSr2: boolean;
-  }>;
-}
+// Request body types live in `@dragons/contracts`: `RefereeVisibilityBody`
+// (referee.ts) and `UpdateRefereeRulesBodyParsed` (referee-rules.ts).
 
 export interface RefereeCountsResponse {
   own: number;

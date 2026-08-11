@@ -1,10 +1,5 @@
-export type HistoryStatusValue = "played" | "cancelled" | "forfeited";
-
-/**
- * @deprecated Use `HistoryStatusValue[]` instead. Kept for legacy URL parsing
- * and any pre-restructure callers. New code should pass the array form.
- */
-export type HistoryStatus = "all" | "active" | "cancelled" | "forfeited";
+// `HistoryStatusValue` is declared once, in `@dragons/contracts`
+// (referee-history.ts), where the zod enum it comes from lives.
 
 export interface HistoryDateRange {
   from: string;
@@ -12,7 +7,7 @@ export interface HistoryDateRange {
   source: "user" | "settings" | "default";
 }
 
-export interface HistoryKpis {
+interface HistoryKpis {
   games: number;
   obligatedSlots: number;
   filledSlots: number;

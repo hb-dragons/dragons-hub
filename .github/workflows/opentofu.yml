@@ -66,6 +66,10 @@ jobs:
       TF_VAR_github_repo: ${{ github.event.repository.name }}
       TF_VAR_web_domain: ${{ vars.WEB_DOMAIN }}
       TF_VAR_api_domain: ${{ vars.API_DOMAIN }}
+      # HCL list, e.g. ["cms.testing.hbdragons.de"]. The `|| '[]'` fallback:
+      # an unset repo variable renders "", which is not a valid list value.
+      TF_VAR_cms_domains: ${{ vars.CMS_DOMAINS || '[]' }}
+      TF_VAR_cms_media_public: ${{ vars.CMS_MEDIA_PUBLIC || 'false' }}
       TF_VAR_sdk_username: ${{ secrets.SDK_USERNAME }}
       TF_VAR_sdk_password: ${{ secrets.SDK_PASSWORD }}
       TF_VAR_referee_sdk_username: ${{ secrets.REFEREE_SDK_USERNAME }}
@@ -77,6 +81,23 @@ jobs:
       TF_VAR_assistant_enabled: ${{ vars.ASSISTANT_ENABLED || 'false' }}
       TF_VAR_google_generative_ai_api_key: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
       TF_VAR_mcp_token: ${{ secrets.MCP_TOKEN }}
+      # WhatsApp group delivery. The WAHA endpoint is not a credential, so it is a
+      # repo variable and lands in Cloud Run env_vars. Unset renders "", which TF
+      # reads as "leave WhatsApp disabled" rather than passing an invalid URL on.
+      TF_VAR_waha_base_url: ${{ vars.WAHA_BASE_URL }}
+      TF_VAR_waha_session: ${{ vars.WAHA_SESSION || 'default' }}
+      # Expo Push authenticated send tier. A credential, so a repo secret; unset
+      # renders "" and leaves push on the unauthenticated tier.
+      TF_VAR_expo_access_token: ${{ secrets.EXPO_ACCESS_TOKEN }}
+      # Email delivery. Only the password is a credential; the relay coordinates
+      # are repo variables and land in Cloud Run env_vars. An unset SMTP_HOST
+      # renders "", which TF reads as "leave email disabled" and omits the whole
+      # set rather than passing empties the API env schema rejects at boot.
+      TF_VAR_smtp_host: ${{ vars.SMTP_HOST }}
+      TF_VAR_smtp_port: ${{ vars.SMTP_PORT || '587' }}
+      TF_VAR_smtp_user: ${{ vars.SMTP_USER }}
+      TF_VAR_smtp_from: ${{ vars.SMTP_FROM }}
+      TF_VAR_smtp_password: ${{ secrets.SMTP_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -100,7 +121,15 @@ jobs:
 
       - name: Plan
         id: plan
-        run: tofu plan -input=false -out=tfplan -no-color 2>&1 | tee plan_output.txt
+        # `run:` steps execute under `bash -e` (no pipefail), so piping through
+        # `tee` for the PR-comment log would otherwise always report success
+        # via tee's own exit code, no matter what `tofu plan` does. `set -o
+        # pipefail` makes the step's exit code reflect the pipeline's first
+        # failure so `continue-on-error` + `steps.plan.outcome` below actually
+        # observe a failed plan.
+        run: |
+          set -o pipefail
+          tofu plan -input=false -out=tfplan -no-color 2>&1 | tee plan_output.txt
         continue-on-error: true
 
       - name: Comment Plan on PR

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CHANNEL_TYPES, EVENT_TYPE_VALUES, EVENT_URGENCIES } from "@dragons/shared";
 import {
   watchRuleIdParamSchema,
   watchRuleListQuerySchema,
@@ -102,7 +103,7 @@ describe("createWatchRuleSchema", () => {
   it("accepts multiple eventTypes", () => {
     const result = createWatchRuleSchema.parse({
       ...validBody,
-      eventTypes: ["match.created", "match.updated"],
+      eventTypes: ["match.created", "match.score.changed"],
     });
     expect(result.eventTypes).toHaveLength(2);
   });
@@ -118,14 +119,22 @@ describe("createWatchRuleSchema", () => {
     expect(result.channels).toHaveLength(2);
   });
 
-  it("accepts all valid channel types", () => {
-    for (const channel of ["in_app", "whatsapp_group", "push", "email"] as const) {
-      const result = createWatchRuleSchema.parse({
-        ...validBody,
-        channels: [{ channel, targetId: "1" }],
-      });
-      expect(result.channels[0]!.channel).toBe(channel);
-    }
+  // Derived from CHANNEL_TYPES rather than restated, so a channel target can
+  // never address a channel the pipeline has no adapter for.
+  it.each(CHANNEL_TYPES)("accepts the shared channel type %s", (channel) => {
+    const result = createWatchRuleSchema.parse({
+      ...validBody,
+      channels: [{ channel, targetId: "1" }],
+    });
+    expect(result.channels[0]!.channel).toBe(channel);
+  });
+
+  it("rejects a channel target the shared list does not name", () => {
+    const result = createWatchRuleSchema.safeParse({
+      ...validBody,
+      channels: [{ channel: "carrier_pigeon", targetId: "1" }],
+    });
+    expect(result.success).toBe(false);
   });
 
   it("accepts all valid filter fields", () => {
@@ -200,6 +209,42 @@ describe("createWatchRuleSchema", () => {
     ).toThrow();
   });
 
+  // A typo'd event type used to save cleanly into a rule that could then never
+  // match anything.
+  it("rejects an event type that is not in the shared EVENT_TYPES registry", () => {
+    expect(() =>
+      createWatchRuleSchema.parse({ ...validBody, eventTypes: ["match.scheduled"] }),
+    ).toThrow();
+  });
+
+  it.each(EVENT_TYPE_VALUES)("accepts the shared event type %s", (eventType) => {
+    const result = createWatchRuleSchema.safeParse({ ...validBody, eventTypes: [eventType] });
+    expect(result.error?.issues ?? []).toEqual([]);
+  });
+
+  it.each(CHANNEL_TYPES)("accepts the shared channel type %s as a target", (channel) => {
+    const result = createWatchRuleSchema.safeParse({
+      ...validBody,
+      channels: [{ channel, targetId: "1" }],
+    });
+    expect(result.error?.issues ?? []).toEqual([]);
+  });
+
+  it.each(EVENT_URGENCIES)("accepts the shared urgency %s", (urgency) => {
+    const result = createWatchRuleSchema.safeParse({ ...validBody, urgencyOverride: urgency });
+    expect(result.error?.issues ?? []).toEqual([]);
+  });
+
+  it("rejects an urgencyOverride outside the shared list", () => {
+    expect(() =>
+      createWatchRuleSchema.parse({ ...validBody, urgencyOverride: "high" }),
+    ).toThrow();
+  });
+
+  it("rejects a key the schema does not declare", () => {
+    expect(() => createWatchRuleSchema.parse({ ...validBody, enable: true })).toThrow();
+  });
+
   it("rejects missing channels", () => {
     expect(() =>
       createWatchRuleSchema.parse({
@@ -270,9 +315,9 @@ describe("updateWatchRuleSchema", () => {
 
   it("accepts updating eventTypes", () => {
     const result = updateWatchRuleSchema.parse({
-      eventTypes: ["match.updated"],
+      eventTypes: ["match.score.changed"],
     });
-    expect(result.eventTypes).toEqual(["match.updated"]);
+    expect(result.eventTypes).toEqual(["match.score.changed"]);
   });
 
   it("accepts updating channels", () => {

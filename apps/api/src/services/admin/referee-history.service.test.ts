@@ -80,7 +80,9 @@ async function seedReferees() {
   ]);
 }
 
-function baseGame(overrides: Partial<typeof refereeGames.$inferInsert> = {}) {
+function baseGame(
+  overrides: Partial<typeof refereeGames.$inferInsert> = {},
+): typeof refereeGames.$inferInsert {
   return {
     apiMatchId: Math.floor(Math.random() * 1_000_000),
     matchNo: 1,
@@ -90,8 +92,8 @@ function baseGame(overrides: Partial<typeof refereeGames.$inferInsert> = {}) {
     guestTeamName: "Bears",
     sr1OurClub: true,
     sr2OurClub: true,
-    sr1Status: "filled",
-    sr2Status: "filled",
+    sr1Status: "assigned",
+    sr2Status: "assigned",
     sr1RefereeApiId: 100,
     sr2RefereeApiId: 101,
     sr1Name: "Own, Anna",
@@ -368,6 +370,74 @@ describe("getRefereeHistorySummary leaderboard", () => {
     expect(res.leaderboard).toEqual([]);
     expect(res.kpis.distinctReferees).toBe(0);
   });
+
+  // distinctReferees used to be read off `leaderboard.length`, which the query
+  // truncates at 100 — so any season busier than that reported exactly 100.
+  it("counts every distinct referee, not just the leaderboard's first 100", async () => {
+    const games = Array.from({ length: 65 }, (_, i) =>
+      baseGame({
+        apiMatchId: 10_000 + i,
+        kickoffDate: "2025-09-15",
+        sr1RefereeApiId: 1000 + i * 2,
+        sr2RefereeApiId: 1001 + i * 2,
+        sr1Name: `Ref, A${i}`,
+        sr2Name: `Ref, B${i}`,
+      }),
+    );
+    await ctx.db.insert(refereeGames).values(games);
+
+    const res = await getRefereeHistorySummary({
+      status: [],
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+    });
+
+    expect(res.leaderboard).toHaveLength(100);
+    expect(res.kpis.distinctReferees).toBe(130);
+  });
+
+  it("counts a referee appearing in both slots once", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 20_001, sr1RefereeApiId: 100, sr2RefereeApiId: 100 }),
+      baseGame({ apiMatchId: 20_002, sr1RefereeApiId: 100, sr2RefereeApiId: 101 }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      status: [],
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+    });
+
+    expect(res.kpis.distinctReferees).toBe(2);
+  });
+
+  it("groups an api-id-less referee by name, matching the leaderboard", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({
+        apiMatchId: 30_001,
+        sr1RefereeApiId: null,
+        sr2RefereeApiId: null,
+        sr1Name: "Nameless, Only",
+        sr2Name: "Nameless, Only",
+      }),
+      baseGame({
+        apiMatchId: 30_002,
+        sr1RefereeApiId: null,
+        sr2RefereeApiId: null,
+        sr1Name: "Nameless, Only",
+        sr2Name: "Other, Person",
+      }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      status: [],
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+    });
+
+    expect(res.kpis.distinctReferees).toBe(2);
+    expect(res.leaderboard).toHaveLength(2);
+  });
 });
 
 describe("getRefereeHistorySummary availableLeagues", () => {
@@ -569,5 +639,98 @@ describe("getRefereeHistoryGames refereeApiId filter", () => {
     expect(res.total).toBe(2);
     const matchNos = res.items.map((i) => i.matchNo).sort((a, b) => a - b);
     expect(matchNos).toEqual([11, 22]);
+  });
+});
+
+/**
+ * refereeGames is soft-deleted (AGENTS.md, "Soft deletes (tombstones)"): a
+ * withdrawn assignment keeps its row and gains a removedAt timestamp. Every
+ * live-rows query needs isNull(removedAt); this service was the only
+ * refereeGames consumer in the codebase that omitted it, so withdrawn
+ * assignments were being counted everywhere the history screen reads.
+ */
+describe("soft-deleted games are excluded from every history read", () => {
+  beforeEach(async () => { await seedReferees(); });
+
+  it("omits tombstoned rows from KPIs, leaderboard and distinct-referee count", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, kickoffDate: "2025-09-15" }),
+      // Withdrawn after assignment: still on the table, must not be counted.
+      baseGame({
+        apiMatchId: 2,
+        kickoffDate: "2025-09-16",
+        removedAt: new Date("2025-09-17T00:00:00Z"),
+      }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: [],
+    });
+
+    expect(res.kpis.games).toBe(1);
+    expect(res.kpis.obligatedSlots).toBe(2);
+    expect(res.kpis.filledSlots).toBe(2);
+    // Anna + Ben officiated the one live game; the tombstoned game must not
+    // inflate either the per-referee tallies or the distinct-people KPI.
+    expect(res.kpis.distinctReferees).toBe(2);
+
+    const anna = res.leaderboard.find((e) => e.refereeApiId === 100);
+    const ben = res.leaderboard.find((e) => e.refereeApiId === 101);
+    expect(anna).toEqual(expect.objectContaining({ sr1Count: 1, sr2Count: 0, total: 1 }));
+    expect(ben).toEqual(expect.objectContaining({ sr1Count: 0, sr2Count: 1, total: 1 }));
+    // The tombstoned game is the later one, so an unfiltered read would
+    // report 2025-09-16 here.
+    expect(anna!.lastRefereedDate).toBe("2025-09-15");
+  });
+
+  it("omits tombstoned rows from the games list", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({ apiMatchId: 1, matchNo: 11, kickoffDate: "2025-09-15" }),
+      baseGame({
+        apiMatchId: 2,
+        matchNo: 22,
+        kickoffDate: "2025-09-16",
+        removedAt: new Date("2025-09-17T00:00:00Z"),
+      }),
+    ]);
+
+    const res = await getRefereeHistoryGames({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: [],
+      limit: 50,
+      offset: 0,
+    });
+
+    expect(res.total).toBe(1);
+    expect(res.items.map((i) => i.matchNo)).toEqual([11]);
+  });
+
+  it("omits leagues that only tombstoned games belong to", async () => {
+    await ctx.db.insert(refereeGames).values([
+      baseGame({
+        apiMatchId: 1,
+        kickoffDate: "2025-09-15",
+        leagueShort: "BL1",
+        leagueName: "Bezirksliga 1",
+      }),
+      baseGame({
+        apiMatchId: 2,
+        kickoffDate: "2025-09-16",
+        leagueShort: "BL2",
+        leagueName: "Bezirksliga 2",
+        removedAt: new Date("2025-09-17T00:00:00Z"),
+      }),
+    ]);
+
+    const res = await getRefereeHistorySummary({
+      dateFrom: "2025-08-01",
+      dateTo: "2026-07-31",
+      status: [],
+    });
+
+    expect(res.availableLeagues.map((l) => l.short)).toEqual(["BL1"]);
   });
 });

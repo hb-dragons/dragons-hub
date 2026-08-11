@@ -1,5 +1,5 @@
 FROM node:24-alpine AS base
-RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
+RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
 
 FROM base AS builder
 RUN apk add --no-cache git openssh-client

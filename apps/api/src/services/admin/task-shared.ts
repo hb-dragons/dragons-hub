@@ -1,7 +1,7 @@
 import { getDb } from "../../config/database";
 import { taskAssignees, boards, user } from "@dragons/db/schema";
 import { eq, asc, sql } from "drizzle-orm";
-import type { TaskAssignee, EventType } from "@dragons/shared";
+import type { TaskAssignee, EventType, TaskPriority } from "@dragons/shared";
 import { publishDomainEvent, type TransactionClient } from "../events/event-publisher";
 import { logger } from "../../config/logger";
 
@@ -10,7 +10,7 @@ const log = logger.child({ service: "task.service" });
 export interface TaskFilters {
   columnId?: number;
   assigneeId?: string;
-  priority?: string;
+  priority?: TaskPriority;
 }
 
 export async function fetchAssignees(taskId: number): Promise<TaskAssignee[]> {

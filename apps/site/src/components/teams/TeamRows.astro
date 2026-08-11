@@ -1,0 +1,147 @@
+---
+/**
+ * Alternating team banner rows on the teams index, ported from dragons-app
+ * TeamsRows (components/teams/Rows.vue): angled team photo, gray halftone
+ * background from the team-background global, name + league, and the
+ * magnetic "Zum Team" button. Legacy token notes: the heading carried a
+ * typo'd (nonexistent) color class and so inherited the body color — kept
+ * here without a color utility; the md text size maps to base, the legacy
+ * toned/muted text colors to the muted foreground token.
+ */
+import type { SiteImage } from "../../lib/media";
+import { BANNER_IMAGE } from "../../lib/site-assets";
+import { strings } from "../../lib/strings";
+import BlurImage from "../BlurImage.astro";
+import Magnet from "../Magnet.astro";
+
+export interface RowTeam {
+  name: string;
+  slug: string;
+  leagueName: string | null;
+  image: SiteImage | null;
+}
+
+interface Props {
+  teams: RowTeam[];
+  backgroundImage: SiteImage | null;
+}
+
+const { teams, backgroundImage } = Astro.props;
+
+/** Nuxt UI solid-primary button recipe, classes lifted from prod markup. */
+const BUTTON_CLASSES =
+  "rounded-md items-center transition-colors font-bold mt-4 text-primary-foreground bg-primary hover:bg-primary/75 active:bg-primary/75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+---
+
+{
+  teams.map((team, index) => {
+    const image = team.image ?? BANNER_IMAGE;
+    const background = backgroundImage ?? BANNER_IMAGE;
+    const even = index % 2 === 0;
+    return (
+      <div class="grid grid-cols-1 md:grid-cols-2 rounded-lg overflow-hidden border shadow-sm">
+        <div
+          class:list={[
+            "h-[200px] md:h-[400px] lg:h-[500px] z-20 select-none pointer-events-none",
+            even
+              ? "[clip-path:polygon(0%_0,100%_0%,100%_100%,0_90%)] md:[clip-path:polygon(0%_0,100%_0%,90%_100%,0_100%)] md:-mr-4 lg:-mr-6 xl:-mr-8 2xl:-mr-10"
+              : "[clip-path:polygon(0%_0,100%_0%,100%_100%,0_90%)] md:[clip-path:polygon(0%_0,100%_0%,100%_100%,10%_100%)] md:-ml-4 lg:-ml-6 xl:-ml-8 2xl:-ml-10",
+          ]}
+        >
+          <BlurImage
+            src={image.url}
+            blurhash={image.blurhash}
+            alt={"alt" in image ? (image.alt ?? "") : ""}
+            class="h-full w-full"
+            imgClass="object-cover"
+          />
+        </div>
+        <div
+          class:list={[
+            "relative h-[100px] md:h-[400px] lg:h-[500px]",
+            even
+              ? "md:order-1 -mt-6 md:-mt-0 md:-ml-6 lg:-ml-8 xl:-ml-10 2xl:-ml-12"
+              : "md:-order-1 -mt-6 md:-mt-0 md:-mr-6 lg:-mr-8 xl:-mr-10 2xl:-mr-12",
+          ]}
+        >
+          <div class="absolute top-0 left-0 w-full h-full select-none pointer-events-none">
+            <BlurImage
+              src={background.url}
+              blurhash={background.blurhash}
+              alt={"alt" in background ? (background.alt ?? "") : ""}
+              class="h-full w-full"
+              imgClass={`object-cover grayscale-75${even ? " scale-x-[-1]" : ""}`}
+            />
+            <div class="absolute top-0 left-0 w-full h-full dark:bg-black/70 bg-white/70" />
+          </div>
+          <div
+            class:list={[
+              "z-10 backdrop-blur-[2px] w-full h-full flex items-center",
+              even
+                ? "md:pl-24 justify-start text-left"
+                : "md:pr-24 justify-start md:justify-end text-left md:text-right",
+            ]}
+          >
+            <div class="flex w-full h-full justify-between md:justify-center flex-row md:flex-col px-2 pb-2 md:px-0 md:pb-0">
+              <div class="w-full flex flex-col justify-center">
+                <h2 class="text-3xl md:text-5xl font-bold">{team.name}</h2>
+                <p class="text-base md:text-2xl text-muted-foreground font-semibold">
+                  {team.leagueName}
+                </p>
+              </div>
+              <div
+                class:list={[
+                  "flex justify-end items-end flex-shrink-0",
+                  even ? "md:justify-start" : "md:justify-end",
+                ]}
+              >
+                <Magnet padding={5} magnetStrength={8}>
+                  <a
+                    href={`/teams/${team.slug}/`}
+                    class:list={["hidden md:flex px-3 py-2 text-base gap-2", BUTTON_CLASSES]}
+                  >
+                    {strings.teams.goToTeam}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="size-5"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                  </a>
+                </Magnet>
+                <a
+                  href={`/teams/${team.slug}/`}
+                  class:list={["md:hidden inline-flex px-2 py-1 text-xs gap-1", BUTTON_CLASSES]}
+                >
+                  {strings.teams.goToTeam}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="size-5"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  })
+}

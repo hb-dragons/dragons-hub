@@ -1,14 +1,14 @@
 import { getDb } from "../../config/database";
 import { syncRuns, syncRunEntries, syncSchedule, matches, matchRemoteVersions, matchChanges, user } from "@dragons/db/schema";
 import { desc, eq, sql, and, or, ilike, inArray } from "drizzle-orm";
-import { updateSyncSchedule, updateRefereeSyncSchedule } from "../../workers/queues";
+import { updateSyncSchedule, updateRefereeSyncSchedule } from "../sync-jobs.service";
 import { escapeLikePattern } from "../utils/sql";
-import type { EntityType, EntryAction } from "@dragons/shared";
+import type { EntityType, EntryAction, SyncStatus } from "@dragons/shared";
 
 export interface SyncLogsQuery {
   limit: number;
   offset: number;
-  status?: "running" | "completed" | "failed";
+  status?: SyncStatus;
   syncType?: string;
 }
 

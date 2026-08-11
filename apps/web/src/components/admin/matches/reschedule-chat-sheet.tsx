@@ -27,13 +27,27 @@ export function RescheduleChatSheet({
 }) {
   const t = useTranslations("matches.reschedule");
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, error, stop, regenerate, setMessages, clearError } = useChat({
     transport: new DefaultChatTransport({
       api: `${API_BASE}/admin/assistant/reschedule/chat`,
       credentials: "include",
       body: { matchId },
     }),
   });
+
+  // AI SDK v6 parks the chat in `status: "error"` after a failed turn and never
+  // leaves it, so gating the composer on `status === "ready"` killed it for the
+  // rest of the session. Only an in-flight request should block sending.
+  const busy = status === "submitted" || status === "streaming";
+
+  // Issue #148: Retry re-sends the same message list, so it cannot recover a
+  // turn the server rejected *because of* that list. Dropping the transcript
+  // can. `clearError()` goes with it — v6 leaves `status` at "error" and keeps
+  // `error` set, so the banner would outlive the messages behind it.
+  const startNewChat = () => {
+    setMessages([]);
+    clearError();
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -54,6 +68,31 @@ export function RescheduleChatSheet({
             </div>
           ))}
         </div>
+
+        {error ? (
+          <div className="flex items-center justify-between gap-2 px-1">
+            <p className="text-sm text-destructive">{t("error")}</p>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void regenerate()}
+              >
+                {t("retry")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={startNewChat}
+              >
+                {t("newChat")}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         <form
           className="flex items-end gap-2"
           onSubmit={(e) => {
@@ -71,9 +110,13 @@ export function RescheduleChatSheet({
             className="rounded-md"
             rows={2}
           />
-          <Button type="submit" disabled={status !== "ready"}>
-            {t("send")}
-          </Button>
+          {busy ? (
+            <Button type="button" variant="outline" onClick={() => void stop()}>
+              {t("stop")}
+            </Button>
+          ) : (
+            <Button type="submit">{t("send")}</Button>
+          )}
         </form>
       </SheetContent>
     </Sheet>

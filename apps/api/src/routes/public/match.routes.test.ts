@@ -161,6 +161,21 @@ describe("GET /matches (public)", () => {
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
+
+  it("passes opponentApiId param to service", async () => {
+    mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+    await app.request("/matches?opponentApiId=42");
+    expect(mocks.getOwnClubMatches).toHaveBeenCalledWith(
+      expect.objectContaining({ opponentApiId: 42 }),
+    );
+  });
+
+  it("rejects a non-numeric opponentApiId", async () => {
+    const res = await app.request("/matches?opponentApiId=abc");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(mocks.getOwnClubMatches).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /schedule.ics", () => {
@@ -280,14 +295,26 @@ describe("GET /matches/:id", () => {
     const res = await app.request("/matches/999");
 
     expect(res.status).toBe(404);
-    expect(await json(res)).toEqual({ error: "Not found" });
+    expect(await json(res)).toEqual({ error: "Not found", code: "NOT_FOUND" });
   });
 
   it("returns 400 for non-numeric id", async () => {
     const res = await app.request("/matches/abc");
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toEqual({ error: "Invalid ID" });
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("rejects a zero match id", async () => {
+    const res = await app.request("/matches/0");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("rejects a negative match id", async () => {
+    const res = await app.request("/matches/-1");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });
 
@@ -313,13 +340,19 @@ describe("GET /matches/:id/context", () => {
     const res = await app.request("/matches/999/context");
 
     expect(res.status).toBe(404);
-    expect(await json(res)).toEqual({ error: "Not found" });
+    expect(await json(res)).toEqual({ error: "Not found", code: "NOT_FOUND" });
   });
 
   it("returns 400 for non-numeric id", async () => {
     const res = await app.request("/matches/abc/context");
 
     expect(res.status).toBe(400);
-    expect(await json(res)).toEqual({ error: "Invalid ID" });
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("rejects a zero match id", async () => {
+    const res = await app.request("/matches/0/context");
+    expect(res.status).toBe(400);
+    expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });

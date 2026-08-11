@@ -7,17 +7,20 @@ vi.mock("../../config/database", () => ({
 
 // --- Imports (after mocks) ---
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
+import { traceQueries, type QueryTrace } from "../../test/trace-queries";
 import { matches, teams, venues, leagues, seasons, venueBookings, venueBookingMatches } from "@dragons/db/schema";
 import { verifySlot } from "./verify-slot.service";
 
 let ctx: TestDbContext;
+let trace: QueryTrace;
 let activeSeasonId: number;
-beforeAll(async () => { ctx = await setupTestDb(); dbHolder.ref = ctx.db; });
+beforeAll(async () => { ctx = await setupTestDb(); trace = traceQueries(ctx.db as object); dbHolder.ref = trace.db; });
 beforeEach(async () => {
   await resetTestDb(ctx);
   const [season] = await ctx.db.insert(seasons).values({ name: "2025/26", status: "active" }).returning();
   activeSeasonId = season!.id;
   vi.clearAllMocks();
+  trace.reset();
 });
 afterAll(async () => { await closeTestDb(ctx); });
 
@@ -142,5 +145,65 @@ describe("verifySlot", () => {
     await ctx.db.insert(venueBookingMatches).values({ venueBookingId: b!.id, matchId: 2 });
     const res = await verifySlot({ matchId: 1, date: "2026-02-16", time: "18:00:00", venueId: 1 });
     expect(res.conflicts.map((c) => c.type)).toContain("venue-busy");
+  });
+});
+
+describe("verifySlot — query fan-out", () => {
+  // A booking well clear of the proposed 17:00–20:30 window, tied to a filler
+  // match so the venue-busy loop reaches the overlap check. `venue_bookings` is
+  // unique on (venue_id, date), so a day holds at most one of these.
+  async function seedIdleBooking() {
+    await seedMatch({
+      id: 100, apiMatchId: 500, home: 300, guest: 400,
+      date: "2026-02-12", time: "10:00:00", venueId: 1, leagueId: 1, matchDay: 4,
+    });
+    const [b] = await ctx.db.insert(venueBookings).values({
+      venueId: 1, date: "2026-02-16",
+      calculatedStartTime: "06:00:00", calculatedEndTime: "06:30:00",
+      status: "confirmed",
+    }).returning();
+    await ctx.db.insert(venueBookingMatches).values({ venueBookingId: b!.id, matchId: 100 });
+  }
+
+  async function seedScenario() {
+    await seedOwnTeam(100); await seedOwnTeam(200); await seedOwnTeam(300); await seedOwnTeam(400);
+    await seedVenue(1); await seedLeague(1);
+    await seedMatch({ id: 1, apiMatchId: 11, home: 100, guest: 200, date: "2026-02-14", time: "18:00:00", venueId: 1, leagueId: 1, matchDay: 5 });
+    await seedMatch({ id: 2, apiMatchId: 12, home: 200, guest: 100, date: "2026-02-20", time: "18:00:00", venueId: 1, leagueId: 1, matchDay: 5 });
+  }
+
+  it("reads the bookings' linked matches once, outside the loop", async () => {
+    await seedScenario();
+    await seedIdleBooking();
+    trace.reset();
+
+    const res = await verifySlot({ matchId: 1, date: "2026-02-16", time: "18:00:00", venueId: 1 });
+
+    expect(res.ok).toBe(true);
+    // match, venue, booking config, home team, that day's bookings, their
+    // linked matches, same-day team fixtures, round window.
+    expect(trace.startCount()).toBe(8);
+  });
+
+  it("skips the linked-match query when the venue has no booking that day", async () => {
+    await seedScenario();
+    trace.reset();
+
+    const res = await verifySlot({ matchId: 1, date: "2026-02-16", time: "18:00:00", venueId: 1 });
+
+    expect(res.ok).toBe(true);
+    expect(trace.startCount()).toBe(7);
+  });
+
+  it("runs the booking config, home-team and bookings reads together", async () => {
+    await seedScenario();
+    await seedIdleBooking();
+    trace.reset();
+
+    await verifySlot({ matchId: 1, date: "2026-02-16", time: "18:00:00", venueId: 1 });
+
+    // 2 booking config, 3 home team, 4 that day's bookings.
+    expect(trace.overlaps(3)).toBe(true);
+    expect(trace.overlaps(4)).toBe(true);
   });
 });

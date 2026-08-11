@@ -2,6 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { logger } from "../config/logger";
 import { runWithLogContext, type LogContext } from "../config/log-context";
 import { anonymizeIp, scrubPath, scrubUrl } from "../config/log-privacy";
+import { clientFromForwardedFor } from "./auth-protect";
 import type { AppEnv } from "../types";
 
 const REDACTED_HEADERS = new Set(["authorization", "cookie", "set-cookie"]);
@@ -76,8 +77,14 @@ export const requestLogger = createMiddleware<AppEnv>(async (c, next) => {
     const duration = Math.round(durationMs);
     const status = c.res.status;
     const userAgent = c.req.header("user-agent");
+    // X-Forwarded-For[0] is whatever the caller sent — the proxy appends to the
+    // right, so the leftmost entry is attacker-controlled and mislabels every
+    // request it decorates. Use the same trust rule the auth routes already
+    // apply (`clientFromForwardedFor`: the entry the nearest trusted proxy
+    // inserted before its own) so both halves of the app agree on which hop is
+    // the client. Telemetry only — nothing authorizes off this value.
     const rawIp =
-      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+      clientFromForwardedFor(c.req.header("x-forwarded-for")) ??
       c.req.header("x-real-ip");
     // IP is anonymized (last IPv4 octet / last 64 IPv6 bits zeroed) so the
     // logged value is no longer personal data under GDPR Art. 4(1).

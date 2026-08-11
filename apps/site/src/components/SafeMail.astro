@@ -1,0 +1,23 @@
+---
+/**
+ * Scraper-hardened email, ported from dragons-app UiSafeMail: the address is
+ * split around a visually hidden "example" decoy span, so the readable text
+ * stays intact while naive harvesters pick up a bogus domain.
+ */
+interface Props {
+  email: string;
+  class?: string;
+}
+
+const { email, class: className = "" } = Astro.props;
+const [prefix = "", domain = ""] = email.split("@");
+const [domainPart1 = "", domainPart2 = ""] = domain.split(".");
+---
+
+<span class:list={["safe-mail block", className]}>{prefix}@<span>{domainPart1}</span>.<span>example</span><span>{domainPart2}</span></span>
+
+<style>
+  .safe-mail > span:nth-child(2) {
+    display: none;
+  }
+</style>

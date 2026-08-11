@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
   setClubConfig: vi.fn(),
   getBookingSettings: vi.fn(),
   setBookingSettings: vi.fn(),
-  getSetting: vi.fn(),
   upsertSetting: vi.fn(),
+  getRefereeReminderDays: vi.fn(),
   triggerRefereeGamesSync: vi.fn(),
 }));
 
@@ -19,11 +19,11 @@ vi.mock("../../services/admin/settings.service", () => ({
   setClubConfig: mocks.setClubConfig,
   getBookingSettings: mocks.getBookingSettings,
   setBookingSettings: mocks.setBookingSettings,
-  getSetting: mocks.getSetting,
   upsertSetting: mocks.upsertSetting,
+  getRefereeReminderDays: mocks.getRefereeReminderDays,
 }));
 
-vi.mock("../../workers/queues", () => ({
+vi.mock("../../services/sync-jobs.service", () => ({
   triggerRefereeGamesSync: mocks.triggerRefereeGamesSync,
 }));
 
@@ -216,32 +216,17 @@ describe("PUT /settings/booking", () => {
 });
 
 describe("GET /settings/referee-reminders", () => {
-  it("returns stored reminder days", async () => {
-    mocks.getSetting.mockResolvedValue(JSON.stringify([7, 3, 1]));
+  // Parsing + fallback logic lives in getRefereeReminderDays (see
+  // settings.service.test.ts) — the route just wires the result through, so
+  // this only asserts the wiring, not the validation behavior.
+  it("returns whatever the service resolves", async () => {
+    mocks.getRefereeReminderDays.mockResolvedValue([7, 3, 1]);
 
     const res = await app.request("/settings/referee-reminders");
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ days: [7, 3, 1] });
-    expect(mocks.getSetting).toHaveBeenCalledWith("referee_reminder_days");
-  });
-
-  it("returns default [7, 3, 1] when not configured", async () => {
-    mocks.getSetting.mockResolvedValue(null);
-
-    const res = await app.request("/settings/referee-reminders");
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ days: [7, 3, 1] });
-  });
-
-  it("falls back to default when stored value is malformed JSON", async () => {
-    mocks.getSetting.mockResolvedValue("not json");
-
-    const res = await app.request("/settings/referee-reminders");
-
-    expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ days: [7, 3, 1] });
+    expect(mocks.getRefereeReminderDays).toHaveBeenCalled();
   });
 });
 
@@ -303,7 +288,7 @@ describe("POST /settings/referee-games-sync", () => {
     expect(mocks.triggerRefereeGamesSync).toHaveBeenCalledWith("test-admin");
   });
 
-  it("returns 409 when sync already in progress", async () => {
+  it("codes the already-queued 409", async () => {
     mocks.triggerRefereeGamesSync.mockResolvedValue(null);
 
     const res = await app.request("/settings/referee-games-sync", {
@@ -311,6 +296,9 @@ describe("POST /settings/referee-games-sync", () => {
     });
 
     expect(res.status).toBe(409);
-    expect(await json(res)).toMatchObject({ error: "Referee games sync already in progress or queued" });
+    expect(await json(res)).toMatchObject({
+      error: "Referee games sync already in progress or queued",
+      code: "SYNC_ALREADY_QUEUED",
+    });
   });
 });

@@ -20,6 +20,8 @@ interface DatePickerProps {
   placeholder?: string
   className?: string
   disabled?: boolean
+  /** Lands on the trigger button so a <label htmlFor> can name this control. */
+  id?: string
 }
 
 function DatePicker({
@@ -28,6 +30,7 @@ function DatePicker({
   placeholder = "Datum wählen",
   className,
   disabled,
+  id,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
 
@@ -49,6 +52,7 @@ function DatePicker({
     <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
           variant="outline"
           disabled={disabled}
           className={cn(
@@ -76,4 +80,3 @@ function DatePicker({
 }
 
 export { DatePicker }
-export type { DatePickerProps }

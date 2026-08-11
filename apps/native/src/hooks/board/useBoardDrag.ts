@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo } from "react-native";
 import { useSharedValue, type SharedValue } from "react-native-reanimated";
 import type { BoardColumnData, TaskCardData } from "@dragons/shared";
 import { findDropTarget } from "@dragons/shared";
-import type { ColumnScrollState } from "@dragons/shared";
+import type { ColumnScrollState, PagerLayout, TaskContentRect } from "@dragons/shared";
 import type { BoardColumnHandle } from "@/components/board/BoardColumn";
-import type { BoardPagerHandle, PagerLayout } from "@/components/board/BoardPager";
-import type { TaskCardLayout, TaskContentRect } from "@/components/board/TaskCard";
+import type { BoardPagerHandle } from "@/components/board/BoardPager";
+import type { TaskCardLayout } from "@/components/board/TaskCard";
 import { haptics } from "@/lib/haptics";
 import { i18n } from "@/lib/i18n";
 import { useMoveTask } from "./useMoveTask";
@@ -16,7 +16,7 @@ import { spacing } from "@/theme/spacing";
 // Types
 // ---------------------------------------------------------------------------
 
-export type ActiveDragState = {
+type ActiveDragState = {
   active: true;
   task: TaskCardData;
   cardWidth: number;
@@ -25,7 +25,7 @@ export type ActiveDragState = {
   dropTargetColumnId: number | null;
 };
 
-export type DragState =
+type DragState =
   | { active: false }
   | ActiveDragState;
 
@@ -283,11 +283,17 @@ export function useBoardDrag({
     }
   }, [callFindDropTarget, moveTask]);
 
-  const onTaskDrag = {
-    start: handleDragStart,
-    move: handleDragMove,
-    end: handleDragEnd,
-  };
+  // Must be memoised: this object is forwarded through BoardPager and
+  // BoardColumn down to every TaskCard, so a fresh literal per render made
+  // memoising the cards pointless and rebuilt each card's pan gesture.
+  const onTaskDrag = useMemo(
+    () => ({
+      start: handleDragStart,
+      move: handleDragMove,
+      end: handleDragEnd,
+    }),
+    [handleDragStart, handleDragMove, handleDragEnd],
+  );
 
   // ---------------------------------------------------------------------------
   // Autoscroll interval

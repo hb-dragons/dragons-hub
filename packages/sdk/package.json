@@ -11,12 +11,16 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "check-types": "tsx src/scripts/check-types.ts"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.6",
     "basketball-bund-sdk": "github:dirkdrutschmann/basketball-bund-sdk",
     "dotenv": "^17.4.2",
     "tsx": "^4.22.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
   }
 }

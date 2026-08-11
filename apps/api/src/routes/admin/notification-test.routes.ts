@@ -1,38 +1,30 @@
 import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
-import { eq, like, desc } from "drizzle-orm";
-import { ulid } from "ulid";
-import { getDb } from "../../config/database";
-import {
-  pushDevices,
-  notificationLog,
-  channelConfigs,
-  domainEvents,
-} from "@dragons/db/schema";
-import { ExpoPushClient, mapTicketError } from "../../services/notifications/expo-push.client";
-import { env } from "../../config/env";
-import { logger } from "../../config/logger";
-import { getRedis } from "../../config/redis";
+import { describeRoute, validator } from "hono-openapi";
 import { requirePermission } from "../../middleware/rbac";
-import { escapeLikePattern } from "../../services/utils/sql";
+import { rateLimit } from "../../middleware/rate-limit";
+import { validationHook } from "../../middleware/validation";
+import {
+  sendAdminTestPush,
+  listRecentTestPushes,
+} from "../../services/notifications/test-push.service";
 import type { AppEnv } from "../../types";
 import { notificationTestSendBodySchema } from "@dragons/contracts";
-
-const log = logger.child({ service: "admin-notification-test" });
 
 const notificationTestRoutes = new Hono<AppEnv>();
 const settingsUpdate = requirePermission("settings", "update");
 
-const expoPushClient = new ExpoPushClient({
-  accessToken: env.EXPO_ACCESS_TOKEN,
-});
-
-const TEST_PUSH_COOLDOWN_SEC = 10;
-const TEST_PUSH_COOLDOWN_KEY_PREFIX = "rl:test-push:";
-
 notificationTestRoutes.post(
   "/notifications/test-push",
+  // Ordering matters both ways: `settingsUpdate` must run before `rateLimit`
+  // because rate-limit.ts reads c.get("user") to key the bucket per caller —
+  // swapping them would bucket every unauthenticated caller as "anon" and
+  // share one global cooldown. `validator` must run before `rateLimit` because
+  // this route's window is `limit: 1` — a malformed body that increments the
+  // counter before validation rejects it would burn the caller's only slot on
+  // a request that never sent a real test push, 429ing their next, valid, one.
   settingsUpdate,
+  validator("json", notificationTestSendBodySchema, validationHook),
+  rateLimit({ limit: 1, windowSeconds: 10, keyPrefix: "test-push" }),
   describeRoute({
     description:
       "Send a test push notification to the calling admin's own devices",
@@ -42,126 +34,14 @@ notificationTestRoutes.post(
       400: { description: "No devices registered" },
       401: { description: "Unauthorized" },
       403: { description: "Admin role required" },
+      429: { description: "Rate limited" },
     },
   }),
   async (c) => {
     const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
-
-    const raw = await c.req.json().catch(() => ({}));
-    const body = notificationTestSendBodySchema.parse(raw);
-    const callerId = user.id;
-
-    const cooldownKey = `${TEST_PUSH_COOLDOWN_KEY_PREFIX}${callerId}`;
-    const claim = await getRedis().set(cooldownKey, "1", "EX", TEST_PUSH_COOLDOWN_SEC, "NX");
-    if (claim !== "OK") {
-      const ttl = await getRedis().ttl(cooldownKey);
-      const retryAfter = ttl > 0 ? ttl : TEST_PUSH_COOLDOWN_SEC;
-      c.header("Retry-After", String(retryAfter));
-      return c.json({ error: "rate_limited", retryAfter }, 429);
-    }
-
-    const devices = await getDb()
-      .select()
-      .from(pushDevices)
-      .where(eq(pushDevices.userId, callerId));
-
-    if (devices.length === 0) {
-      return c.json(
-        {
-          error: "no_devices",
-          message: "Open the native app on a signed-in device first.",
-        },
-        400,
-      );
-    }
-
-    const pushChannels = await getDb()
-      .select()
-      .from(channelConfigs)
-      .where(eq(channelConfigs.type, "push"));
-    const pushChannel = pushChannels[0];
-    if (!pushChannel) {
-      log.error("push channel_config row missing");
-      return c.json({ error: "push_channel_missing" }, 500);
-    }
-
-    const sentAt = new Date();
-    const eventId = `admin_test:${callerId}:${ulid()}`;
-    const text = body.message ?? "Test push from Dragons admin";
-    const messages = devices.map((d) => ({
-      to: d.token,
-      title: "Dragons — Test",
-      body: text,
-      data: {
-        deepLink: "/",
-        isTest: true,
-        sentAt: sentAt.toISOString(),
-        eventType: "admin.test",
-      },
-      sound: "default" as const,
-      priority: "high" as const,
-    }));
-
-    let tickets: Awaited<ReturnType<ExpoPushClient["sendBatch"]>>;
-    try {
-      tickets = await expoPushClient.sendBatch(messages);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "unknown";
-      log.error({ err, callerId }, "test push send failed");
-      tickets = devices.map(() => ({ status: "error" as const, message }));
-    }
-
-    const rows = devices.map((d, i) => {
-      const t = tickets[i];
-      const ok = t?.status === "ok";
-      return {
-        eventId,
-        channelConfigId: pushChannel.id,
-        recipientId: callerId,
-        recipientToken: d.token,
-        title: "Dragons — Test",
-        body: text,
-        locale: d.locale ?? "de",
-        status: ok ? "sent_ticket" : "failed",
-        sentAt: ok ? sentAt : null,
-        providerTicketId: ok ? (t.id ?? null) : null,
-        errorMessage: mapTicketError(t),
-      };
-    });
-
-    // Synthetic domain_events row so notification_log FK is satisfied.
-    // Wrapped in a transaction so the event + log rows land atomically.
-    await getDb().transaction(async (tx) => {
-      await tx.insert(domainEvents).values({
-        id: eventId,
-        type: "admin.test_push",
-        source: "manual",
-        urgency: "immediate",
-        occurredAt: sentAt,
-        actor: callerId,
-        entityType: "user",
-        entityId: 0,
-        entityName: "admin test",
-        deepLinkPath: "/",
-        payload: {
-          isTest: true,
-          sentAt: sentAt.toISOString(),
-          message: text,
-        },
-      });
-      await tx.insert(notificationLog).values(rows);
-    });
-
-    return c.json({
-      deviceCount: devices.length,
-      tickets: rows.map((r, i) => ({
-        platform: devices[i]!.platform,
-        status: r.status,
-        ticketId: r.providerTicketId,
-        error: r.errorMessage,
-      })),
-    });
+    if (!user) return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    const { message } = c.req.valid("json");
+    return c.json(await sendAdminTestPush({ callerId: user.id, message }));
   },
 );
 
@@ -175,33 +55,9 @@ notificationTestRoutes.get(
   }),
   async (c) => {
     const user = c.get("user");
-    if (!user) return c.json({ error: "Unauthorized" }, 401);
-
-    const callerId = user.id;
-    const rows = await getDb()
-      .select()
-      .from(notificationLog)
-      .where(like(notificationLog.eventId, `admin_test:${escapeLikePattern(callerId)}:%`))
-      .orderBy(desc(notificationLog.createdAt))
-      .limit(10);
-
-    return c.json({
-      results: rows.map((r) => ({
-        id: r.id,
-        sentAt: r.sentAt ?? r.createdAt,
-        recipientToken: maskToken(r.recipientToken),
-        status: r.status,
-        providerTicketId: r.providerTicketId,
-        errorMessage: r.errorMessage,
-      })),
-    });
+    if (!user) return c.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, 401);
+    return c.json({ results: await listRecentTestPushes(user.id) });
   },
 );
-
-function maskToken(token: string | null): string | null {
-  if (!token) return null;
-  if (token.length > 6) return "..." + token.slice(-6);
-  return "..." + token.slice(-2);
-}
 
 export { notificationTestRoutes };

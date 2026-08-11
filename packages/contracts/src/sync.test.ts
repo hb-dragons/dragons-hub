@@ -8,7 +8,10 @@ import {
   syncJobStatusesQuerySchema,
   syncUpdateScheduleBodySchema,
   syncMatchChangesParamSchema,
+  syncTypeQuerySchema,
+  syncJobIdParamSchema,
 } from "./sync";
+import { SYNC_STATUSES } from "@dragons/shared";
 
 describe("syncPaginationSchema", () => {
   it("applies defaults when empty", () => {
@@ -33,10 +36,11 @@ describe("syncPaginationSchema", () => {
 });
 
 describe("syncLogsQuerySchema", () => {
-  it("accepts valid status values", () => {
-    for (const status of ["running", "completed", "failed"]) {
-      expect(syncLogsQuerySchema.parse({ status }).status).toBe(status);
-    }
+  // Structural guard: the status enum must be derived from SYNC_STATUSES, not
+  // restated. Adding a value to SYNC_STATUSES without it reaching the schema
+  // fails here.
+  it.each(SYNC_STATUSES)("accepts the shared sync status %s", (status) => {
+    expect(syncLogsQuerySchema.parse({ status }).status).toBe(status);
   });
 
   it("rejects invalid status", () => {
@@ -185,9 +189,13 @@ describe("syncUpdateScheduleBodySchema", () => {
     expect(syncUpdateScheduleBodySchema.parse(input)).toEqual(input);
   });
 
-  it("strips a client-supplied updatedBy (audit actor is set server-side)", () => {
-    const result = syncUpdateScheduleBodySchema.parse({ enabled: true, updatedBy: "attacker" });
-    expect(result).not.toHaveProperty("updatedBy");
+  it("rejects a client-supplied updatedBy (audit actor is set server-side)", () => {
+    // Strict schema: a field the server owns is a 400, not a silent strip.
+    const result = syncUpdateScheduleBodySchema.safeParse({
+      enabled: true,
+      updatedBy: "attacker",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("allows empty object", () => {
@@ -206,6 +214,53 @@ describe("syncUpdateScheduleBodySchema", () => {
     for (const cronExpression of expressions) {
       expect(syncUpdateScheduleBodySchema.parse({ cronExpression }).cronExpression).toBe(cronExpression);
     }
+  });
+});
+
+describe("syncTypeQuerySchema", () => {
+  it("accepts the two sync types the pipeline writes", () => {
+    expect(syncTypeQuerySchema.parse({ syncType: "full" }).syncType).toBe("full");
+    expect(syncTypeQuerySchema.parse({ syncType: "referee-games" }).syncType).toBe("referee-games");
+  });
+
+  it("allows omitting syncType", () => {
+    expect(syncTypeQuerySchema.parse({}).syncType).toBeUndefined();
+  });
+
+  // Deliberately not an enum: PUT /admin/sync/schedule takes an arbitrary
+  // syncType in its body and upsertSchedule writes it, so the readable set is
+  // open at runtime. Matches syncLogsQuerySchema.syncType, which is also free.
+  it("accepts a syncType outside the two the pipeline writes", () => {
+    expect(syncTypeQuerySchema.parse({ syncType: "some-future-type" }).syncType).toBe(
+      "some-future-type",
+    );
+  });
+
+  it("keeps an empty syncType as the empty string (the service reads it as no filter)", () => {
+    expect(syncTypeQuerySchema.parse({ syncType: "" }).syncType).toBe("");
+  });
+
+  it("rejects a repeated syncType query param", () => {
+    expect(syncTypeQuerySchema.safeParse({ syncType: ["full", "referee-games"] }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("syncJobIdParamSchema", () => {
+  it("accepts the opaque BullMQ job ids the queue hands out", () => {
+    expect(syncJobIdParamSchema.parse({ jobId: "manual-sync" })).toEqual({ jobId: "manual-sync" });
+    expect(syncJobIdParamSchema.parse({ jobId: "referee-games-sync-42" })).toEqual({
+      jobId: "referee-games-sync-42",
+    });
+  });
+
+  it("rejects an empty job id", () => {
+    expect(() => syncJobIdParamSchema.parse({ jobId: "" })).toThrow();
+  });
+
+  it("rejects a missing job id", () => {
+    expect(() => syncJobIdParamSchema.parse({})).toThrow();
   });
 });
 

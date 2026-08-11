@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type { BroadcastMatch } from "@dragons/shared";
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -82,6 +82,7 @@ function CenterInfo({
   time: string;
   dateLabel: string;
 }) {
+  const t = useTranslations("broadcast.overlay");
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-7">
       {league && (
@@ -96,7 +97,7 @@ function CenterInfo({
         {dateLabel}
       </span>
       <span className="bg-heat text-heat-foreground mt-1 rounded-sm px-2 py-0.5 font-display text-[0.7rem] font-black uppercase tracking-widest">
-        Tip-off
+        {t("tipOff")}
       </span>
     </div>
   );

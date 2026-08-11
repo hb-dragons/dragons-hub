@@ -13,7 +13,7 @@ vi.mock("../../config/database", () => ({
   )),
 }));
 
-vi.mock("../../workers/queues", () => ({
+vi.mock("../sync-jobs.service", () => ({
   updateSyncSchedule: vi.fn(),
   updateRefereeSyncSchedule: vi.fn(),
 }));
@@ -29,7 +29,10 @@ import {
   upsertSchedule,
   getMatchChangesForEntry,
 } from "./sync-admin.service";
-import { updateSyncSchedule, updateRefereeSyncSchedule } from "../../workers/queues";
+import { updateSyncSchedule, updateRefereeSyncSchedule } from "../sync-jobs.service";
+import { getTableColumns } from "drizzle-orm";
+import { syncRuns } from "@dragons/db/schema";
+import type { SyncRun } from "@dragons/shared";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
 // --- PGlite setup ---
@@ -192,6 +195,58 @@ describe("getSyncRun", () => {
     expect(result!.id).toBe(id);
     expect(result!.syncType).toBe("full");
     expect(result!.triggeredBy).toBe("manual");
+  });
+
+  it("returns the incident-triage columns, and the response type declares them", async () => {
+    const id = await insertSyncRun({
+      status: "failed",
+      failed_step: "matches",
+      owner_instance_id: "worker-7",
+    });
+
+    const result = await getSyncRun(id);
+
+    // The two columns are added for incident triage and the API already selects
+    // them; the shared `SyncRun` response type omitted them, so the sync-history
+    // UI structurally could not display them. This assignment is the guard.
+    const triage: Pick<SyncRun, "failedStep" | "ownerInstanceId"> = result!;
+    expect(triage.failedStep).toBe("matches");
+    expect(triage.ownerInstanceId).toBe("worker-7");
+  });
+});
+
+/**
+ * Structural guard: `SyncRun` is the response contract for a `sync_runs` row,
+ * and the API returns the row wholesale. A column added to the table without a
+ * matching field here is a column the UI cannot show — which is exactly how
+ * `failed_step` and `owner_instance_id` came to be invisible.
+ */
+describe("SyncRun response type", () => {
+  const RESPONSE_FIELDS = [
+    "id",
+    "syncType",
+    "status",
+    "triggeredBy",
+    "recordsProcessed",
+    "recordsCreated",
+    "recordsUpdated",
+    "recordsFailed",
+    "recordsSkipped",
+    "startedAt",
+    "completedAt",
+    "durationMs",
+    "errorMessage",
+    "errorStack",
+    "failedStep",
+    "ownerInstanceId",
+    "summary",
+    "createdAt",
+  ] as const satisfies readonly (keyof SyncRun)[];
+
+  it("declares every sync_runs column", () => {
+    expect(Object.keys(getTableColumns(syncRuns)).sort()).toEqual(
+      [...RESPONSE_FIELDS].sort(),
+    );
   });
 });
 

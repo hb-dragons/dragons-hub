@@ -1,7 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+
+// drizzle-orm and @dragons/db/schema are deliberately NOT mocked (issue #110).
+// `getReminderDays` is a scoped read — the row for one settings key, not just
+// "the first row" — and stubbing `eq` to an identity function made that scoping
+// unobservable. It reads from a real (in-process PGlite) Postgres here.
+// The queue and the logger stay mocked: they are external side effects.
+
+const dbHolder = vi.hoisted(() => ({ ref: null as unknown }));
 
 const mocks = vi.hoisted(() => ({
-  selectResult: vi.fn(),
   queueAdd: vi.fn(),
   queueGetJob: vi.fn(),
   logInfo: vi.fn(),
@@ -9,15 +16,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../config/database", () => ({
-  getDb: () => ({
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          limit: mocks.selectResult,
-        }),
-      }),
-    }),
-  }),
+  getDb: () =>
+    new Proxy(
+      {},
+      {
+        get: (_target, prop) => (dbHolder.ref as Record<string | symbol, unknown>)[prop],
+      },
+    ),
 }));
 
 vi.mock("../../workers/queues", () => ({
@@ -38,14 +43,6 @@ vi.mock("../../config/logger", () => ({
   },
 }));
 
-vi.mock("@dragons/db/schema", () => ({
-  appSettings: { key: "as.key", value: "as.value" },
-}));
-
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((_a: unknown, _b: unknown) => ({ eq: [_a, _b] })),
-}));
-
 import {
   computeReminderDelays,
   buildReminderJobId,
@@ -53,8 +50,34 @@ import {
   scheduleReminderJobs,
   cancelReminderJobs,
 } from "./referee-reminders.service";
+import { appSettings } from "@dragons/db/schema";
+import {
+  setupTestDb,
+  resetTestDb,
+  closeTestDb,
+  type TestDbContext,
+} from "../../test/setup-test-db";
 
-beforeEach(() => vi.clearAllMocks());
+let ctx: TestDbContext;
+
+beforeAll(async () => {
+  ctx = await setupTestDb();
+  dbHolder.ref = ctx.db;
+});
+
+afterAll(async () => {
+  await closeTestDb(ctx);
+});
+
+async function seedSetting(key: string, value: string): Promise<void> {
+  await ctx.db.insert(appSettings).values({ key, value });
+}
+
+beforeEach(async () => {
+  await resetTestDb(ctx);
+  dbHolder.ref = ctx.db;
+  vi.clearAllMocks();
+});
 
 describe("computeReminderDelays", () => {
   it("computes correct delays for future reminders", () => {
@@ -104,6 +127,59 @@ describe("computeReminderDelays", () => {
   });
 });
 
+describe("computeReminderDelays - timezone correctness (issue #96)", () => {
+  // `vi.stubEnv`, not `process.env.TZ = original`. TZ is unset on developer
+  // machines that get their zone from /etc/localtime, so restoring by
+  // assignment writes the literal string "undefined", which Node treats as an
+  // invalid zone and falls back to UTC — silently leaving every later test in
+  // this worker in a different timezone than it started in. `unstubAllEnvs`
+  // deletes a key that was originally absent, which assignment cannot do.
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("resolves the exact UTC instant for a CEST (summer) Berlin kickoff under a non-Berlin process TZ", () => {
+    vi.stubEnv("TZ", "UTC");
+    // 19:30 Berlin time in July is CEST (UTC+2) -> 17:30Z
+    const now = new Date("2026-07-01T00:00:00Z");
+    const delays = computeReminderDelays("2026-07-15", "19:30", [0], now);
+
+    expect(delays).toHaveLength(1);
+    const expectedKickoffUtc = new Date("2026-07-15T17:30:00Z");
+    expect(delays[0]!.delayMs).toBe(expectedKickoffUtc.getTime() - now.getTime());
+  });
+
+  it("resolves the exact UTC instant for a CET (winter) Berlin kickoff under a non-Berlin process TZ", () => {
+    vi.stubEnv("TZ", "UTC");
+    // 19:30 Berlin time in January is CET (UTC+1) -> 18:30Z
+    const now = new Date("2026-01-01T00:00:00Z");
+    const delays = computeReminderDelays("2026-01-15", "19:30", [0], now);
+
+    expect(delays).toHaveLength(1);
+    const expectedKickoffUtc = new Date("2026-01-15T18:30:00Z");
+    expect(delays[0]!.delayMs).toBe(expectedKickoffUtc.getTime() - now.getTime());
+  });
+
+  it("resolves the same correct UTC instant under America/New_York process TZ", () => {
+    vi.stubEnv("TZ", "America/New_York");
+    const now = new Date("2026-07-01T00:00:00Z");
+    const delays = computeReminderDelays("2026-07-15", "19:30", [0], now);
+
+    expect(delays).toHaveLength(1);
+    const expectedKickoffUtc = new Date("2026-07-15T17:30:00Z");
+    expect(delays[0]!.delayMs).toBe(expectedKickoffUtc.getTime() - now.getTime());
+  });
+
+  it("still excludes an already-passed kickoff under a non-Berlin process TZ", () => {
+    vi.stubEnv("TZ", "UTC");
+    // "now" is after the CEST kickoff instant (17:30Z), so the 0-day reminder must be excluded
+    const now = new Date("2026-07-15T18:00:00Z");
+    const delays = computeReminderDelays("2026-07-15", "19:30", [0], now);
+
+    expect(delays).toHaveLength(0);
+  });
+});
+
 describe("buildReminderJobId", () => {
   it("builds deterministic job ID from apiMatchId", () => {
     expect(buildReminderJobId(2675740, 7)).toBe("reminder:2675740:7");
@@ -112,69 +188,72 @@ describe("buildReminderJobId", () => {
 });
 
 describe("getReminderDays", () => {
-  it("reads reminder days from database", async () => {
-    mocks.selectResult.mockResolvedValue([{ value: "[14, 5, 2]" }]);
+  it("reads reminder days from the referee_reminder_days setting", async () => {
+    await seedSetting("referee_reminder_days", "[14, 5, 2]");
 
-    const result = await getReminderDays();
-
-    expect(result).toEqual([14, 5, 2]);
+    expect(await getReminderDays()).toEqual([14, 5, 2]);
   });
 
-  it("returns sorted descending", async () => {
-    mocks.selectResult.mockResolvedValue([{ value: "[1, 7, 3]" }]);
+  it("returns them sorted descending", async () => {
+    await seedSetting("referee_reminder_days", "[1, 7, 3]");
 
-    const result = await getReminderDays();
-
-    expect(result).toEqual([7, 3, 1]);
+    expect(await getReminderDays()).toEqual([7, 3, 1]);
   });
 
-  it("falls back to defaults when no row exists", async () => {
-    mocks.selectResult.mockResolvedValue([]);
+  it("reads its own key, not whichever settings row comes first", async () => {
+    await seedSetting("club_id", "[99]");
+    await seedSetting("referee_reminder_days", "[14, 5, 2]");
+    await seedSetting("tracked_leagues", "[42]");
 
-    const result = await getReminderDays();
-
-    expect(result).toEqual([7, 3, 1]);
+    expect(await getReminderDays()).toEqual([14, 5, 2]);
   });
 
-  it("falls back to defaults when value is null", async () => {
-    mocks.selectResult.mockResolvedValue([{ value: null }]);
+  it("falls back to defaults when the setting is absent", async () => {
+    await seedSetting("some_other_setting", "[14, 5, 2]");
 
-    const result = await getReminderDays();
-
-    expect(result).toEqual([7, 3, 1]);
+    expect(await getReminderDays()).toEqual([7, 3, 1]);
   });
 
-  it("falls back to defaults on parse error", async () => {
-    mocks.selectResult.mockResolvedValue([{ value: "not-json" }]);
+  it("falls back to defaults when the stored value is not JSON", async () => {
+    await seedSetting("referee_reminder_days", "not-json");
 
-    const result = await getReminderDays();
-
-    expect(result).toEqual([7, 3, 1]);
+    expect(await getReminderDays()).toEqual([7, 3, 1]);
     expect(mocks.logWarn).toHaveBeenCalled();
   });
 
-  it("falls back to defaults when array contains non-numbers", async () => {
-    mocks.selectResult.mockResolvedValue([{ value: '["a", "b"]' }]);
+  it("falls back to defaults when the array contains non-numbers", async () => {
+    await seedSetting("referee_reminder_days", '["a", "b"]');
 
-    const result = await getReminderDays();
-
-    expect(result).toEqual([7, 3, 1]);
+    expect(await getReminderDays()).toEqual([7, 3, 1]);
   });
 
-  it("falls back to defaults on db error", async () => {
-    mocks.selectResult.mockRejectedValue(new Error("db down"));
+  it("falls back to defaults when the array contains non-positive numbers", async () => {
+    await seedSetting("referee_reminder_days", "[7, 0]");
 
-    const result = await getReminderDays();
+    expect(await getReminderDays()).toEqual([7, 3, 1]);
+  });
 
-    expect(result).toEqual([7, 3, 1]);
+  it("falls back to defaults when the JSON is not an array", async () => {
+    await seedSetting("referee_reminder_days", '{"days": 7}');
+
+    expect(await getReminderDays()).toEqual([7, 3, 1]);
+  });
+
+  it("falls back to defaults when the database read throws", async () => {
+    dbHolder.ref = {
+      select: () => {
+        throw new Error("db down");
+      },
+    };
+
+    expect(await getReminderDays()).toEqual([7, 3, 1]);
     expect(mocks.logWarn).toHaveBeenCalled();
   });
 });
 
 describe("scheduleReminderJobs", () => {
   it("schedules jobs with correct delays and IDs", async () => {
-    // Return default reminder days [7, 3, 1]
-    mocks.selectResult.mockResolvedValue([]);
+    // No app_settings row seeded → default reminder days [7, 3, 1]
     mocks.queueAdd.mockResolvedValue(undefined);
 
     // Kickoff far in the future so all 3 reminders fire
@@ -203,7 +282,6 @@ describe("scheduleReminderJobs", () => {
   });
 
   it("skips reminders already in the past", async () => {
-    mocks.selectResult.mockResolvedValue([]);
     mocks.queueAdd.mockResolvedValue(undefined);
 
     // Kickoff tomorrow — only 1-day reminder fires
@@ -220,11 +298,22 @@ describe("scheduleReminderJobs", () => {
       expect.objectContaining({ jobId: "reminder:12345:1" }),
     );
   });
+
+  it("uses the reminder days configured in app_settings", async () => {
+    await seedSetting("referee_reminder_days", "[10, 2]");
+    mocks.queueAdd.mockResolvedValue(undefined);
+
+    await scheduleReminderJobs(12345, 99, "2027-06-15", "14:00");
+
+    const jobIds = mocks.queueAdd.mock.calls.map(
+      (c: unknown[]) => (c[2] as { jobId: string }).jobId,
+    );
+    expect(jobIds).toEqual(["reminder:12345:10", "reminder:12345:2"]);
+  });
 });
 
 describe("cancelReminderJobs", () => {
   it("removes existing jobs", async () => {
-    mocks.selectResult.mockResolvedValue([]);
     const removeFn = vi.fn();
     mocks.queueGetJob.mockResolvedValue({ remove: removeFn });
     removeFn.mockResolvedValue(undefined);
@@ -240,12 +329,23 @@ describe("cancelReminderJobs", () => {
   });
 
   it("handles missing jobs gracefully", async () => {
-    mocks.selectResult.mockResolvedValue([]);
     mocks.queueGetJob.mockResolvedValue(null);
 
     await cancelReminderJobs(12345);
 
     expect(mocks.queueGetJob).toHaveBeenCalledTimes(3);
     // No error thrown
+  });
+
+  it("cancels the configured reminder days, not the defaults", async () => {
+    await seedSetting("referee_reminder_days", "[10, 2]");
+    mocks.queueGetJob.mockResolvedValue(null);
+
+    await cancelReminderJobs(12345);
+
+    expect(mocks.queueGetJob.mock.calls.flat()).toEqual([
+      "reminder:12345:10",
+      "reminder:12345:2",
+    ]);
   });
 });

@@ -10,17 +10,8 @@ import { Badge } from "@/components/Badge";
 import { ClaimGameButton } from "@/components/ClaimGameButton";
 import { refereeApi } from "@/lib/api";
 import { i18n } from "@/lib/i18n";
+import { kickoffCompact } from "@/lib/format/kickoff";
 import { fontFamilies } from "@/theme/typography";
-
-function formatKickoff(kickoffDate: string, kickoffTime: string): string {
-  const locale = i18n.locale === "de" ? "de-DE" : "en-US";
-  const d = new Date(kickoffDate + "T00:00:00");
-  const weekday = d.toLocaleDateString(locale, { weekday: "short" });
-  const day = d.getDate().toString().padStart(2, "0");
-  const month = (d.getMonth() + 1).toString().padStart(2, "0");
-  const time = kickoffTime.slice(0, 5);
-  return `${weekday} ${day}.${month}. ${time}`;
-}
 
 function slotStatusVariant(
   status: RefereeGameListItem["sr1Status"],
@@ -183,7 +174,7 @@ export default function RefereeGameDetailScreen() {
               },
             ]}
           >
-            {formatKickoff(game.kickoffDate, game.kickoffTime)}
+            {kickoffCompact(game.kickoffDate, game.kickoffTime)}
             {venueName ? ` · ${venueName}` : ""}
           </Text>
 

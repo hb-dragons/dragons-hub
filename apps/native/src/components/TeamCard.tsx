@@ -8,7 +8,7 @@ import { ClubLogo } from "./brand/ClubLogo";
 interface TeamCardProps {
   team: PublicTeam;
   featured?: boolean;
-  onPress?: () => void;
+  onPress?: (team: PublicTeam) => void;
 }
 
 function TeamCardImpl({ team, featured = false, onPress }: TeamCardProps) {
@@ -55,7 +55,7 @@ function TeamCardImpl({ team, featured = false, onPress }: TeamCardProps) {
   if (onPress) {
     return (
       <Pressable
-        onPress={onPress}
+        onPress={() => onPress(team)}
         style={({ pressed }) =>
           pressed ? { opacity: 0.85 } : undefined
         }

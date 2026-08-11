@@ -29,7 +29,7 @@ export function ViewToggle({ view, weekendLabel, calendarLabel }: ViewToggleProp
   }
 
   return (
-    <div className="flex gap-1 rounded-lg bg-muted/50 p-1">
+    <div className="flex gap-1 rounded-md bg-muted/50 p-1">
       <Button
         variant={view === "weekend" ? "secondary" : "ghost"}
         size="sm"

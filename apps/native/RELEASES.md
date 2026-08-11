@@ -30,7 +30,7 @@ Assumes `cd apps/native` unless stated otherwise.
 
 ---
 
-## Current state (as of 2026-04-21)
+## Current state (as of 2026-08-10)
 
 - `eas update:configure` has been run. `app.json` has
   `updates.url = https://u.expo.dev/7b7481e3-ca0a-42dd-ba38-6a9169d6492d`
@@ -44,7 +44,27 @@ Assumes `cd apps/native` unless stated otherwise.
   - `production` → `https://api.app.hbdragons.de`
 - EAS account: `eshamounskerto` (personal; migrate before public launch).
 
-No binary has been built for any channel yet. No updates published.
+**Builds:** four exist, all iOS, all from April 2026 — three on the
+`preview` profile and one on `production`. **No Android build has ever
+been made.** Two of them reached TestFlight as version 1.0.0 builds 1
+and 2; both have since **expired** (see the 90-day rule below), so no
+tester currently has an installable binary.
+
+**Updates:** none. No `eas update` has ever been published on any
+branch, so `development` and `preview` both show an empty update group,
+and there is no `production` channel yet.
+
+**Consequence for the next release:** the April binaries are not just
+expired, they are fingerprint-incompatible with today's JS —
+`react-native-reanimated` + `react-native-worklets`, gesture-handler,
+keyboard-controller, glass-effect, bottom-sheet, datetimepicker,
+segmented-control, haptics, clipboard and device all landed after the
+last build, and camera / web-browser / linking were removed. OTA cannot
+bridge that. Verify before assuming otherwise:
+
+```bash
+eas fingerprint:compare --build-id <id>   # from `eas build:list`
+```
 
 ---
 
@@ -116,6 +136,31 @@ eas submit --profile preview --platform ios
 First run asks for an App Store Connect API key (create it in App Store
 Connect → Users and Access → Integrations → App Store Connect API).
 Save it; EAS reuses it.
+
+Three rules this section used to omit, each of which has already cost a
+build:
+
+- **The profile must be `distribution: "store"`.** An `internal`
+  distribution build is an ad-hoc IPA for directly-installed, UDID-
+  registered devices; App Store Connect rejects it. `preview` was
+  `internal` until 2026-08-10 and is now `store`, so preview builds go
+  to TestFlight while still listening on the `preview` channel — which
+  is what lets JS-only fixes reach testers by `eas update` afterwards
+  instead of by rebuild.
+- **TestFlight builds expire 90 days after upload.** Testers lose the
+  app whether or not anything changed. Version 1.0.0 builds 1 and 2
+  expired this way. A quiet quarter means a rebuild, not an OTA.
+- **The build number must exceed every number already uploaded for that
+  `version`.** App Store Connect has consumed 1 and 2 at 1.0.0, so the
+  next upload needs ≥ 3. `autoIncrement` reads EAS's own remote
+  counter, which tracks its builds and not App Store Connect's — check
+  the number it picked rather than assuming the two agree.
+
+For internal testers (up to 100, added by Apple ID under TestFlight →
+Internal Testing) there is **no Beta App Review** — the build is
+installable minutes after processing. External testing needs review,
+and review needs a live privacy policy URL, which `PRE-LAUNCH.md` still
+lists as unwritten.
 
 ### Android → Play Internal Testing
 
@@ -225,6 +270,50 @@ When `app.json > expo.version` changes:
    updates on that `runtimeVersion`. Updates published to the old
    `version` still reach users still on the old binary — this is how
    versioned rollouts work.
+
+---
+
+## `expo doctor` gates the build
+
+EAS runs `expo doctor` during the build and fails the whole build on a
+non-zero exit, so a doctor failure costs a full cloud build. Run it
+locally first — it is the same 19 checks:
+
+```bash
+cd apps/native && npx expo-doctor
+```
+
+Two of its checks needed structural fixes (2026-08-10):
+
+- **Duplicate native modules.** A native build may contain only one copy
+  of a given native module, and pnpm's isolated store produced several.
+  They are pinned to one version each by the `overrides` block in
+  `pnpm-workspace.yaml` (`react`, `react-native`, `expo-glass-effect`) —
+  nothing is forced past a constraint it declares. Switching pnpm to
+  hoisted linking also fixes this check but breaks `apps/site`; the
+  reasoning is recorded in the root `.npmrc`, which is where the idea
+  looks tempting.
+- **Peer dependencies.** `expo-linking` (peer of `expo-router`) and
+  `react-native-worklets` (peer of `react-native-reanimated`) must be
+  direct dependencies. Note that `npx expo install react-native-worklets`
+  installs 0.7.4, the version SDK 55 pins for reanimated 4.2.1 — this
+  project runs reanimated 4.3.1, which requires worklets **0.8.x**. It is
+  pinned to 0.8.1 by hand. Do not let `expo install --fix` walk it back.
+
+The remaining check — "packages match versions required by installed
+Expo SDK" — cannot pass here and is skipped by
+`EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK=1`, set in the `base` build
+profile in `eas.json`. It is all-or-nothing, and this project runs
+several packages deliberately ahead of the SDK's pins (TypeScript 6
+workspace-wide, plus reanimated / gesture-handler /
+keyboard-controller / safe-area-context / worklets). The same check also
+reports the expo-* family sitting a few patch versions **behind** the
+SDK, which is real drift worth closing on its own branch — skipping the
+check hides that too, so re-read its output by hand now and then:
+
+```bash
+cd apps/native && npx expo-doctor   # no skip var set locally
+```
 
 ---
 

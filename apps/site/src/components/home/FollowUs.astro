@@ -1,0 +1,90 @@
+---
+/**
+ * Social Wall, ported from dragons-app HomeFollowUs. Static images with the
+ * legacy blurhashes (UiGesamtImage / UiStaticBlurImage / UiOrgaImage /
+ * UiBannerImage); tiles are SpotlightLinkCards.
+ */
+import BlurImage from "../BlurImage.astro";
+import PageContainer from "../PageContainer.astro";
+import SpotlightLinkCard from "../SpotlightLinkCard.astro";
+import { BANNER_IMAGE, SOCIAL_LINKS } from "../../lib/site-assets";
+import { strings } from "../../lib/strings";
+
+const iconClass = "size-8 md:size-15";
+---
+
+<PageContainer class="!pb-10 md:!pb-10 lg:!pb-12 xl:!pb-14 !py-0">
+  <h2 class="text-2xl md:text-4xl font-bold text-center mb-4 md:mb-8">
+    {strings.home.socialWallHeading}
+  </h2>
+
+  <div class="grid grid-cols-3 grid-rows-12 gap-2 md:gap-4 h-[300px] md:h-[700px]">
+    <SpotlightLinkCard
+      href={SOCIAL_LINKS.instagram}
+      linkClass="col-span-3 row-span-4"
+      cardClass="h-full"
+    >
+      <BlurImage
+        slot="image"
+        src="/img/gesamt.webp"
+        blurhash="U5DcQ%030JE28|Q]t8xu00$-^+xr?Kt6ITE0"
+        class="w-full h-full"
+      />
+      <svg slot="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class={iconClass} aria-hidden="true"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
+    </SpotlightLinkCard>
+
+    <SpotlightLinkCard
+      href={SOCIAL_LINKS.facebook}
+      cardClass="h-full"
+      linkClass="row-span-8"
+    >
+      <BlurImage
+        slot="image"
+        src="/img/ingame_1.webp"
+        blurhash="UBEo*|?wIo9Y_3SOxuIUOGxv%MxuD%oexu%M"
+        class="w-full h-full"
+      />
+      <svg slot="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class={iconClass} aria-hidden="true"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+    </SpotlightLinkCard>
+
+    <SpotlightLinkCard
+      href={SOCIAL_LINKS.linkedin}
+      linkClass="col-span-1 row-span-4"
+      cardClass="h-full"
+    >
+      <BlurImage
+        slot="image"
+        src="/img/orga.webp"
+        blurhash="U5DcQ%030JE28|Q]t8xu00$-^+xr?Kt6ITE0"
+        class="w-full h-full"
+      />
+      <svg slot="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class={iconClass} aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect width="4" height="12" x="2" y="9"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+    </SpotlightLinkCard>
+
+    <SpotlightLinkCard href="/shop/" linkClass="col-span-1 row-span-8" cardClass="h-full" target="_self">
+      <BlurImage
+        slot="image"
+        src={BANNER_IMAGE.url}
+        blurhash={BANNER_IMAGE.blurhash}
+        class="w-full h-full"
+      />
+      <div slot="icon" class="flex flex-col items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class={iconClass} aria-hidden="true"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg>
+      </div>
+    </SpotlightLinkCard>
+
+    <SpotlightLinkCard
+      href={SOCIAL_LINKS.youtube}
+      linkClass="col-span-1 row-span-4"
+      cardClass="h-full"
+    >
+      <BlurImage
+        slot="image"
+        src="/img/trainer.webp"
+        blurhash="UZIF9*NGtQt7~XV@jbkCxdt7RjofMwWVR%of"
+        class="w-full h-full"
+      />
+      <svg slot="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-8 md:size-20" aria-hidden="true"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"></path><path d="m10 15 5-3-5-3z"></path></svg>
+    </SpotlightLinkCard>
+  </div>
+</PageContainer>

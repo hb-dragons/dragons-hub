@@ -1,14 +1,14 @@
-import { forwardRef, useImperativeHandle, useRef } from "react";
-import { View, Text, ScrollView, Pressable, RefreshControl } from "react-native";
-import type { LayoutChangeEvent } from "react-native";
+import { forwardRef, memo, useCallback, useImperativeHandle, useMemo, useRef } from "react";
+import { View, Text, FlatList, Pressable, RefreshControl } from "react-native";
+import type { LayoutChangeEvent, ListRenderItem } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import type { TaskCardData, BoardColumnData } from "@dragons/shared";
-import { TaskCard, type TaskContentRect, type TaskDragCallbacks } from "./TaskCard";
+import type { TaskCardData, BoardColumnData, TaskContentRect } from "@dragons/shared";
+import { TaskCard, type TaskDragCallbacks } from "./TaskCard";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 
@@ -56,7 +56,7 @@ interface BoardColumnProps {
 // Re-export so BoardPager can forward it without importing TaskCard directly.
 export type { TaskDragCallbacks };
 
-export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
+const BoardColumnImpl = forwardRef<BoardColumnHandle, BoardColumnProps>(
   function BoardColumn(
     {
       column,
@@ -97,21 +97,78 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
       elevation: 8 * dropProgress.value,
     }));
 
-    const columnTasks = tasks
-      .filter((t) => t.columnId === column.id)
-      .sort((a, b) => a.position - b.position);
+    // `.filter().sort()` allocated two arrays on every render (and `.sort()`
+    // used to mutate the array the filter produced), so the list identity
+    // changed even when nothing about this column did.
+    const columnTasks = useMemo(
+      () =>
+        tasks
+          .filter((t) => t.columnId === column.id)
+          .sort((a, b) => a.position - b.position),
+      [tasks, column.id],
+    );
 
-    const scrollRef = useRef<ScrollView | null>(null);
+    const listRef = useRef<FlatList<TaskCardData> | null>(null);
 
     useImperativeHandle(ref, () => ({
       scrollTo: (y: number) => {
-        scrollRef.current?.scrollTo({ y, animated: false });
+        listRef.current?.scrollToOffset({ offset: y, animated: false });
       },
     }), []);
 
-    const handleHeaderLayout = (e: LayoutChangeEvent) => {
-      onHeaderHeight?.(column.id, e.nativeEvent.layout.height);
-    };
+    const handleHeaderLayout = useCallback(
+      (e: LayoutChangeEvent) => {
+        onHeaderHeight?.(column.id, e.nativeEvent.layout.height);
+      },
+      [onHeaderHeight, column.id],
+    );
+
+    const keyExtractor = useCallback((t: TaskCardData) => String(t.id), []);
+
+    const renderTask = useCallback<ListRenderItem<TaskCardData>>(
+      ({ item: t }) => (
+        <TaskCard
+          task={t}
+          onPress={onTaskPress}
+          onLongPress={onTaskLongPress}
+          isBeingDragged={t.id === draggingTaskId}
+          recentlyDropped={t.id === recentlyDroppedTaskId}
+          onDrag={onTaskDrag}
+          onTaskDelete={onTaskDelete}
+          onMeasure={onTaskMeasure}
+        />
+      ),
+      [
+        onTaskPress,
+        onTaskLongPress,
+        draggingTaskId,
+        recentlyDroppedTaskId,
+        onTaskDrag,
+        onTaskDelete,
+        onTaskMeasure,
+      ],
+    );
+
+    const listContentStyle = useMemo(
+      () => ({
+        padding: spacing.sm,
+        gap: spacing.sm,
+        paddingBottom: spacing["2xl"],
+      }),
+      [spacing],
+    );
+
+    const refreshControl = useMemo(
+      () =>
+        onRefresh ? (
+          <RefreshControl
+            refreshing={!!refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.mutedForeground}
+          />
+        ) : undefined,
+      [onRefresh, refreshing, colors.mutedForeground],
+    );
 
     return (
       <View
@@ -172,24 +229,23 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
             </Text>
           </Pressable>
 
-          <ScrollView
-            ref={scrollRef}
-            contentContainerStyle={{
-              padding: spacing.sm,
-              gap: spacing.sm,
-              paddingBottom: spacing["2xl"],
-            }}
+          {/* Virtualized: a long column used to mount every card up front.
+              `removeClippedSubviews` stays off and the window is generous
+              because the drag layer measures cards via their onLayout — cards
+              that never mount never report a rect. */}
+          <FlatList
+            ref={listRef}
+            data={columnTasks}
+            renderItem={renderTask}
+            keyExtractor={keyExtractor}
+            contentContainerStyle={listContentStyle}
             showsVerticalScrollIndicator={false}
             scrollEventThrottle={16}
-            refreshControl={
-              onRefresh ? (
-                <RefreshControl
-                  refreshing={!!refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={colors.mutedForeground}
-                />
-              ) : undefined
-            }
+            removeClippedSubviews={false}
+            initialNumToRender={12}
+            maxToRenderPerBatch={8}
+            windowSize={11}
+            refreshControl={refreshControl}
             onScroll={(e) => {
               onScrollUpdate?.(
                 column.id,
@@ -200,47 +256,41 @@ export const BoardColumn = forwardRef<BoardColumnHandle, BoardColumnProps>(
             onContentSizeChange={(_w, h) => {
               onContentSizeChange?.(column.id, h);
             }}
-          >
-            {columnTasks.map((t) => (
-              <TaskCard
-                key={t.id}
-                task={t}
-                onPress={onTaskPress}
-                onLongPress={onTaskLongPress}
-                isBeingDragged={t.id === draggingTaskId}
-                recentlyDropped={t.id === recentlyDroppedTaskId}
-                onDrag={onTaskDrag}
-                onTaskDelete={onTaskDelete}
-                onMeasure={onTaskMeasure}
-              />
-            ))}
-            {columnTasks.length === 0 ? (
+            ListEmptyComponent={
               <View style={{ padding: spacing.lg, alignItems: "center" }}>
                 <Text style={{ color: colors.mutedForeground, fontSize: 13, textAlign: "center" }}>
                   {i18n.t("board.column.empty")}
                 </Text>
               </View>
-            ) : null}
-            <Pressable
-              onPress={() => onAddTask(column.id)}
-              style={{
-                padding: spacing.md,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderStyle: "dashed",
-                borderColor: colors.border,
-                alignItems: "center",
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={i18n.t("board.column.addCard")}
-            >
-              <Text style={{ color: colors.mutedForeground }}>
-                {i18n.t("board.column.addCard")}
-              </Text>
-            </Pressable>
-          </ScrollView>
+            }
+            ListFooterComponent={
+              <Pressable
+                onPress={() => onAddTask(column.id)}
+                style={{
+                  padding: spacing.md,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderStyle: "dashed",
+                  borderColor: colors.border,
+                  alignItems: "center",
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={i18n.t("board.column.addCard")}
+              >
+                <Text style={{ color: colors.mutedForeground }}>
+                  {i18n.t("board.column.addCard")}
+                </Text>
+              </Pressable>
+            }
+          />
         </Animated.View>
       </View>
     );
   },
 );
+
+/**
+ * Memoised so a pager-level re-render (search keystroke, drag frame) does not
+ * walk every column and, through them, every card.
+ */
+export const BoardColumn = memo(BoardColumnImpl);

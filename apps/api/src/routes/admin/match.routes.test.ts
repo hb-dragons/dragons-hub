@@ -114,6 +114,23 @@ describe("GET /matches", () => {
     expect(res.status).toBe(400);
     expect(await json(res)).toMatchObject({ code: "VALIDATION_ERROR" });
   });
+
+  // Regression guard: matchListQuerySchema is shared with the public route,
+  // which does declare an opponentApiId filter. This route validates with the
+  // same schema but never destructures individual keys — it passes the whole
+  // validated query straight to getOwnClubMatches — so opponentApiId must
+  // stay undeclared here rather than becoming a silent, undocumented admin
+  // filter. An unrecognized key on a non-strict schema is dropped, not
+  // rejected, so this still returns 200.
+  it("silently ignores an opponentApiId query param (not a declared admin filter)", async () => {
+    mocks.getOwnClubMatches.mockResolvedValue({ items: [], total: 0, limit: 1000, offset: 0, hasMore: false });
+
+    const res = await app.request("/matches?opponentApiId=abc");
+
+    expect(res.status).toBe(200);
+    const call = mocks.getOwnClubMatches.mock.calls[0]![0] as Record<string, unknown>;
+    expect(call).not.toHaveProperty("opponentApiId");
+  });
 });
 
 describe("GET /matches/:id", () => {

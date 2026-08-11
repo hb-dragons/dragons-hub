@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { View, type StyleProp, type ViewStyle } from "react-native";
+import { View } from "react-native";
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -9,13 +9,7 @@ import { useTheme } from "@/hooks/useTheme";
  * (Android, iOS < 26) it falls back to a solid surfaceLow capsule with a hairline
  * border. The single swap-point for the surface treatment.
  */
-export function ComposerSurface({
-  children,
-  style,
-}: {
-  children: ReactNode;
-  style?: StyleProp<ViewStyle>;
-}) {
+export function ComposerSurface({ children }: { children: ReactNode }) {
   const { colors, radius, isDark } = useTheme();
 
   if (isLiquidGlassAvailable()) {
@@ -23,7 +17,7 @@ export function ComposerSurface({
       <GlassView
         glassEffectStyle="regular"
         colorScheme={isDark ? "dark" : "light"}
-        style={[{ borderRadius: radius.lg, overflow: "hidden" }, style]}
+        style={{ borderRadius: radius.lg, overflow: "hidden" }}
       >
         {children}
       </GlassView>
@@ -32,16 +26,13 @@ export function ComposerSurface({
 
   return (
     <View
-      style={[
-        {
-          borderRadius: radius.lg,
-          backgroundColor: colors.surfaceLow,
-          borderWidth: 1,
-          borderColor: colors.border,
-          overflow: "hidden",
-        },
-        style,
-      ]}
+      style={{
+        borderRadius: radius.lg,
+        backgroundColor: colors.surfaceLow,
+        borderWidth: 1,
+        borderColor: colors.border,
+        overflow: "hidden",
+      }}
     >
       {children}
     </View>

@@ -5,31 +5,52 @@ const store = new Map<string, string>();
 const ttls = new Map<string, number>();
 const expiries = new Map<string, number>();
 
+// Flipped on by the Redis-outage tests. With a finite maxRetriesPerRequest the
+// real client rejects during an outage (before the fix it hung forever), so
+// rejecting is what the middleware now has to cope with.
+const redis = { down: false };
+
+function guard(): void {
+  if (redis.down) throw new Error("Reached the max retries per request limit");
+}
+
 vi.mock("../config/redis", () => ({
   getRedis: () => ({
     async get(key: string) {
+      guard();
       return store.get(key) ?? null;
     },
     async set(key: string, value: string, _ex?: string, ttl?: number) {
+      guard();
       store.set(key, value);
       if (ttl) expiries.set(key, Date.now() + ttl * 1000);
       return "OK";
     },
-    async incr(key: string) {
-      const next = (Number(store.get(key)) || 0) + 1;
-      store.set(key, String(next));
-      return next;
-    },
-    async expire(key: string, seconds: number) {
-      ttls.set(key, seconds);
-      return 1;
-    },
     async del(...keys: string[]) {
+      guard();
       for (const k of keys) store.delete(k);
       return 0;
     },
   }),
+  // Stands in for the real EVAL-backed helper: bump the counter and stamp the
+  // TTL in one step, so the failure counter can never be left without an expiry
+  // (which would make failures accumulate forever and lock out a real user).
+  async incrementWithTtl(key: string, seconds: number) {
+    guard();
+    const next = (Number(store.get(key)) || 0) + 1;
+    store.set(key, String(next));
+    ttls.set(key, seconds);
+    return next;
+  },
 }));
+
+const log = vi.hoisted(() => ({
+  warn: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock("../config/logger", () => ({ logger: log }));
 
 import {
   trustForwardedFor,
@@ -43,6 +64,8 @@ beforeEach(() => {
   store.clear();
   ttls.clear();
   expiries.clear();
+  redis.down = false;
+  log.warn.mockClear();
 });
 
 describe("trustForwardedFor", () => {
@@ -297,5 +320,60 @@ describe("signInLockout middleware", () => {
       body: JSON.stringify({ email: "user@x.com" }),
     });
     expect(store.get("auth:fail:unknown:user@x.com")).toBeUndefined();
+  });
+
+  // The lockout counter is a hardening measure, not the credential check —
+  // better-auth still verifies the password and applies its own rate limit. So
+  // a Redis outage must let sign-in through rather than 500 the whole route.
+  describe("with Redis unavailable", () => {
+    it("fails open on the lockout check instead of erroring", async () => {
+      redis.down = true;
+      const handler = vi.fn(() => new Response("ok"));
+      const app = new Hono();
+      app.use("/api/auth/sign-in/email", signInLockout);
+      app.post("/api/auth/sign-in/email", handler);
+
+      const res = await app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "user@x.com", password: "p" }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(handler).toHaveBeenCalled();
+      expect(log.warn).toHaveBeenCalled();
+    });
+
+    it("does not error when recording a failed attempt", async () => {
+      redis.down = true;
+      const app = new Hono();
+      app.use("/api/auth/sign-in/email", signInLockout);
+      app.post("/api/auth/sign-in/email", (c) => c.json({ error: "bad" }, 401));
+
+      const res = await app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "user@x.com" }),
+      });
+
+      expect(res.status).toBe(401);
+      expect(log.warn).toHaveBeenCalled();
+    });
+
+    it("does not error when clearing failures after a successful sign-in", async () => {
+      redis.down = true;
+      const app = new Hono();
+      app.use("/api/auth/sign-in/email", signInLockout);
+      app.post("/api/auth/sign-in/email", (c) => c.json({ ok: true }));
+
+      const res = await app.request("/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "user@x.com", password: "p" }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(log.warn).toHaveBeenCalled();
+    });
   });
 });

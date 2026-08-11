@@ -292,8 +292,43 @@
     {
       "idx": 41,
       "version": "7",
-      "when": 1785080912161,
-      "tag": "0041_productive_firebrand",
+      "when": 1785087652494,
+      "tag": "0041_heavy_killraven",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1785095719119,
+      "tag": "0042_yellow_mentor",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1785136641719,
+      "tag": "0043_digest_mode_immediate",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1785165406303,
+      "tag": "0044_quick_umar",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1785614409144,
+      "tag": "0045_slow_jackpot",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1786435311766,
+      "tag": "0046_busy_hammerhead",
       "breakpoints": true
     }
   ]

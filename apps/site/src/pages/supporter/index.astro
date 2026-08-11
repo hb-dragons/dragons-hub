@@ -1,0 +1,48 @@
+---
+// Port of dragons-app app/pages/supporter/index.vue + PartnerRows: CMS page
+// header (slug=supporter) over the shared ItemRows band and partner list.
+import { getCollection } from "astro:content";
+
+import ItemRows, { type RowItem } from "../../components/ItemRows.astro";
+import PageContainer from "../../components/PageContainer.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import Layout from "../../layouts/Layout.astro";
+import { cmsBaseUrl } from "../../lib/media";
+import { publishedPage } from "../../lib/pages";
+import { publishedOnly } from "../../lib/published";
+import { pageSeo } from "../../lib/seo";
+import { toSiteImage } from "../../lib/site-image";
+import { strings } from "../../lib/strings";
+
+const cmsBase = cmsBaseUrl();
+
+// "partner" is the legacy Strapi slug — accepted until A6 pins the mapping.
+const page = publishedPage(await getCollection("pages"), "supporter", "partner");
+
+const headerTitle = page?.header?.title ?? strings.supporter.fallbackHeading;
+const seo = pageSeo(page, cmsBase, strings.seo.supporter);
+
+// Loader sorts by orderIndex. The legacy supporter page shows each partner's
+// prose (verified live against https://hbdragons.de/supporter/ 2026-08-03),
+// so it carries over the same way projects' description does.
+const partners: RowItem[] = (await getCollection("partners", publishedOnly)).map(({ data }) => ({
+  name: data.name,
+  description: data.description,
+  logo: toSiteImage(data.logo, cmsBase),
+  link: data.url,
+}));
+---
+
+<Layout title={headerTitle} description={seo.description} image={seo.image}>
+  <PageHeader title={headerTitle} image={toSiteImage(page?.header?.image, cmsBase)} />
+
+  <PageContainer>
+    <ItemRows
+      items={partners}
+      heroTitle={strings.supporter.heroTitle}
+      heroDescription={strings.supporter.heroDescription}
+      listTitle={strings.supporter.listTitle}
+      buttonLabel={strings.supporter.buttonLabel}
+    />
+  </PageContainer>
+</Layout>
