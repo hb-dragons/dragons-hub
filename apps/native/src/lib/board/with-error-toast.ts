@@ -9,7 +9,7 @@ export interface ErrorToastHost {
 }
 
 /**
- * Runs `fn`; on rejection fires a warning haptic and an error toast titled
+ * Runs `fn`; on rejection fires an error haptic and an error toast titled
  * with `failKey`'s translation, then re-throws so callers can still branch
  * on failure. The single implementation shared by the board mutation hooks
  * (`useAssigneeMutations`, `useColumnMutations`, `useCommentMutations`) —
@@ -25,7 +25,7 @@ export async function withErrorToast<T>(
   try {
     return await fn();
   } catch (error) {
-    haptics.warning();
+    haptics.error();
     toast.show({ title: i18n.t(failKey), variant: "error" });
     throw error;
   }

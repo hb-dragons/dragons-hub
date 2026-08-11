@@ -55,7 +55,7 @@ export function useMoveTask(boardId: number) {
       }
       // Also try to revalidate so we eventually get server truth.
       void mutate((key) => Array.isArray(key) && key[0] === prefix);
-      haptics.warning();
+      haptics.error();
       toast.show({ title: i18n.t("toast.moveFailed"), variant: "error" });
       throw error;
     }

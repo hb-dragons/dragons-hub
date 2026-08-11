@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const warning = vi.fn();
-vi.mock("@/lib/haptics", () => ({ haptics: { warning: (...a: unknown[]) => warning(...a) } }));
+const error = vi.fn();
+vi.mock("@/lib/haptics", () => ({ haptics: { error: (...a: unknown[]) => error(...a) } }));
 vi.mock("@/lib/i18n", () => ({
   i18n: { t: (k: string) => `translated:${k}` },
 }));
@@ -18,10 +18,10 @@ describe("withErrorToast", () => {
     const result = await withErrorToast(() => Promise.resolve("ok"), "toast.saveFailed", toast);
     expect(result).toBe("ok");
     expect(toast.show).not.toHaveBeenCalled();
-    expect(warning).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
   });
 
-  it("fires a warning haptic, shows the failKey's toast, and rethrows on failure", async () => {
+  it("fires an error haptic, shows the failKey's toast, and rethrows on failure", async () => {
     const toast = { show: vi.fn() };
     const boom = new Error("boom");
 
@@ -29,7 +29,7 @@ describe("withErrorToast", () => {
       withErrorToast(() => Promise.reject(boom), "toast.deleteFailed", toast),
     ).rejects.toBe(boom);
 
-    expect(warning).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledTimes(1);
     expect(toast.show).toHaveBeenCalledWith({
       title: "translated:toast.deleteFailed",
       variant: "error",

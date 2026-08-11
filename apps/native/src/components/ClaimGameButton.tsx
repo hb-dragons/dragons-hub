@@ -5,8 +5,8 @@ import { APIError } from "@dragons/api-client";
 import type { RefereeGameListItem } from "@dragons/shared";
 import { useTheme } from "../hooks/useTheme";
 import { refereeApi } from "../lib/api";
-import { i18n } from "../lib/i18n";
 import { haptics } from "../lib/haptics";
+import { i18n } from "../lib/i18n";
 
 interface ClaimGameButtonProps {
   game: RefereeGameListItem;
@@ -78,7 +78,7 @@ export function ClaimGameButton({
       haptics.success();
       Alert.alert(i18n.t("refereeGame.takeSuccess"));
     } catch (e) {
-      haptics.warning();
+      haptics.error();
       Alert.alert(i18n.t("refereeGame.takeFailed"), claimErrorMessage(e));
     } finally {
       setBusy(null);
@@ -93,7 +93,7 @@ export function ClaimGameButton({
       haptics.success();
       Alert.alert(i18n.t("refereeGame.dropSuccess"));
     } catch (e) {
-      haptics.warning();
+      haptics.error();
       Alert.alert(i18n.t("refereeGame.dropFailed"), dropErrorMessage(e));
     } finally {
       setBusy(null);

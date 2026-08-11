@@ -24,7 +24,7 @@ export function useTaskMutations(boardId: number) {
       ]);
       return next;
     } catch (error) {
-      haptics.warning();
+      haptics.error();
       toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
       throw error;
     }
@@ -40,7 +40,7 @@ export function useTaskMutations(boardId: number) {
         ),
       ]);
     } catch (error) {
-      haptics.warning();
+      haptics.error();
       toast.show({ title: i18n.t("toast.deleteFailed"), variant: "error" });
       throw error;
     }

@@ -116,7 +116,7 @@ export const QuickCreateSheet = forwardRef<QuickCreateSheetHandle>(
           );
           const failed = results.filter((r) => r.status === "rejected").length;
           if (failed > 0) {
-            haptics.warning();
+            haptics.error();
             toast.show({
               title: i18n.t("toast.saveFailed"),
               variant: "error",
@@ -130,7 +130,7 @@ export const QuickCreateSheet = forwardRef<QuickCreateSheetHandle>(
         );
         sheetRef.current?.dismiss();
       } catch {
-        haptics.warning();
+        haptics.error();
         toast.show({ title: i18n.t("toast.saveFailed"), variant: "error" });
       } finally {
         setSubmitting(false);
