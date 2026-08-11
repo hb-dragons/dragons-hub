@@ -29,6 +29,12 @@ vi.mock("../../services/admin/season.service", async (importOriginal) => {
     archiveSeason: mocks.archiveSeason,
   };
 });
+// Defensive: the real `season.service` above transitively imports the real
+// SDK client, so a tracked league seeded into any test here would otherwise
+// reach the live federation from a unit test.
+vi.mock("../../services/sync/sdk-client", () => ({
+  sdkClient: { getSpielplan: vi.fn().mockResolvedValue([]) },
+}));
 vi.mock("../../services/admin/league-discovery.service", () => ({
   browseLeagues: mocks.browseLeagues,
   setSeasonLeagues: mocks.setSeasonLeagues,
@@ -253,5 +259,13 @@ describe("GET /seasons/:id/summary", () => {
     const res = await request("/seasons/not-a-number/summary");
 
     expect(res.status).toBe(400);
+  });
+
+  it("answers 404 for a season that does not exist", async () => {
+    // Not 200 with zeroed counts: that would read as "the season is empty".
+    const res = await request("/seasons/424242/summary");
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
   });
 });

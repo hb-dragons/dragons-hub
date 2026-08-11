@@ -107,6 +107,33 @@ export async function activateSeason(id: number): Promise<Season> {
   return toDto(result);
 }
 
+// The federation scan is one serial `getSpielplan` per tracked league, each
+// behind the shared rate limiter and up to 3 retries, all while an admin waits
+// on the HTTP response. Cap the whole scan rather than the individual calls:
+// what matters is when the request stops being interactive.
+const PLACEHOLDER_SCAN_DEADLINE_MS = 15_000;
+
+/**
+ * Counts the fixture slots the federation has not yet assigned a team to.
+ * Returns `null` when any league is unreadable — a partial total reads as a
+ * confidently low one, so we report nothing instead.
+ */
+async function countPlaceholderSlots(apiLigaIds: number[]): Promise<number | null> {
+  let placeholderSlots = 0;
+  for (const apiLigaId of apiLigaIds) {
+    try {
+      const schedule = await sdkClient.getSpielplan(apiLigaId);
+      for (const match of schedule) {
+        if (!match.homeTeam?.teamPermanentId) placeholderSlots += 1;
+        if (!match.guestTeam?.teamPermanentId) placeholderSlots += 1;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return placeholderSlots;
+}
+
 /**
  * Counts for the wizard's review step.
  *
@@ -116,8 +143,17 @@ export async function activateSeason(id: number): Promise<Season> {
  * then skips the whole match because the team FKs are non-deferrable (#133).
  * Neither table records the slot, so we re-read the schedule to count them —
  * which is also what explains `gameCount` trailing the published schedule.
+ *
+ * The long-term fix is to stop reading the federation here at all:
+ * `data-fetcher` already logs every TBD slot it drops, so persisting that count
+ * per sync run would turn this into a plain database read and remove the
+ * fan-out along with its deadline. Not done yet.
  */
-export async function getSeasonSummary(seasonId: number): Promise<SeasonSummary> {
+export async function getSeasonSummary(
+  seasonId: number,
+  /** `placeholderDeadlineMs` exists so tests can shorten the scan deadline. */
+  options: { placeholderDeadlineMs?: number } = {},
+): Promise<SeasonSummary> {
   const [counts] = await getDb()
     .select({
       leagueCount: sql<number>`count(distinct ${leagues.id})::int`,
@@ -128,31 +164,35 @@ export async function getSeasonSummary(seasonId: number): Promise<SeasonSummary>
     .leftJoin(matches, eq(matches.leagueId, leagues.id))
     .where(eq(seasons.id, seasonId))
     .groupBy(seasons.id);
+  // No row means no such season. Answering 200 with zeroed counts would tell
+  // the onboarding review "this season is empty", which is a different fact.
+  if (!counts) throw new SeasonNotFoundError(seasonId);
 
   const tracked = await getDb()
     .select({ apiLigaId: leagues.apiLigaId })
     .from(leagues)
     .where(and(eq(leagues.seasonRefId, seasonId), eq(leagues.isTracked, true)));
 
-  let placeholderSlots: number | null = 0;
-  for (const league of tracked) {
-    try {
-      const schedule = await sdkClient.getSpielplan(league.apiLigaId);
-      for (const match of schedule) {
-        if (!match.homeTeam?.teamPermanentId) placeholderSlots += 1;
-        if (!match.guestTeam?.teamPermanentId) placeholderSlots += 1;
-      }
-    } catch {
-      // One unreadable league makes the whole count untrustworthy: a partial
-      // total reads as a confidently low one. Report nothing instead.
-      placeholderSlots = null;
-      break;
-    }
+  // On expiry the scan keeps running to completion in the background — there is
+  // nothing to cancel an in-flight SDK call with — but the response no longer
+  // waits for it, and the UI renders the missing count as "—".
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), options.placeholderDeadlineMs ?? PLACEHOLDER_SCAN_DEADLINE_MS);
+  });
+  let placeholderSlots: number | null;
+  try {
+    placeholderSlots = await Promise.race([
+      countPlaceholderSlots(tracked.map((l) => l.apiLigaId)),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(timer);
   }
 
   return {
-    leagueCount: counts?.leagueCount ?? 0,
-    gameCount: counts?.gameCount ?? 0,
+    leagueCount: counts.leagueCount,
+    gameCount: counts.gameCount,
     placeholderSlots,
   };
 }

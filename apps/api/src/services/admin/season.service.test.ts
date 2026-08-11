@@ -20,6 +20,7 @@ import {
   invalidateActiveSeasonCache, activateSeason, archiveSeason, getSeasonSummary,
 } from "./season.service";
 import { leagues, teams, matches } from "@dragons/db/schema";
+import { SeasonNotFoundError } from "./season.errors";
 
 let ctx: TestDbContext;
 beforeAll(async () => { ctx = await setupTestDb(); dbHolder.ref = ctx.db; });
@@ -151,7 +152,9 @@ describe("getSeasonSummary", () => {
     const summary = await getSeasonSummary(seasonId);
 
     // The league still counts toward leagueCount; only the placeholder scan is
-    // tracked-only, so an untracked league contributes no slots.
+    // tracked-only, so an untracked league contributes no slots. That asymmetry
+    // is deliberate, so both halves of it are asserted rather than described.
+    expect(summary.leagueCount).toBe(1);
     expect(summary.placeholderSlots).toBe(0);
     expect(getSpielplan).not.toHaveBeenCalled();
   });
@@ -183,5 +186,32 @@ describe("getSeasonSummary", () => {
     const summary = await getSeasonSummary(seasonId);
 
     expect(summary).toEqual({ leagueCount: 0, gameCount: 0, placeholderSlots: 0 });
+  });
+
+  it("throws for a season that does not exist", async () => {
+    // "No such season" and "a season with nothing in it" are different answers,
+    // and an onboarding review must not read the first as the second.
+    await expect(getSeasonSummary(999_999)).rejects.toBeInstanceOf(SeasonNotFoundError);
+  });
+
+  it("gives up on the federation scan at the deadline instead of holding the request open", async () => {
+    const seasonId = await seedActiveSeason(ctx);
+    await ctx.db.insert(leagues).values({
+      apiLigaId: 504,
+      ligaNr: 4,
+      name: "Slow",
+      seasonId: 0,
+      seasonName: "",
+      seasonRefId: seasonId,
+      isTracked: true,
+    });
+    // A federation that never answers: without a deadline the whole HTTP
+    // response would wait on it.
+    getSpielplan.mockReturnValue(new Promise(() => {}));
+
+    const summary = await getSeasonSummary(seasonId, { placeholderDeadlineMs: 10 });
+
+    expect(summary.placeholderSlots).toBeNull();
+    expect(summary.leagueCount).toBe(1);
   });
 });

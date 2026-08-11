@@ -149,7 +149,10 @@ seasonRoutes.get(
   describeRoute({
     description: "League, game and unassigned-slot counts for a season",
     tags: ["Seasons"],
-    responses: { 200: { description: "Success" } },
+    responses: {
+      200: { description: "Success" },
+      404: { description: "Season not found" },
+    },
   }),
   async (c) => c.json(await getSeasonSummary(c.req.valid("param").id)),
 );
