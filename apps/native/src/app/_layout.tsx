@@ -29,23 +29,13 @@ import { colors as themeColors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { configureNotificationHandler } from "@/lib/push/handler";
+import { installGlobalErrorHandler } from "@/lib/global-error-handler";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { ToastProvider } from "@/hooks/useToast";
 import { ToastHost } from "@/components/ui/ToastHost";
 
 void SplashScreen.preventAutoHideAsync();
 configureNotificationHandler();
-
-// Install a global JS error handler that logs to NSLog BEFORE RCTFatal aborts
-// the app in Release builds. Readable via `idevicesyslog | grep DRAGONS_JS_ERROR`.
-const existingHandler = ErrorUtils.getGlobalHandler();
-ErrorUtils.setGlobalHandler((error, isFatal) => {
-  const err = error as Error | undefined;
-  console.warn(
-    `DRAGONS_JS_ERROR fatal=${String(isFatal)} name=${err?.name} msg=${err?.message} stack=${err?.stack?.split("\n").slice(0, 8).join(" | ")}`,
-  );
-  existingHandler(error, isFatal);
-});
 
 const detailHeaderOptions = {
   headerShown: true,
@@ -152,6 +142,8 @@ export default function RootLayout() {
   const { isLocked, isReady: biometricReady, authenticate } = useBiometricLock();
   const { isPending: sessionPending } = authClient.useSession();
   const [authFailed, setAuthFailed] = useState(false);
+
+  useEffect(() => installGlobalErrorHandler(), []);
 
   // Gating: the authed tree must only render once every independent guard has
   // settled. Three async sources feed this decision:
