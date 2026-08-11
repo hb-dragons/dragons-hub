@@ -144,8 +144,15 @@ return exactly what they do today. The migration is reversible.
 
 - `browseLeagues({ vorabligaOnly? })` → `sdkClient.getAllLigen()` (verband 7),
   returns pickable rows: `ligaId, liganame, skName, akName, geschlecht,
-  vorabliga, liganr` (`liganr` may be `null`). `vorabligaOnly` filters
-  `vorabliga === true`.
+  vorabliga, liganr` (`liganr` may be `null`). `vorabligaOnly` returns leagues
+  flagged `vorabliga === true` **plus the onboardable top tiers**: the federation
+  never flags Regionalliga and above as preliminary, because promotion and
+  relegation there are settled before the season and the leagues are published as
+  committed from the start. A club playing in the Regionalliga still has to pick
+  its league during onboarding, so a strict `vorabliga === true` filter would
+  make that club's league unreachable in the wizard. `isOnboardableTopTier`
+  matches on `skName` containing "regionalliga" (the Spielklasse tier, e.g.
+  "1.Regionalliga" / "2.Regionalliga") and has its own test.
 - `setSeasonLeagues(seasonId, ligaIds[])` → upserts each selected liga into
   `leagues` with `seasonId`, `vorabliga`, `isTracked: true`, keyed on
   `apiLigaId`. Untracking is **scoped to this season** (`seasonId = X AND
