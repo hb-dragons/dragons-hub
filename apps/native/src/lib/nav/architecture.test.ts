@@ -2,7 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { TAB_CONFIG } from "@/lib/nav/tabs";
-import { SOURCE_FILES, importSites, rel, resolveInPackage } from "../../../test/source-tree";
+import {
+  SOURCE_FILES,
+  importSites,
+  importsOf,
+  rel,
+  resolveInPackage,
+} from "../../../test/source-tree";
 
 /**
  * Structural navigation rules, asserted against the real source tree.
@@ -64,6 +70,26 @@ describe("navigation architecture", () => {
     expect(
       SOURCE_FILES.filter((f) => /headerBackTitle(Style)?\b/.test(readFileSync(f, "utf8"))).map(rel),
     ).toEqual([]);
+  });
+
+  // Issue #219: the board's utility sheets are system form sheets now. A
+  // `@gorhom/bottom-sheet` import inside one would mean a JS sheet drawn
+  // inside a native sheet — two sets of detents fighting over the same drag.
+  it("draws no JS bottom sheet inside a sheet route", () => {
+    const offenders = importSites("@gorhom/bottom-sheet").filter((file) =>
+      file.startsWith("src/app/admin/boards/sheets/"),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  // Result tokens are only safe while every registration is paired with a
+  // release. Both halves of that pairing live in these two modules; a third
+  // caller would be a leak waiting to happen.
+  it("reaches the sheet-result table from the two modules that own it", () => {
+    const sites = SOURCE_FILES.filter((file) =>
+      importsOf(file).some((spec) => /(^|\/)sheet-result$/.test(spec)),
+    ).map(rel);
+    expect(sites.sort()).toEqual(["src/hooks/useSheetResult.ts", "src/lib/nav/board-sheets.ts"]);
   });
 
   it("does not declare @react-navigation/* as a dependency", () => {

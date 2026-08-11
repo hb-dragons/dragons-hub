@@ -30,8 +30,13 @@ function sourceFiles(dir: string = SRC_DIR): string[] {
 
 export const SOURCE_FILES = sourceFiles();
 
-/** Module specifiers a file imports, covering `import`, `export ... from` and `require`. */
-function importsOf(file: string): string[] {
+/**
+ * Module specifiers a file imports, covering `import`, `export ... from` and
+ * `require`. Exported for the rules that cannot go through `importSites`
+ * because the same module is reached by more than one specifier form (an `@/`
+ * alias from one file, a relative path from its neighbour).
+ */
+export function importsOf(file: string): string[] {
   const source = readFileSync(file, "utf8");
   const specifiers: string[] = [];
   const pattern = /(?:from|import|require)\s*\(?\s*["']([^"']+)["']/g;

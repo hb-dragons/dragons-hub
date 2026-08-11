@@ -8,5 +8,5 @@ import { vi } from "vitest";
 // reaches a module using one of those will read `undefined` and fail here
 // rather than where it looks. Add the export to this factory when that happens.
 vi.mock("expo-router", () => ({
-  router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() },
+  router: { replace: vi.fn(), push: vi.fn(), back: vi.fn(), dismissTo: vi.fn() },
 }));

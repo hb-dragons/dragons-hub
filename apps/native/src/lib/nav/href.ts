@@ -49,6 +49,18 @@ export const APP_ROUTES: Record<string, (...params: string[]) => RouteHref> = {
   "/sign-in": () => "/sign-in",
   "/admin/boards": () => "/admin/boards",
   "/+not-found": () => "/+not-found",
+  // The board's utility sheets (#219). They are routes, so they are part of the
+  // inventory this table diffs against disk; `board-sheets.ts` is what screens
+  // actually open them through.
+  "/admin/boards/sheets/sort": () => "/admin/boards/sheets/sort",
+  "/admin/boards/sheets/priority": () => "/admin/boards/sheets/priority",
+  "/admin/boards/sheets/due": () => "/admin/boards/sheets/due",
+  "/admin/boards/sheets/add-column": () => "/admin/boards/sheets/add-column",
+  "/admin/boards/sheets/move-to": () => "/admin/boards/sheets/move-to",
+  "/admin/boards/sheets/board-settings": () => "/admin/boards/sheets/board-settings",
+  "/admin/boards/sheets/column-settings": () => "/admin/boards/sheets/column-settings",
+  "/admin/boards/sheets/assignees": () => "/admin/boards/sheets/assignees",
+  "/admin/boards/sheets/assignee-filter": () => "/admin/boards/sheets/assignee-filter",
   "/game/[id]": (id: string) => `/game/${id}`,
   "/team/[id]": (id: string) => `/team/${id}`,
   "/h2h/[teamApiId]": (teamApiId: string) => `/h2h/${teamApiId}`,

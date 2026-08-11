@@ -6,7 +6,11 @@ import { useAssigneeMutations } from "@/hooks/board/useAssigneeMutations";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
-import { useBoardPickers } from "./BoardPickersProvider";
+import {
+  openAssigneePickerSheet,
+  openDuePickerSheet,
+  openPriorityPickerSheet,
+} from "@/lib/nav/board-sheets";
 import { ChecklistSection } from "./ChecklistSection";
 import { CommentsSection } from "./CommentsSection";
 import { formatDueShort } from "./TaskCard";
@@ -49,7 +53,6 @@ export function TaskDetailBody({ task, boardId }: Props) {
   const { colors, spacing, radius } = theme;
   const mutations = useTaskMutations(boardId);
   const assigneeMutations = useAssigneeMutations(boardId);
-  const pickers = useBoardPickers();
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
@@ -327,9 +330,8 @@ export function TaskDetailBody({ task, boardId }: Props) {
           valueColor:
             task.assignees.length === 0 ? colors.mutedForeground : undefined,
           onPress: () =>
-            pickers.openAssignees(
-              task.id,
-              task.assignees,
+            openAssigneePickerSheet(
+              task.assignees.map((a) => a.userId),
               async (selected) => {
                 // Diff against the original set: anything new is added,
                 // anything missing is removed. Errors surface as toasts via
@@ -356,7 +358,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
           label: i18n.t("board.task.priority"),
           value: i18n.t(`board.priority.${task.priority}`),
           onPress: () =>
-            pickers.openPriority(task.priority, (p) => {
+            openPriorityPickerSheet(task.priority, (p) => {
               // Mutation hook surfaces failures via toast; swallow rejection.
               mutations.setPriority(task.id, p).catch(() => {});
             }),
@@ -367,7 +369,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
           value: task.dueDate ? formatDueShort(task.dueDate) : i18n.t("board.task.noDue"),
           valueColor: task.dueDate ? dueColor : colors.mutedForeground,
           onPress: () =>
-            pickers.openDue(task.dueDate, (iso) => {
+            openDuePickerSheet(task.dueDate, (iso) => {
               mutations.setDueDate(task.id, iso).catch(() => {});
             }),
         })}

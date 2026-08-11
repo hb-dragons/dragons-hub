@@ -14,10 +14,6 @@ import { SWRConfig } from "swr";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import {
-  BoardPickersProvider,
-  BoardPickersSheets,
-} from "@/components/board/BoardPickersProvider";
 import { swrConfig } from "@/lib/swr-config";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { LocaleProvider } from "@/hooks/useLocale";
@@ -204,13 +200,13 @@ export default function RootLayout() {
             <LocaleProvider>
               <ThemeProvider>
                 <ToastProvider>
-                  <BoardPickersProvider>
-                    <BottomSheetModalProvider>
-                      <BoardPickersSheets />
-                      <RootNavigator />
-                      <ToastHost />
-                    </BottomSheetModalProvider>
-                  </BoardPickersProvider>
+                  {/* The board's task-detail and quick-create sheets are the
+                      last JS bottom sheets left; the utility sheets became
+                      routes in #219, and #222/#225 finish the job. */}
+                  <BottomSheetModalProvider>
+                    <RootNavigator />
+                    <ToastHost />
+                  </BottomSheetModalProvider>
                 </ToastProvider>
               </ThemeProvider>
             </LocaleProvider>
