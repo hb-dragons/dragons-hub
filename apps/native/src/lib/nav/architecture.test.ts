@@ -74,6 +74,31 @@ describe("navigation architecture", () => {
     ]);
   });
 
+  // Issue #219: the board's utility sheets are system form sheets now. A
+  // `@gorhom/bottom-sheet` import inside one would mean a JS sheet drawn
+  // inside a native sheet — two sets of detents fighting over the same drag.
+  it("draws no JS bottom sheet inside a sheet route", () => {
+    const offenders = SOURCE_FILES.filter(
+      (file) =>
+        rel(file).startsWith("src/app/admin/boards/sheets/") &&
+        importsOf(file).some((spec) => spec.startsWith("@gorhom/bottom-sheet")),
+    ).map(rel);
+    expect(offenders).toEqual([]);
+  });
+
+  // Result tokens are only safe while every registration is paired with a
+  // release. Both halves of that pairing live in these two modules; a third
+  // caller would be a leak waiting to happen.
+  it("reaches the sheet-result table from the two modules that own it", () => {
+    const sites = SOURCE_FILES.filter((file) =>
+      importsOf(file).some((spec) => /(^|\/)sheet-result$/.test(spec)),
+    ).map(rel);
+    expect(sites.sort()).toEqual([
+      "src/hooks/useSheetResult.ts",
+      "src/lib/nav/board-sheets.ts",
+    ]);
+  });
+
   it("does not declare @react-navigation/* as a dependency", () => {
     const pkg = JSON.parse(readFileSync(PACKAGE_JSON, "utf8")) as {
       dependencies?: Record<string, string>;

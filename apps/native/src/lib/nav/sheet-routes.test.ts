@@ -1,0 +1,123 @@
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+import {
+  BOARD_SHEET_ROUTES,
+  SHEET_ROUTE_PREFIX,
+  SHEET_ROUTE_SEGMENT,
+  formSheetOptions,
+  sheetScreenName,
+} from "@/lib/nav/sheet-routes";
+
+/**
+ * The route-tree seam for the board's utility sheets (issue #219).
+ *
+ * `BOARD_SHEET_ROUTES` is the single declaration of which sheets exist and how
+ * they present; `admin/_layout.tsx` renders its `<Stack.Screen>`s straight from
+ * it. These assertions keep the table, the files on disk and the layout from
+ * drifting apart — a sheet added as a route file but never declared, or
+ * declared but presented as a full-screen push, fails here.
+ */
+
+const SRC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const APP_DIR = path.join(SRC_DIR, "app");
+const SHEET_DIR = path.join(APP_DIR, SHEET_ROUTE_SEGMENT);
+const ADMIN_LAYOUT = path.join(APP_DIR, "admin/_layout.tsx");
+
+describe("board sheet routes", () => {
+  it("declares every sheet named by the ticket", () => {
+    expect(BOARD_SHEET_ROUTES.map((route) => route.name).sort()).toEqual(
+      [
+        "add-column",
+        "assignee-filter",
+        "assignees",
+        "board-settings",
+        "column-settings",
+        "due",
+        "move-to",
+        "priority",
+        "sort",
+      ].sort(),
+    );
+  });
+
+  it("backs every declared sheet with a route file", () => {
+    for (const route of BOARD_SHEET_ROUTES) {
+      const file = path.join(SHEET_DIR, `${route.name}.tsx`);
+      expect(existsSync(file), `${route.name} has no route file at ${file}`).toBe(true);
+    }
+  });
+
+  it("declares every route file that sits in the sheet directory", () => {
+    const declared = new Set(BOARD_SHEET_ROUTES.map((route) => route.name));
+    for (const entry of readdirSync(SHEET_DIR)) {
+      const name = entry.replace(/\.tsx$/, "");
+      expect(declared.has(name), `${entry} is a sheet route but is not declared`).toBe(true);
+    }
+  });
+
+  // Everything the acceptance criteria ask for at once: a *form* sheet (not a
+  // push, not a full-screen modal), a visible grabber, and a swipe-down that
+  // dismisses it.
+  it("presents every sheet as a swipe-dismissible form sheet with a grabber", () => {
+    for (const route of BOARD_SHEET_ROUTES) {
+      const options = formSheetOptions(route);
+      expect(options.presentation, route.name).toBe("formSheet");
+      expect(options.sheetGrabberVisible, route.name).toBe(true);
+      expect(options.gestureEnabled, route.name).toBe(true);
+      // The sheets draw their own titles in content; a native header would
+      // eat the height that `fitToContents` exists to save.
+      expect(options.headerShown, route.name).toBe(false);
+    }
+  });
+
+  it("passes each sheet's declared detents through to the native option", () => {
+    for (const route of BOARD_SHEET_ROUTES) {
+      expect(formSheetOptions(route).sheetAllowedDetents, route.name).toEqual(route.detents);
+    }
+  });
+
+  // Three sizes, no more: content-sized, half-then-full, and full. A fourth
+  // one-off value is the smell that a sheet is drawing the wrong thing.
+  it("draws detents from the settled size vocabulary", () => {
+    for (const route of BOARD_SHEET_ROUTES) {
+      expect(["fitToContents", [0.5, 1], [1]], route.name).toContainEqual(route.detents);
+    }
+  });
+
+  // The due sheet is the one the ticket calls out by name: it used to be a
+  // fixed 75% panel with the inline picker floating in it.
+  it("sizes the due-date sheet to its inline picker", () => {
+    const due = BOARD_SHEET_ROUTES.find((route) => route.name === "due");
+    expect(due?.detents).toBe("fitToContents");
+  });
+
+  it("opens every sheet at its smallest detent", () => {
+    for (const route of BOARD_SHEET_ROUTES) {
+      expect(formSheetOptions(route).sheetInitialDetentIndex, route.name).toBe(0);
+    }
+  });
+
+  // The admin layout names screens relative to itself, while the `openX`
+  // helpers push absolute paths. Both are derived from the same segment, so a
+  // rename cannot move one without the other.
+  it("names each screen relative to the admin layout", () => {
+    expect(sheetScreenName({ name: "sort", detents: "fitToContents" })).toBe("boards/sheets/sort");
+    for (const route of BOARD_SHEET_ROUTES) {
+      expect(`${SHEET_ROUTE_PREFIX}/${route.name}`).toBe(
+        `/admin/${sheetScreenName(route)}`,
+      );
+    }
+  });
+
+  it("renders the admin stack's sheet screens from the table", () => {
+    const layout = readFileSync(ADMIN_LAYOUT, "utf8");
+    expect(layout).toContain("BOARD_SHEET_ROUTES");
+    expect(layout).toContain("formSheetOptions");
+    // A hand-written <Stack.Screen name="boards/sheets/..."> would leave the
+    // table describing a presentation nothing reads.
+    expect(layout).not.toMatch(/name="boards\/sheets\//);
+  });
+});

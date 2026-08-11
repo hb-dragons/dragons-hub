@@ -6,12 +6,16 @@ import {
   BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { BoardColumnData, TaskAssignee, TaskPriority } from "@dragons/shared";
+import type { BoardColumnData, TaskPriority } from "@dragons/shared";
 import { adminBoardApi } from "@/lib/api";
 import { useSWRConfig } from "swr";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
-import { useBoardPickers } from "./BoardPickersProvider";
+import {
+  openAssigneePickerSheet,
+  openDuePickerSheet,
+  openPriorityPickerSheet,
+} from "@/lib/nav/board-sheets";
 import { formatDueShort } from "./TaskCard";
 import { useToast } from "@/hooks/useToast";
 import { haptics } from "@/lib/haptics";
@@ -45,7 +49,6 @@ export const QuickCreateSheet = forwardRef<QuickCreateSheetHandle>(
     const { colors, spacing, radius } = theme;
     const insets = useSafeAreaInsets();
     const { mutate } = useSWRConfig();
-    const pickers = useBoardPickers();
     const toast = useToast();
 
     useImperativeHandle(
@@ -65,33 +68,23 @@ export const QuickCreateSheet = forwardRef<QuickCreateSheetHandle>(
       [],
     );
 
-    const syntheticAssignees: TaskAssignee[] = useMemo(
-      () =>
-        [...assigneeIds].map((userId) => ({
-          userId,
-          name: null,
-          assignedAt: "",
-        })),
-      [assigneeIds],
-    );
-
     const openDue = useCallback(() => {
-      pickers.openDue(dueDate, (iso) => {
+      openDuePickerSheet(dueDate, (iso) => {
         setDueDate(iso);
       });
-    }, [dueDate, pickers]);
+    }, [dueDate]);
 
     const openAssignees = useCallback(() => {
-      pickers.openAssignees(0, syntheticAssignees, (selected) => {
+      openAssigneePickerSheet(assigneeIds, (selected) => {
         // No task exists yet — just stash the selection and PUT each
         // assignee after the task is created on submit.
         setAssigneeIds(new Set(selected));
       });
-    }, [syntheticAssignees, pickers]);
+    }, [assigneeIds]);
 
     const openPriority = useCallback(() => {
-      pickers.openPriority(priority, (p) => setPriority(p));
-    }, [priority, pickers]);
+      openPriorityPickerSheet(priority, (p) => setPriority(p));
+    }, [priority]);
 
     const submit = async () => {
       if (!args || selectedColumnId == null) return;

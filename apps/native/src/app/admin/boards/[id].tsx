@@ -9,29 +9,28 @@ import { bottomSearchToolbarClearance } from "@/lib/ui/search-toolbar";
 import { useBoard } from "@/hooks/board/useBoard";
 import { useBoardTasks } from "@/hooks/board/useBoardTasks";
 import { useTaskMutations } from "@/hooks/board/useTaskMutations";
-import { useMoveTask } from "@/hooks/board/useMoveTask";
 import { useBoardDrag } from "@/hooks/board/useBoardDrag";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager";
 import { TaskDetailSheet, type TaskDetailSheetHandle } from "@/components/board/TaskDetailSheet";
 import { TaskContextMenu, type TaskContextMenuHandle, type TaskContextAction } from "@/components/board/TaskContextMenu";
-import { MoveToSheet, type MoveToSheetHandle } from "@/components/board/MoveToSheet";
-import { useBoardPickers } from "@/components/board/BoardPickersProvider";
 import { QuickCreateSheet, type QuickCreateSheetHandle } from "@/components/board/QuickCreateSheet";
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
-import {
-  AssigneeFilterSheet,
-  type AssigneeFilterSheetHandle,
-} from "@/components/board/AssigneeFilterSheet";
 import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
-import { SortSheet, type SortSheetHandle } from "@/components/board/SortSheet";
+import {
+  openAddColumnSheet,
+  openAssigneeFilterSheet,
+  openBoardSettingsSheet,
+  openColumnSettingsSheet,
+  openDuePickerSheet,
+  openMoveToSheet,
+  openPriorityPickerSheet,
+  openSortSheet,
+} from "@/lib/nav/board-sheets";
 import { boardTaskComparator } from "@dragons/shared";
 import { useColumnDrag } from "@/hooks/board/useColumnDrag";
 import { TaskCardSkeleton } from "@/components/board/TaskCardSkeleton";
-import { BoardSettingsSheet, type BoardSettingsSheetHandle } from "@/components/board/BoardSettingsSheet";
-import { ColumnSettingsSheet, type ColumnSettingsSheetHandle } from "@/components/board/ColumnSettingsSheet";
-import { AddColumnSheet, type AddColumnSheetHandle } from "@/components/board/AddColumnSheet";
 import type { BoardColumnHandle } from "@/components/board/BoardColumn";
 import type { BoardColumnData } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
@@ -140,20 +139,12 @@ function BoardDetailBody() {
       isPad: (Platform as { isPad?: boolean }).isPad ?? false,
     });
   const [activeIndex, setActiveIndex] = useState(0);
-  const pickers = useBoardPickers();
   const lastPriorityRef = useRef<TaskPriority>("normal");
   const pagerRef = useRef<BoardPagerHandle | null>(null);
   const taskSheetRef = useRef<TaskDetailSheetHandle | null>(null);
   const contextMenuRef = useRef<TaskContextMenuHandle | null>(null);
-  const moveToSheetRef = useRef<MoveToSheetHandle | null>(null);
   const quickCreateRef = useRef<QuickCreateSheetHandle | null>(null);
-  const settingsSheetRef = useRef<BoardSettingsSheetHandle | null>(null);
-  const columnSettingsRef = useRef<ColumnSettingsSheetHandle | null>(null);
-  const addColumnRef = useRef<AddColumnSheetHandle | null>(null);
-  const assigneeFilterRef = useRef<AssigneeFilterSheetHandle | null>(null);
-  const sortSheetRef = useRef<SortSheetHandle | null>(null);
   const taskMutations = useTaskMutations(boardId);
-  const moveTask = useMoveTask(boardId);
   const toast = useToast();
 
   // Per-column ScrollView handles for imperatively scrolling (autoscroll).
@@ -169,12 +160,6 @@ function BoardDetailBody() {
   );
 
   const columnDrag = useColumnDrag(boardId, columns);
-
-  const countsByColumn = useMemo(() => {
-    const m = new Map<number, number>();
-    for (const t of tasks ?? []) m.set(t.columnId, (m.get(t.columnId) ?? 0) + 1);
-    return m;
-  }, [tasks]);
 
   // ---------------------------------------------------------------------------
   // Focus-based revalidation
@@ -281,21 +266,14 @@ function BoardDetailBody() {
     (task: TaskCardData) => {
       const runAction = (action: TaskContextAction) => {
         if (action === "move") {
-          moveToSheetRef.current?.open({
-            task,
-            columns,
-            countsByColumn,
-            onMove: async (columnId, position) => {
-              await moveTask(task.id, columnId, position);
-            },
-          });
+          openMoveToSheet(boardId, task.id);
         } else if (action === "priority") {
-          pickers.openPriority(task.priority, (p) => {
+          openPriorityPickerSheet(task.priority, (p) => {
             // Mutation hook surfaces failures via toast; swallow rejection.
             taskMutations.setPriority(task.id, p).catch(() => {});
           });
         } else if (action === "due") {
-          pickers.openDue(task.dueDate, (iso) => {
+          openDuePickerSheet(task.dueDate, (iso) => {
             taskMutations.setDueDate(task.id, iso).catch(() => {});
           });
         } else if (action === "delete") {
@@ -329,23 +307,23 @@ function BoardDetailBody() {
 
       contextMenuRef.current?.open({ task, onAction: runAction });
     },
-    [columns, countsByColumn, moveTask, taskMutations, pickers, handleTaskDelete],
+    [boardId, taskMutations, handleTaskDelete],
   );
 
   const onPressPriorityChip = useCallback(() => {
     const starting = filters.priority ?? lastPriorityRef.current;
-    pickers.openPriority(starting, (p) => {
+    openPriorityPickerSheet(starting, (p) => {
       lastPriorityRef.current = p;
       setFilters((f) => ({ ...f, priority: p }));
     });
-  }, [filters.priority, pickers]);
+  }, [filters.priority]);
 
   const onClearPriorityFilter = useCallback(() => {
     setFilters((f) => ({ ...f, priority: null }));
   }, []);
 
   const onPressAssignees = useCallback(() => {
-    assigneeFilterRef.current?.open(filters.assigneeIds, (next) => {
+    openAssigneeFilterSheet(filters.assigneeIds, (next) => {
       setFilters((f) => ({ ...f, assigneeIds: next }));
     });
   }, [filters.assigneeIds]);
@@ -367,13 +345,13 @@ function BoardDetailBody() {
 
   const onColumnLongPress = useCallback(
     (col: BoardColumnData) => {
-      columnSettingsRef.current?.open({ boardId, column: col });
+      openColumnSettingsSheet(boardId, col.id);
     },
     [boardId],
   );
 
   const onAddColumnPress = useCallback(() => {
-    addColumnRef.current?.open({ boardId });
+    openAddColumnSheet(boardId);
   }, [boardId]);
 
   const openQuickCreateFab = useCallback(() => {
@@ -421,7 +399,7 @@ function BoardDetailBody() {
               }}
             >
               <Pressable
-                onPress={() => sortSheetRef.current?.open(sort, setSort)}
+                onPress={() => openSortSheet(sort, setSort)}
                 accessibilityRole="button"
                 accessibilityLabel={i18n.t("board.sort.open")}
                 hitSlop={12}
@@ -443,9 +421,7 @@ function BoardDetailBody() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => {
-                  if (board) settingsSheetRef.current?.open({ board });
-                }}
+                onPress={() => openBoardSettingsSheet(boardId)}
                 accessibilityRole="button"
                 accessibilityLabel={i18n.t("admin.boards.settingsTitle")}
                 hitSlop={12}
@@ -649,13 +625,7 @@ function BoardDetailBody() {
 
       <TaskDetailSheet ref={taskSheetRef} boardId={boardId} />
       <TaskContextMenu ref={contextMenuRef} />
-      <MoveToSheet ref={moveToSheetRef} />
       <QuickCreateSheet ref={quickCreateRef} />
-      <BoardSettingsSheet ref={settingsSheetRef} />
-      <ColumnSettingsSheet ref={columnSettingsRef} />
-      <AddColumnSheet ref={addColumnRef} />
-      <AssigneeFilterSheet ref={assigneeFilterRef} />
-      <SortSheet ref={sortSheetRef} />
     </View>
   );
 }
