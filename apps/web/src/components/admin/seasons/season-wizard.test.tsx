@@ -3,17 +3,15 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 
-const { browse, create, setLeagues, trigger, syncLogs, summary, toastError, toastSuccess } =
-  vi.hoisted(() => ({
-    browse: vi.fn(),
-    create: vi.fn(),
-    setLeagues: vi.fn(),
-    trigger: vi.fn(),
-    syncLogs: vi.fn(),
-    summary: vi.fn(),
-    toastError: vi.fn(),
-    toastSuccess: vi.fn(),
-  }));
+const { browse, create, setLeagues, trigger, syncLogs, summary, toastError } = vi.hoisted(() => ({
+  browse: vi.fn(),
+  create: vi.fn(),
+  setLeagues: vi.fn(),
+  trigger: vi.fn(),
+  syncLogs: vi.fn(),
+  summary: vi.fn(),
+  toastError: vi.fn(),
+}));
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -23,7 +21,7 @@ vi.mock("@/lib/api", () => ({
 }));
 vi.mock("swr", () => ({ useSWRConfig: () => ({ mutate: vi.fn() }) }));
 vi.mock("next-intl", () => ({ useTranslations: () => (k: string) => k }));
-vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }));
+vi.mock("sonner", () => ({ toast: { error: toastError } }));
 
 // The real component opens an EventSource; the wizard only needs its
 // onComplete callback, so stand in a button that fires it on demand.
@@ -246,6 +244,49 @@ describe("SeasonWizard", () => {
 
     await screen.findByText("settings.seasons.wizard.close");
     expect(summary).toHaveBeenCalledWith(9);
+  });
+
+  it("reviews what the sync produced", async () => {
+    summary.mockResolvedValue({ leagueCount: 3, gameCount: 42, placeholderSlots: 0 });
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+    fireEvent.click(await screen.findByTestId("live-logs"));
+
+    await screen.findByText("settings.seasons.wizard.reviewLeagues");
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
+    // No unassigned slots, so the explanatory line stays out of the way.
+    expect(
+      screen.queryByText("settings.seasons.wizard.reviewPlaceholderHint"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("explains unassigned fixture slots when there are any", async () => {
+    summary.mockResolvedValue({ leagueCount: 1, gameCount: 8, placeholderSlots: 4 });
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+    fireEvent.click(await screen.findByTestId("live-logs"));
+
+    await screen.findByText("settings.seasons.wizard.reviewPlaceholderHint");
+    expect(screen.getByText("4")).toBeInTheDocument();
+  });
+
+  it("marks the counts unavailable when the summary could not be read", async () => {
+    summary.mockRejectedValue(new Error("api down"));
+    render(<SeasonWizard open onOpenChange={() => {}} />);
+    nameAndAdvance();
+    await screen.findByText("Oberliga Herren Ost");
+    fireEvent.click(screen.getByLabelText("Oberliga Herren Ost"));
+    fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
+    fireEvent.click(await screen.findByTestId("live-logs"));
+
+    await screen.findByText("settings.seasons.wizard.reviewUnavailable");
   });
 
   it("recovers from a transient log-fetch failure instead of stranding on the log panel", async () => {

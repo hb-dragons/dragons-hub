@@ -361,7 +361,43 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
 
         {step === "done" && (
           <div className="space-y-4 py-2">
-            <p className="text-sm">{t("settings.seasons.wizard.done")}</p>
+            {summary === null ? (
+              <p className="text-sm text-muted-foreground">
+                {t("settings.seasons.wizard.reviewUnavailable")}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <dl className="grid grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">
+                      {t("settings.seasons.wizard.reviewLeagues")}
+                    </dt>
+                    <dd className="text-2xl font-semibold">{summary.leagueCount}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">
+                      {t("settings.seasons.wizard.reviewGames")}
+                    </dt>
+                    <dd className="text-2xl font-semibold">{summary.gameCount}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">
+                      {t("settings.seasons.wizard.reviewPlaceholders")}
+                    </dt>
+                    <dd className="text-2xl font-semibold">
+                      {summary.placeholderSlots ?? "—"}
+                    </dd>
+                  </div>
+                </dl>
+                {/* Unassigned slots are why the game count trails the published
+                    schedule, so say so rather than leaving a bare number. */}
+                {summary.placeholderSlots !== null && summary.placeholderSlots > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings.seasons.wizard.reviewPlaceholderHint")}
+                  </p>
+                )}
+              </div>
+            )}
             <DialogFooter>
               <Button onClick={() => handleOpenChange(false)}>
                 {t("settings.seasons.wizard.close")}
