@@ -23,6 +23,7 @@
 
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
+import { execSync } from "node:child_process";
 import { z } from "zod";
 
 // The planner emits its plan as JSON inside <plan> tags; Output.object extracts
@@ -43,14 +44,36 @@ const planSchema = z.object({
 // Raise this if your backlog is large; lower it for a quick smoke-test run.
 const MAX_ITERATIONS = 10;
 
+// pnpm inside the sandbox must resolve the same store path that the host's
+// node_modules/.modules.yaml records (an absolute host path) — otherwise it
+// treats every node_modules as foreign, and either aborts wanting to purge it
+// or, worse, builds a fresh multi-GB store inside the workspace. The store
+// base is mounted at its own absolute path and configured explicitly:
+// `pnpm config set --global` covers pnpm commands the agent runs on its own,
+// and the install hook passes --store-dir as well in case that config write
+// ever fails. pnpm appends the store version itself (base → base/v11), which
+// is exactly how the host derives it. The npm_config_store_dir env var is NOT
+// used because pnpm 11 ignores it (verified against 11.21.0).
+const pnpmStoreBase = execSync("pnpm store path", { encoding: "utf8" })
+  .trim()
+  .replace(/\/v\d+$/, "");
+
+const makeSandbox = () =>
+  docker({
+    mounts: [{ hostPath: pnpmStoreBase, sandboxPath: pnpmStoreBase }],
+  });
+
 // Hooks run inside the sandbox before the agent starts each iteration.
 // pnpm install tops up whatever the node_modules copy below missed; the
 // timeout covers a cold install of the full workspace if the copy fails.
+// CI=1 keeps pnpm from aborting on any confirmation prompt in the TTY-less
+// sandbox.
 const hooks = {
   sandbox: {
     onSandboxReady: [
+      { command: `pnpm config set store-dir ${pnpmStoreBase} --global` },
       {
-        command: "pnpm install --frozen-lockfile --prefer-offline",
+        command: `CI=1 pnpm install --frozen-lockfile --prefer-offline --store-dir ${pnpmStoreBase}`,
         timeoutMs: 900_000,
       },
     ],
@@ -96,7 +119,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // -------------------------------------------------------------------------
   const plan = await sandcastle.run({
     hooks,
-    sandbox: docker(),
+    sandbox: makeSandbox(),
     name: "planner",
     // One iteration is enough: the planner just needs to read and reason,
     // not write code. (Structured output requires maxIterations: 1.)
@@ -139,7 +162,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     issues.map(async (issue) => {
       const sandbox = await sandcastle.createSandbox({
         branch: issue.branch,
-        sandbox: docker(),
+        sandbox: makeSandbox(),
         hooks,
         copyToWorktree,
       });
@@ -231,7 +254,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // -------------------------------------------------------------------------
   await sandcastle.run({
     hooks,
-    sandbox: docker(),
+    sandbox: makeSandbox(),
     name: "merger",
     maxIterations: 1,
     agent: sandcastle.claudeCode("claude-opus-5"),

@@ -35,6 +35,11 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 # Add Claude to PATH
 ENV PATH="/home/agent/.local/bin:$PATH"
 
+# pnpm's global bin dir must be in PATH or `pnpm config set --global` (used by
+# the sandbox-ready hook to pin the store location) refuses to run.
+ENV PNPM_HOME="/home/agent/.local/share/pnpm"
+ENV PATH="$PNPM_HOME/bin:$PATH"
+
 WORKDIR /home/agent
 
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at /home/agent/workspace
