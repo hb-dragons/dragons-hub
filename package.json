@@ -17,15 +17,19 @@
     "check:i18n": "pnpm --filter @dragons/web i18n:check",
     "security:audit": "pnpm audit --audit-level=high --ignore-registry-errors",
     "knip": "knip",
+    "sandcastle": "tsx .sandcastle/main.mts",
     "clean": "turbo clean",
     "seed:extract": "pnpm --filter @dragons/api exec tsx ../../scripts/extract-test-seed.ts"
   },
   "devDependencies": {
+    "@ai-hero/sandcastle": "^0.12.0",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^5.2.0",
     "knip": "^6.13.1",
+    "tsx": "^4.23.12",
     "turbo": "^2.9.14",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.58.2"
+    "typescript-eslint": "^8.58.2",
+    "zod": "^4.4.3"
   }
 }
