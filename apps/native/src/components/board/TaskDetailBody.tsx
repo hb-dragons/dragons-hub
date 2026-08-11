@@ -92,6 +92,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
   const mutations = useTaskMutations(boardId);
   const assigneeMutations = useAssigneeMutations(boardId);
   const deleteTask = useDeleteTaskWithUndo(boardId);
+  const deleteLabel = i18n.t(taskAction("delete").labelKey);
   // The board is in the cache the screen underneath filled, so the column name
   // is there on first render; `undefined` only while a deep link opens the
   // sheet cold.
@@ -330,7 +331,6 @@ export function TaskDetailBody({ task, boardId }: Props) {
           deleteTask(task);
         }}
         accessibilityRole="button"
-        accessibilityLabel={i18n.t(taskAction("delete").labelKey)}
         style={{
           flexDirection: "row",
           alignItems: "center",
@@ -343,7 +343,7 @@ export function TaskDetailBody({ task, boardId }: Props) {
       >
         <Icon name="delete" size={16} color={colors.destructive} />
         <Text style={{ color: colors.destructive, fontSize: 15, fontWeight: "600" }}>
-          {i18n.t(taskAction("delete").labelKey)}
+          {deleteLabel}
         </Text>
       </Pressable>
     </>
