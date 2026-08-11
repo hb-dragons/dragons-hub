@@ -4,11 +4,9 @@ import { useRouter } from "expo-router";
 import useSWR from "swr";
 import type { PublicTeam } from "@dragons/api-client";
 import { useTheme } from "@/hooks/useTheme";
-import { Screen } from "@/components/Screen";
-import { SectionHeader } from "@/components/SectionHeader";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { StandingsTable } from "@/components/StandingsTable";
 import { publicApi } from "@/lib/api";
-import { i18n } from "@/lib/i18n";
 
 /** Build a lookup map from every name a standings row may use → team record */
 function buildTeamLookup(teams: PublicTeam[]): Map<string, PublicTeam> {
@@ -21,17 +19,16 @@ function buildTeamLookup(teams: PublicTeam[]): Map<string, PublicTeam> {
   return map;
 }
 
-interface StandingsScreenProps {
-  /** Top padding clearing a transparent stack header, when pushed rather than a tab root. */
-  headerOffset?: number;
-}
-
 /**
  * The league tables. Rendered by two routes: the Standings tab that Fans get,
  * and `/league-tables`, the pushed screen Staff reach from Home when the
  * Officiating tab has taken the Standings slot.
+ *
+ * Both sit under a native large-title header carrying the screen title, so
+ * this renders content only and takes no props: the two routes differ in how
+ * they are reached, not in what they show.
  */
-export function StandingsScreen({ headerOffset }: StandingsScreenProps) {
+export function StandingsScreen() {
   const { colors, spacing } = useTheme();
   const router = useRouter();
 
@@ -63,7 +60,7 @@ export function StandingsScreen({ headerOffset }: StandingsScreenProps) {
 
   if (isLoading) {
     return (
-      <Screen headerOffset={headerOffset}>
+      <Screen edges={UNDER_NATIVE_HEADER}>
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: spacing.xl }}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -89,11 +86,9 @@ export function StandingsScreen({ headerOffset }: StandingsScreenProps) {
 
   return (
     <Screen
-      headerOffset={headerOffset}
+      edges={UNDER_NATIVE_HEADER}
       onRefresh={[() => mutateStandings(), () => mutateTeams()]}
     >
-      <SectionHeader title={i18n.t("standings.title")} />
-
       {leagues.map((league) => (
         <View key={league.leagueId} style={{ marginBottom: spacing.lg }}>
           <StandingsTable

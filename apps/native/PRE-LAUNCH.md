@@ -200,12 +200,17 @@ board filter/sort prefs moved off SecureStore onto plain AsyncStorage
 the cold-start path for these. The auth session token is still on
 SecureStore (it's an actual secret).
 
-- [ ] Flatten `team/[id].tsx`: the nested `<FlatList scrollEnabled=
-      false>` inside `<Screen>`'s ScrollView defeats virtualization.
-      Convert to a single `<FlatList>` with `ListHeaderComponent`.
-- [ ] Pause inactive-segment SWR in `schedule.tsx` and `referee.tsx`
-      (`isPaused: segment !== "upcoming"` etc). Right now the other
-      segment's 1000-item fetch fires on mount and is thrown away.
+- [x] ~~Flatten `team/[id].tsx`: the nested `<FlatList scrollEnabled=
+      false>` inside `<Screen>`'s ScrollView defeats virtualization.~~
+      Done — it is a single `<FlatList>` with `ListHeaderComponent`
+      inside `<Screen scroll={false}>`. #216 added a check to
+      `lib/nav/architecture.test.ts` so no screen re-nests one: besides
+      the virtualization cost, the outer ScrollView is what a native
+      large title would track instead of the list.
+- [ ] Pause inactive-segment SWR in `schedule/index.tsx` and
+      `officiating/index.tsx` (`isPaused: segment !== "upcoming"` etc).
+      Right now the other segment's 1000-item fetch fires on mount and
+      is thrown away.
 - [ ] Fix memoised cards: `MatchCardFull` / `MatchCardCompact` /
       `TeamCard` are `memo`-wrapped but callers pass inline
       `onPress={() => router.push(...)}`, defeating memo. Either
@@ -215,8 +220,9 @@ SecureStore (it's an actual secret).
 
 ### Polish
 
-- [ ] Extract the `SegmentedControl` component duplicated in
-      `schedule.tsx` and `referee.tsx`.
+- [x] ~~Extract the `SegmentedControl` component duplicated in
+      `schedule.tsx` and `referee.tsx`.~~ Done — both tab roots render
+      `components/ui/Segmented.tsx`, which wraps the platform control.
 - [ ] Extract `getResultBadge` + `resolveName` (duplicated in
       `MatchCardFull` and `MatchCardCompact`) into a shared match
       helper.

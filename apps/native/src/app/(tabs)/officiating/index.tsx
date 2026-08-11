@@ -12,11 +12,10 @@ import { useRouter } from "expo-router";
 import useSWR from "swr";
 import { APIError } from "@dragons/api-client";
 import { can, isReferee, type RefereeGameListItem } from "@dragons/shared";
-import { SectionHeader } from "@/components/SectionHeader";
 import { Segmented } from "@/components/ui/Segmented";
 import { useTheme } from "@/hooks/useTheme";
 import { useRefresh } from "@/hooks/useRefresh";
-import { Screen } from "@/components/Screen";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { RefereeGameCard } from "@/components/RefereeGameCard";
 import { AssignRefereeModal } from "@/components/AssignRefereeModal";
 import { authClient } from "@/lib/auth-client";
@@ -239,8 +238,7 @@ export default function OfficiatingScreen() {
 
   if (isLoading) {
     return (
-      <Screen scroll={false}>
-        <SectionHeader title={i18n.t("refereeTab.title")} />
+      <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
         <View
           style={{
             flex: 1,
@@ -257,8 +255,7 @@ export default function OfficiatingScreen() {
 
   if (error) {
     return (
-      <Screen scroll={false}>
-        <SectionHeader title={i18n.t("refereeTab.title")} />
+      <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
         <View
           style={{
             flex: 1,
@@ -297,80 +294,77 @@ export default function OfficiatingScreen() {
   }
 
   return (
-    <Screen scroll={false}>
-      <SectionHeader title={i18n.t("refereeTab.title")} />
-      <Segmented segments={segments} selected={segment} onSelect={setSegment} />
-      {sections.length === 0 ? (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingTop: spacing["2xl"],
-          }}
-        >
-          <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
-            {i18n.t(emptyKey)}
-          </Text>
-        </View>
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => String(item.id)}
-          renderSectionHeader={({ section }) => (
-            <View
+    <Screen edges={UNDER_NATIVE_HEADER} scroll={false}>
+      <SectionList
+        sections={sections}
+        // This list is the screen's scroll view, so it is the one the native
+        // header insets and the large title collapses against. The segment
+        // switcher rides inside it for the same reason.
+        contentInsetAdjustmentBehavior="automatic"
+        ListHeaderComponent={
+          <Segmented segments={segments} selected={segment} onSelect={setSegment} />
+        }
+        ListEmptyComponent={
+          <View style={{ alignItems: "center", paddingTop: spacing["2xl"] }}>
+            <Text style={[textStyles.body, { color: colors.mutedForeground }]}>
+              {i18n.t(emptyKey)}
+            </Text>
+          </View>
+        }
+        keyExtractor={(item) => String(item.id)}
+        renderSectionHeader={({ section }) => (
+          <View
+            style={{
+              backgroundColor: colors.background,
+              paddingVertical: spacing.xs,
+              paddingTop: spacing.md,
+            }}
+          >
+            <Text
               style={{
-                backgroundColor: colors.background,
-                paddingVertical: spacing.xs,
-                paddingTop: spacing.md,
+                fontSize: 13,
+                fontFamily: fontFamilies.bodySemiBold,
+                color: colors.mutedForeground,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontFamily: fontFamilies.bodySemiBold,
-                  color: colors.mutedForeground,
-                }}
-              >
-                {section.formattedTitle}
-              </Text>
-            </View>
-          )}
-          renderItem={({ item }) => (
-            <View style={{ marginBottom: spacing.sm }}>
-              <RefereeGameCard
-                game={item}
-                isAdmin={isAdmin}
-                onAdminAssign={
-                  isAdmin
-                    ? (slotNumber) =>
-                        setAssignModal({ game: item, slotNumber })
-                    : undefined
+              {section.formattedTitle}
+            </Text>
+          </View>
+        )}
+        renderItem={({ item }) => (
+          <View style={{ marginBottom: spacing.sm }}>
+            <RefereeGameCard
+              game={item}
+              isAdmin={isAdmin}
+              onAdminAssign={
+                isAdmin
+                  ? (slotNumber) =>
+                      setAssignModal({ game: item, slotNumber })
+                  : undefined
+              }
+              onAdminUnassign={
+                isAdmin
+                  ? (slotNumber, name) => {
+                      void handleUnassign(item, slotNumber, name);
+                    }
+                  : undefined
+              }
+              onPress={() => {
+                const isOwnClubGame = item.isHomeGame || item.isGuestGame;
+                if (isOwnClubGame && item.matchId !== null) {
+                  router.push(`/game/${String(item.matchId)}`);
+                } else {
+                  router.push(`/referee-game/${String(item.id)}`);
                 }
-                onAdminUnassign={
-                  isAdmin
-                    ? (slotNumber, name) => {
-                        void handleUnassign(item, slotNumber, name);
-                      }
-                    : undefined
-                }
-                onPress={() => {
-                  const isOwnClubGame = item.isHomeGame || item.isGuestGame;
-                  if (isOwnClubGame && item.matchId !== null) {
-                    router.push(`/game/${String(item.matchId)}`);
-                  } else {
-                    router.push(`/referee-game/${String(item.id)}`);
-                  }
-                }}
-              />
-            </View>
-          )}
-          refreshControl={refreshControl}
-          contentContainerStyle={listContentStyle}
-          showsVerticalScrollIndicator={false}
-          stickySectionHeadersEnabled={false}
-        />
-      )}
+              }}
+            />
+          </View>
+        )}
+        refreshControl={refreshControl}
+        contentContainerStyle={listContentStyle}
+        showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
+      />
       <AssignRefereeModal
         visible={assignModal !== null}
         game={assignModal?.game ?? null}

@@ -1,7 +1,7 @@
 import { View, Text, Pressable } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { visibleSurfaces } from "@dragons/shared";
-import { Screen } from "@/components/Screen";
+import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Card } from "@/components/Card";
 import { useTheme } from "@/hooks/useTheme";
@@ -23,8 +23,8 @@ export default function TodayScreen() {
     .filter((s): s is NonNullable<typeof s> => Boolean(s));
 
   return (
-    <Screen>
-      <SectionHeader title={i18n.t("today.title")} />
+    <Screen edges={UNDER_NATIVE_HEADER}>
+      {/* No screen title here: the stack's large title carries it. */}
       {items.length === 0 ? (
         <View style={{ marginTop: spacing.lg, gap: spacing.xs }}>
           <Text style={[textStyles.body, { color: colors.foreground }]}>
