@@ -1003,7 +1003,17 @@
         "synced": "Season synced successfully",
         "syncFailed": "Sync failed — check the sync log",
         "discoverFailed": "Could not load leagues from the federation",
-        "createFailed": "Could not create the season"
+        "createFailed": "Could not create the season",
+        "startDateLabel": "Start date (optional)",
+        "endDateLabel": "End date (optional)"
+      },
+      "subtitle": "Prepare next season's leagues in the background, then make it live.",
+      "empty": "No seasons yet. Create one to start tracking a season's leagues.",
+      "columns": {
+        "name": "Season",
+        "status": "Status",
+        "leagues": "Leagues",
+        "games": "Games"
       }
     },
     "pushTest": {

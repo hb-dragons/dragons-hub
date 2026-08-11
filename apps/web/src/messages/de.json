@@ -1003,7 +1003,17 @@
         "synced": "Saison erfolgreich synchronisiert",
         "syncFailed": "Synchronisierung fehlgeschlagen — Sync-Log prüfen",
         "discoverFailed": "Ligen konnten nicht vom Verband geladen werden",
-        "createFailed": "Saison konnte nicht erstellt werden"
+        "createFailed": "Saison konnte nicht erstellt werden",
+        "startDateLabel": "Startdatum (optional)",
+        "endDateLabel": "Enddatum (optional)"
+      },
+      "subtitle": "Die Ligen der nächsten Saison im Hintergrund vorbereiten und dann live schalten.",
+      "empty": "Noch keine Saisons. Lege eine an, um die Ligen einer Saison zu verfolgen.",
+      "columns": {
+        "name": "Saison",
+        "status": "Status",
+        "leagues": "Ligen",
+        "games": "Spiele"
       }
     },
     "pushTest": {

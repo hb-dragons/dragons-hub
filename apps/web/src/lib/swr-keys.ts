@@ -38,7 +38,8 @@ export const SWR_KEYS = {
   refereeEligibleGames: (refereeId: number) =>
     `/admin/referees/${refereeId}/eligible-open-games`,
   refereeRules: (refereeId: number) => `/admin/referees/${refereeId}/rules`,
-  standings: "/admin/standings",
+  standings: (seasonId?: number) =>
+    seasonId === undefined ? "/admin/standings" : `/admin/standings?seasonId=${seasonId}`,
   venues: "/admin/venues",
   settingsClub: "/admin/settings/club",
   settingsLeagues: "/admin/settings/leagues",

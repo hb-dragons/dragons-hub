@@ -144,11 +144,13 @@ export async function setSeasonLeagues(
 }
 
 export async function getTrackedLeagues(seasonId?: number): Promise<TrackedLeaguesResponse> {
+  // No season named and none active: answer with nothing rather than dropping
+  // the season predicate. Falling back to an unscoped read returned every
+  // season's tracked leagues at once — the archived ones alongside the live
+  // ones — which is precisely what season scoping exists to prevent.
   const scopeId = seasonId !== undefined ? seasonId : await getActiveSeasonId();
-  const where =
-    scopeId === null
-      ? eq(leagues.isTracked, true)
-      : and(eq(leagues.isTracked, true), eq(leagues.seasonRefId, scopeId));
+  if (scopeId === null) return { leagueNumbers: [], leagues: [] };
+  const where = and(eq(leagues.isTracked, true), eq(leagues.seasonRefId, scopeId));
   const tracked = await getDb()
     .select({
       id: leagues.id,

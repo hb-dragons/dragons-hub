@@ -1,8 +1,9 @@
 // apps/api/src/services/admin/season.service.ts
 import { getDb } from "../../config/database";
-import { seasons, leagues } from "@dragons/db/schema";
+import { seasons, leagues, matches } from "@dragons/db/schema";
 import { eq, sql } from "drizzle-orm";
 import type { Season, SeasonWithCounts } from "@dragons/shared";
+import { SeasonNotFoundError } from "./season.errors";
 
 function toDto(row: typeof seasons.$inferSelect): Season {
   return {
@@ -60,27 +61,45 @@ export async function createSeason(input: {
 export async function listSeasons(): Promise<SeasonWithCounts[]> {
   const rows = await getDb()
     .select({
-      id: seasons.id, name: seasons.name, sdkSeasonId: seasons.sdkSeasonId,
-      status: seasons.status, startDate: seasons.startDate, endDate: seasons.endDate,
-      createdAt: seasons.createdAt, updatedAt: seasons.updatedAt,
-      leagueCount: sql<number>`count(${leagues.id})::int`,
+      id: seasons.id,
+      name: seasons.name,
+      sdkSeasonId: seasons.sdkSeasonId,
+      status: seasons.status,
+      startDate: seasons.startDate,
+      endDate: seasons.endDate,
+      createdAt: seasons.createdAt,
+      updatedAt: seasons.updatedAt,
+      leagueCount: sql<number>`count(distinct ${leagues.id})::int`,
+      // Games are what an admin is actually checking for when preparing a
+      // season — a season with leagues but no fixtures means the sync has not
+      // run yet. Counted through the league join, since matches carry no season
+      // of their own.
+      gameCount: sql<number>`count(distinct ${matches.id})::int`,
     })
     .from(seasons)
     .leftJoin(leagues, eq(leagues.seasonRefId, seasons.id))
+    .leftJoin(matches, eq(matches.leagueId, leagues.id))
     .groupBy(seasons.id)
     .orderBy(seasons.createdAt);
-  return rows.map((r) => ({ ...toDto(r), leagueCount: r.leagueCount }));
+  return rows.map((r) => ({
+    ...toDto(r),
+    leagueCount: r.leagueCount,
+    gameCount: r.gameCount,
+  }));
 }
 
 export async function activateSeason(id: number): Promise<Season> {
   const result = await getDb().transaction(async (tx) => {
-    await tx.update(seasons).set({ status: "archived", updatedAt: new Date() }).where(eq(seasons.status, "active"));
+    await tx
+      .update(seasons)
+      .set({ status: "archived", updatedAt: new Date() })
+      .where(eq(seasons.status, "active"));
     const [row] = await tx
       .update(seasons)
       .set({ status: "active", updatedAt: new Date() })
       .where(eq(seasons.id, id))
       .returning();
-    if (!row) throw new Error(`Season ${id} not found`);
+    if (!row) throw new SeasonNotFoundError(id);
     return row;
   });
   invalidateActiveSeasonCache();
@@ -93,7 +112,7 @@ export async function archiveSeason(id: number): Promise<Season> {
     .set({ status: "archived", updatedAt: new Date() })
     .where(eq(seasons.id, id))
     .returning();
-  if (!row) throw new Error(`Season ${id} not found`);
+  if (!row) throw new SeasonNotFoundError(id);
   invalidateActiveSeasonCache();
   return toDto(row);
 }

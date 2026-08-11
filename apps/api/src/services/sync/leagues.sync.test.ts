@@ -78,6 +78,7 @@ function makeLigaData(overrides: Record<string, unknown> = {}) {
     geschlecht: "m",
     verbandId: 7,
     verbandName: "DBB",
+    vorabliga: false,
     ...overrides,
   };
 }
@@ -95,6 +96,7 @@ function hashOf(ligaData: ReturnType<typeof makeLigaData>): string {
     geschlecht: ligaData.geschlecht,
     verbandId: ligaData.verbandId,
     verbandName: ligaData.verbandName,
+    vorabliga: ligaData.vorabliga,
   });
 }
 
@@ -399,5 +401,67 @@ describe("syncLeagues season gate", () => {
     expect(result.total).toBe(2);
     const fetched = mockGetTabelleResponse.mock.calls.map((c) => c[0]).sort();
     expect(fetched).toEqual([601, 602]);
+  });
+});
+
+describe("syncLeagues vorabliga + season backfill", () => {
+  it("clears vorabliga when a preliminary league becomes committed", async () => {
+    const league = await seedLeague({ apiLigaId: 701, vorabliga: true });
+    mockGetTabelleResponse.mockResolvedValue({ ligaData: makeLigaData({ vorabliga: false }) });
+
+    const result = await syncLeagues();
+
+    expect(result.updated).toBe(1);
+    expect((await leagueRow(league.id)).vorabliga).toBe(false);
+  });
+
+  it("notices the promotion even when nothing else about the league changed", async () => {
+    // vorabliga was missing from the change hash, so a payload that differed
+    // only by this flag hashed identically and the row was skipped as unchanged.
+    const preliminary = makeLigaData({ vorabliga: true });
+    const league = await seedLeague({
+      apiLigaId: 702,
+      vorabliga: true,
+      dataHash: hashOf(preliminary),
+    });
+    mockGetTabelleResponse.mockResolvedValue({ ligaData: makeLigaData({ vorabliga: false }) });
+
+    const result = await syncLeagues();
+
+    expect(result.skipped).toBe(0);
+    expect(result.updated).toBe(1);
+    expect((await leagueRow(league.id)).vorabliga).toBe(false);
+  });
+
+  it("records the federation's season id on a season that has none yet", async () => {
+    // A season created through the wizard carries only the admin's label; the
+    // WAM list has no seasonName for preliminary leagues to derive it from.
+    await seedLeague({ apiLigaId: 703 });
+    mockGetTabelleResponse.mockResolvedValue({ ligaData: makeLigaData({ seasonId: 2077 }) });
+
+    await syncLeagues();
+
+    const [season] = await ctx.db
+      .select()
+      .from(seasons)
+      .where(eq(seasons.id, activeSeasonId));
+    expect(season!.sdkSeasonId).toBe(2077);
+  });
+
+  it("never overwrites a season id that is already recorded", async () => {
+    await ctx.db
+      .update(seasons)
+      .set({ sdkSeasonId: 1999 })
+      .where(eq(seasons.id, activeSeasonId));
+    await seedLeague({ apiLigaId: 704 });
+    mockGetTabelleResponse.mockResolvedValue({ ligaData: makeLigaData({ seasonId: 2077 }) });
+
+    await syncLeagues();
+
+    const [season] = await ctx.db
+      .select()
+      .from(seasons)
+      .where(eq(seasons.id, activeSeasonId));
+    expect(season!.sdkSeasonId).toBe(1999);
   });
 });

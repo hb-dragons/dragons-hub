@@ -83,7 +83,14 @@ describe("SeasonWizard", () => {
     await screen.findByText("Oberliga Herren Ost");
     fireEvent.click(screen.getAllByRole("checkbox")[0]!);
     fireEvent.click(screen.getByText("settings.seasons.wizard.confirm"));
-    await waitFor(() => expect(create).toHaveBeenCalledWith({ name: "2026/27" }));
+    // Both dates are optional and left blank here, so they go over as null.
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({
+        name: "2026/27",
+        startDate: null,
+        endDate: null,
+      }),
+    );
     expect(setLeagues).toHaveBeenCalledWith(9, { ligaIds: [1] });
     await waitFor(() => expect(trigger).toHaveBeenCalled());
     expect(await screen.findByText("settings.seasons.wizard.done")).toBeInTheDocument();

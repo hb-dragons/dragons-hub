@@ -26,6 +26,8 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
   const { mutate } = useSWRConfig();
   const [step, setStep] = useState<Step>("name");
   const [name, setName] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [leagues, setLeagues] = useState<BrowsableLeague[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState("");
@@ -96,7 +98,12 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
     try {
       let id = createdId;
       if (id === null) {
-        const season = await api.seasons.create({ name });
+        const season = await api.seasons.create({
+          name,
+          // The contract takes null for "not set"; an empty date input is "".
+          startDate: startDate || null,
+          endDate: endDate || null,
+        });
         id = season.id;
         setCreatedId(id);
       }
@@ -163,6 +170,32 @@ export function SeasonWizard({ open, onOpenChange }: { open: boolean; onOpenChan
                 if (e.key === "Enter" && name.trim() && !loadingLeagues) void loadLeagues();
               }}
             />
+            {/* Both optional. The federation does not publish season dates, so
+                they are the admin's own note of when this season runs. */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="season-start" className="text-sm font-medium">
+                  {t("settings.seasons.wizard.startDateLabel")}
+                </label>
+                <Input
+                  id="season-start"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="season-end" className="text-sm font-medium">
+                  {t("settings.seasons.wizard.endDateLabel")}
+                </label>
+                <Input
+                  id="season-end"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+            </div>
             <DialogFooter>
               <Button disabled={!name.trim() || loadingLeagues} onClick={() => { void loadLeagues(); }}>
                 {loadingLeagues && <Loader2 className="size-4 animate-spin" />}

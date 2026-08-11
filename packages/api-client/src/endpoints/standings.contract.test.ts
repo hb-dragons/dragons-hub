@@ -1,13 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
+import { standingsListQuerySchema } from "@dragons/contracts";
 import { ApiClient } from "../client";
 import { standingsEndpoints } from "./standings";
 
-/** Build a client whose fetch records the outgoing request url + method + body. */
 function recordingClient() {
-  const calls: { url: string; method: string; body: unknown }[] = [];
+  const calls: { url: string; method: string }[] = [];
   const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-    const body = init?.body ? JSON.parse(init.body as string) : undefined;
-    calls.push({ url: String(url), method: init?.method ?? "GET", body });
+    calls.push({ url: String(url), method: init?.method ?? "GET" });
     return new Response("[]", {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -20,11 +19,25 @@ function recordingClient() {
   return { api: standingsEndpoints(client), calls };
 }
 
-describe("standings endpoints hit the right path/verb", () => {
-  it("list issues GET /admin/standings", async () => {
+describe("standings query satisfies its @dragons/contracts schema", () => {
+  it("list() with no season targets the bare path", async () => {
     const { api, calls } = recordingClient();
     await api.list();
     expect(new URL(calls[0]!.url).pathname).toBe("/admin/standings");
+    expect(new URL(calls[0]!.url).search).toBe("");
     expect(calls[0]!.method).toBe("GET");
+  });
+
+  it("list({ seasonId }) sends a seasonId the contract accepts", async () => {
+    const { api, calls } = recordingClient();
+    await api.list({ seasonId: 7 });
+
+    const query = Object.fromEntries(new URL(calls[0]!.url).searchParams);
+    const parsed = standingsListQuerySchema.safeParse(query);
+    expect(
+      parsed.error?.issues,
+      "standingsListQuerySchema rejected the list query",
+    ).toBeUndefined();
+    expect(parsed.data).toEqual({ seasonId: 7 });
   });
 });

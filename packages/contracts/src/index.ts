@@ -219,6 +219,11 @@ export {
 } from "./league";
 
 export {
+  standingsListQuerySchema,
+  type StandingsListQuery,
+} from "./standings";
+
+export {
   scoreboardListQuerySchema,
   scoreboardLastEventIdSchema,
   scoreboardDeviceQuerySchema,

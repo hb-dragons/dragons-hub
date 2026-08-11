@@ -19,6 +19,8 @@ export interface Season {
 
 export interface SeasonWithCounts extends Season {
   leagueCount: number;
+  /** Fixtures pulled for this season's leagues — 0 until the sync has run. */
+  gameCount: number;
 }
 
 export interface BrowsableLeague {

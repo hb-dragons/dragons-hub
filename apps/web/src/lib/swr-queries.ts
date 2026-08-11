@@ -74,7 +74,10 @@ export function makeQueries(api: Api) {
     }),
     // teams / standings / venues
     teams: () => ({ key: SWR_KEYS.teams, fetcher: () => api.teams.list() }),
-    standings: () => ({ key: SWR_KEYS.standings, fetcher: () => api.standings.list() }),
+    standings: (seasonId?: number) => ({
+      key: SWR_KEYS.standings(seasonId),
+      fetcher: () => api.standings.list(seasonId === undefined ? {} : { seasonId }),
+    }),
     venues: () => ({ key: SWR_KEYS.venues, fetcher: () => api.venues.list() }),
     // referee-admin
     refereesPaginated: (opts: Parameters<typeof normReferees>[0] = {}) => {

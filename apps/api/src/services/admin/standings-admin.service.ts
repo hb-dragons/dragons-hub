@@ -4,85 +4,96 @@ import { eq, and, asc } from "drizzle-orm";
 import type { LeagueStandings } from "@dragons/shared";
 import { withActiveSeason } from "../season-scope";
 
-export async function getStandings(): Promise<LeagueStandings[]> {
-  return withActiveSeason(async (seasonId) => {
-    const rows = await getDb()
-      .select({
-        leagueId: leagues.id,
-        leagueName: leagues.name,
-        seasonName: leagues.seasonName,
-        position: standings.position,
-        teamApiId: standings.teamApiId,
-        clubId: teams.clubId,
-        teamName: teams.name,
-        teamNameShort: teams.nameShort,
-        isOwnClub: teams.isOwnClub,
-        verzicht: teams.verzicht,
-        displayOrder: teams.displayOrder,
-        played: standings.played,
-        won: standings.won,
-        lost: standings.lost,
-        pointsFor: standings.pointsFor,
-        pointsAgainst: standings.pointsAgainst,
-        pointsDiff: standings.pointsDiff,
-        leaguePoints: standings.leaguePoints,
-      })
-      .from(standings)
-      .innerJoin(leagues, eq(standings.leagueId, leagues.id))
-      .innerJoin(teams, eq(standings.teamApiId, teams.apiTeamPermanentId))
-      .where(and(eq(leagues.isTracked, true), eq(leagues.seasonRefId, seasonId)))
-      .orderBy(asc(leagues.name), asc(standings.position));
+/**
+ * Standings for one season's tracked leagues.
+ *
+ * `seasonId` is optional and defaults to the active season. The public
+ * standings route calls this with no argument and must keep doing so — only the
+ * admin route lets a caller name a season, so an admin can check an upcoming
+ * season's table while the public site stays on the live one.
+ */
+export async function getStandings(seasonId?: number): Promise<LeagueStandings[]> {
+  if (seasonId !== undefined) return standingsForSeason(seasonId);
+  return withActiveSeason(standingsForSeason, []);
+}
 
-    const grouped = new Map<number, LeagueStandings>();
-    const leagueOrder = new Map<number, number>();
+async function standingsForSeason(seasonId: number): Promise<LeagueStandings[]> {
+  const rows = await getDb()
+    .select({
+      leagueId: leagues.id,
+      leagueName: leagues.name,
+      seasonName: leagues.seasonName,
+      position: standings.position,
+      teamApiId: standings.teamApiId,
+      clubId: teams.clubId,
+      teamName: teams.name,
+      teamNameShort: teams.nameShort,
+      isOwnClub: teams.isOwnClub,
+      verzicht: teams.verzicht,
+      displayOrder: teams.displayOrder,
+      played: standings.played,
+      won: standings.won,
+      lost: standings.lost,
+      pointsFor: standings.pointsFor,
+      pointsAgainst: standings.pointsAgainst,
+      pointsDiff: standings.pointsDiff,
+      leaguePoints: standings.leaguePoints,
+    })
+    .from(standings)
+    .innerJoin(leagues, eq(standings.leagueId, leagues.id))
+    .innerJoin(teams, eq(standings.teamApiId, teams.apiTeamPermanentId))
+    .where(and(eq(leagues.isTracked, true), eq(leagues.seasonRefId, seasonId)))
+    .orderBy(asc(leagues.name), asc(standings.position));
 
-    for (const row of rows) {
-      let league = grouped.get(row.leagueId);
-      if (!league) {
-        league = {
-          leagueId: row.leagueId,
-          leagueName: row.leagueName,
-          seasonName: row.seasonName,
-          standings: [],
-        };
-        grouped.set(row.leagueId, league);
-      }
-      league.standings.push({
-        position: row.position,
-        teamApiId: row.teamApiId,
-        clubId: row.clubId,
-        teamName: row.teamName,
-        teamNameShort: row.teamNameShort,
-        isOwnClub: row.isOwnClub ?? false,
-        verzicht: row.verzicht ?? false,
-        played: row.played,
-        won: row.won,
-        lost: row.lost,
-        pointsFor: row.pointsFor,
-        pointsAgainst: row.pointsAgainst,
-        pointsDiff: row.pointsDiff,
-        leaguePoints: row.leaguePoints,
-      });
+  const grouped = new Map<number, LeagueStandings>();
+  const leagueOrder = new Map<number, number>();
 
-      if (row.isOwnClub) {
-        const current = leagueOrder.get(row.leagueId);
-        if (current === undefined || row.displayOrder < current) {
-          leagueOrder.set(row.leagueId, row.displayOrder);
-        }
+  for (const row of rows) {
+    let league = grouped.get(row.leagueId);
+    if (!league) {
+      league = {
+        leagueId: row.leagueId,
+        leagueName: row.leagueName,
+        seasonName: row.seasonName,
+        standings: [],
+      };
+      grouped.set(row.leagueId, league);
+    }
+    league.standings.push({
+      position: row.position,
+      teamApiId: row.teamApiId,
+      clubId: row.clubId,
+      teamName: row.teamName,
+      teamNameShort: row.teamNameShort,
+      isOwnClub: row.isOwnClub ?? false,
+      verzicht: row.verzicht ?? false,
+      played: row.played,
+      won: row.won,
+      lost: row.lost,
+      pointsFor: row.pointsFor,
+      pointsAgainst: row.pointsAgainst,
+      pointsDiff: row.pointsDiff,
+      leaguePoints: row.leaguePoints,
+    });
+
+    if (row.isOwnClub) {
+      const current = leagueOrder.get(row.leagueId);
+      if (current === undefined || row.displayOrder < current) {
+        leagueOrder.set(row.leagueId, row.displayOrder);
       }
     }
+  }
 
-    // Sort leagues by their own-club team's displayOrder (leagues without an
-    // own-club team fall to the end alphabetically).
-    return Array.from(grouped.values()).sort((a, b) => {
-      const aOrder = leagueOrder.get(a.leagueId);
-      const bOrder = leagueOrder.get(b.leagueId);
-      if (aOrder !== undefined && bOrder !== undefined) {
-        return aOrder - bOrder || a.leagueName.localeCompare(b.leagueName);
-      }
-      if (aOrder !== undefined) return -1;
-      if (bOrder !== undefined) return 1;
-      return a.leagueName.localeCompare(b.leagueName);
-    });
-  }, []);
+  // Sort leagues by their own-club team's displayOrder (leagues without an
+  // own-club team fall to the end alphabetically).
+  return Array.from(grouped.values()).sort((a, b) => {
+    const aOrder = leagueOrder.get(a.leagueId);
+    const bOrder = leagueOrder.get(b.leagueId);
+    if (aOrder !== undefined && bOrder !== undefined) {
+      return aOrder - bOrder || a.leagueName.localeCompare(b.leagueName);
+    }
+    if (aOrder !== undefined) return -1;
+    if (bOrder !== undefined) return 1;
+    return a.leagueName.localeCompare(b.leagueName);
+  });
 }

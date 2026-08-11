@@ -72,7 +72,10 @@ seasonRoutes.post(
   describeRoute({
     description: "Activate a season (archives the prior active one)",
     tags: ["Seasons"],
-    responses: { 200: { description: "Success" } },
+    responses: {
+      200: { description: "Success" },
+      404: { description: "Season not found" },
+    },
   }),
   async (c) => c.json(await activateSeason(c.req.valid("param").id)),
 );
@@ -84,7 +87,10 @@ seasonRoutes.post(
   describeRoute({
     description: "Archive a season",
     tags: ["Seasons"],
-    responses: { 200: { description: "Success" } },
+    responses: {
+      200: { description: "Success" },
+      404: { description: "Season not found" },
+    },
   }),
   async (c) => c.json(await archiveSeason(c.req.valid("param").id)),
 );

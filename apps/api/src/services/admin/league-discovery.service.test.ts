@@ -296,7 +296,9 @@ describe("getTrackedLeagues", () => {
     expect(result.leagues.map((l) => l.apiLigaId)).toEqual([11111]);
   });
 
-  it("returns all tracked leagues when no active season exists", async () => {
+  it("returns nothing when no season is named and none is active", async () => {
+    // Dropping the season predicate here used to return every season's tracked
+    // leagues at once, mixing archived ones into the settings list.
     const s1 = await makeSeason("archived");
     const s2 = await makeSeason("upcoming");
     await ctx.client.query(
@@ -306,8 +308,8 @@ describe("getTrackedLeagues", () => {
       [s1, s2],
     );
     mockGetActiveSeasonId.mockResolvedValue(null);
-    const result = await getTrackedLeagues();
-    expect(result.leagues.map((l) => l.apiLigaId)).toHaveLength(2);
+
+    expect(await getTrackedLeagues()).toEqual({ leagueNumbers: [], leagues: [] });
   });
 });
 

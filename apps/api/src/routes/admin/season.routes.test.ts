@@ -29,6 +29,7 @@ vi.mock("../../middleware/rbac", () => ({
 vi.mock("../../config/logger", () => ({ logger: { error: vi.fn() } }));
 
 import { seasonRoutes } from "./season.routes";
+import { SeasonNotFoundError } from "../../services/admin/season.errors";
 import { errorHandler } from "../../middleware/error";
 
 const app = new Hono<AppEnv>();
@@ -167,5 +168,27 @@ describe("PUT /seasons/:id/leagues", () => {
       body: JSON.stringify({ ligaIds: [54136] }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("addressing a season that no longer exists", () => {
+  // A stale seasons list, or two admins racing on the same row. This used to
+  // surface as a 500 because the service threw a bare Error.
+  it("answers 404 when activating a missing season", async () => {
+    mocks.activateSeason.mockRejectedValue(new SeasonNotFoundError(42));
+
+    const res = await app.request("/seasons/42/activate", { method: "POST" });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("answers 404 when archiving a missing season", async () => {
+    mocks.archiveSeason.mockRejectedValue(new SeasonNotFoundError(42));
+
+    const res = await app.request("/seasons/42/archive", { method: "POST" });
+
+    expect(res.status).toBe(404);
+    expect(await json(res)).toMatchObject({ code: "NOT_FOUND" });
   });
 });

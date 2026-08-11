@@ -6,10 +6,24 @@ import type {
   TrackedLeaguesResponse,
   LeagueTeamsResponse,
 } from "@dragons/shared";
-import type { CreateSeasonBody, SeasonLeaguesBody } from "@dragons/contracts";
+import type {
+  BrowseLeaguesQuery,
+  CreateSeasonBody,
+  SeasonLeaguesBody,
+} from "@dragons/contracts";
 import type { ApiClient } from "../client";
 
+/**
+ * `browseLeaguesQuerySchema` parses `vorabligaOnly` / `ownClubOnly` from strings,
+ * so the inferred body type is booleans while the wire form is a query string.
+ * One cast, next to the two calls that need it, rather than one per call site.
+ */
+type BrowseQueryParams = Record<string, string | number | boolean | undefined>;
+
 export function seasonsEndpoints(client: ApiClient) {
+  const browseLeagues = (path: string, query?: BrowseLeaguesQuery) =>
+    client.get<BrowsableLeague[]>(path, query as BrowseQueryParams);
+
   return {
     list(): Promise<SeasonWithCounts[]> {
       return client.get("/admin/seasons");
@@ -23,20 +37,13 @@ export function seasonsEndpoints(client: ApiClient) {
     archive(id: number): Promise<Season> {
       return client.post(`/admin/seasons/${id}/archive`);
     },
-    browse(query?: { vorabligaOnly?: boolean; ownClubOnly?: boolean }): Promise<BrowsableLeague[]> {
-      return client.get(
-        "/admin/seasons/browse",
-        query as Record<string, string | number | boolean | undefined>,
-      );
+    /** Federation leagues, not tied to a season. */
+    browse(query?: BrowseLeaguesQuery): Promise<BrowsableLeague[]> {
+      return browseLeagues("/admin/seasons/browse", query);
     },
-    discover(
-      id: number,
-      query?: { vorabligaOnly?: boolean; ownClubOnly?: boolean },
-    ): Promise<BrowsableLeague[]> {
-      return client.get(
-        `/admin/seasons/${id}/discover`,
-        query as Record<string, string | number | boolean | undefined>,
-      );
+    /** As `browse`, but each row also says whether this season already tracks it. */
+    discover(id: number, query?: BrowseLeaguesQuery): Promise<BrowsableLeague[]> {
+      return browseLeagues(`/admin/seasons/${id}/discover`, query);
     },
     getLeagues(id: number): Promise<TrackedLeaguesResponse> {
       return client.get(`/admin/seasons/${id}/leagues`);
