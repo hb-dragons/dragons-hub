@@ -65,9 +65,9 @@ describe("navigation architecture", () => {
     expect(importSites("@react-navigation")).toEqual([]);
   });
 
-  // ADR 0003: native tabs stay, contained. `unstable-native-tabs` is alpha API
-  // and will churn; keeping it behind one wrapper makes that churn a one-file
-  // fix rather than a sweep across every screen that names a tab.
+  // ADR 0003 (#212): native tabs stay, contained. `unstable-native-tabs` is
+  // alpha API and will churn; keeping it behind one wrapper makes that churn a
+  // one-file fix rather than a sweep across every screen that names a tab.
   it("reaches the unstable native-tabs API from the AppTabs wrapper only", () => {
     expect(importSites("expo-router/unstable-native-tabs")).toEqual([
       "src/components/nav/AppTabs.tsx",

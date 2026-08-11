@@ -3,8 +3,8 @@ import type { MaterialIcon, SFSymbolIcon } from "expo-router/unstable-native-tab
 
 /**
  * The app's tab bar, and the only module allowed to import
- * `expo-router/unstable-native-tabs` (ADR 0003, enforced by
- * `lib/nav/architecture.test.ts`).
+ * `expo-router/unstable-native-tabs` (ADR 0003 of the native modernization
+ * spec, #212; enforced by `lib/nav/architecture.test.ts`).
  *
  * The API behind this file is alpha and expected to churn between SDK
  * releases. Everything upstream of it — the tab registry in `lib/nav/tabs.ts`,

@@ -124,7 +124,7 @@ invisible.
 
 - [ ] Pick a service (Sentry, Bugsnag, Crashlytics) and create a
       project for the org.
-- [ ] Wire it into `_layout.tsx` global handler and `ErrorBoundary`.
+- [ ] Wire it into `lib/global-error-handler.ts` and `ErrorBoundary`.
 - [ ] Upload source maps via EAS build hook (e.g. the Sentry Expo
       config plugin) so stack traces symbolicate.
 
