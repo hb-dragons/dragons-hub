@@ -70,6 +70,21 @@ const PATTERNS = Object.entries(APP_ROUTES).map(([pattern, build]) => ({
 }));
 
 /**
+ * The values a pattern's dynamic segments take for this path, in order, or
+ * `null` when the pattern does not describe the path at all.
+ */
+function matchParams(pattern: string[], segments: string[]): string[] | null {
+  if (pattern.length !== segments.length) return null;
+  const params: string[] = [];
+  for (const [index, expected] of pattern.entries()) {
+    const actual = segments[index]!;
+    if (isDynamicSegment(expected)) params.push(actual);
+    else if (expected !== actual) return null;
+  }
+  return params;
+}
+
+/**
  * Turn a path that arrived from outside the type system — a notification
  * payload, which is remote input — into an href the router is known to have a
  * screen for, or `null`.
@@ -88,15 +103,8 @@ export function resolveDeepLink(link: string): RouteHref | null {
     .filter((segment) => segment.length > 0 && !isGroupSegment(segment));
 
   for (const { segments: pattern, build } of PATTERNS) {
-    if (pattern.length !== segments.length) continue;
-    const params: string[] = [];
-    const matches = pattern.every((expected, index) => {
-      const actual = segments[index]!;
-      if (!isDynamicSegment(expected)) return expected === actual;
-      params.push(actual);
-      return true;
-    });
-    if (matches) return build(...params);
+    const params = matchParams(pattern, segments);
+    if (params) return build(...params);
   }
   return null;
 }
