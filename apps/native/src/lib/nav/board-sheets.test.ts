@@ -13,6 +13,7 @@ import {
   openQuickCreateSheet,
   openSortSheet,
   openTaskDetailSheet,
+  taskDetailHref,
 } from "@/lib/nav/board-sheets";
 import {
   __resetSheetResultsForTests,
@@ -153,6 +154,16 @@ describe("board sheet navigation", () => {
       const { pathname, params } = pushed();
       expect(pathname).toBe("/admin/boards/sheets/task-detail");
       expect(params).toEqual({ boardId: 7, taskId: 42 });
+    });
+
+    // The task context menu (#220) is a `<Link>`, so it needs the href itself
+    // rather than a helper that pushes it. Both come from one definition:
+    // a menu that previewed a different address than the tap opens would be
+    // the same drift the openers exist to prevent.
+    it("hands out the same task detail href the opener pushes", () => {
+      openTaskDetailSheet(7, 42);
+
+      expect(taskDetailHref(7, 42)).toEqual(pushed());
     });
 
     // The column the user started from, not the whole column list: the sheet

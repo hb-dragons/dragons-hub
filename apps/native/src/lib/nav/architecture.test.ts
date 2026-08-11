@@ -90,14 +90,38 @@ describe("navigation architecture", () => {
   // screen, so it no longer knows to lift for the keyboard.
   //
   // The list is what is left of the JS sheet layer, and it shrinks to nothing:
-  // the task menu is #220's, the board-create sheet and the provider in the
-  // root layout go with the library in #225.
-  it("has the JS bottom sheet layer down to its last three sites", () => {
+  // the task menu was #220's, and the board-create sheet and the provider in
+  // the root layout go with the library in #225.
+  it("has the JS bottom sheet layer down to its last two sites", () => {
     expect(importSites("@gorhom/bottom-sheet")).toEqual([
       "src/app/_layout.tsx",
       "src/components/board/CreateBoardSheet.tsx",
-      "src/components/board/TaskContextMenu.tsx",
     ]);
+  });
+
+  // Issue #220, ADR 0002: item-level actions belong behind a real context
+  // menu. `ActionSheetIOS` was the sanctioned interim while there was no
+  // first-party menu in the app; there is one now (`TaskContextMenu`), so the
+  // sanctioned set is empty and an action sheet reappearing is a regression to
+  // the pattern the ADR replaced.
+  it("reaches for no action sheet, on either platform", () => {
+    const offenders = SOURCE_FILES.filter((file) =>
+      reactNativeImports(readFileSync(file, "utf8")).includes("ActionSheetIOS"),
+    ).map(rel);
+
+    expect(offenders).toEqual([]);
+    expect(importSites("@expo/react-native-action-sheet")).toEqual([]);
+  });
+
+  // The other half of "one implementation serves both platforms": the menu is
+  // declared in one component, so a second surface wanting task actions asks
+  // that component for them rather than growing its own list.
+  it("declares the native link menu in one component", () => {
+    const sites = SOURCE_FILES.filter((file) =>
+      /<Link\.(Menu|Preview)\b/.test(readFileSync(file, "utf8")),
+    ).map(rel);
+
+    expect(sites).toEqual(["src/components/board/TaskContextMenu.tsx"]);
   });
 
   // Issue #223: the referee-assignment picker was the app's last React Native
@@ -167,6 +191,9 @@ describe("navigation architecture", () => {
     expect(valueImportSites("expo-symbols")).toEqual(["src/components/ui/Icon.tsx"]);
     expect(importSites("expo-symbols")).toEqual([
       "src/components/ui/Icon.tsx",
+      // Type-only, both of them: the icon registry's two symbol catalogues,
+      // and the SF Symbol names the task menu hands to UIKit (#220).
+      "src/lib/board/task-actions.ts",
       "src/lib/ui/icons.ts",
     ]);
   });

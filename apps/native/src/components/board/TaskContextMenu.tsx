@@ -1,90 +1,138 @@
-import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Pressable, Text } from "react-native";
-import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
+import { memo, type ReactNode } from "react";
+import { Text, View } from "react-native";
+import { Link } from "expo-router";
 import type { TaskCardData } from "@dragons/shared";
+import { dueDateBucket } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
+import { TASK_ACTIONS, type TaskActionKey } from "@/lib/board/task-actions";
+import { taskDetailHref } from "@/lib/nav/board-sheets";
+import { Icon } from "@/components/ui/Icon";
+import { dueColorFor, formatDueWithBucket } from "./TaskCard";
 
-export type TaskContextAction = "move" | "priority" | "due" | "delete";
-
-interface OpenArgs {
+interface Props {
   task: TaskCardData;
-  onAction: (action: TaskContextAction) => void;
+  /** Runs the action the user picked. Ordered `(task, action)` like `onTaskDelete`. */
+  onAction: (task: TaskCardData, action: TaskActionKey) => void;
+  /** The card itself — whatever the menu is attached to. */
+  children: ReactNode;
 }
 
-export interface TaskContextMenuHandle {
-  open: (args: OpenArgs) => void;
+/**
+ * A task's actions as the system context menu, opened by holding the card
+ * (issue #220, ADR 0002).
+ *
+ * This replaces two implementations of the same four actions: an
+ * `ActionSheetIOS` sheet on iOS and a `@gorhom/bottom-sheet` panel drawn by
+ * hand on Android. The menu is expo-router's — `Link.Menu` on a link pointing
+ * at the task's own sheet — so it is a real `UIContextMenuInteraction`:
+ * UIKit's blur, its lift animation, its haptic, its destructive styling, and a
+ * preview of what tapping would open.
+ *
+ * On Android `Link.Menu` and `Link.Preview` render nothing and the link falls
+ * back to its trigger, which is the plainest acceptable fallback per ADR 0001:
+ * the card still opens the task, and every action here is also a control on
+ * the task sheet (`TaskDetailBody`), so nothing is out of reach.
+ *
+ * The trigger wrapper is a plain `View`, so the link's own press handler lands
+ * on something that ignores it: the card inside keeps its `Pressable`, and the
+ * task opens once rather than twice.
+ */
+function TaskContextMenuImpl({ task, onAction, children }: Props) {
+  return (
+    <Link href={taskDetailHref(task.boardId, task.id)} asChild>
+      <Link.Trigger>
+        <View>{children}</View>
+      </Link.Trigger>
+      <Link.Preview style={PREVIEW_SIZE}>
+        <TaskPreview task={task} />
+      </Link.Preview>
+      <Link.Menu>
+        {TASK_ACTIONS.map((action) => (
+          <Link.MenuAction
+            key={action.key}
+            icon={action.icon}
+            destructive={action.destructive}
+            onPress={() => onAction(task, action.key)}
+          >
+            {i18n.t(action.labelKey)}
+          </Link.MenuAction>
+        ))}
+      </Link.Menu>
+    </Link>
+  );
 }
 
-export const TaskContextMenu = forwardRef<TaskContextMenuHandle>(
-  function TaskContextMenu(_p, ref) {
-    const sheetRef = useRef<BottomSheetModal>(null);
-    const [args, setArgs] = useState<OpenArgs | null>(null);
-    const snapPoints = useMemo(() => ["38%"], []);
-    const { colors, spacing, radius } = useTheme();
+/**
+ * Memoised for the same reason `TaskCard` is: a column renders one per task,
+ * and the board re-renders on every search keystroke and drag frame.
+ */
+export const TaskContextMenu = memo(TaskContextMenuImpl);
 
-    useImperativeHandle(ref, () => ({
-      open: (next) => {
-        setArgs(next);
-        sheetRef.current?.present();
-      },
-    }), []);
+/**
+ * The preferred size of the preview, in points.
+ *
+ * A preview is a fixed box — the system asks for a content size up front — so
+ * `TaskPreview` below is built to fill it: a title clamped to two lines over a
+ * single meta row. Left unset, the preview takes the whole screen.
+ */
+const PREVIEW_SIZE = { width: 320, height: 128 } as const;
 
-    const items: Array<{ key: TaskContextAction; label: string; destructive?: boolean }> = [
-      { key: "move", label: i18n.t("board.task.actions.moveTo") },
-      { key: "priority", label: i18n.t("board.task.actions.setPriority") },
-      { key: "due", label: i18n.t("board.task.actions.setDue") },
-      { key: "delete", label: i18n.t("board.task.actions.delete"), destructive: true },
-    ];
+/**
+ * What the preview shows: the task, read-only.
+ *
+ * Deliberately not `TaskCard` — that one is a pressable with a swipe action, a
+ * drag gesture and a drop animation, none of which mean anything inside a
+ * preview that cannot be touched.
+ */
+function TaskPreview({ task }: { task: TaskCardData }) {
+  const { colors, spacing } = useTheme();
+  const bucket = task.dueDate ? dueDateBucket(task.dueDate, new Date()) : null;
+  const dueColor = dueColorFor(bucket, colors);
 
-    return (
-      <BottomSheetModal
-        ref={sheetRef}
-        snapPoints={snapPoints}
-        backgroundStyle={{ backgroundColor: colors.background }}
-        handleIndicatorStyle={{ backgroundColor: colors.mutedForeground }}
-        enablePanDownToClose
-        onDismiss={() => setArgs(null)}
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.card,
+        padding: spacing.md,
+        gap: spacing.sm,
+        justifyContent: "center",
+      }}
+    >
+      <Text
+        numberOfLines={2}
+        style={{ color: colors.foreground, fontSize: 16, fontWeight: "600", lineHeight: 21 }}
       >
-        <BottomSheetView style={{ padding: spacing.lg, gap: spacing.xs }} testID="task-context-menu">
-          {args?.task ? (
-            <Text
-              numberOfLines={1}
-              style={{ color: colors.mutedForeground, fontSize: 13, marginBottom: spacing.sm }}
-            >
-              {args.task.title}
+        {task.title}
+      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+        <Text style={{ color: colors.mutedForeground, fontSize: 12, fontWeight: "600" }}>
+          {i18n.t(`board.priority.${task.priority}`)}
+        </Text>
+        {task.dueDate ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Icon name="due" size={12} color={dueColor} />
+            <Text style={{ color: dueColor, fontSize: 12 }}>
+              {formatDueWithBucket(task.dueDate, bucket, i18n.t.bind(i18n))}
             </Text>
-          ) : null}
-          {items.map((item) => (
-            <Pressable
-              key={item.key}
-              onPress={() => {
-                sheetRef.current?.dismiss();
-                args?.onAction(item.key);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
+          </View>
+        ) : null}
+        {task.checklistTotal > 0 ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Icon name="checklist" size={12} color={colors.mutedForeground} />
+            <Text
               style={{
-                padding: spacing.md,
-                borderRadius: radius.md,
-                backgroundColor: colors.surfaceBase,
-                borderWidth: 1,
-                borderColor: colors.border,
+                color: colors.mutedForeground,
+                fontSize: 12,
+                fontVariant: ["tabular-nums"],
               }}
             >
-              <Text
-                style={{
-                  color: item.destructive ? colors.destructive : colors.foreground,
-                  fontSize: 15,
-                  fontWeight: "600",
-                }}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
-          ))}
-        </BottomSheetView>
-      </BottomSheetModal>
-    );
-  },
-);
+              {task.checklistChecked}/{task.checklistTotal}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}

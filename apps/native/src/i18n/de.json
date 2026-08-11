@@ -266,6 +266,8 @@
       "idLabel": "#%{id}",
       "priority": "Priorität",
       "due": "Fällig",
+      "column": "Spalte",
+      "noColumn": "Keine Spalte",
       "noDue": "Kein Fälligkeitsdatum",
       "dueOverdue": "Überfällig",
       "dueToday": "Heute",

@@ -132,7 +132,7 @@ const HAPTIC_CALL_SITES: Record<string, readonly HapticName[]> = {
 
   // Board mutations. `warning` is reserved for a destructive action that took
   // effect with undo still on screen; a rejected request is `error`.
-  "src/app/admin/boards/[id].tsx": ["warning"],
+  "src/hooks/board/useDeleteTaskWithUndo.ts": ["warning"],
   "src/components/board/ChecklistSection.tsx": ["success", "warning", "selection"],
   "src/components/board/CommentsSection.tsx": ["warning"],
   "src/app/admin/boards/sheets/quick-create.tsx": ["error"],
