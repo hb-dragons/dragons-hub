@@ -3,14 +3,16 @@ import { View, Text, ActivityIndicator, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import useSWR from "swr";
 import type { MatchListItem } from "@dragons/shared";
+import { needsStandingsShortcut } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { Screen } from "@/components/Screen";
 import { StatStrip } from "@/components/StatStrip";
 import { MatchCardFull } from "@/components/MatchCardFull";
 import { MatchCardCompact } from "@/components/MatchCardCompact";
 import { ResultChip } from "@/components/ResultChip";
-import { authClient } from "@/lib/auth-client";
+import { authClient, useGateUser } from "@/lib/auth-client";
 import { publicApi } from "@/lib/api";
+import { STANDINGS_SHORTCUT_ROUTE } from "@/lib/nav/tabs";
 import { i18n } from "@/lib/i18n";
 import { kickoffCountdownDays } from "@/lib/format/kickoff";
 import { resolveFetchState } from "@/lib/ui/fetch-state";
@@ -32,6 +34,12 @@ export default function HomeScreen() {
 
   const initial = session?.user?.name?.trim().charAt(0).toUpperCase() ?? "";
   const isSignedIn = Boolean(session);
+
+  // Staff whose Officiating tab took the Standings slot have no tab to the
+  // league tables; the stat strip below carries their way in. Everyone else
+  // has the tab, and their Home stays as it was.
+  const gateUser = useGateUser();
+  const showStandingsLink = needsStandingsShortcut(gateUser);
 
   const {
     data: dashboard,
@@ -247,6 +255,28 @@ export default function HomeScreen() {
             },
           ]}
         />
+
+        {showStandingsLink ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={i18n.t("home.viewStandings")}
+            onPress={() => router.push(STANDINGS_SHORTCUT_ROUTE)}
+            style={{
+              alignItems: "center",
+              paddingVertical: spacing.md,
+              marginTop: spacing.xs,
+            }}
+          >
+            <Text
+              style={[
+                textStyles.body,
+                { color: colors.primary, fontFamily: fontFamilies.bodySemiBold },
+              ]}
+            >
+              {i18n.t("home.viewStandings")}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Section: Upcoming Games */}

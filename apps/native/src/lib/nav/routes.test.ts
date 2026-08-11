@@ -12,6 +12,7 @@ vi.mock("expo-notifications", () => ({
 }));
 
 import { SIGNED_OUT_FALLBACK, isPublicDeepLink } from "@/lib/push/handler";
+import { STANDINGS_SHORTCUT_ROUTE } from "@/lib/nav/tabs";
 
 /**
  * Keeps the deep-link gate honest against the real expo-router file tree:
@@ -73,6 +74,16 @@ describe("expo-router route tree", () => {
       );
       expect(exists, `${link} is treated as public but no route file backs it`).toBe(true);
     }
+  });
+
+  it("backs the Staff standings shortcut with a route outside the tab group", () => {
+    const file = FILES.find(
+      (segments) => "/" + segments.filter((s) => !isGroup(s)).join("/") === STANDINGS_SHORTCUT_ROUTE,
+    );
+    expect(file, `no route file backs ${STANDINGS_SHORTCUT_ROUTE}`).toBeDefined();
+    // A route inside (tabs) is mounted only while its own trigger renders, so
+    // it would be missing for the very users the shortcut exists for.
+    expect(file).not.toContain("(tabs)");
   });
 
   it("treats every session-gated screen as non-public", () => {

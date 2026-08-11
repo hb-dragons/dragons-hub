@@ -15,6 +15,16 @@ export interface TabConfig {
   md: MaterialIcon["md"];
 }
 
+/**
+ * Where the Staff standings entry point sends the user.
+ *
+ * Not `/standings`: native tabs build the navigator from the triggers that
+ * render, so `(tabs)/standings` does not exist for a user whose Officiating tab
+ * took its slot — exactly the user this shortcut is for. This route lives
+ * outside the tab group and is pushed onto the root stack instead.
+ */
+export const STANDINGS_SHORTCUT_ROUTE = "/league-tables";
+
 export const TAB_CONFIG: Record<TabId, TabConfig> = {
   home: {
     name: "index",

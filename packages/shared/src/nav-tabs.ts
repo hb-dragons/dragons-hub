@@ -16,3 +16,14 @@ export function selectTabs(user: GateUser): TabId[] {
   const third: TabId = canViewOpenGames(user) ? "officiating" : "standings";
   return ["home", "schedule", third, "today", "teams"];
 }
+
+/**
+ * Whether this user needs a deliberate entry point to the league tables from
+ * another surface, because their tab set has no Standings tab.
+ *
+ * Derived from {@link selectTabs} rather than re-deciding who officiates, so
+ * the two can never disagree about who lost the tab.
+ */
+export function needsStandingsShortcut(user: GateUser): boolean {
+  return !selectTabs(user).includes("standings");
+}
