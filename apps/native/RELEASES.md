@@ -30,8 +30,10 @@ Assumes `cd apps/native` unless stated otherwise.
 
 ---
 
-## Current state (as of 2026-08-10)
+## Current state (as of 2026-08-11)
 
+- Expo SDK 57 (`expo` / `expo-router` 57.0.12, react-native 0.86.2),
+  since #213. `ios.deploymentTarget` is pinned to `16.4` in `app.json`.
 - `eas update:configure` has been run. `app.json` has
   `updates.url = https://u.expo.dev/7b7481e3-ca0a-42dd-ba38-6a9169d6492d`
   and the EAS project is bound.
@@ -59,8 +61,11 @@ expired, they are fingerprint-incompatible with today's JS —
 `react-native-reanimated` + `react-native-worklets`, gesture-handler,
 keyboard-controller, glass-effect, bottom-sheet, datetimepicker,
 segmented-control, haptics, clipboard and device all landed after the
-last build, and camera / web-browser / linking were removed. OTA cannot
-bridge that. Verify before assuming otherwise:
+last build, and camera / web-browser were removed. (An earlier revision
+of this line also listed `linking` as removed; it never was — see
+`PRE-LAUNCH.md`, expo-router requires it.) On top of that the whole
+project moved from SDK 55 to SDK 57 in #213, which is a rebuild on its
+own. OTA cannot bridge any of it. Verify before assuming otherwise:
 
 ```bash
 eas fingerprint:compare --build-id <id>   # from `eas build:list`
@@ -277,43 +282,45 @@ When `app.json > expo.version` changes:
 
 EAS runs `expo doctor` during the build and fails the whole build on a
 non-zero exit, so a doctor failure costs a full cloud build. Run it
-locally first — it is the same 19 checks:
+locally first — it is the same 20 checks (SDK 57 added one; it was 19
+on SDK 55):
 
 ```bash
 cd apps/native && npx expo-doctor
 ```
 
-Two of its checks needed structural fixes (2026-08-10):
+As of #213 all 20 pass, with nothing skipped. Three of them needed
+structural fixes to get there:
 
 - **Duplicate native modules.** A native build may contain only one copy
   of a given native module, and pnpm's isolated store produced several.
   They are pinned to one version each by the `overrides` block in
-  `pnpm-workspace.yaml` (`react`, `react-native`, `expo-glass-effect`) —
-  nothing is forced past a constraint it declares. Switching pnpm to
-  hoisted linking also fixes this check but breaks `apps/site`; the
-  reasoning is recorded in the root `.npmrc`, which is where the idea
-  looks tempting.
+  `pnpm-workspace.yaml` (`react`, `react-native`, `expo-glass-effect`,
+  `expo-constants`) — nothing is forced past a constraint it declares.
+  Switching pnpm to hoisted linking also fixes this check but breaks
+  `apps/site`; the reasoning is recorded in the root `.npmrc`, which is
+  where the idea looks tempting.
 - **Peer dependencies.** `expo-linking` (peer of `expo-router`) and
   `react-native-worklets` (peer of `react-native-reanimated`) must be
-  direct dependencies. Note that `npx expo install react-native-worklets`
-  installs 0.7.4, the version SDK 55 pins for reanimated 4.2.1 — this
-  project runs reanimated 4.3.1, which requires worklets **0.8.x**. It is
-  pinned to 0.8.1 by hand. Do not let `expo install --fix` walk it back.
+  direct dependencies. On SDK 55 worklets also had to be hand-pinned,
+  because `expo install` wanted 0.7.4 while the reanimated version in
+  use needed 0.8.x. SDK 57 ships the matching pair (reanimated 4.5.1 +
+  worklets 0.10.1), so that deviation is gone and `expo install --fix`
+  no longer walks anything back.
+- **Packages match versions required by installed Expo SDK.** This check
+  used to be switched off wholesale by
+  `EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK=1` in the `base` build
+  profile, because the project ran several packages ahead of the SDK's
+  pins. That was all-or-nothing, and it also hid the expo-\* family
+  drifting *behind* the SDK — which is how the app ended up two SDK
+  releases back. The env var is gone. The one remaining deliberate
+  deviation, `react` (pinned to a single version workspace-wide by
+  `overrides`), is named in `expo.install.exclude` in
+  `apps/native/package.json`, so the check stays on for everything else
+  and a genuinely stale package fails it.
 
-The remaining check — "packages match versions required by installed
-Expo SDK" — cannot pass here and is skipped by
-`EXPO_DOCTOR_SKIP_DEPENDENCY_VERSION_CHECK=1`, set in the `base` build
-profile in `eas.json`. It is all-or-nothing, and this project runs
-several packages deliberately ahead of the SDK's pins (TypeScript 6
-workspace-wide, plus reanimated / gesture-handler /
-keyboard-controller / safe-area-context / worklets). The same check also
-reports the expo-* family sitting a few patch versions **behind** the
-SDK, which is real drift worth closing on its own branch — skipping the
-check hides that too, so re-read its output by hand now and then:
-
-```bash
-cd apps/native && npx expo-doctor   # no skip var set locally
-```
+When adding a package that must sit ahead of its SDK pin, add it to
+`expo.install.exclude` with a reason — do not reach for the env var.
 
 ---
 

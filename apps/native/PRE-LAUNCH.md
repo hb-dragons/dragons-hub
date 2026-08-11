@@ -3,8 +3,9 @@
 Items deferred while the app is in internal-testing phase. Work through
 this list before submitting to the public App Store / Play Store.
 
-Last reviewed: 2026-07-26 (issue #118 — this pass corrected several items
-below that had drifted from the code; see the "Resolved" note on each).
+Last reviewed: 2026-08-11 (issue #213 — the Expo SDK 57 upgrade; this pass
+corrected the items #118 had left describing an app that no longer exists).
+Before that: 2026-07-26 (issue #118).
 
 ---
 
@@ -55,13 +56,31 @@ not. Without the entitlement iOS silently opens the link in Safari.
       `app.hbdragons.de` with the app's `TeamID.bundleId` and path
       patterns.
 
-### Unused Expo modules — resolved (#118)
+### Unused Expo modules — resolved (#118), corrected (#213)
 
 `expo-camera` and `expo-web-browser` had zero imports and are removed
 from `package.json`. `expo-network` turned out to have a real caller
 (`lib/swr-native-adapters.ts`, `lib/api.ts` — network-state-aware SWR
-reconnect) and was kept. `expo-linking` also had zero imports and is
-removed too (not listed here originally, but same rationale).
+reconnect) and was kept.
+
+This section used to claim `expo-linking` was removed on the same
+"zero imports" rationale. It never was, and it must not be: zero
+imports in our source does not mean unused. `expo-router` declares
+`expo-linking` a **required** peer (not optional in
+`peerDependenciesMeta`) and calls it directly — `Linking.getLinkingURL`
+in `getInitialURL`, `Linking.addEventListener` in `subscribe`,
+`Linking.openURL` for external redirects. Dropping it was re-checked on
+SDK 57 (#213) and `expo doctor` fails immediately:
+
+```
+✖ Check that required peer dependencies are installed
+Missing peer dependency: expo-linking — Required by: expo-router
+Your app may crash outside of Expo Go without this dependency.
+```
+
+`expo-updates` is the other zero-import dependency and stays for the
+same kind of reason — it is the OTA infrastructure `RELEASES.md`
+describes, driven by the config plugin rather than by an import.
 
 ### Android adaptive icon — monochrome
 
@@ -134,18 +153,27 @@ before launch:
 
 ---
 
-## Testing — corrected (#118)
+## Testing — corrected (#118), corrected again (#213)
 
 This used to say "native has zero tests" and that `lint` was just
-`tsc --noEmit`. Both were stale: there are 26 `*.test.ts` files under
-`src/`, `lint` runs real ESLint (`eslint .`) separate from `typecheck`
-(`tsc --noEmit`), and `apps/native` has its own `vitest.config.ts`
-coverage gate (currently a measured floor — 48% branches / 27% functions
-/ 49% lines / 48% statements — that ratchets up over time, well below
-`apps/api`'s 90/95% bar). Coverage only instruments `src/lib/**/*.ts` —
-hooks and screens under `src/hooks` and `src/app` aren't measured, since
-there's no React-render test harness here (logic-first vitest; RN/Expo
-are mocked per test, no component rendering).
+`tsc --noEmit`. Both were stale: there are 36 `*.test.ts(x)` files under
+`src/`, and `lint` runs real ESLint (`eslint .`) separate from
+`typecheck` (`tsc --noEmit`).
+
+The coverage paragraph then went stale in turn. It quoted 48% branches /
+27% functions / 49% lines / 48% statements and said coverage only
+instruments `src/lib/**/*.ts`. Both were true until the 2026-07-26
+rescope (#109) widened `coverage.include` to all of `src/**`. The live
+floors are in `vitest.config.ts` — read them there rather than here —
+and they are much lower numbers *because they measure much more*:
+`components/`, `app/`, `hooks/` and `theme/` used to be invisible to the
+gate. They ratchet up; never lower them.
+
+There is still no React-render test harness (logic-first vitest; RN/Expo
+are mocked per test, no component rendering), so what those percentages
+buy is coverage of pure logic plus the structural tests in
+`src/lib/nav/` that assert against the route tree and source tree
+themselves.
 
 Still open:
 
@@ -195,9 +223,11 @@ SecureStore (it's an actual secret).
 - [ ] Add a `withAlpha(hex, 0.1)` helper; replace inline
       `colors.primary + "1A"` / `"0D"` / `"60"` etc. across the
       codebase.
-- [ ] Move `ErrorUtils.setGlobalHandler` in `_layout.tsx` from
+- [x] ~~Move `ErrorUtils.setGlobalHandler` in `_layout.tsx` from
       module-scope into a `useEffect(..., [])` so fast-refresh doesn't
-      chain handlers in dev.
+      chain handlers in dev.~~ Resolved (#213): it lives in
+      `lib/global-error-handler.ts`, installing returns the restore
+      function, and the effect's cleanup runs it.
 - [ ] Fix pluralisation in `home.countdown.inDays` — `"In 1 Tagen"` is
       wrong German. Use i18n-js plural rules or handle 1 vs n
       explicitly.
@@ -208,14 +238,24 @@ SecureStore (it's an actual secret).
 
 ### Tech debt to watch
 
-- [ ] `expo-router/unstable-native-tabs` is unstable API. Abstract into
-      a local `<AppTabs>` component so the eventual migration touches
-      one file.
+- [x] ~~`expo-router/unstable-native-tabs` is unstable API. Abstract
+      into a local `<AppTabs>` component so the eventual migration
+      touches one file.~~ Resolved (#213):
+      `components/nav/AppTabs.tsx` is the wrapper, and
+      `lib/nav/architecture.test.ts` fails the build if a second file
+      imports the module.
 - [ ] This is a managed-workflow Expo project (no `ios/`/`android/`
       directories checked in — native config lives entirely in
       `app.json` and is applied by `expo prebuild`/EAS build). If a
       future need forces a bare-workflow eject, re-audit any Podfile /
       Gradle patches added at that point; there's nothing to watch yet.
+      Both directories are in `.gitignore`, so a local `apps/native/ios`
+      left behind by an `expo prebuild` / `expo run:ios` is invisible to
+      the repo *and* to everyone else's checkout — but it is not
+      invisible to your build, which will use the stale copy instead of
+      re-applying `app.json`. Delete it by hand (`rm -rf
+      apps/native/ios apps/native/android`) after any change to
+      `app.json` native keys or the plugin list.
 
 ---
 
