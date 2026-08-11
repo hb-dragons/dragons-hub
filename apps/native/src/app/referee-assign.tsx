@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, SectionList, Text, View } from "react-native";
+import { ActivityIndicator, Alert, SectionList, Text, View } from "react-native";
 import { Stack, router, useLocalSearchParams } from "expo-router";
-import Svg, { Path } from "react-native-svg";
 import useSWR, { useSWRConfig } from "swr";
 import { APIError } from "@dragons/api-client";
+import { bracketColor, RefereeCandidateRow } from "@/components/RefereeCandidateRow";
 import { useTheme } from "@/hooks/useTheme";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { refereeApi } from "@/lib/api";
@@ -13,10 +13,7 @@ import { i18n } from "@/lib/i18n";
 import { parseNumericParam } from "@/lib/nav/route-params";
 import { searchFieldOptions } from "@/lib/nav/search-bar";
 import {
-  candidateInitials,
-  distanceBracket,
   groupByDistance,
-  paletteIndexFor,
   parseSlotParam,
   slotLabel,
   type DistanceBracket,
@@ -45,47 +42,14 @@ import { fontFamilies } from "@/theme/typography";
  * app actually renders from (see `lib/swr-config.ts`).
  */
 
-type ThemeColors = ReturnType<typeof useTheme>["colors"];
-
 const SECTION_TITLE_KEY: Record<DistanceBracket, string> = {
   close: "refereeGame.admin.nearby",
   med: "refereeGame.admin.further",
   far: "refereeGame.admin.distant",
 };
 
-function bracketColor(bracket: DistanceBracket, colors: ThemeColors): string {
-  if (bracket === "close") return colors.primary;
-  if (bracket === "med") return colors.heat;
-  return colors.destructive;
-}
-
-function avatarPalette(key: string, colors: ThemeColors): { bg: string; fg: string } {
-  const options = [
-    { bg: colors.secondary, fg: colors.secondaryForeground },
-    { bg: colors.heatSubtle, fg: colors.heat },
-    { bg: colors.surfaceHigh, fg: colors.foreground },
-    { bg: colors.muted, fg: colors.mutedForeground },
-  ];
-  // Non-null: the index is derived modulo the length of a non-empty list.
-  return options[paletteIndexFor(key, options.length)]!;
-}
-
-function ChevronIcon({ color, size = 14 }: { color: string; size?: number }) {
-  return (
-    <Svg width={(size * 8) / 14} height={size} viewBox="0 0 8 14" fill="none">
-      <Path
-        d="m1.5 1 5 6-5 6"
-        stroke={color}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
 export default function RefereeAssignSheetRoute() {
-  const { colors, spacing, radius, textStyles } = useTheme();
+  const { colors, spacing, textStyles } = useTheme();
   const params = useLocalSearchParams<{ apiMatchId?: string; slot?: string }>();
   const apiMatchId = parseNumericParam(params.apiMatchId);
   const slot = parseSlotParam(params.slot);
@@ -256,150 +220,18 @@ export default function RefereeAssignSheetRoute() {
               </Text>
             </View>
           )}
-          renderItem={({ item }) => {
-            const bracket = distanceBracket(item.distanceKm);
-            const pillColor = bracketColor(bracket, colors);
-            const palette = avatarPalette(`${item.vorname}${item.nachName}`, colors);
-            const grade = slot === 1 ? item.qmaxSr1 : item.qmaxSr2;
-            const isAssigning = assigningId === item.srId;
-            const anyAssigning = assigningId !== null;
-            return (
-              <Pressable
-                onPress={() => confirmAssign(item)}
-                disabled={anyAssigning}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.vorname} ${item.nachName}, ${item.distanceKm} km`}
-                style={({ pressed }) => ({
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: spacing.sm + 2,
-                  borderRadius: radius.md,
-                  backgroundColor: pressed ? colors.surfaceHigh : "transparent",
-                  opacity: anyAssigning && !isAssigning ? 0.4 : 1,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing.sm,
-                })}
-              >
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    backgroundColor: palette.bg,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: fontFamilies.displayMedium,
-                      fontSize: 13,
-                      color: palette.fg,
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {candidateInitials(item)}
-                  </Text>
-                </View>
-
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text
-                    style={{
-                      fontFamily: fontFamilies.bodySemiBold,
-                      fontSize: 15,
-                      color: colors.foreground,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {item.vorname} {item.nachName}
-                  </Text>
-                  {grade || item.ort ? (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 6,
-                        marginTop: 2,
-                      }}
-                    >
-                      {grade ? (
-                        <View
-                          style={{
-                            backgroundColor: colors.surfaceHigh,
-                            paddingHorizontal: 5,
-                            paddingVertical: 1,
-                            borderRadius: 3,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontFamily: fontFamilies.displayMedium,
-                              fontSize: 10,
-                              color: colors.foreground,
-                              letterSpacing: 0.3,
-                            }}
-                          >
-                            {grade}
-                          </Text>
-                        </View>
-                      ) : null}
-                      {item.ort ? (
-                        <Text
-                          style={{
-                            flex: 1,
-                            fontFamily: fontFamilies.body,
-                            fontSize: 12,
-                            color: colors.mutedForeground,
-                          }}
-                          numberOfLines={1}
-                        >
-                          {item.ort}
-                        </Text>
-                      ) : null}
-                    </View>
-                  ) : null}
-                  {item.warning.length > 0 ? (
-                    <Text
-                      style={{
-                        fontFamily: fontFamilies.bodyMedium,
-                        fontSize: 11,
-                        color: colors.destructive,
-                        marginTop: 3,
-                      }}
-                      numberOfLines={1}
-                    >
-                      ⚠  {item.warning[0]}
-                    </Text>
-                  ) : null}
-                </View>
-
-                <View
-                  style={{
-                    paddingHorizontal: spacing.sm,
-                    paddingVertical: 4,
-                    borderRadius: radius.pill,
-                    backgroundColor: pillColor + "22",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: fontFamilies.bodyMedium,
-                      fontSize: 11,
-                      color: pillColor,
-                    }}
-                  >
-                    {item.distanceKm} km
-                  </Text>
-                </View>
-
-                {isAssigning ? (
-                  <ActivityIndicator size="small" color={colors.mutedForeground} />
-                ) : (
-                  <ChevronIcon color={colors.mutedForeground} />
-                )}
-              </Pressable>
-            );
-          }}
+          // The bracket comes from the section the row was grouped into, so a
+          // row's distance pill cannot disagree with the header above it.
+          renderItem={({ item, section }) => (
+            <RefereeCandidateRow
+              candidate={item}
+              bracket={section.key}
+              slot={slot}
+              isAssigning={assigningId === item.srId}
+              isBusy={assigningId !== null}
+              onPress={() => confirmAssign(item)}
+            />
+          )}
         />
       )}
     </View>
