@@ -52,9 +52,29 @@ describe("team request bodies satisfy @dragons/contracts schemas", () => {
     ).toBeUndefined();
   });
 
+  it("update body with leagueId parses against teamUpdateBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.update(7, { leagueId: 12 });
+    const parsed = teamUpdateBodySchema.safeParse(calls[0]!.body);
+    expect(
+      parsed.error?.issues,
+      "teamUpdateBodySchema rejected the update body with leagueId",
+    ).toBeUndefined();
+  });
+
+  it("update body with leagueId null parses against teamUpdateBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.update(7, { leagueId: null });
+    const parsed = teamUpdateBodySchema.safeParse(calls[0]!.body);
+    expect(
+      parsed.error?.issues,
+      "teamUpdateBodySchema rejected the update body with leagueId null",
+    ).toBeUndefined();
+  });
+
   it("reorder body parses against teamReorderBodySchema", async () => {
     const { api, calls } = recordingClient();
-    await api.reorder({ teamIds: [3, 1, 2] });
+    await api.reorder({ entryIds: [3, 1, 2] });
     const parsed = teamReorderBodySchema.safeParse(calls[0]!.body);
     expect(
       parsed.error?.issues,
@@ -62,6 +82,16 @@ describe("team request bodies satisfy @dragons/contracts schemas", () => {
     ).toBeUndefined();
     expect(calls[0]!.url).toContain("/admin/teams/order");
     expect(calls[0]!.method).toBe("PUT");
+  });
+
+  it("reorder body with seasonId parses against teamReorderBodySchema", async () => {
+    const { api, calls } = recordingClient();
+    await api.reorder({ seasonId: 5, entryIds: [1] });
+    const parsed = teamReorderBodySchema.safeParse(calls[0]!.body);
+    expect(
+      parsed.error?.issues,
+      "teamReorderBodySchema rejected the reorder body with seasonId",
+    ).toBeUndefined();
   });
 });
 

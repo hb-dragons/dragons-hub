@@ -15,7 +15,8 @@ vi.mock("../../config/database", () => ({
 
 // --- Imports (after mocks) ---
 
-import { getOwnClubTeams, updateTeam, reorderOwnClubTeams } from "./team-admin.service";
+import { getOwnClubTeams, updateTeamEntry, reorderTeamEntries } from "./team-admin.service";
+import { TeamReorderError, TeamLeagueMismatchError } from "./team-admin.errors";
 import { invalidateActiveSeasonCache } from "./season.service";
 import { setupTestDb, resetTestDb, closeTestDb, type TestDbContext } from "../../test/setup-test-db";
 
@@ -82,27 +83,6 @@ async function insertEntry(
   return result.rows[0]!.id;
 }
 
-async function insertLeague(overrides: Record<string, unknown> = {}) {
-  const seasonRefId = overrides.season_ref_id ?? (await seedSeason("2024/2025", "archived"));
-  const defaults = {
-    api_liga_id: 100,
-    liga_nr: 1,
-    name: "Test League",
-    season_id: 2025,
-    season_name: "2024/2025",
-    season_ref_id: seasonRefId,
-  };
-  const data = { ...defaults, ...overrides };
-  const cols = Object.keys(data);
-  const vals = Object.values(data);
-  const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await ctx.client.query(
-    `INSERT INTO leagues (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
-    vals,
-  );
-  return (result.rows[0] as { id: number }).id;
-}
-
 async function insertTeam(overrides: Record<string, unknown> = {}) {
   const defaults = {
     api_team_permanent_id: 1000,
@@ -121,13 +101,6 @@ async function insertTeam(overrides: Record<string, unknown> = {}) {
     vals,
   );
   return (result.rows[0] as { id: number }).id;
-}
-
-async function insertStanding(leagueId: number, teamApiId: number) {
-  await ctx.client.query(
-    "INSERT INTO standings (league_id, team_api_id, position) VALUES ($1, $2, $3)",
-    [leagueId, teamApiId, 1],
-  );
 }
 
 // --- Tests ---
@@ -323,202 +296,121 @@ describe("getOwnClubTeams (entry-based)", () => {
   });
 });
 
-describe("updateTeam", () => {
-  it("updates custom name for own club team", async () => {
-    const id = await insertTeam({
-      api_team_permanent_id: 1000,
-      name: "Dragons Herren 1",
-      is_own_club: true,
-    });
+describe("updateTeamEntry", () => {
+  it("sets the league link manually and reports the season's league name", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const league = await seedLeague(40, "U10 Kreisliga", season);
+    const squad = await seedTeam(5000, "Dragons U10");
+    const entry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2) RETURNING id`, [squad, season]);
 
-    const result = await updateTeam(id, { customName: "Herren 1" });
+    const updated = await updateTeamEntry(entry.rows[0]!.id, { leagueId: league });
 
-    expect(result).not.toBeNull();
-    expect(result!.customName).toBe("Herren 1");
-    expect(result!.name).toBe("Dragons Herren 1");
+    expect(updated?.leagueName).toBe("U10 Kreisliga");
+    expect(updated?.linkSource).toBe("manual");
   });
 
-  it("clears custom name with null", async () => {
-    const id = await insertTeam({
-      api_team_permanent_id: 1000,
-      name: "Dragons Herren 1",
-      custom_name: "Herren 1",
-      is_own_club: true,
-    });
+  it("clears the link with leagueId null", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const league = await seedLeague(41, "U10", season);
+    const squad = await seedTeam(5001, "Dragons U10");
+    const entry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3) RETURNING id`,
+      [squad, season, league]);
 
-    const result = await updateTeam(id, { customName: null });
-
-    expect(result!.customName).toBeNull();
+    const updated = await updateTeamEntry(entry.rows[0]!.id, { leagueId: null });
+    expect(updated?.leagueId).toBeNull();
+    expect(updated?.leagueName).toBeNull();
   });
 
-  it("updates estimatedGameDuration", async () => {
-    const id = await insertTeam({
-      api_team_permanent_id: 1000,
-      name: "Dragons Herren 1",
-      is_own_club: true,
-    });
+  it("rejects a league from another season", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const other = await seedSeason("2025/26", "archived");
+    const foreign = await seedLeague(42, "Old U10", other);
+    const squad = await seedTeam(5002, "Dragons U10");
+    const entry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2) RETURNING id`, [squad, season]);
 
-    const result = await updateTeam(id, { estimatedGameDuration: 120 });
-
-    expect(result).not.toBeNull();
-    expect(result!.estimatedGameDuration).toBe(120);
+    await expect(updateTeamEntry(entry.rows[0]!.id, { leagueId: foreign }))
+      .rejects.toThrow(TeamLeagueMismatchError);
   });
 
-  it("clears estimatedGameDuration with null", async () => {
-    const id = await insertTeam({
-      api_team_permanent_id: 1000,
-      name: "Dragons Herren 1",
-      estimated_game_duration: 120,
-      is_own_club: true,
-    });
-
-    const result = await updateTeam(id, { estimatedGameDuration: null });
-
-    expect(result!.estimatedGameDuration).toBeNull();
-  });
-
-  it("updates both fields at once", async () => {
-    const id = await insertTeam({
-      api_team_permanent_id: 1000,
-      name: "Dragons Herren 1",
-      is_own_club: true,
-    });
-
-    const result = await updateTeam(id, { customName: "H1", estimatedGameDuration: 90 });
-
-    expect(result).not.toBeNull();
-    expect(result!.customName).toBe("H1");
-    expect(result!.estimatedGameDuration).toBe(90);
-  });
-
-  it("returns null for non-existent team", async () => {
-    const result = await updateTeam(999, { customName: "Test" });
-
+  it("returns null for a non-existent entry", async () => {
+    const result = await updateTeamEntry(999999, { customName: "Test" });
     expect(result).toBeNull();
   });
 
-  it("returns null for non-own-club team", async () => {
-    const id = await insertTeam({
-      api_team_permanent_id: 1000,
-      name: "Other Team",
-      is_own_club: false,
-    });
+  it("returns null for an entry whose squad is not own-club", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const squad = await seedTeam(5003, "Other Team", false);
+    const entry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2) RETURNING id`, [squad, season]);
 
-    const result = await updateTeam(id, { customName: "Test" });
-
+    const result = await updateTeamEntry(entry.rows[0]!.id, { customName: "Test" });
     expect(result).toBeNull();
   });
 
-  it("includes league name in response", async () => {
-    const leagueId = await insertLeague({ name: "Kreisliga A" });
-    const id = await insertTeam({
-      api_team_permanent_id: 1000,
-      name: "Dragons Herren 1",
-      is_own_club: true,
-    });
-    await insertStanding(leagueId, 1000);
+  it("updates customName, estimatedGameDuration and badgeColor", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const squad = await seedTeam(5004, "Dragons U10");
+    const entry = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2) RETURNING id`, [squad, season]);
 
-    const result = await updateTeam(id, { customName: "Herren 1" });
-
-    expect(result!.leagueName).toBe("Kreisliga A");
-  });
-
-  it("returns null leagueName when team has no standings", async () => {
-    const id = await insertTeam({
-      api_team_permanent_id: 1000,
-      name: "Dragons Herren 1",
-      is_own_club: true,
+    const updated = await updateTeamEntry(entry.rows[0]!.id, {
+      customName: "U10",
+      estimatedGameDuration: 90,
+      badgeColor: "red",
     });
 
-    const result = await updateTeam(id, { customName: "Herren 1" });
-
-    expect(result!.leagueName).toBeNull();
-  });
-
-  it("updates updatedAt timestamp", async () => {
-    const id = await insertTeam({
-      api_team_permanent_id: 1000,
-      name: "Dragons Herren 1",
-      is_own_club: true,
-    });
-
-    const before = await ctx.client.query("SELECT updated_at FROM teams WHERE id = $1", [id]);
-    const beforeTime = (before.rows[0] as { updated_at: Date }).updated_at;
-
-    await updateTeam(id, { customName: "Herren 1" });
-
-    const after = await ctx.client.query("SELECT updated_at FROM teams WHERE id = $1", [id]);
-    const afterTime = (after.rows[0] as { updated_at: Date }).updated_at;
-
-    expect(new Date(afterTime as unknown as string).getTime()).toBeGreaterThanOrEqual(
-      new Date(beforeTime as unknown as string).getTime(),
-    );
+    expect(updated?.customName).toBe("U10");
+    expect(updated?.estimatedGameDuration).toBe(90);
+    expect(updated?.badgeColor).toBe("red");
   });
 });
 
-// Helper with own-club defaults for reorder tests
-async function insertOwnClubTeam(overrides: Record<string, unknown> = {}) {
-  const defaults = {
-    api_team_permanent_id: 100,
-    season_team_id: 200,
-    team_competition_id: 300,
-    name: "Dragons Test",
-    club_id: 999,
-    is_own_club: true,
-    display_order: 0,
-  };
-  const data = { ...defaults, ...overrides };
-  const cols = Object.keys(data);
-  const vals = Object.values(data);
-  const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
-  const result = await ctx.client.query<{ id: number }>(
-    `INSERT INTO teams (${cols.join(", ")}) VALUES (${placeholders}) RETURNING id`,
-    vals,
-  );
-  return result.rows[0]!.id;
-}
+describe("reorderTeamEntries", () => {
+  it("reorders exactly the season's entries", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const a = await seedTeam(5100, "A");
+    const b = await seedTeam(5101, "B");
+    const rows = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id, display_order)
+       VALUES ($1, $3, 0), ($2, $3, 1) RETURNING id`, [a, b, season]);
+    const [ea, eb] = rows.rows.map((r) => r.id);
 
-describe("reorderOwnClubTeams", () => {
-  it("persists dense positions 0..n-1 in given order", async () => {
-    const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
-    const b = await insertOwnClubTeam({ api_team_permanent_id: 2, name: "B" });
-    const c = await insertOwnClubTeam({ api_team_permanent_id: 3, name: "C" });
-
-    const result = await reorderOwnClubTeams([c, a, b]);
-
-    expect(result.map((t) => t.id)).toEqual([c, a, b]);
-    expect(result.map((t) => t.displayOrder)).toEqual([0, 1, 2]);
+    const result = await reorderTeamEntries([eb!, ea!], season);
+    expect(result.map((r) => r.id)).toEqual([eb, ea]);
   });
 
-  it("rejects when teamIds is missing an own-club team", async () => {
-    const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
-    await insertOwnClubTeam({ api_team_permanent_id: 2, name: "B" });
-
-    await expect(reorderOwnClubTeams([a])).rejects.toThrow(
-      expect.objectContaining({ code: "INVALID_TEAM_SET" }),
-    );
+  it("rejects a set that does not exactly match the season's entries", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const a = await seedTeam(5102, "A");
+    const rows = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2) RETURNING id`, [a, season]);
+    await expect(reorderTeamEntries([rows.rows[0]!.id, 99999], season))
+      .rejects.toThrow(TeamReorderError);
   });
 
-  it("rejects when teamIds contains a non-own-club team", async () => {
-    const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
-    const foreign = await insertOwnClubTeam({
-      api_team_permanent_id: 9,
-      name: "Foreign",
-      is_own_club: false,
-    });
+  it("rejects duplicate entryIds", async () => {
+    const season = await seedSeason("2026/27", "active");
+    const a = await seedTeam(5103, "A");
+    const rows = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2) RETURNING id`, [a, season]);
+    const entryId = rows.rows[0]!.id;
 
-    await expect(reorderOwnClubTeams([a, foreign])).rejects.toThrow(
-      expect.objectContaining({ code: "INVALID_TEAM_SET" }),
-    );
-  });
-
-  it("rejects duplicate teamIds", async () => {
-    const a = await insertOwnClubTeam({ api_team_permanent_id: 1, name: "A" });
-    const b = await insertOwnClubTeam({ api_team_permanent_id: 2, name: "B" });
-
-    await expect(reorderOwnClubTeams([a, b, a])).rejects.toThrow(
+    await expect(reorderTeamEntries([entryId, entryId], season)).rejects.toThrow(
       expect.objectContaining({ code: "DUPLICATE_TEAM_ID" }),
     );
+  });
+
+  it("defaults to the active season when seasonId is omitted", async () => {
+    const active = await seedSeason("2026/27", "active");
+    const a = await seedTeam(5104, "A");
+    const rows = await ctx.client.query<{ id: number }>(
+      `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2) RETURNING id`, [a, active]);
+
+    const result = await reorderTeamEntries([rows.rows[0]!.id]);
+    expect(result.map((r) => r.id)).toEqual([rows.rows[0]!.id]);
   });
 });
 

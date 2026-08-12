@@ -6,14 +6,14 @@ import type { AppEnv } from "../../types";
 
 const mocks = vi.hoisted(() => ({
   getOwnClubTeams: vi.fn(),
-  updateTeam: vi.fn(),
-  reorderOwnClubTeams: vi.fn(),
+  updateTeamEntry: vi.fn(),
+  reorderTeamEntries: vi.fn(),
 }));
 
 vi.mock("../../services/admin/team-admin.service", () => ({
   getOwnClubTeams: mocks.getOwnClubTeams,
-  updateTeam: mocks.updateTeam,
-  reorderOwnClubTeams: mocks.reorderOwnClubTeams,
+  updateTeamEntry: mocks.updateTeamEntry,
+  reorderTeamEntries: mocks.reorderTeamEntries,
 }));
 
 vi.mock("../../middleware/rbac", () => ({
@@ -75,7 +75,7 @@ describe("GET /teams", () => {
 describe("PATCH /teams/:id", () => {
   it("updates custom name and returns team", async () => {
     const updated = { id: 1, name: "Dragons Herren 1", nameShort: "Dragons H1", customName: "Herren 1", leagueName: "Kreisliga A", estimatedGameDuration: null, badgeColor: null, displayOrder: 0 };
-    mocks.updateTeam.mockResolvedValue(updated);
+    mocks.updateTeamEntry.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
       method: "PATCH",
@@ -85,12 +85,12 @@ describe("PATCH /teams/:id", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(updated);
-    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { customName: "Herren 1" });
+    expect(mocks.updateTeamEntry).toHaveBeenCalledWith(1, { customName: "Herren 1" });
   });
 
   it("clears custom name with null", async () => {
     const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null, badgeColor: null, displayOrder: 0 };
-    mocks.updateTeam.mockResolvedValue(updated);
+    mocks.updateTeamEntry.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
       method: "PATCH",
@@ -99,12 +99,12 @@ describe("PATCH /teams/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { customName: null });
+    expect(mocks.updateTeamEntry).toHaveBeenCalledWith(1, { customName: null });
   });
 
   it("updates estimatedGameDuration", async () => {
     const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: 120, badgeColor: null, displayOrder: 0 };
-    mocks.updateTeam.mockResolvedValue(updated);
+    mocks.updateTeamEntry.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
       method: "PATCH",
@@ -114,12 +114,12 @@ describe("PATCH /teams/:id", () => {
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(updated);
-    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { estimatedGameDuration: 120 });
+    expect(mocks.updateTeamEntry).toHaveBeenCalledWith(1, { estimatedGameDuration: 120 });
   });
 
   it("clears estimatedGameDuration with null", async () => {
     const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null, badgeColor: null, displayOrder: 0 };
-    mocks.updateTeam.mockResolvedValue(updated);
+    mocks.updateTeamEntry.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
       method: "PATCH",
@@ -128,12 +128,12 @@ describe("PATCH /teams/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { estimatedGameDuration: null });
+    expect(mocks.updateTeamEntry).toHaveBeenCalledWith(1, { estimatedGameDuration: null });
   });
 
   it("updates both customName and estimatedGameDuration", async () => {
     const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: "H1", leagueName: null, estimatedGameDuration: 90, badgeColor: null, displayOrder: 0 };
-    mocks.updateTeam.mockResolvedValue(updated);
+    mocks.updateTeamEntry.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
       method: "PATCH",
@@ -142,11 +142,11 @@ describe("PATCH /teams/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(mocks.updateTeam).toHaveBeenCalledWith(1, { customName: "H1", estimatedGameDuration: 90 });
+    expect(mocks.updateTeamEntry).toHaveBeenCalledWith(1, { customName: "H1", estimatedGameDuration: 90 });
   });
 
   it("returns 404 for unknown or non-own-club team", async () => {
-    mocks.updateTeam.mockResolvedValue(null);
+    mocks.updateTeamEntry.mockResolvedValue(null);
 
     const res = await app.request("/teams/999", {
       method: "PATCH",
@@ -193,7 +193,7 @@ describe("PATCH /teams/:id", () => {
 
   it("accepts empty object (no fields to update)", async () => {
     const updated = { id: 1, name: "Dragons Herren 1", nameShort: null, customName: null, leagueName: null, estimatedGameDuration: null, badgeColor: null, displayOrder: 0 };
-    mocks.updateTeam.mockResolvedValue(updated);
+    mocks.updateTeamEntry.mockResolvedValue(updated);
 
     const res = await app.request("/teams/1", {
       method: "PATCH",
@@ -202,7 +202,7 @@ describe("PATCH /teams/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(mocks.updateTeam).toHaveBeenCalledWith(1, {});
+    expect(mocks.updateTeamEntry).toHaveBeenCalledWith(1, {});
   });
 
   it("returns 400 for non-integer estimatedGameDuration", async () => {
@@ -246,37 +246,37 @@ describe("PUT /teams/order", () => {
       { id: 1, name: "A", displayOrder: 1 },
       { id: 2, name: "B", displayOrder: 2 },
     ];
-    mocks.reorderOwnClubTeams.mockResolvedValue(reordered);
+    mocks.reorderTeamEntries.mockResolvedValue(reordered);
 
     const res = await app.request("/teams/order", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamIds: [3, 1, 2] }),
+      body: JSON.stringify({ entryIds: [3, 1, 2] }),
     });
 
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual(reordered);
-    expect(mocks.reorderOwnClubTeams).toHaveBeenCalledWith([3, 1, 2]);
+    expect(mocks.reorderTeamEntries).toHaveBeenCalledWith([3, 1, 2], undefined);
   });
 
-  it("rejects empty teamIds with 400", async () => {
+  it("rejects empty entryIds with 400", async () => {
     const res = await app.request("/teams/order", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamIds: [] }),
+      body: JSON.stringify({ entryIds: [] }),
     });
 
     expect(res.status).toBe(400);
-    expect(mocks.reorderOwnClubTeams).not.toHaveBeenCalled();
+    expect(mocks.reorderTeamEntries).not.toHaveBeenCalled();
   });
 
   it("returns 400 when service throws INVALID_TEAM_SET", async () => {
-    mocks.reorderOwnClubTeams.mockRejectedValue(TeamReorderError.invalidTeamSet());
+    mocks.reorderTeamEntries.mockRejectedValue(TeamReorderError.invalidTeamSet());
 
     const res = await app.request("/teams/order", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamIds: [1, 2] }),
+      body: JSON.stringify({ entryIds: [1, 2] }),
     });
 
     expect(res.status).toBe(400);
@@ -287,12 +287,12 @@ describe("PUT /teams/order", () => {
   });
 
   it("returns 400 when service throws DUPLICATE_TEAM_ID", async () => {
-    mocks.reorderOwnClubTeams.mockRejectedValue(TeamReorderError.duplicateTeamId());
+    mocks.reorderTeamEntries.mockRejectedValue(TeamReorderError.duplicateTeamId());
 
     const res = await app.request("/teams/order", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamIds: [1, 1] }),
+      body: JSON.stringify({ entryIds: [1, 1] }),
     });
 
     expect(res.status).toBe(400);
@@ -305,12 +305,12 @@ describe("PUT /teams/order", () => {
   // unrelated failure whose message happened to spell INVALID_TEAM_SET became a
   // 400. Only the typed error may produce one.
   it("does not turn an unrelated error with a matching message into a 400", async () => {
-    mocks.reorderOwnClubTeams.mockRejectedValue(new Error("INVALID_TEAM_SET"));
+    mocks.reorderTeamEntries.mockRejectedValue(new Error("INVALID_TEAM_SET"));
 
     const res = await app.request("/teams/order", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamIds: [1, 2] }),
+      body: JSON.stringify({ entryIds: [1, 2] }),
     });
 
     expect(res.status).toBe(500);

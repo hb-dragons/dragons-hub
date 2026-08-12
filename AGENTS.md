@@ -649,8 +649,8 @@ nested under their task.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/admin/teams` | List own club team entries for a season (`?seasonId=`, defaults to active) |
-| PATCH | `/admin/teams/:id` | Update team (e.g. isOwnClub) |
-| PUT | `/admin/teams/order` | Reorder own club teams (display order) |
+| PATCH | `/admin/teams/:id` | Update a team entry (custom name, color, duration, connected league) |
+| PUT | `/admin/teams/order` | Reorder a season's team entries (`seasonId` optional, defaults to active) |
 
 ### Admin - Venues
 

@@ -293,7 +293,7 @@ export function TeamsTable({ canManage }: TeamsTableProps) {
     await mutate(SWR_KEYS.teams, reordered, { revalidate: false });
 
     try {
-      await api.teams.reorder({ teamIds: reordered.map((t) => t.id) });
+      await api.teams.reorder({ entryIds: reordered.map((t) => t.id) });
       await mutate(SWR_KEYS.teams);
     } catch {
       await mutate(SWR_KEYS.teams);

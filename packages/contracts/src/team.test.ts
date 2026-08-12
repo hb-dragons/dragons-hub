@@ -109,31 +109,62 @@ describe("teamUpdateBodySchema", () => {
       teamUpdateBodySchema.parse({ badgeColor: "x".repeat(21) }),
     ).toThrow();
   });
+
+  it("accepts leagueId as a positive integer", () => {
+    expect(teamUpdateBodySchema.parse({ leagueId: 12 })).toEqual({
+      leagueId: 12,
+    });
+  });
+
+  it("accepts null leagueId to clear the link", () => {
+    expect(teamUpdateBodySchema.parse({ leagueId: null })).toEqual({
+      leagueId: null,
+    });
+  });
+
+  it("rejects non-positive leagueId", () => {
+    expect(() => teamUpdateBodySchema.parse({ leagueId: 0 })).toThrow();
+  });
 });
 
 describe("teamReorderBodySchema", () => {
   it("accepts a non-empty array of positive integers", () => {
-    const result = teamReorderBodySchema.safeParse({ teamIds: [3, 1, 2] });
+    const result = teamReorderBodySchema.safeParse({ entryIds: [3, 1, 2] });
     expect(result.success).toBe(true);
   });
 
   it("rejects an empty array", () => {
-    const result = teamReorderBodySchema.safeParse({ teamIds: [] });
+    const result = teamReorderBodySchema.safeParse({ entryIds: [] });
     expect(result.success).toBe(false);
   });
 
   it("rejects non-positive ids", () => {
-    const result = teamReorderBodySchema.safeParse({ teamIds: [1, 0, 2] });
+    const result = teamReorderBodySchema.safeParse({ entryIds: [1, 0, 2] });
     expect(result.success).toBe(false);
   });
 
   it("rejects non-integer ids", () => {
-    const result = teamReorderBodySchema.safeParse({ teamIds: [1, 1.5] });
+    const result = teamReorderBodySchema.safeParse({ entryIds: [1, 1.5] });
     expect(result.success).toBe(false);
   });
 
-  it("rejects missing teamIds", () => {
+  it("rejects missing entryIds", () => {
     const result = teamReorderBodySchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts an optional seasonId", () => {
+    const result = teamReorderBodySchema.safeParse({ seasonId: 5, entryIds: [1] });
+    expect(result.success).toBe(true);
+  });
+
+  it("coerces a string seasonId", () => {
+    const result = teamReorderBodySchema.safeParse({ seasonId: "5", entryIds: [1] });
+    expect(result).toMatchObject({ success: true, data: { seasonId: 5, entryIds: [1] } });
+  });
+
+  it("rejects a non-positive seasonId", () => {
+    const result = teamReorderBodySchema.safeParse({ seasonId: 0, entryIds: [1] });
     expect(result.success).toBe(false);
   });
 });
