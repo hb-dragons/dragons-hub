@@ -286,7 +286,13 @@ describe("getOwnClubTeams (entry-based)", () => {
     const squad = await seedTeam(3000, "Dragons U16");
     // Standings history in BOTH leagues (the original bug's trigger)…
     await ctx.client.query(`INSERT INTO standings (league_id, team_api_id, position) VALUES ($1, 3000, 1), ($2, 3000, 1)`, [u14, u16]);
-    // …but the entry pins the league.
+    // …and the squad has a genuine entry in BOTH seasons (the real-world state
+    // the original bug came from: history in an earlier season's league) —
+    // this is what makes the fixture able to tell scoped from unscoped reads
+    // apart. Without a second entry, dropping the seasonId predicate would be
+    // a no-op against this test.
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3)`, [squad, archived, u14]);
     await ctx.client.query(
       `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3)`, [squad, active, u16]);
 
@@ -405,9 +411,15 @@ describe("reorderTeamEntries", () => {
 
   it("defaults to the active season when seasonId is omitted", async () => {
     const active = await seedSeason("2026/27", "active");
+    const archived = await seedSeason("2025/26", "archived");
     const a = await seedTeam(5104, "A");
     const rows = await ctx.client.query<{ id: number }>(
       `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2) RETURNING id`, [a, active]);
+    // A second own-club entry for the SAME team in an archived season — if the
+    // default resolution or the season scope broke, this entry would count
+    // toward "own" and the length check below would reject the call.
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id) VALUES ($1, $2)`, [a, archived]);
 
     const result = await reorderTeamEntries([rows.rows[0]!.id]);
     expect(result.map((r) => r.id)).toEqual([rows.rows[0]!.id]);
