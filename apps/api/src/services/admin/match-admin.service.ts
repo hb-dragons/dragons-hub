@@ -38,7 +38,8 @@ async function loadTeamNames(
   // (leagueId -> leagues.seasonRefId). No league (or no matching league row)
   // means no season to scope to, so NO_SEASON — a value no leagues.id can ever
   // hold — makes the entry join match nothing rather than falling back to the
-  // frozen teams.customName.
+  // pre-entries teams.customName (that column no longer exists; this note is
+  // historical context for why the join is scoped by season at all).
   let seasonId = NO_SEASON;
   if (leagueId !== null) {
     const [league] = await tx
