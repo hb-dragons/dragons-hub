@@ -311,21 +311,21 @@ function BoardDetailBody() {
       switch (action) {
         case "create": {
           const active = columns[activeIndex] ?? columns[0];
-          if (active) openQuickCreateSheet(boardId, active.id);
+          if (active) openQuickCreate(active.id);
           break;
         }
         case "sort":
           openSortSheet(sort, setSort);
           break;
         case "addColumn":
-          openAddColumnSheet(boardId);
+          onAddColumnPress();
           break;
         case "settings":
           openBoardSettingsSheet(boardId);
           break;
       }
     },
-    [activeIndex, boardId, columns, sort, setSort],
+    [activeIndex, boardId, columns, openQuickCreate, onAddColumnPress, sort, setSort],
   );
 
   // ---------------------------------------------------------------------------
