@@ -17,7 +17,11 @@ export const SWR_KEYS = {
   matchDetail: (id: number) => `/admin/matches/${id}`,
   matchHistory: (id: number, limit?: number, offset?: number) =>
     `/admin/matches/${id}/history?limit=${limit ?? 50}&offset=${offset ?? 0}`,
-  teams: "/admin/teams",
+  // Season-scoped variant, mirroring `matches`/`standings`: the bare path when
+  // no season is named keeps the server prefetch and initial client render on
+  // one shared cache entry.
+  teams: (seasonId?: number) =>
+    seasonId === undefined ? "/admin/teams" : `/admin/teams?seasonId=${seasonId}`,
   refereesPaginated: (opts: {
     scope?: "own" | "all";
     search?: string;

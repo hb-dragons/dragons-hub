@@ -608,7 +608,9 @@
     "placeholder": "Enter custom name...",
     "gameDuration": "Game Duration (min)",
     "gameDurationPlaceholder": "Default",
-    "badgeColor": "Badge Color"
+    "badgeColor": "Badge Color",
+    "leagueNotConnected": "Not connected",
+    "leagueUntracked": "League no longer tracked"
   },
   "users": {
     "title": "Users",
