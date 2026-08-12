@@ -2,6 +2,7 @@ export * from "./app-settings";
 export * from "./seasons";
 export * from "./leagues";
 export * from "./teams";
+export * from "./team-entries";
 export * from "./venues";
 export * from "./matches";
 export * from "./match-overrides";

@@ -97,7 +97,7 @@ Match (0..1) ──── (N) BroadcastConfig (PK deviceId — one row per score
 
 ### Database Tables
 
-46 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
+48 tables, all exported from `packages/db/src/schema/index.ts`. The list below is
 verified against those exports by `apps/api/src/test/docs-drift.test.ts` in both
 directions — adding a `pgTable` without a row here fails the build.
 
@@ -113,6 +113,7 @@ tables (`user`, `session`, `account`, `verification`) use text ids,
 | `seasons` | `packages/db/src/schema/seasons.ts` | id, name, sdkSeasonId (nullable int), status (`upcoming`\|`active`\|`archived`), startDate, endDate, createdAt, updatedAt — partial-unique index enforces at most one `active` row at a time; `activateSeason()` archives the current active in the same transaction |
 | `leagues` | `packages/db/src/schema/leagues.ts` | apiLigaId (unique), ligaNr, name, seasonId (legacy SDK int), seasonRefId (FK → seasons.id, NOT NULL), vorabliga (boolean), isTracked, discoveredAt, dataHash — season scoping for matches/standings flows through `leagues.seasonRefId`; sync gates to active+upcoming seasons; public reads are active-season-only; admin reads accept an optional `seasonId` query param (defaulting to the active season) |
 | `teams` | `packages/db/src/schema/teams.ts` | apiTeamPermanentId (unique), name, clubId, isOwnClub, dataHash |
+| `teamEntries` | `packages/db/src/schema/team-entries.ts` | teamId FK + seasonId FK (unique pair), leagueId FK (nullable = not connected), linkSource (`seeded`\|`manual`), customName, badgeColor, estimatedGameDuration, displayOrder — the per-season Team entry; source of truth for team↔league (ADR 0004) |
 | `venues` | `packages/db/src/schema/venues.ts` | apiId (unique), name, street, postalCode, city, lat/lng, dataHash |
 | `matches` | `packages/db/src/schema/matches.ts` | apiMatchId (unique), leagueId FK, venueId FK, scores, sr1Open, sr2Open, sr3Open, JSONB fields, versioning |
 | `standings` | `packages/db/src/schema/standings.ts` | leagueId FK + teamApiId (unique), position, won, lost, points |
