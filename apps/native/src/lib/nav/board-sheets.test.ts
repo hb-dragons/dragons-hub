@@ -7,6 +7,7 @@ import {
   openAssigneePickerSheet,
   openBoardSettingsSheet,
   openColumnSettingsSheet,
+  openCreateBoardSheet,
   openDuePickerSheet,
   openMoveToSheet,
   openPriorityPickerSheet,
@@ -176,6 +177,18 @@ describe("board sheet navigation", () => {
       expect(params).toEqual({ boardId: 7, columnId: 3 });
     });
 
+    // #225. The one sheet that belongs to the board *list* rather than to a
+    // board, so it takes no params at all — and it does not hand the new
+    // board's id back to the list either: it navigates to the board itself,
+    // which is what keeps it on the owning side of the result rule.
+    it("opens the create-board sheet with nothing to scope it to", () => {
+      openCreateBoardSheet();
+
+      expect(vi.mocked(router.push)).toHaveBeenCalledExactlyOnceWith(
+        "/admin/boards/sheets/create-board",
+      );
+    });
+
     // These sheets apply their own change and close; a result token would be
     // registered and never delivered.
     it("registers no result handler", () => {
@@ -185,6 +198,7 @@ describe("board sheet navigation", () => {
       openMoveToSheet(7, 42);
       openTaskDetailSheet(7, 42);
       openQuickCreateSheet(7, 3);
+      openCreateBoardSheet();
 
       expect(pendingSheetResultCount()).toBe(0);
     });

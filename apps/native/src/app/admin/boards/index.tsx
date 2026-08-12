@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import {
   FlatList,
   Pressable,
@@ -10,26 +9,17 @@ import { Stack, router } from "expo-router";
 import { useBoardList } from "@/hooks/board/useBoardList";
 import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
-import {
-  CreateBoardSheet,
-  type CreateBoardSheetHandle,
-} from "@/components/board/CreateBoardSheet";
+import { openCreateBoardSheet } from "@/lib/nav/board-sheets";
 import { BoardListSkeleton } from "@/components/board/BoardListSkeleton";
 import { Icon } from "@/components/ui/Icon";
 
 export default function BoardListScreen() {
   const { colors, spacing, radius } = useTheme();
   const { data, isLoading, mutate, isValidating } = useBoardList();
-  const createRef = useRef<CreateBoardSheetHandle | null>(null);
-
-  const openCreate = () =>
-    createRef.current?.open((id) => {
-      router.push(`/admin/boards/${id}`);
-    });
 
   const renderHeaderRight = () => (
     <Pressable
-      onPress={openCreate}
+      onPress={openCreateBoardSheet}
       accessibilityRole="button"
       accessibilityLabel={i18n.t("admin.boards.new")}
       hitSlop={12}
@@ -97,7 +87,7 @@ export default function BoardListScreen() {
                 {i18n.t("admin.boards.emptyHint")}
               </Text>
               <Pressable
-                onPress={openCreate}
+                onPress={openCreateBoardSheet}
                 accessibilityRole="button"
                 style={{
                   marginTop: spacing.sm,
@@ -147,7 +137,6 @@ export default function BoardListScreen() {
           )}
         />
       )}
-      <CreateBoardSheet ref={createRef} />
     </>
   );
 }

@@ -73,30 +73,34 @@ describe("navigation architecture", () => {
     ).toEqual([]);
   });
 
-  // Issue #219: the board's utility sheets are system form sheets now. A
-  // `@gorhom/bottom-sheet` import inside one would mean a JS sheet drawn
-  // inside a native sheet — two sets of detents fighting over the same drag.
-  it("draws no JS bottom sheet inside a sheet route", () => {
-    const offenders = importSites("@gorhom/bottom-sheet").filter((file) =>
-      file.startsWith("src/app/admin/boards/sheets/"),
-    );
-    expect(offenders).toEqual([]);
-  });
+  /**
+   * Issue #225, the contract step: there is no JS bottom-sheet layer left.
+   *
+   * Every sheet the app has is a route with a native presentation (#219, #222,
+   * #223) and every long-press menu is a first-party one (#220), so the
+   * library, the provider it needed at the root, and the last panel drawn with
+   * it are all gone. Stated in both places it can come back from: an import
+   * anywhere in `src/`, and the manifest — a dependency left declared is what
+   * makes such an import resolve, and it ships the native module into the
+   * binary whether anything renders it or not.
+   *
+   * What the rule is protecting, in the order the reasons were found:
+   *  - a JS sheet inside a route sheet is two sets of detents fighting over one
+   *    drag (#219);
+   *  - a `BottomSheetTextInput` inside a *native* sheet registers with a JS
+   *    sheet that is not on screen, so it stops lifting for the keyboard
+   *    (#222).
+   */
+  it("has no JS bottom sheet layer left, in source or in the manifest", () => {
+    expect(importSites("@gorhom/bottom-sheet")).toEqual([]);
 
-  // ...nor in what a sheet route renders. #222 moved task detail and quick
-  // create onto routes, which means their bodies — and the checklist and
-  // comment composers inside them — are inside a *native* sheet: a
-  // `BottomSheetTextInput` there registers with a JS sheet that is not on
-  // screen, so it no longer knows to lift for the keyboard.
-  //
-  // The list is what is left of the JS sheet layer, and it shrinks to nothing:
-  // the task menu was #220's, and the board-create sheet and the provider in
-  // the root layout go with the library in #225.
-  it("has the JS bottom sheet layer down to its last two sites", () => {
-    expect(importSites("@gorhom/bottom-sheet")).toEqual([
-      "src/app/_layout.tsx",
-      "src/components/board/CreateBoardSheet.tsx",
-    ]);
+    const pkg = JSON.parse(readFileSync(PACKAGE_JSON, "utf8")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    expect(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })).not.toContain(
+      "@gorhom/bottom-sheet",
+    );
   });
 
   // Issue #220, ADR 0002: item-level actions belong behind a real context

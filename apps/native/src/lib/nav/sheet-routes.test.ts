@@ -45,6 +45,7 @@ describe("board sheet routes", () => {
         "assignees",
         "board-settings",
         "column-settings",
+        "create-board",
         "due",
         "move-to",
         "priority",
@@ -121,6 +122,14 @@ describe("board sheet routes", () => {
   // the rest of the form underneath it.
   it("presents quick create at full height", () => {
     expect(sheetRoute("quick-create").detents).toEqual([1]);
+  });
+
+  // #225. The last JS bottom sheet in the app was an 85%-tall panel holding a
+  // name field, an optional description and a Create button — the same shape as
+  // the add-column sheet, so it gets the same content-measured height instead of
+  // a percentage nobody derived.
+  it("sizes the create-board sheet to its two fields", () => {
+    expect(sheetRoute("create-board").detents).toBe("fitToContents");
   });
 
   it("opens every sheet at its smallest detent", () => {
