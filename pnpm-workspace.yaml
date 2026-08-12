@@ -125,3 +125,10 @@ minimumReleaseAgeExclude:
   - expo-splash-screen@57.0.6
   - expo-updates@57.0.13
   - expo@57.0.12
+
+# Qualifies one `abs(...)` call as `Swift.abs(...)` so the package compiles under
+# Xcode 26.2+ (C++ interop makes the bare call ambiguous). Upstream fix is
+# expo/expo#48261, unreleased as of 2026-08-12; remove with issue #226 when a
+# release contains it.
+patchedDependencies:
+  expo-modules-jsi@57.0.4: patches/expo-modules-jsi@57.0.4.patch
