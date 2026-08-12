@@ -343,6 +343,32 @@ describe("getTeamStats — team entry", () => {
     expect(stats?.position).toBeNull();
     expect(stats?.played).toBe(0);
   });
+
+  it("defaults everything when the entry has no league connected yet", async () => {
+    // The "U10 unconnected" case that motivated the feature: an entry exists
+    // for the season but league_id is still NULL, so there is no standings
+    // join to run at all.
+    const squad = await seedTeam(7101, "Dragons U10");
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, NULL)`,
+      [squad, activeSeasonId],
+    );
+
+    const stats = await getTeamStats(squad);
+
+    expect(stats).toEqual({
+      teamId: squad,
+      leagueName: "",
+      position: null,
+      played: 0,
+      wins: 0,
+      losses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      pointsDiff: 0,
+      form: [],
+    });
+  });
 });
 
 describe("getTeamStats — season scope", () => {

@@ -71,7 +71,13 @@ describe("listPublicTeams", () => {
     const ownRows = rows.filter((r) => r.isOwnClub);
     expect(ownRows.map((r) => r.name)).toEqual(["Dragons U16"]); // no-entry squad is not fielded
     expect(ownRows[0]).toMatchObject({ id: squadWith, customName: "U16", badgeColor: "red", displayOrder: 2 });
-    expect(rows.some((r) => r.id === rival)).toBe(true); // non-own teams unaffected
+    const rivalRow = rows.find((r) => r.id === rival); // non-own teams unaffected
+    expect(rivalRow).toMatchObject({
+      customName: null,
+      badgeColor: null,
+      estimatedGameDuration: null,
+      displayOrder: 0,
+    });
   });
 
   it("orders own-club teams first (by entry displayOrder, then name), then non-own teams by name", async () => {
