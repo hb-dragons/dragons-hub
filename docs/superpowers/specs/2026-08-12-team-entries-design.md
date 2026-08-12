@@ -87,7 +87,7 @@ Constraints and indexes:
 One Drizzle migration (DDL generated, backfill hand-written in the same migration, following the `0046` pattern):
 
 1. Create `team_entries`.
-2. Backfill entries for all seasons from local standings evidence: own-club squads × season-scoped standings rows; where a squad has standings in more than one of a season's leagues, prefer the committed league over a vorabliga.
+2. Backfill entries for all seasons from local standings evidence: own-club squads × season-scoped standings rows; where a squad has standings in more than one of a season's leagues, prefer the committed league over a vorabliga. Supplement with match participation (`matches.homeTeamApiId`/`guestTeamApiId` via the league's season) for squads a league table does not list yet — this covers early-season leagues whose schedule is published but whose table is empty.
 3. Copy `custom_name`, `badge_color`, `estimated_game_duration`, `display_order` from `teams` onto the active season's entries; copy color, duration, and order (not custom name) onto upcoming-season entries.
 4. Drop the four moved columns from `teams`.
 
