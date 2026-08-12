@@ -328,6 +328,23 @@ describe("getTeamStats — form", () => {
   });
 });
 
+describe("getTeamStats — team entry", () => {
+  it("names the entry's league even before any standings row exists", async () => {
+    const league = await seedLeague(60, "U10 Kreisliga", activeSeasonId);
+    const squad = await seedTeam(7100, "Dragons U10");
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, league_id) VALUES ($1, $2, $3)`,
+      [squad, activeSeasonId, league],
+    );
+
+    const stats = await getTeamStats(squad);
+
+    expect(stats?.leagueName).toBe("U10 Kreisliga");
+    expect(stats?.position).toBeNull();
+    expect(stats?.played).toBe(0);
+  });
+});
+
 describe("getTeamStats — season scope", () => {
   it("returns null when no season is active", async () => {
     const teamId = await seedTeam(100, "Dragons 1");
