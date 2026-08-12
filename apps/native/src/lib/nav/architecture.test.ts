@@ -28,6 +28,22 @@ const PACKAGE_JSON = resolveInPackage("package.json");
 const APP_DIR = resolveInPackage("src/app");
 const TABS_DIR = path.join(APP_DIR, "(tabs)");
 
+interface PackageManifest {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+}
+
+/** The app's own `package.json`, for the rules about what it declares. */
+function readManifest(): PackageManifest {
+  return JSON.parse(readFileSync(PACKAGE_JSON, "utf8")) as PackageManifest;
+}
+
+/** Every package the app declares, runtime and dev alike. */
+function declaredPackages(): string[] {
+  const manifest = readManifest();
+  return Object.keys({ ...manifest.dependencies, ...manifest.devDependencies });
+}
+
 describe("navigation architecture", () => {
   it("found the source tree", () => {
     expect(SOURCE_FILES.length).toBeGreaterThan(50);
@@ -93,14 +109,7 @@ describe("navigation architecture", () => {
    */
   it("has no JS bottom sheet layer left, in source or in the manifest", () => {
     expect(importSites("@gorhom/bottom-sheet")).toEqual([]);
-
-    const pkg = JSON.parse(readFileSync(PACKAGE_JSON, "utf8")) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    expect(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })).not.toContain(
-      "@gorhom/bottom-sheet",
-    );
+    expect(declaredPackages()).not.toContain("@gorhom/bottom-sheet");
   });
 
   // Issue #220, ADR 0002: item-level actions belong behind a real context
@@ -164,12 +173,7 @@ describe("navigation architecture", () => {
   });
 
   it("does not declare @react-navigation/* as a dependency", () => {
-    const pkg = JSON.parse(readFileSync(PACKAGE_JSON, "utf8")) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    const declared = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
-    expect(declared.filter((name) => name.startsWith("@react-navigation/"))).toEqual([]);
+    expect(declaredPackages().filter((name) => name.startsWith("@react-navigation/"))).toEqual([]);
   });
 
   // #221: symbols arrive through expo-router's native tabs either way, but the
@@ -177,9 +181,7 @@ describe("navigation architecture", () => {
   // pins it: an Expo SDK package has to match the SDK's major or it links
   // against a different native runtime than the one the app builds.
   it("declares expo-symbols directly, at the SDK's major", () => {
-    const { dependencies = {} } = JSON.parse(readFileSync(PACKAGE_JSON, "utf8")) as {
-      dependencies?: Record<string, string>;
-    };
+    const { dependencies = {} } = readManifest();
     const sdkMajor = /^~?(\d+)\./.exec(dependencies.expo ?? "")?.[1];
     expect(sdkMajor, "cannot read the Expo SDK major from the expo dependency").toBeTruthy();
     expect(dependencies["expo-symbols"]).toMatch(new RegExp(`^~${sdkMajor}\\.`));

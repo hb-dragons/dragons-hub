@@ -61,11 +61,11 @@ expired, they are fingerprint-incompatible with today's JS —
 `react-native-reanimated` + `react-native-worklets`, gesture-handler,
 keyboard-controller, glass-effect, datetimepicker, segmented-control,
 haptics, clipboard and device all landed after the last build, and
-camera / web-browser were removed — as was `@gorhom/bottom-sheet`, which
-landed after that build and left again in #225, once every sheet had
-become a native form-sheet route. (An earlier revision of this line also
-listed `linking` as removed; it never was — see `PRE-LAUNCH.md`,
-expo-router requires it.) On top of that the whole
+camera / web-browser were removed. `@gorhom/bottom-sheet` is on neither
+list any more: it arrived after that build and left again in #225, once
+every sheet had become a native form-sheet route. (An earlier revision
+of this line also listed `linking` as removed; it never was — see
+`PRE-LAUNCH.md`, expo-router requires it.) On top of that the whole
 project moved from SDK 55 to SDK 57 in #213, which is a rebuild on its
 own. OTA cannot bridge any of it. Verify before assuming otherwise:
 

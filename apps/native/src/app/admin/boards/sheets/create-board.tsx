@@ -11,12 +11,12 @@ import { i18n } from "@/lib/i18n";
 /**
  * Create a board (issue #225).
  *
- * The app's last `<BottomSheetModal>`: it was mounted next to the board list
- * and opened through an imperative ref, so the list screen had to hold that ref
- * and hand it a callback to run afterwards. As a route it is the same shape as
- * every other sheet under this directory — the presentation is declared once in
- * `lib/nav/sheet-routes.ts` and the system draws the grabber, the detent and
- * the swipe-to-dismiss.
+ * Replaces the app's last `<BottomSheetModal>`, which was mounted next to the
+ * board list and opened through an imperative ref — so the list screen had to
+ * hold that ref and hand it a callback to run afterwards. As a route it is the
+ * same shape as every other sheet under this directory: the presentation is
+ * declared once in `lib/nav/sheet-routes.ts` and the system draws the grabber,
+ * the detent and the swipe-to-dismiss.
  */
 export default function CreateBoardSheetRoute() {
   const [name, setName] = useState("");

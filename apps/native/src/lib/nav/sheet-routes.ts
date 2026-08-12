@@ -88,10 +88,10 @@ export const BOARD_SHEET_ROUTES: readonly SheetRouteSpec[] = [
   // Full height for the same reason as the assignee sheets: the keyboard is up
   // from the moment it opens (#222).
   { name: "quick-create", detents: FULL },
-  // The board *list*'s sheet, and the last JS bottom sheet in the app (#225).
-  // It presents over `boards/index` rather than over a board, which is the only
-  // thing that sets it apart from the rest of the table — one field, one
-  // optional field and a button, so the system measures it, exactly as for
+  // The board *list*'s sheet, which replaced the app's last JS bottom sheet
+  // (#225). It presents over `boards/index` rather than over a board, which is
+  // the only thing that sets it apart from the rest of the table — one field,
+  // one optional field and a button, so the system measures it, exactly as for
   // add-column.
   { name: "create-board", detents: FIT_TO_CONTENTS },
 ];
