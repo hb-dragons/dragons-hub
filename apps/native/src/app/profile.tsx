@@ -1,9 +1,8 @@
-import { View, Text, Pressable, Switch, StyleSheet } from "react-native";
+import { View, Text, Pressable, Switch } from "react-native";
 import { useRouter } from "expo-router";
 import { parseRoles, isReferee, type RoleName } from "@dragons/shared";
 import { useTheme } from "@/hooks/useTheme";
 import { useLocale } from "@/hooks/useLocale";
-import type { LocalePref } from "@/hooks/useLocale";
 import { useBiometricLock } from "@/hooks/useBiometricLock";
 import { authClient } from "@/lib/auth-client";
 import { performSignOut } from "@/lib/auth/sign-out";
@@ -11,21 +10,14 @@ import { Card } from "@/components/Card";
 import { Badge } from "@/components/Badge";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Screen, UNDER_NATIVE_HEADER } from "@/components/Screen";
+import { Segmented } from "@/components/ui/Segmented";
 import { Logo } from "@/components/brand/Logo";
 import { i18n } from "@/lib/i18n";
-import type { Mode } from "@/hooks/useTheme";
-
-const THEME_OPTIONS: { labelKey: string; value: Mode }[] = [
-  { labelKey: "profile.themeSystem", value: "system" },
-  { labelKey: "profile.themeLight", value: "light" },
-  { labelKey: "profile.themeDark", value: "dark" },
-];
-
-const LOCALE_OPTIONS: { labelKey: string; value: LocalePref }[] = [
-  { labelKey: "profile.languageSystem", value: "system" },
-  { labelKey: "profile.languageDe", value: "de" },
-  { labelKey: "profile.languageEn", value: "en" },
-];
+import {
+  LOCALE_SEGMENTS,
+  THEME_SEGMENTS,
+  segmentLabels,
+} from "@/lib/ui/preference-segments";
 
 export default function ProfileScreen() {
   const { colors, textStyles, spacing, radius, mode, setMode } = useTheme();
@@ -84,41 +76,11 @@ export default function ProfileScreen() {
 
         <View style={{ marginTop: spacing.xl * 2 }}>
           <SectionHeader title={i18n.t("profile.language")} />
-          <View style={styles.segmentedRow}>
-            {LOCALE_OPTIONS.map((option) => {
-              const isActive = localePref === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  onPress={() => setLocalePref(option.value)}
-                  style={[
-                    styles.segmentedButton,
-                    {
-                      backgroundColor: isActive
-                        ? colors.primary
-                        : colors.surfaceHigh,
-                      borderRadius: radius.md,
-                      paddingVertical: spacing.sm,
-                      paddingHorizontal: spacing.md,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      textStyles.label,
-                      {
-                        color: isActive
-                          ? colors.primaryForeground
-                          : colors.foreground,
-                      },
-                    ]}
-                  >
-                    {i18n.t(option.labelKey)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Segmented
+            segments={segmentLabels(LOCALE_SEGMENTS, (key) => i18n.t(key))}
+            selected={localePref}
+            onSelect={setLocalePref}
+          />
         </View>
       </Screen>
     );
@@ -222,81 +184,21 @@ export default function ProfileScreen() {
         {/* Theme section */}
         <View>
           <SectionHeader title={i18n.t("profile.theme")} />
-          <View style={styles.segmentedRow}>
-            {THEME_OPTIONS.map((option) => {
-              const isActive = mode === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  onPress={() => setMode(option.value)}
-                  style={[
-                    styles.segmentedButton,
-                    {
-                      backgroundColor: isActive
-                        ? colors.primary
-                        : colors.surfaceHigh,
-                      borderRadius: radius.md,
-                      paddingVertical: spacing.sm,
-                      paddingHorizontal: spacing.md,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      textStyles.label,
-                      {
-                        color: isActive
-                          ? colors.primaryForeground
-                          : colors.foreground,
-                      },
-                    ]}
-                  >
-                    {i18n.t(option.labelKey)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Segmented
+            segments={segmentLabels(THEME_SEGMENTS, (key) => i18n.t(key))}
+            selected={mode}
+            onSelect={setMode}
+          />
         </View>
 
         {/* Language section */}
         <View>
           <SectionHeader title={i18n.t("profile.language")} />
-          <View style={styles.segmentedRow}>
-            {LOCALE_OPTIONS.map((option) => {
-              const isActive = localePref === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  onPress={() => setLocalePref(option.value)}
-                  style={[
-                    styles.segmentedButton,
-                    {
-                      backgroundColor: isActive
-                        ? colors.primary
-                        : colors.surfaceHigh,
-                      borderRadius: radius.md,
-                      paddingVertical: spacing.sm,
-                      paddingHorizontal: spacing.md,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      textStyles.label,
-                      {
-                        color: isActive
-                          ? colors.primaryForeground
-                          : colors.foreground,
-                      },
-                    ]}
-                  >
-                    {i18n.t(option.labelKey)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <Segmented
+            segments={segmentLabels(LOCALE_SEGMENTS, (key) => i18n.t(key))}
+            selected={localePref}
+            onSelect={setLocalePref}
+          />
         </View>
 
         {/* Sign Out */}
@@ -317,14 +219,3 @@ export default function ProfileScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  segmentedRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  segmentedButton: {
-    flex: 1,
-    alignItems: "center",
-  },
-});

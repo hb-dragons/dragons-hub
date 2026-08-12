@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ICONS } from "@/lib/ui/icons";
+import { ICONS, symbolFor } from "@/lib/ui/icons";
 import { SOURCE_FILES, rel } from "../../../test/source-tree";
 
 const entries = Object.entries(ICONS);
@@ -42,8 +42,11 @@ describe("ICONS", () => {
   // might want one day: a role nothing renders is a name nobody has to keep
   // honest. `<Icon name="...">` is compile-checked in the other direction.
   //
-  // Textual, so it reads a role's name where it is written — `name="add"`, or
-  // `name={busy ? "stop" : "send"}` — rather than where it is rendered.
+  // Textual, so it reads a role's name where it is written rather than where
+  // it is drawn. Three shapes name one: `name="add"` (and
+  // `name={busy ? "stop" : "send"}`) on an `<Icon>`, `symbolFor("more")` where
+  // the chrome is handed a symbol instead, and `icon: "sort"` in an action
+  // table the bar renders from.
   it("keeps no role the app never renders", () => {
     const sources = SOURCE_FILES.filter((file) => rel(file) !== "src/lib/ui/icons.ts").map((file) =>
       readFileSync(file, "utf8"),
@@ -51,9 +54,19 @@ describe("ICONS", () => {
     const unused = entries
       .map(([role]) => role)
       .filter((role) => {
-        const named = new RegExp(String.raw`name=\{?[^\n]*"${role}"`);
+        const named = new RegExp(String.raw`(name=\{?[^\n]*|symbolFor\(|icon: )"${role}"`);
         return !sources.some((source) => named.test(source));
       });
     expect(unused).toEqual([]);
+  });
+});
+
+describe("symbolFor", () => {
+  // The accessor exists so a native toolbar item can be handed a symbol name
+  // without becoming a second place that decides what a role looks like.
+  it("returns the role's iOS symbol", () => {
+    for (const [role, symbol] of entries) {
+      expect(symbolFor(role as keyof typeof ICONS)).toBe(symbol.ios);
+    }
   });
 });

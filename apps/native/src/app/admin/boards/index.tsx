@@ -11,35 +11,28 @@ import { useTheme } from "@/hooks/useTheme";
 import { i18n } from "@/lib/i18n";
 import { openCreateBoardSheet } from "@/lib/nav/board-sheets";
 import { BoardListSkeleton } from "@/components/board/BoardListSkeleton";
-import { Icon } from "@/components/ui/Icon";
+import { HeaderActions, type HeaderAction } from "@/components/nav/HeaderActions";
+
+/** The list's one bar action. A constant so it is not a fresh array per render. */
+const CREATE_BOARD_ACTION: readonly HeaderAction<"create">[] = [
+  { key: "create", labelKey: "admin.boards.new", icon: "add" },
+];
 
 export default function BoardListScreen() {
   const { colors, spacing, radius } = useTheme();
   const { data, isLoading, mutate, isValidating } = useBoardList();
-
-  const renderHeaderRight = () => (
-    <Pressable
-      onPress={openCreateBoardSheet}
-      accessibilityRole="button"
-      accessibilityLabel={i18n.t("admin.boards.new")}
-      hitSlop={12}
-      style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}
-    >
-      <Icon name="add" size={22} color={colors.primary} />
-    </Pressable>
-  );
 
   // One declaration site, rendered by both the skeleton and the loaded list:
   // attaching the title and the "+" button only after the boards arrive
   // reconfigures the native header mid push-transition, which flashes.
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: i18n.t("admin.boards.title"),
-          headerRight: renderHeaderRight,
-        }}
-      />
+      <Stack.Screen options={{ title: i18n.t("admin.boards.title") }} />
+      {/* A bar button item rather than a `headerRight` render prop (#224): the
+          "+" was a `Pressable` padded to a tap target by hand, which is what
+          UIKit does for a bar button item anyway — and better, since it also
+          gets the bar's tint and its iOS 26 glass. */}
+      <HeaderActions items={CREATE_BOARD_ACTION} onAction={openCreateBoardSheet} />
       {isLoading && !data ? (
         <BoardListSkeleton />
       ) : (

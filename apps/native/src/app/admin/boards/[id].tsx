@@ -17,9 +17,15 @@ import { BoardPager, type BoardPagerHandle } from "@/components/board/BoardPager
 import { TaskCardDragGhost } from "@/components/board/TaskCardDragGhost";
 import { FilterChips, type BoardFilters } from "@/components/board/FilterChips";
 import { Icon } from "@/components/ui/Icon";
+import { HeaderActions } from "@/components/nav/HeaderActions";
 import { useBoardFilterPersistence } from "@/hooks/board/useBoardFilterPersistence";
 import { sortedColumns } from "@/lib/board/columns";
 import type { TaskActionKey } from "@/lib/board/task-actions";
+import {
+  BOARD_OVERFLOW_ACTIONS,
+  BOARD_TOOLBAR_ACTIONS,
+  type BoardActionKey,
+} from "@/lib/board/board-actions";
 import {
   openAddColumnSheet,
   openAssigneeFilterSheet,
@@ -291,20 +297,46 @@ function BoardDetailBody() {
     openAddColumnSheet(boardId);
   }, [boardId]);
 
-  const openQuickCreateFab = useCallback(() => {
-    const active = columns[activeIndex] ?? columns[0];
-    if (!active) return;
-    openQuickCreateSheet(boardId, active.id);
-  }, [activeIndex, boardId, columns]);
+  /**
+   * What the header toolbar picked (#224).
+   *
+   * Same shape as `handleTaskAction`: a switch over the vocabulary's keys, so a
+   * fifth entry in `BOARD_ACTIONS` is a compile error here rather than a button
+   * that silently does nothing. Creating a task lands in the column the pager
+   * is showing — the toolbar has no column of its own, and the visible one is
+   * the one the user is looking at.
+   */
+  const handleBoardAction = useCallback(
+    (action: BoardActionKey) => {
+      switch (action) {
+        case "create": {
+          const active = columns[activeIndex] ?? columns[0];
+          if (active) openQuickCreateSheet(boardId, active.id);
+          break;
+        }
+        case "sort":
+          openSortSheet(sort, setSort);
+          break;
+        case "addColumn":
+          openAddColumnSheet(boardId);
+          break;
+        case "settings":
+          openBoardSettingsSheet(boardId);
+          break;
+      }
+    },
+    [activeIndex, boardId, columns, sort, setSort],
+  );
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
-  // NOTE: no early returns before Stack.Screen — the header options (title,
-  // search bar, right buttons) must be attached from the very first render.
-  // Attaching them only once board data arrives re-configures the native
-  // header mid push-transition, which flashes a header overlay.
+  // NOTE: no early returns before Stack.Screen and HeaderActions — the header
+  // options (title, search bar, bar button items) must be attached from the
+  // very first render. Attaching them only once board data arrives
+  // re-configures the native header mid push-transition, which flashes a
+  // header overlay.
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack.Screen
@@ -313,52 +345,24 @@ function BoardDetailBody() {
           headerSearchBarOptions: searchFieldOptions({
             placeholder: i18n.t("board.search.placeholder"),
             // The iOS 26 bottom toolbar; `bottomSearchToolbarClearance` above
-            // is what keeps the columns and the FAB clear of it.
+            // is what keeps the columns clear of it.
             placement: "integrated",
             onChangeText: commitSearchQuery,
             // Clearing is a deliberate action, not a keystroke — apply at once.
             onCancel: () => setSearchQuery(""),
           }),
-          headerRight: () => (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing.xs,
-              }}
-            >
-              <Pressable
-                onPress={() => openSortSheet(sort, setSort)}
-                accessibilityRole="button"
-                accessibilityLabel={i18n.t("board.sort.open")}
-                hitSlop={12}
-                style={{
-                  width: 44,
-                  height: 44,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Icon
-                  name="sort"
-                  size={20}
-                  color={sort === "position" ? colors.foreground : colors.primary}
-                />
-              </Pressable>
-              <Pressable
-                onPress={() => openBoardSettingsSheet(boardId)}
-                accessibilityRole="button"
-                accessibilityLabel={i18n.t("admin.boards.settingsTitle")}
-                hitSlop={12}
-                style={{ paddingHorizontal: spacing.sm, paddingVertical: spacing.sm }}
-              >
-                <Icon name="more" size={20} color={colors.primary} />
-              </Pressable>
-            </View>
-          ),
         }}
       />
-      {/* Pills/chips start below the header; columns and the FAB end above
+      {/* The header's own buttons (#224). Declared beside `Stack.Screen` and
+          ahead of every state branch below, for the same reason it is: bar
+          items compose into the same native header options, and a header
+          reconfigured mid push-transition flashes. */}
+      <HeaderActions
+        items={BOARD_TOOLBAR_ACTIONS}
+        overflow={BOARD_OVERFLOW_ACTIONS}
+        onAction={handleBoardAction}
+      />
+      {/* Pills/chips start below the header; the columns end above
           the bottom search toolbar. The drag ghost stays OUTSIDE this
           container: it is positioned in window-absolute coordinates, which
           only line up with the unpadded root. */}
@@ -512,29 +516,6 @@ function BoardDetailBody() {
               />
             )}
           </View>
-          <Pressable
-            onPress={openQuickCreateFab}
-            accessibilityRole="button"
-            accessibilityLabel={i18n.t("board.quickCreate.fab")}
-            style={{
-              position: "absolute",
-              right: spacing.lg,
-              bottom: spacing.lg,
-              width: 56,
-              height: 56,
-              borderRadius: 28,
-              backgroundColor: colors.primary,
-              alignItems: "center",
-              justifyContent: "center",
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.15,
-              shadowRadius: 6,
-              elevation: 5,
-            }}
-          >
-            <Icon name="add" size={28} color={colors.primaryForeground} />
-          </Pressable>
         </View>
         )}
       </View>

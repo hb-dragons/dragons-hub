@@ -53,7 +53,29 @@ export const ICONS = {
   warning: { ios: "exclamationmark.triangle.fill", android: "warning" },
   /** Destroys what it sits on: the delete button on the task sheet. */
   delete: { ios: "trash", android: "delete" },
+  /** A board column — the menu entry that adds one. */
+  column: { ios: "rectangle.split.3x1", android: "view_column" },
+  /** Opens the settings of the surface it sits on. */
+  settings: { ios: "gearshape", android: "settings" },
 } as const satisfies Record<string, IconSymbol>;
 
 /** A role in the vocabulary above, i.e. what `<Icon name>` accepts. */
 export type IconName = keyof typeof ICONS;
+
+/**
+ * The iOS symbol for a role, for chrome that draws its own symbol.
+ *
+ * `<Icon>` is the answer wherever the app renders the symbol itself. Native
+ * toolbar items (#224) and context menus do not: UIKit draws them from a name,
+ * so those call sites need the string. Reading it here rather than spelling it
+ * out is what keeps the vocabulary single — a bar button naming
+ * `"arrow.up.arrow.down"` directly would be a second place deciding what
+ * "sort" looks like.
+ *
+ * No Android counterpart, deliberately. UIKit's consumers are iOS-only, and
+ * the Android toolbar takes an image source rather than a symbol name, so a
+ * `materialSymbolFor` would return something nothing on that platform accepts.
+ */
+export function symbolFor(name: IconName): SFSymbol {
+  return ICONS[name].ios;
+}

@@ -94,10 +94,16 @@ export default defineConfig({
         // of the scope and put its submit gate in a tested lib module.
         // Measured 16.94/11.12/20.87/16.47 — statements, functions and lines
         // have not cleared the next whole point.
+        //
+        // Ratcheted 2026-08-12 (#224): statements 16 -> 17, functions 20 -> 21.
+        // The board's header buttons and Profile's two hand-rolled pickers
+        // became data — the board action vocabulary and the preference segment
+        // specs — and the untested JSX they replaced left the scope with them.
+        // Measured 17.21/11.16/21.32/16.75 — branches and lines hold.
         branches: 11,
-        functions: 20,
+        functions: 21,
         lines: 16,
-        statements: 16,
+        statements: 17,
       },
     },
   },
