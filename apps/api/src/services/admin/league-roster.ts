@@ -20,6 +20,8 @@ export async function fetchLeagueRoster(ligaId: number): Promise<SdkTeamRef[]> {
   }
   const byId = new Map<number, SdkTeamRef>();
   for (const ref of refs) {
+    // Defensive guard: exclude refs missing a teamPermanentId (0 or undefined).
+    // The federation API may publish refs without an assigned id in early seasons.
     if (ref.teamPermanentId && !byId.has(ref.teamPermanentId)) byId.set(ref.teamPermanentId, ref);
   }
   return [...byId.values()];

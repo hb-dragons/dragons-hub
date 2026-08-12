@@ -31,4 +31,26 @@ describe("fetchLeagueRoster", () => {
     const roster = await fetchLeagueRoster(42);
     expect(roster.map((r) => r.teamPermanentId)).toEqual([1, 2]);
   });
+
+  it("returns empty array when both table and schedule are empty", async () => {
+    vi.mocked(sdkClient.getTabelle).mockResolvedValue([] as never);
+    vi.mocked(sdkClient.getSpielplan).mockResolvedValue([] as never);
+    const roster = await fetchLeagueRoster(42);
+    expect(roster).toEqual([]);
+  });
+
+  it("dedupes a home/guest pair with the same teamPermanentId within one match", async () => {
+    vi.mocked(sdkClient.getTabelle).mockResolvedValue([] as never);
+    vi.mocked(sdkClient.getSpielplan).mockResolvedValue([
+      { homeTeam: ref(1), guestTeam: ref(1) },
+    ] as never);
+    const roster = await fetchLeagueRoster(42);
+    expect(roster.map((r) => r.teamPermanentId)).toEqual([1]);
+  });
+
+  it("excludes refs with teamPermanentId of 0 (unassigned federation id)", async () => {
+    vi.mocked(sdkClient.getTabelle).mockResolvedValue([{ team: ref(0, "Unassigned") }, { team: ref(1) }] as never);
+    const roster = await fetchLeagueRoster(42);
+    expect(roster.map((r) => r.teamPermanentId)).toEqual([1]);
+  });
 });
