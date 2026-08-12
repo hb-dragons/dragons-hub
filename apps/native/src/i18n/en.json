@@ -233,6 +233,7 @@
     "delete": "Delete",
     "clear": "Clear",
     "edit": "Edit",
+    "more": "More",
     "apply": "Apply",
     "loading": "Loading…",
     "vs": "vs",
@@ -372,7 +373,7 @@
       "titlePlaceholder": "Task title",
       "descriptionPlaceholder": "Add a description (optional)",
       "submit": "Create",
-      "fab": "New task"
+      "open": "New task"
     }
   },
   "error": {

@@ -137,6 +137,54 @@ describe("navigation architecture", () => {
     expect(sites).toEqual(["src/components/board/TaskContextMenu.tsx"]);
   });
 
+  /**
+   * Issue #224. A header button is a bar button item, not a view hosted in the
+   * bar.
+   *
+   * `headerRight` hands react-native-screens a React element to mount inside
+   * the navigation bar: the app then owns the tap target, the tint, the
+   * spacing and the pressed state, and on iOS 26 the item sits *on* the bar's
+   * glass rather than in it. `Stack.Toolbar` items are `UIBarButtonItem`s, so
+   * all of that comes from UIKit. Stated as an absence, because the render
+   * prop is what a screen reaches for by habit.
+   */
+  it("puts header buttons in the bar, not a view hosted inside it", () => {
+    // Matched where the option is *set* — `headerRight:` in an options object,
+    // `headerRight=` on a component — so the prose above and the notes in the
+    // screens that stopped using it do not read as offenders.
+    const offenders = SOURCE_FILES.filter((file) =>
+      /\bheader(Right|Left)\s*[:=]/.test(readFileSync(file, "utf8")),
+    ).map(rel);
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * The other half of #224: what did not fit in the bar is a `UIMenu`, not one
+   * more button opening one more sheet — and the bar itself is declared in one
+   * component, the same containment `TaskContextMenu` has for item menus.
+   *
+   * The containment is what makes the Android tier possible at all:
+   * `Stack.Toolbar`'s items take an SF Symbol name on iOS and an image source
+   * on Android, and render nothing there when handed the former, so exactly
+   * one module knows that and hosts plain pressables instead.
+   */
+  it("declares the navigation bar's items in one component", () => {
+    const sites = SOURCE_FILES.filter((file) =>
+      /<Stack\.Toolbar\b/.test(readFileSync(file, "utf8")),
+    ).map(rel);
+    expect(sites).toEqual(["src/components/nav/HeaderActions.tsx"]);
+  });
+
+  // #224: Profile's theme and language switchers were rows of tinted
+  // `Pressable`s. They are the same `UISegmentedControl` the Schedule and
+  // Officiating tabs use now, and the wrapper is the only importer of it — the
+  // containment that stops a screen re-deriving the selected treatment.
+  it("draws every segmented control through the one wrapper", () => {
+    expect(importSites("@react-native-segmented-control/segmented-control")).toEqual([
+      "src/components/ui/Segmented.tsx",
+    ]);
+  });
+
   // Issue #223: the referee-assignment picker was the app's last React Native
   // `<Modal>` — a JS-drawn `pageSheet` that had to bring its own header, close
   // button and keyboard handling. Every modal surface is a route with a native
@@ -312,17 +360,20 @@ describe("native header declarations", () => {
   // note in app/admin/boards/[id].tsx records where that was first seen). The
   // declaration therefore has to be reachable before any state branch returns.
   //
+  // `<HeaderActions>` counts too (#224): its bar items compose into the same
+  // native header options, so a bar declared in a late branch flashes for
+  // exactly the same reason.
+  //
   // Textual and therefore approximate: it catches a header declared inside a
   // late branch, not one built early and then dropped from a branch. At most
   // one `return (` may precede the declaration — the very return that renders
   // it. A second one is a loading or error state that ships no header.
-  it("declares header options ahead of every state branch", () => {
+  it.each(["<Stack.Screen", "<HeaderActions"])("declares %s ahead of every state branch", (tag) => {
     for (const file of SCREEN_FILES) {
-      const body = componentBody(readFileSync(file, "utf8"));
-      const header = body.indexOf("<Stack.Screen");
-      if (header === -1) continue;
-      const returnsBefore = body.slice(0, header).match(/return \(/g) ?? [];
-      expect(returnsBefore.length, `${rel(file)} returns before it declares header options`)
+      const preamble = declaringComponentPreamble(readFileSync(file, "utf8"), tag);
+      if (preamble === null) continue;
+      const returnsBefore = preamble.match(/return \(/g) ?? [];
+      expect(returnsBefore.length, `${rel(file)} returns before it declares ${tag}`)
         .toBeLessThanOrEqual(1);
     }
   });
@@ -359,12 +410,22 @@ describe("scroll containers", () => {
 });
 
 /**
- * The body of a file's default-exported component, so a rule about a screen is
- * not tripped by a helper declared below it.
+ * Everything between the start of the component that declares `tag` and the
+ * `tag` itself, or `null` if the file never declares it.
+ *
+ * Measured from the *declaring* component rather than from the default export:
+ * a screen may export a one-line wrapper around the component that renders the
+ * header, which `app/admin/boards/[id].tsx` does, and reading only the export
+ * would make the rule above vacuous for exactly the screen whose flash it
+ * records. The enclosing component is the last top-level `function` opened
+ * before the tag, so a helper declared *below* the component still cannot trip
+ * the rule.
  */
-function componentBody(source: string): string {
-  const start = source.indexOf("export default function");
-  if (start === -1) return "";
-  const end = source.indexOf("\n}", start);
-  return source.slice(start, end === -1 ? undefined : end);
+function declaringComponentPreamble(source: string, tag: string): string | null {
+  const tagAt = source.indexOf(tag);
+  if (tagAt === -1) return null;
+  const declarations = [
+    ...source.slice(0, tagAt).matchAll(/^(?:export (?:default )?)?function /gm),
+  ];
+  return source.slice(declarations.at(-1)?.index ?? 0, tagAt);
 }

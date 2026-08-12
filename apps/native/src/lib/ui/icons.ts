@@ -53,7 +53,34 @@ export const ICONS = {
   warning: { ios: "exclamationmark.triangle.fill", android: "warning" },
   /** Destroys what it sits on: the delete button on the task sheet. */
   delete: { ios: "trash", android: "delete" },
+  /** A board column — the menu entry that adds one. */
+  column: { ios: "rectangle.split.3x1", android: "view_column" },
+  /** Opens the settings of the surface it sits on. */
+  settings: { ios: "gearshape", android: "settings" },
 } as const satisfies Record<string, IconSymbol>;
 
 /** A role in the vocabulary above, i.e. what `<Icon name>` accepts. */
 export type IconName = keyof typeof ICONS;
+
+/**
+ * The iOS symbol for a role, for chrome that draws its own symbol.
+ *
+ * `<Icon>` is the answer wherever the app renders the symbol itself. A native
+ * toolbar item (#224) does not: UIKit draws it from a name, so that call site
+ * needs the string. Reading it here rather than spelling it out is what keeps
+ * the vocabulary single — a bar button naming `"arrow.up.arrow.down"` directly
+ * would be a second place deciding what "sort" looks like.
+ *
+ * The task context menu (#220) is the deliberate exception and spells its
+ * symbols literally: it exists on iOS only, so a role there would carry an
+ * Android tier nothing ever draws. A bar item has one, because the Android bar
+ * falls back to `<Icon>`.
+ *
+ * No Android counterpart here, for the same reason. UIKit is this accessor's
+ * only consumer, and the Android toolbar takes an image source rather than a
+ * symbol name, so a `materialSymbolFor` would return something nothing on that
+ * platform accepts.
+ */
+export function symbolFor(name: IconName): SFSymbol {
+  return ICONS[name].ios;
+}

@@ -233,6 +233,7 @@
     "delete": "Löschen",
     "clear": "Entfernen",
     "edit": "Bearbeiten",
+    "more": "Mehr",
     "apply": "Anwenden",
     "loading": "Laden…",
     "vs": "vs",
@@ -372,7 +373,7 @@
       "titlePlaceholder": "Aufgabentitel",
       "descriptionPlaceholder": "Beschreibung hinzufügen (optional)",
       "submit": "Erstellen",
-      "fab": "Neue Aufgabe"
+      "open": "Neue Aufgabe"
     }
   },
   "error": {

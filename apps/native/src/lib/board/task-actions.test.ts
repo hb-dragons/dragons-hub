@@ -3,20 +3,8 @@ import { describe, expect, it } from "vitest";
 import de from "@/i18n/de.json";
 import en from "@/i18n/en.json";
 import { TASK_ACTIONS, taskAction, type TaskActionKey } from "@/lib/board/task-actions";
+import { lookup } from "../../../test/i18n-bundles";
 import { SOURCE_FILES, rel, resolveInPackage } from "../../../test/source-tree";
-
-/** The string a nested i18n key resolves to, or `undefined` if it is missing. */
-function lookup(bundle: object, key: string): unknown {
-  return key
-    .split(".")
-    .reduce<unknown>(
-      (node, segment) =>
-        typeof node === "object" && node !== null
-          ? (node as Record<string, unknown>)[segment]
-          : undefined,
-      bundle,
-    );
-}
 
 describe("TASK_ACTIONS", () => {
   it("carries each of the board's task actions once", () => {
