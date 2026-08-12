@@ -5,6 +5,7 @@ import { sdkClient } from "../sync/sdk-client";
 import { getActiveSeasonId } from "./season.service";
 import { getClubConfig } from "./settings.service";
 import { fetchLeagueRoster } from "./league-roster";
+import { seedSeasonTeamEntries } from "./team-entry-seeding.service";
 import type { SdkLiga } from "@dragons/sdk";
 import type {
   BrowsableLeague,
@@ -140,7 +141,13 @@ export async function setSeasonLeagues(
     return untracked.length;
   });
 
-  return { tracked: selected.length, untracked: untrackedCount };
+  const seeding = await seedSeasonTeamEntries(seasonId, keepIds);
+  return {
+    tracked: selected.length,
+    untracked: untrackedCount,
+    entriesSeeded: seeding.entriesSeeded,
+    rosterFailures: seeding.rosterFailures,
+  };
 }
 
 export async function getTrackedLeagues(seasonId?: number): Promise<TrackedLeaguesResponse> {
