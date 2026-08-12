@@ -12,6 +12,25 @@ _Avoid_: guest, anonymous user
 A signed-in person with a club role (admin, referee admin, team manager, coach, referee self-service). Gets the role-driven surfaces and club tooling.
 _Avoid_: member, signed-in user
 
+**Squad**:
+The federation-identified group of players behind a club team. Keeps its federation identity for life and ages up through age brackets across seasons (last season's U14 squad can be this season's U16 squad).
+_Avoid_: permanent team
+
+**Team entry**:
+A club team in one specific season — the thing staff see and manage. Owns the club-facing team data for that season and is connected to exactly one league at a time. A squad has at most one team entry per season.
+_Avoid_: team slot, own-club team
+
+**Connected league**:
+The one league a team entry plays in for its season. Replaced, never duplicated, when the federation moves the team (e.g. a vorabliga giving way to the committed league).
+_Avoid_: assigned league
+
+**Tracked league**:
+A league the club follows in a given season; the sync's unit of work. Chosen per season during onboarding and manageable afterwards.
+_Avoid_: selected league, subscribed league
+
+**Vorabliga**:
+A preliminary league the federation publishes before promotion/relegation is settled. Carries a full schedule; superseded by a committed league whose fixtures replace it.
+
 ### Native app
 
 **iOS-first**:
