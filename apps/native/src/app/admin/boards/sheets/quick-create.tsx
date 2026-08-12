@@ -30,7 +30,8 @@ import {
  * sheet opens, so the keyboard covers the bottom half for as long as the sheet
  * is up, and every other field would sit under it.
  *
- * The column the FAB (or a column's + button) started from arrives as a param;
+ * The column the toolbar's create item (or a column's + button) started from
+ * arrives as a param;
  * the column *list* does not — it comes from the board's SWR key, already warm
  * from the screen underneath, per the scalar-params convention in
  * `lib/nav/sheet-routes.ts`.
