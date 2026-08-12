@@ -12,21 +12,23 @@ import {
   teamIdParamSchema,
   teamUpdateBodySchema,
   teamReorderBodySchema,
+  teamsListQuerySchema,
 } from "@dragons/contracts";
 
 const teamRoutes = new Hono<AppEnv>();
 
-// GET /admin/teams - List own club teams
+// GET /admin/teams - List own club team entries (defaults to the active season)
 teamRoutes.get(
   "/teams",
   requirePermission("team", "view"),
+  validator("query", teamsListQuerySchema, validationHook),
   describeRoute({
-    description: "List own club teams",
+    description: "List own club team entries (defaults to the active season)",
     tags: ["Teams"],
     responses: { 200: { description: "Success" } },
   }),
   async (c) => {
-    const teams = await getOwnClubTeams();
+    const teams = await getOwnClubTeams(c.req.valid("query").seasonId);
     return c.json(teams);
   },
 );

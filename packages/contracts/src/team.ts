@@ -16,3 +16,9 @@ export const teamReorderBodySchema = z.strictObject({
 });
 
 export type TeamReorderBody = z.infer<typeof teamReorderBodySchema>;
+
+export const teamsListQuerySchema = z.object({
+  seasonId: z.coerce.number().int().positive().optional(),
+});
+
+export type TeamsListQuery = z.infer<typeof teamsListQuerySchema>;

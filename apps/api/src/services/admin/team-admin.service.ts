@@ -1,38 +1,55 @@
 import { getDb } from "../../config/database";
-import { teams, standings, leagues } from "@dragons/db/schema";
+import { teams, teamEntries, standings, leagues } from "@dragons/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
 import { TeamReorderError } from "./team-admin.errors";
+import { getActiveSeasonId } from "./season.service";
 
 export type { OwnClubTeam, TeamReorderItem } from "@dragons/shared";
 
-export async function getOwnClubTeams(): Promise<OwnClubTeam[]> {
+export async function getOwnClubTeams(seasonId?: number): Promise<OwnClubTeam[]> {
+  const scopeId = seasonId !== undefined ? seasonId : await getActiveSeasonId();
+  // No season to scope to means no entries; answering with an unscoped read is
+  // exactly the bug this table replaced.
+  if (scopeId === null) return [];
+
   const rows = await getDb()
-    .selectDistinctOn([teams.id], {
-      id: teams.id,
+    .select({
+      id: teamEntries.id,
+      teamId: teams.id,
       name: teams.name,
       nameShort: teams.nameShort,
-      customName: teams.customName,
+      customName: teamEntries.customName,
+      leagueId: teamEntries.leagueId,
       leagueName: leagues.name,
-      estimatedGameDuration: teams.estimatedGameDuration,
-      badgeColor: teams.badgeColor,
-      displayOrder: teams.displayOrder,
+      leagueTracked: leagues.isTracked,
+      linkSource: teamEntries.linkSource,
+      estimatedGameDuration: teamEntries.estimatedGameDuration,
+      badgeColor: teamEntries.badgeColor,
+      displayOrder: teamEntries.displayOrder,
     })
-    .from(teams)
-    .leftJoin(standings, eq(standings.teamApiId, teams.apiTeamPermanentId))
-    .leftJoin(leagues, eq(leagues.id, standings.leagueId))
-    .where(eq(teams.isOwnClub, true))
-    .orderBy(teams.id, sql`${leagues.name} ASC NULLS LAST`);
+    .from(teamEntries)
+    .innerJoin(teams, eq(teamEntries.teamId, teams.id))
+    .leftJoin(leagues, eq(teamEntries.leagueId, leagues.id))
+    .where(and(eq(teamEntries.seasonId, scopeId), eq(teams.isOwnClub, true)));
 
-  return rows.sort(
-    (a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
-  );
+  return rows
+    .map((r) => ({
+      ...r,
+      linkSource: (r.linkSource === "manual" ? "manual" : "seeded") as "seeded" | "manual",
+      leagueTracked: r.leagueId === null ? true : (r.leagueTracked ?? false),
+    }))
+    .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name));
 }
 
+// Return type deliberately narrower than OwnClubTeam: this still updates the
+// `teams` row (squad-level fields only), so it cannot populate the
+// entry-scoped fields (teamId/leagueId/leagueTracked/linkSource). Task 5
+// replaces this with `updateTeamEntry`, which returns the full shape.
 export async function updateTeam(
   id: number,
   data: { customName?: string | null; estimatedGameDuration?: number | null; badgeColor?: string | null },
-): Promise<OwnClubTeam | null> {
+): Promise<Omit<OwnClubTeam, "teamId" | "leagueId" | "leagueTracked" | "linkSource"> | null> {
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (data.customName !== undefined) set.customName = data.customName;
   if (data.estimatedGameDuration !== undefined)
