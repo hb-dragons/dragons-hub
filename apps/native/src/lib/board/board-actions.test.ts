@@ -8,20 +8,8 @@ import {
   BOARD_TOOLBAR_ACTIONS,
 } from "@/lib/board/board-actions";
 import { ICONS } from "@/lib/ui/icons";
+import { lookup } from "../../../test/i18n-bundles";
 import { resolveInPackage } from "../../../test/source-tree";
-
-/** The string a bundle holds at a dotted key path, or undefined. */
-function lookup(bundle: object, key: string): unknown {
-  return key
-    .split(".")
-    .reduce<unknown>(
-      (node, part) =>
-        typeof node === "object" && node !== null
-          ? (node as Record<string, unknown>)[part]
-          : undefined,
-      bundle,
-    );
-}
 
 describe("BOARD_ACTIONS", () => {
   it("names each action once", () => {
@@ -30,8 +18,10 @@ describe("BOARD_ACTIONS", () => {
   });
 
   it("splits into the toolbar's own items and the overflow menu's, with nothing lost", () => {
-    expect([...BOARD_TOOLBAR_ACTIONS, ...BOARD_OVERFLOW_ACTIONS].map((a) => a.key).sort()).toEqual(
-      BOARD_ACTIONS.map((a) => a.key).sort(),
+    const placed = [...BOARD_TOOLBAR_ACTIONS, ...BOARD_OVERFLOW_ACTIONS];
+
+    expect(placed.map((action) => action.key).sort()).toEqual(
+      BOARD_ACTIONS.map((action) => action.key).sort(),
     );
     expect(BOARD_TOOLBAR_ACTIONS.length).toBeGreaterThan(0);
     expect(BOARD_OVERFLOW_ACTIONS.length).toBeGreaterThan(0);
@@ -44,7 +34,7 @@ describe("BOARD_ACTIONS", () => {
    * action, so it stays one tap away.
    */
   it("gives creating a task its own toolbar item", () => {
-    expect(BOARD_TOOLBAR_ACTIONS.map((a) => a.key)).toContain("create");
+    expect(BOARD_TOOLBAR_ACTIONS.map((action) => action.key)).toContain("create");
   });
 
   // The HIG asks menus to keep their items few. Four is already generous for a
@@ -68,10 +58,13 @@ describe("BOARD_ACTIONS", () => {
     expect(typeof lookup(de, labelKey), `${labelKey} missing from de`).toBe("string");
   });
 
-  // Same rule as `task-actions.test.ts`: one spelling of an action's label. A
-  // second site translating the same key is a label that can be changed in one
-  // place and stay stale in the other.
-  it("is the only site naming the board's chrome labels", () => {
+  // Narrower than `task-actions.test.ts`'s equivalent, and deliberately so:
+  // two of these keys are shared on purpose with the other control for the
+  // same action — the add-column pill, the settings sheet's own title — so one
+  // action reads the same wherever it is offered. What must not come back is
+  // the *screen* spelling them, which is where they lived before this
+  // vocabulary existed.
+  it("leaves the board screen naming none of the labels", () => {
     const board = readFileSync(resolveInPackage("src/app/admin/boards/[id].tsx"), "utf8");
     for (const { labelKey } of BOARD_ACTIONS) {
       expect(board, `${labelKey} is spelled in the board screen too`).not.toContain(

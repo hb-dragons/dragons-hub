@@ -2,19 +2,7 @@ import { describe, expect, it } from "vitest";
 import de from "@/i18n/de.json";
 import en from "@/i18n/en.json";
 import { LOCALE_SEGMENTS, THEME_SEGMENTS, segmentLabels } from "@/lib/ui/preference-segments";
-
-/** The string a bundle holds at a dotted key path, or undefined. */
-function lookup(bundle: object, key: string): unknown {
-  return key
-    .split(".")
-    .reduce<unknown>(
-      (node, part) =>
-        typeof node === "object" && node !== null
-          ? (node as Record<string, unknown>)[part]
-          : undefined,
-      bundle,
-    );
-}
+import { lookup } from "../../../test/i18n-bundles";
 
 describe("preference segments", () => {
   // The order is the control's reading order, and "system" first is what makes

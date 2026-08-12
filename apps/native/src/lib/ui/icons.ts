@@ -65,16 +65,21 @@ export type IconName = keyof typeof ICONS;
 /**
  * The iOS symbol for a role, for chrome that draws its own symbol.
  *
- * `<Icon>` is the answer wherever the app renders the symbol itself. Native
- * toolbar items (#224) and context menus do not: UIKit draws them from a name,
- * so those call sites need the string. Reading it here rather than spelling it
- * out is what keeps the vocabulary single — a bar button naming
- * `"arrow.up.arrow.down"` directly would be a second place deciding what
- * "sort" looks like.
+ * `<Icon>` is the answer wherever the app renders the symbol itself. A native
+ * toolbar item (#224) does not: UIKit draws it from a name, so that call site
+ * needs the string. Reading it here rather than spelling it out is what keeps
+ * the vocabulary single — a bar button naming `"arrow.up.arrow.down"` directly
+ * would be a second place deciding what "sort" looks like.
  *
- * No Android counterpart, deliberately. UIKit's consumers are iOS-only, and
- * the Android toolbar takes an image source rather than a symbol name, so a
- * `materialSymbolFor` would return something nothing on that platform accepts.
+ * The task context menu (#220) is the deliberate exception and spells its
+ * symbols literally: it exists on iOS only, so a role there would carry an
+ * Android tier nothing ever draws. A bar item has one, because the Android bar
+ * falls back to `<Icon>`.
+ *
+ * No Android counterpart here, for the same reason. UIKit is this accessor's
+ * only consumer, and the Android toolbar takes an image source rather than a
+ * symbol name, so a `materialSymbolFor` would return something nothing on that
+ * platform accepts.
  */
 export function symbolFor(name: IconName): SFSymbol {
   return ICONS[name].ios;

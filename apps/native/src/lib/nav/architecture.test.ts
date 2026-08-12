@@ -370,10 +370,9 @@ describe("native header declarations", () => {
   // it. A second one is a loading or error state that ships no header.
   it.each(["<Stack.Screen", "<HeaderActions"])("declares %s ahead of every state branch", (tag) => {
     for (const file of SCREEN_FILES) {
-      const body = componentBody(readFileSync(file, "utf8"));
-      const header = body.indexOf(tag);
-      if (header === -1) continue;
-      const returnsBefore = body.slice(0, header).match(/return \(/g) ?? [];
+      const preamble = declaringComponentPreamble(readFileSync(file, "utf8"), tag);
+      if (preamble === null) continue;
+      const returnsBefore = preamble.match(/return \(/g) ?? [];
       expect(returnsBefore.length, `${rel(file)} returns before it declares ${tag}`)
         .toBeLessThanOrEqual(1);
     }
@@ -411,12 +410,22 @@ describe("scroll containers", () => {
 });
 
 /**
- * The body of a file's default-exported component, so a rule about a screen is
- * not tripped by a helper declared below it.
+ * Everything between the start of the component that declares `tag` and the
+ * `tag` itself, or `null` if the file never declares it.
+ *
+ * Measured from the *declaring* component rather than from the default export:
+ * a screen may export a one-line wrapper around the component that renders the
+ * header, which `app/admin/boards/[id].tsx` does, and reading only the export
+ * would make the rule above vacuous for exactly the screen whose flash it
+ * records. The enclosing component is the last top-level `function` opened
+ * before the tag, so a helper declared *below* the component still cannot trip
+ * the rule.
  */
-function componentBody(source: string): string {
-  const start = source.indexOf("export default function");
-  if (start === -1) return "";
-  const end = source.indexOf("\n}", start);
-  return source.slice(start, end === -1 ? undefined : end);
+function declaringComponentPreamble(source: string, tag: string): string | null {
+  const tagAt = source.indexOf(tag);
+  if (tagAt === -1) return null;
+  const declarations = [
+    ...source.slice(0, tagAt).matchAll(/^(?:export (?:default )?)?function /gm),
+  ];
+  return source.slice(declarations.at(-1)?.index ?? 0, tagAt);
 }

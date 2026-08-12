@@ -99,7 +99,7 @@ export default defineConfig({
         // The board's header buttons and Profile's two hand-rolled pickers
         // became data — the board action vocabulary and the preference segment
         // specs — and the untested JSX they replaced left the scope with them.
-        // Measured 17.21/11.16/21.32/16.75 — branches and lines hold.
+        // Measured 17.17/11.14/21.24/16.7 — branches and lines hold.
         branches: 11,
         functions: 21,
         lines: 16,
