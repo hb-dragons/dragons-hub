@@ -65,7 +65,12 @@ export async function upsertEntryFromEvidence(
       .from(teamEntries)
       .innerJoin(seasons, eq(teamEntries.seasonId, seasons.id))
       .where(eq(teamEntries.teamId, teamId))
-      .orderBy(desc(seasons.createdAt))
+      // `startDate` is the chronological key — seasons are not guaranteed to
+      // be created in chronological order, so ordering by insertion time
+      // (createdAt alone) could carry forward the wrong squad's fields when
+      // backfilling an older season. createdAt only breaks ties, including
+      // for rows whose startDate is null.
+      .orderBy(desc(seasons.startDate), desc(seasons.createdAt))
       .limit(1);
 
     const displayOrder =
@@ -107,12 +112,10 @@ export async function seedSeasonTeamEntries(
   const ownClubId = (await getClubConfig())?.clubId ?? null;
   if (ownClubId === null || apiLigaIds.length === 0) return result;
 
-  const leagueRows = apiLigaIds.length
-    ? await getDb()
-        .select({ id: leagues.id, apiLigaId: leagues.apiLigaId })
-        .from(leagues)
-        .where(and(eq(leagues.seasonRefId, seasonId), inArray(leagues.apiLigaId, apiLigaIds)))
-    : [];
+  const leagueRows = await getDb()
+    .select({ id: leagues.id, apiLigaId: leagues.apiLigaId })
+    .from(leagues)
+    .where(and(eq(leagues.seasonRefId, seasonId), inArray(leagues.apiLigaId, apiLigaIds)));
   const dbIdByLigaId = new Map(leagueRows.map((l) => [l.apiLigaId, l.id]));
 
   for (const ligaId of apiLigaIds) {

@@ -48,19 +48,27 @@ async function seedClubConfig(clubId: number) {
 }
 
 describe("seedSeasonTeamEntries", () => {
-  it("creates squad rows and entries for own-club teams found in the roster", async () => {
+  it("creates squad rows and entries for own-club teams found in the roster, defaulting display_order to MAX+1", async () => {
     await seedClubConfig(100);
     const season = await seedSeason("2026/27", "upcoming");
     const league = await seedLeague(30, "U10 Kreisliga", season);
+    // A pre-existing entry in this season with no relation to the new squad,
+    // so the MAX(display_order)+1 fallback is exercised against a real value
+    // rather than defaulting from an empty table (which would trivially pass
+    // even with broken arithmetic).
+    const otherSquad = await seedTeam(8999, "Dragons U8");
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, league_id, display_order) VALUES ($1, $2, $3, 2)`,
+      [otherSquad, season, league]);
     vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9000, "Dragons U10", 100), ref(9001, "Rivals", 200)]);
 
     const result = await seedSeasonTeamEntries(season, [30]);
 
     expect(result).toEqual({ entriesSeeded: 1, rosterFailures: [] });
-    const entries = await ctx.client.query<{ league_id: number; link_source: string }>(
-      `SELECT te.league_id, te.link_source FROM team_entries te
+    const entries = await ctx.client.query<{ league_id: number; link_source: string; display_order: number }>(
+      `SELECT te.league_id, te.link_source, te.display_order FROM team_entries te
        JOIN teams t ON t.id = te.team_id WHERE t.api_team_permanent_id = 9000`);
-    expect(entries.rows).toEqual([{ league_id: league, link_source: "seeded" }]);
+    expect(entries.rows).toEqual([{ league_id: league, link_source: "seeded", display_order: 3 }]);
     // The brand-new squad row exists and is own-club:
     const squad = await ctx.client.query<{ is_own_club: boolean }>(
       `SELECT is_own_club FROM teams WHERE api_team_permanent_id = 9000`);
@@ -122,5 +130,32 @@ describe("seedSeasonTeamEntries", () => {
     expect(result.entriesSeeded).toBe(1);
     const entries = await ctx.client.query(`SELECT id FROM team_entries WHERE league_id = $1`, [okLeague]);
     expect(entries.rows).toHaveLength(1);
+  });
+
+  it("reports entriesSeeded: 0 and leaves the row untouched when re-seeding an already-correct entry", async () => {
+    await seedClubConfig(100);
+    const season = await seedSeason("2026/27", "upcoming");
+    const league = await seedLeague(37, "U18", season);
+    vi.mocked(fetchLeagueRoster).mockResolvedValue([ref(9400, "Dragons U18", 100)]);
+
+    const first = await seedSeasonTeamEntries(season, [37]);
+    expect(first.entriesSeeded).toBe(1);
+    const before = await ctx.client.query<{ id: number; updated_at: string }>(
+      `SELECT te.id, te.updated_at FROM team_entries te
+       JOIN teams t ON t.id = te.team_id WHERE t.api_team_permanent_id = 9400`);
+    expect(before.rows).toHaveLength(1);
+
+    const second = await seedSeasonTeamEntries(season, [37]);
+    expect(second).toEqual({ entriesSeeded: 0, rosterFailures: [] });
+
+    const after = await ctx.client.query<{ id: number; updated_at: string; league_id: number }>(
+      `SELECT te.id, te.updated_at, te.league_id FROM team_entries te
+       JOIN teams t ON t.id = te.team_id WHERE t.api_team_permanent_id = 9400`);
+    // Same row, same league, no re-touch — the "unchanged" branch never
+    // reaches the UPDATE, so updatedAt does not move.
+    expect(after.rows).toHaveLength(1);
+    expect(after.rows[0]!.id).toBe(before.rows[0]!.id);
+    expect(after.rows[0]!.league_id).toBe(league);
+    expect(after.rows[0]!.updated_at).toEqual(before.rows[0]!.updated_at);
   });
 });
