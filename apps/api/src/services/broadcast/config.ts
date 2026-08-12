@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../config/database";
 import { BroadcastError } from "./config.errors";
 import {
@@ -6,6 +6,7 @@ import {
   leagues,
   matches,
   teams,
+  teamEntries,
 } from "@dragons/db/schema";
 import type {
   BroadcastConfig,
@@ -160,25 +161,48 @@ export async function loadJoinedMatch(
   if (!home || !guest) return null;
 
   let league: { id: number; name: string } | null = null;
+  let seasonRefId: number | null = null;
   if (match.leagueId !== null) {
     const [lg] = await getDb()
       .select()
       .from(leagues)
       .where(eq(leagues.id, match.leagueId))
       .limit(1);
-    if (lg) league = { id: lg.id, name: lg.name };
+    if (lg) {
+      league = { id: lg.id, name: lg.name };
+      seasonRefId = lg.seasonRefId;
+    }
   }
 
+  // customName/badgeColor live on team_entries now, scoped to the match's
+  // season. No league (or no season on it) means no entries can apply.
+  const entries =
+    seasonRefId !== null
+      ? await getDb()
+          .select({
+            teamId: teamEntries.teamId,
+            customName: teamEntries.customName,
+            badgeColor: teamEntries.badgeColor,
+          })
+          .from(teamEntries)
+          .where(
+            and(inArray(teamEntries.teamId, [home.id, guest.id]), eq(teamEntries.seasonId, seasonRefId)),
+          )
+      : [];
+  const entryByTeamId = new Map(entries.map((e) => [e.teamId, e]));
+  const homeEntry = entryByTeamId.get(home.id) ?? null;
+  const guestEntry = entryByTeamId.get(guest.id) ?? null;
+
   const homeTeam: BroadcastMatchTeam = {
-    name: home.customName ?? home.name,
+    name: homeEntry?.customName ?? home.name,
     abbr: inputs.homeAbbr ?? deriveAbbr(home),
-    color: inputs.homeColorOverride ?? home.badgeColor ?? DEFAULT_HOME_COLOR,
+    color: inputs.homeColorOverride ?? homeEntry?.badgeColor ?? DEFAULT_HOME_COLOR,
     clubId: home.clubId,
   };
   const guestTeam: BroadcastMatchTeam = {
-    name: guest.customName ?? guest.name,
+    name: guestEntry?.customName ?? guest.name,
     abbr: inputs.guestAbbr ?? deriveAbbr(guest),
-    color: inputs.guestColorOverride ?? guest.badgeColor ?? DEFAULT_GUEST_COLOR,
+    color: inputs.guestColorOverride ?? guestEntry?.badgeColor ?? DEFAULT_GUEST_COLOR,
     clubId: guest.clubId,
   };
 

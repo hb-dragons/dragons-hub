@@ -51,6 +51,7 @@ import {
   matchRemoteVersions,
   matches,
   teams,
+  teamEntries,
   venueBookingMatches,
   venueBookings,
   venues,
@@ -487,6 +488,20 @@ describe("row mappers", () => {
   it("rowToListItem maps a real joined row", async () => {
     const leagueId = await seedLeague("Bezirksliga");
     const venueId = await seedVenue("Sporthalle Nord");
+    // customName/badgeColor come from the season entry, not the (stale)
+    // teams-row columns seeded by seedTeams() — OWN_A's teams row has
+    // badgeColor "#FF0000" with no customName; the entry below carries
+    // different values that must win.
+    const [ownATeam] = await ctx.db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.apiTeamPermanentId, OWN_A));
+    await ctx.db.insert(teamEntries).values({
+      teamId: ownATeam!.id,
+      seasonId: activeSeasonId,
+      customName: "Dragons Herren I",
+      badgeColor: "#00FF00",
+    });
     const matchId = await seedMatch({
       leagueId,
       venueId,
@@ -505,15 +520,17 @@ describe("row mappers", () => {
       homeTeamApiId: OWN_A,
       homeTeamName: "Dragons I",
       homeTeamNameShort: "DRG1",
-      homeTeamCustomName: null,
+      homeTeamCustomName: "Dragons Herren I",
       homeClubId: 500,
       guestTeamApiId: FOREIGN_X,
       guestTeamName: "Tigers",
       guestClubId: 600,
       homeIsOwnClub: true,
       guestIsOwnClub: false,
-      homeBadgeColor: "#FF0000",
-      guestBadgeColor: "#0000FF",
+      homeBadgeColor: "#00FF00",
+      // FOREIGN_X is not own-club — it never gets a team_entries row, so its
+      // teams-row badgeColor ("#0000FF") is no longer read at all.
+      guestBadgeColor: null,
       homeScore: 78,
       guestScore: 65,
       leagueId,

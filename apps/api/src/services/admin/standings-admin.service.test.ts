@@ -86,6 +86,22 @@ async function insertTeam(overrides: Record<string, unknown> = {}) {
   return (result.rows[0] as { id: number }).id;
 }
 
+async function insertTeamEntry(teamId: number, overrides: Record<string, unknown> = {}) {
+  const defaults = {
+    team_id: teamId,
+    season_id: activeSeasonId,
+    display_order: 0,
+  };
+  const data = { ...defaults, ...overrides };
+  const cols = Object.keys(data);
+  const vals = Object.values(data);
+  const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
+  await ctx.client.query(
+    `INSERT INTO team_entries (${cols.join(", ")}) VALUES (${placeholders})`,
+    vals,
+  );
+}
+
 async function insertStanding(leagueId: number, teamApiId: number, overrides: Record<string, unknown> = {}) {
   const defaults = {
     league_id: leagueId,
@@ -249,11 +265,14 @@ describe("getStandings", () => {
     const ligaC = await insertLeague({ api_liga_id: 3, liga_nr: 4104, name: "Liga C" });
 
     // Liga A has own team with displayOrder=2
-    await insertTeam({ api_team_permanent_id: 1000, name: "Own A", is_own_club: true, display_order: 2 });
+    const ownA = await insertTeam({ api_team_permanent_id: 1000, name: "Own A", is_own_club: true });
+    await insertTeamEntry(ownA, { display_order: 2 });
     // Liga B has own team with displayOrder=0
-    await insertTeam({ api_team_permanent_id: 2000, name: "Own B", is_own_club: true, display_order: 0, season_team_id: 2, team_competition_id: 2 });
+    const ownB = await insertTeam({ api_team_permanent_id: 2000, name: "Own B", is_own_club: true, season_team_id: 2, team_competition_id: 2 });
+    await insertTeamEntry(ownB, { display_order: 0 });
     // Liga C has own team with displayOrder=1
-    await insertTeam({ api_team_permanent_id: 3000, name: "Own C", is_own_club: true, display_order: 1, season_team_id: 3, team_competition_id: 3 });
+    const ownC = await insertTeam({ api_team_permanent_id: 3000, name: "Own C", is_own_club: true, season_team_id: 3, team_competition_id: 3 });
+    await insertTeamEntry(ownC, { display_order: 1 });
 
     await insertStanding(ligaA, 1000, { position: 1 });
     await insertStanding(ligaB, 2000, { position: 1 });
@@ -269,7 +288,8 @@ describe("getStandings", () => {
     const fooLiga = await insertLeague({ api_liga_id: 2, liga_nr: 4103, name: "Foo Liga" });
     const barLiga = await insertLeague({ api_liga_id: 3, liga_nr: 4104, name: "Bar Liga" });
 
-    await insertTeam({ api_team_permanent_id: 1000, name: "Own Team", is_own_club: true, display_order: 5 });
+    const ownTeamId = await insertTeam({ api_team_permanent_id: 1000, name: "Own Team", is_own_club: true });
+    await insertTeamEntry(ownTeamId, { display_order: 5 });
     await insertTeam({ api_team_permanent_id: 2000, name: "Foreign 1", is_own_club: false, season_team_id: 2, team_competition_id: 2 });
     await insertTeam({ api_team_permanent_id: 3000, name: "Foreign 2", is_own_club: false, season_team_id: 3, team_competition_id: 3 });
 
@@ -303,6 +323,25 @@ describe("getStandings", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]!.leagueId).toBe(activeLeague);
+  });
+
+  it("uses the team entry's displayOrder over the stale teams-row value", async () => {
+    const ligaX = await insertLeague({ api_liga_id: 1, name: "Liga X" });
+    const ligaY = await insertLeague({ api_liga_id: 2, liga_nr: 4103, name: "Liga Y" });
+
+    // teams.display_order is stale/frozen (Task 5 moved writes to entries);
+    // the entry's value must win, even though it points the opposite way.
+    const teamX = await insertTeam({ api_team_permanent_id: 1000, name: "Own X", is_own_club: true, display_order: 5 });
+    await insertTeamEntry(teamX, { display_order: 0 });
+    const teamY = await insertTeam({ api_team_permanent_id: 2000, name: "Own Y", is_own_club: true, display_order: 0, season_team_id: 2, team_competition_id: 2 });
+    await insertTeamEntry(teamY, { display_order: 5 });
+
+    await insertStanding(ligaX, 1000, { position: 1 });
+    await insertStanding(ligaY, 2000, { position: 1 });
+
+    const result = await getStandings();
+
+    expect(result.map((r) => r.leagueName)).toEqual(["Liga X", "Liga Y"]);
   });
 
   it("returns empty array when there is no active season", async () => {

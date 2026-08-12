@@ -6,8 +6,11 @@ import {
   matchLocalVersions,
   matchChanges,
   teams,
+  teamEntries,
+  leagues,
 } from "@dragons/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { NO_SEASON } from "../season-scope";
 import { OVERRIDABLE_FIELDS, LOCAL_ONLY_FIELDS } from "./match-diff.service";
 
 /**
@@ -27,16 +30,36 @@ const log = logger.child({ service: "match-admin" });
 
 async function loadTeamNames(
   tx: TransactionClient,
+  leagueId: number | null,
   homeApiId: number,
   guestApiId: number,
 ): Promise<{ home: string; guest: string }> {
+  // customName lives on team_entries now, scoped to the match's season
+  // (leagueId -> leagues.seasonRefId). No league (or no matching league row)
+  // means no season to scope to, so NO_SEASON — a value no leagues.id can ever
+  // hold — makes the entry join match nothing rather than falling back to the
+  // frozen teams.customName.
+  let seasonId = NO_SEASON;
+  if (leagueId !== null) {
+    const [league] = await tx
+      .select({ seasonRefId: leagues.seasonRefId })
+      .from(leagues)
+      .where(eq(leagues.id, leagueId))
+      .limit(1);
+    seasonId = league?.seasonRefId ?? NO_SEASON;
+  }
+
   const rows = await tx
     .select({
       apiId: teams.apiTeamPermanentId,
       name: teams.name,
-      customName: teams.customName,
+      customName: teamEntries.customName,
     })
     .from(teams)
+    .leftJoin(
+      teamEntries,
+      and(eq(teamEntries.teamId, teams.id), eq(teamEntries.seasonId, seasonId)),
+    )
     .where(inArray(teams.apiTeamPermanentId, [homeApiId, guestApiId]));
   const byId = new Map(rows.map((r) => [r.apiId, r.customName ?? r.name]));
   return {
@@ -204,7 +227,7 @@ export async function updateMatchLocal(
     const entityName = `Match #${locked.matchNo}`;
 
     const teamIds = [locked.homeTeamApiId, locked.guestTeamApiId];
-    const teamNames = await loadTeamNames(tx, locked.homeTeamApiId, locked.guestTeamApiId);
+    const teamNames = await loadTeamNames(tx, locked.leagueId, locked.homeTeamApiId, locked.guestTeamApiId);
     // Kickoff *after* this edit: `updateValues` holds what is being written,
     // `locked` the pre-edit row.
     const effectiveKickoff = (field: "kickoffDate" | "kickoffTime"): string | null => {
@@ -385,7 +408,7 @@ export async function releaseOverride(
       ),
     );
 
-    const teamNames = await loadTeamNames(tx, locked.homeTeamApiId, locked.guestTeamApiId);
+    const teamNames = await loadTeamNames(tx, locked.leagueId, locked.homeTeamApiId, locked.guestTeamApiId);
     const basePayload = {
       matchNo: locked.matchNo,
       homeTeam: teamNames.home,

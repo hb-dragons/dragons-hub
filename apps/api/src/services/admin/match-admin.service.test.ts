@@ -708,6 +708,34 @@ describe("updateMatchLocal", () => {
     expect(push!.body).toContain("15.03.2025 18:00");
   });
 
+  it("uses the season entry's customName for event payloads, not the stale teams-row value", async () => {
+    const { leagueId } = await seedBasicData();
+    // teams.custom_name holds a value frozen at backfill time; team_entries
+    // owns it now and must win.
+    await ctx.client.query(
+      `UPDATE teams SET custom_name = 'Stale Custom' WHERE api_team_permanent_id = 1000`,
+    );
+    const homeTeamRow = await ctx.client.query<{ id: number }>(
+      `SELECT id FROM teams WHERE api_team_permanent_id = 1000`,
+    );
+    await ctx.client.query(
+      `INSERT INTO team_entries (team_id, season_id, custom_name) VALUES ($1, $2, $3)`,
+      [homeTeamRow.rows[0]!.id, activeSeasonId, "Fresh Custom"],
+    );
+    const matchId = await insertMatch({ league_id: leagueId });
+
+    await updateMatchLocal(
+      matchId,
+      { isCancelled: true, changeReason: "Test" },
+      "admin@test.com",
+    );
+
+    const call = vi
+      .mocked(publishDomainEvent)
+      .mock.calls.find(([params]) => params.type === EVENT_TYPES.MATCH_CANCELLED);
+    expect(call![0].payload).toMatchObject({ homeTeam: "Fresh Custom" });
+  });
+
   it("a kickoff edit publishes the post-edit kickoff, not the old one", async () => {
     await seedBasicData();
     const matchId = await insertMatch();
